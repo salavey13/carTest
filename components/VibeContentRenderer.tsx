@@ -1,97 +1,164 @@
-// /components/VibeContentRenderer.tsx
+"use client";
+
 import React from 'react';
-import * as Fa6Icons from 'react-icons/fa6';
-import { iconNameMap } from '@/lib/iconNameMap';
-import { debugLogger as logger } from '@/lib/debugLogger';
+import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text, Comment } from 'html-react-parser';
+import Link from 'next/link';
+import * as Fa6Icons from "react-icons/fa6";
+import { debugLogger as logger } from "@/lib/debugLogger";
+import { iconNameMap } from '@/lib/iconNameMap'; 
+
+function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
+    return typeof iconName === 'string' && iconName.startsWith('Fa') && iconName in Fa6Icons;
+}
+
+// Internal function for icon syntax preprocessing
+function preprocessIconSyntaxInternal(content: string): string {
+    if (!content) return '';
+    return content.replace(
+        /::(Fa\w+)((?:\s+\w+(?:=(?:(["'])(?:(?!\3).)*\3|\w+)))*)\s*::/g,
+        (_match, iconName, attributesString) => {
+            const attrs = attributesString ? attributesString.trim() : '';
+            return `<${iconName}${attrs ? ' ' + attrs : ''}></${iconName}>`; // Changed to closing tag for parser
+        }
+    );
+}
+
+// Function to apply simple markdown conversions
+function applySimpleMarkdown(content: string): string {
+    if (!content) return '';
+    let result = content;
+    result = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    result = result.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Note: Be cautious with more complex regex to avoid unclosed tags or invalid HTML
+    return result;
+}
+
+const simplifiedParserOptions: HTMLReactParserOptions = {
+    replace: (domNode) => {
+        if (domNode.type === 'text' || domNode instanceof Text) {
+            return undefined; 
+        }
+
+        if (domNode.type === 'comment' || domNode instanceof Comment) {
+            return <></>;
+        }
+
+        if (domNode instanceof Element && domNode.name) {
+            const nodeName = domNode.name;
+            const lowerCaseName = nodeName.toLowerCase();
+            
+            const mutableAttribs = attributesToProps(domNode.attribs || {});
+            const children = domNode.children && domNode.children.length > 0
+                           ? domToReact(domNode.children, simplifiedParserOptions) 
+                           : null;
+
+            // --- Icon Handling ---
+            let iconToRender: keyof typeof Fa6Icons | undefined = undefined;
+            
+            if (isValidFa6Icon(nodeName)) { 
+                iconToRender = nodeName as keyof typeof Fa6Icons;
+            } else if (iconNameMap[lowerCaseName]) { 
+                const mappedName = iconNameMap[lowerCaseName];
+                if (isValidFa6Icon(mappedName)) {
+                    iconToRender = mappedName;
+                }
+            }
+            
+            if (iconToRender) {
+                const IconComponent = Fa6Icons[iconToRender];
+                const { className, style, title, ...restProps } = mutableAttribs; 
+                const finalProps: Record<string, any> = {
+                    ...restProps, 
+                    className: `${className || ''} inline align-baseline mx-px`.trim(),
+                    style: style,
+                    title: title 
+                };
+                return React.createElement(IconComponent, finalProps); // Icons are self-closing
+            } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) {
+                logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
+                return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?] Неизвестная иконка <${nodeName}>`}</span>;
+            }
+
+            // --- Link Handling ---
+            if (lowerCaseName === 'a') {
+                const hrefVal = mutableAttribs.href;
+                const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
+                
+                let linkClassName = mutableAttribs.className || '';
+                mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); 
+
+                if (isInternal && !mutableAttribs.target && hrefVal) {
+                    return <Link {...mutableAttribs} href={hrefVal as string}>{children}</Link>;
+                }
+                return React.createElement('a', mutableAttribs, children);
+            }
+            
+            // --- Standard HTML Elements Styling & Passing Children ---
+            if (lowerCaseName === 'strong') {
+                mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim();
+            }
+            if (lowerCaseName === 'em') {
+                mutableAttribs.className = `${mutableAttribs.className || ''} italic text-brand-cyan`.trim();
+            }
+            if (lowerCaseName === 'code' && domNode.parent?.name !== 'pre') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted px-1 py-0.5 rounded text-sm font-mono text-accent-foreground`.trim();
+            }
+            if (lowerCaseName === 'pre') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar`.trim();
+            }
+            if (lowerCaseName === 'blockquote') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} border-l-4 border-brand-purple pl-4 italic text-muted-foreground my-4`.trim();
+            }
+            if (lowerCaseName === 'ul') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} list-disc list-inside space-y-1 my-2`.trim();
+            }
+            if (lowerCaseName === 'ol') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} list-decimal list-inside space-y-1 my-2`.trim();
+            }
+            if (lowerCaseName === 'li') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} my-0.5`.trim();
+            }
+            if (lowerCaseName === 'hr') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} border-border my-4`.trim();
+            }
+
+            return React.createElement(nodeName, mutableAttribs, children);
+        }
+        
+        return undefined; 
+    },
+};
 
 interface VibeContentRendererProps {
   content: string | null | undefined;
-  debugContext?: string;
+  className?: string; 
 }
 
-const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debugContext = "VCR" }) => {
-  if (typeof content !== 'string' || !content) {
-    return null;
-  }
-
-  const renderableParts: (JSX.Element | string)[] = [];
-  let lastIndex = 0;
-
-  const iconRegex = /::([A-Za-z][a-zA-Z0-9]*)((?:\s+[^:]*)*)::/g;
-  // match[1] = alias (e.g., "fadownload" or "FaBeer")
-  // match[2] = raw attributes string (e.g., " className='text-neon-lime'" or "" or " title='Hi'")
-  
-  let match;
-  while ((match = iconRegex.exec(content)) !== null) {
-    const plainText = content.substring(lastIndex, match.index);
-    if (plainText) {
-      renderableParts.push(plainText);
+export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className }) => {
+    if (typeof content !== 'string' || !content.trim()) {
+        return null;
     }
-
-    const fullMatch = match[0];
-    const iconAlias = match[1].toLowerCase(); 
-    const rawAttributesString = (match[2] || ""); 
-
-    logger.debug(`[${debugContext}] Matched icon tag: ${fullMatch} | Alias: ${iconAlias} | Raw Attributes: '${rawAttributesString}'`);
-
-    const IconComponent = iconNameMap[iconAlias] ? Fa6Icons[iconNameMap[iconAlias] as keyof typeof Fa6Icons] : null;
-
-    if (IconComponent) {
-      const props: any = {};
-      const trimmedAttributesString = rawAttributesString.trim(); 
-
-      if (trimmedAttributesString) {
-        const attrRegex = /(className|title|style)\s*=\s*(?:'([^']*)'|"([^"]*)"|({[^}]*?}))/g;
-        let attrMatch;
-        while((attrMatch = attrRegex.exec(trimmedAttributesString)) !== null) {
-          const key = attrMatch[1];
-          const singleQuotedValue = attrMatch[2];
-          const doubleQuotedValue = attrMatch[3];
-          const objectValue = attrMatch[4]; 
-
-          if (key === 'style' && objectValue) {
-            try {
-              const styleStringForJson = objectValue
-                .replace(/(\w+)\s*:/g, '"$1":') 
-                .replace(/'/g, '"'); 
-              const styleObject = JSON.parse(styleStringForJson);
-              props.style = styleObject;
-              logger.debug(`[${debugContext}] Parsed style for ${iconAlias}:`, styleObject);
-            } catch (e) {
-              logger.error(`[${debugContext}] Failed to parse style attribute for ${iconAlias}: ${objectValue}`, e);
-            }
-          } else {
-            props[key] = singleQuotedValue || doubleQuotedValue || objectValue; 
-            logger.debug(`[${debugContext}] Parsed prop for ${iconAlias}: ${key} = ${props[key]}`);
-          }
-        }
-      }
+    try {
+      let processedContent = String(content);
+      processedContent = applySimpleMarkdown(processedContent);
+      processedContent = preprocessIconSyntaxInternal(processedContent);
       
-      const key = `icon-${match.index}-${iconAlias}`;
-      renderableParts.push(React.createElement(IconComponent, { key, ...props }));
-      logger.debug(`[${debugContext}] Rendered <${iconNameMap[iconAlias]}> with props:`, props);
+      const parsedContent = parse(processedContent, simplifiedParserOptions); 
+      
+      if (className) {
+        return <div className={className}>{parsedContent}</div>;
+      }
+      return <>{parsedContent}</>;
 
-    } else {
-      logger.warn(`[${debugContext}] Icon alias "${iconAlias}" not found in iconNameMap or Fa6Icons. Full tag: ${fullMatch}`);
-      renderableParts.push(`[ICON ERR: ${iconAlias}]`);
+    } catch (error) {
+      logger.error("[VCR Root] Parse Error:", error, "Input for parsing:", content, "Processed HTML:", preprocessIconSyntaxInternal(applySimpleMarkdown(String(content))));
+      const ErrorSpan = () => <span className="text-red-500">[Content Parse Error]</span>;
+      if (className) {
+        return <div className={className}><ErrorSpan /></div>;
+      }
+      return <ErrorSpan />;
     }
-    lastIndex = match.index + match[0].length;
-  }
+});
 
-  const remainingText = content.substring(lastIndex);
-  if (remainingText) {
-    renderableParts.push(remainingText);
-  }
-  
-  if (renderableParts.length === 0 && content.trim() !== "") {
-      logger.warn(`[${debugContext}] No renderable parts produced for non-empty content: "${content}". This might indicate a regex issue or no icons to parse.`);
-      return <>{content}</>; 
-  }
-  if (renderableParts.length === 1 && typeof renderableParts[0] === 'string' && renderableParts[0] === content) {
-     logger.debug(`[${debugContext}] Content "${content}" is plain text, no icons found.`);
-  }
-
-  return <>{renderableParts}</>;
-};
-
+VibeContentRenderer.displayName = 'VibeContentRenderer';
 export default VibeContentRenderer;
