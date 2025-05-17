@@ -33,6 +33,19 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
   const showDebugOverlay = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true';
 
+  // Refs for state values to be used in RAF callbacks
+  const isUnderScrollControlRef = useRef(isUnderScrollControl);
+  const isVisibleRef = useRef(isVisible);
+
+  useEffect(() => {
+    isUnderScrollControlRef.current = isUnderScrollControl;
+  }, [isUnderScrollControl]);
+
+  useEffect(() => {
+    isVisibleRef.current = isVisible;
+  }, [isVisible]);
+
+
   useEffect(() => {
     logger.log(`[ScrollVideo EASTER_EGG] Player for ${src.split('/').pop()} initialized. Get ready to VIBE with the scroll! ::FaSatelliteDish::`);
   }, [src]);
@@ -40,12 +53,13 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
   const handleIntersection = useCallback((entries: IntersectionObserverEntry[]) => {
     entries.forEach(entry => {
       const newVisibility = entry.isIntersecting;
-      if (isVisible !== newVisibility) {
-        logger.debug(`[ScrollVideo] Video ${src.split('/').pop()} visibility changed to: ${newVisibility}`);
+      // Check ref here to avoid race condition with state update
+      if (isVisibleRef.current !== newVisibility) { 
+        logger.debug(`[ScrollVideo] Video ${src.split('/').pop()} visibility changed via IntersectionObserver to: ${newVisibility}`);
         setIsVisible(newVisibility);
       }
     });
-  }, [src, isVisible]);
+  }, [src]); // isVisibleRef is not needed as dependency since it's a ref
 
   useEffect(() => {
     const observer = new IntersectionObserver(handleIntersection, {
@@ -86,17 +100,16 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
     }
   }, [src]);
 
-  const updateVideoPlayback = useCallback(() => {
+  const updateVideoPlayback = useCallback((): boolean => { // Returns if scroll control should be active
     const video = videoRef.current;
     const container = containerRef.current;
 
     if (!video || !container || videoDuration === null || videoDuration === 0) {
-      if (isUnderScrollControl) setIsUnderScrollControl(false);
       if (showDebugOverlay) {
         setDebugProgress(0);
         setDebugCurrentTime(0);
       }
-      return;
+      return false; // Not under scroll control
     }
 
     const rect = container.getBoundingClientRect();
@@ -111,7 +124,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
     const fitsEntirelyInViewport = videoTop >= 0 && videoBottom <= viewportHeight;
 
-    if (fitsEntirelyInViewport && isVisible) {
+    if (fitsEntirelyInViewport && isVisibleRef.current) { // Use ref for isVisible
         newActiveScrollControl = true;
         const scrollableDistanceInViewport = viewportHeight - videoHeight;
         
@@ -129,39 +142,40 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
             setDebugProgress(currentProgress);
             setDebugCurrentTime(newTime);
         }
-
-    } else {
-      newActiveScrollControl = false;
+        
+        if (Math.abs(newTime - video.currentTime) > 0.035) { 
+          video.currentTime = newTime;
+        }
     }
-
-    if (newActiveScrollControl !== isUnderScrollControl) {
-      setIsUnderScrollControl(newActiveScrollControl);
-      logger.log(`[ScrollVideo EASTER_EGG] ${src.split('/').pop()} Scroll Control State: ${newActiveScrollControl ? 'ENGAGED ::FaRobot::' : 'DISENGAGED (Looping Active) ::FaUndo::'}`);
-    }
-
-    if (newActiveScrollControl) {
-      if (Math.abs(newTime - video.currentTime) > 0.035) { 
-        video.currentTime = newTime;
-      }
-    }
-  }, [videoDuration, isVisible, isUnderScrollControl, src, showDebugOverlay]);
+    
+    return newActiveScrollControl;
+  }, [videoDuration, src, showDebugOverlay]); // Removed isVisible and isUnderScrollControl, using refs instead
 
   const masterScrollHandler = useCallback(() => {
     const now = performance.now();
-    if (now - lastRAFTimeRef.current < 30) { 
+    if (now - lastRAFTimeRef.current < 16) { // approx 60fps
       scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
       return;
     }
     lastRAFTimeRef.current = now;
-    updateVideoPlayback();
+    
+    const shouldBeUnderScrollControl = updateVideoPlayback();
+    if (shouldBeUnderScrollControl !== isUnderScrollControlRef.current) {
+      logger.log(`[ScrollVideo EASTER_EGG] ${src.split('/').pop()} Scroll Control State CHANGED via masterScrollHandler to: ${shouldBeUnderScrollControl ? 'ENGAGED ::FaRobot::' : 'DISENGAGED (Looping Active) ::FaUndo::'}`);
+      setIsUnderScrollControl(shouldBeUnderScrollControl);
+    }
+
     scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
-  }, [updateVideoPlayback]);
+  }, [updateVideoPlayback, src]); // updateVideoPlayback is stable
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || videoDuration === null) return;
 
-    if (isUnderScrollControl && isVisible) {
+    const localIsVisible = isVisibleRef.current;
+    const localIsUnderScrollControl = isUnderScrollControlRef.current;
+
+    if (localIsUnderScrollControl && localIsVisible) {
       video.loop = false;
       if (showDebugOverlay) setDebugIsLooping(false);
       if (!video.paused && video.duration > 0) {
@@ -169,12 +183,13 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
       }
       logger.debug(`[ScrollVideo] ${src.split('/').pop()} Scroll control ACTIVE. Attaching RAF.`);
       if (scrollRAFRef.current) cancelAnimationFrame(scrollRAFRef.current);
-      updateVideoPlayback(); 
+      // updateVideoPlayback(); // Initial call to set time based on current scroll
       scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
+      
       window.addEventListener('scroll', masterScrollHandler, { passive: true });
       window.addEventListener('resize', masterScrollHandler, { passive: true });
       return () => {
-        logger.debug(`[ScrollVideo] ${src.split('/').pop()} Scroll control ended or video hidden. Removing RAF & listeners.`);
+        logger.debug(`[ScrollVideo] ${src.split('/').pop()} Cleanup for SCROLL mode. Removing RAF & listeners.`);
         window.removeEventListener('scroll', masterScrollHandler);
         window.removeEventListener('resize', masterScrollHandler);
         if (scrollRAFRef.current) {
@@ -182,27 +197,46 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
           scrollRAFRef.current = null;
         }
       };
-    } else {
-      logger.debug(`[ScrollVideo] ${src.split('/').pop()} LOOPING (isUnderScrollControl: ${isUnderScrollControl}, isVisible: ${isVisible}).`);
-      if (video.duration > 0) { 
-          if (video.currentTime !== 0 && !video.seeking) video.currentTime = 0; 
+    } else { // Not under scroll control OR not visible
+      logger.debug(`[ScrollVideo] ${src.split('/').pop()} Setting up for LOOPING (isUnderScrollControl: ${localIsUnderScrollControl}, isVisible: ${localIsVisible}).`);
+      if (video.duration > 0 && !video.seeking && video.currentTime !== 0) {
+         // If it's visible but not scroll controlled, it should loop from start.
+         // If not visible, it should be paused, currentTime reset is fine.
+        video.currentTime = 0; 
       }
       video.loop = true;
       if (showDebugOverlay) setDebugIsLooping(true);
-      if (video.paused && isVisible) { 
-        video.play().catch(error => {
-            logger.warn(`[ScrollVideo] ${src.split('/').pop()} Autoplay for loop failed:`, error.message);
-        });
-      } else if (!isVisible && !video.paused) { 
-        video.pause();
+
+      if (localIsVisible) {
+        if (video.paused) {
+            video.play().catch(error => {
+                logger.warn(`[ScrollVideo] ${src.split('/').pop()} Autoplay for loop failed:`, error.message);
+            });
+        }
+      } else { // Not visible
+        if (!video.paused) {
+            video.pause();
+        }
       }
       
-      if (scrollRAFRef.current) {
+      if (scrollRAFRef.current) { // Ensure RAF is cancelled if we switch to looping
         cancelAnimationFrame(scrollRAFRef.current);
         scrollRAFRef.current = null;
+        logger.debug(`[ScrollVideo] ${src.split('/').pop()} Cancelled RAF because switched to LOOPING/NOT_VISIBLE.`);
       }
+       return () => {
+         logger.debug(`[ScrollVideo] ${src.split('/').pop()} Cleanup for LOOPING/NOT_VISIBLE mode.`);
+         // Ensure listeners are removed if they were somehow attached by a previous state
+         window.removeEventListener('scroll', masterScrollHandler);
+         window.removeEventListener('resize', masterScrollHandler);
+         if (scrollRAFRef.current) {
+          cancelAnimationFrame(scrollRAFRef.current);
+          scrollRAFRef.current = null;
+        }
+       }
     }
-  }, [isUnderScrollControl, isVisible, videoDuration, masterScrollHandler, src, updateVideoPlayback, showDebugOverlay]);
+  }, [isUnderScrollControl, isVisible, videoDuration, masterScrollHandler, src, showDebugOverlay]);
+
 
   return (
     <div ref={containerRef} className={cn('w-full relative', className)}>
@@ -213,6 +247,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         preload="metadata"
         playsInline
         muted
+        loop // Default to loop, JS will manage it
       >
         Your browser does not support the video tag.
       </video>
@@ -227,9 +262,9 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
           <div>ScrollControlled: {isUnderScrollControl ? 'YES' : 'NO'}</div>
           <div>Looping: {debugIsLooping ? 'YES' : 'NO'}</div>
           <div>Visible: {isVisible ? 'YES' : 'NO'}</div>
-          <div>Progress: {debugProgress.toFixed(2)}</div>
-          <div>Calc Time: {debugCurrentTime.toFixed(2)}s</div>
-          <div>Actual Time: {videoRef.current?.currentTime?.toFixed(2) ?? 'N/A'}s</div>
+          <div>Progress: {debugProgress.toFixed(3)}</div>
+          <div>Calc Time: {debugCurrentTime.toFixed(3)}s</div>
+          <div>Actual Time: {videoRef.current?.currentTime?.toFixed(3) ?? 'N/A'}s</div>
           <div>Duration: {videoDuration?.toFixed(2) ?? 'N/A'}s</div>
         </div>
       )}
