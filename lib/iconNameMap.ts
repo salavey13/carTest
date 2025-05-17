@@ -130,5 +130,6 @@ facodebranch: "FaCodeBranch",
   fapuzzlepiece: "FaPuzzlePiece",
   falayergroup: "FaLayerGroup",
   fagraduationcap: "FaGraduationCap",
+fauplong: "FaUpLong",
   faheartbeat: "FaHeartbeat",
 };
