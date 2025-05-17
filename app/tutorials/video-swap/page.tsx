@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
+import TutorialLoader from '../TutorialLoader'; // Import the loader
 
 const videoSwapTutorialTranslations = {
   ru: {
@@ -76,7 +77,7 @@ const videoSwapTutorialTranslations = {
         id: 3,
         title: "ШАГ 3: СТУДИЯ! URL_СТАРЫЙ -> URL_НОВЫЙ -> GO!",
         description: "SUPERVIBE Studio (да, та же, что для картинок). Старый URL, новый URL. Кнопка 'ВПЕРЕД'. AI не тупой, разберется.",
-        icon: "FaVideo", // Re-using FaVideo for emphasis
+        icon: "FaVideo", 
         color: "brand-purple",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4" 
       },
@@ -106,7 +107,7 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-orange": { text: "text-brand-orange", border: "border-brand-orange/50", shadow: "shadow-brand-orange/40" },
 };
 
-export default function VideoSwapTutorialPage() {
+function VideoSwapTutorialContent() {
   const searchParams = useSearchParams();
   const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
@@ -222,5 +223,13 @@ export default function VideoSwapTutorialPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function VideoSwapTutorialPage() {
+  return (
+    <Suspense fallback={<TutorialLoader />}>
+      <VideoSwapTutorialContent />
+    </Suspense>
   );
 }

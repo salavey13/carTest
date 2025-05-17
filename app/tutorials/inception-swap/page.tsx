@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
-// import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer'; // Not used for this conceptual tutorial
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
+import TutorialLoader from '../TutorialLoader'; // Import the loader
 
 const inceptionSwapTutorialTranslations = {
   ru: {
@@ -44,8 +45,8 @@ const inceptionSwapTutorialTranslations = {
     nextLevelTitle: "::FaProjectDiagram:: Миссия Выполнена, Архитектор!",
     nextLevelText: "Ты постиг Дзен разработки на oneSitePls. Теперь ты видишь код. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> — твой верстак, а идеи — твои чертежи. Строй будущее!",
     tryLiveButton: "::FaTools:: В SUPERVIBE Studio",
-    toggleButtonToWtf: "::FaBroadcastTower:: Показать WTF-Реальность",
-    toggleButtonToNormal: "::FaBookOpen:: Вернуться к Учебнику",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
     pageTitle: "::FaBomb:: ВСЁ ЕСТЬ КОД! WTF?!",
@@ -83,8 +84,8 @@ const inceptionSwapTutorialTranslations = {
     nextLevelTitle: "::FaSatelliteDish:: ТЫ ПОДКЛЮЧЕН К ИСТОЧНИКУ!",
     nextLevelText: "РЕАЛЬНОСТЬ – ЭТО КОД. ТЫ – ЕГО АРХИТЕКТОР. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> – ТВОЯ КИБЕРДЕКА. ВРЕМЯ ЛОМАТЬ СИСТЕМУ!",
     tryLiveButton: "::FaLaptopCode:: В БОЙ!",
-    toggleButtonToWtf: "::FaBroadcastTower:: Показать WTF-Реальность",
-    toggleButtonToNormal: "::FaBookOpen:: Вернуться к Учебнику",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   }
 };
 
@@ -96,15 +97,25 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-lime": { text: "text-neon-lime", border: "border-neon-lime/50", shadow: "shadow-neon-lime/40" }, 
 };
 
-export default function InceptionSwapTutorialPage() {
-  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>('ru');
+function InceptionSwapTutorialContent() {
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+  
   const t = inceptionSwapTutorialTranslations[currentMode];
 
   const toggleMode = () => {
     setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
   };
 
-  const stepsToRender = currentMode === 'wtf' ? inceptionSwapTutorialTranslations.wtf.steps : inceptionSwapTutorialTranslations.ru.steps;
+  useEffect(() => {
+    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (newMode !== currentMode) {
+      setCurrentMode(newMode);
+    }
+  }, [searchParams, currentMode]);
+
+  const stepsToRender = t.steps;
   const pageMainColor = "brand-lime"; 
 
   return (
@@ -133,8 +144,8 @@ export default function InceptionSwapTutorialPage() {
             onClick={toggleMode} 
             variant="outline" 
             className={cn(
-              "mt-6 bg-card/50 hover:bg-brand-pink/10 transition-all duration-200 text-sm px-4 py-2",
-              "border-brand-pink/50 text-brand-pink/90 hover:text-brand-pink" // WTF button color
+              "mt-6 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
+              "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink" 
             )}
           >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
@@ -187,5 +198,14 @@ export default function InceptionSwapTutorialPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+
+export default function InceptionSwapTutorialPage() {
+  return (
+    <Suspense fallback={<TutorialLoader />}>
+      <InceptionSwapTutorialContent />
+    </Suspense>
   );
 }

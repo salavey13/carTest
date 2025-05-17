@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
+import TutorialLoader from '../TutorialLoader'; // Import the loader
 
 const iconSwapTutorialTranslations = {
   ru: {
@@ -67,7 +68,7 @@ const iconSwapTutorialTranslations = {
         id: 1,
         title: "ШАГ 1: СКОПИПАСТЬ ИМЯ БАГА",
         description: "Видишь `[?] Неизвестная иконка <СРАТОЕ_ИМЯ>`? Копируй `<СРАТОЕ_ИМЯ>`! ВСЁ!",
-        icon: "FaRegCopy", // Changed icon
+        icon: "FaRegCopy", 
         color: "brand-orange",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step1_find_icon.mp4"
       },
@@ -75,7 +76,7 @@ const iconSwapTutorialTranslations = {
         id: 2,
         title: "ШАГ 2: КНОПКА ЧАТА -> CTRL+V",
         description: "Слева внизу КРУГЛАЯ ФИГНЯ ::FaCommentDots::. Жми. В поле вставь `<СРАТОЕ_ИМЯ>`. Done.",
-        icon: "FaPaste", // Changed icon
+        icon: "FaPaste", 
         color: "brand-pink",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step2_sticky_chat.mp4"
       },
@@ -83,7 +84,7 @@ const iconSwapTutorialTranslations = {
         id: 3,
         title: "ШАГ 3: МАГИЯ STICKY CHAT, BLYAT!",
         description: "Чат предложит 'Заменить Иконку'. Жми! \n1. Ссылка на FontAwesome – тыкай, ищи НОРМ ИКОНКУ, копируй её ПОЛНОЕ ИМЯ (типа `FaBeer`).\n2. Вставь новое имя в поле. \n3. Жми 'OK'. Profit!",
-        icon: "FaMagic", // Changed icon
+        icon: "FaMagic", 
         color: "brand-purple",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step3_modal_magic.mp4"
       },
@@ -91,7 +92,7 @@ const iconSwapTutorialTranslations = {
         id: 4,
         title: "ШАГ 4: GG WP! ИКОНКА ЦЕЛА!",
         description: "Автоматика всё сделает: PR, мердж. Обнови страницу – иконка ИДЕАЛЬНА! Ты – боженька UX!",
-        icon: "FaCheckCircle", // Changed icon
+        icon: "FaCheckCircle", 
         color: "brand-green",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step4_profit.mp4"
       }
@@ -112,7 +113,7 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-orange": { text: "text-brand-orange", border: "border-brand-orange/50", shadow: "shadow-brand-orange/40" },
 };
 
-export default function IconSwapTutorialPage() {
+function IconSwapTutorialContent() {
   const searchParams = useSearchParams();
   const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
@@ -130,8 +131,7 @@ export default function IconSwapTutorialPage() {
     }
   }, [searchParams, currentMode]);
 
-
-  const stepsToRender = t.steps; // Already references currentMode
+  const stepsToRender = t.steps;
   const pageMainColor = "brand-purple"; 
 
   return (
@@ -227,5 +227,13 @@ export default function IconSwapTutorialPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function IconSwapTutorialPage() {
+  return (
+    <Suspense fallback={<TutorialLoader />}>
+      <IconSwapTutorialContent />
+    </Suspense>
   );
 }
