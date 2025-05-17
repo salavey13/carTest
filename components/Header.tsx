@@ -36,6 +36,7 @@ const allPages: PageInfo[] = [
   { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "FaExchangeAlt", group: "Tutorial Quests", isImportant: true, color: "green", isHot: true },
   { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "Tutorial Quests", isImportant: true, color: "red", isHot: true },
   { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "Tutorial Quests", isImportant: true, color: "cyan", isHot: true },
+  { path: "/tutorials/inception-swap", name: "Inception Swap Mission", icon: "FaInfinity", group: "Tutorial Quests", isImportant: true, color: "lime", isHot: true },
 
   // CyberFitness
   { path: "/profile", name: "Agent Profile", icon: "FaCircleUser", group: "CyberFitness", color: "pink" },
@@ -89,7 +90,7 @@ const groupIcons: Record<string, string> = {
 const translations: Record<string, Record<string, string>> = {
   en: {
     "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
-    "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission", "Video Render Mission": "Video Render Mission",
+    "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission", "Video Render Mission": "Video Render Mission", "Inception Swap Mission": "Inception Swap Mission",
     "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
     "Vibe Schematics": "Vibe Schematics", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
@@ -100,7 +101,7 @@ const translations: Record<string, Record<string, string>> = {
   },
   ru: {
     "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
-    "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок", "Video Render Mission": "Миссия: Видео-Рендер",
+    "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок", "Video Render Mission": "Миссия: Видео-Рендер", "Inception Swap Mission": "Миссия: Inception Swap",
     "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
     "Vibe Schematics": "Схемы Вайба", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
@@ -221,6 +222,7 @@ export default function Header() {
 
   const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
     if (!icon) return null;
+    // Directly use PascalCase icon name from allPages
     return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
   };
 
