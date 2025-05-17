@@ -2,6 +2,7 @@
 import { supabaseAdmin } from './supabase';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import type { UserProfile } from '@/contexts/AppContext';
+import type * as Fa6Icons from 'react-icons/fa6'; // Import Fa6Icons type
 
 export const TOKEN_ESTIMATION_FACTOR = 4; // Chars per token
 
@@ -24,8 +25,7 @@ export const PERKS_BY_LEVEL: Record<number, Perk[]> = {
   8: [ { id: "perk_advanced_ai_refactoring", name: "Продвинутый Рефакторинг с AI", description: "Использование AI для сложных задач рефакторинга кода.", levelRequired: 8 } ],
   9: [ { id: "perk_custom_ai_instructions_basic", name: "Кастомные Инструкции для AI (Базовый)", description: "Возможность задавать собственные системные промпты или инструкции для AI.", levelRequired: 9 } ],
   10: [ { id: "perk_deploy_own_cybervibe_guide", name: "Гайд по Развертыванию Собственного CyberVibe", description: "Доступ к документации и инструкциям по настройке и развертыванию собственного экземпляра CyberVibe.", levelRequired: 10 }, { id: "perk_bot_token_management_placeholder", name: "Управление Токенами Ботов (Заглушка)", description: "Интерфейс или инструкции для управления токенами API для ботов (например, Telegram).", levelRequired: 10 }, { id: "perk_xtr_automation_docs", name: "Документация по Созданию Собственных XTR Автоматизаций", description: "Доступ к гайдам по созданию пользовательских XTR-автоматизаций.", levelRequired: 10 }, ],
-};
-
+}; // THIS WAS THE MISSING CLOSING BRACE AND SEMICOLON
 
 export interface Achievement {
   id: string;
@@ -43,8 +43,8 @@ export const QUEST_IDS = {
     FIRST_FETCH: "first_fetch_completed",
     FIRST_PARSE: "first_parse_completed",
     FIRST_PR: "first_pr_created",
-    IMAGE_SWAP_MISSION: "image-swap-mission", // Example if you have this
-    ICON_SWAP_MISSION: "icon-swap-mission", // Example if you have this
+    IMAGE_SWAP_MISSION: "image-swap-mission", 
+    ICON_SWAP_MISSION: "icon-swap-mission", 
 };
 
 
@@ -464,9 +464,9 @@ export async function checkAndUnlockFeatureAchievement(
 export async function completeQuestAndUpdateProfile(
   userId: string,
   questId: string,
-  kiloVibesAward: number,
-  levelToPotentiallyUnlock?: number, // For quests that might also trigger a level up directly
-  perksToAward?: Perk[] | string[] // Perks awarded by this quest specifically
+  kiloVibesAward: number, // This parameter is kept for compatibility but quest.kiloVibesAward is preferred
+  levelToPotentiallyUnlock?: number, 
+  perksToAward?: Perk[] | string[] 
 ): Promise<{success: boolean, error?: string, data?: UserProfile['metadata'], newAchievements?: Achievement[]}> {
   logger.log(`[CyberFitness CompleteQuest ENTRY] User_id: ${userId}, QuestId: ${questId}`);
   const profile = await fetchUserProfile(userId);
@@ -475,7 +475,7 @@ export async function completeQuestAndUpdateProfile(
   const quest = ALL_ACHIEVEMENTS.find(q => q.id === questId && q.isQuest);
   if (!quest) {
     logger.warn(`[CyberFitness CompleteQuest] Quest with ID '${questId}' not found or is not a quest. Aborting.`);
-    return { success: false, error: `Quest ${questId} not found.` };
+    return { success: false, error: `Quest ${questId} not found.`, newAchievements: [] };
   }
   
   if (profile.metadata.cyberFitness.completedQuests.includes(questId)) {
@@ -525,7 +525,7 @@ export async function completeQuestAndUpdateProfile(
   const updateResult = await updateUserCyberFitnessProfile(userId, updates, [questId]);
 
   if (!updateResult.success) {
-    return { success: false, error: updateResult.error || "Failed to update profile after quest completion." };
+    return { success: false, error: updateResult.error || "Failed to update profile after quest completion.", newAchievements: [] };
   }
   logger.log(`[CyberFitness CompleteQuest EXIT] Quest '${questId}' completed for user ${userId}.`);
   return { success: true, data: updateResult.data ? { ...profile.metadata, cyberFitness: updateResult.data } : profile.metadata, newAchievements: [quest] };
@@ -549,12 +549,12 @@ export async function checkAndUnlockAchievement(
     const achievement = ALL_ACHIEVEMENTS.find(ach => ach.id === achievementId);
     if (!achievement) {
         logger.warn(`[CyberFitness CheckUnlockAchievement] Achievement with ID '${achievementId}' not found. Aborting.`);
-        return { success: false, error: `Achievement ${achievementId} not found.` };
+        return { success: false, error: `Achievement ${achievementId} not found.`, newAchievements: [] };
     }
     
     if (achievement.isQuest) { // Quests should be completed via completeQuestAndUpdateProfile
         logger.warn(`[CyberFitness CheckUnlockAchievement] Attempted to unlock quest '${achievementId}' via generic achievement check. Use completeQuestAndUpdateProfile instead.`);
-        return { success: false, error: `Cannot unlock quest '${achievementId}' this way.` };
+        return { success: false, error: `Cannot unlock quest '${achievementId}' this way.`, newAchievements: [] };
     }
 
     if (achievement.checkCondition(profile, value)) {
