@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react"; 
-import { Suspense, useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useCallback } from 'react'; // Added useCallback
 import { usePathname } from 'next/navigation';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -40,28 +40,41 @@ function AppInitializers() {
     enabled: !!(isAuthenticated && dbUser?.user_id), 
   });
 
-  useEffect(() => {
-    const handleScroll = async () => {
-      if (window.scrollY > 1000 && isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
-        scrollAchievementUnlockedRef.current = true; // Prevent multiple triggers
-        logger.info(`[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`);
+  const handleScrollForAchievement = useCallback(async () => {
+    if (window.scrollY > 1000 && isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
+      scrollAchievementUnlockedRef.current = true; 
+      logger.info(`[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`);
+      try {
         const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'scrolled_like_a_maniac');
         newAchievements?.forEach(ach => {
             addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
             logger.info(`[ClientLayout ScrollAch] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
         });
-        window.removeEventListener('scroll', handleScroll); // Remove listener after unlocking
+      } catch (error) {
+        logger.error("[ClientLayout ScrollAch] Error unlocking achievement:", error);
+        scrollAchievementUnlockedRef.current = false; // Allow retry if error
       }
-    };
+      // Listener is removed in the useEffect cleanup or if dependencies change causing re-run
+    }
+  }, [isAuthenticated, dbUser, addToast]); // addToast is stable, dbUser and isAuthenticated are key
+
+  useEffect(() => {
+    const currentScrollHandler = handleScrollForAchievement; // Capture current handler
 
     if (isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
-      window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('scroll', currentScrollHandler, { passive: true });
+      logger.debug(`[ClientLayout ScrollAch] Added scroll listener for user ${dbUser.user_id}.`);
+    } else {
+      // Ensure listener is removed if conditions are not met (e.g., logout) or achievement unlocked
+      window.removeEventListener('scroll', currentScrollHandler);
+      logger.debug(`[ClientLayout ScrollAch] Conditions not met or achievement unlocked. Ensured scroll listener is removed for user ${dbUser?.user_id}.`);
     }
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', currentScrollHandler);
+      logger.debug(`[ClientLayout ScrollAch] Cleaned up scroll listener for user ${dbUser?.user_id}.`);
     };
-  }, [isAuthenticated, dbUser, addToast]);
+  }, [isAuthenticated, dbUser, handleScrollForAchievement]); // handleScrollForAchievement will change if its deps change
   
   return null; 
 }
