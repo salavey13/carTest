@@ -12,7 +12,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { QUEST_ORDER, fetchUserCyberFitnessProfile, isQuestUnlocked } from '@/hooks/cyberFitnessSupabase'; 
 import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
-import * as Fa6Icons from "react-icons/fa6"; // Import all Fa6Icons
+import * as Fa6Icons from "react-icons/fa6"; 
 import { iconNameMap } from "@/lib/iconNameMap";
 
 
@@ -38,7 +38,7 @@ const allPages: PageInfo[] = [
   { path: "/game-plan", name: "Game Plan", icon: "FaFilm", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
-  // GTA Vibe Missions (Tutorial Quests)
+  // GTA Vibe Missions
   { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "faexchangealt", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" }, 
   { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "GTA Vibe Missions", isImportant: true, color: "red", isHot: true, questId: "icon-swap-mission" },
   { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "GTA Vibe Missions", isImportant: true, color: "cyan", isHot: true, questId: "video-swap-mission" },
@@ -86,10 +86,10 @@ const allPages: PageInfo[] = [
 ];
 
 const groupOrder = ["Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
-// groupIcons values are now direct Fa6Icons keys (PascalCase)
+
 const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
     "Core Vibe": "FaBolt",
-    "GTA Vibe Missions": "FaGamepad",
+    "GTA Vibe Missions": "FaGamepad", 
     "CyberFitness": "FaDumbbell", 
     "Content & Tools": "FaPuzzlePiece",
     "Misc": "FaLayerGroup", 
@@ -340,20 +340,21 @@ export default function Header() {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null; 
                   
-                  const groupIconKey = groupIcons[groupName];
+                  const groupIconKey = groupIcons[groupName] as keyof typeof Fa6Icons | undefined;
                   const IconComponent = groupIconKey ? Fa6Icons[groupIconKey] : null;
+                  const isGtaVibeGroup = groupName === "GTA Vibe Missions";
 
                   return (
                     <div key={groupName}>
                        <h3 className={cn(
                         "text-xl font-orbitron mb-3 flex items-center gap-x-2.5 justify-center py-2",
-                        "gta-vibe-text-effect" 
+                        "gta-vibe-text-effect" // Apply to all group titles
                         )}>
                         {IconComponent && (
-                          <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses[groupName === "GTA Vibe Missions" ? 'pink' : 'purple']?.text || 'text-brand-cyan')} />
+                          <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : 'purple']?.text || 'text-brand-cyan')} />
                         )}
                         <span>{t(groupName)}</span>
-                        {IconComponent && groupName === "GTA Vibe Missions" && ( // Show second icon for GTA Vibe
+                        {IconComponent && isGtaVibeGroup && ( 
                            <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses['pink']?.text || 'text-brand-cyan')} />
                         )}
                       </h3>
