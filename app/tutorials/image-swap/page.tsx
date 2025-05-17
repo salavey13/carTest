@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback, useRef } from 'react'; 
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -11,58 +11,150 @@ import TutorialLoader from '../TutorialLoader';
 import { useAppContext } from '@/contexts/AppContext';
 import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from '@/hooks/useAppToast';
+import { FaArrowUpRightFromSquare, FaBookOpen, FaCloudArrowUp, FaCopy, FaPooStorm, FaRightLeft, FaRocket, FaThumbsUp, FaWandMagicSparkles, FaCirclePlay, FaImage, FaToolbox, FaImagePortrait, FaLink, FaUpload, FaCheckDouble, FaArrowRight } from 'react-icons/fa6';
 
-// New Structural Components (placeholders for now or simple wrappers)
+
+// New Structural Components
 const TutorialPageContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200 overflow-x-hidden">
+  <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-brand-pink/30 selection:text-brand-pink">
     {children}
   </div>
 );
+TutorialPageContainer.displayName = "TutorialPageContainer";
 
-const RockstarHeroSection: React.FC<{ title: string; subtitle: string; backgroundImageUrl?: string }> = ({ title, subtitle, backgroundImageUrl }) => (
-  <section 
-    className="h-[70vh] md:h-[80vh] flex flex-col items-center justify-center text-center p-4 bg-black/30 relative" // Basic styling
-    // style={{ backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}
-  >
-    {/* Grid overlay - can be more complex later */}
-    <div
-        className="absolute inset-0 bg-repeat opacity-5 -z-10"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(0, 255, 157, 0.07) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(0, 255, 157, 0.07) 1px, transparent 1px)`,
-          backgroundSize: '30px 30px',
+interface RockstarHeroSectionProps {
+  title: string;
+  subtitle: string;
+  mainBackgroundImageUrl?: string; // For the furthest background
+  foregroundImageUrl?: string;    // For the object that zooms/moves most prominently
+  revealedBackgroundImageUrl?: string; // For the background revealed 'through' the text/mask
+  children?: React.ReactNode; // To place elements like buttons inside
+}
+
+const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
+  title,
+  subtitle,
+  mainBackgroundImageUrl = "https://images.unsplash.com/photo-1505452209359-e739ed0ddd46?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Placeholder dark city
+  foregroundImageUrl = "https://images.unsplash.com/photo-1605000794134-a013de605406?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Placeholder character/object
+  revealedBackgroundImageUrl = "https://images.unsplash.com/photo-1587691592099-48109787033a?q=80&w=2574&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Placeholder bright/abstract
+  children
+}) => {
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const animationDurationVH = 150; // Animate over 150vh of scroll
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (heroRef.current) {
+        const rect = heroRef.current.getBoundingClientRect();
+        // Progress from 0 (top of hero is at top of viewport) to 1 (bottom of hero is at top of viewport)
+        // or when hero top is -animationDurationVH * vh_unit
+        const scrollDistance = window.innerHeight * (animationDurationVH / 100);
+        const currentScroll = Math.max(0, -rect.top);
+        const progress = Math.min(1, currentScroll / scrollDistance);
+        setScrollProgress(progress);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Initial calculation
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [animationDurationVH]);
+
+  // Calculate dynamic styles based on scrollProgress
+  const foregroundScale = 1 + scrollProgress * 1.5; // Zoom in more
+  const foregroundTranslateY = -scrollProgress * 30; // Move up slightly less
+  const textScale = 1 + scrollProgress * 0.3;
+  const textTranslateY = -scrollProgress * 10;
+  const revealedBgOpacity = scrollProgress > 0.1 ? Math.min(1, (scrollProgress - 0.1) * 1.5) : 0;
+  const revealedBgScale = 1 - scrollProgress * 0.2; // Zoom out
+
+  return (
+    <section
+      ref={heroRef}
+      className="relative flex flex-col items-center justify-center text-center p-4 overflow-hidden"
+      style={{ height: `${animationDurationVH}vh` }} // Define scrollable height for animation
+    >
+      {/* Main Background (Fixed or very slow parallax) */}
+      {mainBackgroundImageUrl && (
+        <div
+          className="absolute inset-0 -z-30 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${mainBackgroundImageUrl})`, transform: `translateY(${scrollProgress * 10}vh)` }}
+        />
+      )}
+       <div className="absolute inset-0 bg-black/60 -z-20"></div> {/* Dark overlay */}
+
+
+      {/* Revealed Background (behind text, animates) */}
+      {revealedBackgroundImageUrl && (
+        <div
+          className="absolute inset-0 -z-10 bg-cover bg-center bg-no-repeat transition-opacity duration-300"
+          style={{ 
+            backgroundImage: `url(${revealedBackgroundImageUrl})`, 
+            opacity: revealedBgOpacity,
+            transform: `scale(${revealedBgScale})`
+          }}
+        />
+      )}
+      
+      {/* Foreground Image (zooms towards viewer) */}
+      {foregroundImageUrl && (
+        <img
+          src={foregroundImageUrl}
+          alt="Hero Foreground"
+          className="absolute top-1/2 left-1/2 w-1/2 md:w-1/3 max-w-md h-auto object-contain -translate-x-1/2 -translate-y-1/2 transition-transform duration-100 ease-out pointer-events-none"
+          style={{
+            transform: `translate(-50%, -50%) scale(${foregroundScale}) translateY(${foregroundTranslateY}px)`,
+            zIndex: 10, // Above text
+          }}
+        />
+      )}
+
+      {/* Text Content Block (Stays somewhat central, scales slightly) */}
+      <div 
+        className="sticky top-1/2 -translate-y-1/2 z-0 transition-transform duration-100 ease-out" // z-index 0, behind foreground
+        style={{ 
+          transform: `translateY(-50%) scale(${textScale}) translateY(${textTranslateY}px)`
         }}
-    ></div>
-    <h1 className={cn(
-        "text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-orbitron font-bold cyber-text glitch mb-4 md:mb-6",
-         colorClasses["brand-green"]?.text || "text-brand-green" // Default to green or a specific hero color
-        )} data-text={title}>
-      <VibeContentRenderer content={title} />
-    </h1>
-    <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
-      <VibeContentRenderer content={subtitle} />
-    </p>
-  </section>
-);
+      >
+        <h1 className={cn(
+            "text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-orbitron font-bold cyber-text glitch mb-4 md:mb-6",
+            colorClasses["brand-green"]?.text || "text-brand-green"
+            )} data-text={title}>
+          <VibeContentRenderer content={title} />
+        </h1>
+        <p className="text-md sm:text-lg md:text-xl text-gray-200 font-mono max-w-3xl mx-auto px-4">
+          <VibeContentRenderer content={subtitle} />
+        </p>
+      </div>
+      {children && <div className="relative z-20 mt-8">{children}</div>} {/* For buttons, placed above all */}
+    </section>
+  );
+};
+RockstarHeroSection.displayName = "RockstarHeroSection";
 
 const TutorialContentContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="container mx-auto px-4 py-12 md:py-16">
+  <div className="container mx-auto px-4 py-12 md:py-16 relative z-10 bg-background"> {/* Ensure content is above fixed hero after scroll */}
     {children}
   </div>
 );
+TutorialContentContainer.displayName = "TutorialContentContainer";
 
 const TutorialStepSection: React.FC<{ children: React.ReactNode, className?: string }> = ({ children, className }) => (
   <section className={cn("py-8 md:py-12", className)}>
     {children}
   </section>
 );
+TutorialStepSection.displayName = "TutorialStepSection";
 
-const NextLevelTeaser: React.FC<{ title: string; text: string; buttonText: string; buttonLink: string; mainColorClass: string }> = ({ title, text, buttonText, buttonLink, mainColorClass }) => (
-   <section className={cn(
+const NextLevelTeaser: React.FC<{ title: string; text: string; buttonText: string; buttonLink: string; mainColorClassKey: keyof typeof colorClasses | string }> = ({ title, text, buttonText, buttonLink, mainColorClassKey }) => {
+  const mainColor = colorClasses[mainColorClassKey as keyof typeof colorClasses] || colorClasses["brand-green"];
+  return (
+    <section className={cn(
             "mt-16 md:mt-24 text-center py-12 md:py-16",
-            colorClasses[mainColorClass]?.border ? `border-t ${colorClasses[mainColorClass]?.border}/30` : "border-t border-brand-green/30"
+            mainColor.border ? `border-t ${mainColor.border}/30` : "border-t border-brand-green/30"
             )}>
-          <h2 className={cn("text-3xl md:text-4xl font-orbitron mb-6", colorClasses[mainColorClass]?.text || "text-brand-green")}>
+          <h2 className={cn("text-3xl md:text-4xl font-orbitron mb-6", mainColor.text)}>
              <VibeContentRenderer content={title} />
           </h2>
           <p className="text-lg md:text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-8">
@@ -71,55 +163,28 @@ const NextLevelTeaser: React.FC<{ title: string; text: string; buttonText: strin
           <Button asChild className={cn(
              "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
              "shadow-xl",
-              mainColorClass && colorClasses[mainColorClass] ? `${colorClasses[mainColorClass].text.replace('text-', 'bg-')} hover:${colorClasses[mainColorClass].text.replace('text-', 'bg-')}/80 ${colorClasses[mainColorClass].shadow.replace('shadow-','hover:shadow-')}/60` : "bg-brand-green hover:bg-brand-green/80 hover:shadow-green-glow/60",
+              `bg-${mainColorClassKey} hover:bg-${mainColorClassKey}/80 ${mainColor.shadow.replace('shadow-','hover:shadow-')}/60`
              )}>
             <Link href={buttonLink}>
                 <VibeContentRenderer content={buttonText} />
             </Link>
           </Button>
         </section>
-);
-
+  );
+};
+NextLevelTeaser.displayName = "NextLevelTeaser";
 
 const imageSwapTutorialTranslations = {
   ru: {
     pageTitle: "Миссия 1: Охота на Битый Пиксель",
-    pageSubtitle: "Агент, твоя задача: освоить замену изображений в коде! Думай об этом как о реанимации цифрового артефакта: <FaImageSlash /> -> <FaToolbox /> -> <FaImagePortrait />. Без регистрации, только чистый скилл-ап!",
+    pageSubtitle: "Агент, твоя задача: освоить замену изображений в коде! Думай об этом как о реанимации цифрового артефакта: <FaImage /> -> <FaToolbox /> -> <FaImagePortrait />. Без регистрации, только чистый скилл-ап!",
     steps: [ 
-      {
-        id: 1,
-        title: "Шаг 1: Захват URL Старого Артефакта",
-        description: "Первая задача, оперативник: обнаружить в кодовой базе изображение, требующее замены. Найдя, скопируй его полный URL. Это твоя основная цель!",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4",
-        icon: "FaLink",
-        color: "brand-pink"
-      },
-      {
-        id: 2,
-        title: "Шаг 2: Развертывание Нового Актива",
-        description: "Далее, загрузи свой новенький, сияющий файл замены. Рекомендуем Supabase Storage для гладкой интеграции, но подойдет любой публично доступный URL. Защити новую ссылку!",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4",
-        icon: "FaUpload",
-        color: "brand-blue"
-      },
-      {
-        id: 3,
-        title: "Шаг 3: Активация VIBE-Трансмутации!",
-        description: "Время магии! Направляйся в SUPERVIBE Studio. Введи URL старого изображения, затем нового. Наш AI-агент обработает модификации кода и подготовит замену.",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4",
-        icon: "FaWandMagicSparkles",
-        color: "brand-purple"
-      },
-      {
-        id: 4,
-        title: "Шаг 4: Операция Успешна! Анализ PR",
-        description: "Миссия выполнена! Pull Request с заменой изображения сгенерирован автоматически. Осталось лишь проверить, смерджить и наслаждаться результатом. Профит!",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4",
-        icon: "FaCheckDouble",
-        color: "brand-green"
-      }
+      { id: 1, title: "Шаг 1: Захват URL Старого Артефакта", description: "Первая задача, оперативник: обнаружить в кодовой базе изображение, требующее замены. Найдя, скопируй его полный URL. Это твоя основная цель!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaLink", color: "brand-pink" },
+      { id: 2, title: "Шаг 2: Развертывание Нового Актива", description: "Далее, загрузи свой новенький, сияющий файл замены. Рекомендуем Supabase Storage для гладкой интеграции, но подойдет любой публично доступный URL. Защити новую ссылку!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaUpload", color: "brand-blue" },
+      { id: 3, title: "Шаг 3: Активация VIBE-Трансмутации!", description: "Время магии! Направляйся в SUPERVIBE Studio. Введи URL старого изображения, затем нового. Наш AI-агент обработает модификации кода и подготовит замену.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4", icon: "FaWandMagicSparkles", color: "brand-purple" },
+      { id: 4, title: "Шаг 4: Операция Успешна! Анализ PR", description: "Миссия выполнена! Pull Request с заменой изображения сгенерирован автоматически. Осталось лишь проверить, смерджить и наслаждаться результатом. Профит!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4", icon: "FaCheckDouble", color: "brand-green" }
     ],
-    nextLevelTitle: "<FaPlayCircle /> Новый Уровень Разблокирован!",
+    nextLevelTitle: "<FaCirclePlay /> Новый Уровень Разблокирован!",
     nextLevelText: "Основы у тебя в кармане, Агент! Готов применить эти навыки в реальном бою? <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих команд.",
     tryLiveButton: "<FaWandMagicSparkles /> Попробовать в Студии",
     toggleButtonToWtf: "<FaPooStorm /> Включить Режим БОГА (WTF?!)",
@@ -128,38 +193,10 @@ const imageSwapTutorialTranslations = {
     pageTitle: "КАРТИНКИ МЕНЯТЬ – КАК ДВА БАЙТА ПЕРЕСЛАТЬ!",
     pageSubtitle: "Забудь про нудятину. Делай как на видосе. ЭТО ЖЕ ЭЛЕМЕНТАРНО, ВАТСОН!",
     steps: [ 
-      {
-        id: 1,
-        title: "ШАГ 1: КОПИРУЙ СТАРЫЙ URL",
-        description: "Нашел картинку в коде? КОПИРНИ ЕЕ АДРЕС. Всё.",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4",
-        icon: "FaCopy",
-        color: "brand-pink"
-      },
-      {
-        id: 2,
-        title: "ШАГ 2: ЗАЛЕЙ НОВУЮ, КОПИРУЙ URL",
-        description: "Загрузи НОВУЮ картинку. КОПИРНИ ЕЕ АДРЕС. Изи.",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4",
-        icon: "FaCloudArrowUp", // Changed icon
-        color: "brand-blue"
-      },
-      {
-        id: 3,
-        title: "ШАГ 3: СТУДИЯ -> CTRL+V, CTRL+V -> MAGIC!",
-        description: "Иди в SUPERVIBE. Старый URL -> Новый URL. ЖМИ КНОПКУ. Бот сам всё сделает.",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4",
-        icon: "FaRightLeft", // Changed icon
-        color: "brand-purple"
-      },
-      {
-        id: 4,
-        title: "ШАГ 4: PR ГОТОВ! ТЫ КРАСАВЧИК!",
-        description: "PR создан. Проверь, смерджи. Всё! Ты поменял картинку быстрее, чем заварил дошик.",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4",
-        icon: "FaThumbsUp",
-        color: "brand-green"
-      }
+      { id: 1, title: "ШАГ 1: КОПИРУЙ СТАРЫЙ URL", description: "Нашел картинку в коде? КОПИРНИ ЕЕ АДРЕС. Всё.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaCopy", color: "brand-pink" },
+      { id: 2, title: "ШАГ 2: ЗАЛЕЙ НОВУЮ, КОПИРУЙ URL", description: "Загрузи НОВУЮ картинку. КОПИРНИ ЕЕ АДРЕС. Изи.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaCloudArrowUp", color: "brand-blue" },
+      { id: 3, title: "ШАГ 3: СТУДИЯ -> CTRL+V, CTRL+V -> MAGIC!", description: "Иди в SUPERVIBE. Старый URL -> Новый URL. ЖМИ КНОПКУ. Бот сам всё сделает.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4", icon: "FaRightLeft", color: "brand-purple" },
+      { id: 4, title: "ШАГ 4: PR ГОТОВ! ТЫ КРАСАВЧИК!", description: "PR создан. Проверь, смерджи. Всё! Ты поменял картинку быстрее, чем заварил дошик.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4", icon: "FaThumbsUp", color: "brand-green" }
     ],
     nextLevelTitle: "<FaRocket /> ТЫ ПРОКАЧАЛСЯ, БРО!",
     nextLevelText: "Менять картинки – это для лохов. Ты уже ПРО. Го в <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link>, там РЕАЛЬНЫЕ ДЕЛА.",
@@ -173,7 +210,7 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-blue": { text: "text-brand-blue", border: "border-brand-blue", shadow: "shadow-brand-blue/30" },
   "brand-purple": { text: "text-brand-purple", border: "border-brand-purple", shadow: "shadow-brand-purple/30" },
   "brand-green": { text: "text-brand-green", border: "border-brand-green", shadow: "shadow-brand-green/30" },
-};
+}; // This should be defined or imported if used by NextLevelTeaser for bg color
 
 function ImageSwapTutorialContent() {
   const searchParams = useSearchParams();
@@ -206,7 +243,6 @@ function ImageSwapTutorialContent() {
   const toggleMode = () => {
     const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
     setCurrentMode(newMode);
-    // Update URL without full page reload, if possible, or simply for bookmarking
     router.replace(`/tutorials/image-swap${newMode === 'wtf' ? '?mode=wtf' : ''}`, { scroll: false });
   };
   
@@ -218,13 +254,18 @@ function ImageSwapTutorialContent() {
   }, [searchParams, currentMode]);
 
   const stepsToRender = t.steps;
-  const pageMainColor = "brand-green"; // Or determine dynamically
+  const pageMainColorKey = "brand-green"; 
 
   return (
     <TutorialPageContainer>
-      <RockstarHeroSection title={t.pageTitle} subtitle={t.pageSubtitle} />
-      
-      <div className="text-center my-8">
+      <RockstarHeroSection 
+        title={t.pageTitle} 
+        subtitle={t.pageSubtitle}
+        // Provide actual image URLs for a better effect
+        // mainBackgroundImageUrl="/path/to/your/main-hero-bg.jpg"
+        // foregroundImageUrl="/path/to/your/foreground-object.png"
+        // revealedBackgroundImageUrl="/path/to/your/revealed-bg.jpg"
+      >
         <Button 
             onClick={toggleMode} 
             variant="outline" 
@@ -235,16 +276,16 @@ function ImageSwapTutorialContent() {
         >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
         </Button>
-      </div>
-
+      </RockstarHeroSection>
+      
       <TutorialContentContainer>
         <div className="space-y-16 md:space-y-24">
           {stepsToRender.map((step, index) => {
-            const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
-            const hasVideo = !!(step as any).videoSrc && typeof (step as any).videoSrc === 'string';
+            const stepColor = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
+            const hasVideo = !!step.videoSrc && typeof step.videoSrc === 'string';
 
             return (
-              <TutorialStepSection key={step.id} className={cn(index > 0 && "border-t border-gray-700/30 pt-12 md:pt-16")}>
+              <TutorialStepSection key={step.id} className={cn(index > 0 && "border-t border-border/30 pt-12 md:pt-16")}>
                 <div className={cn(
                   "flex flex-col gap-6 md:gap-10",
                   index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
@@ -254,13 +295,13 @@ function ImageSwapTutorialContent() {
                       <VibeContentRenderer content={`::${step.icon}::`} className="text-3xl opacity-90" />
                       <VibeContentRenderer content={step.title} />
                     </h2>
-                    <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                    <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
                       <VibeContentRenderer content={step.description} />
                     </p>
                     {step.id === 3 && ( 
                       <Button asChild className={cn(
-                        "inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-black transition-colors shadow-lg mt-4",
-                        "bg-brand-yellow hover:bg-brand-yellow/80 hover:shadow-yellow-glow/50"
+                        "inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-background transition-colors shadow-lg mt-4",
+                        "bg-brand-yellow hover:bg-brand-yellow/80 focus:ring-2 focus:ring-brand-yellow focus:ring-offset-2 focus:ring-offset-background"
                         )}>
                         <Link href="/repo-xml?flow=imageSwap">
                            <VibeContentRenderer content="К Студии SUPERVIBE <FaArrowUpRightFromSquare />" />
@@ -273,7 +314,7 @@ function ImageSwapTutorialContent() {
                     <div className="md:w-3/5 lg:w-2/3">
                       <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColor.border, stepColor.shadow, "bg-black")}>
                         <ScrollControlledVideoPlayer 
-                          src={(step as any).videoSrc} 
+                          src={step.videoSrc} 
                           className="w-full" 
                         />
                       </div>
@@ -291,7 +332,7 @@ function ImageSwapTutorialContent() {
         text={t.nextLevelText}
         buttonText={t.tryLiveButton}
         buttonLink="/repo-xml?flow=imageSwap"
-        mainColorClass={pageMainColor}
+        mainColorClassKey={pageMainColorKey}
       />
     </TutorialPageContainer>
   );
