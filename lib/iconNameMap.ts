@@ -75,7 +75,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fadooropen: "FaDoorOpen",
   faregcopy: "FaRegCopy",
   fapaste: "FaPaste",
-  famagic: "FaWandMagicSparkles", // Mapped to a more common magic icon
+  famagic: "FaWandMagicSparkles", 
   facheckcircle: "FaCheckCircle",
   facrown: "FaCrown",
   facopy: "FaCopy",
@@ -83,8 +83,8 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   // fathumbsup: "FaThumbsUp", // Already defined
   faforwardstep: "FaForwardStep",
   faserver: "FaServer",
-  faphotofilm: "FaPhotoFilm", // Correct name for Fa6 if available, FaFilm is a good fallback
-  favideocamera: "FaVideoCamera", // Correct name is FaVideo
+  faphotofilm: "FaPhotoFilm", 
+  favideocamera: "FaVideoCamera", 
   fapoostorm: "FaPooStorm",
   fabook: "FaBook",
   fabiohazard: "FaBiohazard",
@@ -93,6 +93,9 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fafistraised: "FaFistRaised",
   fastreetview: "FaStreetView",
   fahandmiddlefinger: "FaHandMiddleFinger",
+  facity: "FaCity", // Added
+  faangledoubledown: "FaAngleDoubleDown", 
+
 
   // StickyChat specific icons
   faarrowright: "FaArrowRight",
@@ -126,5 +129,6 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fauserdoctor: "FaUserDoctor",
   fapuzzlepiece: "FaPuzzlePiece",
   falayergroup: "FaLayerGroup",
-  faangledevildown: "FaAngleDoubleDown" // Corrected from FaAngleDoubleDown
+  fagraduationcap: "FaGraduationCap", // Added for Tutorial Quests/GTA Vibe Missions
+  faheartbeat: "FaHeartbeat", // For CyberFitness as an alternative to FaDumbbell
 };
