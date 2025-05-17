@@ -226,6 +226,7 @@ export default function Header() {
 
   const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
     if (!icon) return null;
+    // Directly use icon name as is from allPages, VibeContentRenderer will handle mapping/errors
     return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
   };
 
