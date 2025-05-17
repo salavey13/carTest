@@ -1,3 +1,4 @@
+// /components/AICodeAssistant.tsx
 "use client";
 
 import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback, useRef } from "react";
@@ -20,13 +21,9 @@ import { ToolsMenu } from './assistant_components/ToolsMenu';
 import { ImageToolsModal } from './assistant_components/ImageToolsModal';
 import { SwapModal } from './assistant_components/SwapModal';
 import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase"; 
+import VibeContentRenderer from '@/components/VibeContentRenderer';
 // UI & Utils
 import { AnimatePresence, motion } from "framer-motion";
-import {
-    FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate,
-    FaImage, FaImages, FaSpinner, FaPlus, FaKeyboard, FaFileLines, FaCode,
-    FaCheck, FaCircleXmark, FaExclamation
-} from "react-icons/fa6";
 import clsx from "clsx";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
@@ -231,8 +228,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const finalRepoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
     const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!finalRepoUrlForForm && !imageReplaceTask;
     const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR";
-    const prButtonIconNode = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
-    const prButtonLoadingIconNode = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <FaSpinner className="animate-spin"/> : prButtonIconNode;
+    const prButtonIconNode = targetBranchName ? <VibeContentRenderer content="::facodebranch::" /> : <VibeContentRenderer content="::fagithub::" />;
+    const prButtonLoadingIconNode = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <VibeContentRenderer content="::faspinner className='animate-spin'::" /> : prButtonIconNode;
     const assistantTooltipText = `Вставь ответ AI -> '➡️' -> Проверь/Исправь -> Выбери файлы -> ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError;
@@ -252,9 +249,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))]">
                          {showImageReplaceUI ? (imageTaskFailed ? "🖼️ Ошибка Замены Картинки" : "🖼️ Статус Замены Картинки") : "🤖 AI Code Assistant"}
                      </h1>
-                     {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-brand-blue hover:text-brand-blue/80 transition" /> </button> )}
+                     {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <VibeContentRenderer content="::facircleinfo className='text-brand-blue hover:text-brand-blue/80 transition'::" /> </button> )}
                  </div>
-                 <button id="settings-modal-trigger-assistant" onClick={() => { triggerToggleSettingsModal(); }} className="p-2 text-muted-foreground hover:text-brand-cyan transition rounded-full hover:bg-muted/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
+                 <button id="settings-modal-trigger-assistant" onClick={() => { triggerToggleSettingsModal(); }} className="p-2 text-muted-foreground hover:text-brand-cyan transition rounded-full hover:bg-muted/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <VibeContentRenderer content="::facodebranch className='text-xl'::" /> </button>
              </header>
 
             {showStandardAssistantUI && (
@@ -351,7 +348,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                             disabled={isProcessingAny}
                             title="Загрузить/Связать Картинки (prompts_imgs.txt)"
                          >
-                             <FaImage className="text-muted-foreground" />
+                             <VibeContentRenderer content="::faimage className='text-muted-foreground'::" />
                              <span className="text-sm text-foreground">Картинки</span>
                              {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && (
                                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-brand-blue rounded-full border-2 border-card shadow-md animate-pulse"></span>
@@ -366,11 +363,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      "flex flex-col items-center justify-center text-center p-6 bg-card/50 rounded-lg border border-dashed min-h-[200px]",
                      imageTaskFailed ? 'border-destructive' : 'border-brand-blue'
                  )}>
-                     {assistantLoading ? <FaSpinner className="text-brand-purple text-4xl mb-4 animate-spin" />
-                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <FaSpinner className="text-brand-blue text-4xl mb-4 animate-spin" />
-                       : imageTaskFailed ? <FaCircleXmark className="text-destructive text-4xl mb-4" />
-                       : imageReplaceTask ? <FaImages className="text-brand-blue text-4xl mb-4" />
-                       : <FaCheck className="text-brand-green text-4xl mb-4" />
+                     {assistantLoading ? <VibeContentRenderer content="::faspinner className='text-brand-purple text-4xl mb-4 animate-spin'::" />
+                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <VibeContentRenderer content="::faspinner className='text-brand-blue text-4xl mb-4 animate-spin'::" />
+                       : imageTaskFailed ? <VibeContentRenderer content="::facirclexmark className='text-destructive text-4xl mb-4'::" />
+                       : imageReplaceTask ? <VibeContentRenderer content="::faimages className='text-brand-blue text-4xl mb-4'::" />
+                       : <VibeContentRenderer content="::facheck className='text-brand-green text-4xl mb-4'::" />
                      }
                      <p className={clsx(
                          "text-lg font-semibold",

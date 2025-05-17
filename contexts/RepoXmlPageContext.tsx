@@ -1,3 +1,4 @@
+// /contexts/RepoXmlPageContext.tsx
 "use client";
 
 import React, {
@@ -288,11 +289,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             secondaryHighlights: Record<ImportCategory, string[]>
         ) => {
             const currentImgTask = imageReplaceTaskStateRef.current; 
-            const currentIconTask = iconReplaceTaskStateRef.current; // Check icon task too
+            const currentIconTask = iconReplaceTaskStateRef.current; 
             const currentPendingFlow = pendingFlowDetailsRef.current; 
             
             const flowLogPrefix = currentImgTask ? '[Flow 1 - Image Swap]' 
-                                : currentIconTask ? '[Flow X - Icon Swap]' // Log for Icon Swap
+                                : currentIconTask ? '[Flow X - Icon Swap]' 
                                 : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]' 
                                 : '[Flow 2 - Generic Idea]');
             
@@ -307,12 +308,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let questCompleted = false;
             let questResult: Awaited<ReturnType<typeof completeQuestAndUpdateProfile>> | null = null;
 
-            // Priority to ImageReplaceTask if both somehow active (should not happen)
             const activeVisualTask = currentImgTask || currentIconTask;
             const isVisualSwapFlow = !!activeVisualTask;
 
-            if (isVisualSwapFlow && activeVisualTask) { // Check activeVisualTask to satisfy TypeScript
-                const taskToProcess = activeVisualTask; // Use a new const for type narrowing
+            if (isVisualSwapFlow && activeVisualTask) { 
+                const taskToProcess = activeVisualTask; 
                 const taskType = currentImgTask ? 'ImageSwap' : 'IconSwap';
                 
                 if (fetched) {
@@ -326,7 +326,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                        if (assistantRef.current?.handleDirectImageReplace) { 
                            setAssistantLoadingStateStable(true);
                            
-                           assistantRef.current.handleDirectImageReplace(taskToProcess, allFiles ?? []) // Pass the correct task type
+                           assistantRef.current.handleDirectImageReplace(taskToProcess, allFiles ?? []) 
                                .then(async ({ success: replaceSuccess, error: replaceError }) => {
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR (${taskType}): ${replaceError || 'Неизвестно'}`, 'error');
@@ -352,7 +352,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                             setAssistantLoadingStateStable(false);
                        }
                     }
-                } else { // files not fetched
+                } else { 
                     finalFetchStatus = 'error'; 
                     addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Не удалось загрузить файлы.`, 'error', 5000);
                     setAssistantLoadingStateStable(false);
@@ -768,16 +768,17 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              const effectiveBranch = localManualBranchName.trim() || localTargetBranchName || 'default';
              const activeVisualTask = localImageReplaceTask || localIconReplaceTask;
              const visualTaskType = localImageReplaceTask ? 'картинки' : (localIconReplaceTask ? 'иконки' : '');
+             const visualTaskTargetFile = activeVisualTask ? activeVisualTask.targetPath.split('/').pop() ?? 'файла': 'файла';
 
              if (localIsPreChecking && localPendingFlowDetails) return `Проверяю наличие PR/ветки для '${localPendingFlowDetails.targetPath.split('/').pop() ?? 'файла'}'...`;
-              if (localIsPreChecking && activeVisualTask) return `Проверяю наличие PR/ветки для замены ${visualTaskType} '${activeVisualTask.targetPath.split('/').pop() ?? 'файла'}'...`;
+             if (localIsPreChecking && activeVisualTask) return `Проверяю наличие PR/ветки для замены ${visualTaskType} в '${visualTaskTargetFile}'...`;
              
              if (activeVisualTask) {
-                 if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${activeVisualTask.targetPath.split('/').pop()} из ветки ${effectiveBranch} для замены ${visualTaskType}...`;
+                 if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${visualTaskTargetFile} из ветки ${effectiveBranch} для замены ${visualTaskType}...`;
                  if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return `Твою ж! Ошибка загрузки файла для ${visualTaskType}. URL/ветка верные? Жми 'Попробовать Снова'.`;
                  const targetFileExists = allFetchedFilesState?.some(f => f.path === activeVisualTask.targetPath);
-                 if (localFetchStatus === 'success' && !targetFileExists && localFilesFetched) return `Файл для замены ${visualTaskType} НЕ НАЙДЕН в репе! Проверь путь/ветку!`;
-                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return `Меняю ${visualTaskType} и делаю авто-PR... Магия!`; return `Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Level 1 пройден! (${visualTaskType})`; }
+                 if (localFetchStatus === 'success' && !targetFileExists && localFilesFetched) return `Файл для замены ${visualTaskType} (${visualTaskTargetFile}) НЕ НАЙДЕН в репе! Проверь путь/ветку!`;
+                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return `Меняю ${visualTaskType} в ${visualTaskTargetFile} и делаю авто-PR... Магия!`; return `Файл ${visualTaskTargetFile} на месте! Ассистент сейчас сам всё заменит и запушит PR. Level 1 пройден! (${visualTaskType})`; }
                  return `Готовлю авто-замену ${visualTaskType} (Level 1)...`;
              }
 

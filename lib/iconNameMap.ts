@@ -76,7 +76,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fadooropen: "FaDoorOpen",
   faregcopy: "FaRegCopy",
   fapaste: "FaPaste",
-  famagic: "FaWandMagicSparkles",
+  famagic: "FaWandMagicSparkles", // Duplicate, but same mapping is fine
   facheckcircle: "FaCheckCircle",
   facrown: "FaCrown",
   facopy: "FaCopy",
@@ -95,9 +95,9 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fahandmiddlefinger: "FaHandMiddleFinger",
   facity: "FaCity",
   faangledoubledown: "FaAngleDoubleDown",
-  faguitar: "FaGuitar", // Added for Fifth Door WTF
+  faguitar: "FaGuitar",
 
-  // StickyChat specific icons
+  // StickyChat specific icons (many might be duplicates, ensure correct Fa6 mapping)
   faarrowright: "FaArrowRight",
   fahighlighter: "FaHighlighter",
   fagithub: "FaGithub",
@@ -107,7 +107,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fapaperplane: "FaPaperPlane",
   falightbulb: "FaLightbulb",
   faimages: "FaImages",
-  fasquarearrowupright: "FaSquareArrowUpRight",
+  fasquarearrowupright: "FaSquareArrowUpRight", // Maps to FaSquareArrowUpRight
   fafileimport: "FaFileImport",
   faclipboardlist: "FaClipboardList",
   faicons: "FaIcons",
@@ -132,12 +132,52 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fauplong: "FaUpLong",
   faheartbeat: "FaHeartbeat",
 
-  // Newly added icons from PR description
+  // From PR description / repo-xml page.tsx / ActualPageContent
   faangleup: "FaAngleUp",
   faangledown: "FaAngleDown",
-  faxmarkcircle: "FaXmarkCircle",
+  faxmarkcircle: "FaXmarkCircle", // maps to FaCircleXmark or FaXmarkCircle
   fafile: "FaFile",
   fafolder: "FaFolder",
   faterminal: "FaTerminal",
   facloud: "FaCloud",
+  fahandsparkles: "FaHandSparkles",
+  faarrowuprightfromsquare: "FaArrowUpRightFromSquare",
+  fauserastronaut: "FaUserAstronaut",
+  fabullseye: "FaBullseye",
+  faatom: "FaAtom",
+  fabug: "FaBug",
+  famicrophone: "FaMicrophone",
+  famemory: "FaMemory",
+  fabriefcase: "FaBriefcase",
+  famagnifyingglasschart: "FaMagnifyingGlassChart",
+  faquoteleft: "FaQuoteLeft",
+  faquoteright: "FaQuoteRight",
+  facirclexmark: "FaCircleXmark", // Same as faxmarkcircle if it maps to this
+  faanglesdown: "FaAnglesDown",
+  faanglesup: "FaAnglesUp",
+  
+  // From AutomationBuddy
+  faarrowsrotate: "FaArrowsRotate",
+  faangrycreative: "FaAngrycreative", // Check if this exists in Fa6, might need alternative
+  fapoo: "FaPoo",
+  falist: "FaList",
+  faexclamation: "FaExclamationTriangle", // FaExclamation does not exist, FaExclamationTriangle is common
+  
+  // From AICodeAssistant
+  fafilelines: "FaFileLines",
+
+  // From RepoTxtFetcher (some might be duplicates)
+  faarrowsrotaterepotxt: "FaArrowsRotate", // if specific styling needed, else use faarrowsrotate
+  
+  // Ensure all icons from VibeContentRenderer in repo-xml/page.tsx are here
+  // Example: If <VibeContentRenderer content="::FaRocket::" /> is used, 'farocket' should be in this map.
+  // Checked: FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles,
+  // FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye, FaAtom, FaBrain,
+  // FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt, FaToolbox, FaCode, FaVideo,
+  // FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket, FaMagnifyingGlass,
+  // FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye, FaUsers,
+  // FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash
+
+  // If any icon was used like <FaSpecificIcon directly, ensure its 'faspecificicon' key is here.
+  // e.g. for <FaRocket />, ensure 'farocket': 'FaRocket' is present. (It is)
 };

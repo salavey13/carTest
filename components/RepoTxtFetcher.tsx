@@ -1,3 +1,4 @@
+// /components/RepoTxtFetcher.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback, useRef } from "react"; 
@@ -447,19 +448,19 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   <div>
                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 flex items-center gap-2">
                         {currentVisualTask 
-                            ? <VibeContentRenderer content={imageReplaceTask ? '::FaImages className="text-brand-blue"::' : '::FaIcons className="text-brand-purple"::'} /> 
-                            : <VibeContentRenderer content='::FaDownload className="text-neon-lime"::' />}
+                            ? <VibeContentRenderer content={imageReplaceTask ? '::faimages className="text-brand-blue"::' : '::faicons className="text-brand-purple"::'} /> 
+                            : <VibeContentRenderer content='::fadownload className="text-neon-lime"::' />}
                         <span className={currentVisualTask ? (imageReplaceTask ? "text-brand-blue" : "text-brand-purple") : "text-brand-purple"}>
                            {currentVisualTask ? (imageReplaceTask ? "Задача: Замена Картинки" : "Задача: Замена Иконки") : "Кибер-Экстрактор Кода"}
                         </span>
                      </h2>
                       {!currentVisualTask && (
                          <div className="text-brand-yellow/80 text-xs md:text-sm space-y-1 mb-2 prose prose-invert prose-p:my-1 prose-strong:text-brand-purple prose-span:font-normal prose-a:text-brand-blue max-w-none">
-                            <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>."} />
+                            <VibeContentRenderer content={"1. Настрой ::facodebranch title='Настройки' class='inline text-cyan-400'::."} />
                             <VibeContentRenderer content={"2. Жми <strong class='text-purple-400 mx-1'>\"Извлечь файлы\"</strong>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <strong class='text-teal-400 mx-1'>связанные</strong> / <strong class='text-orange-400 mx-1'>важные</strong>."} />
-                            <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>."} />
-                            <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
+                            <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы ::faplus title='Добавить выбранные в запрос' class='inline text-sm':: / все ::fatree title='Добавить все файлы в запрос' class='inline text-sm'::."} />
+                            <VibeContentRenderer content={"5. Скопируй ::facopy title='Скопировать запрос' class='inline text-sm mx-px':: или передай дальше."} />
                          </div>
                       )}
                       {currentVisualTask && (
@@ -479,8 +480,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       className="p-2 bg-muted/50 rounded-full hover:bg-muted/70 transition-colors flex-shrink-0 disabled:opacity-50"
                   >
                       {isSettingsModalOpen 
-                        ? <VibeContentRenderer content='::FaAngleUp className="text-brand-cyan text-xl"::' /> 
-                        : <VibeContentRenderer content='::FaCodeBranch className="text-brand-cyan text-xl"::' />}
+                        ? <VibeContentRenderer content='::faangleup className="text-brand-cyan text-xl"::' /> 
+                        : <VibeContentRenderer content='::facodebranch className="text-brand-cyan text-xl"::' />}
                   </motion.button>
               </div>
 
@@ -513,12 +514,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}${currentVisualTask ? ` (для задачи замены ${imageReplaceTask ? 'картинки' : 'иконки'})` : ''}`}
                   >
                        {isFetchLoading 
-                           ? <VibeContentRenderer content='::FaSpinner className="animate-spin"::' /> 
+                           ? <VibeContentRenderer content='::faspinner className="animate-spin"::' /> 
                            : (fetchStatus === 'failed_retries' || fetchStatus === 'error' 
-                               ? <VibeContentRenderer content="::FaArrowsRotate::" /> 
+                               ? <VibeContentRenderer content="::faarrowsrotate::" /> 
                                : currentVisualTask 
-                                   ? <VibeContentRenderer content={imageReplaceTask ? "::FaImages::" : "::FaIcons::"} /> 
-                                   : <VibeContentRenderer content="::FaDownload::" />)}
+                                   ? <VibeContentRenderer content={imageReplaceTask ? "::faimages::" : "::faicons::"} /> 
+                                   : <VibeContentRenderer content="::fadownload::" />)}
                        {fetchStatus === 'retrying' ? "Повтор запроса..." : isFetchLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : currentVisualTask ? "Загрузить файл" : "Извлечь файлы")}
                        <span className="text-xs opacity-80 hidden sm:inline">({effectiveBranchDisplay})</span>
                   </motion.button>
@@ -531,22 +532,22 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       {isParsing && !currentVisualTask && <p className="text-brand-yellow text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
                       {fetchStatus === 'success' && !currentVisualTask && fetchedFiles.length > 0 && (
                          <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1">
-                             <VibeContentRenderer content="::FaCircleCheck::" /> {`Успешно ${fetchedFiles.length} файлов из '${effectiveBranchDisplay}'. Выберите нужные.`}
+                             <VibeContentRenderer content="::facheckcircle::" /> {`Успешно ${fetchedFiles.length} файлов из '${effectiveBranchDisplay}'. Выберите нужные.`}
                          </div>
                        )}
                        {fetchStatus === 'success' && !currentVisualTask && fetchedFiles.length === 0 && (
                           <div className="text-center text-xs font-mono mt-1 text-brand-yellow flex items-center justify-center gap-1">
-                              <VibeContentRenderer content="::FaCircleCheck::" /> {`Завершено успешно, но 0 файлов найдено в ветке '${effectiveBranchDisplay}'.`}
+                              <VibeContentRenderer content="::facheckcircle::" /> {`Завершено успешно, но 0 файлов найдено в ветке '${effectiveBranchDisplay}'.`}
                           </div>
                        )}
                        {visualTaskTargetFileReady && (
                           <div className={`text-center text-xs font-mono mt-1 ${imageReplaceTask ? "text-brand-green" : "text-brand-purple"} flex items-center justify-center gap-1`}>
-                              <VibeContentRenderer content="::FaCircleCheck::" /> {`Файл ${currentVisualTask?.targetPath.split('/').pop()} загружен и готов.`}
+                              <VibeContentRenderer content="::facheckcircle::" /> {`Файл ${currentVisualTask?.targetPath.split('/').pop()} загружен и готов.`}
                           </div>
                         )}
                         {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchError && (
                            <div className="text-center text-xs font-mono mt-1 text-destructive flex items-center justify-center gap-1">
-                               <VibeContentRenderer content="::FaXmark::" /> {fetchError}
+                               <VibeContentRenderer content="::facirclexmark::" /> {fetchError}
                            </div>
                         )}
                         {isWaitingForAiResponse && !currentVisualTask && (
@@ -607,12 +608,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                  {currentVisualTask && filesFetched && ( 
                       <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-card/30 rounded-lg border border-dashed ${visualTaskTargetFileReady ? (imageReplaceTask ? 'border-brand-blue' : 'border-brand-purple') : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-destructive' : 'border-muted'} min-h-[200px]`}>
                           {isFetchLoading 
-                            ? <VibeContentRenderer content='::FaSpinner className="text-brand-blue text-3xl mb-3 animate-spin"::' />
+                            ? <VibeContentRenderer content='::faspinner className="text-brand-blue text-3xl mb-3 animate-spin"::' />
                            : assistantLoading 
-                            ? <VibeContentRenderer content='::FaSpinner className="text-brand-purple text-3xl mb-3 animate-spin"::' />
+                            ? <VibeContentRenderer content='::faspinner className="text-brand-purple text-3xl mb-3 animate-spin"::' />
                            : visualTaskTargetFileReady 
-                            ? <VibeContentRenderer content='::FaCircleCheck className="text-brand-green text-3xl mb-3"::' />
-                           : <VibeContentRenderer content='::FaXmark className="text-destructive text-3xl mb-3"::' /> }
+                            ? <VibeContentRenderer content='::facheckcircle className="text-brand-green text-3xl mb-3"::' />
+                           : <VibeContentRenderer content='::facirclexmark className="text-destructive text-3xl mb-3"::' /> }
                           <p className={`text-sm font-semibold ${visualTaskTargetFileReady ? (imageReplaceTask ? 'text-brand-blue' : 'text-brand-purple') : 'text-destructive'}`}>
                               {isFetchLoading ? "Загрузка файла..."
                                : assistantLoading ? "Обработка Ассистентом..."

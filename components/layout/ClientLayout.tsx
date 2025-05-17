@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -42,7 +43,7 @@ function AppInitializers() {
 
   useEffect(() => {
     const handleScroll = async () => {
-      if (window.scrollY > 1000 && isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
+      if (isAuthenticated && dbUser?.user_id && window.scrollY > 1000 && !scrollAchievementUnlockedRef.current) {
         scrollAchievementUnlockedRef.current = true; // Prevent multiple triggers
         logger.info(`[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`);
         const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'scrolled_like_a_maniac');

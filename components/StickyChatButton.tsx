@@ -1,14 +1,9 @@
+// /components/StickyChatButton.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-    FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
-    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
-    FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight, FaFileImport,
-    FaClipboardList, FaCircleCheck, FaCommentDots, FaIcons
-} from "react-icons/fa6";
 
 // Import Subcomponents
 import { FloatingActionButton } from "@/components/stickyChat_components/FloatingActionButton";
@@ -18,6 +13,7 @@ import { SuggestionList } from "@/components/stickyChat_components/SuggestionLis
 import { ImageReplaceTool } from "@/components/stickyChat_components/ImageReplaceTool";
 import { IconReplaceTool } from "@/components/stickyChat_components/IconReplaceTool";
 import { toast } from "sonner";
+import VibeContentRenderer from '@/components/VibeContentRenderer';
 
 // Import Context & Actions
 import { useAppContext } from "@/contexts/AppContext";
@@ -42,7 +38,6 @@ interface Suggestion { id: string; text: string; link?: string; action?: () => v
 interface GitHubProfile { login: string; avatar_url: string; html_url: string; name?: string | null; }
 interface IconReplaceDetails { oldIconName: string; newIconName: string; componentProps?: string; }
 
-
 // --- Animation Variants ---
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
@@ -65,7 +60,6 @@ const isIconNameInput = (input: string): boolean => {
     const trimmed = input.trim();
     return /^(Fa[A-Z0-9][a-zA-Z0-9]*|fa-[a-z0-9-]+)$/i.test(trimmed) && !trimmed.includes(" ") && trimmed.length > 2;
 };
-
 
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
@@ -186,21 +180,21 @@ const StickyChatButton: React.FC = () => {
 
         if (!isToolPage) {
             if (hasGenericCustomIdea) { 
-                baseSuggestions.push({ id: ADD_NEW_ID, text: "Передать Идею в Студию 🚀", link: "/repo-xml", icon: <FaFileImport className="mr-1.5 text-green-400"/>, tooltip: `Передать идею "${trimmedCustomIdea.substring(0, 30)}..." и контекст страницы в Студию` }); 
+                baseSuggestions.push({ id: ADD_NEW_ID, text: "Передать Идею в Студию 🚀", link: "/repo-xml", icon: <VibeContentRenderer content="::fafileimport className='mr-1.5 text-green-400'::" />, tooltip: `Передать идею "${trimmedCustomIdea.substring(0, 30)}..." и контекст страницы в Студию` }); 
             } else if (!potentialOldImageUrl && !isLikelyIconInput) { 
-                baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" />, tooltip: "Перейти в СуперВайб Студию без контекста" }); 
+                baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <VibeContentRenderer content="::fawandmagicsparkles className='mr-1.5'::" />, tooltip: "Перейти в СуперВайб Студию без контекста" }); 
             }
         }
         
-        baseSuggestions.push({ id: HIRE_ME_ID, text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" />, tooltip: "Узнать о SelfDev пути и заказать консультацию" });
+        baseSuggestions.push({ id: HIRE_ME_ID, text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <VibeContentRenderer content="::fastar className='mr-1.5'::" />, tooltip: "Узнать о SelfDev пути и заказать консультацию" });
         
         if (potentialOldImageUrl && !isToolPage && !showReplaceTool && !showIconReplaceTool) { 
-            baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => { logger.debug("[Flow 1 - Image Swap] StickyChatButton: Replace Image suggestion clicked."); setShowReplaceTool(true); setShowIconReplaceTool(false); }, icon: <FaImages className="mr-1.5 text-blue-400" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); 
+            baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => { logger.debug("[Flow 1 - Image Swap] StickyChatButton: Replace Image suggestion clicked."); setShowReplaceTool(true); setShowIconReplaceTool(false); }, icon: <VibeContentRenderer content="::faimages className='mr-1.5 text-blue-400'::" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); 
         } else if (isLikelyIconInput && !isToolPage && !showIconReplaceTool && !showReplaceTool) {
-            baseSuggestions.unshift({ id: REPLACE_ICON_ID, text: "Заменить Иконку? 🎨", action: () => { logger.debug("[Flow X - Icon Swap] StickyChatButton: Replace Icon suggestion clicked."); setShowIconReplaceTool(true); setShowReplaceTool(false); }, icon: <FaIcons className="mr-1.5 text-purple-400" />, tooltip: `Начать процесс замены иконки, начиная с: ${trimmedCustomIdea}`});
+            baseSuggestions.unshift({ id: REPLACE_ICON_ID, text: "Заменить Иконку? 🎨", action: () => { logger.debug("[Flow X - Icon Swap] StickyChatButton: Replace Icon suggestion clicked."); setShowIconReplaceTool(true); setShowReplaceTool(false); }, icon: <VibeContentRenderer content="::faicons className='mr-1.5 text-purple-400'::" />, tooltip: `Начать процесс замены иконки, начиная с: ${trimmedCustomIdea}`});
         }
         
-        baseSuggestions.push({ id: COPY_LOGS_ID, text: logsCopied ? "Логи скопированы!" : "Скопировать Логи", action: handleCopyLogs, icon: logsCopied ? <FaCircleCheck className="mr-1.5 text-green-400"/> : <FaClipboardList className="mr-1.5" />, tooltip: "Скопировать историю системных логов в буфер обмена для отладки" });
+        baseSuggestions.push({ id: COPY_LOGS_ID, text: logsCopied ? "Логи скопированы!" : "Скопировать Логи", action: handleCopyLogs, icon: logsCopied ? <VibeContentRenderer content="::facheckcircle className='mr-1.5 text-green-400'::" /> : <VibeContentRenderer content="::faclipboardlist className='mr-1.5'::" />, tooltip: "Скопировать историю системных логов в буфер обмена для отладки" });
         return baseSuggestions;
     }, [currentPath, potentialOldImageUrl, showReplaceTool, showIconReplaceTool, customIdea, logsCopied, handleCopyLogs]);
 
@@ -375,7 +369,7 @@ const StickyChatButton: React.FC = () => {
                                 {showReplaceTool && potentialOldImageUrl ? ( <ImageReplaceTool oldImageUrl={potentialOldImageUrl} onReplaceConfirmed={handleReplaceConfirmed} onCancel={handleCancelReplace} /> ) 
                                 : showIconReplaceTool ? ( <IconReplaceTool oldIconNameInput={isIconNameInput(customIdea.trim()) ? customIdea.trim() : ""} onReplaceConfirmed={handleIconReplaceConfirmed} onCancel={handleCancelReplace} />) 
                                 : (
-                                    <> {showInputArea && ( <motion.div variants={childVariants} className="w-full"> <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300 flex items-center"> <FaLightbulb className="text-yellow-400 mr-1.5 text-sm" /> Введи идею / URL картинки / Имя иконки:</label> <textarea id="custom-idea-input" rows={2} value={customIdea} onChange={(e) => setCustomIdea(e.target.value)} className="w-full p-2 text-sm bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-white placeholder-gray-400 simple-scrollbar resize-none" placeholder="Напр: 'Добавь кнопку Х', https://..., FaBeer" /> </motion.div> )} <SuggestionList suggestions={suggestions} onSuggestionClick={handleSuggestionClick} listVariants={childVariants} itemVariants={childVariants} className="items-center sm:items-start" /> </>
+                                    <> {showInputArea && ( <motion.div variants={childVariants} className="w-full"> <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300 flex items-center"> <VibeContentRenderer content="::falightbulb className='text-yellow-400 mr-1.5 text-sm'::" /> Введи идею / URL картинки / Имя иконки:</label> <textarea id="custom-idea-input" rows={2} value={customIdea} onChange={(e) => setCustomIdea(e.target.value)} className="w-full p-2 text-sm bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-white placeholder-gray-400 simple-scrollbar resize-none" placeholder="Напр: 'Добавь кнопку Х', https://..., FaBeer" /> </motion.div> )} <SuggestionList suggestions={suggestions} onSuggestionClick={handleSuggestionClick} listVariants={childVariants} itemVariants={childVariants} className="items-center sm:items-start" /> </>
                                 )}
                             </div>
                         </div>
@@ -383,7 +377,7 @@ const StickyChatButton: React.FC = () => {
                 </motion.div>
             ) : ( 
                 !isAppLoading && <div className="fixed bottom-16 left-4 z-40 sm:bottom-4"> 
-                    <FloatingActionButton onClick={handleFabClick} variants={fabVariants} icon={<FaCommentDots />} /> 
+                    <FloatingActionButton onClick={handleFabClick} variants={fabVariants} icon={<VibeContentRenderer content="::facommentdots::" />} /> 
                 </div> 
             )}
         </AnimatePresence>

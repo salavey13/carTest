@@ -201,13 +201,7 @@ export const useRepoFetcher = ({
     // useEffect for autoFetch based on URL params is removed
     // The ideaProp useEffect in RepoTxtFetcher.tsx now handles the initial trigger
 
-    const currentContextFetchStatus = fetchStatus; // For logging
-    const isLoading = currentContextFetchStatus === 'loading' || currentContextFetchStatus === 'retrying';
-    
-    useEffect(() => {
-        logger.debug(`[useRepoFetcher Effect RawContextStatus] Raw fetchStatus from context: ${currentContextFetchStatus}, Calculated isLoading: ${isLoading}`);
-    }, [currentContextFetchStatus, isLoading]);
-
+    const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading;
 
     return {

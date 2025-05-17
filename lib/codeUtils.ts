@@ -1,3 +1,4 @@
+// /lib/codeUtils.ts
 /**
  * Selects the start and end position (line-based) of a function/method definition
  * containing the given startIndex within the text. Handles comments and strings.
