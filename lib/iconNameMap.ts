@@ -7,7 +7,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fakeyboard: "FaKeyboard",
   fawandmagicsparkles: "FaWandMagicSparkles",
   facheckdouble: "FaCheckDouble",
-  fatools: "FaToolbox", // Corrected from FaTools
+  fatools: "FaToolbox", 
   falandmineon: "FaLandMineOn",
   fascrewdriverwrench: "FaScrewdriverWrench",
   fasmilewink: "FaSmileWink",
@@ -70,8 +70,9 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fausershield: "FaUserShield",
   fayoutube: "FaYoutube",
   fabookuser: "FaBookUser", 
+  fabolt: "FaBolt", // <--- ДОБАВЛЕНО ЗДЕСЬ
 
-  // StickyChat specific icons if they are different or need aliases
+  // StickyChat specific icons
   faarrowright: "FaArrowRight",
   fahighlighter: "FaHighlighter",
   fagithub: "FaGithub",
@@ -87,26 +88,27 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   facirclecheck: "FaCircleCheck",
   faicons: "FaIcons", 
   faspinner: "FaSpinner",
-
-  // Tutorial Inception Specific
-  // fauniversalaccess: "FaUniversalAccess", // Already covered
-  // fafire: "FaFire",                   // Already covered
-  // fasatellitedish: "FaSatelliteDish",   // Already covered
-  // falaptopcode: "FaLaptopCode",        // Already covered
-
-  // Error and diagnostics related
-  favial: "FaVial",
-  fadatabase: "FaDatabase",
-  faboxarchive: "FaBoxArchive",
-  facoins: "FaCoins",
-  fakraken: "FaKraken", 
-  facodecommit: "FaCodeCommit",
-  fatree: "FaTree",
-  faplus: "FaPlus",
-  fabroom: "FaBroom",
-  fascroll: "FaScroll",
-  famobilescreenbutton: "FaMobileScreenButton",
-  fauserdoctor: "FaUserDoctor",
-  fapuzzlepiece: "FaPuzzlePiece",
-  falayergroup: "FaLayerGroup",
+  fakey: "FaKey",
+  fadooropen: "FaDoorOpen",
+  faregcopy: "FaRegCopy",
+  fapaste: "FaPaste",
+  famagic: "FaMagic", // Assuming FaWandMagicSparkles or similar
+  facheckcircle: "FaCheckCircle",
+  facrown: "FaCrown",
+  facopy: "FaCopy",
+  faclouduploadalt: "FaCloudUploadAlt",
+  fathumbsup: "FaThumbsUp",
+  faforwardstep: "FaForwardStep",
+  faserver: "FaServer",
+  faphotofilm: "FaPhotoFilm",
+  favideocamera: "FaVideoCamera",
+  fapoostorm: "FaPooStorm",
+  fabook: "FaBook",
+  fabiocard: "FaAddressCard", 
+fabiohazard: "FaBiohazard",
+  fameteor: "FaMeteor",
+  fadumbbell: "FaDumbbell",
+  fafistraised: "FaFistRaised",
+  fastreetview: "FaStreetView",
+  fahandmiddlefinger: "FaHandMiddleFinger", // Explicitly listed
 };
