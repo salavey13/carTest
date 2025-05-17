@@ -131,11 +131,12 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "integration_supabase_connected", name: "Supabase Интегрирован", description: "Интеграция с Supabase подтверждена.", icon: "FaDatabase", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_supabase_connected === true },
     { id: "integration_aistudio_connected", name: "AI Studio Активен", description: "Интеграция с AI Studio (OpenAI/Gemini/Claude) подтверждена.", icon: "FaRobot", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_aistudio_connected === true },
     { id: "curious_scrollerman", name: "Любопытный Скроллермен", description: "Проявил недюжинное любопытство, изучая просторы приложения скроллом. Респект!", icon: "FaAngleDoubleDown", kiloVibesAward: 5, checkCondition: (p) => p.featuresUsed?.scrolled_like_a_maniac === true },
-    { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу. +25 KiloVibes", icon: "FaBolt", checkCondition: () => false, isQuest: true, unlocksPerks: ["Доступ к СуперВайб Студии"] },
-    { id: "first_fetch_completed", name: "Квест: Первая Загрузка", description: "Успешно загружены файлы. +75 KiloVibes", icon: "FaDownload", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[1] },
-    { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI. +150 KiloVibes", icon: "FaCode", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[2] },
-    { id: "first_pr_created", name: "Квест: Первый PR", description: "Успешно создан Pull Request. +250 KiloVibes", icon: "FaGithub", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[3] },
-    // Tutorial Quests (these are no longer isQuest: true in the main list, handled by markTutorialAsCompleted)
+    // Legacy "Quests" - now treated as standard achievements triggered explicitly
+    { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу.", icon: "FaBolt", checkCondition: () => false, isQuest: true, kiloVibesAward: 25, unlocksPerks: ["Доступ к СуперВайб Студии"] },
+    { id: "first_fetch_completed", name: "Квест: Первая Загрузка", description: "Успешно загружены файлы.", icon: "FaDownload", checkCondition: () => false, isQuest: true, kiloVibesAward: 75, unlocksPerks: PERKS_BY_LEVEL[1] },
+    { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI.", icon: "FaCode", checkCondition: () => false, isQuest: true, kiloVibesAward: 150, unlocksPerks: PERKS_BY_LEVEL[2] },
+    { id: "first_pr_created", name: "Квест: Первый PR", description: "Успешно создан Pull Request.", icon: "FaGithub", checkCondition: () => false, isQuest: true, kiloVibesAward: 250, unlocksPerks: PERKS_BY_LEVEL[3] },
+    // Tutorial Quests (handled by markTutorialAsCompleted, but definitions here for consistency)
     { id: "image-swap-mission", name: "Миссия: Битый Пиксель", description: "Заменил битую картинку как босс!", icon: "FaExchangeAlt", kiloVibesAward: 15, checkCondition: (p) => p.completedQuests.includes("image-swap-mission") },
     { id: "icon-swap-mission", name: "Миссия: Сапёр Иконок", description: "Обезвредил минное поле из битых иконок!", icon: "FaBomb", kiloVibesAward: 15, checkCondition: (p) => p.completedQuests.includes("icon-swap-mission") },
     { id: "video-swap-mission", name: "Миссия: Видео-Рендер", description: "Заменил видео-файл, как будто так и надо!", icon: "FaVideo", kiloVibesAward: 15, checkCondition: (p) => p.completedQuests.includes("video-swap-mission") },
@@ -356,6 +357,7 @@ export const updateUserCyberFitnessProfile = async (
       levelUpdate: updates.level,
       featuresUsedUpdates: updates.featuresUsed ? Object.keys(updates.featuresUsed) : [],
       dynamicAchievementsToAdd: updates.dynamicAchievementsToAdd?.map(a => a.id),
+      completedQuestsUpdate: updates.completedQuests,
   });
 
   if (!userId) {
@@ -393,24 +395,52 @@ export const updateUserCyberFitnessProfile = async (
         newCyberFitnessProfile.activeQuests = Array.from(activeQuestsSet);
     }
     
+    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []);
+    let newlyUnlockedAchievements: Achievement[] = [];
+
     if (updates.completedQuests && Array.isArray(updates.completedQuests)) {
         const completedQuestsSet = new Set(newCyberFitnessProfile.completedQuests || []);
-        updates.completedQuests.forEach(q => completedQuestsSet.add(q));
+        updates.completedQuests.forEach(questId => {
+            if (!completedQuestsSet.has(questId)) { // Only process if newly completed
+                completedQuestsSet.add(questId);
+
+                const achDef = ALL_ACHIEVEMENTS.find(a => a.id === questId);
+                if (achDef && !currentAchievementsSet.has(questId)) {
+                    currentAchievementsSet.add(questId);
+                    newlyUnlockedAchievements.push(achDef);
+                    if (achDef.kiloVibesAward) {
+                        newCyberFitnessProfile.kiloVibes += achDef.kiloVibesAward;
+                        logger.debug(`[CyberFitness UpdateProfile] Explicitly awarded ${achDef.kiloVibesAward} KV for quest/achievement '${questId}'. New total KV: ${newCyberFitnessProfile.kiloVibes}`);
+                    }
+                    if (achDef.unlocksPerks) {
+                        const existingPerksSet = new Set(newCyberFitnessProfile.unlockedPerks || []);
+                        achDef.unlocksPerks.forEach(perk => {
+                            if (!existingPerksSet.has(perk)) {
+                                newCyberFitnessProfile.unlockedPerks.push(perk);
+                                logger.info(`[CyberFitness UpdateProfile] Perk "${perk}" unlocked by quest/achievement "${questId}".`);
+                            }
+                        });
+                        newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
+                    }
+                }
+            }
+        });
         newCyberFitnessProfile.completedQuests = Array.from(completedQuestsSet);
         
-        // Remove completed quests from active quests
         newCyberFitnessProfile.activeQuests = (newCyberFitnessProfile.activeQuests || []).filter(q => !completedQuestsSet.has(q));
 
-        // Add next quest in order to activeQuests if it's not already there or completed
-        const lastCompletedIndex = QUEST_ORDER.indexOf(updates.completedQuests[updates.completedQuests.length - 1]); // Assuming one quest is completed at a time
-        if (lastCompletedIndex !== -1 && lastCompletedIndex + 1 < QUEST_ORDER.length) {
-            const nextQuestId = QUEST_ORDER[lastCompletedIndex + 1];
-            if (!completedQuestsSet.has(nextQuestId) && !(newCyberFitnessProfile.activeQuests || []).includes(nextQuestId)) {
-                newCyberFitnessProfile.activeQuests = [...(newCyberFitnessProfile.activeQuests || []), nextQuestId];
+        const lastNewlyCompletedQuestId = updates.completedQuests.find(qId => !existingCyberFitnessProfileData.completedQuests.includes(qId));
+        if (lastNewlyCompletedQuestId) {
+            const lastCompletedIndex = QUEST_ORDER.indexOf(lastNewlyCompletedQuestId);
+            if (lastCompletedIndex !== -1 && lastCompletedIndex + 1 < QUEST_ORDER.length) {
+                const nextQuestId = QUEST_ORDER[lastCompletedIndex + 1];
+                if (!completedQuestsSet.has(nextQuestId) && !(newCyberFitnessProfile.activeQuests || []).includes(nextQuestId)) {
+                    newCyberFitnessProfile.activeQuests = [...(newCyberFitnessProfile.activeQuests || []), nextQuestId];
+                }
             }
         }
     }
-     // If no active quests, and not all quests are completed, add the first uncompleted quest from QUEST_ORDER
+    
     if (newCyberFitnessProfile.activeQuests.length === 0 && newCyberFitnessProfile.completedQuests.length < QUEST_ORDER.length) {
         for (const questId of QUEST_ORDER) {
             if (!newCyberFitnessProfile.completedQuests.includes(questId)) {
@@ -419,7 +449,6 @@ export const updateUserCyberFitnessProfile = async (
             }
         }
     }
-
 
     if (updates.unlockedPerks && Array.isArray(updates.unlockedPerks)) {
         const perksToAddSet = new Set(updates.unlockedPerks);
@@ -453,8 +482,8 @@ export const updateUserCyberFitnessProfile = async (
         logger.info(`[CyberFitness UpdateProfile] Explicit level update to ${newLevelCandidate} (was ${previousLevel} based on KV).`);
     }
     
-    let newlyUnlockedAchievements: Achievement[] = [];
-    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []);
+    // Re-initialize newlyUnlockedAchievements here because "completedQuests" might have added some.
+    // currentAchievementsSet is already up-to-date from completedQuests processing.
 
     if (newLevelCandidate > previousLevel) {
         logger.info(`[CyberFitness UpdateProfile] LEVEL UP! User ${userId} from ${previousLevel} to ${newLevelCandidate}.`);

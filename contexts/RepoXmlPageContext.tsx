@@ -15,10 +15,11 @@ import * as repoUtils from "@/lib/repoUtils";
 import { useAppContext } from './AppContext'; 
 import { 
     checkAndUnlockFeatureAchievement, 
-    completeQuestAndUpdateProfile, 
+    updateUserCyberFitnessProfile, // Changed from completeQuestAndUpdateProfile
     logCyberFitnessAction, 
     Achievement,
-    PERKS_BY_LEVEL 
+    PERKS_BY_LEVEL,
+    ALL_ACHIEVEMENTS // Import ALL_ACHIEVEMENTS to get definitions
 } from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
@@ -305,7 +306,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let finalFetchStatus: FetchStatus = 'idle'; 
             
             let questCompleted = false;
-            let questResult: Awaited<ReturnType<typeof completeQuestAndUpdateProfile>> | null = null;
+            let questResult: Awaited<ReturnType<typeof updateUserCyberFitnessProfile>> | null = null; // Changed type
 
             // Priority to ImageReplaceTask if both somehow active (should not happen)
             const activeVisualTask = currentImgTask || currentIconTask;
@@ -331,7 +332,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR (${taskType}): ${replaceError || 'Неизвестно'}`, 'error');
                                    } else if (dbUser?.user_id) { 
-                                       questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
+                                       questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] }); // Use new call
                                        questCompleted = true;
                                    }
                                })
@@ -375,7 +376,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                              try {
                                  fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
                                  if (dbUser?.user_id) { 
-                                      questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
+                                      questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] }); // Use new call
                                       questCompleted = true;
                                  }
                                  scrollToSectionStable('executor');
@@ -392,16 +393,22 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                   finalFetchStatus = fetched ? 'success' : 'error';
                   if (fetched && !currentImgTask && !currentIconTask && !currentPendingFlow && dbUser?.user_id) { 
-                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
+                        questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] }); // Use new call
                         questCompleted = true;
                   }
             }
             
             if (questCompleted && questResult) {
-                if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 1) {
-                    addToastStable("🚀 Квест 'Первая Загрузка' выполнен! Level 1 достигнут!", "success", 4000);
+                const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level;
+                const firstFetchAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_fetch_completed');
+                const kvAwardedForQuest = firstFetchAchDef?.kiloVibesAward || 0;
+
+                if (questResult.success && updatedProfileLevel === 1 && kvAwardedForQuest > 0) { // Check specific level if that was the old logic's intent
+                    addToastStable(`🚀 Квест '${firstFetchAchDef?.name || 'Первая Загрузка'}' выполнен! Level 1 достигнут! +${kvAwardedForQuest} KiloVibes!`, "success", 4000);
+                } else if (questResult.success && kvAwardedForQuest > 0) {
+                     addToastStable(`🚀 Квест '${firstFetchAchDef?.name || 'Первая Загрузка'}' выполнен! +${kvAwardedForQuest} KiloVibes!`, "success", 4000);
                 } else if (questResult.success) {
-                     addToastStable("🚀 Квест 'Первая Загрузка' выполнен!", "success", 4000);
+                    addToastStable(`🚀 Квест '${firstFetchAchDef?.name || 'Первая Загрузка'}' выполнен!`, "success", 4000);
                 }
                 questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
@@ -475,8 +482,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setManualBranchNameStateStable(''); 
 
             if (dbUser?.user_id) { 
-                const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
-                if (questResult.success) addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
+                const questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['initial_boot_sequence'] }); // Use new call
+                if (questResult.success) {
+                    const initialBootAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'initial_boot_sequence');
+                    const kvAwarded = initialBootAchDef?.kiloVibesAward || 0;
+                    if (kvAwarded > 0) addToastStable(`🛰️ Квест '${initialBootAchDef?.name || 'Пойман Сигнал'}': +${kvAwarded} KiloVibes!`, "success", 3000);
+                    else addToastStable(`🛰️ Квест '${initialBootAchDef?.name || 'Пойман Сигнал'}' выполнен!`, "success", 3000);
+                }
                 questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
 
@@ -566,11 +578,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 try { 
                     await assistantRef.current.handleParse(); 
                     if (dbUser?.user_id) { 
-                         const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_parse_completed', 150, 2); 
-                         if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 2) {
-                             addToastStable("🚀 Квест 'Первый Парсинг' выполнен! Level 2 достигнут!", "success", 4000);
-                         } else if (questResult.success) {
-                            addToastStable("🚀 Квест 'Первый Парсинг' выполнен!", "success", 4000);
+                         const questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_parse_completed'] }); // Use new call
+                         if (questResult.success) {
+                             const parseAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_parse_completed');
+                             const kvAwarded = parseAchDef?.kiloVibesAward || 0;
+                             const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level;
+                             if (updatedProfileLevel === 2 && kvAwarded > 0) { // Check specific level if that was the old logic's intent
+                                 addToastStable(`🚀 Квест '${parseAchDef?.name || 'Первый Парсинг'}' выполнен! Level 2 достигнут! +${kvAwarded} KiloVibes!`, "success", 4000);
+                             } else if (kvAwarded > 0) {
+                                 addToastStable(`🚀 Квест '${parseAchDef?.name || 'Первый Парсинг'}' выполнен! +${kvAwarded} KiloVibes!`, "success", 4000);
+                             } else {
+                                addToastStable(`🚀 Квест '${parseAchDef?.name || 'Первый Парсинг'}' выполнен!`, "success", 4000);
+                             }
                          }
                          questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
@@ -657,11 +676,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         if(actionAch) combinedAchievements.push(...actionAch);
                         logger.info(`[CyberFitness] Logged 'prCreated' for PR #${result.prNumber}. User: ${dbUser.user_id}`);
                         
-                        const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3, PERKS_BY_LEVEL[3]);
-                        if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
-                            addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
-                        } else if (questResult.success) {
-                            addToastStable("🚀 Квест 'Первый PR' выполнен!", "success", 4000);
+                        const questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_pr_created'] }); // Use new call
+                        if(questResult.success) {
+                            const prAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_pr_created');
+                            const kvAwarded = prAchDef?.kiloVibesAward || 0;
+                             const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level;
+                            if (updatedProfileLevel === 3 && kvAwarded > 0) { // Check specific level if that was the old logic's intent
+                                addToastStable(`🚀 Квест '${prAchDef?.name || 'Первый PR'}' выполнен! Level 3 достигнут! +${kvAwarded} KiloVibes!`, "success", 4000);
+                            } else if (kvAwarded > 0) {
+                                 addToastStable(`🚀 Квест '${prAchDef?.name || 'Первый PR'}' выполнен! +${kvAwarded} KiloVibes!`, "success", 4000);
+                            } else {
+                                addToastStable(`🚀 Квест '${prAchDef?.name || 'Первый PR'}' выполнен!`, "success", 4000);
+                            }
                         }
                         if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
                     }
