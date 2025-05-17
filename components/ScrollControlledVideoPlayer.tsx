@@ -13,7 +13,7 @@ interface ScrollControlledVideoPlayerProps {
 const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = ({
   src,
   className,
-  intersectionThreshold = 0.001, // More sensitive threshold
+  intersectionThreshold = [0, 0.01, 0.99, 1], // Sensitive thresholds
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +52,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
     entries.forEach(entry => {
       const newVisibility = entry.isIntersecting;
       if (isVisibleRef.current !== newVisibility) { 
-        logger.debug(`[ScrollVideo] ${src.split('/').pop()} visibility changed via IO to: ${newVisibility}`);
+        logger.debug(`[ScrollVideo] ${src.split('/').pop()} visibility changed via IO to: ${newVisibility} (boundingClientRect.top: ${entry.boundingClientRect.top.toFixed(0)})`);
         setIsVisible(newVisibility);
       }
     });
@@ -61,7 +61,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
   useEffect(() => {
     const observer = new IntersectionObserver(handleIntersection, {
       threshold: intersectionThreshold, 
-      rootMargin: "0px 0px 0px 0px" 
+      rootMargin: "0px 0px -1px 0px" // Trigger slightly before fully out/in view
     });
     const currentContainer = containerRef.current;
     if (currentContainer) {
@@ -82,33 +82,41 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
     const video = videoRef.current;
     if (video) {
       const onLoadedMetadata = () => {
-        logger.log(`[ScrollVideo] Metadata loaded for ${src.split('/').pop()}: duration ${video.duration}s, readyState ${video.readyState}`);
-        if (video.duration > 0) {
-          setVideoDuration(video.duration);
-        } else {
-            // Safari might report 0 duration initially for some MP4s
-            const handleCanPlay = () => {
-                if (video.duration > 0) {
+        if (video.duration > 0 && videoDuration !== video.duration) {
+            logger.log(`[ScrollVideo] Metadata loaded for ${src.split('/').pop()}: duration ${video.duration}s, readyState ${video.readyState}`);
+            setVideoDuration(video.duration);
+        } else if (video.duration === 0) { // Handle cases where duration is initially 0
+            const onCanPlay = () => {
+                if (video.duration > 0 && videoDuration !== video.duration) {
                     logger.log(`[ScrollVideo] Duration resolved on canplay for ${src.split('/').pop()}: ${video.duration}s`);
                     setVideoDuration(video.duration);
                 }
-                video.removeEventListener('canplay', handleCanPlay);
+                video.removeEventListener('canplay', onCanPlay);
             };
-            video.addEventListener('canplay', handleCanPlay);
+            video.addEventListener('canplay', onCanPlay);
         }
-        if (video.readyState < 1) { 
-            video.load(); 
+        // Attempt to load if not already loading/loaded
+        if (video.networkState === video.NETWORK_EMPTY || video.networkState === video.NETWORK_NO_SOURCE) {
+             video.load();
         }
       };
+      
       video.addEventListener('loadedmetadata', onLoadedMetadata);
-      if (video.readyState >= 1 && video.duration > 0) { 
+      // If already loaded
+      if (video.readyState >= video.HAVE_METADATA && video.duration > 0) {
         onLoadedMetadata();
+      } else if (video.readyState >= video.HAVE_METADATA && video.duration === 0){
+         // Call it anyway to attach canplay listener if needed
+         onLoadedMetadata();
       }
+
+
       return () => {
         video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        // video.removeEventListener('canplay', onCanPlay); // This would need onCanPlay to be defined in scope
       };
     }
-  }, [src]);
+  }, [src, videoDuration]); // videoDuration added to re-check if it was initially null
 
   const calculatePlaybackState = useCallback(() => {
     const video = videoRef.current;
@@ -116,9 +124,9 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
     let shouldBeScrollControlled = false;
     let newTime = video?.currentTime ?? 0;
-    let newProgress = video && videoDuration ? (video.currentTime / videoDuration) : 0;
+    let newProgress = video && videoDuration && videoDuration > 0 ? (video.currentTime / videoDuration) : 0;
 
-    if (video && container && videoDuration && isVisibleRef.current) {
+    if (video && container && videoDuration && videoDuration > 0 && isVisibleRef.current) {
         const rect = container.getBoundingClientRect();
         const videoTop = rect.top;
         const videoBottom = rect.bottom;
@@ -129,11 +137,8 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
           setDebugVideoBottom(videoBottom);
         }
         
-        // Condition for scroll control: top of video is at or above viewport top, 
-        // AND bottom of video is still within viewport.
-        if (videoTop <= 0 && videoBottom > 0) {
+        if (videoHeight > 0 && videoTop <= 0 && videoBottom > 0) { // Control when top is off-screen & bottom is on-screen
             shouldBeScrollControlled = true;
-            // Progress is based on how much of the video's height has passed the top of the viewport
             newProgress = Math.min(1, Math.max(0, (-videoTop) / videoHeight));
             newTime = newProgress * videoDuration;
         }
@@ -161,9 +166,8 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
       setIsUnderScrollControl(shouldBeScrollControlled);
     }
 
-    if (shouldBeScrollControlled && videoRef.current && newTime !== undefined) {
-      // Ensure time is within bounds, especially at the very end
-      const targetTime = Math.min(newTime, videoDuration || newTime);
+    if (shouldBeScrollControlled && videoRef.current && videoDuration && newTime !== undefined) {
+      const targetTime = Math.min(newTime, videoDuration); // Ensure time does not exceed duration
       if (Math.abs(targetTime - videoRef.current.currentTime) > 0.035) { 
         videoRef.current.currentTime = targetTime;
       }
@@ -173,11 +177,13 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || videoDuration === null) {
-        logger.debug(`[ScrollVideo ${src.split('/').pop()}] Effect: Video or duration not ready. Cleanup and return.`);
+    if (!video || videoDuration === null || videoDuration === 0) { // Ensure duration is positive
+        logger.debug(`[ScrollVideo ${src.split('/').pop()}] Effect: Video or valid duration not ready. Cleanup and return.`);
         window.removeEventListener('scroll', masterScrollHandler);
         window.removeEventListener('resize', masterScrollHandler);
         if (scrollRAFRef.current) cancelAnimationFrame(scrollRAFRef.current);
+        if (video && !video.paused) video.pause(); // Pause if duration is not ready
+        if (video) video.loop = false;
         return;
     }
 
@@ -187,11 +193,10 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
     const videoTop = rect ? rect.top : 0;
     const videoBottom = rect ? rect.bottom : 0;
 
-    logger.debug(`[ScrollVideo ${src.split('/').pop()}] Effect running. Visible: ${localIsVisible}, ScrollControl: ${localIsUnderScrollControl}, Top: ${videoTop.toFixed(0)}, Bottom: ${videoBottom.toFixed(0)}`);
+    logger.debug(`[ScrollVideo ${src.split('/').pop()}] Effect logic. Visible: ${localIsVisible}, ScrollCtrl: ${localIsUnderScrollControl}, Top: ${videoTop.toFixed(0)}, Bottom: ${videoBottom.toFixed(0)}, Duration: ${videoDuration}`);
     
     if (showDebugOverlay) setDebugIsLooping(video.loop);
 
-    // Clear previous listeners and RAF
     window.removeEventListener('scroll', masterScrollHandler);
     window.removeEventListener('resize', masterScrollHandler);
     if (scrollRAFRef.current) {
@@ -205,39 +210,38 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         video.loop = false;
         if (video.currentTime !== 0 && !video.seeking) video.currentTime = 0;
         if (showDebugOverlay) setDebugIsLooping(false);
-    } else { // Is Visible
+    } else { 
         if (localIsUnderScrollControl) {
             logger.debug(`[ScrollVideo ${src.split('/').pop()}] Under Scroll Control. Paused, loop=false.`);
             video.loop = false;
             if (showDebugOverlay) setDebugIsLooping(false);
             if (!video.paused) video.pause();
             
-            // Call calculatePlaybackState once to set initial time if needed
-            const { newTime } = calculatePlaybackState();
+            const { newTime } = calculatePlaybackState(); // Get current scroll-controlled time
             if (newTime !== undefined && videoRef.current && Math.abs(newTime - videoRef.current.currentTime) > 0.035) {
-                 videoRef.current.currentTime = Math.min(newTime, videoDuration || newTime);
+                 videoRef.current.currentTime = Math.min(newTime, videoDuration);
             }
 
             scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
             window.addEventListener('scroll', masterScrollHandler, { passive: true });
             window.addEventListener('resize', masterScrollHandler, { passive: true });
-        } else { // Visible, but NOT under scroll control
-            if (videoBottom <= 0 && videoTop < 0) { // Video has scrolled completely past the top of viewport
+        } else { 
+            if (videoBottom <= 0 && videoTop < 0) { 
                 logger.debug(`[ScrollVideo ${src.split('/').pop()}] Visible (passed top), Not ScrollControlled. Looping from end.`);
-                if (video.readyState >= 3 && !video.seeking) { // Ensure video is ready
-                    video.currentTime = videoDuration - 0.01; // Start near the end for loop
+                if (video.readyState >= video.HAVE_METADATA && !video.seeking) {
+                    video.currentTime = videoDuration - 0.01; 
                 }
                 video.loop = true;
                 if (showDebugOverlay) setDebugIsLooping(true);
                 if (video.paused) {
                     video.play().catch(e => logger.warn(`[ScrollVideo Play Fail ${src.split('/').pop()}] PassedTop Loop: ${e.message}`));
                 }
-            } else { // Video is visible but either entering from bottom or not yet in scroll control zone
+            } else { 
                 logger.debug(`[ScrollVideo ${src.split('/').pop()}] Visible, Not ScrollControlled, Initial/Bottom. Frame 0, paused.`);
                 video.loop = false;
                 if (showDebugOverlay) setDebugIsLooping(false);
                 if (!video.paused) video.pause();
-                if (video.currentTime !== 0 && !video.seeking && video.readyState >= 1) video.currentTime = 0;
+                if (video.currentTime !== 0 && !video.seeking && video.readyState >= video.HAVE_METADATA) video.currentTime = 0;
             }
         }
     }
@@ -254,7 +258,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
   }, [isUnderScrollControl, isVisible, videoDuration, masterScrollHandler, src, showDebugOverlay, calculatePlaybackState]);
 
   return (
-    <div ref={containerRef} className={cn('w-full relative', className)}>
+    <div ref={containerRef} className={cn('w-full relative bg-black', className)}> {/* Added bg-black */}
       <video
         ref={videoRef}
         src={src}
@@ -262,11 +266,10 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         preload="metadata" 
         playsInline
         muted
-        // loop // Default to loop, JS will manage it
       >
         Your browser does not support the video tag.
       </video>
-      {videoDuration === null && isVisible && ( // Show loader only if visible and duration not yet set
+      {isVisible && (videoDuration === null || videoDuration === 0) && ( 
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white backdrop-blur-sm">
           Loading video metadata...
         </div>
@@ -282,6 +285,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
           <div>CalcTime: {debugCalculatedTime.toFixed(3)}s</div>
           <div>ActualTime: {videoRef.current?.currentTime?.toFixed(3) ?? 'N/A'}s</div>
           <div>Duration: {videoDuration?.toFixed(2) ?? 'N/A'}s</div>
+          <div>ReadyState: {videoRef.current?.readyState}</div>
         </div>
       )}
     </div>
