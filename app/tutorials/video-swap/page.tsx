@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
@@ -18,7 +19,7 @@ const videoSwapTutorialTranslations = {
         description: "Твоя первая задача: найти в коде компонент или тег, отображающий видео, которое нужно заменить. Скопируй полный URL текущего видео-источника (атрибут `src` или аналогичный). Это твоя цель номер один.",
         icon: "FaLink",
         color: "brand-pink",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4" // Placeholder
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4" 
       },
       {
         id: 2,
@@ -26,7 +27,7 @@ const videoSwapTutorialTranslations = {
         description: "Загрузи новый видео-файл на хостинг (например, Supabase Storage). Убедись, что файл доступен по публичному URL. Скопируй этот новый URL – это твой ключ к обновлению.",
         icon: "FaUpload",
         color: "brand-blue",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4" // Placeholder
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4" 
       },
       {
         id: 3,
@@ -34,7 +35,7 @@ const videoSwapTutorialTranslations = {
         description: "Перейди в SUPERVIBE Studio. В специальном интерфейсе для замены (Image/Video Swap) укажи старый URL видео и новый URL. AI-ассистент проанализирует код и подготовит необходимые изменения.",
         icon: "FaWandMagicSparkles",
         color: "brand-purple",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4" // Placeholder
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4" 
       },
       {
         id: 4,
@@ -42,57 +43,57 @@ const videoSwapTutorialTranslations = {
         description: "Миссия почти выполнена! SUPERVIBE Studio автоматически создаст Pull Request с изменениями. Твоя задача – проверить корректность замены в PR, смерджить его и убедиться, что новое видео отображается на сайте. Победа!",
         icon: "FaCheckDouble",
         color: "brand-green",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4" // Placeholder
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4" 
       }
     ],
     nextLevelTitle: "::FaFilm:: Киномеханик Готов!",
     nextLevelText: "Отличная работа, Агент! Ты освоил замену видео. <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих новых подвигов с видео-контентом. *Заметка: для видео используется тот же ImageSwap флоу в студии.*",
     tryLiveButton: "::FaWandMagicSparkles:: Попробовать в Студии",
-    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
-    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
-    pageTitle: "Замена Видео для Полных Нубов",
-    pageSubtitle: "Смотри видосы, повторяй, ПРОФИТ! ::FaFilm:: Это так же просто, как с картинками!",
+    pageTitle: "ВИДОСЫ МЕНЯТЬ – ЕЩЁ ПРОЩЕ, ЧЕМ ТЫ ДУМАЛ!",
+    pageSubtitle: "Большие файлы? Большая ответственность? ХА! Те же 4 кнопки, братан. ::FaVideo::",
     steps: [
       {
         id: 1,
-        title: "Шаг 1: Скопируй Старый Адрес Видео",
-        description: "Найди в коде СТАРОЕ видео. Скопируй его АДРЕС (URL).",
-        icon: "FaLink",
+        title: "ШАГ 1: СТАРЫЙ URL ВИДОСА – COPY!",
+        description: "Нашел СТАРОЕ видео в коде? Адрес (URL) скопировал. Поехали дальше.",
+        icon: "FaFilm",
         color: "brand-pink",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4" // Placeholder from image-swap
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4" 
       },
       {
         id: 2,
-        title: "Шаг 2: Загрузи Новое Видео, Скопируй Адрес",
-        description: "Загрузи НОВОЕ видео (на хостинг, где есть ссылка). Скопируй его АДРЕС (URL).",
-        icon: "FaUpload",
+        title: "ШАГ 2: НОВЫЙ ВИДОС ЗАЛЕЙ, URL – COPY!",
+        description: "Загрузи НОВОЕ видео. Адрес (URL) скопировал. Не сложнее, чем мем ВКонтакте залить.",
+        icon: "FaServer",
         color: "brand-blue",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4" // Placeholder from image-swap
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4" 
       },
       {
         id: 3,
-        title: "Шаг 3: Студия Сделает Магию (Видео)",
-        description: "Иди в SUPERVIBE Studio (используй флоу для картинок). Вставь СТАРЫЙ адрес, потом НОВЫЙ. AI всё сделает.",
-        icon: "FaWandMagicSparkles",
+        title: "ШАГ 3: СТУДИЯ! URL_СТАРЫЙ -> URL_НОВЫЙ -> GO!",
+        description: "SUPERVIBE Studio (да, та же, что для картинок). Старый URL, новый URL. Кнопка 'ВПЕРЕД'. AI не тупой, разберется.",
+        icon: "FaVideo", // Re-using FaVideo for emphasis
         color: "brand-purple",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4" // Placeholder from image-swap
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4" 
       },
       {
         id: 4,
-        title: "Шаг 4: Готово! Проверь PR (Видео)",
-        description: "PR создан! Просто проверь и смерджи. Видео заменено! Ты – режиссер своей страницы!",
-        icon: "FaCheckDouble",
+        title: "ШАГ 4: PR СОЗДАН! ТЫ – ТАРАНТИНО!",
+        description: "PR готов. Проверь, смерджи. Готово! Твои видосы теперь топчик. Считай, Оскар твой.",
+        icon: "FaMedal",
         color: "brand-green",
-        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4" // Placeholder from image-swap
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4" 
       }
     ],
-    nextLevelTitle: "::FaAward:: Видео-Мастер!",
-    nextLevelText: "Теперь и видео тебе по плечу! Продолжай в том же духе! <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> (да, та же кнопка для картинок) всегда готова помочь.",
-    tryLiveButton: "::FaWandMagicSparkles:: В Студию!",
-    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
-    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
+    nextLevelTitle: "::FaPhotoFilm:: ТЫ ТЕПЕРЬ ВИДЕО-МАГНАТ!",
+    nextLevelText: "Картинки, иконки, видосы... Что дальше? Весь Голливуд твой! <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет.",
+    tryLiveButton: "::FaVideoCamera:: В Монтажную!",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   }
 };
 
@@ -101,20 +102,30 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-blue": { text: "text-brand-blue", border: "border-brand-blue/50", shadow: "shadow-brand-blue/40" },
   "brand-purple": { text: "text-brand-purple", border: "border-brand-purple/50", shadow: "shadow-brand-purple/40" },
   "brand-green": { text: "text-brand-green", border: "border-brand-green/50", shadow: "shadow-brand-green/40" },
-  "brand-cyan": { text: "text-brand-cyan", border: "border-brand-cyan/50", shadow: "shadow-brand-cyan/40" }, // Added cyan
-  "brand-orange": { text: "text-brand-orange", border: "border-brand-orange/50", shadow: "shadow-brand-orange/40" }, // Added orange for consistency if needed
+  "brand-cyan": { text: "text-brand-cyan", border: "border-brand-cyan/50", shadow: "shadow-brand-cyan/40" },
+  "brand-orange": { text: "text-brand-orange", border: "border-brand-orange/50", shadow: "shadow-brand-orange/40" },
 };
 
 export default function VideoSwapTutorialPage() {
-  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>('ru');
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+  
   const t = videoSwapTutorialTranslations[currentMode];
 
   const toggleMode = () => {
     setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
   };
 
-  const stepsToRender = currentMode === 'wtf' ? videoSwapTutorialTranslations.wtf.steps : videoSwapTutorialTranslations.ru.steps;
-  const pageMainColor = "brand-cyan"; // Main color for this tutorial page
+  useEffect(() => {
+    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (newMode !== currentMode) {
+      setCurrentMode(newMode);
+    }
+  }, [searchParams, currentMode]);
+
+  const stepsToRender = t.steps; 
+  const pageMainColor = "brand-cyan"; 
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-blue-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
@@ -142,9 +153,8 @@ export default function VideoSwapTutorialPage() {
             onClick={toggleMode} 
             variant="outline" 
             className={cn(
-              "mt-6 bg-card/50 hover:bg-brand-cyan/10 transition-all duration-200 text-sm px-4 py-2",
-              colorClasses[pageMainColor]?.border || "border-brand-cyan/50",
-              `${colorClasses[pageMainColor]?.text}/90 hover:${colorClasses[pageMainColor]?.text}`
+              "mt-6 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
+               "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
             )}
           >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
@@ -204,8 +214,6 @@ export default function VideoSwapTutorialPage() {
              pageMainColor === "brand-cyan" && "bg-brand-cyan hover:bg-brand-cyan/80 hover:shadow-cyan-glow/60",
              pageMainColor === "brand-green" && "bg-brand-green hover:bg-brand-green/80 hover:shadow-green-glow/60",
              pageMainColor === "brand-purple" && "bg-brand-purple hover:bg-brand-purple/80 hover:shadow-purple-glow/60"
-             // Add more colors if needed, or a default
-            // !colorClasses[pageMainColor] && "bg-primary hover:bg-primary/80" // Example default
              )}>
             <Link href="/repo-xml?flow=imageSwap">
                 <VibeContentRenderer content={t.tryLiveButton} />

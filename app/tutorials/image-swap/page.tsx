@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
@@ -11,7 +12,7 @@ const imageSwapTutorialTranslations = {
   ru: {
     pageTitle: "Миссия 1: Охота на Битый Пиксель",
     pageSubtitle: "Агент, твоя задача: освоить замену изображений в коде! Думай об этом как о реанимации цифрового артефакта: ::FaImageSlash:: -> ::FaToolbox:: -> ::FaImagePortrait::. Без регистрации, только чистый скилл-ап!",
-    steps: [ // Changed from 'videos' to 'steps' for consistency
+    steps: [ 
       {
         id: 1,
         title: "Шаг 1: Захват URL Старого Артефакта",
@@ -48,51 +49,51 @@ const imageSwapTutorialTranslations = {
     nextLevelTitle: "::FaPlayCircle:: Новый Уровень Разблокирован!",
     nextLevelText: "Основы у тебя в кармане, Агент! Готов применить эти навыки в реальном бою? <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих команд.",
     tryLiveButton: "::FaWandMagicSparkles:: Попробовать в Студии",
-    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
-    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
-    pageTitle: "Замена Картинок для Чайников",
-    pageSubtitle: "Просто, как дважды два. Следуй видосам! ::FaThumbsUp::",
-    steps: [ // Changed from 'videos' to 'steps' for consistency
+    pageTitle: "КАРТИНКИ МЕНЯТЬ – КАК ДВА БАЙТА ПЕРЕСЛАТЬ!",
+    pageSubtitle: "Забудь про нудятину. Делай как на видосе. ЭТО ЖЕ ЭЛЕМЕНТАРНО, ВАТСОН!",
+    steps: [ 
       {
         id: 1,
-        title: "Шаг 1: Скопируй Старый Адрес",
-        description: "Найди в коде СТАРУЮ картинку. Скопируй её АДРЕС (URL). Это просто!",
+        title: "ШАГ 1: КОПИРУЙ СТАРЫЙ URL",
+        description: "Нашел картинку в коде? КОПИРНИ ЕЕ АДРЕС. Всё.",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4",
-        icon: "FaLink",
+        icon: "FaCopy",
         color: "brand-pink"
       },
       {
         id: 2,
-        title: "Шаг 2: Загрузи Новую, Скопируй Адрес",
-        description: "Загрузи НОВУЮ картинку (куда-нибудь, где есть ссылка). Скопируй её АДРЕС (URL).",
+        title: "ШАГ 2: ЗАЛЕЙ НОВУЮ, КОПИРУЙ URL",
+        description: "Загрузи НОВУЮ картинку. КОПИРНИ ЕЕ АДРЕС. Изи.",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4",
-        icon: "FaUpload",
+        icon: "FaCloudUploadAlt",
         color: "brand-blue"
       },
       {
         id: 3,
-        title: "Шаг 3: Студия Сделает Магию",
-        description: "Иди в SUPERVIBE Studio. Вставь СТАРЫЙ адрес, потом НОВЫЙ. Наш AI всё сделает сам и подготовит PR.",
+        title: "ШАГ 3: СТУДИЯ -> CTRL+V, CTRL+V -> MAGIC!",
+        description: "Иди в SUPERVIBE. Старый URL -> Новый URL. ЖМИ КНОПКУ. Бот сам всё сделает.",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4",
-        icon: "FaWandMagicSparkles",
+        icon: "FaExchangeAlt",
         color: "brand-purple"
       },
       {
         id: 4,
-        title: "Шаг 4: Готово! Проверь PR",
-        description: "PR создан! Просто проверь и смерджи. Картинка заменена! Ты молодец!",
+        title: "ШАГ 4: PR ГОТОВ! ТЫ КРАСАВЧИК!",
+        description: "PR создан. Проверь, смерджи. Всё! Ты поменял картинку быстрее, чем заварил дошик.",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4",
-        icon: "FaCheckDouble",
+        icon: "FaThumbsUp",
         color: "brand-green"
       }
     ],
-    nextLevelTitle: "::FaAward:: Мастер Пикселей!",
-    nextLevelText: "Теперь ты меняешь картинки как босс! Готов к реальным задачам? <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> заряжена.",
-    tryLiveButton: "::FaWandMagicSparkles:: В Студию!",
-    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
-    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
+    nextLevelTitle: "::FaRocket:: ТЫ ПРОКАЧАЛСЯ, БРО!",
+    nextLevelText: "Менять картинки – это для лохов. Ты уже ПРО. Го в <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link>, там РЕАЛЬНЫЕ ДЕЛА.",
+    tryLiveButton: "::FaForwardStep:: В Студию, НЕ ТОРМОЗИ!",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   }
 };
 
@@ -104,15 +105,25 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 };
 
 export default function ImageSwapTutorialPage() {
-  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>('ru');
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+
   const t = imageSwapTutorialTranslations[currentMode];
 
   const toggleMode = () => {
     setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
   };
 
-  const stepsToRender = currentMode === 'wtf' ? imageSwapTutorialTranslations.wtf.steps : imageSwapTutorialTranslations.ru.steps;
-  const pageMainColor = "brand-green"; // Main color for this tutorial page
+  useEffect(() => {
+    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (newMode !== currentMode) {
+      setCurrentMode(newMode);
+    }
+  }, [searchParams, currentMode]);
+
+  const stepsToRender = t.steps;
+  const pageMainColor = "brand-green"; 
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200 pt-24 pb-20 overflow-x-hidden">
@@ -140,9 +151,8 @@ export default function ImageSwapTutorialPage() {
             onClick={toggleMode} 
             variant="outline" 
             className={cn(
-              "mt-6 bg-card/50 hover:bg-brand-cyan/10 transition-all duration-200 text-sm px-4 py-2",
-              colorClasses["brand-cyan"]?.border || "border-brand-cyan/50", // WTF button always cyan for contrast
-              `${colorClasses["brand-cyan"]?.text}/90 hover:${colorClasses["brand-cyan"]?.text}`
+              "mt-6 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
+              "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
             )}
           >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
@@ -152,7 +162,6 @@ export default function ImageSwapTutorialPage() {
         <div className="space-y-16 md:space-y-24">
           {stepsToRender.map((step, index) => {
             const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
-            // Ensure videoSrc is checked correctly for each step
             const hasVideo = !!(step as any).videoSrc && typeof (step as any).videoSrc === 'string';
 
             return (
@@ -169,7 +178,7 @@ export default function ImageSwapTutorialPage() {
                     <p className="text-gray-300 text-base md:text-lg leading-relaxed">
                       <VibeContentRenderer content={step.description} />
                     </p>
-                    {step.id === 3 && ( // Check original step ID for button placement
+                    {step.id === 3 && ( 
                       <Button asChild className={cn(
                         "inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-black transition-colors shadow-lg mt-4",
                         "bg-brand-yellow hover:bg-brand-yellow/80 hover:shadow-yellow-glow/50"
@@ -185,7 +194,7 @@ export default function ImageSwapTutorialPage() {
                     <div className="md:w-3/5 lg:w-2/3">
                       <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColor.border, stepColor.shadow, "bg-black")}>
                         <ScrollControlledVideoPlayer 
-                          src={(step as any).videoSrc} // Cast to any to access videoSrc
+                          src={(step as any).videoSrc} 
                           className="w-full" 
                         />
                       </div>
@@ -211,7 +220,6 @@ export default function ImageSwapTutorialPage() {
              "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
              "shadow-xl",
               pageMainColor === "brand-green" && "bg-brand-green hover:bg-brand-green/80 hover:shadow-green-glow/60",
-             // Add other color conditions if this page type can have variable main colors
              )}>
             <Link href="/repo-xml?flow=imageSwap">
                 <VibeContentRenderer content={t.tryLiveButton} />
