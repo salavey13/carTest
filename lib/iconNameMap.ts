@@ -12,7 +12,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   falandmineon: "FaLandMineOn",
   fascrewdriverwrench: "FaScrewdriverWrench",
   fasmilewink: "FaSmileWink",
-  fatriangleexclamation: "FaTriangleExclamation",
+  fatriangleexclamation: "FaTriangleExclamation", // Corrected as per user's statement
   facrosshairs: "FaCrosshairs",
   fabookmedical: "FaBookMedical",
   fashieldhalved: "FaShieldHalved",
@@ -76,7 +76,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fadooropen: "FaDoorOpen",
   faregcopy: "FaRegCopy",
   fapaste: "FaPaste",
-  famagic: "FaWandMagicSparkles", // Duplicate, but same mapping is fine
+  famagic: "FaWandMagicSparkles", 
   facheckcircle: "FaCheckCircle",
   facrown: "FaCrown",
   facopy: "FaCopy",
@@ -97,7 +97,6 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faangledoubledown: "FaAngleDoubleDown",
   faguitar: "FaGuitar",
 
-  // StickyChat specific icons (many might be duplicates, ensure correct Fa6 mapping)
   faarrowright: "FaArrowRight",
   fahighlighter: "FaHighlighter",
   fagithub: "FaGithub",
@@ -107,13 +106,12 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fapaperplane: "FaPaperPlane",
   falightbulb: "FaLightbulb",
   faimages: "FaImages",
-  fasquarearrowupright: "FaSquareArrowUpRight", // Maps to FaSquareArrowUpRight
+  fasquarearrowupright: "FaSquareArrowUpRight", 
   fafileimport: "FaFileImport",
   faclipboardlist: "FaClipboardList",
   faicons: "FaIcons",
   faspinner: "FaSpinner",
 
-  // Error and diagnostics related
   favial: "FaVial",
   fadatabase: "FaDatabase",
   faboxarchive: "FaBoxArchive",
@@ -132,10 +130,9 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fauplong: "FaUpLong",
   faheartbeat: "FaHeartbeat",
 
-  // From PR description / repo-xml page.tsx / ActualPageContent
   faangleup: "FaAngleUp",
   faangledown: "FaAngleDown",
-  faxmarkcircle: "FaXmarkCircle", // maps to FaCircleXmark or FaXmarkCircle
+  faxmarkcircle: "FaXmarkCircle", 
   fafile: "FaFile",
   fafolder: "FaFolder",
   faterminal: "FaTerminal",
@@ -152,32 +149,16 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   famagnifyingglasschart: "FaMagnifyingGlassChart",
   faquoteleft: "FaQuoteLeft",
   faquoteright: "FaQuoteRight",
-  facirclexmark: "FaCircleXmark", // Same as faxmarkcircle if it maps to this
+  facirclexmark: "FaCircleXmark", 
   faanglesdown: "FaAnglesDown",
   faanglesup: "FaAnglesUp",
   
-  // From AutomationBuddy
   faarrowsrotate: "FaArrowsRotate",
-  faangrycreative: "FaAngrycreative", // Check if this exists in Fa6, might need alternative
+  faangrycreative: "FaAngrycreative", 
   fapoo: "FaPoo",
   falist: "FaList",
-  faexclamation: "FaExclamationTriangle", // FaExclamation does not exist, FaExclamationTriangle is common
+  faexclamation: "FaTriangleExclamation", // Changed to FaTriangleExclamation as per user feedback
   
-  // From AICodeAssistant
   fafilelines: "FaFileLines",
-
-  // From RepoTxtFetcher (some might be duplicates)
-  faarrowsrotaterepotxt: "FaArrowsRotate", // if specific styling needed, else use faarrowsrotate
-  
-  // Ensure all icons from VibeContentRenderer in repo-xml/page.tsx are here
-  // Example: If <VibeContentRenderer content="::FaRocket::" /> is used, 'farocket' should be in this map.
-  // Checked: FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles,
-  // FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye, FaAtom, FaBrain,
-  // FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt, FaToolbox, FaCode, FaVideo,
-  // FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket, FaMagnifyingGlass,
-  // FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye, FaUsers,
-  // FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash
-
-  // If any icon was used like <FaSpecificIcon directly, ensure its 'faspecificicon' key is here.
-  // e.g. for <FaRocket />, ensure 'farocket': 'FaRocket' is present. (It is)
+  faimage: "FaImage", // Added for AICodeAssistant
 };

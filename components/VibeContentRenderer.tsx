@@ -18,12 +18,16 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
   let lastIndex = 0;
 
   // Regex to capture:
-  // 1. Icon alias (FaCamelCase or fa-kebab-case)
-  // 2. The rest of the string within :: :: which might contain attributes
-  const iconRegex = /::(Fa[A-Za-z0-9]+|fa-[a-z0-9-]+)((?:\s+[^:]+)?)::/g;
-  // Example: ::FaBeer className='text-blue-500' title='Beer time'::
-  // match[1] = "FaBeer" (iconAlias)
-  // match[2] = " className='text-blue-500' title='Beer time'" (rawAttributesString)
+  // 1. Icon alias (e.g., FaBeer, fadownload)
+  // 2. The rest of the string within :: :: which might contain attributes (optional)
+  const iconRegex = /::([A-Za-z][a-zA-Z0-9]*)((?:\s+[^:]*)*)::/g;
+  // match[1] = alias (e.g., "fadownload" or "FaBeer")
+  // match[2] = raw attributes string (e.g., " className='text-neon-lime'" or "" or " title='Hi'")
+  // The `(?:\s+[^:]*)*` part:
+  //   (?:         - non-capturing group for the whole attribute part
+  //     \s+       - one or more spaces (attributes must be space-separated from alias)
+  //     [^:]*     - zero or more characters that are not colons (the attributes themselves)
+  //   )*          - this whole group can appear zero or more times (allows for no attributes)
 
   let match;
   while ((match = iconRegex.exec(content)) !== null) {
@@ -34,7 +38,7 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
 
     const fullMatch = match[0];
     const iconAlias = match[1].toLowerCase(); 
-    const rawAttributesString = (match[2] || "").trim(); 
+    const rawAttributesString = (match[2] || ""); // Ensure it's a string, even if empty or undefined
 
     logger.debug(`[${debugContext}] Matched icon tag: ${fullMatch} | Alias: ${iconAlias} | Raw Attributes: '${rawAttributesString}'`);
 
@@ -42,24 +46,22 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
 
     if (IconComponent) {
       const props: any = {};
-      if (rawAttributesString) {
-        // Regex to parse individual attributes: key='value', key="value", or key={value}
+      const trimmedAttributesString = rawAttributesString.trim(); // Trim spaces for reliable parsing
+
+      if (trimmedAttributesString) {
         const attrRegex = /(className|title|style)\s*=\s*(?:'([^']*)'|"([^"]*)"|({[^}]*?}))/g;
         let attrMatch;
-        while((attrMatch = attrRegex.exec(rawAttributesString)) !== null) {
+        while((attrMatch = attrRegex.exec(trimmedAttributesString)) !== null) {
           const key = attrMatch[1];
           const singleQuotedValue = attrMatch[2];
           const doubleQuotedValue = attrMatch[3];
-          const objectValue = attrMatch[4]; // For style objects like {color:'red'}
+          const objectValue = attrMatch[4]; 
 
           if (key === 'style' && objectValue) {
             try {
-              // This is a very basic style parser. For production, a safer method is needed.
-              // It attempts to convert something like "{color:'red', fontSize:'12px'}"
-              // It expects keys and string values to be single-quoted for this simple replacement.
               const styleStringForJson = objectValue
-                .replace(/(\w+)\s*:/g, '"$1":') // Add quotes to keys: {color: -> {"color":
-                .replace(/'/g, '"'); // Replace single quotes with double quotes for JSON
+                .replace(/(\w+)\s*:/g, '"$1":') 
+                .replace(/'/g, '"'); 
               const styleObject = JSON.parse(styleStringForJson);
               props.style = styleObject;
               logger.debug(`[${debugContext}] Parsed style for ${iconAlias}:`, styleObject);
@@ -67,7 +69,7 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
               logger.error(`[${debugContext}] Failed to parse style attribute for ${iconAlias}: ${objectValue}`, e);
             }
           } else {
-            props[key] = singleQuotedValue || doubleQuotedValue || objectValue; // prioritize quoted values
+            props[key] = singleQuotedValue || doubleQuotedValue || objectValue; 
             logger.debug(`[${debugContext}] Parsed prop for ${iconAlias}: ${key} = ${props[key]}`);
           }
         }
