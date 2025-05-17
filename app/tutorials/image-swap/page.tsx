@@ -107,17 +107,19 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        // Placeholder URLs, replace with actual ones
-        // mainBackgroundImageUrl="/assets/images/tutorial/gta-vice-city-main-bg.jpg"
-        // foregroundImageUrl="/assets/images/tutorial/gta-lucia-foreground.png"
-        // revealedBackgroundImageUrl="/assets/images/tutorial/gta-abstract-flames.jpg"
+        // Example image URLs - replace with your actual assets
+        // mainBackgroundImageUrl="https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2670&q=80"
+        // foregroundImageUrl="https://www.transparentpng.com/thumb/character/DzrPAs-character- φωτογραφίες.png" // Example PNG
+        // revealedBackgroundImageUrl="https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2574&q=80"
       >
         <Button 
             onClick={toggleMode} 
             variant="outline" 
             className={cn(
-            "bg-background/70 backdrop-blur-sm hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2 shadow-lg",
-            currentMode === 'ru' ? "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink focus:ring-brand-pink" : "border-brand-blue/70 text-brand-blue/90 hover:text-brand-blue focus:ring-brand-blue"
+            "bg-card/80 backdrop-blur-md hover:bg-brand-pink/20 transition-all duration-200 text-sm px-6 py-3 shadow-lg hover:shadow-brand-pink/30",
+            "focus:ring-2 focus:ring-offset-2 focus:ring-offset-background",
+            currentMode === 'ru' ? "border-brand-pink/70 text-brand-pink hover:text-brand-pink focus:ring-brand-pink" 
+                                 : "border-brand-blue/70 text-brand-blue hover:text-brand-blue focus:ring-brand-blue"
             )}
         >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
@@ -131,7 +133,11 @@ function ImageSwapTutorialContent() {
             const hasVideo = !!step.videoSrc && typeof step.videoSrc === 'string';
 
             return (
-              <TutorialStepSection key={step.id} className={cn(index > 0 && "border-t border-border/20 pt-12 md:pt-16")} isLastStep={index === stepsToRender.length -1}>
+              <TutorialStepSection 
+                key={step.id} 
+                className={cn(index > 0 && "border-t border-border/20 pt-12 md:pt-16")} 
+                isLastStep={index === stepsToRender.length -1}
+              >
                 <div className={cn(
                   "flex flex-col gap-6 md:gap-10",
                   index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
