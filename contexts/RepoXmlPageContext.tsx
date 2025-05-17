@@ -15,20 +15,22 @@ import * as repoUtils from "@/lib/repoUtils";
 import { useAppContext } from './AppContext'; 
 import { 
     checkAndUnlockFeatureAchievement, 
-    completeQuestAndUpdateProfile, 
+    updateUserCyberFitnessProfile, 
     logCyberFitnessAction, 
     Achievement,
-    PERKS_BY_LEVEL 
+    PERKS_BY_LEVEL,
+    ALL_ACHIEVEMENTS,
+    CYBERFIT_METADATA_KEY // IMPORTED
 } from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
 export type WorkflowStep = | 'idle' | 'ready_to_fetch' | 'fetching' | 'fetch_failed' | 'files_fetched' | 'files_fetched_highlights' | 'files_fetched_image_replace' | 'files_selected' | 'request_written' | 'request_copied' | 'generating_ai_response' | 'response_pasted' | 'parsing_response' | 'pr_ready';
-export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; } // Used for actual image URL replacement
-export interface IconReplaceTask { targetPath: string; oldIconName: string; newIconName: string; componentProps?: string; } // Used for icon component replacement
+export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; } 
+export interface IconReplaceTask { targetPath: string; oldIconName: string; newIconName: string; componentProps?: string; } 
 
 export interface PendingFlowDetails {
-    type: 'ImageSwap' | 'ErrorFix' | 'IconSwap'; // Added IconSwap
+    type: 'ImageSwap' | 'ErrorFix' | 'IconSwap'; 
     targetPath: string;
     details: any; 
 }
@@ -55,8 +57,8 @@ interface RepoXmlPageContextType {
     manualBranchName: string;
     openPrs: SimplePullRequest[];
     currentAiRequestId: string | null;
-    imageReplaceTask: ImageReplaceTask | null; // For actual images
-    iconReplaceTask: IconReplaceTask | null;   // For icons
+    imageReplaceTask: ImageReplaceTask | null; 
+    iconReplaceTask: IconReplaceTask | null;   
     allFetchedFiles: FileNode[];
     currentStep: WorkflowStep;
     repoUrl: string;
@@ -84,7 +86,7 @@ interface RepoXmlPageContextType {
     setContextIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
     setCurrentAiRequestId: React.Dispatch<React.SetStateAction<string | null>>;
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
-    setIconReplaceTask: React.Dispatch<React.SetStateAction<IconReplaceTask | null>>; // Setter for icon task
+    setIconReplaceTask: React.Dispatch<React.SetStateAction<IconReplaceTask | null>>; 
     setRepoUrl: React.Dispatch<React.SetStateAction<string>>;
     setTargetPrData: React.Dispatch<React.SetStateAction<TargetPrData | null>>;
     setIsPreChecking: React.Dispatch<React.SetStateAction<boolean>>;
@@ -201,7 +203,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [isParsingState, setIsParsingState] = useState<boolean>(false);
         const [currentAiRequestIdState, setCurrentAiRequestIdState] = useState<string | null>(null);
         const [imageReplaceTaskState, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null);
-        const [iconReplaceTaskState, setIconReplaceTaskState] = useState<IconReplaceTask | null>(null); // New state for icons
+        const [iconReplaceTaskState, setIconReplaceTaskState] = useState<IconReplaceTask | null>(null); 
         const [allFetchedFilesState, setAllFetchedFilesState] = useState<FileNode[]>([]);
         const [repoUrlState, setRepoUrlState] = useState<string>(defaultContextValue.repoUrl ?? '');
         const [targetPrDataState, setTargetPrDataState] = useState<TargetPrData | null>(null);
@@ -216,7 +218,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
         const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
         const imageReplaceTaskStateRef = useRef(imageReplaceTaskState); 
-        const iconReplaceTaskStateRef = useRef(iconReplaceTaskState); // Ref for icon task
+        const iconReplaceTaskStateRef = useRef(iconReplaceTaskState); 
         const pendingFlowDetailsRef = useRef(pendingFlowDetailsState); 
         const repoUrlStateRef = useRef(repoUrlState); 
         
@@ -253,7 +255,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setIsParsingStateStable = useCallback((parsing: boolean | ((prevState: boolean) => boolean)) => setIsParsingState(parsing), []);
         const setCurrentAiRequestIdStateStable = useCallback((id: string | null | ((prevState: string | null) => string | null)) => setCurrentAiRequestIdState(id), []);
         const setImageReplaceTaskStateStable = useCallback((task: ImageReplaceTask | null | ((prevState: ImageReplaceTask | null) => ImageReplaceTask | null)) => setImageReplaceTaskState(task), []);
-        const setIconReplaceTaskStateStable = useCallback((task: IconReplaceTask | null | ((prevState: IconReplaceTask | null) => IconReplaceTask | null)) => setIconReplaceTaskState(task), []); // Setter for icon task
+        const setIconReplaceTaskStateStable = useCallback((task: IconReplaceTask | null | ((prevState: IconReplaceTask | null) => IconReplaceTask | null)) => setIconReplaceTaskState(task), []); 
         const setAllFetchedFilesStateStable = useCallback((files: FileNode[] | ((prevState: FileNode[]) => FileNode[])) => setAllFetchedFilesState(files), []);
         const setRepoUrlStateStable = useCallback((url: string | ((prevState: string) => string)) => setRepoUrlState(url), []);
         const setTargetPrDataStable = useCallback((data: TargetPrData | null | ((prevState: TargetPrData | null) => TargetPrData | null)) => setTargetPrDataState(data), []);
@@ -262,7 +264,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setShowComponentsStateStable = useCallback((show: boolean | ((prevState: boolean) => boolean)) => setShowComponentsState(show), []);
 
         useEffect(() => { imageReplaceTaskStateRef.current = imageReplaceTaskState; }, [imageReplaceTaskState]);
-        useEffect(() => { iconReplaceTaskStateRef.current = iconReplaceTaskState; }, [iconReplaceTaskState]); // Effect for icon task
+        useEffect(() => { iconReplaceTaskStateRef.current = iconReplaceTaskState; }, [iconReplaceTaskState]); 
         useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetailsState; }, [pendingFlowDetailsState]);
         useEffect(() => { repoUrlStateRef.current = repoUrlState; }, [repoUrlState]);
         useEffect(() => { setRepoUrlEnteredStateStable(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com")); }, [repoUrlState, setRepoUrlEnteredStateStable]);
@@ -282,130 +284,132 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }, []); 
 
         const handleSetFilesFetchedStable = useCallback(async (
-            fetched: boolean,
+            fetched: boolean, // This is the result of the primary file fetch operation
             allFiles: FileNode[],
             primaryHighlight: string | null,
             secondaryHighlights: Record<ImportCategory, string[]>
         ) => {
-            const currentImgTask = imageReplaceTaskStateRef.current; 
-            const currentIconTask = iconReplaceTaskStateRef.current; // Check icon task too
-            const currentPendingFlow = pendingFlowDetailsRef.current; 
-            
-            const flowLogPrefix = currentImgTask ? '[Flow 1 - Image Swap]' 
-                                : currentIconTask ? '[Flow X - Icon Swap]' // Log for Icon Swap
-                                : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]' 
-                                : '[Flow 2 - Generic Idea]');
-            
+            const currentImgTask = imageReplaceTaskStateRef.current;
+            const currentIconTask = iconReplaceTaskStateRef.current;
+            const currentPendingFlow = pendingFlowDetailsRef.current;
+        
+            const flowLogPrefix = currentImgTask ? '[Flow 1 - Image Swap]'
+                : currentIconTask ? '[Flow X - Icon Swap]'
+                : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]'
+                : '[Flow 2 - Generic Idea]');
+        
             logger.debug(`${flowLogPrefix} Context: handleSetFilesFetchedStable. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
+            
+            // Set initial UI states based on the fetch operation
             setFilesFetchedState(fetched);
             if (fetched) { setAllFetchedFilesStateStable(allFiles ?? []); }
             else { setAllFetchedFilesStateStable([]); }
             setPrimaryHighlightPathState(primaryHighlight);
             setSecondaryHighlightPathsStateInternal(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
-            let finalFetchStatus: FetchStatus = 'idle'; 
-            
-            let questCompleted = false;
-            let questResult: Awaited<ReturnType<typeof completeQuestAndUpdateProfile>> | null = null;
-
-            // Priority to ImageReplaceTask if both somehow active (should not happen)
-            const activeVisualTask = currentImgTask || currentIconTask;
-            const isVisualSwapFlow = !!activeVisualTask;
-
-            if (isVisualSwapFlow && activeVisualTask) { // Check activeVisualTask to satisfy TypeScript
-                const taskToProcess = activeVisualTask; // Use a new const for type narrowing
-                const taskType = currentImgTask ? 'ImageSwap' : 'IconSwap';
-                
-                if (fetched) {
-                    const targetFileExists = (allFiles ?? []).some(f => f.path === taskToProcess.targetPath);
-                    if (!targetFileExists) {
-                       finalFetchStatus = 'error'; 
-                       addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Целевой файл ${taskToProcess.targetPath} не найден!`, 'error', 5000);
-                       setAssistantLoadingStateStable(false);
-                    } else {
-                       finalFetchStatus = 'success'; 
-                       if (assistantRef.current?.handleDirectImageReplace) { 
-                           setAssistantLoadingStateStable(true);
-                           
-                           assistantRef.current.handleDirectImageReplace(taskToProcess, allFiles ?? []) // Pass the correct task type
-                               .then(async ({ success: replaceSuccess, error: replaceError }) => {
-                                   if (!replaceSuccess) {
-                                       addToastStable(`Ошибка замены/PR (${taskType}): ${replaceError || 'Неизвестно'}`, 'error');
-                                   } else if (dbUser?.user_id) { 
-                                       questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
-                                       questCompleted = true;
-                                   }
-                               })
-                               .catch(replaceError => { 
-                                   addToastStable(`Проблема при вызове замены (${taskType}): ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); 
-                                })
-                               .finally(() => { 
-                                   setAssistantLoadingStateStable(false); 
-                                   if (taskType === 'ImageSwap') setImageReplaceTaskStateStable(null);
-                                   if (taskType === 'IconSwap') setIconReplaceTaskStateStable(null);
-                                   logger.info(`${flowLogPrefix} Context: ${taskType} task cleared in handleSetFilesFetchedStable finally block.`);
-                               });
-                       } else {
-                            addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену (${taskType}).`, 'error', 7000);
-                            finalFetchStatus = 'error'; 
+        
+            let finalFetchStatusDeterminedByFetch: FetchStatus = fetched ? 'success' : 'error';
+            let questResult: Awaited<ReturnType<typeof updateUserCyberFitnessProfile>> | null = null;
+        
+            try {
+                const activeVisualTask = currentImgTask || currentIconTask;
+                const isVisualSwapFlow = !!activeVisualTask;
+        
+                if (isVisualSwapFlow && activeVisualTask) {
+                    const taskToProcess = activeVisualTask;
+                    const taskType = currentImgTask ? 'ImageSwap' : 'IconSwap';
+        
+                    if (fetched) { // If initial files were fetched successfully for the visual task
+                        const targetFileExists = (allFiles ?? []).some(f => f.path === taskToProcess.targetPath);
+                        if (!targetFileExists) {
+                            finalFetchStatusDeterminedByFetch = 'error'; // Still an error for this specific flow
+                            addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Целевой файл ${taskToProcess.targetPath} не найден!`, 'error', 5000);
+                            setAssistantLoadingStateStable(false); // Ensure loading state is reset
+                        } else {
+                            // File needed for visual task exists, proceed with assistant
+                            if (assistantRef.current?.handleDirectImageReplace) {
+                                setAssistantLoadingStateStable(true);
+                                const replaceResult = await assistantRef.current.handleDirectImageReplace(taskToProcess, allFiles ?? []);
+                                if (!replaceResult.success) {
+                                    addToastStable(`Ошибка замены/PR (${taskType}): ${replaceResult.error || 'Неизвестно'}`, 'error');
+                                } else if (dbUser?.user_id) {
+                                    questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] });
+                                }
+                            } else {
+                                addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену (${taskType}).`, 'error', 7000);
+                            }
+                            // Reset task states after attempt, regardless of success
                             if (taskType === 'ImageSwap') setImageReplaceTaskStateStable(null);
                             if (taskType === 'IconSwap') setIconReplaceTaskStateStable(null);
                             setAssistantLoadingStateStable(false);
-                       }
+                            logger.info(`${flowLogPrefix} Context: ${taskType} task processing finished and cleared.`);
+                        }
+                    } else { // Initial file fetch failed for the visual task flow
+                        // finalFetchStatusDeterminedByFetch is already 'error'
+                        addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Не удалось загрузить файлы.`, 'error', 5000);
+                        setAssistantLoadingStateStable(false);
                     }
-                } else { // files not fetched
-                    finalFetchStatus = 'error'; 
-                    addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Не удалось загрузить файлы.`, 'error', 5000);
-                    setAssistantLoadingStateStable(false);
-                }
-                if (currentPendingFlow?.type === 'ImageSwap' && currentImgTask) { 
-                    setPendingFlowDetailsStateStable(null); 
-                } 
-                if (currentPendingFlow?.type === 'IconSwap' && currentIconTask) {
+                    if (currentPendingFlow?.type === 'ImageSwap' && currentImgTask) { setPendingFlowDetailsStateStable(null); } 
+                    if (currentPendingFlow?.type === 'IconSwap' && currentIconTask) { setPendingFlowDetailsStateStable(null); }
+        
+                } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) {
+                    const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
+                    if (targetFileExists) {
+                        const { Message, Stack, Logs, Source } = currentPendingFlow.details;
+                        const prompt = `Fix error in ${currentPendingFlow.targetPath}:\n\nMessage: ${Message}\nSource: ${Source || 'N/A'}\n\nStack:\n\`\`\`\n${Stack || 'N/A'}\n\`\`\`\n\nLogs:\n${Logs || 'N/A'}\n\nProvide ONLY the corrected code block or full file content.`;
+                        setKworkInputValueStateStable(prompt);
+                        if (fetcherRef?.current?.handleAddSelected) {
+                            setTimeout(async () => {
+                                try {
+                                    fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
+                                    if (dbUser?.user_id) {
+                                        questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] });
+                                    }
+                                    scrollToSectionStable('executor');
+                                } catch (addErr) { logger.error(`${flowLogPrefix} Context: Error calling handleAddSelected for ErrorFix:`, addErr); }
+                            }, 100);
+                        } else { scrollToSectionStable('executor'); }
+                    } else {
+                        addToastStable(`Ошибка Исправления: Целевой файл ${currentPendingFlow.targetPath} не найден!`, 'error', 5000);
+                        finalFetchStatusDeterminedByFetch = 'error'; // This specific flow step failed
+                    }
                     setPendingFlowDetailsStateStable(null);
+        
+                } else { // Generic fetch or unhandled flow
+                    if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
+                    if (fetched && !currentImgTask && !currentIconTask && !currentPendingFlow && dbUser?.user_id) {
+                        questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] });
+                    }
                 }
-            } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { 
-                 const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
-                 if (targetFileExists) {
-                     const { Message, Stack, Logs, Source } = currentPendingFlow.details;
-                     const prompt = `Fix error in ${currentPendingFlow.targetPath}:\n\nMessage: ${Message}\nSource: ${Source || 'N/A'}\n\nStack:\n\`\`\`\n${Stack || 'N/A'}\n\`\`\`\n\nLogs:\n${Logs || 'N/A'}\n\nProvide ONLY the corrected code block or full file content.`;
-                     setKworkInputValueStateStable(prompt);
-                     finalFetchStatus = 'success'; 
-                     if (fetcherRef?.current?.handleAddSelected) {
-                         setTimeout(async () => { 
-                             try {
-                                 fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
-                                 if (dbUser?.user_id) { 
-                                      questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
-                                      questCompleted = true;
-                                 }
-                                 scrollToSectionStable('executor');
-                             } catch (addErr) { logger.error(`${flowLogPrefix} Context: Error calling handleAddSelected for ErrorFix:`, addErr); }
-                         }, 100);
-                     } else { scrollToSectionStable('executor'); }
-                     setPendingFlowDetailsStateStable(null); 
-                 } else {
-                     addToastStable(`Ошибка Исправления: Целевой файл ${currentPendingFlow.targetPath} не найден!`, 'error', 5000);
-                     finalFetchStatus = 'error'; 
-                     setPendingFlowDetailsStateStable(null); 
-                 }
-            } else { 
-                  if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
-                  finalFetchStatus = fetched ? 'success' : 'error';
-                  if (fetched && !currentImgTask && !currentIconTask && !currentPendingFlow && dbUser?.user_id) { 
-                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
-                        questCompleted = true;
-                  }
-            }
-            
-            if (questCompleted && questResult) {
-                if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 1) {
-                    addToastStable("🚀 Квест 'Первая Загрузка' выполнен! Level 1 достигнут!", "success", 4000);
-                } else if (questResult.success) {
-                     addToastStable("🚀 Квест 'Первая Загрузка' выполнен!", "success", 4000);
+        
+                // Process questResult toast logic safely, after main async operations
+                if (questResult) {
+                    // Access CYBERFIT_METADATA_KEY safely here as it's imported
+                    const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level; 
+                    const firstFetchAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_fetch_completed');
+                    const kvAwardedForQuest = firstFetchAchDef?.kiloVibesAward || 0;
+        
+                    if (questResult.success && updatedProfileLevel === 1 && kvAwardedForQuest > 0) {
+                        addToastStable(`🚀 Квест '${firstFetchAchDef?.name || 'Первая Загрузка'}' выполнен! Level 1 достигнут! +${kvAwardedForQuest} KiloVibes!`, "success", 4000);
+                    } else if (questResult.success && kvAwardedForQuest > 0) {
+                        addToastStable(`🚀 Квест '${firstFetchAchDef?.name || 'Первая Загрузка'}' выполнен! +${kvAwardedForQuest} KiloVibes!`, "success", 4000);
+                    } else if (questResult.success) {
+                        addToastStable(`🚀 Квест '${firstFetchAchDef?.name || 'Первая Загрузка'}' выполнен!`, "success", 4000);
+                    } else if (!questResult.success) {
+                        addToastStable(`Предупреждение: Ошибка обновления CyberFitness профиля после извлечения файлов: ${questResult.error}`, "warning", 5000);
+                        logger.error(`${flowLogPrefix} CyberFitness update failed after successful fetch: ${questResult.error}`);
+                    }
+                    questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                 }
-                questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+        
+            } catch (error: any) { // Catch errors from the async block
+                logger.error(`${flowLogPrefix} Context: CRITICAL ERROR in handleSetFilesFetchedStable's async logic:`, error);
+                addToastStable(`Критическая ошибка при обработке файлов: ${error.message || "Проверьте консоль."}`, "error", 7000);
+                finalFetchStatusDeterminedByFetch = 'error'; // Ensure status reflects the critical error
+            } finally {
+                // This will always run, ensuring the UI reflects the *initial file fetch* status
+                setFetchStatusStateStable(finalFetchStatusDeterminedByFetch);
+                logger.info(`${flowLogPrefix} Context: handleSetFilesFetchedStable finished. Final UI fetchStatus set to: ${finalFetchStatusDeterminedByFetch}`);
             }
-           setFetchStatusStateStable(finalFetchStatus);
         }, [ 
              dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setIconReplaceTaskStateStable, 
@@ -475,8 +479,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setManualBranchNameStateStable(''); 
 
             if (dbUser?.user_id) { 
-                const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
-                if (questResult.success) addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
+                const questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['initial_boot_sequence'] }); 
+                if (questResult.success) {
+                    const initialBootAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'initial_boot_sequence');
+                    const kvAwarded = initialBootAchDef?.kiloVibesAward || 0;
+                    if (kvAwarded > 0) addToastStable(`🛰️ Квест '${initialBootAchDef?.name || 'Пойман Сигнал'}': +${kvAwarded} KiloVibes!`, "success", 3000);
+                    else addToastStable(`🛰️ Квест '${initialBootAchDef?.name || 'Пойман Сигнал'}' выполнен!`, "success", 3000);
+                }
                 questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
 
@@ -566,11 +575,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 try { 
                     await assistantRef.current.handleParse(); 
                     if (dbUser?.user_id) { 
-                         const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_parse_completed', 150, 2); 
-                         if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 2) {
-                             addToastStable("🚀 Квест 'Первый Парсинг' выполнен! Level 2 достигнут!", "success", 4000);
-                         } else if (questResult.success) {
-                            addToastStable("🚀 Квест 'Первый Парсинг' выполнен!", "success", 4000);
+                         const questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_parse_completed'] }); 
+                         if (questResult.success) {
+                             const parseAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_parse_completed');
+                             const kvAwarded = parseAchDef?.kiloVibesAward || 0;
+                             const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level;
+                             if (updatedProfileLevel === 2 && kvAwarded > 0) { 
+                                 addToastStable(`🚀 Квест '${parseAchDef?.name || 'Первый Парсинг'}' выполнен! Level 2 достигнут! +${kvAwarded} KiloVibes!`, "success", 4000);
+                             } else if (kvAwarded > 0) {
+                                 addToastStable(`🚀 Квест '${parseAchDef?.name || 'Первый Парсинг'}' выполнен! +${kvAwarded} KiloVibes!`, "success", 4000);
+                             } else {
+                                addToastStable(`🚀 Квест '${parseAchDef?.name || 'Первый Парсинг'}' выполнен!`, "success", 4000);
+                             }
                          }
                          questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
@@ -606,7 +622,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
                     if (dbUser?.user_id) {
-                        // Log 'branchUpdated' unconditionally on successful branch update.
                         const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
                         if(actionAch) combinedAchievements.push(...actionAch);
                         
@@ -657,11 +672,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         if(actionAch) combinedAchievements.push(...actionAch);
                         logger.info(`[CyberFitness] Logged 'prCreated' for PR #${result.prNumber}. User: ${dbUser.user_id}`);
                         
-                        const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3, PERKS_BY_LEVEL[3]);
-                        if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
-                            addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
-                        } else if (questResult.success) {
-                            addToastStable("🚀 Квест 'Первый PR' выполнен!", "success", 4000);
+                        const questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_pr_created'] }); 
+                        if(questResult.success) {
+                            const prAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_pr_created');
+                            const kvAwarded = prAchDef?.kiloVibesAward || 0;
+                             const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level;
+                            if (updatedProfileLevel === 3 && kvAwarded > 0) { 
+                                addToastStable(`🚀 Квест '${prAchDef?.name || 'Первый PR'}' выполнен! Level 3 достигнут! +${kvAwarded} KiloVibes!`, "success", 4000);
+                            } else if (kvAwarded > 0) {
+                                 addToastStable(`🚀 Квест '${prAchDef?.name || 'Первый PR'}' выполнен! +${kvAwarded} KiloVibes!`, "success", 4000);
+                            } else {
+                                addToastStable(`🚀 Квест '${prAchDef?.name || 'Первый PR'}' выполнен!`, "success", 4000);
+                            }
                         }
                         if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
                     }
@@ -833,7 +855,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 
     } catch (providerError: any) {
         logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
-        // Fallback UI or re-throw if this component should not handle the error itself
         return <div className="fixed inset-0 flex items-center justify-center bg-red-900 text-white p-4 z-[9999]">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
     }
 };
