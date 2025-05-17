@@ -54,28 +54,28 @@ const inceptionSwapTutorialTranslations = {
       {
         id: 1,
         title: "ШАГ 1: ЧТО? 4 ШАГА = ВСЁ!",
-        description: "1. СКОПИРУЙ СТАРОЕ (код, файл, идея). 2. ПРИДУМАЙ НОВОЕ (фикс, фича, рефактор). 3. СКАЖИ СТУДИИ (дай старое, опиши новое). 4. ПРОВЕРЬ PR. ЭТО БАЗА!",
+        description: "1. СКОПИРУЙ СТАРОЕ (код, файл, идея). 2. ПРИДУМАЙ НОВОЕ (фикс, фича, рефактор). 3. СКАЖИ СТУДИИ (дай старое, опиши новое). 4. ПРОВЕРЬ PR. ЭТО БАЗА! Как F5 в Доте, только для кода!",
         icon: "FaUniversalAccess", 
         color: "brand-pink"
       },
       {
         id: 2,
         title: "ШАГ 2: КАРТИНКИ? ИКОНКИ? ВИДЕО? Х**НЯ!",
-        description: "ЭТО РАБОТАЕТ ДЛЯ ЛЮБОГО ГРЁБАНОГО КОДА, ПОНЯЛ?! РЕФАКТОРИНГ? ДА! НОВЫЕ ФИЧИ? ДА! ИСПРАВЛЕНИЕ БАГОВ? ДА, ЧЕРТ ВОЗЬМИ!",
+        description: "ЭТО РАБОТАЕТ ДЛЯ ЛЮБОГО ГРЁБАНОГО КОДА, ПОНЯЛ?! РЕФАКТОРИНГ? ДА! НОВЫЕ ФИЧИ? ДА! ИСПРАВЛЕНИЕ БАГОВ? ДА, ЧЕРТ ВОЗЬМИ! Это как закуп в Доте – меняешь старый арт на новый, становишься сильнее!",
         icon: "FaBong",
         color: "brand-blue"
       },
       {
         id: 3,
         title: "ШАГ 3: СДЕЛАЙ СВОЙ VIDEO SWAP TOOL!",
-        description: "ХОЧЕШЬ VIDEO SWAP TOOL В ЧАТЕ? ЛЕГКО! СКАЖИ AI: 'ВОТ IMAGE SWAP TOOL (старый код), СДЕЛАЙ ИЗ НЕГО VIDEO SWAP TOOL (новая задача)'. БУМ! ГОТОВО!",
+        description: "ХОЧЕШЬ VIDEO SWAP TOOL В ЧАТЕ? ЛЕГКО! СКАЖИ AI: 'ВОТ IMAGE SWAP TOOL (старый код), СДЕЛАЙ ИЗ НЕГО VIDEO SWAP TOOL (новая задача)'. БУМ! ГОТОВО! Это как скрафтить новый имба-айтем из существующих!",
         icon: "FaToolbox", 
         color: "brand-purple"
       },
       {
         id: 4,
         title: "ШАГ 4: ТЫ В МАТРИЦЕ, НЕО!",
-        description: "ТЫ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТЫ, ЧТОБЫ ДЕЛАТЬ ИНСТРУМЕНТЫ! ТЫ И ЕСТЬ КОД! ТЫ МОЖЕШЬ ВСЁ! ААААА! WAKE THE FUCK UP, SAMURAI! WE HAVE A CITY TO BURN!",
+        description: "ТЫ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТЫ, ЧТОБЫ ДЕЛАТЬ ИНСТРУМЕНТЫ! ТЫ И ЕСТЬ КОД! ТЫ МОЖЕШЬ ВСЁ! ААААА! WAKE THE FUCK UP, SAMURAI! WE HAVE A CITY TO BURN! Пора ломать трон кодинга!",
         icon: "FaFire", 
         color: "brand-green"
       }
@@ -134,7 +134,7 @@ export default function InceptionSwapTutorialPage() {
             variant="outline" 
             className={cn(
               "mt-6 bg-card/50 hover:bg-brand-pink/10 transition-all duration-200 text-sm px-4 py-2",
-              "border-brand-pink/50 text-brand-pink/90 hover:text-brand-pink"
+              "border-brand-pink/50 text-brand-pink/90 hover:text-brand-pink" // WTF button color
             )}
           >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
