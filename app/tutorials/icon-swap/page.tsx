@@ -1,0 +1,146 @@
+"use client";
+
+import React from 'react';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
+import { VibeContentRenderer } from '@/components/VibeContentRenderer';
+import { Button } from '@/components/ui/button';
+
+const iconSwapTutorialTranslations = {
+  ru: {
+    pageTitle: "Миссия 2: Сапёр Иконок",
+    pageSubtitle: "Агент! Твоя цель – научиться обезвреживать 'минные поля' из битых иконок. ::FaLandMineOn:: -> ::FaScrewdriverWrench:: -> ::FaSmileWink::. Одна ошибка – и интерфейс может 'подорваться'!",
+    steps: [
+      {
+        id: 1,
+        title: "Шаг 1: Обнаружение Аномалии",
+        description: "Первый признак проблемы – предупреждение `[?] Неизвестная иконка <iconname>` в консоли браузера (F12) или в Оверлее Ошибок (Ctrl+Shift+E). Это сигнал от `VibeContentRenderer`, что иконка не найдена в его карте (`iconNameMap`).",
+        icon: "FaTriangleExclamation",
+        color: "brand-orange"
+      },
+      {
+        id: 2,
+        title: "Шаг 2: Идентификация Цели",
+        description: "Запомни имя `<iconname>` из предупреждения. Это имя (в нижнем регистре) должно быть ключом в `iconNameMap` в `/components/VibeContentRenderer.tsx`. Значение этого ключа – корректное PascalCase имя иконки из `react-icons/fa6`.",
+        icon: "FaCrosshairs",
+        color: "brand-pink"
+      },
+      {
+        id: 3,
+        title: "Шаг 3: Подбор Боеприпаса (Иконки)",
+        description: "Если иконки нет в карте, или имя некорректно, найди правильное имя на сайте [FontAwesome](https://fontawesome.com/search?o=r&m=free&f=brands,solid,regular) (например, `magnifying-glass` -> `FaMagnifyingGlass`) или в документации `react-icons`. ",
+        icon: "FaBookMedical",
+        color: "brand-blue"
+      },
+      {
+        id: 4,
+        title: "Шаг 4: Нейтрализация Угрозы",
+        description: "Внеси исправление: \n1. Если ошибка в строке типа `::FaIconName::`, убедись что `FaIconName` (PascalCase) написано правильно и `faiconname` (lowercase) есть в `iconNameMap` и указывает на существующую иконку. \n2. Если нужно добавить новую иконку в карту – отредактируй `iconNameMap` в `VibeContentRenderer.tsx`. \n3. Используй SUPERVIBE Studio для автоматической замены через 'Magic Swap' или 'Search/Replace'.",
+        icon: "FaShieldHalved",
+        color: "brand-purple"
+      },
+      {
+        id: 5,
+        title: "Шаг 5: Контрольная Проверка",
+        description: "Обнови страницу. Убедись, что иконка отображается корректно и предупреждение в консоли исчезло. Помни: без `VibeContentRenderer` или другой защиты, отсутствующая иконка может вызвать падение сборки!",
+        icon: "FaCheckDouble",
+        color: "brand-green"
+      }
+    ],
+    nextLevelTitle: "::FaAward:: Навык 'Разминирование Иконок' Получен!",
+    nextLevelText: "Отличная работа, сапёр! Теперь ты можешь поддерживать визуальную целостность интерфейсов. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> готова к новым задачам.",
+    tryLiveButton: "::FaTools:: Перейти в Студию"
+  },
+};
+
+const colorClasses: Record<string, { text: string; border: string; shadow: string }> = {
+  "brand-pink": { text: "text-brand-pink", border: "border-brand-pink/50", shadow: "shadow-brand-pink/40" },
+  "brand-blue": { text: "text-brand-blue", border: "border-brand-blue/50", shadow: "shadow-brand-blue/40" },
+  "brand-purple": { text: "text-brand-purple", border: "border-brand-purple/50", shadow: "shadow-brand-purple/40" },
+  "brand-green": { text: "text-brand-green", border: "border-brand-green/50", shadow: "shadow-brand-green/40" },
+  "brand-orange": { text: "text-brand-orange", border: "border-brand-orange/50", shadow: "shadow-brand-orange/40" },
+};
+
+export default function IconSwapTutorialPage() {
+  const lang = 'ru'; 
+  const t = iconSwapTutorialTranslations[lang];
+
+  return (
+    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-indigo-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
+      <div
+        className="absolute inset-0 bg-repeat opacity-[0.04] -z-10"
+        style={{
+          backgroundImage: `linear-gradient(to right, rgba(139, 92, 246, 0.1) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(139, 92, 246, 0.1) 1px, transparent 1px)`,
+          backgroundSize: '45px 45px',
+        }}
+      ></div>
+
+      <div className="container mx-auto px-4">
+        <header className="text-center mb-12 md:mb-20">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold text-brand-purple cyber-text glitch mb-4" data-text={t.pageTitle}>
+            <VibeContentRenderer content={t.pageTitle} />
+          </h1>
+          <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
+            <VibeContentRenderer content={t.pageSubtitle} />
+          </p>
+        </header>
+
+        <div className="space-y-12 md:space-y-20">
+          {t.steps.map((step, index) => {
+            const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
+            const hasVideo = step.hasOwnProperty('videoSrc') && (step as any).videoSrc;
+
+            return (
+              <section key={step.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-10 md:pt-14")}>
+                <div className={cn(
+                  "flex flex-col gap-6 md:gap-10",
+                  index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
+                )}>
+                  <div className={cn("space-y-4 flex flex-col items-start justify-center", hasVideo ? "md:w-2/5 lg:w-1/3" : "w-full")}>
+                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center gap-3", stepColor.text)}>
+                      <VibeContentRenderer content={`::${step.icon}::`} className="text-3xl opacity-90" />
+                      <VibeContentRenderer content={step.title} />
+                    </h2>
+                    <div className="text-gray-300 text-base md:text-lg leading-relaxed prose prose-invert prose-sm md:prose-base max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-1 prose-headings:my-3 prose-a:text-brand-blue hover:prose-a:text-brand-cyan">
+                      <VibeContentRenderer content={step.description} />
+                    </div>
+                  </div>
+
+                  {hasVideo && (
+                    <div className="md:w-3/5 lg:w-2/3">
+                      <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColor.border, stepColor.shadow, "bg-black")}>
+                        <ScrollControlledVideoPlayer 
+                          src={(step as any).videoSrc}
+                          className="w-full" 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        <section className="mt-20 md:mt-32 text-center border-t border-brand-purple/40 pt-12 md:pt-16">
+          <h2 className="text-3xl md:text-4xl font-orbitron text-brand-purple mb-6">
+             <VibeContentRenderer content={t.nextLevelTitle} />
+          </h2>
+          <p className="text-lg md:text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-8">
+            <VibeContentRenderer content={t.nextLevelText} />
+          </p>
+          <Button asChild className={cn(
+             "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
+             "bg-brand-purple hover:bg-brand-purple/80 shadow-xl hover:shadow-purple-glow/60"
+             )}>
+            <Link href="/repo-xml">
+                <VibeContentRenderer content={t.tryLiveButton} />
+            </Link>
+          </Button>
+        </section>
+      </div>
+    </div>
+  );
+}
