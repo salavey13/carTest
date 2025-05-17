@@ -1,4 +1,3 @@
-// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -21,7 +20,8 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots,
+    FaAngleUp, FaAngleDown, FaFile, FaFolder, FaTerminal, FaCloud // Added new icons
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';

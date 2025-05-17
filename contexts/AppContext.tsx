@@ -1,16 +1,11 @@
 "use client";
 
 import type React from "react";
-import { createContext, useContext, useEffect, useMemo } from "react"; // Removed useState as it's not directly used here
+import { createContext, useContext, useEffect, useMemo, useRef } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
-// import { debugLogger } from "@/lib/debugLogger"; // Keep if specific debugs needed for AppContext itself
 import { logger as globalLogger } from "@/lib/logger"; 
 import { toast } from "sonner";
-// Types not directly used in this file if passed through from useTelegram
-// import type { WebAppUser, WebApp, ThemeParams, WebAppInitData } from "@/types/telegram";
-// import type { Database } from "@/types/database.types";
 
-// type User = Database["public"]["Tables"]["users"]["Row"]; // Not directly used
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   // isAuthenticating is already part of ReturnType<typeof useTelegram>
@@ -19,40 +14,43 @@ interface AppContextData extends ReturnType<typeof useTelegram> {
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const telegramData = useTelegram(); // This now contains all states including isLoading, isAuthenticating, error etc.
+  const telegramData = useTelegram(); 
+  const telegramDataRef = useRef(telegramData); // Ref to hold the latest telegramData
 
-  // contextValue simply passes through what useTelegram provides.
-  // useMemo here ensures that the context object reference only changes if telegramData itself changes.
+  useEffect(() => {
+    telegramDataRef.current = telegramData; // Keep ref updated
+  }, [telegramData]);
+
   const contextValue = useMemo(() => {
-    // No need for extensive debug logging here for memoization itself,
-    // as the primary source of truth and logging is useTelegram.
     return telegramData;
-  }, [telegramData]); // Dependency array is just telegramData
+  }, [telegramData]); 
 
   useEffect(() => {
     globalLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value changed. Current state from context:", {
       isAuthenticated: contextValue.isAuthenticated,
-      isLoading: contextValue.isLoading, // Directly from useTelegram
-      isAuthenticating: contextValue.isAuthenticating, // Directly from useTelegram
+      isLoading: contextValue.isLoading, 
+      isAuthenticating: contextValue.isAuthenticating, 
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
       dbUserStatus: contextValue.dbUser?.status,
       dbUserRole: contextValue.dbUser?.role,
       isAdminFuncType: typeof contextValue.isAdmin,
-      errorMsg: contextValue.error?.message, // Directly from useTelegram
+      errorMsg: contextValue.error?.message, 
       inTelegram: contextValue.isInTelegramContext,
       mockUserEnv: process.env.NEXT_PUBLIC_USE_MOCK_USER,
       platform: contextValue.platform,
     });
-  }, [contextValue]); // Log whenever the memoized contextValue changes
+  }, [contextValue]); 
 
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 350; 
 
-    globalLogger.log(`[APP_CONTEXT EFFECT_TOAST_LOGIC] Evaluating toasts. isLoading: ${contextValue.isLoading}, isAuthenticating: ${contextValue.isAuthenticating}, isAuthenticated: ${contextValue.isAuthenticated}, error: ${contextValue.error?.message}, isInTG: ${contextValue.isInTelegramContext}, MOCK_ENV: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, Visible: ${document.visibilityState}`);
+    // Use the ref for the most current data inside the effect, especially in setTimeout
+    const currentTgData = telegramDataRef.current;
 
-    // Consolidate loading state check
-    const فعلاًЗагружается = contextValue.isLoading || contextValue.isAuthenticating;
+    globalLogger.log(`[APP_CONTEXT EFFECT_TOAST_LOGIC] Evaluating toasts. isLoading: ${currentTgData.isLoading}, isAuthenticating: ${currentTgData.isAuthenticating}, isAuthenticated: ${currentTgData.isAuthenticated}, error: ${currentTgData.error?.message}, isInTG: ${currentTgData.isInTelegramContext}, MOCK_ENV: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, Visible: ${document.visibilityState}`);
+
+    const فعلاًЗагружается = currentTgData.isLoading || currentTgData.isAuthenticating;
 
     if (فعلاًЗагружается) { 
        toast.dismiss("auth-success-toast");
@@ -61,8 +59,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
        globalLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] In loading/authenticating state. Dismissed other toasts.");
 
        loadingTimer = setTimeout(() => {
-          // Re-check condition inside timeout
-          const stillLoadingInTimeout = contextValue.isLoading || contextValue.isAuthenticating;
+          // Re-check condition inside timeout using the most up-to-date ref
+          const stillLoadingInTimeout = telegramDataRef.current.isLoading || telegramDataRef.current.isAuthenticating;
           if (stillLoadingInTimeout && document.visibilityState === 'visible') {
              globalLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Showing 'Авторизация...' loading toast (ID: auth-loading-toast).");
              toast.loading("Авторизация...", { id: "auth-loading-toast" });
@@ -71,13 +69,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              toast.dismiss("auth-loading-toast");
           }
        }, LOADING_TOAST_DELAY);
-    } else { // Not loading AND not authenticating
+    } else { 
         if (loadingTimer) clearTimeout(loadingTimer);
-        toast.dismiss("auth-loading-toast"); // Ensure loading toast is dismissed
+        toast.dismiss("auth-loading-toast"); 
         globalLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Exited loading/authenticating state. Dismissed auth-loading-toast.");
 
-        // Mock user toast logic
-        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !contextValue.isInTelegramContext) {
+        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !currentTgData.isInTelegramContext) {
              const existingMockToast = document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]');
              if (!existingMockToast && document.visibilityState === 'visible') {
                 globalLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Using MOCK_USER outside of Telegram. Displaying info toast (ID: mock-user-info-toast).");
@@ -89,31 +86,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              } else if (existingMockToast) {
                 globalLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Mock user info toast already exists or tab not visible. Not showing new one.");
              }
-        } else if (contextValue.isInTelegramContext) { // Explicitly in real TG context
+        } else if (currentTgData.isInTelegramContext) { 
              globalLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] In real Telegram context. Dismissing any mock user info toast (ID: mock-user-info-toast).");
              toast.dismiss("mock-user-info-toast");
         }
 
-        // Auth success/error toast logic
-        if (contextValue.isAuthenticated && !contextValue.error) {
+        if (currentTgData.isAuthenticated && !currentTgData.error) {
             toast.dismiss("auth-error-toast"); 
              if (document.visibilityState === 'visible') {
                  globalLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] User authenticated successfully. Showing success toast (ID: auth-success-toast).");
                  toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
              }
-        } else if (contextValue.error) {
+        } else if (currentTgData.error) {
             toast.dismiss("auth-success-toast"); 
             if (document.visibilityState === 'visible') {
-                 globalLogger.error("[APP_CONTEXT EFFECT_TOAST_LOGIC] Auth error. Showing error toast (ID: auth-error-toast). Error:", contextValue.error.message);
-                 toast.error(`Ошибка авторизации: ${contextValue.error.message}`, { 
+                 globalLogger.error("[APP_CONTEXT EFFECT_TOAST_LOGIC] Auth error. Showing error toast (ID: auth-error-toast). Error:", currentTgData.error.message);
+                 toast.error(`Ошибка авторизации: ${currentTgData.error.message}`, { 
                     id: "auth-error-toast", 
                     description: "Не удалось войти. Попробуйте перезапустить приложение или обратитесь в поддержку.",
                     duration: 10000 
                 });
             }
         } else {
-            // This case: !isLoading, !isAuthenticating, !isAuthenticated, !error
-            // Means user is simply not authenticated yet, but no error occurred (e.g. first visit, no initData)
             globalLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Not loading, not authed, no error. No specific auth status toast needed.");
         }
     }
@@ -124,7 +118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             globalLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC_CLEANUP] Cleared loadingTimer.");
         }
     };
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error, contextValue.isInTelegramContext]);
+  }, [telegramData]); // Re-run this effect when telegramData changes to capture new states for toast logic.
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
@@ -132,8 +126,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  // Check if context is truly uninitialized (e.g. called outside Provider, or Provider hasn't run its effect yet)
-  // `isLoading` and `isAuthenticating` are good indicators from `useTelegram`'s initial state.
   if (!context || context.isLoading === undefined || context.isAuthenticating === undefined ) { 
      globalLogger.warn("HOOK_APP_CONTEXT: Context is empty or key state flags (`isLoading`/`isAuthenticating`) are undefined. Returning SKELETON/LOADING defaults. This is usually very brief on initial mount BEFORE useTelegram initializes.");
      return {
@@ -156,8 +148,6 @@ export const useAppContext = (): AppContextData => {
      } as AppContextData; 
   }
 
-  // This specific check is for a rare edge case where useTelegram might have finished, 
-  // but the isAdmin function somehow isn't correctly formed on the context object.
   if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
     globalLogger.error(
         "HOOK_APP_CONTEXT: CRITICAL - Context fully loaded (isLoading: false, isAuthenticating: false) but context.isAdmin is NOT a function. This indicates a problem with how useTelegram returns its memoized value or how AppContext consumes it. Providing a fallback isAdmin.", 
@@ -166,10 +156,10 @@ export const useAppContext = (): AppContextData => {
             contextDbUserStatus: context.dbUser?.status, 
             contextDbUserRole: context.dbUser?.role,
             contextIsAuthenticated: context.isAuthenticated,
-            contextKeys: Object.keys(context) // Log all keys to see what's actually there
+            contextKeys: Object.keys(context) 
         }
     );
-    const fallbackIsAdmin = () => { // Define the fallback function
+    const fallbackIsAdmin = () => { 
         if (context.dbUser) {
             const statusIsAdmin = context.dbUser.status === 'admin';
             const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; 
@@ -179,12 +169,10 @@ export const useAppContext = (): AppContextData => {
         globalLogger.warn("[HOOK_APP_CONTEXT - Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false.");
         return false;
     };
-    // Return the context spread, but override isAdmin with the fallback
     return {
-        ...(context as AppContextData), // Cast to ensure type compliance
+        ...(context as AppContextData), 
         isAdmin: fallbackIsAdmin, 
     };
   }
-  // globalLogger.log("[HOOK_APP_CONTEXT] Context seems valid and complete. isLoading:", context.isLoading, "isAuthenticating:", context.isAuthenticating, "isAdmin is func:", typeof context.isAdmin === 'function');
-  return context as AppContextData; // All checks passed, context is good.
+  return context as AppContextData; 
 };

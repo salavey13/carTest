@@ -14,11 +14,17 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 // Internal function for icon syntax preprocessing
 function preprocessIconSyntaxInternal(content: string): string {
     if (!content) return '';
+    // Updated regex to ensure attributes are correctly captured and spaces are handled
     return content.replace(
-        /::(Fa\w+)((?:\s+\w+(?:=(?:(["'])(?:(?!\3).)*\3|\w+)))*)\s*::/g,
+        /::(Fa\w+)((?:\s+\w+=(?:(["'])(?:(?!\3)[^"'])*\3|[^"'\s]+))*)?\s*::/g,
         (_match, iconName, attributesString) => {
             const attrs = attributesString ? attributesString.trim() : '';
-            return `<${iconName}${attrs ? ' ' + attrs : ''}></${iconName}>`; // Changed to closing tag for parser
+            // Create a self-closing tag structure that the parser can handle
+            // Or ensure it's a simple tag if no children are expected, e.g. <FaIconName attributes />
+            // For parser, it's better to use a structure like <FaIconName attributes></FaIconName>
+            // Or if it MUST be self-closing for some reason, ensure parser knows.
+            // Let's try with a non-self-closing structure for broader compatibility with html-react-parser.
+            return `<${iconName}${attrs ? ' ' + attrs : ''}></${iconName}>`;
         }
     );
 }
@@ -54,29 +60,33 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
 
             // --- Icon Handling ---
             let iconToRender: keyof typeof Fa6Icons | undefined = undefined;
-            
-            if (isValidFa6Icon(nodeName)) { 
-                iconToRender = nodeName as keyof typeof Fa6Icons;
-            } else if (iconNameMap[lowerCaseName]) { 
+            let determinedIconName = nodeName; // Start with the original node name
+
+            if (isValidFa6Icon(determinedIconName)) { 
+                iconToRender = determinedIconName as keyof typeof Fa6Icons;
+            } else {
                 const mappedName = iconNameMap[lowerCaseName];
-                if (isValidFa6Icon(mappedName)) {
+                if (mappedName && isValidFa6Icon(mappedName)) {
                     iconToRender = mappedName;
+                    determinedIconName = mappedName; // Update determinedIconName if mapped
                 }
             }
             
             if (iconToRender) {
                 const IconComponent = Fa6Icons[iconToRender];
-                const { className, style, title, ...restProps } = mutableAttribs; 
+                // Ensure className is a string and handle potential undefined style/title
+                const currentClassName = typeof mutableAttribs.className === 'string' ? mutableAttribs.className : '';
                 const finalProps: Record<string, any> = {
-                    ...restProps, 
-                    className: `${className || ''} inline align-baseline mx-px`.trim(),
-                    style: style,
-                    title: title 
+                    ...mutableAttribs, // Spread original attributes first
+                    className: `${currentClassName} inline align-baseline mx-px`.trim(), // Append default classes
+                    style: mutableAttribs.style ?? undefined,
+                    title: mutableAttribs.title ?? determinedIconName, // Use icon name as fallback title
                 };
-                return React.createElement(IconComponent, finalProps); // Icons are self-closing
+                delete finalProps.children; // Icons generally don't have children from HTML parsing
+                return React.createElement(IconComponent, finalProps);
             } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) {
                 logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
-                return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?] Неизвестная иконка <${nodeName}>`}</span>;
+                return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?]`}</span>;
             }
 
             // --- Link Handling ---
@@ -84,7 +94,7 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 const hrefVal = mutableAttribs.href;
                 const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
                 
-                let linkClassName = mutableAttribs.className || '';
+                let linkClassName = typeof mutableAttribs.className === 'string' ? mutableAttribs.className : '';
                 mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); 
 
                 if (isInternal && !mutableAttribs.target && hrefVal) {
@@ -94,32 +104,33 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             }
             
             // --- Standard HTML Elements Styling & Passing Children ---
+            const currentElemClassName = typeof mutableAttribs.className === 'string' ? mutableAttribs.className : '';
             if (lowerCaseName === 'strong') {
-                mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim();
+                mutableAttribs.className = `${currentElemClassName} font-semibold text-brand-yellow`.trim();
             }
             if (lowerCaseName === 'em') {
-                mutableAttribs.className = `${mutableAttribs.className || ''} italic text-brand-cyan`.trim();
+                mutableAttribs.className = `${currentElemClassName} italic text-brand-cyan`.trim();
             }
             if (lowerCaseName === 'code' && domNode.parent?.name !== 'pre') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted px-1 py-0.5 rounded text-sm font-mono text-accent-foreground`.trim();
+                 mutableAttribs.className = `${currentElemClassName} bg-muted px-1 py-0.5 rounded text-sm font-mono text-accent-foreground`.trim();
             }
             if (lowerCaseName === 'pre') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar`.trim();
+                 mutableAttribs.className = `${currentElemClassName} bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar`.trim();
             }
             if (lowerCaseName === 'blockquote') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} border-l-4 border-brand-purple pl-4 italic text-muted-foreground my-4`.trim();
+                 mutableAttribs.className = `${currentElemClassName} border-l-4 border-brand-purple pl-4 italic text-muted-foreground my-4`.trim();
             }
             if (lowerCaseName === 'ul') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} list-disc list-inside space-y-1 my-2`.trim();
+                 mutableAttribs.className = `${currentElemClassName} list-disc list-inside space-y-1 my-2`.trim();
             }
             if (lowerCaseName === 'ol') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} list-decimal list-inside space-y-1 my-2`.trim();
+                 mutableAttribs.className = `${currentElemClassName} list-decimal list-inside space-y-1 my-2`.trim();
             }
             if (lowerCaseName === 'li') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} my-0.5`.trim();
+                 mutableAttribs.className = `${currentElemClassName} my-0.5`.trim();
             }
             if (lowerCaseName === 'hr') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} border-border my-4`.trim();
+                 mutableAttribs.className = `${currentElemClassName} border-border my-4`.trim();
             }
 
             return React.createElement(nodeName, mutableAttribs, children);
