@@ -98,7 +98,7 @@ interface RepoXmlPageContextType {
     triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>;
     triggerSelectHighlighted: () => void;
     triggerAddSelectedToKwork: (clearSelection?: boolean) => Promise<void>;
-    triggerCopyKwork: () => boolean;
+    triggerCopyKwork: () => Promise<void>; // Changed return type from Promise<boolean> to Promise<void>
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
@@ -155,7 +155,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     triggerFetch: async () => { logger.warn("triggerFetch called on default context value"); },
     triggerSelectHighlighted: () => { logger.warn("triggerSelectHighlighted called on default context value"); },
     triggerAddSelectedToKwork: async () => { logger.warn("triggerAddSelectedToKwork called on default context value"); },
-    triggerCopyKwork: () => { logger.warn("triggerCopyKwork called on default context value"); return false; },
+    triggerCopyKwork: async () => { logger.warn("triggerCopyKwork called on default context value"); }, // Default void promise
     triggerAskAi: async () => { logger.warn("triggerAskAi called on default context value"); return { success: false, error: "Context not ready" }; },
     triggerParseResponse: async () => { logger.warn("triggerParseResponse called on default context value"); },
     triggerSelectAllParsed: () => { logger.warn("triggerSelectAllParsed called on default context value"); },
@@ -549,24 +549,22 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
         const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
         
-        const triggerCopyKwork = useCallback(async (): Promise<boolean> => { 
-            if (fetcherRef.current?.handleCopyToClipboard) { 
-                try { 
-                    const success = fetcherRef.current.handleCopyToClipboard(undefined, true);
-                    if (success && dbUser?.user_id) { 
-                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'system_prompt_copied');
-                        newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
-                    }
-                    return success; 
-                } catch (e: any) { 
-                    addToastStable(`Ошибка копирования запроса: ${e?.message ?? 'Неизвестно'}`, "error"); 
-                    return false; 
-                } 
-            } else { 
-                addToastStable("Ошибка копирования: Компонент Экстрактора недоступен.", "error"); 
-                return false; 
-            } 
-        }, [addToastStable, fetcherRef, dbUser?.user_id]);
+        const triggerCopyKwork = useCallback(async (): Promise<void> => {
+            // This function is called when the "Copy System Prompt" button is clicked.
+            // Its only responsibility now is to log the CyberFitness achievement.
+            // The actual copying of the system prompt happens in RequestInput.tsx.
+            // The copying of the main kwork input happens via useKworkInput.handleCopyToClipboard.
+            if (dbUser?.user_id) {
+                logger.debug("[RepoXmlPageContext triggerCopyKwork] Attempting to log 'system_prompt_copied' achievement.");
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'system_prompt_copied');
+                newAchievements?.forEach(ach => {
+                    addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+                    logger.info(`[RepoXmlPageContext triggerCopyKwork] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
+                });
+            } else {
+                logger.warn("[RepoXmlPageContext triggerCopyKwork] Cannot log 'system_prompt_copied': dbUser.user_id is missing.");
+            }
+        }, [dbUser, addToastStable, logger]); // Updated dependencies
 
         const triggerAskAi = useCallback(async () => { addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
         
@@ -848,7 +846,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             triggerUpdateBranchStable, 
             triggerCreateNewPRStable, 
             triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
-            addToastStable,
+            addToastStable, dbUser, // Added dbUser to dependencies of contextValue if triggerCopyKwork needs it
         ]);
 
         return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
