@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell, FaGraduationCap } from "react-icons/fa6";
+import { FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell } from "react-icons/fa6";
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ const tutorialLinks: TutorialLink[] = [
   { href: "/tutorials/icon-swap", wtfHref: "/tutorials/icon-swap?mode=wtf", title: "Миссия 2: Сапёр Иконок", icon: "FaBomb", color: "brand-red" },
   { href: "/tutorials/video-swap", wtfHref: "/tutorials/video-swap?mode=wtf", title: "Миссия 3: Видео-Рендер", icon: "FaVideo", color: "brand-cyan" },
   { href: "/tutorials/inception-swap", wtfHref: "/tutorials/inception-swap?mode=wtf", title: "Миссия 4: Inception Swap", icon: "FaInfinity", color: "brand-lime" },
+  { href: "/tutorials/the-fifth-door", wtfHref: "/tutorials/the-fifth-door?mode=wtf", title: "Миссия 5: Пятая Дверь", icon: "FaKey", color: "brand-yellow" },
 ];
 
 const colorClasses: Record<string, { text: string; border: string; shadow: string, bgHover: string, ring: string }> = {
@@ -29,7 +30,8 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-red": { text: "text-destructive", border: "border-destructive/60", shadow: "hover:shadow-red-glow", bgHover: "hover:bg-destructive/10", ring: "focus:ring-destructive" },
   "brand-cyan": { text: "text-brand-cyan", border: "border-brand-cyan/60", shadow: "hover:shadow-cyan-glow", bgHover: "hover:bg-brand-cyan/10", ring: "focus:ring-brand-cyan" },
   "brand-lime": { text: "text-neon-lime", border: "border-neon-lime/60", shadow: "hover:shadow-neon-lime/50", bgHover: "hover:bg-neon-lime/10", ring: "focus:ring-neon-lime" },
-  "brand-pink-wtf": { text: "text-brand-pink", border: "border-brand-pink/70", shadow: "hover:shadow-pink-glow", bgHover: "hover:bg-brand-pink/20", ring: "focus:ring-brand-pink" },
+  "brand-yellow": { text: "text-brand-yellow", border: "border-brand-yellow/60", shadow: "hover:shadow-yellow-glow", bgHover: "hover:bg-brand-yellow/10", ring: "focus:ring-brand-yellow" },
+  "brand-pink-wtf": { text: "text-white", border: "border-brand-pink/70", shadow: "hover:shadow-pink-glow", bgHover: "hover:bg-brand-pink/80", ring: "focus:ring-brand-pink" }, // For WTF buttons
 };
 
 
@@ -142,15 +144,15 @@ export default function StartTrainingPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="w-full max-w-2xl"
+        className="w-full max-w-2xl" // Adjusted width for tutorial links
       >
         <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow">
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl font-orbitron text-brand-purple flex items-center justify-center gap-2">
-                <VibeContentRenderer content="::FaGraduationCap::" /> Ворвись в Матрицу Кода: Твои Первые Миссии!
+                <VibeContentRenderer content="::FaGraduationCap::" /> Взломай Матрицу Кода: Твои Первые Миссии!
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono text-center">
-                Обычные туториалы – для ботанов. Эти – твой FAST TRACK к скиллу. Прожми WTF-кнопку на каждой миссии, если ты не из этих... ну ты понял.
+                Обычные туториалы – для зубрил. Эти – твой SPEEDRUN к скиллу. На каждой миссии есть WTF-кнопка – это как секретный уровень, только для самых дерзких. НЕ ЗАССЫ, ЖМИ!
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 md:p-6">
@@ -158,18 +160,18 @@ export default function StartTrainingPage() {
               const colorConfig = colorClasses[link.color as keyof typeof colorClasses] || { text: "text-primary", border: "border-primary", shadow: "hover:shadow-primary/50", bgHover: "hover:bg-primary/10", ring: "focus:ring-primary" };
               const wtfColorConfig = colorClasses["brand-pink-wtf"];
               return (
-                <div key={link.href} className={cn("flex flex-col items-center justify-center p-3 rounded-lg border-2", colorConfig.border, "bg-dark-card/50", colorConfig.shadow, "transition-all duration-200 transform hover:scale-[1.02]")}>
-                    <VibeContentRenderer content={`::${link.icon}::`} className={cn("text-4xl mb-2", colorConfig.text)} />
+                <Card key={link.href} className={cn("flex flex-col items-center justify-between p-4 rounded-lg border-2", colorConfig.border, "bg-dark-card/60 backdrop-blur-sm", colorConfig.shadow, "transition-all duration-200 transform hover:scale-[1.03] hover:-translate-y-1")}>
+                    <VibeContentRenderer content={`::${link.icon}::`} className={cn("text-5xl mb-2", colorConfig.text, "drop-shadow-[0_0_8px_currentColor]")} />
                     <span className={cn("font-orbitron text-md font-semibold leading-tight text-center mb-3", colorConfig.text)}>{link.title}</span>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full">
-                        <Button asChild variant="outline" className={cn("flex-1 text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white")}>
-                            <Link href={link.href}>Норм Инструкция</Link>
+                    <div className="flex flex-col gap-2 w-full mt-auto">
+                        <Button asChild variant="outline" className={cn("w-full text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white focus:text-white")}>
+                            <Link href={link.href}>Унылый Гайд</Link>
                         </Button>
-                        <Button asChild variant="default" className={cn("flex-1 text-xs py-2 text-black", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/80 font-bold")}>
-                            <Link href={link.wtfHref}>WTF-МОД ::FaFire::</Link>
+                        <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon")}>
+                            <Link href={link.wtfHref}>WTF-РЕЖИМ ::FaBiohazard::</Link>
                         </Button>
                     </div>
-                </div>
+                </Card>
               );
             })}
           </CardContent>

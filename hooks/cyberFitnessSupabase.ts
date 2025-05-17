@@ -122,6 +122,7 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "integration_vercel_connected", name: "Vercel Подключен", description: "Интеграция с Vercel подтверждена.", icon: "FaBolt", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_vercel_connected === true },
     { id: "integration_supabase_connected", name: "Supabase Интегрирован", description: "Интеграция с Supabase подтверждена.", icon: "FaDatabase", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_supabase_connected === true },
     { id: "integration_aistudio_connected", name: "AI Studio Активен", description: "Интеграция с AI Studio (OpenAI/Gemini/Claude) подтверждена.", icon: "FaRobot", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_aistudio_connected === true },
+    { id: "curious_scrollerman", name: "Любопытный Скроллермен", description: "Проявил недюжинное любопытство, изучая просторы приложения скроллом. Респект!", icon: "FaAngleDoubleDown", kiloVibesAward: 5, checkCondition: (p) => p.featuresUsed?.scrolled_like_a_maniac === true },
     { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу. +25 KiloVibes", icon: "FaBolt", checkCondition: () => false, isQuest: true, unlocksPerks: ["Доступ к СуперВайб Студии"] },
     { id: "first_fetch_completed", name: "Квест: Первая Загрузка", description: "Успешно загружены файлы. +75 KiloVibes", icon: "FaDownload", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[1] },
     { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI. +150 KiloVibes", icon: "FaCode", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[2] },
@@ -575,7 +576,6 @@ export const logCyberFitnessAction = async (
       return { success: false, error: `Action '${actionType}' expects a numeric count.` };
   }
 
-
   try {
     const profileResult = await fetchUserCyberFitnessProfile(userId); // userId is string
     if (!profileResult.success && !profileResult.data?.hasOwnProperty('level')) { 
@@ -667,7 +667,6 @@ export const logCyberFitnessAction = async (
             logger.warn(`[CyberFitness LogAction] Negative minutes for 'focusTimeAdded': ${minutes}. Ignoring.`);
         }
     }
-
 
     if (kiloVibesFromAction > 0) {
         profileUpdates.kiloVibes = kiloVibesFromAction;

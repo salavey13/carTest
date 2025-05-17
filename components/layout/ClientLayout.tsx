@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react"; 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -17,6 +17,8 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; 
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
+import { useAppToast } from "@/hooks/useAppToast";
 
 function LoadingChatButtonFallback() {
   return (
@@ -27,14 +29,39 @@ function LoadingChatButtonFallback() {
   );
 }
 
-function FocusTrackingInitializer() {
+function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
+  const { addToast } = useAppToast();
+  const scrollAchievementUnlockedRef = useRef(false);
   
   useFocusTimeTracker({
     inactiveTimeout: 60 * 1000, 
     componentName: "GlobalAppFocusTracker",
     enabled: !!(isAuthenticated && dbUser?.user_id), 
   });
+
+  useEffect(() => {
+    const handleScroll = async () => {
+      if (window.scrollY > 1000 && isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
+        scrollAchievementUnlockedRef.current = true; // Prevent multiple triggers
+        logger.info(`[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`);
+        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'scrolled_like_a_maniac');
+        newAchievements?.forEach(ach => {
+            addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+            logger.info(`[ClientLayout ScrollAch] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
+        });
+        window.removeEventListener('scroll', handleScroll); // Remove listener after unlocking
+      }
+    };
+
+    if (isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
+      window.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [isAuthenticated, dbUser, addToast]);
   
   return null; 
 }
@@ -54,7 +81,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <ErrorOverlayProvider>
       <AppProvider> 
-        <FocusTrackingInitializer /> 
+        <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
             <Header />
