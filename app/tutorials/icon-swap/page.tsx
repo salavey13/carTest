@@ -17,35 +17,40 @@ const iconSwapTutorialTranslations = {
         title: "Шаг 1: Обнаружение Аномалии",
         description: "Первый признак проблемы – предупреждение `[?] Неизвестная иконка <iconname>` в консоли браузера (F12) или в Оверлее Ошибок (Ctrl+Shift+E). Это сигнал от `VibeContentRenderer`, что иконка не найдена в его карте (`iconNameMap`).",
         icon: "FaTriangleExclamation",
-        color: "brand-orange"
+        color: "brand-orange",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step1_find_icon.mp4" // Placeholder
       },
       {
         id: 2,
         title: "Шаг 2: Идентификация Цели",
         description: "Запомни имя `<iconname>` из предупреждения. Это имя (в нижнем регистре) должно быть ключом в `iconNameMap` в `/components/VibeContentRenderer.tsx`. Значение этого ключа – корректное PascalCase имя иконки из `react-icons/fa6`.",
         icon: "FaCrosshairs",
-        color: "brand-pink"
+        color: "brand-pink",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step2_sticky_chat.mp4" // Placeholder
       },
       {
         id: 3,
         title: "Шаг 3: Подбор Боеприпаса (Иконки)",
         description: "Если иконки нет в карте, или имя некорректно, найди правильное имя на сайте [FontAwesome](https://fontawesome.com/search?o=r&m=free&f=brands,solid,regular) (например, `magnifying-glass` -> `FaMagnifyingGlass`) или в документации `react-icons`. ",
         icon: "FaBookMedical",
-        color: "brand-blue"
+        color: "brand-blue",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step3_modal_magic.mp4" // Placeholder
       },
       {
         id: 4,
         title: "Шаг 4: Нейтрализация Угрозы",
         description: "Внеси исправление: \n1. Если ошибка в строке типа `::FaIconName::`, убедись что `FaIconName` (PascalCase) написано правильно и `faiconname` (lowercase) есть в `iconNameMap` и указывает на существующую иконку. \n2. Если нужно добавить новую иконку в карту – отредактируй `iconNameMap` в `VibeContentRenderer.tsx`. \n3. Используй SUPERVIBE Studio для автоматической замены через 'Magic Swap' или 'Search/Replace'.",
         icon: "FaShieldHalved",
-        color: "brand-purple"
+        color: "brand-purple",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step4_profit.mp4" // Placeholder
       },
       {
         id: 5,
         title: "Шаг 5: Контрольная Проверка",
         description: "Обнови страницу. Убедись, что иконка отображается корректно и предупреждение в консоли исчезло. Помни: без `VibeContentRenderer` или другой защиты, отсутствующая иконка может вызвать падение сборки!",
         icon: "FaCheckDouble",
-        color: "brand-green"
+        color: "brand-green",
+        // No video for this RU step typically
       }
     ],
     nextLevelTitle: "::FaAward:: Навык 'Разминирование Иконок' Получен!",
@@ -116,6 +121,7 @@ export default function IconSwapTutorialPage() {
   };
 
   const stepsToRender = currentMode === 'wtf' ? iconSwapTutorialTranslations.wtf.steps : iconSwapTutorialTranslations.ru.steps;
+  const pageMainColor = "brand-purple"; // Main color for this tutorial page
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-indigo-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
@@ -130,7 +136,10 @@ export default function IconSwapTutorialPage() {
 
       <div className="container mx-auto px-4">
         <header className="text-center mb-12 md:mb-16">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold text-brand-purple cyber-text glitch mb-4" data-text={t.pageTitle}>
+          <h1 className={cn(
+            "text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold cyber-text glitch mb-4",
+             colorClasses[pageMainColor]?.text || "text-brand-purple"
+            )} data-text={t.pageTitle}>
             <VibeContentRenderer content={t.pageTitle} />
           </h1>
           <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
@@ -139,7 +148,11 @@ export default function IconSwapTutorialPage() {
            <Button 
             onClick={toggleMode} 
             variant="outline" 
-            className="mt-6 bg-card/50 border-brand-cyan/50 hover:bg-brand-cyan/10 hover:text-brand-cyan text-brand-cyan/90 transition-all duration-200 text-sm px-4 py-2"
+            className={cn(
+              "mt-6 bg-card/50 hover:bg-brand-cyan/10 transition-all duration-200 text-sm px-4 py-2",
+              colorClasses["brand-cyan"]?.border || "border-brand-cyan/50", // WTF button always cyan for contrast
+              `${colorClasses["brand-cyan"]?.text}/90 hover:${colorClasses["brand-cyan"]?.text}`
+            )}
           >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
           </Button>
@@ -148,7 +161,9 @@ export default function IconSwapTutorialPage() {
         <div className="space-y-12 md:space-y-20">
           {stepsToRender.map((step, index) => {
             const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
-            const hasVideo = step.hasOwnProperty('videoSrc') && (step as any).videoSrc;
+            // Check if videoSrc exists and is a non-empty string for the current step
+            const hasVideo = !!(step as any).videoSrc && typeof (step as any).videoSrc === 'string';
+
 
             return (
               <section key={step.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-10 md:pt-14")}>
@@ -182,8 +197,11 @@ export default function IconSwapTutorialPage() {
           })}
         </div>
 
-        <section className="mt-20 md:mt-32 text-center border-t border-brand-purple/40 pt-12 md:pt-16">
-          <h2 className="text-3xl md:text-4xl font-orbitron text-brand-purple mb-6">
+        <section className={cn(
+            "mt-20 md:mt-32 text-center pt-12 md:pt-16",
+            colorClasses[pageMainColor]?.border ? `border-t ${colorClasses[pageMainColor]?.border}/40` : "border-t border-brand-purple/40"
+            )}>
+          <h2 className={cn("text-3xl md:text-4xl font-orbitron mb-6", colorClasses[pageMainColor]?.text || "text-brand-purple")}>
              <VibeContentRenderer content={t.nextLevelTitle} />
           </h2>
           <p className="text-lg md:text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-8">
@@ -191,7 +209,9 @@ export default function IconSwapTutorialPage() {
           </p>
           <Button asChild className={cn(
              "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
-             "bg-brand-purple hover:bg-brand-purple/80 shadow-xl hover:shadow-purple-glow/60"
+             "shadow-xl",
+             pageMainColor === "brand-purple" && "bg-brand-purple hover:bg-brand-purple/80 hover:shadow-purple-glow/60",
+             // Add other color conditions if this page type can have variable main colors
              )}>
             <Link href="/repo-xml">
                 <VibeContentRenderer content={t.tryLiveButton} />
