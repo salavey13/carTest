@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, Suspense } from 'react'; 
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,11 @@ import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import TutorialLoader from '../tutorials/TutorialLoader'; 
+import { useAppContext } from '@/contexts/AppContext';
+import { fetchUserCyberFitnessProfile, QUEST_ORDER, isQuestUnlocked as checkQuestUnlocked } from '@/hooks/cyberFitnessSupabase';
+import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 interface TutorialLink {
   href: string;
@@ -17,14 +22,15 @@ interface TutorialLink {
   icon: string;
   color: string;
   wtfHref: string;
+  questId: string; 
 }
 
 const tutorialLinks: TutorialLink[] = [
-  { href: "/tutorials/image-swap", wtfHref: "/tutorials/image-swap?mode=wtf", title: "Миссия 1: Битый Пиксель", icon: "FaExchangeAlt", color: "brand-green" },
-  { href: "/tutorials/icon-swap", wtfHref: "/tutorials/icon-swap?mode=wtf", title: "Миссия 2: Сапёр Иконок", icon: "FaBomb", color: "brand-red" },
-  { href: "/tutorials/video-swap", wtfHref: "/tutorials/video-swap?mode=wtf", title: "Миссия 3: Видео-Рендер", icon: "FaVideo", color: "brand-cyan" },
-  { href: "/tutorials/inception-swap", wtfHref: "/tutorials/inception-swap?mode=wtf", title: "Миссия 4: Inception Swap", icon: "FaInfinity", color: "brand-lime" },
-  { href: "/tutorials/the-fifth-door", wtfHref: "/tutorials/the-fifth-door?mode=wtf", title: "Миссия 5: Пятая Дверь", icon: "FaKey", color: "brand-yellow" },
+  { href: "/tutorials/image-swap", wtfHref: "/tutorials/image-swap?mode=wtf", title: "Миссия 1: Битый Пиксель", icon: "FaExchangeAlt", color: "brand-green", questId: "image-swap-mission" },
+  { href: "/tutorials/icon-swap", wtfHref: "/tutorials/icon-swap?mode=wtf", title: "Миссия 2: Сапёр Иконок", icon: "FaBomb", color: "brand-red", questId: "icon-swap-mission" },
+  { href: "/tutorials/video-swap", wtfHref: "/tutorials/video-swap?mode=wtf", title: "Миссия 3: Видео-Рендер", icon: "FaVideo", color: "brand-cyan", questId: "video-swap-mission" },
+  { href: "/tutorials/inception-swap", wtfHref: "/tutorials/inception-swap?mode=wtf", title: "Миссия 4: Inception Swap", icon: "FaInfinity", color: "brand-lime", questId: "inception-swap-mission" },
+  { href: "/tutorials/the-fifth-door", wtfHref: "/tutorials/the-fifth-door?mode=wtf", title: "Миссия 5: Пятая Дверь", icon: "FaKey", color: "brand-yellow", questId: "the-fifth-door-mission" },
 ];
 
 const colorClasses: Record<string, { text: string; border: string; shadow: string, bgHover: string, ring: string }> = {
@@ -39,26 +45,31 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 const pageTranslations = {
     ru: {
         pageTitle: "VIBE ТРЕНИРОВКА",
-        pageSubtitleTraining: "", // Not really needed for RU if it's just a timer block
+        pageSubtitleTraining: "", 
         trainingTitle: "VIBE ТРЕНИРОВКА",
         missionsTitle: "::FaGraduationCap:: Взломай Матрицу Кода: Твои Первые Миссии!",
         missionsSubtitle: "Обычные туториалы – для зубрил. Эти – твой SPEEDRUN к скиллу. На каждой миссии есть WTF-кнопка – это как секретный уровень, только для самых дерзких. НЕ ЗАССЫ, ЖМИ!",
         toggleButtonToWtf: "::FaPooStorm:: Врубить WTF-Режим СТРАНИЦЫ!",
         toggleButtonToNormal: "::FaBook:: Вернуть Норм Вид",
+        lockedMissionTooltip: "Сначала пройди предыдущую миссию, чумба!",
     },
     wtf: {
-        pageTitle: "::FaFistRaised:: КАЧАЛКА ДЛЯ МОЗГА И ПАЛЬЦЕВ!",
+        pageTitle: "::FaCity:: GTA VIBE TRAINING GROUND!",
         pageSubtitleTraining: "Забудь про нудные тренировки и скучные гайды. Тут – чистый ФАН и СКИЛЛ-АП! Жми WTF-кнопки на миссиях, если не боишься стать КИБЕР-КОТЛЕТОЙ!",
         trainingTitle: "::FaDumbbell:: ФИЗУХА ДЛЯ КИБЕР-АТЛЕТА (МОЖНО СКИПНУТЬ, ЕСЛИ ТЫ ДРИЩ)",
-        missionsTitle: "::FaGraduationCap:: ВЗЛОМАЙ МАТРИЦУ КОДА: ТВОИ ПЕРВЫЕ МИССИИ!",
-        missionsSubtitle: "ЗАБУДЬ ПРО НУДНЫЕ ГАЙДЫ! ЭТО ТВОЙ FAST TRACK К СКИЛЛУ! НА КАЖДОЙ МИССИИ ЕСТЬ КНОПКА 'WTF-РЕЖИМ ::FaBiohazard::' – ЭТО КАК СЕКРЕТНЫЙ УРОВЕНЬ, ТОЛЬКО ДЛЯ РЕАЛЬНЫХ ПАЦАНОВ! НЕ ОБОССЫСЬ, ЖМИ!",
+        missionsTitle: "::FaGamepad:: GTA Vibe Missions ::FaStreetView::",
+        missionsSubtitle: "Хватит катать вату! Это не школа, это GTA Vibe! Пройди эти миссии, чтобы стать реальным пацаном в кодинге. WTF-режим – для тех, кто не боится запачкать руки и сломать пару правил. GO GO GO!",
         toggleButtonToWtf: "::FaPooStorm:: Врубить WTF-Режим СТРАНИЦЫ!",
         toggleButtonToNormal: "::FaBook:: Вернуть Норм Вид",
+        lockedMissionTooltip: "СНАЧАЛА ПРЕДЫДУЩУЮ, НУБАС!",
     }
 }
 
 function StartTrainingContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { dbUser, isAuthenticated } = useAppContext();
+
   const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
   
@@ -68,18 +79,49 @@ function StartTrainingContent() {
   const [currentExercise, setCurrentExercise] = useState("Приседания");
   const [nextExercise, setNextExercise] = useState("Отжимания");
 
+  const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const t = pageTranslations[currentMode];
 
   const togglePageMode = () => {
-    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+    const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
+    setCurrentMode(newMode);
+    // Update URL without full page reload to reflect mode change for potential refresh/sharing
+    const currentPath = window.location.pathname;
+    if (newMode === 'wtf') {
+      router.replace(`${currentPath}?mode=wtf`);
+    } else {
+      router.replace(currentPath);
+    }
   };
 
   useEffect(() => {
-    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-    if (newMode !== currentMode) {
-      setCurrentMode(newMode);
+    const modeFromUrl = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (modeFromUrl !== currentMode) {
+      setCurrentMode(modeFromUrl);
     }
   }, [searchParams, currentMode]);
+
+  const fetchProfile = useCallback(async () => {
+    if (isAuthenticated && dbUser?.user_id) {
+      setLoadingProfile(true);
+      const profileData = await fetchUserCyberFitnessProfile(dbUser.user_id);
+      if (profileData.success && profileData.data) {
+        setCyberProfile(profileData.data);
+      } else {
+        toast.error("Не удалось загрузить профиль CyberFitness.");
+      }
+      setLoadingProfile(false);
+    } else if (!isAuthenticated) {
+      setLoadingProfile(false); // Not authenticated, no profile to load
+    }
+  }, [isAuthenticated, dbUser?.user_id]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -130,12 +172,12 @@ function StartTrainingContent() {
           <h1 className={cn(
             "text-4xl sm:text-5xl font-orbitron font-bold cyber-text glitch",
             currentMode === 'wtf' ? "text-brand-pink" : "text-brand-green"
-           )} data-text={currentMode === 'wtf' ? pageTranslations.wtf.pageTitle : pageTranslations.ru.pageTitle}>
-             <VibeContentRenderer content={currentMode === 'wtf' ? pageTranslations.wtf.pageTitle : pageTranslations.ru.pageTitle} />
+           )} data-text={t.pageTitle}>
+             <VibeContentRenderer content={t.pageTitle} />
           </h1>
           {currentMode === 'wtf' && (
             <p className="text-md sm:text-lg text-gray-300 font-mono max-w-xl mx-auto mt-3">
-                <VibeContentRenderer content={pageTranslations.wtf.pageSubtitleTraining} />
+                <VibeContentRenderer content={t.pageSubtitleTraining} />
             </p>
           )}
       </header>
@@ -154,7 +196,7 @@ function StartTrainingContent() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
+        transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.2 : 0.1 }}
         className="w-full max-w-md mb-12"
       >
         <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
@@ -207,12 +249,12 @@ function StartTrainingContent() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.4 : 0.3 }}
         className="w-full max-w-2xl"
       >
-        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow">
+        <Card className={cn("bg-dark-card/80 backdrop-blur-md border shadow-xl", currentMode === 'wtf' ? "border-brand-pink/70 shadow-pink-glow" : "border-brand-purple/50 shadow-purple-glow")}>
           <CardHeader className="pb-4">
-            <CardTitle className={cn("text-2xl font-orbitron flex items-center justify-center gap-2", currentMode === 'wtf' ? "text-brand-pink" : "text-brand-purple")}>
+            <CardTitle className={cn("text-2xl font-orbitron flex items-center justify-center gap-2", currentMode === 'wtf' ? "text-brand-pink gta-vibe-text-effect" : "text-brand-purple")}>
                 <VibeContentRenderer content={t.missionsTitle} />
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono text-center">
@@ -220,22 +262,43 @@ function StartTrainingContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 md:p-6">
-            {tutorialLinks.map((link) => {
+            {loadingProfile && <TutorialLoader />}
+            {!loadingProfile && tutorialLinks.map((link) => {
               const colorConfig = colorClasses[link.color as keyof typeof colorClasses] || { text: "text-primary", border: "border-primary", shadow: "hover:shadow-primary/50", bgHover: "hover:bg-primary/10", ring: "focus:ring-primary" };
               const wtfColorConfig = colorClasses["brand-pink-wtf"];
-              return (
-                <Card key={link.href} className={cn("flex flex-col items-center justify-between p-4 rounded-lg border-2", colorConfig.border, "bg-dark-card/60 backdrop-blur-sm", colorConfig.shadow, "transition-all duration-200 transform hover:scale-[1.03] hover:-translate-y-1")}>
-                    <VibeContentRenderer content={`::${link.icon}::`} className={cn("text-5xl mb-2", colorConfig.text, "drop-shadow-[0_0_8px_currentColor]")} />
-                    <span className={cn("font-orbitron text-md font-semibold leading-tight text-center mb-3", colorConfig.text)}>{link.title}</span>
+              const isUnlocked = cyberProfile ? checkQuestUnlocked(link.questId, cyberProfile.completedQuests, QUEST_ORDER) : false;
+              
+              const buttonCard = (
+                 <Card 
+                    className={cn(
+                        "flex flex-col items-center justify-between p-4 rounded-lg border-2 bg-dark-card/60 backdrop-blur-sm transition-all duration-200 transform",
+                        isUnlocked ? `${colorConfig.border} ${colorConfig.shadow} hover:scale-[1.03] hover:-translate-y-1` : "border-muted/30 opacity-60 cursor-not-allowed"
+                    )}
+                  >
+                    <VibeContentRenderer content={`::${link.icon}::`} className={cn("text-5xl mb-2 drop-shadow-[0_0_8px_currentColor]", isUnlocked ? colorConfig.text : "text-muted-foreground")} />
+                    <span className={cn("font-orbitron text-md font-semibold leading-tight text-center mb-3", isUnlocked ? colorConfig.text : "text-muted-foreground")}>{link.title}</span>
                     <div className="flex flex-col gap-2 w-full mt-auto">
-                        <Button asChild variant="outline" className={cn("w-full text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white focus:text-white")}>
-                            <Link href={link.href}>Унылый Гайд</Link>
+                        <Button asChild variant="outline" className={cn("w-full text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white focus:text-white", !isUnlocked && "pointer-events-none opacity-50")}>
+                            <Link href={link.href} onClick={(e) => !isUnlocked && e.preventDefault()}>Унылый Гайд</Link>
                         </Button>
-                        <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon")}>
-                            <Link href={link.wtfHref}>WTF-РЕЖИМ ::FaBiohazard::</Link>
+                        <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon", !isUnlocked && "pointer-events-none opacity-50")}>
+                            <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}>WTF-РЕЖИМ ::FaBiohazard::</Link>
                         </Button>
                     </div>
                 </Card>
+              );
+
+              return isUnlocked ? buttonCard : (
+                <TooltipProvider key={link.href + "-tooltip"}>
+                  <Tooltip delayDuration={100}>
+                    <TooltipTrigger asChild>
+                      <div>{buttonCard}</div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-black/80 text-brand-orange border-brand-orange/50 font-mono">
+                      <p>{t.lockedMissionTooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               );
             })}
           </CardContent>
