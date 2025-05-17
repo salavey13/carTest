@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
@@ -50,8 +50,53 @@ const iconSwapTutorialTranslations = {
     ],
     nextLevelTitle: "::FaAward:: Навык 'Разминирование Иконок' Получен!",
     nextLevelText: "Отличная работа, сапёр! Теперь ты можешь поддерживать визуальную целостность интерфейсов. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> готова к новым задачам.",
-    tryLiveButton: "::FaTools:: Перейти в Студию"
+    tryLiveButton: "::FaTools:: Перейти в Студию",
+    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
+    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
   },
+  wtf: {
+    pageTitle: "Инструкция по Иконкам для Чайников",
+    pageSubtitle: "Просто следуй этим шагам, и всё будет ::FaThumbsUp::!",
+    steps: [
+      {
+        id: 1,
+        title: "Шаг 1: Увидел? Запомни!",
+        description: "На странице видишь `[?] Неизвестная иконка <ИМЯ_ИКОНКИ>`? Просто ЗАПОМНИ это `<ИМЯ_ИКОНКИ>`. Больше ничего не надо, просто запомни или скопируй.",
+        icon: "FaEye",
+        color: "brand-orange",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step1_find_icon.mp4"
+      },
+      {
+        id: 2,
+        title: "Шаг 2: Кнопка Чата -> Вставь Имя",
+        description: "Внизу слева есть КРУГЛАЯ КНОПКА ::FaCommentDots:: (это Sticky Chat). Нажми её. Появится поле для текста. ВСТАВЬ туда `<ИМЯ_ИКОНКИ>` которое ты запомнил.",
+        icon: "FaKeyboard",
+        color: "brand-pink",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step2_sticky_chat.mp4"
+      },
+      {
+        id: 3,
+        title: "Шаг 3: Магия Sticky Chat!",
+        description: "Sticky Chat сам всё поймёт! Он предложит ЗАМЕНИТЬ иконку. Нажми кнопку, которую он покажет. Откроется окно. Там будет:\n1.  Ссылка на сайт со ВСЕМИ иконками. Нажми, найди НУЖНУЮ, скопируй её ПОЛНОЕ ИМЯ (например, `FaBeer`).\n2.  Поле, куда ВСТАВИТЬ это новое имя.\n3.  Кнопка 'OK'. Нажми её. Всё! Можно расслабиться. Это самый сложный шаг, ты справишься!",
+        icon: "FaWandMagicSparkles",
+        color: "brand-purple",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step3_modal_magic.mp4"
+      },
+      {
+        id: 4,
+        title: "Шаг 4: ПРОФИТ! Иконка на Месте!",
+        description: "Автоматика всё сделает: обновит код, создаст PR, он сам одобрится. Через пару минут обнови страницу – иконка будет КРАСИВАЯ! Ты – ГЕРОЙ!",
+        icon: "FaCheckDouble",
+        color: "brand-green",
+        videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step4_profit.mp4"
+      }
+    ],
+    nextLevelTitle: "::FaMedal:: Иконки Обезврежены!",
+    nextLevelText: "Ты крут! Теперь ты можешь чинить иконки как профи. Хочешь еще магии? <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет.",
+    tryLiveButton: "::FaTools:: В Студию!",
+    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
+    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
+  }
 };
 
 const colorClasses: Record<string, { text: string; border: string; shadow: string }> = {
@@ -63,8 +108,14 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 };
 
 export default function IconSwapTutorialPage() {
-  const lang = 'ru'; 
-  const t = iconSwapTutorialTranslations[lang];
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>('ru');
+  const t = iconSwapTutorialTranslations[currentMode];
+
+  const toggleMode = () => {
+    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+  };
+
+  const stepsToRender = currentMode === 'wtf' ? iconSwapTutorialTranslations.wtf.steps : iconSwapTutorialTranslations.ru.steps;
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-indigo-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
@@ -78,17 +129,24 @@ export default function IconSwapTutorialPage() {
       ></div>
 
       <div className="container mx-auto px-4">
-        <header className="text-center mb-12 md:mb-20">
+        <header className="text-center mb-12 md:mb-16">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold text-brand-purple cyber-text glitch mb-4" data-text={t.pageTitle}>
             <VibeContentRenderer content={t.pageTitle} />
           </h1>
           <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
             <VibeContentRenderer content={t.pageSubtitle} />
           </p>
+           <Button 
+            onClick={toggleMode} 
+            variant="outline" 
+            className="mt-6 bg-card/50 border-brand-cyan/50 hover:bg-brand-cyan/10 hover:text-brand-cyan text-brand-cyan/90 transition-all duration-200 text-sm px-4 py-2"
+          >
+            <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+          </Button>
         </header>
 
         <div className="space-y-12 md:space-y-20">
-          {t.steps.map((step, index) => {
+          {stepsToRender.map((step, index) => {
             const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
             const hasVideo = step.hasOwnProperty('videoSrc') && (step as any).videoSrc;
 
