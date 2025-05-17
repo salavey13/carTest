@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
+import { useSearchParams } from 'next/navigation';
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell } from "react-i
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
+import TutorialLoader from '../tutorials/TutorialLoader'; // Import the loader
 
 interface TutorialLink {
   href: string;
@@ -31,16 +33,50 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-cyan": { text: "text-brand-cyan", border: "border-brand-cyan/60", shadow: "hover:shadow-cyan-glow", bgHover: "hover:bg-brand-cyan/10", ring: "focus:ring-brand-cyan" },
   "brand-lime": { text: "text-neon-lime", border: "border-neon-lime/60", shadow: "hover:shadow-neon-lime/50", bgHover: "hover:bg-neon-lime/10", ring: "focus:ring-neon-lime" },
   "brand-yellow": { text: "text-brand-yellow", border: "border-brand-yellow/60", shadow: "hover:shadow-yellow-glow", bgHover: "hover:bg-brand-yellow/10", ring: "focus:ring-brand-yellow" },
-  "brand-pink-wtf": { text: "text-white", border: "border-brand-pink/70", shadow: "hover:shadow-pink-glow", bgHover: "hover:bg-brand-pink/80", ring: "focus:ring-brand-pink" }, // For WTF buttons
+  "brand-pink-wtf": { text: "text-white", border: "border-brand-pink/70", shadow: "hover:shadow-pink-glow", bgHover: "hover:bg-brand-pink/80", ring: "focus:ring-brand-pink" },
 };
 
+const pageTranslations = {
+    ru: {
+        trainingTitle: "VIBE ТРЕНИРОВКА",
+        missionsTitle: "::FaGraduationCap:: Взломай Матрицу Кода: Твои Первые Миссии!",
+        missionsSubtitle: "Обычные туториалы – для зубрил. Эти – твой SPEEDRUN к скиллу. На каждой миссии есть WTF-кнопка – это как секретный уровень, только для самых дерзких. НЕ ЗАССЫ, ЖМИ!",
+        toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+        toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+    },
+    wtf: {
+        trainingTitle: "::FaDumbbell:: ФИЗУХА ДЛЯ КИБЕР-АТЛЕТА (МОЖНО СКИПНУТЬ, ЕСЛИ ТЫ ДРИЩ)",
+        missionsTitle: "::FaGraduationCap:: ВЗЛОМАЙ МАТРИЦУ КОДА: ТВОИ ПЕРВЫЕ МИССИИ!",
+        missionsSubtitle: "ЗАБУДЬ ПРО НУДНЫЕ ГАЙДЫ! ЭТО ТВОЙ FAST TRACK К СКИЛЛУ! НА КАЖДОЙ МИССИИ ЕСТЬ КНОПКА 'WTF-РЕЖИМ ::FaBiohazard::' – ЭТО КАК СЕКРЕТНЫЙ УРОВЕНЬ, ТОЛЬКО ДЛЯ РЕАЛЬНЫХ ПАЦАНОВ! НЕ ОБОССЫСЬ, ЖМИ!",
+        toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+        toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+    }
+}
 
-export default function StartTrainingPage() {
-  const [timer, setTimer] = useState(120); // 2 minutes in seconds
+function StartTrainingContent() {
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+  
+  const [timer, setTimer] = useState(120); 
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentExercise, setCurrentExercise] = useState("Приседания");
   const [nextExercise, setNextExercise] = useState("Отжимания");
+
+  const t = pageTranslations[currentMode];
+
+  const togglePageMode = () => {
+    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+  };
+
+  useEffect(() => {
+    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (newMode !== currentMode) {
+      setCurrentMode(newMode);
+    }
+  }, [searchParams, currentMode]);
+
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -87,6 +123,17 @@ export default function StartTrainingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 flex flex-col items-center justify-start">
+      <Button 
+        onClick={togglePageMode} 
+        variant="outline" 
+        className={cn(
+          "mb-8 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
+          "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
+        )}
+      >
+        <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+      </Button>
+
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -96,8 +143,8 @@ export default function StartTrainingPage() {
         <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
           <CardHeader className="p-6 md:p-8 border-b border-brand-green/40">
             <FaDumbbell className="text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)]" />
-            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text="VIBE ТРЕНИРОВКА">
-              VIBE ТРЕНИРОВКА
+            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text={currentMode === 'wtf' ? "ФИЗУХА (СКИП)" : "VIBE ТРЕНИРОВКА"}>
+               <VibeContentRenderer content={t.trainingTitle} />
             </CardTitle>
           </CardHeader>
 
@@ -144,15 +191,15 @@ export default function StartTrainingPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="w-full max-w-2xl" // Adjusted width for tutorial links
+        className="w-full max-w-2xl"
       >
         <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow">
           <CardHeader className="pb-4">
             <CardTitle className="text-2xl font-orbitron text-brand-purple flex items-center justify-center gap-2">
-                <VibeContentRenderer content="::FaGraduationCap::" /> Взломай Матрицу Кода: Твои Первые Миссии!
+                <VibeContentRenderer content={t.missionsTitle} />
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono text-center">
-                Обычные туториалы – для зубрил. Эти – твой SPEEDRUN к скиллу. На каждой миссии есть WTF-кнопка – это как секретный уровень, только для самых дерзких. НЕ ЗАССЫ, ЖМИ!
+                <VibeContentRenderer content={t.missionsSubtitle} />
             </CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 md:p-6">
@@ -179,4 +226,12 @@ export default function StartTrainingPage() {
       </motion.div>
     </div>
   );
+}
+
+export default function StartTrainingPage() {
+  return (
+    <Suspense fallback={<TutorialLoader />}>
+      <StartTrainingContent />
+    </Suspense>
+  )
 }

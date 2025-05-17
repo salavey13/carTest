@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
+import TutorialLoader from '../TutorialLoader'; // Import the loader
 
 const imageSwapTutorialTranslations = {
   ru: {
@@ -104,7 +105,7 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-green": { text: "text-brand-green", border: "border-brand-green/50", shadow: "shadow-brand-green/40" },
 };
 
-export default function ImageSwapTutorialPage() {
+function ImageSwapTutorialContent() {
   const searchParams = useSearchParams();
   const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
@@ -228,5 +229,13 @@ export default function ImageSwapTutorialPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function ImageSwapTutorialPage() {
+  return (
+    <Suspense fallback={<TutorialLoader />}>
+      <ImageSwapTutorialContent />
+    </Suspense>
   );
 }

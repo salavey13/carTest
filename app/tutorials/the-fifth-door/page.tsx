@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
+import TutorialLoader from '../TutorialLoader'; // Import the loader
 
 const theFifthDoorTutorialTranslations = {
   ru: {
@@ -111,7 +112,7 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-lime": { text: "text-neon-lime", border: "border-neon-lime/50", shadow: "shadow-neon-lime/40" }, 
 };
 
-export default function TheFifthDoorTutorialPage() {
+function TheFifthDoorTutorialContent() {
   const searchParams = useSearchParams();
   const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
@@ -212,5 +213,13 @@ export default function TheFifthDoorTutorialPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+export default function TheFifthDoorPage() {
+  return (
+    <Suspense fallback={<TutorialLoader />}>
+      <TheFifthDoorTutorialContent />
+    </Suspense>
   );
 }
