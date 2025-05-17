@@ -12,7 +12,7 @@ const TutorialStepSection: React.FC<TutorialStepSectionProps> = ({ children, cla
   return (
     <section className={cn(
       "py-10 md:py-16",
-      !isLastStep && "border-b border-border/20", // Add border if not the last step
+      !isLastStep && "border-b border-border/20", 
       className
     )}>
       {children}

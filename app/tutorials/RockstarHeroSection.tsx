@@ -1,29 +1,29 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { VibeContentRenderer } from '@/components/VibeContentRenderer'; // Assuming this is for rendering title/subtitle with icons
+import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
 
 interface RockstarHeroSectionProps {
   title: string;
   subtitle: string;
   mainBackgroundImageUrl?: string;
-  foregroundImageUrl?: string;    // e.g., character silhouette
-  revealedBackgroundImageUrl?: string; // e.g., abstract/bright texture for text reveal
-  children?: React.ReactNode; // For buttons or other elements inside the hero
-  animationScrollHeightVH?: number; // How many viewport heights the animation should span
+  foregroundImageUrl?: string;    
+  revealedBackgroundImageUrl?: string; 
+  children?: React.ReactNode; 
+  animationScrollHeightVH?: number; 
 }
 
 const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   title,
   subtitle,
-  mainBackgroundImageUrl = "/assets/images/placeholder-hero-bg-dark-city.jpg", // Placeholder
-  foregroundImageUrl = "/assets/images/placeholder-hero-fg-object.png",     // Placeholder, should have transparency
-  revealedBackgroundImageUrl = "/assets/images/placeholder-hero-revealed-bg-abstract.jpg", // Placeholder
+  mainBackgroundImageUrl = "/assets/images/placeholder-hero-bg-dark-city.jpg", 
+  foregroundImageUrl = "/assets/images/placeholder-hero-fg-object.png",     
+  revealedBackgroundImageUrl = "/assets/images/placeholder-hero-revealed-bg-abstract.jpg", 
   children,
-  animationScrollHeightVH = 150, // Default: animation occurs over 150vh of scroll
+  animationScrollHeightVH = 150, 
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
-  const heroWrapperRef = useRef<HTMLDivElement>(null); // Ref for the overall animation container
+  const heroWrapperRef = useRef<HTMLDivElement>(null); 
 
   useEffect(() => {
     const heroElement = heroWrapperRef.current;
@@ -31,9 +31,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
 
     const handleScroll = () => {
       const rect = heroElement.getBoundingClientRect();
-      // Calculate how much of the 'animationScrollHeightVH' has been scrolled past
-      // rect.top will be 0 when the top of heroWrapperRef is at the top of the viewport
-      // It will be negative as it scrolls up.
       const scrollDistanceForAnimation = window.innerHeight * (animationScrollHeightVH / 100);
       const scrolledAmount = Math.max(0, -rect.top);
       const progress = Math.min(1, scrolledAmount / scrollDistanceForAnimation);
@@ -41,38 +38,31 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Initial calculation
+    handleScroll(); 
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, [animationScrollHeightVH]);
 
-  // Define transformations based on scrollProgress (0 to 1)
-  // Foreground: zooms in significantly, moves up slightly
-  const fgScale = 1 + scrollProgress * 2; // Example: scales from 1x to 3x
-  const fgTranslateY = -scrollProgress * 50; // Example: moves up by 50% of its own height equivalent over the scroll
+  const fgScale = 1 + scrollProgress * 2; 
+  const fgTranslateY = -scrollProgress * 50; 
 
-  // Text block: scales up a bit, moves up more noticeably than FG to create parallax
-  const textScale = 1 + scrollProgress * 0.5; // Example: scales from 1x to 1.5x
-  const textTranslateY = -scrollProgress * 100; // Example: moves up by 100% of its own height equivalent
+  const textScale = 1 + scrollProgress * 0.5; 
+  const textTranslateY = -scrollProgress * 100; 
 
-  // Revealed background: opacity and slight zoom out
-  const revealedBgOpacity = scrollProgress > 0.2 ? Math.min(1, (scrollProgress - 0.2) / 0.6) : 0; // Fades in between 20% and 80% scroll
-  const revealedBgScale = 1 + scrollProgress * 0.3; // Zooms in slightly to fill 'hole'
+  const revealedBgOpacity = scrollProgress > 0.2 ? Math.min(1, (scrollProgress - 0.2) / 0.6) : 0; 
+  const revealedBgScale = 1 + scrollProgress * 0.3; 
 
   return (
     <div ref={heroWrapperRef} className="relative" style={{ height: `${animationScrollHeightVH}vh` }}>
       <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
-        {/* Layer 1: Main Background (fixed or very slow parallax) */}
         <div
           className="absolute inset-0 bg-cover bg-center -z-30"
           style={{ 
             backgroundImage: `url(${mainBackgroundImageUrl})`,
-            // transform: `translateY(${scrollProgress * 5}vh)` // Subtle parallax
           }}
         />
-        <div className="absolute inset-0 bg-black/70 -z-20"></div> {/* Darkening overlay */}
+        <div className="absolute inset-0 bg-black/70 -z-20"></div>
 
-        {/* Layer 2: Revealed Background (behind text, animates) */}
         {revealedBackgroundImageUrl && (
           <div
             className="absolute inset-0 bg-cover bg-center -z-10"
@@ -85,9 +75,8 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           />
         )}
         
-        {/* Layer 3: Text Content (scales and moves, acts as 'window') */}
         <div 
-          className="relative text-center px-4" // z-index managed by order, will be behind foreground by default
+          className="relative text-center px-4" 
           style={{ 
             transform: `scale(${textScale}) translateY(${textTranslateY}px)`,
             willChange: 'transform',
@@ -103,14 +92,13 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </p>
         </div>
 
-        {/* Layer 4: Foreground Image (zooms and moves most) */}
         {foregroundImageUrl && (
           <div
             className="absolute top-0 left-0 w-full h-full flex items-center justify-center pointer-events-none"
             style={{ 
               transform: `scale(${fgScale}) translateY(${fgTranslateY}px)`,
               willChange: 'transform',
-              zIndex: 5 // Ensures it's above the text block (default z-index 0)
+              zIndex: 5 
             }}
           >
             <img
@@ -121,7 +109,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Layer 5: Children (e.g., buttons), above everything */}
         {children && <div className="absolute bottom-[10vh] md:bottom-[15vh] z-10">{children}</div>}
       </div>
     </div>
