@@ -1,42 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe, Layers, Zap, Puzzle, BookUser, Settings2, ShieldCheck, Users, Star as LucideStar, DraftingCompass } from "lucide-react"; // Added DraftingCompass
+import { LayoutGrid, X, Search, Globe } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
-// Removed direct Fa6 imports if VibeContentRenderer is used for nav icons,
-// but keeping them here as `allPages` still defines them directly.
-// For nav items, we will eventually pass icon *names* to VibeContentRenderer.
-import { 
-  FaGears, 
-  FaScrewdriverWrench,
-  FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
-  FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
-  FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
-  FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaShieldVirus, FaStar, FaGamepad, FaFilm, FaPiggyBank,
-  FaTools // Added FaTools as an alternative for Schematics
-} from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import VibeContentRenderer from "@/components/VibeContentRenderer"; // Import VCR
+import VibeContentRenderer from "@/components/VibeContentRenderer";
 
 interface PageInfo {
   path: string;
-  name: string;
-  icon?: React.ComponentType<{ className?: string }> | string; // Allow string for VCR
+  name: string; 
+  icon?: string; 
   isImportant?: boolean;
   isAdminOnly?: boolean;
   isHot?: boolean;
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; 
   group?: string; 
-  translatedName?: string; 
+  translatedName?: string;
 }
 
 const allPages: PageInfo[] = [
+  // Core Vibe
   { path: "/", name: "Home", icon: "FaBrain", group: "Core Vibe", isImportant: true, color: "cyan" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: "FaWandMagicSparkles", group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
   { path: "/selfdev", name: "SelfDev Path", icon: "FaRoad", group: "Core Vibe", isImportant: true, color: "green" },
@@ -44,13 +32,19 @@ const allPages: PageInfo[] = [
   { path: "/game-plan", name: "Game Plan", icon: "FaFilm", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
+  // Tutorial Quests
+  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "FaExchangeAlt", group: "Tutorial Quests", isImportant: true, color: "green", isHot: true },
+  { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "Tutorial Quests", isImportant: true, color: "red", isHot: true },
+
+  // CyberFitness
   { path: "/profile", name: "Agent Profile", icon: "FaCircleUser", group: "CyberFitness", color: "pink" },
   { path: "/buy-subscription", name: "OS Upgrades", icon: "FaCreditCard", group: "CyberFitness", color: "green" },
   { path: "/premium", name: "Premium Modules", icon: "FaStar", group: "CyberFitness", color: "yellow" }, 
-  { path: "/nutrition", name: "Vibe Schematics", icon: "FaTools", group: "CyberFitness", color: "orange"}, // CHANGED name and icon
+  { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange"},
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue" },  
-  { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, // Lucide icon here
+  { path: "/partner", name: "Alliance Perks", icon: "FaUsers", group: "CyberFitness", color: "purple"},
   
+  // Content & Tools
   { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
   { path: "/purpose-profit", name: "Purpose & Profit", icon: "FaBookOpen", group: "Content & Tools", color: "purple" },
   { path: "/ai-work-future", name: "AI & Future of Work", icon: "FaNetworkWired", group: "Content & Tools", color: "cyan" },
@@ -60,6 +54,7 @@ const allPages: PageInfo[] = [
   { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "gray" },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green"},
   
+  // Misc
   { path: "/cartest", name: "Cyber Garage", icon: "FaCarOn", group: "Misc", color: "blue" },
   { path: "/botbusters", name: "Bot Busters", icon: "FaRobot", group: "Misc", color: "blue"},
   { path: "/bullshitdetector", name: "BS Detector", icon: "FaMagnifyingGlass", group: "Misc", color: "yellow" },
@@ -69,48 +64,49 @@ const allPages: PageInfo[] = [
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: "FaListCheck", group: "Misc", color: "gray" },
   { path: "/rent-car", name: "Rent a Car", icon: "FaCarOn", group: "Misc", color: "yellow" },
   { path: "/vpr-tests", name: "VPR Tests", icon: "FaListCheck", group: "Misc", color: 'pink' },
-  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: Globe, group: "Misc", color: 'green' }, // Lucide
+  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: "FaGlobe", group: "Misc", color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: "FaLandmarkDome", group: "Misc", color: 'yellow' },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: "FaLeaf", group: "Misc", color: 'lime' },
   
+  // Admin Zone
   { path: "/admin", name: "Admin Panel", icon: "FaUserShield", group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/advice-upload", name: "Upload Advice", icon: "FaUpload", group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: "FaCarOn", group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red" },
 ];
 
-const groupOrder = ["Core Vibe", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
-// Using string names for Fa6 icons for groupIcons now
+const groupOrder = ["Core Vibe", "Tutorial Quests", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 const groupIcons: Record<string, string> = {
-    "Core Vibe": "FaZap", // Changed from Zap (lucide) to FaZap for VCR
+    "Core Vibe": "FaBolt",
+    "Tutorial Quests": "FaGraduationCap",
     "CyberFitness": "FaBookUser", 
-    "Content & Tools": "FaPuzzlePiece", // Changed from Puzzle (lucide) to FaPuzzlePiece
-    "Misc": "FaLayers", 
-    "Admin Zone": "FaShieldCheck",
+    "Content & Tools": "FaPuzzlePiece",
+    "Misc": "FaLayerGroup", 
+    "Admin Zone": "FaShieldHalved",
 };
 
 const translations: Record<string, Record<string, string>> = {
   en: {
     "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
+    "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission",
     "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
-    "Vibe Schematics": "Vibe Schematics", // CHANGED
-    "System Config": "System Config", "Alliance Perks": "Alliance Perks",
+    "Vibe Schematics": "Vibe Schematics", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
-    "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin", "Fix13min": "Fix13min", "About Me": "About Me", "Subscribe": "Subscribe",
+    "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
     "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot",
-    "Core Vibe": "Core Vibe", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
+    "Core Vibe": "Core Vibe", "Tutorial Quests": "Tutorial Quests", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
   ru: {
     "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
+    "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок",
     "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
-    "Vibe Schematics": "Схемы Вайба", // CHANGED
-    "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
+    "Vibe Schematics": "Схемы Вайба", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
     "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
-    "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT", "Fix13min": "Fix13min", "About Me": "Обо мне", "Subscribe": "Подписаться",
+    "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
     "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥",
-    "Core Vibe": "Ядро Вайба", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
+    "Core Vibe": "Ядро Вайба", "Tutorial Quests": "Учебные Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
   }
 };
 
@@ -159,28 +155,27 @@ export default function Header() {
   const currentLogoText = useMemo(() => {
     const page = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) return "VPR";
+    if (pathname?.startsWith('/tutorials')) { // Changed from /lab/tutorials
+        const tutorialName = t(page?.name || "Missions");
+        return tutorialName.length > 10 ? "MISSIONS" : tutorialName.toUpperCase();
+    }
     if (page?.name) {
         const translatedPageName = t(page.name);
         const firstWord = translatedPageName.split(' ')[0];
         if (firstWord.length <= 6) return firstWord.toUpperCase(); 
         if (page.name.length <= 6) return page.name.toUpperCase(); 
     }
-    return "CYBERVICE"; 
+    return "CYBERVIBE"; 
   }, [pathname, t]);
   
-  const logoCyberPart = currentLogoText === "CYBERVICE" ? "CYBER" : currentLogoText;
-  const logoVicePart = currentLogoText === "CYBERVICE" ? "VICE" : "";
+  const logoCyberPart = currentLogoText === "CYBERVIBE" ? "CYBER" : currentLogoText;
+  const logoVicePart = currentLogoText === "CYBERVIBE" ? "VIBE" : "";
 
   const groupedAndFilteredPages = useMemo(() => {
-    logger.debug("[Header] Recalculating groupedAndFilteredPages. appContextLoading:", appContextLoading, "isAdmin function exists:", typeof isAdmin === 'function');
     const lowerSearchTerm = searchTerm.toLowerCase();
-    
     let currentIsAdminReal = false;
     if (!appContextLoading && typeof isAdmin === 'function') {
       currentIsAdminReal = isAdmin();
-      logger.debug("[Header] Admin status determined from context. isAdminReal:", currentIsAdminReal);
-    } else {
-      logger.debug("[Header] Admin status check deferred or isAdmin not ready. appContextLoading:", appContextLoading, "isAdmin type:", typeof isAdmin);
     }
     
     const filtered = allPages
@@ -190,7 +185,7 @@ export default function Header() {
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
-        if (groupName === "Admin Zone" && !currentIsAdminReal && !appContextLoading) { // Ensure admin zone is hidden if not admin and context loaded
+        if (groupName === "Admin Zone" && !currentIsAdminReal && !appContextLoading) {
             return; 
         }
         groups[groupName] = [];
@@ -198,11 +193,16 @@ export default function Header() {
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (groups[groupName]) { groups[groupName].push(page); } 
-      else if (groupName === "Admin Zone" && currentIsAdminReal) { groups[groupName] = [page];} 
-      else if (groupName !== "Admin Zone") { groups[groupName] = [page];}
+      if (!groups[groupName] && groupName === "Admin Zone" && currentIsAdminReal) {
+        groups[groupName] = [];
+      } else if (!groups[groupName] && groupName !== "Admin Zone") {
+        groups[groupName] = [];
+      }
+      
+      if (groups[groupName]) {
+        groups[groupName].push(page);
+      }
     });
-    logger.debug("[Header] Final groups for nav:", Object.keys(groups).filter(gn => groups[gn]?.length > 0));
     return groups;
   }, [searchTerm, isAdmin, t, appContextLoading]);
 
@@ -218,14 +218,9 @@ export default function Header() {
   useEffect(() => { if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); } }, [pathname]); 
   useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
-  const RenderIcon = ({ icon, className }: { icon?: string | React.ComponentType<{ className?: string }>; className?: string }) => {
+  const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
     if (!icon) return null;
-    if (typeof icon === 'string') {
-      return <VibeContentRenderer content={`::${icon} className='${className || ''}'::`} />;
-    }
-    // If it's a component (like Lucide icons)
-    const IconComponent = icon;
-    return <IconComponent className={className} />;
+    return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
   };
 
   return (
