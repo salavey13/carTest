@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
+import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
-import TutorialLoader from '../TutorialLoader'; // Import the loader
+import TutorialLoader from '../TutorialLoader'; 
+import { useAppContext } from '@/contexts/AppContext';
+import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
+import { useAppToast } from '@/hooks/useAppToast';
+
 
 const inceptionSwapTutorialTranslations = {
   ru: {
@@ -46,7 +50,6 @@ const inceptionSwapTutorialTranslations = {
     nextLevelText: "Ты постиг Дзен разработки на oneSitePls. Теперь ты видишь код. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> — твой верстак, а идеи — твои чертежи. Строй будущее!",
     tryLiveButton: "::FaTools:: В SUPERVIBE Studio",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
     pageTitle: "::FaBomb:: ВСЁ ЕСТЬ КОД! WTF?!",
@@ -84,8 +87,7 @@ const inceptionSwapTutorialTranslations = {
     nextLevelTitle: "::FaSatelliteDish:: ТЫ ПОДКЛЮЧЕН К ИСТОЧНИКУ!",
     nextLevelText: "РЕАЛЬНОСТЬ – ЭТО КОД. ТЫ – ЕГО АРХИТЕКТОР. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> – ТВОЯ КИБЕРДЕКА. ВРЕМЯ ЛОМАТЬ СИСТЕМУ!",
     tryLiveButton: "::FaLaptopCode:: В БОЙ!",
-    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
 };
 
@@ -99,19 +101,44 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 
 function InceptionSwapTutorialContent() {
   const searchParams = useSearchParams();
-  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+  const router = useRouter();
+  const { dbUser, isAuthenticated } = useAppContext();
+  const { addToast } = useAppToast();
+
+  const initialModeFromUrl = searchParams.get('mode') === 'wtf';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
   
   const t = inceptionSwapTutorialTranslations[currentMode];
+  const tutorialQuestId = "inception-swap-mission";
+
+  const handleTutorialCompletion = useCallback(async () => {
+    if (isAuthenticated && dbUser?.user_id) {
+      const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
+      if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
+        addToast(`::FaCheckCircle:: Миссия "${inceptionSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+      }
+      result.newAchievements?.forEach(ach => {
+        addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+      });
+    }
+  }, [isAuthenticated, dbUser, addToast, tutorialQuestId]);
+
+  useEffect(() => {
+    handleTutorialCompletion();
+  }, [handleTutorialCompletion]);
 
   const toggleMode = () => {
-    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+    const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
+    setCurrentMode(newMode);
+    if (newMode === 'wtf') {
+      router.replace(`/tutorials/inception-swap?mode=wtf`);
+    }
   };
 
   useEffect(() => {
-    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-    if (newMode !== currentMode) {
-      setCurrentMode(newMode);
+    const modeFromUrl = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (modeFromUrl !== currentMode) {
+      setCurrentMode(modeFromUrl);
     }
   }, [searchParams, currentMode]);
 
@@ -140,6 +167,7 @@ function InceptionSwapTutorialContent() {
           <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
             <VibeContentRenderer content={t.pageSubtitle} />
           </p>
+          {!initialModeFromUrl && currentMode === 'ru' && (
            <Button 
             onClick={toggleMode} 
             variant="outline" 
@@ -148,8 +176,9 @@ function InceptionSwapTutorialContent() {
               "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink" 
             )}
           >
-            <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+            <VibeContentRenderer content={inceptionSwapTutorialTranslations.ru.toggleButtonToWtf} />
           </Button>
+          )}
         </header>
 
         <div className="space-y-12 md:space-y-16">

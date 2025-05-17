@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
+import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
-import TutorialLoader from '../TutorialLoader'; // Import the loader
+import TutorialLoader from '../TutorialLoader'; 
+import { useAppContext } from '@/contexts/AppContext';
+import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
+import { useAppToast } from '@/hooks/useAppToast';
+
 
 const videoSwapTutorialTranslations = {
   ru: {
@@ -51,7 +55,6 @@ const videoSwapTutorialTranslations = {
     nextLevelText: "Отличная работа, Агент! Ты освоил замену видео. <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих новых подвигов с видео-контентом. *Заметка: для видео используется тот же ImageSwap флоу в студии.*",
     tryLiveButton: "::FaWandMagicSparkles:: Попробовать в Студии",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
     pageTitle: "ВИДОСЫ МЕНЯТЬ – ЕЩЁ ПРОЩЕ, ЧЕМ ТЫ ДУМАЛ!",
@@ -93,8 +96,7 @@ const videoSwapTutorialTranslations = {
     nextLevelTitle: "::FaPhotoFilm:: ТЫ ТЕПЕРЬ ВИДЕО-МАГНАТ!",
     nextLevelText: "Картинки, иконки, видосы... Что дальше? Весь Голливуд твой! <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет.",
     tryLiveButton: "::FaVideoCamera:: В Монтажную!",
-    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
 };
 
@@ -109,19 +111,44 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 
 function VideoSwapTutorialContent() {
   const searchParams = useSearchParams();
-  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+  const router = useRouter();
+  const { dbUser, isAuthenticated } = useAppContext();
+  const { addToast } = useAppToast();
+
+  const initialModeFromUrl = searchParams.get('mode') === 'wtf';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
   
   const t = videoSwapTutorialTranslations[currentMode];
+  const tutorialQuestId = "video-swap-mission";
+
+  const handleTutorialCompletion = useCallback(async () => {
+    if (isAuthenticated && dbUser?.user_id) {
+      const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
+      if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
+        addToast(`::FaCheckCircle:: Миссия "${videoSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+      }
+      result.newAchievements?.forEach(ach => {
+        addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+      });
+    }
+  }, [isAuthenticated, dbUser, addToast, tutorialQuestId]);
+
+  useEffect(() => {
+    handleTutorialCompletion();
+  }, [handleTutorialCompletion]);
 
   const toggleMode = () => {
-    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+    const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
+    setCurrentMode(newMode);
+    if (newMode === 'wtf') {
+      router.replace(`/tutorials/video-swap?mode=wtf`);
+    }
   };
 
   useEffect(() => {
-    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-    if (newMode !== currentMode) {
-      setCurrentMode(newMode);
+    const modeFromUrl = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (modeFromUrl !== currentMode) {
+      setCurrentMode(modeFromUrl);
     }
   }, [searchParams, currentMode]);
 
@@ -150,6 +177,7 @@ function VideoSwapTutorialContent() {
           <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
             <VibeContentRenderer content={t.pageSubtitle} />
           </p>
+          {!initialModeFromUrl && currentMode === 'ru' && (
            <Button 
             onClick={toggleMode} 
             variant="outline" 
@@ -158,8 +186,9 @@ function VideoSwapTutorialContent() {
                "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
             )}
           >
-            <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+            <VibeContentRenderer content={videoSwapTutorialTranslations.ru.toggleButtonToWtf} />
           </Button>
+          )}
         </header>
 
         <div className="space-y-12 md:space-y-20">
