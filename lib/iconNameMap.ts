@@ -80,7 +80,6 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   facrown: "FaCrown",
   facopy: "FaCopy",
   faclouduploadalt: "FaCloudUploadAlt",
-  // fathumbsup: "FaThumbsUp", // Already defined
   faforwardstep: "FaForwardStep",
   faserver: "FaServer",
   faphotofilm: "FaPhotoFilm", 
@@ -93,9 +92,9 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fafistraised: "FaFistRaised",
   fastreetview: "FaStreetView",
   fahandmiddlefinger: "FaHandMiddleFinger",
-  facity: "FaCity", // Added
+  facity: "FaCity", 
   faangledoubledown: "FaAngleDoubleDown", 
-
+  faguitar: "FaGuitar", // Added for Fifth Door WTF
 
   // StickyChat specific icons
   faarrowright: "FaArrowRight",
@@ -110,7 +109,6 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fasquarearrowupright: "FaSquareArrowUpRight",
   fafileimport: "FaFileImport",
   faclipboardlist: "FaClipboardList",
-  // facirclecheck: "FaCircleCheck", // Already defined
   faicons: "FaIcons", 
   faspinner: "FaSpinner",
 
@@ -129,6 +127,6 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fauserdoctor: "FaUserDoctor",
   fapuzzlepiece: "FaPuzzlePiece",
   falayergroup: "FaLayerGroup",
-  fagraduationcap: "FaGraduationCap", // Added for Tutorial Quests/GTA Vibe Missions
-  faheartbeat: "FaHeartbeat", // For CyberFitness as an alternative to FaDumbbell
+  fagraduationcap: "FaGraduationCap",
+  faheartbeat: "FaHeartbeat",
 };

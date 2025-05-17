@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe } from "lucide-react"; // Lucide icons for general UI
+import { LayoutGrid, X, Search, Globe } from "lucide-react"; 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +12,9 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { QUEST_ORDER, fetchUserCyberFitnessProfile, isQuestUnlocked } from '@/hooks/cyberFitnessSupabase'; 
 import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
-import { FaGamepad } from "react-icons/fa6"; // Directly import for specific use
+import * as Fa6Icons from "react-icons/fa6"; // Import all Fa6Icons
+import { iconNameMap } from "@/lib/iconNameMap";
+
 
 interface PageInfo {
   path: string;
@@ -37,7 +39,7 @@ const allPages: PageInfo[] = [
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
   // GTA Vibe Missions (Tutorial Quests)
-  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "FaExchangeAlt", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" }, 
+  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "faexchangealt", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" }, 
   { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "GTA Vibe Missions", isImportant: true, color: "red", isHot: true, questId: "icon-swap-mission" },
   { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "GTA Vibe Missions", isImportant: true, color: "cyan", isHot: true, questId: "video-swap-mission" },
   { path: "/tutorials/inception-swap", name: "Inception Swap Mission", icon: "FaInfinity", group: "GTA Vibe Missions", isImportant: true, color: "lime", isHot: true, questId: "inception-swap-mission" },
@@ -50,7 +52,7 @@ const allPages: PageInfo[] = [
   { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange"},
   { path: "/start-training", name: "Start Training", icon: "FaDumbbell", group: "CyberFitness", color: "green", isImportant: true},
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue" },  
-  { path: "/partner", name: "Alliance Perks", icon: "FaBookUser", group: "CyberFitness", color: "purple"}, 
+  { path: "/partner", name: "Alliance Perks", icon: "fabookuser", group: "CyberFitness", color: "purple"}, 
   
   // Content & Tools
   { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
@@ -84,9 +86,10 @@ const allPages: PageInfo[] = [
 ];
 
 const groupOrder = ["Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
-const groupIcons: Record<string, string> = {
+// groupIcons values are now direct Fa6Icons keys (PascalCase)
+const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
     "Core Vibe": "FaBolt",
-    // "GTA Vibe Missions" icon is handled directly in render with FaGamepad
+    "GTA Vibe Missions": "FaGamepad",
     "CyberFitness": "FaDumbbell", 
     "Content & Tools": "FaPuzzlePiece",
     "Misc": "FaLayerGroup", 
@@ -253,7 +256,7 @@ export default function Header() {
   useEffect(() => { if (isNavOpen) { setSearchTerm(""); } }, [pathname, isNavOpen]); 
   useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
-  const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
+  const RenderIconFromPage = ({ icon, className }: { icon?: string; className?: string }) => {
     if (!icon) return null;
     return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
   };
@@ -337,19 +340,22 @@ export default function Header() {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null; 
                   
-                  const groupIconName = groupIcons[groupName];
-                  const isGtaVibeGroup = groupName === "GTA Vibe Missions";
+                  const groupIconKey = groupIcons[groupName];
+                  const IconComponent = groupIconKey ? Fa6Icons[groupIconKey] : null;
 
                   return (
                     <div key={groupName}>
                        <h3 className={cn(
-                        "text-lg font-orbitron mb-3 flex items-center gap-2",
-                        isGtaVibeGroup ? "gta-vibe-text-effect text-2xl justify-center py-2" : "text-brand-purple"
+                        "text-xl font-orbitron mb-3 flex items-center gap-x-2.5 justify-center py-2",
+                        "gta-vibe-text-effect" 
                         )}>
-                        {groupIconName && !isGtaVibeGroup && <RenderIcon icon={groupIconName} className="w-6 h-6 opacity-80" />} 
-                        {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 mr-2 filter brightness-150 saturate-200", {"text-transparent": !logoVicePart})} style={{filter: "drop-shadow(0 0 3px hsl(var(--brand-pink))) drop-shadow(0 0 6px hsl(var(--brand-orange)))"}} /> }
-                        <span className={isGtaVibeGroup ? "gta-vibe-text-effect" : ""}>{t(groupName)}</span>
-                         {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 ml-2 filter brightness-150 saturate-200", {"text-transparent": !logoVicePart})} style={{filter: "drop-shadow(0 0 3px hsl(var(--brand-pink))) drop-shadow(0 0 6px hsl(var(--brand-orange)))"}} />}
+                        {IconComponent && (
+                          <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses[groupName === "GTA Vibe Missions" ? 'pink' : 'purple']?.text || 'text-brand-cyan')} />
+                        )}
+                        <span>{t(groupName)}</span>
+                        {IconComponent && groupName === "GTA Vibe Missions" && ( // Show second icon for GTA Vibe
+                           <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses['pink']?.text || 'text-brand-cyan')} />
+                        )}
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
                         {pagesInGroup.map((page) => {
@@ -380,7 +386,7 @@ export default function Header() {
                                 </span>
                               )}
                               {page.icon && (
-                                <RenderIcon 
+                                <RenderIconFromPage 
                                     icon={page.icon} 
                                     className={cn(
                                         "transition-transform duration-200 group-hover:scale-110 mb-1.5", 
