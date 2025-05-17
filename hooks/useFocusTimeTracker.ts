@@ -30,7 +30,7 @@ export const useFocusTimeTracker = ({
             if (accumulatedFocusTimeMsRef.current > 0 && accumulatedFocusTimeMsRef.current < MIN_FOCUS_SESSION_MS && dbUser?.user_id) {
                 logger.log(`[FocusTimeTracker - ${componentName}] Accumulated focus time (${accumulatedFocusTimeMsRef.current}ms) for user ${dbUser.user_id} is less than minimum (${MIN_FOCUS_SESSION_MS}ms). Not logging. Resetting.`);
             }
-            accumulatedFocusTimeMsRef.current = 0; // Reset if too short or no user
+            accumulatedFocusTimeMsRef.current = 0; 
             return;
         }
 
@@ -38,10 +38,9 @@ export const useFocusTimeTracker = ({
         if (minutesToLog > 0) {
             logger.log(`[FocusTimeTracker - ${componentName}] Logging ${minutesToLog} minutes of focus time for user ${dbUser.user_id}. Is unload: ${isUnload}`);
             try {
-                // Pass the Supabase user_id (string)
                 await logCyberFitnessAction(dbUser.user_id, 'focusTimeAdded', { minutes: minutesToLog });
-                accumulatedFocusTimeMsRef.current -= minutesToLog * 60 * 1000; // Subtract logged time
-                 logger.info(`[FocusTimeTracker - ${componentName}] Successfully logged ${minutesToLog} focus minutes. Remaining accumulated: ${accumulatedFocusTimeMsRef.current}ms`);
+                accumulatedFocusTimeMsRef.current -= minutesToLog * 60 * 1000; 
+                logger.info(`[FocusTimeTracker - ${componentName}] Successfully logged ${minutesToLog} focus minutes. Remaining accumulated: ${accumulatedFocusTimeMsRef.current}ms`);
             } catch (error) {
                 logger.error(`[FocusTimeTracker - ${componentName}] Error logging focus time:`, error);
             }
@@ -51,6 +50,8 @@ export const useFocusTimeTracker = ({
     }, [dbUser?.user_id, componentName]);
 
     const debouncedLogFocusTime = useDebouncedCallback(
+        // Purposefully not including logAccumulatedFocusTime in deps, it's called directly.
+        // The debounced function itself doesn't change, its execution calls the latest logAccumulatedFocusTime.
         () => logAccumulatedFocusTime(false),
         FOCUS_LOG_INTERVAL_MS,
         { leading: false, trailing: true }
@@ -68,7 +69,7 @@ export const useFocusTimeTracker = ({
             }
             activityStartTimeRef.current = null;
         }
-    }, [componentName, debouncedLogFocusTime]);
+    }, [componentName, debouncedLogFocusTime]); // debouncedLogFocusTime is stable
 
     const handleBecameActive = useCallback(() => {
         if (!activityStartTimeRef.current) {
@@ -83,68 +84,71 @@ export const useFocusTimeTracker = ({
         handleBecameActive,
         componentName
     );
+    
+    const handleVisibilityChange = useCallback(() => {
+        if (document.visibilityState === 'hidden') {
+            logger.log(`[FocusTimeTracker - ${componentName}] Tab became hidden.`);
+            if (activityStartTimeRef.current) {
+                const sessionDuration = Date.now() - activityStartTimeRef.current;
+                 if (sessionDuration >= MIN_FOCUS_SESSION_MS / 2 ) { 
+                    accumulatedFocusTimeMsRef.current += sessionDuration;
+                     logger.log(`[FocusTimeTracker - ${componentName}] Tab hidden during active session. Duration: ${sessionDuration}ms. Total accumulated: ${accumulatedFocusTimeMsRef.current}ms`);
+                     logAccumulatedFocusTime(true); 
+                 } else {
+                    logger.log(`[FocusTimeTracker - ${componentName}] Tab hidden, active session too short (${sessionDuration}ms) to accumulate.`);
+                 }
+                activityStartTimeRef.current = null; 
+            } else {
+                 if(accumulatedFocusTimeMsRef.current > 0 && dbUser?.user_id) { 
+                    logAccumulatedFocusTime(true); 
+                 }
+            }
+        } else if (document.visibilityState === 'visible') {
+            logger.log(`[FocusTimeTracker - ${componentName}] Tab became visible. Activity session can restart on interaction.`);
+        }
+    }, [componentName, logAccumulatedFocusTime, dbUser?.user_id]); // logAccumulatedFocusTime is stable
+
+    const handleBeforeUnload = useCallback(() => {
+        logger.log(`[FocusTimeTracker - ${componentName}] beforeunload triggered.`);
+         if (activityStartTimeRef.current && dbUser?.user_id) {
+             const sessionDuration = Date.now() - activityStartTimeRef.current;
+             accumulatedFocusTimeMsRef.current += sessionDuration;
+             activityStartTimeRef.current = null;
+         }
+        if (dbUser?.user_id) logAccumulatedFocusTime(true);
+    }, [dbUser?.user_id, logAccumulatedFocusTime]); // logAccumulatedFocusTime is stable
 
     useEffect(() => {
         if (!enabled) {
-            // If disabled, attempt to log any pending time and clear refs
             if (activityStartTimeRef.current && dbUser?.user_id) {
                  const sessionDuration = Date.now() - activityStartTimeRef.current;
                  accumulatedFocusTimeMsRef.current += sessionDuration;
             }
             if (accumulatedFocusTimeMsRef.current > 0 && dbUser?.user_id) {
-                logAccumulatedFocusTime(true); // Force log on disable
+                logAccumulatedFocusTime(true); 
             }
             activityStartTimeRef.current = null;
             accumulatedFocusTimeMsRef.current = 0;
-            debouncedLogFocusTime.cancel(); // Cancel any pending debounced calls
+            debouncedLogFocusTime.cancel(); 
+            // Remove listeners if they were added by this effect when it was enabled
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
             return;
         }
 
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                logger.log(`[FocusTimeTracker - ${componentName}] Tab became hidden.`);
-                if (activityStartTimeRef.current) {
-                    const sessionDuration = Date.now() - activityStartTimeRef.current;
-                     if (sessionDuration >= MIN_FOCUS_SESSION_MS / 2 ) { 
-                        accumulatedFocusTimeMsRef.current += sessionDuration;
-                         logger.log(`[FocusTimeTracker - ${componentName}] Tab hidden during active session. Duration: ${sessionDuration}ms. Total accumulated: ${accumulatedFocusTimeMsRef.current}ms`);
-                         logAccumulatedFocusTime(true); // Log immediately
-                     } else {
-                        logger.log(`[FocusTimeTracker - ${componentName}] Tab hidden, active session too short (${sessionDuration}ms) to accumulate.`);
-                     }
-                    activityStartTimeRef.current = null; 
-                } else {
-                     if(accumulatedFocusTimeMsRef.current > 0 && dbUser?.user_id) { // Check dbUser as well
-                        logAccumulatedFocusTime(true); // Log any pending on hide
-                     }
-                }
-            } else if (document.visibilityState === 'visible') {
-                logger.log(`[FocusTimeTracker - ${componentName}] Tab became visible. Activity session can restart on interaction.`);
-                // Don't immediately restart timer here, let onActive from useInactivityTimer handle it
-                // to ensure there's actual user interaction.
-                // activityStartTimeRef.current = null; // Resetting here might be redundant if onActive handles it
-            }
-        };
-        
-        const handleBeforeUnload = () => {
-            logger.log(`[FocusTimeTracker - ${componentName}] beforeunload triggered.`);
-             if (activityStartTimeRef.current && dbUser?.user_id) {
-                 const sessionDuration = Date.now() - activityStartTimeRef.current;
-                 accumulatedFocusTimeMsRef.current += sessionDuration;
-                 activityStartTimeRef.current = null;
-             }
-            if (dbUser?.user_id) logAccumulatedFocusTime(true); // Force log on unload
-        };
-
+        // Add listeners only if enabled
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', handleBeforeUnload);
 
         return () => {
+            // Always try to remove listeners on cleanup, regardless of current `enabled` state
+            // because they might have been added when `enabled` was true.
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            debouncedLogFocusTime.cancel(); // Cancel debounced calls on unmount
-            // Log any remaining time on unmount if enabled and user exists
-            if(enabled && dbUser?.user_id) {
+            debouncedLogFocusTime.cancel(); 
+
+            // Log any remaining time on unmount if tracker was enabled and user exists
+            if(enabled && dbUser?.user_id) { // Check 'enabled' here to reflect its state during the effect's active period
                 if (activityStartTimeRef.current) {
                     const sessionDuration = Date.now() - activityStartTimeRef.current;
                     accumulatedFocusTimeMsRef.current += sessionDuration;
@@ -152,5 +156,5 @@ export const useFocusTimeTracker = ({
                 logAccumulatedFocusTime(true);
             }
         };
-    }, [enabled, dbUser?.user_id, logAccumulatedFocusTime, debouncedLogFocusTime, componentName]);
+    }, [enabled, dbUser?.user_id, componentName, handleVisibilityChange, handleBeforeUnload, logAccumulatedFocusTime, debouncedLogFocusTime]);
 };
