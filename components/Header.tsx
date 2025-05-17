@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe, FaGamepad } from "lucide-react"; // FaGamepad for GTA Vibe Missions
+import { LayoutGrid, X, Search, Globe, FaGamepad } from "lucide-react"; 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,7 +10,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { QUEST_ORDER, fetchUserCyberFitnessProfile, isQuestUnlocked } from '@/hooks/cyberFitnessSupabase'; // For checking unlocked missions
+import { QUEST_ORDER, fetchUserCyberFitnessProfile, isQuestUnlocked } from '@/hooks/cyberFitnessSupabase'; 
 import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
 
 interface PageInfo {
@@ -23,7 +23,7 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; 
   group?: string; 
   translatedName?: string;
-  questId?: string; // Added questId for tutorial missions
+  questId?: string; 
 }
 
 const allPages: PageInfo[] = [
@@ -52,7 +52,6 @@ const allPages: PageInfo[] = [
   { path: "/partner", name: "Alliance Perks", icon: "fabookuser", group: "CyberFitness", color: "purple"}, 
   
   // Content & Tools
-  // ... (rest of the pages remain the same)
   { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
   { path: "/purpose-profit", name: "Purpose & Profit", icon: "FaBookOpen", group: "Content & Tools", color: "purple" },
   { path: "/ai-work-future", name: "AI & Future of Work", icon: "FaNetworkWired", group: "Content & Tools", color: "cyan" },
@@ -86,7 +85,7 @@ const allPages: PageInfo[] = [
 const groupOrder = ["Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 const groupIcons: Record<string, string> = {
     "Core Vibe": "FaBolt",
-    "GTA Vibe Missions": "FaGamepad", // Changed Icon
+    "GTA Vibe Missions": "FaGamepad",
     "CyberFitness": "FaDumbbell", 
     "Content & Tools": "FaPuzzlePiece",
     "Misc": "FaLayerGroup", 
@@ -95,23 +94,28 @@ const groupIcons: Record<string, string> = {
 
 const translations: Record<string, Record<string, string>> = {
   en: {
-    // ... (other translations remain the same)
+    "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
     "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission", "Video Render Mission": "Video Render Mission", "Inception Swap Mission": "Inception Swap Mission", "The Fifth Door Mission": "The Fifth Door Mission",
-    "Start Training": "Start Training",
-    "Tutorial Quests": "Tutorial Quests", // Keep old key for safety, new key below
-    "GTA Vibe Missions": "GTA Vibe Missions",
-    // ... (other translations remain the same)
+    "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
+    "Vibe Schematics": "Vibe Schematics", "Start Training": "Start Training", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
+    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
+    "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
+    "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
+    "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot",
+    "Core Vibe": "Core Vibe", "GTA Vibe Missions": "GTA Vibe Missions", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
   ru: {
-    // ... (other translations remain the same)
+    "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
     "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок", "Video Render Mission": "Миссия: Видео-Рендер", "Inception Swap Mission": "Миссия: Inception Swap", "The Fifth Door Mission": "Миссия: Пятая Дверь",
-    "Start Training": "Начать Тренировку",
-    "Tutorial Quests": "Учебные Миссии", // Keep old key
-    "GTA Vibe Missions": "GTA Vibe Миссии",
-    // ... (other translations remain the same)
+    "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
+    "Vibe Schematics": "Схемы Вайба", "Start Training": "Начать Тренировку", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
+    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
+    "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
+    "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
+    "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥",
+    "Core Vibe": "Ядро Вайба", "GTA Vibe Missions": "GTA Vibe Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
   }
 };
-// Ensure all English and Russian keys from allPages are present in translations above.
 
 const colorVarMap: Record<string, string> = {
   purple: "var(--brand-purple-rgb)", blue: "var(--brand-blue-rgb)", yellow: "var(--brand-yellow-rgb)",
@@ -135,7 +139,7 @@ const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> 
 };
 
 export default function Header() {
-  const { isAdmin, user, dbUser, isLoading: appContextLoading } = useAppContext(); // Added dbUser
+  const { isAdmin, user, dbUser, isLoading: appContextLoading } = useAppContext(); 
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -168,8 +172,10 @@ export default function Header() {
   }, [dbUser?.user_id]);
 
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if(isNavOpen){ // Fetch profile only when nav is opened to check mission status
+      fetchProfile();
+    }
+  }, [isNavOpen, fetchProfile]);
 
   const t = useCallback((key: string): string => translations[currentLang]?.[key] || translations['en']?.[key] || key, [currentLang]);
   const toggleLang = useCallback(() => setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en'), []);
@@ -204,8 +210,9 @@ export default function Header() {
       .filter(page => {
         if (page.isAdminOnly && !currentIsAdminReal) return false;
         if (page.group === "GTA Vibe Missions" && page.questId && cyberProfile && !profileLoading) {
-          return isQuestUnlocked(page.questId, cyberProfile.completedTutorials, QUEST_ORDER);
+          return isQuestUnlocked(page.questId, cyberProfile.completedQuests, QUEST_ORDER);
         }
+        // For non-GTA mission pages, or if profile isn't loaded yet, show them by default if not admin-only
         return true;
       })
       .map(page => ({ ...page, translatedName: t(page.name) }))
@@ -243,7 +250,7 @@ export default function Header() {
   }, [lastScrollY, isNavOpen, isHeaderVisible]);
 
   useEffect(() => { window.addEventListener("scroll", handleScroll, { passive: true }); return () => window.removeEventListener("scroll", handleScroll); }, [handleScroll]);
-  useEffect(() => { if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); } }, [pathname]); 
+  useEffect(() => { if (isNavOpen) { setSearchTerm(""); } }, [pathname, isNavOpen]); // Reset search on nav open too
   useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
   const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
@@ -325,8 +332,8 @@ export default function Header() {
               </div>
               
               <div className="space-y-6">
-                {profileLoading && !cyberProfile && <div className="text-center text-brand-cyan font-mono"><VibeContentRenderer content="::FaSpinner className='animate-spin':: Загрузка профиля агента..."/></div>}
-                {groupOrder.map(groupName => {
+                {profileLoading && <div className="text-center text-brand-cyan font-mono"><VibeContentRenderer content="::FaSpinner className='animate-spin':: Загрузка профиля агента..."/></div>}
+                {!profileLoading && groupOrder.map(groupName => {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null; 
                   
@@ -340,9 +347,9 @@ export default function Header() {
                         isGtaVibeGroup ? "gta-vibe-text-effect text-2xl justify-center py-2" : "text-brand-purple"
                         )}>
                         {groupIconName && !isGtaVibeGroup && <RenderIcon icon={groupIconName} className="w-6 h-6 opacity-80" />} 
-                        {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 mr-2", "text-transparent")} /> /* Invisible but takes space for gta-vibe-text-effect */}
-                        {t(groupName)}
-                         {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 ml-2", "text-transparent")} />}
+                        {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 mr-2", {"text-transparent": !logoVicePart})} /> }
+                        <span className={isGtaVibeGroup ? "gta-vibe-text-effect" : ""}>{t(groupName)}</span>
+                         {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 ml-2", {"text-transparent": !logoVicePart})} />}
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
                         {pagesInGroup.map((page) => {
@@ -406,7 +413,7 @@ export default function Header() {
                     </div>
                   );
                 })}
-                {Object.values(groupedAndFilteredPages).every(g => !g || g.length === 0) && (
+                {!profileLoading && Object.values(groupedAndFilteredPages).every(g => !g || g.length === 0) && (
                   <p className="text-center text-gray-500 text-sm md:text-base mt-6 md:mt-8 font-mono">
                     {t("No pages found matching")} "{searchTerm}"
                   </p>
