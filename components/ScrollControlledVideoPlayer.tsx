@@ -23,8 +23,15 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [isUnderScrollControl, setIsUnderScrollControl] = useState(false); 
 
+  // Debug states
+  const [debugCurrentTime, setDebugCurrentTime] = useState(0);
+  const [debugProgress, setDebugProgress] = useState(0);
+  const [debugIsLooping, setDebugIsLooping] = useState(false);
+
   const lastRAFTimeRef = useRef(0);
   const scrollRAFRef = useRef<number | null>(null);
+
+  const showDebugOverlay = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true';
 
   useEffect(() => {
     logger.log(`[ScrollVideo EASTER_EGG] Player for ${src.split('/').pop()} initialized. Get ready to VIBE with the scroll! ::FaSatelliteDish::`);
@@ -85,6 +92,10 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
     if (!video || !container || videoDuration === null || videoDuration === 0) {
       if (isUnderScrollControl) setIsUnderScrollControl(false);
+      if (showDebugOverlay) {
+        setDebugProgress(0);
+        setDebugCurrentTime(0);
+      }
       return;
     }
 
@@ -96,28 +107,27 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
     let newActiveScrollControl = false;
     let newTime = video.currentTime;
+    let currentProgress = 0;
 
-    // NEW LOGIC: Scroll control is active when the video FITS ENTIRELY in the viewport
     const fitsEntirelyInViewport = videoTop >= 0 && videoBottom <= viewportHeight;
 
     if (fitsEntirelyInViewport && isVisible) {
         newActiveScrollControl = true;
-        // Calculate the total scrollable distance for the video's top edge within the viewport
         const scrollableDistanceInViewport = viewportHeight - videoHeight;
         
-        if (scrollableDistanceInViewport > 0) { // Video is shorter than viewport
-            // Progress is based on how much the video's top has moved from the viewport's top
-            // relative to the total space it can move.
-            const scrolledDistance = videoTop; // videoTop is 0 when at top, scrollableDistanceInViewport when at bottom
-            let progress = scrolledDistance / scrollableDistanceInViewport;
-            // Invert progress: 0 when videoTop is at max (bottom), 1 when videoTop is 0 (top)
-            progress = 1 - progress; 
-            progress = Math.max(0, Math.min(1, progress));
-            newTime = progress * videoDuration;
-        } else { // Video is as tall as or taller than viewport; scroll control based on its position
-            let progress = (viewportHeight - videoTop) / videoHeight; // Fraction of video scrolled past the top
-            progress = Math.max(0, Math.min(1, progress)); // Clamp between 0 and 1
-            newTime = progress * videoDuration;
+        if (scrollableDistanceInViewport > 0) { 
+            const scrolledDistance = videoTop; 
+            currentProgress = 1 - (scrolledDistance / scrollableDistanceInViewport); 
+            currentProgress = Math.max(0, Math.min(1, currentProgress));
+            newTime = currentProgress * videoDuration;
+        } else { 
+            currentProgress = (viewportHeight - videoTop) / videoHeight; 
+            currentProgress = Math.max(0, Math.min(1, currentProgress)); 
+            newTime = currentProgress * videoDuration;
+        }
+        if (showDebugOverlay) {
+            setDebugProgress(currentProgress);
+            setDebugCurrentTime(newTime);
         }
 
     } else {
@@ -134,7 +144,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         video.currentTime = newTime;
       }
     }
-  }, [videoDuration, isVisible, isUnderScrollControl, src]);
+  }, [videoDuration, isVisible, isUnderScrollControl, src, showDebugOverlay]);
 
   const masterScrollHandler = useCallback(() => {
     const now = performance.now();
@@ -153,6 +163,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
 
     if (isUnderScrollControl && isVisible) {
       video.loop = false;
+      if (showDebugOverlay) setDebugIsLooping(false);
       if (!video.paused && video.duration > 0) {
         video.pause();
       }
@@ -172,17 +183,17 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         }
       };
     } else {
-      // Loop when not under scroll control OR not visible
       logger.debug(`[ScrollVideo] ${src.split('/').pop()} LOOPING (isUnderScrollControl: ${isUnderScrollControl}, isVisible: ${isVisible}).`);
       if (video.duration > 0) { 
-          if (video.currentTime !== 0) video.currentTime = 0; 
+          if (video.currentTime !== 0 && !video.seeking) video.currentTime = 0; 
       }
       video.loop = true;
-      if (video.paused && isVisible) { // Play only if paused AND visible
+      if (showDebugOverlay) setDebugIsLooping(true);
+      if (video.paused && isVisible) { 
         video.play().catch(error => {
             logger.warn(`[ScrollVideo] ${src.split('/').pop()} Autoplay for loop failed:`, error.message);
         });
-      } else if (!isVisible && !video.paused) { // Pause if it becomes not visible while looping
+      } else if (!isVisible && !video.paused) { 
         video.pause();
       }
       
@@ -191,7 +202,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         scrollRAFRef.current = null;
       }
     }
-  }, [isUnderScrollControl, isVisible, videoDuration, masterScrollHandler, src, updateVideoPlayback]);
+  }, [isUnderScrollControl, isVisible, videoDuration, masterScrollHandler, src, updateVideoPlayback, showDebugOverlay]);
 
   return (
     <div ref={containerRef} className={cn('w-full relative', className)}>
@@ -208,6 +219,18 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
       {videoDuration === null && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white backdrop-blur-sm">
           Loading video...
+        </div>
+      )}
+      {showDebugOverlay && (
+        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs p-2 rounded font-mono z-10 pointer-events-none">
+          <div>Src: {src.split('/').pop()}</div>
+          <div>ScrollControlled: {isUnderScrollControl ? 'YES' : 'NO'}</div>
+          <div>Looping: {debugIsLooping ? 'YES' : 'NO'}</div>
+          <div>Visible: {isVisible ? 'YES' : 'NO'}</div>
+          <div>Progress: {debugProgress.toFixed(2)}</div>
+          <div>Calc Time: {debugCurrentTime.toFixed(2)}s</div>
+          <div>Actual Time: {videoRef.current?.currentTime?.toFixed(2) ?? 'N/A'}s</div>
+          <div>Duration: {videoDuration?.toFixed(2) ?? 'N/A'}s</div>
         </div>
       )}
     </div>
