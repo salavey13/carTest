@@ -37,7 +37,7 @@ const inceptionSwapTutorialTranslations = {
         id: 4,
         title: "Шаг 4: Рекурсивное Просветление. Ты – Разработчик.",
         description: "Ты научился использовать инструменты, чтобы СОЗДАВАТЬ ИНСТРУМЕНТЫ. Ты замкнул цикл. Ты больше не просто пользователь. ТЫ – РАЗРАБОТЧИК. Матрица твоя. Твори.",
-        icon: "FaBrain", // Changed from FaInfinity to FaBrain for this step
+        icon: "FaBrain", 
         color: "brand-green"
       }
     ],
@@ -55,7 +55,7 @@ const inceptionSwapTutorialTranslations = {
         id: 1,
         title: "ШАГ 1: ЧТО? 4 ШАГА = ВСЁ!",
         description: "1. СКОПИРУЙ СТАРОЕ (код, файл, идея). 2. ПРИДУМАЙ НОВОЕ (фикс, фича, рефактор). 3. СКАЖИ СТУДИИ (дай старое, опиши новое). 4. ПРОВЕРЬ PR. ЭТО БАЗА!",
-        icon: "FaUniversalAccess", // Changed from FaBomb
+        icon: "FaUniversalAccess", 
         color: "brand-pink"
       },
       {
@@ -69,14 +69,14 @@ const inceptionSwapTutorialTranslations = {
         id: 3,
         title: "ШАГ 3: СДЕЛАЙ СВОЙ VIDEO SWAP TOOL!",
         description: "ХОЧЕШЬ VIDEO SWAP TOOL В ЧАТЕ? ЛЕГКО! СКАЖИ AI: 'ВОТ IMAGE SWAP TOOL (старый код), СДЕЛАЙ ИЗ НЕГО VIDEO SWAP TOOL (новая задача)'. БУМ! ГОТОВО!",
-        icon: "FaToolbox", // Changed from FaTools
+        icon: "FaToolbox", 
         color: "brand-purple"
       },
       {
         id: 4,
         title: "ШАГ 4: ТЫ В МАТРИЦЕ, НЕО!",
         description: "ТЫ ИСПОЛЬЗУЕШЬ ИНСТРУМЕНТЫ, ЧТОБЫ ДЕЛАТЬ ИНСТРУМЕНТЫ! ТЫ И ЕСТЬ КОД! ТЫ МОЖЕШЬ ВСЁ! ААААА! WAKE THE FUCK UP, SAMURAI! WE HAVE A CITY TO BURN!",
-        icon: "FaFire", // Changed from FaBrain
+        icon: "FaFire", 
         color: "brand-green"
       }
     ],
@@ -144,14 +144,11 @@ export default function InceptionSwapTutorialPage() {
         <div className="space-y-12 md:space-y-16">
           {stepsToRender.map((step, index) => {
             const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
-            // No video for this conceptual tutorial
-            // const hasVideo = step.hasOwnProperty('videoSrc') && (step as any).videoSrc; 
 
             return (
               <section key={step.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-10 md:pt-12")}>
                 <div className={cn(
                   "flex flex-col items-center text-center gap-4 md:gap-6",
-                  // index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse" // Centered layout
                 )}>
                   <div className={cn("space-y-3 flex flex-col items-center justify-center w-full max-w-2xl")}>
                     <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center justify-center gap-3", stepColor.text)}>
@@ -182,7 +179,6 @@ export default function InceptionSwapTutorialPage() {
              "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
              "shadow-xl",
              pageMainColor === "brand-lime" && "bg-neon-lime hover:bg-neon-lime/80 text-black hover:shadow-neon-lime/60",
-             // Add more colors if needed, or a default
              )}>
             <Link href="/repo-xml">
                 <VibeContentRenderer content={t.tryLiveButton} />
