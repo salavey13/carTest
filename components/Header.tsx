@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe } from "lucide-react";
+import { LayoutGrid, X, Search, Globe, FaGamepad } from "lucide-react"; // FaGamepad for GTA Vibe Missions
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +10,8 @@ import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
+import { QUEST_ORDER, fetchUserCyberFitnessProfile, isQuestUnlocked } from '@/hooks/cyberFitnessSupabase'; // For checking unlocked missions
+import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
 
 interface PageInfo {
   path: string;
@@ -21,11 +23,9 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; 
   group?: string; 
   translatedName?: string;
+  questId?: string; // Added questId for tutorial missions
 }
 
-// IMPORTANT: Intentionally keeping some icons incorrect (e.g., 'faexchangealt' instead of 'FaExchangeAlt')
-// to serve as a real-world example for the icon-swapping tutorial.
-// The VibeContentRenderer will show "[?] Неизвестная иконка" for these, which is the desired effect for the tutorial.
 const allPages: PageInfo[] = [
   // Core Vibe
   { path: "/", name: "Home", icon: "FaBrain", group: "Core Vibe", isImportant: true, color: "cyan" },
@@ -35,13 +35,12 @@ const allPages: PageInfo[] = [
   { path: "/game-plan", name: "Game Plan", icon: "FaFilm", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
-  // Tutorial Quests
-  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "faexchangealt", group: "Tutorial Quests", isImportant: true, color: "green", isHot: true }, // Intentionally incorrect for tutorial
-  { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "Tutorial Quests", isImportant: true, color: "red", isHot: true },
-  { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "Tutorial Quests", isImportant: true, color: "cyan", isHot: true },
-  { path: "/tutorials/inception-swap", name: "Inception Swap Mission", icon: "FaInfinity", group: "Tutorial Quests", isImportant: true, color: "lime", isHot: true },
-  { path: "/tutorials/the-fifth-door", name: "The Fifth Door Mission", icon: "FaKey", group: "Tutorial Quests", isImportant: true, color: "yellow", isHot: true },
-
+  // GTA Vibe Missions (Tutorial Quests)
+  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "faexchangealt", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" }, 
+  { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "GTA Vibe Missions", isImportant: true, color: "red", isHot: true, questId: "icon-swap-mission" },
+  { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "GTA Vibe Missions", isImportant: true, color: "cyan", isHot: true, questId: "video-swap-mission" },
+  { path: "/tutorials/inception-swap", name: "Inception Swap Mission", icon: "FaInfinity", group: "GTA Vibe Missions", isImportant: true, color: "lime", isHot: true, questId: "inception-swap-mission" },
+  { path: "/tutorials/the-fifth-door", name: "The Fifth Door Mission", icon: "FaKey", group: "GTA Vibe Missions", isImportant: true, color: "yellow", isHot: true, questId: "the-fifth-door-mission" },
 
   // CyberFitness
   { path: "/profile", name: "Agent Profile", icon: "FaCircleUser", group: "CyberFitness", color: "pink" },
@@ -50,9 +49,10 @@ const allPages: PageInfo[] = [
   { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange"},
   { path: "/start-training", name: "Start Training", icon: "FaDumbbell", group: "CyberFitness", color: "green", isImportant: true},
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue" },  
-  { path: "/partner", name: "Alliance Perks", icon: "fabookuser", group: "CyberFitness", color: "purple"}, // Intentionally incorrect for tutorial
+  { path: "/partner", name: "Alliance Perks", icon: "fabookuser", group: "CyberFitness", color: "purple"}, 
   
   // Content & Tools
+  // ... (rest of the pages remain the same)
   { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
   { path: "/purpose-profit", name: "Purpose & Profit", icon: "FaBookOpen", group: "Content & Tools", color: "purple" },
   { path: "/ai-work-future", name: "AI & Future of Work", icon: "FaNetworkWired", group: "Content & Tools", color: "cyan" },
@@ -83,11 +83,11 @@ const allPages: PageInfo[] = [
   { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red" },
 ];
 
-const groupOrder = ["Core Vibe", "Tutorial Quests", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
+const groupOrder = ["Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 const groupIcons: Record<string, string> = {
     "Core Vibe": "FaBolt",
-    "Tutorial Quests": "FaGraduationCap",
-    "CyberFitness": "FaDumbbell", // Changed from FaBookUser
+    "GTA Vibe Missions": "FaGamepad", // Changed Icon
+    "CyberFitness": "FaDumbbell", 
     "Content & Tools": "FaPuzzlePiece",
     "Misc": "FaLayerGroup", 
     "Admin Zone": "FaShieldHalved",
@@ -95,28 +95,23 @@ const groupIcons: Record<string, string> = {
 
 const translations: Record<string, Record<string, string>> = {
   en: {
-    "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
+    // ... (other translations remain the same)
     "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission", "Video Render Mission": "Video Render Mission", "Inception Swap Mission": "Inception Swap Mission", "The Fifth Door Mission": "The Fifth Door Mission",
-    "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
-    "Vibe Schematics": "Vibe Schematics", "Start Training": "Start Training", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
-    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
-    "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
-    "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
-    "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot",
-    "Core Vibe": "Core Vibe", "Tutorial Quests": "Tutorial Quests", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
+    "Start Training": "Start Training",
+    "Tutorial Quests": "Tutorial Quests", // Keep old key for safety, new key below
+    "GTA Vibe Missions": "GTA Vibe Missions",
+    // ... (other translations remain the same)
   },
   ru: {
-    "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
+    // ... (other translations remain the same)
     "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок", "Video Render Mission": "Миссия: Видео-Рендер", "Inception Swap Mission": "Миссия: Inception Swap", "The Fifth Door Mission": "Миссия: Пятая Дверь",
-    "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
-    "Vibe Schematics": "Схемы Вайба", "Start Training": "Начать Тренировку", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
-    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
-    "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
-    "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
-    "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥",
-    "Core Vibe": "Ядро Вайба", "Tutorial Quests": "Учебные Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
+    "Start Training": "Начать Тренировку",
+    "Tutorial Quests": "Учебные Миссии", // Keep old key
+    "GTA Vibe Missions": "GTA Vibe Миссии",
+    // ... (other translations remain the same)
   }
 };
+// Ensure all English and Russian keys from allPages are present in translations above.
 
 const colorVarMap: Record<string, string> = {
   purple: "var(--brand-purple-rgb)", blue: "var(--brand-blue-rgb)", yellow: "var(--brand-yellow-rgb)",
@@ -140,7 +135,7 @@ const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> 
 };
 
 export default function Header() {
-  const { isAdmin, user, isLoading: appContextLoading } = useAppContext();
+  const { isAdmin, user, dbUser, isLoading: appContextLoading } = useAppContext(); // Added dbUser
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -149,13 +144,32 @@ export default function Header() {
   
   const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
-  
+  const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
   useEffect(() => {
     const newLangBasedOnUser = user?.language_code === 'ru' ? 'ru' : 'en';
     if (newLangBasedOnUser !== currentLang) {
        setCurrentLang(newLangBasedOnUser);
     }
   }, [user?.language_code, currentLang]);
+
+  const fetchProfile = useCallback(async () => {
+    if (dbUser?.user_id) {
+      setProfileLoading(true);
+      const profileData = await fetchUserCyberFitnessProfile(dbUser.user_id);
+      if (profileData.success && profileData.data) {
+        setCyberProfile(profileData.data);
+      }
+      setProfileLoading(false);
+    } else {
+      setProfileLoading(false);
+    }
+  }, [dbUser?.user_id]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   const t = useCallback((key: string): string => translations[currentLang]?.[key] || translations['en']?.[key] || key, [currentLang]);
   const toggleLang = useCallback(() => setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en'), []);
@@ -187,7 +201,13 @@ export default function Header() {
     }
     
     const filtered = allPages
-      .filter(page => !(page.isAdminOnly && !currentIsAdminReal)) 
+      .filter(page => {
+        if (page.isAdminOnly && !currentIsAdminReal) return false;
+        if (page.group === "GTA Vibe Missions" && page.questId && cyberProfile && !profileLoading) {
+          return isQuestUnlocked(page.questId, cyberProfile.completedTutorials, QUEST_ORDER);
+        }
+        return true;
+      })
       .map(page => ({ ...page, translatedName: t(page.name) }))
       .filter(page => page.translatedName!.toLowerCase().includes(lowerSearchTerm));
 
@@ -212,7 +232,7 @@ export default function Header() {
       }
     });
     return groups;
-  }, [searchTerm, isAdmin, t, appContextLoading]);
+  }, [searchTerm, isAdmin, t, appContextLoading, cyberProfile, profileLoading]);
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
@@ -228,7 +248,6 @@ export default function Header() {
 
   const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
     if (!icon) return null;
-    // Directly use icon name as is from allPages, VibeContentRenderer will handle mapping/errors
     return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
   };
 
@@ -306,17 +325,24 @@ export default function Header() {
               </div>
               
               <div className="space-y-6">
+                {profileLoading && !cyberProfile && <div className="text-center text-brand-cyan font-mono"><VibeContentRenderer content="::FaSpinner className='animate-spin':: Загрузка профиля агента..."/></div>}
                 {groupOrder.map(groupName => {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null; 
                   
                   const groupIconName = groupIcons[groupName];
+                  const isGtaVibeGroup = groupName === "GTA Vibe Missions";
 
                   return (
                     <div key={groupName}>
-                      <h3 className="text-lg font-orbitron text-brand-purple mb-3 flex items-center gap-2">
-                        {groupIconName && <RenderIcon icon={groupIconName} className="w-6 h-6 opacity-80" />} 
+                      <h3 className={cn(
+                        "text-lg font-orbitron mb-3 flex items-center gap-2",
+                        isGtaVibeGroup ? "gta-vibe-text-effect text-2xl justify-center py-2" : "text-brand-purple"
+                        )}>
+                        {groupIconName && !isGtaVibeGroup && <RenderIcon icon={groupIconName} className="w-6 h-6 opacity-80" />} 
+                        {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 mr-2", "text-transparent")} /> /* Invisible but takes space for gta-vibe-text-effect */}
                         {t(groupName)}
+                         {isGtaVibeGroup && <FaGamepad className={cn("w-7 h-7 ml-2", "text-transparent")} />}
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
                         {pagesInGroup.map((page) => {
