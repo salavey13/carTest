@@ -1,3 +1,4 @@
+// /lib/iconNameMap.ts
 import type * as Fa6Icons from "react-icons/fa6";
 
 export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
@@ -8,6 +9,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fawandmagicsparkles: "FaWandMagicSparkles",
   facheckdouble: "FaCheckDouble",
   fatools: "FaToolbox", 
+facodebranch: "FaCodeBranch",
   falandmineon: "FaLandMineOn",
   fascrewdriverwrench: "FaScrewdriverWrench",
   fasmilewink: "FaSmileWink",
