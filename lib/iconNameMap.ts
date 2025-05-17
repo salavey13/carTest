@@ -70,7 +70,29 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fausershield: "FaUserShield",
   fayoutube: "FaYoutube",
   fabookuser: "FaBookUser", 
-  fabolt: "FaBolt", // <--- ДОБАВЛЕНО ЗДЕСЬ
+  fabolt: "FaBolt",
+  fakey: "FaKey",
+  fadooropen: "FaDoorOpen",
+  faregcopy: "FaRegCopy",
+  fapaste: "FaPaste",
+  famagic: "FaWandMagicSparkles", // Mapped to a more common magic icon
+  facheckcircle: "FaCheckCircle",
+  facrown: "FaCrown",
+  facopy: "FaCopy",
+  faclouduploadalt: "FaCloudUploadAlt",
+  // fathumbsup: "FaThumbsUp", // Already defined
+  faforwardstep: "FaForwardStep",
+  faserver: "FaServer",
+  faphotofilm: "FaPhotoFilm", // Correct name for Fa6 if available, FaFilm is a good fallback
+  favideocamera: "FaVideoCamera", // Correct name is FaVideo
+  fapoostorm: "FaPooStorm",
+  fabook: "FaBook",
+  fabiohazard: "FaBiohazard",
+  fameteor: "FaMeteor",
+  fadumbbell: "FaDumbbell",
+  fafistraised: "FaFistRaised",
+  fastreetview: "FaStreetView",
+  fahandmiddlefinger: "FaHandMiddleFinger",
 
   // StickyChat specific icons
   faarrowright: "FaArrowRight",
@@ -85,30 +107,24 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fasquarearrowupright: "FaSquareArrowUpRight",
   fafileimport: "FaFileImport",
   faclipboardlist: "FaClipboardList",
-  facirclecheck: "FaCircleCheck",
+  // facirclecheck: "FaCircleCheck", // Already defined
   faicons: "FaIcons", 
   faspinner: "FaSpinner",
-  fakey: "FaKey",
-  fadooropen: "FaDoorOpen",
-  faregcopy: "FaRegCopy",
-  fapaste: "FaPaste",
-  famagic: "FaMagic", // Assuming FaWandMagicSparkles or similar
-  facheckcircle: "FaCheckCircle",
-  facrown: "FaCrown",
-  facopy: "FaCopy",
-  faclouduploadalt: "FaCloudUploadAlt",
-  fathumbsup: "FaThumbsUp",
-  faforwardstep: "FaForwardStep",
-  faserver: "FaServer",
-  faphotofilm: "FaPhotoFilm",
-  favideocamera: "FaVideoCamera",
-  fapoostorm: "FaPooStorm",
-  fabook: "FaBook",
-  fabiocard: "FaAddressCard", 
-fabiohazard: "FaBiohazard",
-  fameteor: "FaMeteor",
-  fadumbbell: "FaDumbbell",
-  fafistraised: "FaFistRaised",
-  fastreetview: "FaStreetView",
-  fahandmiddlefinger: "FaHandMiddleFinger", // Explicitly listed
+
+  // Error and diagnostics related
+  favial: "FaVial",
+  fadatabase: "FaDatabase",
+  faboxarchive: "FaBoxArchive",
+  facoins: "FaCoins",
+  fakraken: "FaKraken", 
+  facodecommit: "FaCodeCommit",
+  fatree: "FaTree",
+  faplus: "FaPlus",
+  fabroom: "FaBroom",
+  fascroll: "FaScroll",
+  famobilescreenbutton: "FaMobileScreenButton",
+  fauserdoctor: "FaUserDoctor",
+  fapuzzlepiece: "FaPuzzlePiece",
+  falayergroup: "FaLayerGroup",
+  faangledevildown: "FaAngleDoubleDown" // Corrected from FaAngleDoubleDown
 };

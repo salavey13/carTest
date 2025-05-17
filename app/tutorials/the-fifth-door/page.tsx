@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
 import TutorialLoader from '../TutorialLoader'; 
+import { useAppContext } from '@/contexts/AppContext';
+import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
+import { useAppToast } from '@/hooks/useAppToast';
+
 
 const theFifthDoorTutorialTranslations = {
   ru: {
@@ -53,7 +57,6 @@ const theFifthDoorTutorialTranslations = {
     nextLevelText: "Все миссии пройдены. Все печати сломаны. Теперь у тебя есть всё, чтобы стать легендой. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих гениальных идей. Вперёд, творить историю!",
     tryLiveButton: "::FaRocket:: К ЗВЁЗДАМ!",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
     pageTitle: "::FaKey:: ПЯТАЯ ДВЕРЬ! ВЫХОД ИЗ МАТРИЦЫ, БЛ*ТЬ!",
@@ -68,8 +71,8 @@ const theFifthDoorTutorialTranslations = {
       },
       {
         id: 2,
-        title: "ШАГ 2: GOOGLE АКК – ТВОЙ ПРОПУСК В КИБЕРПАНК!",
-        description: "Нет гугл-акка? Ты типа из пещеры вылез? <Link href='https://accounts.google.com/signup' target='_blank' class='text-brand-blue hover:underline'>БЕГОМ ДЕЛАТЬ!</Link> Google - это твой Deus Ex Machina, твой доступ ко всему.",
+        title: "ШАГ 2: GOOGLE АКК – ТВОЙ ПАСПОРТ В КИБЕРПАНК!",
+        description: "Нет гугл-акка? Ты типа из пещеры вылез? <Link href='https://accounts.google.com/signup' target='_blank' class='text-brand-blue hover:underline'>БЕГОМ ДЕЛАТЬ!</Link> Google - это Твой ПапаРимский в Инете!",
         icon: "FaGoogle",
         color: "brand-blue"
       },
@@ -98,8 +101,7 @@ const theFifthDoorTutorialTranslations = {
     nextLevelTitle: "::FaSatelliteDish:: ТЫ НЕ ПРОСТО В МАТРИЦЕ, ТЫ И ЕСТЬ МАТРИЦА!",
     nextLevelText: "Ты – Джонни Сильверхенд этого города. Код – твоя гитара. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> – твоя сцена. Зажги!",
     tryLiveButton: "::FaGuitar:: ВПЕРЕД, В NIGHT CITY!",
-    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
 };
 
@@ -114,19 +116,44 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 
 function TheFifthDoorTutorialContent() {
   const searchParams = useSearchParams();
-  const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
+  const router = useRouter();
+  const { dbUser, isAuthenticated } = useAppContext();
+  const { addToast } = useAppToast();
+
+  const initialModeFromUrl = searchParams.get('mode') === 'wtf';
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
   
   const t = theFifthDoorTutorialTranslations[currentMode];
+  const tutorialQuestId = "the-fifth-door-mission";
+
+  const handleTutorialCompletion = useCallback(async () => {
+    if (isAuthenticated && dbUser?.user_id) {
+      const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
+      if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
+        addToast(`::FaCheckCircle:: Миссия "${theFifthDoorTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+      }
+      result.newAchievements?.forEach(ach => {
+        addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+      });
+    }
+  }, [isAuthenticated, dbUser, addToast, tutorialQuestId]);
+
+  useEffect(() => {
+    handleTutorialCompletion();
+  }, [handleTutorialCompletion]);
 
   const toggleMode = () => {
-    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+    const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
+    setCurrentMode(newMode);
+    if (newMode === 'wtf') {
+      router.replace(`/tutorials/the-fifth-door?mode=wtf`);
+    }
   };
 
   useEffect(() => {
-    const newMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
-    if (newMode !== currentMode) {
-      setCurrentMode(newMode);
+    const modeFromUrl = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
+    if (modeFromUrl !== currentMode) {
+      setCurrentMode(modeFromUrl);
     }
   }, [searchParams, currentMode]);
 
@@ -155,6 +182,7 @@ function TheFifthDoorTutorialContent() {
           <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
             <VibeContentRenderer content={t.pageSubtitle} />
           </p>
+           {!initialModeFromUrl && currentMode === 'ru' && (
            <Button 
             onClick={toggleMode} 
             variant="outline" 
@@ -163,8 +191,9 @@ function TheFifthDoorTutorialContent() {
               "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
             )}
           >
-            <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+            <VibeContentRenderer content={theFifthDoorTutorialTranslations.ru.toggleButtonToWtf} />
           </Button>
+           )}
         </header>
 
         <div className="space-y-12 md:space-y-16">
