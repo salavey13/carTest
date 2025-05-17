@@ -7,44 +7,39 @@ import { debugLogger as logger } from '@/lib/debugLogger';
 interface ScrollControlledVideoPlayerProps {
   src: string;
   className?: string;
-  // Threshold for IntersectionObserver, defines how much of the target is visible for callback
   intersectionThreshold?: number | number[];
-  // Defines how much the scroll should "overshoot" the video element
-  // before video.currentTime reaches video.duration.
-  // 0 means video ends when its bottom reaches viewport top.
-  // 1 means video ends when its bottom reaches viewport bottom (it has fully scrolled past).
-  scrollPlayFactor?: number; // 0 to 1, default 0.5
+  scrollPlayFactor?: number; 
 }
 
 const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = ({
   src,
   className,
-  intersectionThreshold = 0.01, // Becomes active as soon as 1% is visible
-  scrollPlayFactor = 0.5, // Video progresses over its own height + 50% of viewport height
+  intersectionThreshold = 0.01,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  
+  const [isVisible, setIsVisible] = useState(false); 
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
-  const [isLoopingOutOfView, setIsLoopingOutOfView] = useState(false);
+  const [isUnderScrollControl, setIsUnderScrollControl] = useState(false); 
 
-  const lastScrollTimeRef = useRef(0);
+  const lastRAFTimeRef = useRef(0);
   const scrollRAFRef = useRef<number | null>(null);
 
-  // Callback for IntersectionObserver
-  const handleIntersection = useCallback((entries: IntersectionObserverEntry[]) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        logger.debug(`[ScrollVideo] Video ${src.split('/').pop()} became VISIBLE`);
-        setIsVisible(true);
-      } else {
-        logger.debug(`[ScrollVideo] Video ${src.split('/').pop()} became HIDDEN`);
-        setIsVisible(false);
-      }
-    });
+  useEffect(() => {
+    logger.log(`[ScrollVideo EASTER_EGG] Player for ${src.split('/').pop()} initialized. Get ready to VIBE with the scroll! ::FaSatelliteDish::`);
   }, [src]);
 
-  // Effect for IntersectionObserver
+  const handleIntersection = useCallback((entries: IntersectionObserverEntry[]) => {
+    entries.forEach(entry => {
+      const newVisibility = entry.isIntersecting;
+      if (isVisible !== newVisibility) {
+        logger.debug(`[ScrollVideo] Video ${src.split('/').pop()} visibility changed to: ${newVisibility}`);
+        setIsVisible(newVisibility);
+      }
+    });
+  }, [src, isVisible]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(handleIntersection, {
       threshold: intersectionThreshold,
@@ -59,20 +54,23 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
       }
       if (scrollRAFRef.current) {
         cancelAnimationFrame(scrollRAFRef.current);
+        scrollRAFRef.current = null;
       }
     };
   }, [handleIntersection, intersectionThreshold]);
 
-  // Effect for video metadata
   useEffect(() => {
     const video = videoRef.current;
     if (video) {
       const onLoadedMetadata = () => {
-        logger.log(`[ScrollVideo] Metadata loaded for ${src.split('/').pop()}: duration ${video.duration}s`);
+        logger.log(`[ScrollVideo] Metadata loaded for ${src.split('/').pop()}: duration ${video.duration}s, readyState ${video.readyState}`);
         setVideoDuration(video.duration);
+        if (video.readyState < 1) { 
+            video.load(); 
+        }
       };
       video.addEventListener('loadedmetadata', onLoadedMetadata);
-      if (video.readyState >= 1) { // Check if metadata already loaded
+      if (video.readyState >= 1) { 
         onLoadedMetadata();
       }
       return () => {
@@ -81,93 +79,119 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
     }
   }, [src]);
 
-  // Scroll handler using requestAnimationFrame
-  const handleScroll = useCallback(() => {
+  const updateVideoPlayback = useCallback(() => {
     const video = videoRef.current;
     const container = containerRef.current;
 
-    if (!video || !container || videoDuration === null || !isVisible || isLoopingOutOfView) {
-      if (scrollRAFRef.current) cancelAnimationFrame(scrollRAFRef.current);
-      scrollRAFRef.current = null;
+    if (!video || !container || videoDuration === null || videoDuration === 0) {
+      if (isUnderScrollControl) setIsUnderScrollControl(false);
       return;
     }
-
-    const now = performance.now();
-    // Throttle updates to roughly 30fps max for performance
-    if (now - lastScrollTimeRef.current < 30) { 
-      scrollRAFRef.current = requestAnimationFrame(handleScroll);
-      return;
-    }
-    lastScrollTimeRef.current = now;
 
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    const videoTop = rect.top;
+    const videoBottom = rect.bottom;
+    const videoHeight = rect.height;
 
-    // Calculate the total scroll distance over which the video playback is controlled.
-    // This is the height of the video element plus a factor of the viewport height.
-    // factor = 0: video plays fully as it scrolls its own height across the viewport.
-    // factor = 1: video plays fully as it scrolls its own height + one viewportHeight.
-    const effectiveScrollPlayFactor = Math.max(0, Math.min(1, scrollPlayFactor));
-    const scrollWindowHeight = rect.height + viewportHeight * effectiveScrollPlayFactor;
-    
-    // Calculate progress:
-    // 0 when the top of the video is at the bottom of the viewport (or slightly before based on scrollPlayFactor adjustment).
-    // 1 when the bottom of the video is at the top of the viewport (or slightly after).
-    // `distanceFromViewportBottomToVideoTop` measures how far the video's top has moved up from the viewport bottom.
-    const distanceFromViewportBottomToVideoTop = viewportHeight - rect.top;
-    
-    let progress = distanceFromViewportBottomToVideoTop / scrollWindowHeight;
-    progress = Math.max(0, Math.min(1, progress)); // Clamp progress between 0 and 1.
+    let newActiveScrollControl = false;
+    let newTime = video.currentTime;
 
-    const newTime = progress * videoDuration;
+    // NEW LOGIC: Scroll control is active when the video FITS ENTIRELY in the viewport
+    const fitsEntirelyInViewport = videoTop >= 0 && videoBottom <= viewportHeight;
 
-    // Only update currentTime if it has changed significantly to avoid jitter
-    if (Math.abs(newTime - video.currentTime) > 0.02) { // Approx 1/50th of a second
-      video.currentTime = newTime;
-      logger.debug(`[ScrollVideo] ${src.split('/').pop()} newTime: ${newTime.toFixed(2)}, progress: ${progress.toFixed(2)} (rect.top: ${rect.top.toFixed(0)}, dist: ${distanceFromViewportBottomToVideoTop.toFixed(0)})`);
+    if (fitsEntirelyInViewport && isVisible) {
+        newActiveScrollControl = true;
+        // Calculate the total scrollable distance for the video's top edge within the viewport
+        const scrollableDistanceInViewport = viewportHeight - videoHeight;
+        
+        if (scrollableDistanceInViewport > 0) { // Video is shorter than viewport
+            // Progress is based on how much the video's top has moved from the viewport's top
+            // relative to the total space it can move.
+            const scrolledDistance = videoTop; // videoTop is 0 when at top, scrollableDistanceInViewport when at bottom
+            let progress = scrolledDistance / scrollableDistanceInViewport;
+            // Invert progress: 0 when videoTop is at max (bottom), 1 when videoTop is 0 (top)
+            progress = 1 - progress; 
+            progress = Math.max(0, Math.min(1, progress));
+            newTime = progress * videoDuration;
+        } else { // Video is as tall as or taller than viewport; scroll control based on its position
+            let progress = (viewportHeight - videoTop) / videoHeight; // Fraction of video scrolled past the top
+            progress = Math.max(0, Math.min(1, progress)); // Clamp between 0 and 1
+            newTime = progress * videoDuration;
+        }
+
+    } else {
+      newActiveScrollControl = false;
     }
-    
-    scrollRAFRef.current = requestAnimationFrame(handleScroll);
-  }, [videoDuration, isVisible, isLoopingOutOfView, scrollPlayFactor, src]);
 
+    if (newActiveScrollControl !== isUnderScrollControl) {
+      setIsUnderScrollControl(newActiveScrollControl);
+      logger.log(`[ScrollVideo EASTER_EGG] ${src.split('/').pop()} Scroll Control State: ${newActiveScrollControl ? 'ENGAGED ::FaRobot::' : 'DISENGAGED (Looping Active) ::FaUndo::'}`);
+    }
 
-  // Effect to manage scroll listener and video state based on visibility
+    if (newActiveScrollControl) {
+      if (Math.abs(newTime - video.currentTime) > 0.035) { 
+        video.currentTime = newTime;
+      }
+    }
+  }, [videoDuration, isVisible, isUnderScrollControl, src]);
+
+  const masterScrollHandler = useCallback(() => {
+    const now = performance.now();
+    if (now - lastRAFTimeRef.current < 30) { 
+      scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
+      return;
+    }
+    lastRAFTimeRef.current = now;
+    updateVideoPlayback();
+    scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
+  }, [updateVideoPlayback]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || videoDuration === null) return;
 
-    if (isVisible) {
-      setIsLoopingOutOfView(false);
+    if (isUnderScrollControl && isVisible) {
       video.loop = false;
-      if (!video.paused) video.pause();
-      logger.debug(`[ScrollVideo] ${src.split('/').pop()} Attaching scroll listener.`);
-      
-      // Initial sync and start RAF loop
+      if (!video.paused && video.duration > 0) {
+        video.pause();
+      }
+      logger.debug(`[ScrollVideo] ${src.split('/').pop()} Scroll control ACTIVE. Attaching RAF.`);
       if (scrollRAFRef.current) cancelAnimationFrame(scrollRAFRef.current);
-      scrollRAFRef.current = requestAnimationFrame(handleScroll);
-
-      window.addEventListener('scroll', handleScroll, { passive: true });
-      window.addEventListener('resize', handleScroll, { passive: true }); // Also adjust on resize
-
+      updateVideoPlayback(); 
+      scrollRAFRef.current = requestAnimationFrame(masterScrollHandler);
+      window.addEventListener('scroll', masterScrollHandler, { passive: true });
+      window.addEventListener('resize', masterScrollHandler, { passive: true });
       return () => {
-        logger.debug(`[ScrollVideo] ${src.split('/').pop()} Removing scroll listener.`);
-        window.removeEventListener('scroll', handleScroll);
-        window.removeEventListener('resize', handleScroll);
+        logger.debug(`[ScrollVideo] ${src.split('/').pop()} Scroll control ended or video hidden. Removing RAF & listeners.`);
+        window.removeEventListener('scroll', masterScrollHandler);
+        window.removeEventListener('resize', masterScrollHandler);
         if (scrollRAFRef.current) {
           cancelAnimationFrame(scrollRAFRef.current);
           scrollRAFRef.current = null;
         }
       };
-    } else { // Not visible
-      setIsLoopingOutOfView(true);
-      video.currentTime = 0; // Reset to start as per user request
+    } else {
+      // Loop when not under scroll control OR not visible
+      logger.debug(`[ScrollVideo] ${src.split('/').pop()} LOOPING (isUnderScrollControl: ${isUnderScrollControl}, isVisible: ${isVisible}).`);
+      if (video.duration > 0) { 
+          if (video.currentTime !== 0) video.currentTime = 0; 
+      }
       video.loop = true;
-      video.play().catch(error => {
-        logger.warn(`[ScrollVideo] ${src.split('/').pop()} Autoplay failed when out of view:`, error.message);
-      });
-      logger.debug(`[ScrollVideo] ${src.split('/').pop()} Video playing in loop (out of view).`);
+      if (video.paused && isVisible) { // Play only if paused AND visible
+        video.play().catch(error => {
+            logger.warn(`[ScrollVideo] ${src.split('/').pop()} Autoplay for loop failed:`, error.message);
+        });
+      } else if (!isVisible && !video.paused) { // Pause if it becomes not visible while looping
+        video.pause();
+      }
+      
+      if (scrollRAFRef.current) {
+        cancelAnimationFrame(scrollRAFRef.current);
+        scrollRAFRef.current = null;
+      }
     }
-  }, [isVisible, videoDuration, handleScroll, src]);
+  }, [isUnderScrollControl, isVisible, videoDuration, masterScrollHandler, src, updateVideoPlayback]);
 
   return (
     <div ref={containerRef} className={cn('w-full relative', className)}>
@@ -177,12 +201,12 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         className="w-full h-auto block"
         preload="metadata"
         playsInline
-        muted // Muted is generally required for programmatic play and good UX
+        muted
       >
         Your browser does not support the video tag.
       </video>
       {videoDuration === null && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white backdrop-blur-sm">
           Loading video...
         </div>
       )}
