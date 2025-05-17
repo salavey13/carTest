@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
+import React, { useState, useEffect, Suspense } from 'react'; 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
-import TutorialLoader from '../TutorialLoader'; // Import the loader
+import TutorialLoader from '../TutorialLoader'; 
 
 const theFifthDoorTutorialTranslations = {
   ru: {
@@ -56,48 +56,48 @@ const theFifthDoorTutorialTranslations = {
     toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   },
   wtf: {
-    pageTitle: "::FaKey:: ПЯТАЯ ДВЕРЬ! ВЫХОД ИЗ МАТРИЦЫ!",
-    pageSubtitle: "ХВАТИТ ДРОЧИТЬ НА ЛОКАЛКЕ! ВРЕМЯ СТАТЬ РЕАЛЬНЫМ КИБЕР-ПАПОЙ! ЭТО ФИНАЛЬНЫЙ БОСС ОБУЧЕНИЯ!",
+    pageTitle: "::FaKey:: ПЯТАЯ ДВЕРЬ! ВЫХОД ИЗ МАТРИЦЫ, БЛ*ТЬ!",
+    pageSubtitle: "ХВАТИТ ДРОЧИТЬ НА ЛОКАЛКЕ И СМОТРЕТЬ ЮТУБЧИК! ВРЕМЯ СТАТЬ РЕАЛЬНЫМ КИБЕР-ПАПОЙ, КОТОРЫЙ КОНТРОЛИРУЕТ СВОЙ КОД И СВОЮ ЖИЗНЬ! ЭТО ФИНАЛЬНЫЙ БОСС ОБУЧЕНИЯ – ТЫ САМ!",
     steps: [
       {
         id: 1,
-        title: "ШАГ 1: 4 ШАГА? ТЫ УЖЕ ПРО ЭТО ЗНАЕШЬ!",
-        description: "Старое -> Новое -> Studio -> PR. Если ты до сих пор не понял этот прикол, то тебе не сюда, братан. Закрывай вкладку.",
+        title: "ШАГ 1: 4 ШАГА? ТЫ УЖЕ БОГ ЭТОГО ДЕРЬМА!",
+        description: "Старое -> Новое -> Studio -> PR. Если ты до сих пор не понял этот прикол, то тебе не сюда, братан. Это как пытаться играть в Доту без мышки. Закрывай вкладку.",
         icon: "FaRecycle",
         color: "brand-pink"
       },
       {
         id: 2,
-        title: "ШАГ 2: GOOGLE АКК – ТВОЙ ПАСПОРТ В ИНЕТ!",
-        description: "Нет гугл-акка? ТЫ КТО ВООБЩЕ? <Link href='https://accounts.google.com/signup' target='_blank' class='text-brand-blue hover:underline'>БЕГОМ ДЕЛАТЬ!</Link> Google - это Твой ПапаРимский в Инете!",
+        title: "ШАГ 2: GOOGLE АКК – ТВОЙ ПРОПУСК В КИБЕРПАНК!",
+        description: "Нет гугл-акка? Ты типа из пещеры вылез? <Link href='https://accounts.google.com/signup' target='_blank' class='text-brand-blue hover:underline'>БЕГОМ ДЕЛАТЬ!</Link> Google - это твой Deus Ex Machina, твой доступ ко всему.",
         icon: "FaGoogle",
         color: "brand-blue"
       },
       {
         id: 3,
-        title: "ШАГ 3: GITHUB – ТВОЯ ХАТА ДЛЯ КОДА!",
-        description: "<Link href='https://github.com/signup' target='_blank' class='text-brand-blue hover:underline'>Регай GitHub</Link> через Google. Там твой код будет жить, там твои PR-чики. Это как твоя личная база в GTA, только для кода.",
+        title: "ШАГ 3: GITHUB – ТВОЯ КИБЕР-БАЗА ОПЕРАЦИЙ!",
+        description: "<Link href='https://github.com/signup' target='_blank' class='text-brand-blue hover:underline'>Регай GitHub</Link> через Google. Там твой код будет жить, там твои PR-чики. Это как твоя личная корпорация Arasaka, только ты тут решаешь.",
         icon: "FaGithub",
         color: "brand-purple"
       },
       {
         id: 4,
-        title: "ШАГ 4: 2FA – СЕКРЕТНОЕ РУКОПОЖАТИЕ НИНДЗЯ!",
-        description: "Двухфакторка на GitHub – ОБЯЗАТЕЛЬНО! Чтобы никакой нуб не угнал твой код. Скачай Authy или Google Authenticator. Это как секретный код от чита на бессмертие.",
+        title: "ШАГ 4: 2FA – ТВОЙ ЛИЧНЫЙ \"SANDIVISTAN\"!",
+        description: "Двухфакторка на GitHub – ОБЯЗАТЕЛЬНО! Чтобы никакой netrunner не угнал твой код. Скачай Authy или Google Authenticator. Это как имплант для кибер-ниндзя – без него ты мясо.",
         icon: "FaUserShield",
         color: "brand-green"
       },
       {
         id: 5,
-        title: "ШАГ 5: ДВЕРЬ ОТКРЫТА! ТЫ СВОБОДЕН!",
-        description: "ВСЁ! Ты прошел игру! У тебя есть скиллы, мозг и теперь полный доступ! Ты не просто кодер, ты – КИБЕРБОГ своего проекта! Иди и разъеби этот мир! (P.S. Это только начало... муахаха!)",
+        title: "ШАГ 5: ДВЕРЬ ОТКРЫТА! ТЫ – JOHNNY SILVERHAND!",
+        description: "ВСЁ! Ты прошел игру! У тебя есть скиллы, мозг и теперь полный доступ! Ты не просто кодер, ты – КИБЕРБОГ своего проекта! Иди и WAKE THE FUCK UP, SAMURAI! WE HAVE A CITY TO BURN!",
         icon: "FaDoorOpen",
         color: "brand-yellow"
       }
     ],
-    nextLevelTitle: "::FaSatellite:: ТЫ ПОДКЛЮЧЕН К ИСТОЧНИКУ! ТЕПЕРЬ ТЫ БОГ!",
-    nextLevelText: "Ты прошел все пять кругов посвящения. Матрица трепещет. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> – твой алтарь. Принеси ему в жертву свои идеи!",
-    tryLiveButton: "::FaMeteor:: РАЗНЕСТИ ВСЁ К ХЕРАМ!",
+    nextLevelTitle: "::FaSatelliteDish:: ТЫ НЕ ПРОСТО В МАТРИЦЕ, ТЫ И ЕСТЬ МАТРИЦА!",
+    nextLevelText: "Ты – Джонни Сильверхенд этого города. Код – твоя гитара. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> – твоя сцена. Зажги!",
+    tryLiveButton: "::FaGuitar:: ВПЕРЕД, В NIGHT CITY!",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
     toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
   }

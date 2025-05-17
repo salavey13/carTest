@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, Suspense } from 'react'; // Added Suspense
+import React, { useState, useEffect, Suspense } from 'react'; 
 import { useSearchParams } from 'next/navigation';
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -9,7 +9,7 @@ import { FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell } from "react-i
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
-import TutorialLoader from '../tutorials/TutorialLoader'; // Import the loader
+import TutorialLoader from '../tutorials/TutorialLoader'; 
 
 interface TutorialLink {
   href: string;
@@ -38,18 +38,22 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 
 const pageTranslations = {
     ru: {
+        pageTitle: "VIBE ТРЕНИРОВКА",
+        pageSubtitleTraining: "", // Not really needed for RU if it's just a timer block
         trainingTitle: "VIBE ТРЕНИРОВКА",
         missionsTitle: "::FaGraduationCap:: Взломай Матрицу Кода: Твои Первые Миссии!",
         missionsSubtitle: "Обычные туториалы – для зубрил. Эти – твой SPEEDRUN к скиллу. На каждой миссии есть WTF-кнопка – это как секретный уровень, только для самых дерзких. НЕ ЗАССЫ, ЖМИ!",
-        toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-        toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+        toggleButtonToWtf: "::FaPooStorm:: Врубить WTF-Режим СТРАНИЦЫ!",
+        toggleButtonToNormal: "::FaBook:: Вернуть Норм Вид",
     },
     wtf: {
+        pageTitle: "::FaFistRaised:: КАЧАЛКА ДЛЯ МОЗГА И ПАЛЬЦЕВ!",
+        pageSubtitleTraining: "Забудь про нудные тренировки и скучные гайды. Тут – чистый ФАН и СКИЛЛ-АП! Жми WTF-кнопки на миссиях, если не боишься стать КИБЕР-КОТЛЕТОЙ!",
         trainingTitle: "::FaDumbbell:: ФИЗУХА ДЛЯ КИБЕР-АТЛЕТА (МОЖНО СКИПНУТЬ, ЕСЛИ ТЫ ДРИЩ)",
         missionsTitle: "::FaGraduationCap:: ВЗЛОМАЙ МАТРИЦУ КОДА: ТВОИ ПЕРВЫЕ МИССИИ!",
         missionsSubtitle: "ЗАБУДЬ ПРО НУДНЫЕ ГАЙДЫ! ЭТО ТВОЙ FAST TRACK К СКИЛЛУ! НА КАЖДОЙ МИССИИ ЕСТЬ КНОПКА 'WTF-РЕЖИМ ::FaBiohazard::' – ЭТО КАК СЕКРЕТНЫЙ УРОВЕНЬ, ТОЛЬКО ДЛЯ РЕАЛЬНЫХ ПАЦАНОВ! НЕ ОБОССЫСЬ, ЖМИ!",
-        toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
-        toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию",
+        toggleButtonToWtf: "::FaPooStorm:: Врубить WTF-Режим СТРАНИЦЫ!",
+        toggleButtonToNormal: "::FaBook:: Вернуть Норм Вид",
     }
 }
 
@@ -76,7 +80,6 @@ function StartTrainingContent() {
       setCurrentMode(newMode);
     }
   }, [searchParams, currentMode]);
-
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -123,6 +126,20 @@ function StartTrainingContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 flex flex-col items-center justify-start">
+      <header className={cn("text-center mb-8 md:mb-10", currentMode === 'wtf' && "animate-pulse")}>
+          <h1 className={cn(
+            "text-4xl sm:text-5xl font-orbitron font-bold cyber-text glitch",
+            currentMode === 'wtf' ? "text-brand-pink" : "text-brand-green"
+           )} data-text={currentMode === 'wtf' ? pageTranslations.wtf.pageTitle : pageTranslations.ru.pageTitle}>
+             <VibeContentRenderer content={currentMode === 'wtf' ? pageTranslations.wtf.pageTitle : pageTranslations.ru.pageTitle} />
+          </h1>
+          {currentMode === 'wtf' && (
+            <p className="text-md sm:text-lg text-gray-300 font-mono max-w-xl mx-auto mt-3">
+                <VibeContentRenderer content={pageTranslations.wtf.pageSubtitleTraining} />
+            </p>
+          )}
+      </header>
+      
       <Button 
         onClick={togglePageMode} 
         variant="outline" 
@@ -195,7 +212,7 @@ function StartTrainingContent() {
       >
         <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow">
           <CardHeader className="pb-4">
-            <CardTitle className="text-2xl font-orbitron text-brand-purple flex items-center justify-center gap-2">
+            <CardTitle className={cn("text-2xl font-orbitron flex items-center justify-center gap-2", currentMode === 'wtf' ? "text-brand-pink" : "text-brand-purple")}>
                 <VibeContentRenderer content={t.missionsTitle} />
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono text-center">
