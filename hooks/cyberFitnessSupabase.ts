@@ -51,8 +51,8 @@ export interface CyberFitnessProfile {
   featuresUsed: Record<string, boolean | number | string>; 
 }
 
-const CYBERFIT_METADATA_KEY = "cyberFitness";
-const MAX_DAILY_LOG_ENTRIES = 30; 
+export const CYBERFIT_METADATA_KEY = "cyberFitness";
+export const MAX_DAILY_LOG_ENTRIES = 30; 
 
 export interface Achievement { 
     id: string;
