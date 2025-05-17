@@ -23,6 +23,9 @@ interface PageInfo {
   translatedName?: string;
 }
 
+// IMPORTANT: Intentionally keeping some icons incorrect (e.g., 'faexchangealt' instead of 'FaExchangeAlt')
+// to serve as a real-world example for the icon-swapping tutorial.
+// The VibeContentRenderer will show "[?] Неизвестная иконка" for these, which is the desired effect for the tutorial.
 const allPages: PageInfo[] = [
   // Core Vibe
   { path: "/", name: "Home", icon: "FaBrain", group: "Core Vibe", isImportant: true, color: "cyan" },
@@ -33,10 +36,11 @@ const allPages: PageInfo[] = [
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
   // Tutorial Quests
-  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "FaExchangeAlt", group: "Tutorial Quests", isImportant: true, color: "green", isHot: true },
+  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "faexchangealt", group: "Tutorial Quests", isImportant: true, color: "green", isHot: true }, // Intentionally incorrect for tutorial
   { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "Tutorial Quests", isImportant: true, color: "red", isHot: true },
   { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "Tutorial Quests", isImportant: true, color: "cyan", isHot: true },
   { path: "/tutorials/inception-swap", name: "Inception Swap Mission", icon: "FaInfinity", group: "Tutorial Quests", isImportant: true, color: "lime", isHot: true },
+
 
   // CyberFitness
   { path: "/profile", name: "Agent Profile", icon: "FaCircleUser", group: "CyberFitness", color: "pink" },
@@ -44,7 +48,7 @@ const allPages: PageInfo[] = [
   { path: "/premium", name: "Premium Modules", icon: "FaStar", group: "CyberFitness", color: "yellow" }, 
   { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange"},
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue" },  
-  { path: "/partner", name: "Alliance Perks", icon: "FaUsers", group: "CyberFitness", color: "purple"},
+  { path: "/partner", name: "Alliance Perks", icon: "fabookuser", group: "CyberFitness", color: "purple"}, // Intentionally incorrect for tutorial
   
   // Content & Tools
   { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
@@ -222,7 +226,6 @@ export default function Header() {
 
   const RenderIcon = ({ icon, className }: { icon?: string; className?: string }) => {
     if (!icon) return null;
-    // Directly use PascalCase icon name from allPages
     return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
   };
 
