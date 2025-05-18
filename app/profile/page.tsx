@@ -46,7 +46,6 @@ interface DailyActivityRecordForChart {
   label: string; // For default label if needed
 }
 
-
 const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE: Array<DailyActivityRecordForChart> = Array.from({ length: 7 }).map((_, i) => {
     const dayOfWeek = startOfWeek(new Date(), { weekStartsOn: 1 }); 
     const date = addDays(dayOfWeek, i);
@@ -112,7 +111,7 @@ export default function ProfilePage() {
     github: false,
     vercel: false,
     supabase: false,
-    aiStudio: false,
+    aistudio: false, // Changed key to lowercase 's'
   });
 
   const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
@@ -129,31 +128,31 @@ export default function ProfilePage() {
         if (appContextError) {
           logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Defaulting.`);
            setCyberProfile(getDefaultCyberFitnessProfile()); // Use helper
-           setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+           setIntegrations({ github: false, vercel: false, supabase: false, aistudio: false });
         } else if (dbUser?.user_id) {
           const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
           if (result.success && result.data) {
             setCyberProfile(result.data);
-            setIntegrations({ // Ensure this is set from fresh data
+            setIntegrations({ 
               github: result.data.featuresUsed?.integration_github_connected === true,
               vercel: result.data.featuresUsed?.integration_vercel_connected === true,
               supabase: result.data.featuresUsed?.integration_supabase_connected === true,
-              aiStudio: result.data.featuresUsed?.integration_aistudio_connected === true,
+              aistudio: result.data.featuresUsed?.integration_aistudio_connected === true, // Reads 'integration_aistudio_connected'
             });
           } else {
             logger.warn(`[ProfilePage] Failed to load profile for ${dbUser.user_id}. Error: ${result.error}. Defaulting.`);
             setCyberProfile(getDefaultCyberFitnessProfile());
-            setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+            setIntegrations({ github: false, vercel: false, supabase: false, aistudio: false });
           }
         } else {
           logger.info("[ProfilePage] No dbUser.user_id, using guest profile.");
           setCyberProfile(getDefaultCyberFitnessProfile());
-          setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+          setIntegrations({ github: false, vercel: false, supabase: false, aistudio: false });
         }
     } catch(e: any) {
        logger.error(`[ProfilePage] Exception during profile loading:`, e);
        setCyberProfile(getDefaultCyberFitnessProfile());
-       setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+       setIntegrations({ github: false, vercel: false, supabase: false, aistudio: false });
     } finally {
       setProfileLoading(false); 
     }
@@ -164,23 +163,23 @@ export default function ProfilePage() {
   }, [fetchProfileData]); 
 
   const handleIntegrationChange = useCallback(async (integrationKey: keyof typeof integrations, isChecked: boolean) => {
-    if (!dbUser?.user_id) { // Removed !cyberProfile check, as we re-fetch anyway
+    if (!dbUser?.user_id) { 
         toast.error("Профиль пользователя не загружен для обновления интеграций.");
         return;
     }
 
+    // Construct the feature name EXACTLY as it's stored in the backend (e.g., integration_aistudio_connected)
     const featureName = `integration_${integrationKey}_connected`; 
+    logger.debug(`[ProfilePage] handleIntegrationChange: key='${integrationKey}', featureName='${featureName}', checked=${isChecked}`);
 
-    // Optimistic UI update - still useful for immediate feedback
+
     setIntegrations(prev => ({ ...prev, [integrationKey]: isChecked }));
     const operationToastId = toast.loading(`${isChecked ? "Отметка" : "Снятие отметки"} интеграции с ${integrationKey}...`);
 
-    // Backend update
     const result = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, isChecked);
     
     if (result.error) {
         toast.error(`Ошибка обновления статуса для ${integrationKey}: ${result.error}`, { id: operationToastId });
-        // Revert optimistic UI if backend failed
         setIntegrations(prev => ({ ...prev, [integrationKey]: !isChecked })); 
     } else {
         toast.success(`Интеграция с ${integrationKey} ${isChecked ? "отмечена" : "снята"}!`, { id: operationToastId });
@@ -189,7 +188,6 @@ export default function ProfilePage() {
                 if (addToast) addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
             });
         }
-        // Re-fetch profile to reflect ALL changes (KV, level, featuresUsed for checkbox state)
         await fetchProfileData();
     }
   }, [dbUser?.user_id, addToast, fetchProfileData]);
@@ -207,7 +205,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Helper function to get a default profile, moved outside component if it doesn't depend on component's state/props
   const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({ 
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: [],
@@ -270,21 +267,25 @@ export default function ProfilePage() {
     toast.info(`Функция "${featureName}" находится в активной разработке и скоро будет доступна!`);
   };
 
-  // Filter out dynamic achievements like level_up_X and mastered_schematic_X for the "possible" pool
   const allPossibleNonDynamicAchievements = ALL_ACHIEVEMENTS.filter(ach => !ach.isQuest && !ach.isDynamic);
   
-  // Get full details for all achievements the user has unlocked, including dynamic ones
   const allUnlockedAchievementDetails = userAchievements
     .map(id => getAchievementDetails(id))
     .filter((ach): ach is Achievement => !!ach);
 
-  // Create a combined list for display: all possible non-dynamic ones + any dynamic ones the user has that aren't in the base list
   const allDisplayableAchievements = [...allPossibleNonDynamicAchievements];
   allUnlockedAchievementDetails.forEach(unlockedAch => {
       if (unlockedAch.isDynamic && !allDisplayableAchievements.find(dispAch => dispAch.id === unlockedAch.id)) {
           allDisplayableAchievements.push(unlockedAch);
       }
   });
+  
+  const integrationItems = [
+    {id: "github" as keyof typeof integrations, label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
+    {id: "vercel" as keyof typeof integrations, label: "Vercel (Деплой проектов)", icon: "FaBolt"},
+    {id: "supabase" as keyof typeof integrations, label: "Supabase (База данных & Auth)", icon: "FaDatabase"},
+    {id: "aistudio" as keyof typeof integrations, label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"}, // Changed id to lowercase 's'
+  ];
 
 
   return (
@@ -418,17 +419,12 @@ export default function ProfilePage() {
                 </h2>
                 <Card className="bg-dark-bg/70 border-brand-blue/30 p-4 space-y-3">
                     <p className="text-xs text-muted-foreground font-mono mb-3">Отметьте сервисы, с которыми вы успешно настроили интеграцию или имеете аккаунт для работы в CyberVibe Studio.</p>
-                    {[
-                        {id: "github", label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
-                        {id: "vercel", label: "Vercel (Деплой проектов)", icon: "FaBolt"},
-                        {id: "supabase", label: "Supabase (База данных & Auth)", icon: "FaDatabase"},
-                        {id: "aiStudio", label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"},
-                    ].map(item => (
+                    {integrationItems.map(item => (
                         <div key={item.id} className="flex items-center space-x-2">
                             <Checkbox 
                                 id={`integration-${item.id}`} 
-                                checked={integrations[item.id as keyof typeof integrations]}
-                                onCheckedChange={(checked) => handleIntegrationChange(item.id as keyof typeof integrations, !!checked)}
+                                checked={integrations[item.id]}
+                                onCheckedChange={(checked) => handleIntegrationChange(item.id, !!checked)}
                                 className="data-[state=checked]:bg-brand-blue data-[state=checked]:border-brand-blue border-muted-foreground"
                             />
                             <Label htmlFor={`integration-${item.id}`} className="text-sm font-mono text-light-text flex items-center gap-2 cursor-pointer">
