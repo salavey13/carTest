@@ -106,10 +106,11 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        animationScrollHeightVH={300} // Example: 3 screens high for scroll effect
-        // mainBackgroundImageUrl="/path/to/your/main-hero-bg.jpg"
-        // foregroundImageUrl="/path/to/your/foreground-object.png"
-        // revealedBackgroundImageUrl="/path/to/your/revealed-bg.jpg"
+        animationScrollHeightVH={300} 
+        // Replace with actual image URLs for the full effect
+        // mainBackgroundImageUrl="/your-main-bg.jpg"
+        // foregroundImageUrl="/your-character-or-object.png"
+        // revealedBackgroundImageUrl="/your-revealed-texture.jpg"
       >
         <Button 
             onClick={toggleMode} 
@@ -134,7 +135,7 @@ function ImageSwapTutorialContent() {
             return (
               <TutorialStepSection 
                 key={step.id} 
-                className={cn(index > 0 && "pt-12 md:pt-16")} // border-t removed for now, handled by NextLevelTeaser before it
+                className={cn(index > 0 && "pt-12 md:pt-16")} 
                 isLastStep={index === stepsToRender.length -1}
               >
                 <div className={cn(
