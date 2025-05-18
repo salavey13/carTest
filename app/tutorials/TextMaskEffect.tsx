@@ -41,21 +41,18 @@ const TextMaskEffect: React.FC<TextMaskEffectProps> = ({
   currentOpacity = Math.max(0, Math.min(1, currentOpacity));
   currentScale = Math.max(targetScale, currentScale); 
 
-  // Dynamic gradient for text
-  // The gradient reveals from bottom to top as inRangeProgress goes from 0 to 1
-  const gradientTopPosition = 100 - (inRangeProgress * 100); // from 100% (all transparent) to 0% (all color1)
-  const gradientBottomPosition = gradientTopPosition + 100; // Maintain a 100% spread
+  const gradientStopTop = 100 - (inRangeProgress * 120); // Adjusted to ensure full coverage earlier
+  const gradientStopBottom = gradientStopTop + 100; 
   
   const dynamicGradientStyle: React.CSSProperties = {
     backgroundImage: `linear-gradient(to top, 
-      hsl(var(--brand-yellow)) ${gradientTopPosition}%, 
-      hsl(var(--brand-pink)) ${gradientBottomPosition}%
-    )`,
+      hsl(var(--brand-yellow)) ${gradientStopTop}%, 
+      hsl(var(--brand-pink) / 0.7) ${gradientStopBottom}%
+    )`, // Slightly more transparent top color for softer blend
     WebkitBackgroundClip: 'text',
     backgroundClip: 'text',
     color: 'transparent',
-    // Add a subtle text shadow that fades in with opacity
-    textShadow: `0 1px 3px hsla(var(--brand-orange-rgb), ${currentOpacity * 0.3}), 0 2px 8px hsla(var(--brand-yellow-rgb), ${currentOpacity * 0.2})`,
+    textShadow: `0 1px 5px hsla(var(--brand-orange-rgb), ${currentOpacity * 0.4}), 0 2px 10px hsla(var(--brand-yellow-rgb), ${currentOpacity * 0.3})`,
   };
 
 

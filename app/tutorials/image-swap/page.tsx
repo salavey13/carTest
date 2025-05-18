@@ -105,8 +105,8 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        textToMask={t.pageTitle.substring(0,20)} 
-        // Not passing logoMaskPathD, so it will use TextToSVGMask with title
+        textToMask="SLY13" // Text for the final reveal
+        // logoMaskPathD will be dynamically generated from title
         animationScrollHeightVH={300} 
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
