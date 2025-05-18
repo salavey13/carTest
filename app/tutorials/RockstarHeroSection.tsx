@@ -7,7 +7,7 @@ import TextMaskEffect from './TextMaskEffect';
 interface TextToSVGMaskProps {
   text: string;
   maskId: string;
-  sourceElementSelector?: string; // Selector for the HTML element to match style from
+  sourceElementId?: string; // Changed from selector to ID
   svgX?: string; 
   svgY?: string; 
 }
@@ -15,49 +15,47 @@ interface TextToSVGMaskProps {
 const TextToSVGMask: React.FC<TextToSVGMaskProps> = ({
   text,
   maskId,
-  sourceElementSelector, // e.g., '.gta-vibe-text-effect' specific to the title
+  sourceElementId, 
   svgX = "50%",
-  svgY = "0%", // Using dominant-baseline: hanging, y=0 aligns top of text
+  svgY = "0%", 
 }) => {
   const [fontFamily, setFontFamily] = useState("Orbitron, sans-serif");
   const [fontWeight, setFontWeight] = useState<string | number>("bold");
-  const [fontSize, setFontSize] = useState("80"); // Default SVG font size units
+  const [fontSize, setFontSize] = useState("80"); 
   const [letterSpacing, setLetterSpacing] = useState("normal");
 
   useEffect(() => {
-    if (sourceElementSelector) {
-      const sourceElement = document.querySelector(sourceElementSelector) as HTMLElement;
+    if (sourceElementId) {
+      const sourceElement = document.getElementById(sourceElementId) as HTMLElement;
       if (sourceElement) {
         const computedStyle = window.getComputedStyle(sourceElement);
         setFontFamily(computedStyle.fontFamily);
         setFontWeight(computedStyle.fontWeight);
-        setFontSize(computedStyle.fontSize); // Will be like "72px"
+        setFontSize(computedStyle.fontSize); 
         setLetterSpacing(computedStyle.letterSpacing);
       } else {
-        // Fallback if source element not found
-        console.warn(`[TextToSVGMask] Source element for style matching ("${sourceElementSelector}") not found. Using defaults.`);
+        console.warn(`[TextToSVGMask] Source element with ID "${sourceElementId}" not found. Using defaults.`);
       }
     }
-  }, [text, sourceElementSelector]); // Re-calculate if text or selector changes
+  }, [text, sourceElementId]); 
   
   return (
     <svg className="rockstar-svg-mask-defs" aria-hidden="true">
       <defs>
         <mask id={maskId} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
           <rect x="0" y="0" width="1" height="1" fill="white" />
-          {/* ViewBox adjusted to give more relative height for text */}
           <svg x="0.02" y="0.05" width="0.96" height="0.9" 
-               viewBox="0 0 1000 300" // Increased height in viewBox for better font scaling
+               viewBox="0 0 1000 300" 
                preserveAspectRatio="xMidYMid meet">
             <text 
               x={svgX} 
-              y={svgY} // Y position for hanging text
-              dominantBaseline="hanging" // Aligns top of text to Y
+              y={svgY}
+              dominantBaseline="hanging" 
               textAnchor="middle" 
               fill="black" 
               fontFamily={fontFamily}
               fontWeight={fontWeight.toString()}
-              fontSize={fontSize} // Use computed font size directly
+              fontSize={fontSize} 
               letterSpacing={letterSpacing}
               className="uppercase" 
             >
@@ -73,7 +71,7 @@ const TextToSVGMask: React.FC<TextToSVGMaskProps> = ({
 
 interface RockstarHeroSectionProps {
   title: string;
-  titleClassNameForMask?: string; // Pass the class used by the H1 title for style matching
+  // titleClassNameForMask prop is no longer needed as we use ID
   subtitle?: string; 
   textToMask?: string;
   mainBackgroundImageUrl?: string;
@@ -86,7 +84,7 @@ interface RockstarHeroSectionProps {
 
 const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   title,
-  titleClassNameForMask = "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect",
+  // titleClassNameForMask, // Removed
   subtitle,
   textToMask,
   mainBackgroundImageUrl = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg", 
@@ -99,8 +97,13 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const fixedHeroContainerRef = useRef<HTMLDivElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null); // Ref for the H1 title
-  const uniqueMaskId = useId(); 
+  // const titleRef = useRef<HTMLHeadingElement>(null); // titleRef can be removed if not used elsewhere
+  const baseUniqueId = useId(); 
+  // Sanitize the ID for use in CSS selectors by replacing colons
+  const sanitizedBaseId = baseUniqueId.replace(/:/g, "-");
+  const uniqueMaskId = `mask-${sanitizedBaseId}`;
+  const h1TargetIdForMask = `rockstar-title-for-mask-${sanitizedBaseId}`;
+
 
   useEffect(() => {
     const triggerElement = document.querySelector(triggerElementSelector);
@@ -112,42 +115,45 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     const observer = new IntersectionObserver(
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
-        // Scroll progress calculation remains the same, handled by scroll listener when visible
       },
       { 
-        threshold: 0, // Trigger as soon as any part is visible/hidden
+        threshold: 0, 
         rootMargin: "0px" 
       }
     );
     observer.observe(triggerElement);
 
     const handleScroll = () => {
-        // We need to check isVisible state directly, not from a stale closure
-        // A ref for isVisible could be used, or check entry.isIntersecting from observer if possible
-        // For simplicity, let's assume isVisible state is up-to-date enough for this scroll handler
-        // or rely more on IntersectionObserver's entry.intersectionRatio for progress when it fires.
-        
         const currentTriggerEl = document.querySelector(triggerElementSelector);
         if(currentTriggerEl){
             const rect = currentTriggerEl.getBoundingClientRect();
             const viewportHeight = window.innerHeight;
-            // Progress based on the trigger element's journey through the viewport
-            // 0 when trigger's top is at viewport bottom, 1 when trigger's bottom is at viewport top
             const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + rect.height)));
             setScrollProgress(progress);
         }
     };
     
-    // Call initially to set progress if trigger is already in view
-    handleScroll(); 
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    if (isVisible) { // Only add scroll listener if visible to potentially save performance
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll(); // Initial calculation when it becomes visible
+    } else {
+        window.removeEventListener('scroll', handleScroll);
+        // When not visible, set progress based on position relative to viewport
+        const currentTriggerEl = document.querySelector(triggerElementSelector);
+         if(currentTriggerEl){
+            const rect = currentTriggerEl.getBoundingClientRect();
+            if (rect.bottom < 0) setScrollProgress(1); // Fully scrolled past
+            else if (rect.top > window.innerHeight) setScrollProgress(0); // Not yet scrolled to
+         } else {
+            setScrollProgress(0); // Default if trigger somehow disappears
+         }
+    }
 
     return () => {
-      observer.unobserve(triggerElement);
+      if (triggerElement) observer.unobserve(triggerElement); // Check if triggerElement exists before unobserving
       window.removeEventListener('scroll', handleScroll);
     };
-  }, [triggerElementSelector]); // Removed isVisible from deps to avoid re-binding scroll listener on its change
+  }, [triggerElementSelector, isVisible]); 
 
   const scrollThresholds = {
     maskZoomStart: 0.1, 
@@ -180,9 +186,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const finalMaskedTextContent = textToMask || title;
   const svgMaskUrl = `url(#${uniqueMaskId})`;
 
-  // Create a unique class or ID for the H1 to be targeted by TextToSVGMask
-  const h1TargetClassForMask = `rockstar-title-for-mask-${uniqueMaskId}`;
-
   return (
     <div 
         ref={fixedHeroContainerRef} 
@@ -192,7 +195,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
             pointerEvents: isVisible ? 'auto' : 'none',
         }}
     >
-        {/* Layer 1: Main Background */}
         <div
           className="absolute inset-0 bg-cover bg-center -z-30"
           style={{ 
@@ -202,7 +204,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           }}
         />
         
-        {/* Layer 2: Decorative Background Object */}
         {backgroundImageObjectUrl && (
           <div
             className="absolute inset-0 flex items-center justify-center -z-10 pointer-events-none"
@@ -219,9 +220,8 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Layer 3: Initial Title & Subtitle (Static) */}
         <div className="relative text-center px-4 z-10">
-          <h1 ref={titleRef} className={cn(titleClassNameForMask, h1TargetClassForMask, "mb-4 md:mb-6")} data-text={title}>
+          <h1 id={h1TargetIdForMask} className={cn("text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect mb-4 md:mb-6")} data-text={title}>
             <VibeContentRenderer content={title} />
           </h1>
           {subtitle && (
@@ -231,12 +231,11 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           )}
         </div>
 
-        {/* Layer 4: Masked Overlay */}
         <div
           className="absolute inset-0 z-20" 
           style={{
             backgroundColor: 'hsl(var(--background))', 
-            opacity: maskOverlayOpacity, // Controlled by maskProgress
+            opacity: maskOverlayOpacity, 
             transform: `scale(${Math.max(targetMaskScale, currentMaskScale)})`,
             transformOrigin: 'center center', 
             willChange: 'transform, opacity',
@@ -260,11 +259,10 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           <TextToSVGMask 
             text={title} 
             maskId={uniqueMaskId}
-            sourceElementSelector={`.${h1TargetClassForMask}`} // Target the specific H1
+            sourceElementId={h1TargetIdForMask} 
           />
         )}
         
-        {/* Layer 5: Final Text (TextMaskEffect) */}
         <TextMaskEffect 
             text={finalMaskedTextContent} 
             scrollProgress={scrollProgress} 
@@ -272,7 +270,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
             animationEndProgress={scrollThresholds.finalTextEnd}
         />
         
-        {/* Layer 6: Children (Buttons, etc.) */}
         {children && (
             <div 
                 className="absolute bottom-[10vh] md:bottom-[15vh] z-50 transition-opacity duration-500"
