@@ -22,8 +22,8 @@
   --popover-foreground: 0 0% 94%; 
   --muted: 263 30% 25%;          
   --muted-foreground: 0 0% 65%;  
-  --destructive: 0 80% 60%;     
-  --destructive-foreground: 0 0% 95%; 
+  --destructive: 0 75% 55%;     /* Slightly darker and less saturated red */
+  --destructive-foreground: 0 0% 95%; /* Keep light text for destructive */
   --radius: 0.75rem;
 
   /* Brand Colors (Adjusted Pastel-like for Dark Mode) */
@@ -36,15 +36,15 @@
   --brand-orange: 28 65% 55%;     
   --brand-lime: 80 65% 60%;        
 
-  /* Derived UI Element Colors */
+  /* Derived UI Element Colors - Button specific foregrounds updated */
   --primary: hsl(var(--brand-purple));
-  --primary-foreground: 270 10% 15%; 
+  --primary-foreground: 270 80% 96%; /* Light text for purple button */
   --secondary: hsl(var(--brand-cyan));
-  --secondary-foreground: 180 10% 15%; 
+  --secondary-foreground: 180 80% 96%; /* Light text for cyan button */
   --accent: hsl(var(--brand-yellow));
-  --accent-foreground: 50 15% 15%;   
+  --accent-foreground: 50 30% 15%;   /* Dark text for yellow button */
   
-  --border: hsl(var(--brand-purple) / 0.4);         
+  --border: hsl(var(--brand-purple) / 0.5); /* Adjusted border opacity */       
   --input: hsl(var(--brand-purple) / 0.3);          
   --ring: hsl(var(--brand-cyan));           
 
@@ -74,9 +74,9 @@
   --sidebar-background: 263 75% 10%; 
   --sidebar-foreground: 0 0% 85%;   
   --sidebar-primary: hsl(var(--brand-purple) / 0.9); 
-  --sidebar-primary-foreground: 270 10% 15%; 
+  --sidebar-primary-foreground: 270 80% 96%; 
   --sidebar-accent: hsl(var(--brand-cyan) / 0.9);     
-  --sidebar-accent-foreground: 180 10% 15%;
+  --sidebar-accent-foreground: 180 80% 96%;
   --sidebar-border: hsl(var(--brand-purple) / 0.3);    
   --sidebar-ring: hsl(var(--brand-cyan) / 0.95);       
 
@@ -90,6 +90,7 @@
 }
 
 .dark {
+  /* Values are identical to :root for now, as dark mode is default */
   --background: 263 80% 7%;
   --foreground: 0 0% 94%;
   --card: 264 65% 13%;
@@ -98,8 +99,8 @@
   --popover-foreground: 0 0% 94%;
   --muted: 263 30% 25%;
   --muted-foreground: 0 0% 65%;
-  --destructive: 0 80% 60%;
-  --destructive-foreground: 0 0% 95%;
+  --destructive: 0 75% 55%;     
+  --destructive-foreground: 0 0% 95%; 
   
   --brand-purple: 270 65% 65%;
   --brand-pink: 330 70% 70%;
@@ -111,13 +112,13 @@
   --brand-lime: 80 65% 60%;
 
   --primary: hsl(var(--brand-purple));
-  --primary-foreground: 270 10% 15%;
+  --primary-foreground: 270 80% 96%; 
   --secondary: hsl(var(--brand-cyan));
-  --secondary-foreground: 180 10% 15%;
+  --secondary-foreground: 180 80% 96%; 
   --accent: hsl(var(--brand-yellow));
-  --accent-foreground: 50 15% 15%;
+  --accent-foreground: 50 30% 15%;   
 
-  --border: hsl(var(--brand-purple) / 0.4);
+  --border: hsl(var(--brand-purple) / 0.5);
   --input: hsl(var(--brand-purple) / 0.3);
   --ring: hsl(var(--brand-cyan));
 
@@ -143,9 +144,9 @@
   --sidebar-background: 263 75% 10%;
   --sidebar-foreground: 0 0% 85%;
   --sidebar-primary: hsl(var(--brand-purple) / 0.9);
-  --sidebar-primary-foreground: 270 10% 15%;
+  --sidebar-primary-foreground: 270 80% 96%;
   --sidebar-accent: hsl(var(--brand-cyan) / 0.9);
-  --sidebar-accent-foreground: 180 10% 15%;
+  --sidebar-accent-foreground: 180 80% 96%;
   --sidebar-border: hsl(var(--brand-purple) / 0.3);
   --sidebar-ring: hsl(var(--brand-cyan) / 0.95);
   
