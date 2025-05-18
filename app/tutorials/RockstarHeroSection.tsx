@@ -2,16 +2,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import TextMaskEffect from './TextMaskEffect'; // Предполагается, что этот компонент будет создан
+import TextMaskEffect from './TextMaskEffect'; 
 
 interface RockstarHeroSectionProps {
   title: string;
-  subtitle?: string; // Сделаем опциональным
-  textToMask?: string; // Текст, который будет "маскироваться/раскрываться"
+  subtitle?: string; 
+  textToMask: string; 
   mainBackgroundImageUrl?: string;
-  backgroundImageObjectUrl?: string; // Для большой иконки/объекта на фоне
-  foregroundIconName?: string; // Имя иконки из Fa6
-  foregroundIconSize?: string; // Tailwind класс для размера иконки
+  // backgroundImageObjectUrl?: string; // Removed for simplification in this iteration
+  foregroundIconName?: string; 
+  foregroundIconSize?: string; 
   children?: React.ReactNode; 
   animationScrollHeightVH?: number; 
 }
@@ -20,8 +20,8 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   title,
   subtitle,
   textToMask,
-  mainBackgroundImageUrl = "/assets/images/placeholder-hero-bg-dark-city.jpg", 
-  backgroundImageObjectUrl, // Оставим опциональным
+  mainBackgroundImageUrl = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg", 
+  // backgroundImageObjectUrl, 
   foregroundIconName,    
   foregroundIconSize = "text-6xl",
   children,
@@ -41,7 +41,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
         if (heroElement) { 
             const rect = heroElement.getBoundingClientRect();
             const scrollDistanceForAnimation = window.innerHeight * (animationScrollHeightVH / 100);
-            const scrolledAmount = Math.max(0, -rect.top);
+            const scrolledAmount = Math.max(0, -rect.top); // 얼마나 스크롤되었는지 (뷰포트 상단을 기준으로)
             const progress = Math.min(1, scrolledAmount / scrollDistanceForAnimation);
             setScrollProgress(progress);
         }
@@ -57,24 +57,33 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     }
   }, [animationScrollHeightVH]);
 
-  // Анимации
-  const mainBgTranslateY = scrollProgress * 15; // vh
-  const mainBgScale = 1 + scrollProgress * 0.1;
+  // Background Animation
+  const mainBgTranslateY = scrollProgress * 10; // vh
+  const mainBgScale = 1 + scrollProgress * 0.05;
 
-  const bgObjectScale = 1 + scrollProgress * 0.5;
-  const bgObjectTranslateY = -scrollProgress * 20; // vh
-  const bgObjectOpacity = 1 - scrollProgress * 0.8;
+  // Title Text Animation (relatively static, but can have subtle effects)
+  const titleTextScale = 1; // Keep title static for mask to reveal it
+  const titleTextTranslateY = 0; 
+  const titleTextOpacity = 1; 
 
-  const titleTextScale = 1 - scrollProgress * 0.3; // Текст немного уменьшается
-  const titleTextTranslateY = scrollProgress * 30; // Уезжает вниз
-  const titleTextOpacity = 1 - scrollProgress * 1.5; // Быстро исчезает
+  // Foreground Icon Animation
+  // Starts small/off-screen, zooms in over text, then zooms out/fades
+  let fgIconScale = 0.1;
+  let fgIconOpacity = 0;
+  let fgIconTranslateY = 50; // Start from bottom (vh)
 
-  const fgIconScale = 1 + scrollProgress * 2.5; 
-  const fgIconTranslateY = -scrollProgress * 60; // vh
-  const fgIconOpacity = 1 - scrollProgress * 0.5;
-
-  const maskText = textToMask || title; // Текст для маски
-
+  if (scrollProgress < 0.5) { // First half of scroll: icon zooms in and moves up
+    const halfProgress = scrollProgress / 0.5;
+    fgIconScale = 0.1 + halfProgress * 2.9; // Scale from 0.1 to 3
+    fgIconOpacity = halfProgress;          // Fade in
+    fgIconTranslateY = 50 - halfProgress * 70; // Move from 50vh below center to 20vh above center
+  } else { // Second half of scroll: icon continues to move up and fades out / scales down
+    const halfProgress = (scrollProgress - 0.5) / 0.5;
+    fgIconScale = 3 - halfProgress * 2; // Scale from 3 down to 1
+    fgIconOpacity = 1 - halfProgress;     // Fade out
+    fgIconTranslateY = -20 - halfProgress * 50; // Continue moving up
+  }
+  
   return (
     <div ref={heroWrapperRef} className="relative" style={{ height: `${animationScrollHeightVH}vh` }}>
       <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
@@ -87,25 +96,11 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
             willChange: 'transform',
           }}
         />
-        <div className="absolute inset-0 bg-black/75 -z-20"></div> {/* Darker Overlay */}
+        <div className="absolute inset-0 bg-black/75 -z-20"></div>
 
-        {/* Large Background Icon/Object */}
-        {backgroundImageObjectUrl && (
-          <div
-            className="absolute inset-0 flex items-center justify-center -z-10 pointer-events-none"
-            style={{
-              opacity: bgObjectOpacity,
-              transform: `scale(${bgObjectScale}) translateY(${bgObjectTranslateY}vh)`,
-              willChange: 'opacity, transform',
-            }}
-          >
-            <img src={backgroundImageObjectUrl} alt="Background Object" className="max-w-[70%] md:max-w-[50%] opacity-30 h-auto object-contain" />
-          </div>
-        )}
-        
-        {/* Title Text (initially visible, will be covered/revealed by mask) */}
+        {/* Title Text (acts as the base layer to be revealed) */}
         <div 
-          className="relative text-center px-4 z-10" // z-index 10 to be above revealed bg, but potentially behind mask
+          className="relative text-center px-4 z-10" // z-index 10
           style={{ 
             transform: `scale(${titleTextScale}) translateY(${titleTextTranslateY}vh)`, 
             opacity: titleTextOpacity,
@@ -124,21 +119,22 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           )}
         </div>
 
-        {/* Text Mask Effect - this is what creates the "hole" or reveals the text */}
-        <TextMaskEffect text={maskText} scrollProgress={scrollProgress} />
+        {/* Text Mask Effect - This "reveals" the title by fading out */}
+        <TextMaskEffect text={textToMask} scrollProgress={scrollProgress} baseTitleZIndex={10} />
+
 
         {/* Foreground Icon */}
         {foregroundIconName && (
           <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" 
+            className="absolute top-1/2 left-1/2 pointer-events-none" 
             style={{ 
               transform: `translate(-50%, -50%) scale(${fgIconScale}) translateY(${fgIconTranslateY}vh)`, 
               opacity: fgIconOpacity,
               willChange: 'transform, opacity',
-              zIndex: 30 // Highest visual layer for icon
+              zIndex: 30 
             }}
           >
-            <VibeContentRenderer content={`::${foregroundIconName}::`} className={cn(foregroundIconSize, "text-brand-pink opacity-80")} />
+            <VibeContentRenderer content={`::${foregroundIconName}::`} className={cn(foregroundIconSize, "text-brand-yellow")} />
           </div>
         )}
         
