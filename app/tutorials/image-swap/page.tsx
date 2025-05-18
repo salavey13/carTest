@@ -106,11 +106,14 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        animationScrollHeightVH={300} 
-        // Replace with actual image URLs for the full effect
-        // mainBackgroundImageUrl="/your-main-bg.jpg"
-        // foregroundImageUrl="/your-character-or-object.png"
-        // revealedBackgroundImageUrl="/your-revealed-texture.jpg"
+        textToMask={t.pageTitle} // Use the title for the mask effect
+        animationScrollHeightVH={300}
+        // Placeholder URLs for images - replace with actual assets for desired effect
+        // mainBackgroundImageUrl="/assets/images/gta-style-cityscape.jpg"
+        // backgroundImageObjectUrl="/assets/images/large-logo-or-symbol.png" // Large, semi-transparent icon/logo for background
+        foregroundIconName="FaCar" // Example foreground icon
+        foregroundIconSize="text-7xl md:text-9xl"
+        // revealedBackgroundImageUrl="/assets/images/abstract-light-streaks.jpg"
       >
         <Button 
             onClick={toggleMode} 
