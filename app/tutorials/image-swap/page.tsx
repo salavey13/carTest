@@ -21,7 +21,7 @@ import NextLevelTeaser from '../NextLevelTeaser';
 const imageSwapTutorialTranslations = {
   ru: {
     pageTitle: "Миссия 1: Охота на Битый Пиксель",
-    pageSubtitle: "Агент, твоя задача: освоить замену изображений в коде! Думай об этом как о реанимации цифрового артефакта: <FaImageSlash /> -> <FaToolbox /> -> <FaImagePortrait />. Без регистрации, только чистый скилл-ап!",
+    // pageSubtitle removed as requested
     steps: [ 
       { id: 1, title: "Шаг 1: Захват URL Старого Артефакта", description: "Первая задача, оперативник: обнаружить в кодовой базе изображение, требующее замены. Найдя, скопируй его полный URL. Это твоя основная цель!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaLink", color: "brand-pink" },
       { id: 2, title: "Шаг 2: Развертывание Нового Актива", description: "Далее, загрузи свой новенький, сияющий файл замены. Рекомендуем Supabase Storage для гладкой интеграции, но подойдет любой публично доступный URL. Защити новую ссылку!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaUpload", color: "brand-blue" },
@@ -35,7 +35,7 @@ const imageSwapTutorialTranslations = {
   },
   wtf: {
     pageTitle: "КАРТИНКИ МЕНЯТЬ – КАК ДВА БАЙТА ПЕРЕСЛАТЬ!",
-    pageSubtitle: "Забудь про нудятину. Делай как на видосе. ЭТО ЖЕ ЭЛЕМЕНТАРНО, ВАТСОН!",
+    // pageSubtitle removed as requested
     steps: [ 
       { id: 1, title: "ШАГ 1: КОПИРУЙ СТАРЫЙ URL", description: "Нашел картинку в коде? КОПИРНИ ЕЕ АДРЕС. Всё.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaCopy", color: "brand-pink" },
       { id: 2, title: "ШАГ 2: ЗАЛЕЙ НОВУЮ, КОПИРУЙ URL", description: "Загрузи НОВУЮ картинку. КОПИРНИ ЕЕ АДРЕС. Изи.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaCloudArrowUp", color: "brand-blue" },
@@ -105,7 +105,7 @@ function ImageSwapTutorialContent() {
     <TutorialPageContainer>
       <RockstarHeroSection 
         title={t.pageTitle} 
-        subtitle={t.pageSubtitle}
+        // subtitle prop removed
         textToMask="SLY13" 
         triggerElementSelector={`#${heroTriggerElementId}`}
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
@@ -114,7 +114,7 @@ function ImageSwapTutorialContent() {
         <Button 
             onClick={toggleMode} 
             variant="outline" 
-            size="lg" // Made button larger
+            size="lg"
             className={cn(
               "bg-card/80 backdrop-blur-md hover:bg-pink-500/20 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-500/50",
               "focus:ring-2 focus:ring-offset-2 focus:ring-offset-background active:scale-95 transform hover:scale-105",
@@ -127,10 +127,9 @@ function ImageSwapTutorialContent() {
         </Button>
       </RockstarHeroSection>
       
-      {/* This div will trigger the fixed hero section's animation */}
-      <div id={heroTriggerElementId} style={{ height: '200vh' }} aria-hidden="true"></div>
+      <div id={heroTriggerElementId} style={{ height: '200vh' }} aria-hidden="true" />
 
-      <TutorialContentContainer className="-mt-[100vh]"> {/* Offset to account for fixed hero */}
+      <TutorialContentContainer className="-mt-[100vh] relative"> {/* Added relative for z-indexing context if needed */}
         <div className="space-y-16 md:space-y-24">
           {stepsToRender.map((step, index) => {
             const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
@@ -155,7 +154,7 @@ function ImageSwapTutorialContent() {
                       <VibeContentRenderer content={step.description} />
                     </p>
                     {step.id === 3 && ( 
-                      <Button asChild size="lg" className={cn( // Made button larger
+                      <Button asChild size="lg" className={cn( 
                         "inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-semibold rounded-md text-background transition-colors shadow-lg mt-4",
                         "bg-brand-yellow hover:bg-brand-yellow/80 focus:ring-2 focus:ring-brand-yellow focus:ring-offset-2 focus:ring-offset-background active:scale-95 transform hover:scale-105"
                         )}>
