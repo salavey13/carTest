@@ -107,12 +107,11 @@ function ImageSwapTutorialContent() {
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
         textToMask={t.pageTitle} 
-        animationScrollHeightVH={300} 
+        animationScrollHeightVH={200} // Adjusted scroll height
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
-        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg" // Example icon on background
-        foregroundIconName="FaStar" 
-        foregroundIconSize="text-7xl md:text-9xl lg:text-[10rem]"
-        // revealedBackgroundImageUrl="/assets/images/abstract-light-streaks.jpg" // Uses default
+        // backgroundImageObjectUrl="/assets/images/your-large-bg-icon.png" // Optional: Large icon behind text
+        // foregroundIconName="FaRocket" // Optional: Small icon flying in front
+        // foregroundIconSize="text-7xl"
       >
         <Button 
             onClick={toggleMode} 
