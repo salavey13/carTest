@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchRepoContents } from "@/app/actions_github/actions"; // getOpenPullRequests removed as it's not used here
+import { fetchRepoContents } from "@/app/actions_github/actions"; 
 import {
     useRepoXmlPageContext, FetchStatus, FileNode,
-    ImportCategory, ImageReplaceTask, IconReplaceTask, // Added IconReplaceTask for type checking
+    ImportCategory, ImageReplaceTask, IconReplaceTask, 
     PendingFlowDetails
 } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -15,10 +15,9 @@ interface UseRepoFetcherProps {
     token: string;
     targetBranchName: string | null;
     manualBranchName: string;
-    imageReplaceTask: ImageReplaceTask | null; // This can be ImageReplaceTask or IconReplaceTask passed as ImageReplaceTask
+    imageReplaceTask: ImageReplaceTask | null; 
     highlightedPathFromUrl: string;
     importantFiles: string[];
-    // autoFetch: boolean; // Removed autoFetch
     ideaFromUrl: string;
     isSettingsModalOpen: boolean;
     repoUrlEntered: boolean;
@@ -44,7 +43,7 @@ interface UseRepoFetcherReturn {
 
 export const useRepoFetcher = ({
     repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask, 
-    highlightedPathFromUrl, importantFiles, /* autoFetch, */ ideaFromUrl, isSettingsModalOpen, // autoFetch removed
+    highlightedPathFromUrl, importantFiles, ideaFromUrl, isSettingsModalOpen, 
     repoUrlEntered, loadingPrs, assistantLoading, isParsing, aiActionLoading,
 }: UseRepoFetcherProps): UseRepoFetcherReturn => {
     const {
@@ -52,7 +51,7 @@ export const useRepoFetcher = ({
         setRequestCopied, 
         triggerToggleSettingsModal, setKworkInputValue,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-        pendingFlowDetails, iconReplaceTask // Get iconReplaceTask from context if needed for differentiation
+        pendingFlowDetails, iconReplaceTask 
     } = useRepoXmlPageContext();
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning, loading: toastLoading } = useAppToast();
 
@@ -64,9 +63,8 @@ export const useRepoFetcher = ({
 
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isFetchInitiatedRef = useRef(false);
-    // isAutoFetchingRef removed as autoFetch is removed
     const fetchStatusRef = useRef(fetchStatus);
-    const activeVisualTaskRef = useRef(imageReplaceTask || (iconReplaceTask as unknown as ImageReplaceTask | null)); // Store the active task
+    const activeVisualTaskRef = useRef(imageReplaceTask || (iconReplaceTask as unknown as ImageReplaceTask | null)); 
     const pendingFlowDetailsRef = useRef(pendingFlowDetails);
 
     useEffect(() => {
@@ -90,20 +88,21 @@ export const useRepoFetcher = ({
         
         const currentFlowContext = pendingFlowDetailsRef.current; 
         const currentActiveVisualTask = activeVisualTaskRef.current;
-        const isActualImageTask = currentActiveVisualTask && 'oldUrl' in currentActiveVisualTask; // Check if it's ImageReplaceTask
+        const isActualImageTask = currentActiveVisualTask && 'oldUrl' in currentActiveVisualTask; 
         
         const isVisualFlow = !!currentActiveVisualTask;
         const isErrorFixFlow = currentFlowContext?.type === 'ErrorFix';
-        const isDedicatedFlow = isVisualFlow || isErrorFixFlow;
+        const isGenericIdeaFlow = currentFlowContext?.type === 'GenericIdea';
+        const isDedicatedFlow = isVisualFlow || isErrorFixFlow || isGenericIdeaFlow;
 
         let currentTargetPath: string | null = null;
         if (currentActiveVisualTask) {
             currentTargetPath = currentActiveVisualTask.targetPath;
-        } else if (isErrorFixFlow && currentFlowContext) {
+        } else if ((isErrorFixFlow || isGenericIdeaFlow) && currentFlowContext) {
             currentTargetPath = currentFlowContext.targetPath;
         }
         
-        logger.debug(`[useRepoFetcher handleFetchManual] Args: isRetry=${isManualRetry}, branch=${effectiveBranchDisplay}, isDedicatedFlow=${isDedicatedFlow}, visualFlowType=${isVisualFlow ? (isActualImageTask ? 'Image' : 'Icon') : 'None'}, errorFixFlow=${isErrorFixFlow}, targetPath=${currentTargetPath}`);
+        logger.debug(`[useRepoFetcher handleFetchManual] Args: isRetry=${isManualRetry}, branch=${effectiveBranchDisplay}, isDedicatedFlow=${isDedicatedFlow}, visualFlowType=${isVisualFlow ? (isActualImageTask ? 'Image' : 'Icon') : 'None'}, errorFixFlow=${isErrorFixFlow}, genericIdeaFlow=${isGenericIdeaFlow}, targetPath=${currentTargetPath}`);
 
         if (isFetchInitiatedRef.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { return; }
         if (!repoUrl.trim()) { setError("URL репозитория не указан."); triggerToggleSettingsModal(); return; }
@@ -111,8 +110,25 @@ export const useRepoFetcher = ({
 
         setFetchStatus('loading'); setError(null); setFiles([]); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setSelectedFetcherFiles(new Set());
         isFetchInitiatedRef.current = true;
-        if (!isDedicatedFlow) { setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setKworkInputValue(""); }
-        else if (isVisualFlow) { setKworkInputValue(""); }
+        
+        if (!isDedicatedFlow) { 
+            setRequestCopied(false); 
+            setAiResponseHasContent(false); 
+            setFilesParsed(false); 
+            setSelectedAssistantFiles(new Set()); 
+            setKworkInputValue(""); 
+            logger.debug("[useRepoFetcher handleFetchManual] Not a dedicated flow, resetting kwork/AI states.");
+        } else if (isVisualFlow) { 
+            setKworkInputValue(""); 
+            logger.debug("[useRepoFetcher handleFetchManual] Visual flow, resetting kwork input.");
+        } else if (isErrorFixFlow) {
+            // For ErrorFix, kwork might be pre-populated by context, so don't clear it here.
+            logger.debug("[useRepoFetcher handleFetchManual] ErrorFix flow, preserving kwork input.");
+        } else if (isGenericIdeaFlow) {
+            // For GenericIdea, kwork will be set by context after fetch, so don't clear here.
+             logger.debug("[useRepoFetcher handleFetchManual] GenericIdea flow, preserving kwork input (will be set by context).");
+        }
+
 
         const fetchToastId = toastLoading(`Запрос файлов из ветки (${effectiveBranchDisplay})...`, { duration: 15000 });
         startProgressSimulation(13);
@@ -129,8 +145,10 @@ export const useRepoFetcher = ({
                 fetchAttemptSucceeded = true; fetchedFilesData = fetchResult.files;
                 const allPaths = fetchedFilesData.map(f => f.path);
 
-                if ((isVisualFlow || isErrorFixFlow) && currentTargetPath) {
-                    const flowName = isVisualFlow ? (isActualImageTask ? "Image Flow" : "Icon Flow") : "Error Fix";
+                if (isDedicatedFlow && currentTargetPath) {
+                    const flowName = isVisualFlow ? (isActualImageTask ? "Image Flow" : "Icon Flow") 
+                                     : isErrorFixFlow ? "Error Fix" 
+                                     : "Generic Idea";
                     primaryHighlightPathInternal = currentTargetPath;
                     if (!allPaths.includes(primaryHighlightPathInternal)) { 
                         const errorMsg = `Файл (${primaryHighlightPathInternal}) для '${flowName}' не найден в ветке ${effectiveBranchDisplay}.`; 
@@ -138,7 +156,7 @@ export const useRepoFetcher = ({
                     } else { 
                         const successMsg = `Файл для '${flowName}' (${primaryHighlightPathInternal.split('/').pop()}) загружен.`; 
                         toastSuccess(successMsg, { id: fetchToastId }); 
-                        if (isErrorFixFlow) filesToAutoSelect.add(primaryHighlightPathInternal); 
+                        if (isErrorFixFlow || isGenericIdeaFlow) filesToAutoSelect.add(primaryHighlightPathInternal); 
                     }
                     secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] };
                  } else { 
@@ -193,13 +211,8 @@ export const useRepoFetcher = ({
         setError, setFiles, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState,
         startProgressSimulation, stopProgressSimulation,
         toastSuccess, toastError, toastInfo, toastWarning, toastLoading,
-        // No direct dependency on imageReplaceTask or iconReplaceTask from context here, 
-        // as their current values are read via refs (activeVisualTaskRef, pendingFlowDetailsRef)
-        // to avoid re-triggering this whole callback when they change during its execution.
     ]);
 
-    // useEffect for autoFetch based on URL params is removed
-    // The ideaProp useEffect in RepoTxtFetcher.tsx now handles the initial trigger
 
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading;
