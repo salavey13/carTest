@@ -11,7 +11,7 @@ const TutorialContentContainer: React.FC<TutorialContentContainerProps> = ({ chi
   return (
     <div className={cn(
       "container mx-auto px-4 py-12 md:py-16 relative z-10", 
-      "bg-background", 
+      "bg-background", // Ensures this container has a background for content after fixed hero
       className
     )}>
       {children}

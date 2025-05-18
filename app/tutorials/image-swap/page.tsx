@@ -99,33 +99,38 @@ function ImageSwapTutorialContent() {
 
   const stepsToRender = t.steps;
   const pageMainColorKey = "brand-green"; 
+  const heroTriggerElementId = "hero-trigger-element";
 
   return (
     <TutorialPageContainer>
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        textToMask="SLY13" // Text for the final reveal
-        // logoMaskPathD will be dynamically generated from title
-        animationScrollHeightVH={300} 
+        textToMask="SLY13" 
+        triggerElementSelector={`#${heroTriggerElementId}`}
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         <Button 
             onClick={toggleMode} 
             variant="outline" 
+            size="lg" // Made button larger
             className={cn(
-            "bg-card/80 backdrop-blur-md hover:bg-pink-500/30 transition-all duration-200 text-sm px-6 py-3 shadow-lg hover:shadow-pink-500/40",
-            "focus:ring-2 focus:ring-offset-2 focus:ring-offset-background",
-            currentMode === 'ru' ? "border-pink-500/70 text-pink-400 hover:text-pink-300 focus:ring-pink-500" 
-                                 : "border-blue-500/70 text-blue-400 hover:text-blue-300 focus:ring-blue-500"
+              "bg-card/80 backdrop-blur-md hover:bg-pink-500/20 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-500/50",
+              "focus:ring-2 focus:ring-offset-2 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              currentMode === 'ru' 
+                ? "border-pink-500/70 text-pink-300 hover:text-pink-100 focus:ring-pink-500" 
+                : "border-blue-500/70 text-blue-300 hover:text-blue-100 focus:ring-blue-500"
             )}
         >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
         </Button>
       </RockstarHeroSection>
       
-      <TutorialContentContainer>
+      {/* This div will trigger the fixed hero section's animation */}
+      <div id={heroTriggerElementId} style={{ height: '200vh' }} aria-hidden="true"></div>
+
+      <TutorialContentContainer className="-mt-[100vh]"> {/* Offset to account for fixed hero */}
         <div className="space-y-16 md:space-y-24">
           {stepsToRender.map((step, index) => {
             const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
@@ -150,9 +155,9 @@ function ImageSwapTutorialContent() {
                       <VibeContentRenderer content={step.description} />
                     </p>
                     {step.id === 3 && ( 
-                      <Button asChild className={cn(
-                        "inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-background transition-colors shadow-lg mt-4",
-                        "bg-brand-yellow hover:bg-brand-yellow/80 focus:ring-2 focus:ring-brand-yellow focus:ring-offset-2 focus:ring-offset-background"
+                      <Button asChild size="lg" className={cn( // Made button larger
+                        "inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-semibold rounded-md text-background transition-colors shadow-lg mt-4",
+                        "bg-brand-yellow hover:bg-brand-yellow/80 focus:ring-2 focus:ring-brand-yellow focus:ring-offset-2 focus:ring-offset-background active:scale-95 transform hover:scale-105"
                         )}>
                         <Link href="/repo-xml?flow=imageSwap">
                            <VibeContentRenderer content="К Студии SUPERVIBE <FaArrowUpRightFromSquare />" />

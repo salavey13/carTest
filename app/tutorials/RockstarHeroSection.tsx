@@ -23,39 +23,24 @@ const TextToSVGMask: React.FC<TextToSVGMaskProps> = ({
   svgX = "50%",
   svgY = "50%",
 }) => {
-  const [actualFontSize, setActualFontSize] = useState("80px"); // Default SVG font size
+  const [actualFontSize, setActualFontSize] = useState("80px"); 
   const [actualLetterSpacing, setActualLetterSpacing] = useState("normal");
 
   useEffect(() => {
-    // Create a temporary element to measure text rendered with Tailwind classes
     const tempElement = document.createElement("div");
     tempElement.style.fontFamily = fontFamily;
     tempElement.style.fontWeight = fontWeight.toString();
-    // Apply a base Tailwind class that RockstarHeroSection's h1 uses for text size
-    // This should ideally match the class used for the visible H1 to get accurate metrics
     tempElement.className = cn("text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold uppercase"); 
     tempElement.style.visibility = "hidden";
     tempElement.style.position = "absolute";
-    tempElement.textContent = text.toUpperCase(); // Measure uppercase text
+    tempElement.textContent = text.toUpperCase(); 
     document.body.appendChild(tempElement);
 
     const computedStyle = window.getComputedStyle(tempElement);
-    const htmlFontSize = parseFloat(computedStyle.fontSize);
     const htmlLetterSpacing = computedStyle.letterSpacing;
     document.body.removeChild(tempElement);
 
-    // Convert HTML font size to an appropriate SVG font size
-    // This is an approximation. ViewBox scaling also plays a role.
-    // Assuming the inner SVG for text (viewBox="0 0 1000 200") means 200 units height.
-    // We want the text to fill a portion of this, e.g. 80% => 160 units.
-    // The targetMaskTextHeightVH gives a hint about how large it should be visually on screen.
-    // This part is complex because HTML px and SVG units in a viewBox are different.
-    // Let's use a simpler approach: scale based on a reference HTML size.
-    // If targetMaskTextHeightVH is 15vh, and a 7xl tailwind font is ~10vh, then scale up.
-    // This calculation is still tricky. A direct pixel value might be more stable if possible.
-    // For now, let's keep it tied to a base size and allow `targetMaskTextHeightVH` to be a qualitative guide.
-    // A simpler fixed size for SVG text units might be better:
-    setActualFontSize("70"); // Units for viewBox 0 0 1000 200, makes text large
+    setActualFontSize("70"); 
     setActualLetterSpacing(htmlLetterSpacing === "normal" ? "0" : htmlLetterSpacing);
 
   }, [text, fontFamily, fontWeight, targetMaskTextHeightVH]);
@@ -65,8 +50,8 @@ const TextToSVGMask: React.FC<TextToSVGMaskProps> = ({
       <defs>
         <mask id={maskId} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
           <rect x="0" y="0" width="1" height="1" fill="white" />
-          <svg x="0.05" y="0.1" width="0.9" height="0.8" // Area for text mask within the 0-1 space
-               viewBox="0 0 1000 200" // Inner SVG viewBox
+          <svg x="0.05" y="0.1" width="0.9" height="0.8" 
+               viewBox="0 0 1000 200" 
                preserveAspectRatio="xMidYMid meet">
             <text 
               x={svgX} 
@@ -99,7 +84,7 @@ interface RockstarHeroSectionProps {
   logoMaskPathD?: string; 
   logoMaskViewBox?: string; 
   children?: React.ReactNode; 
-  animationScrollHeightVH?: number; 
+  triggerElementSelector: string; // CSS selector for the trigger element
 }
 
 const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
@@ -111,70 +96,90 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   logoMaskPathD,
   logoMaskViewBox,
   children,
-  animationScrollHeightVH = 300,
+  triggerElementSelector,
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
-  const heroWrapperRef = useRef<HTMLDivElement>(null); 
-  const stickyContainerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const fixedHeroContainerRef = useRef<HTMLDivElement>(null);
   const uniqueMaskId = useId(); 
 
   useEffect(() => {
-    const heroElement = heroWrapperRef.current;
-    const stickyElement = stickyContainerRef.current;
-    if (!heroElement || !stickyElement) return;
+    const triggerElement = document.querySelector(triggerElementSelector);
+    if (!triggerElement) {
+      console.warn(`[RockstarHeroSection] Trigger element "${triggerElementSelector}" not found.`);
+      return;
+    }
 
-    let rafId: number;
-    const handleScroll = () => {
-      cancelAnimationFrame(rafId); 
-      rafId = requestAnimationFrame(() => {
-        if (heroElement && stickyElement) { 
-            const viewportHeight = window.innerHeight;
-            const scrollableParentHeight = heroElement.scrollHeight - viewportHeight;
-            
-            const heroWrapperRect = heroElement.getBoundingClientRect();
-            const amountScrolledRelativeToHeroStart = -heroWrapperRect.top; // How much top of wrapper is scrolled above viewport top
-
-            let progress = 0;
-            if (scrollableParentHeight > 0) {
-                // Normalize scroll position to a 0-1 range
-                progress = Math.min(1, Math.max(0, amountScrolledRelativeToHeroStart / scrollableParentHeight));
-            } else {
-                // If no scrollable height, progress is 0 if not scrolled, 1 if scrolled past
-                progress = amountScrolledRelativeToHeroStart > 0 ? 1 : 0;
-            }
-            setScrollProgress(progress);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+        // Calculate scroll progress based on how much of the trigger element is visible
+        if (entry.isIntersecting) {
+          const rect = entry.boundingClientRect;
+          const viewportHeight = window.innerHeight;
+          // Progress: 0 when top of trigger is at bottom of viewport
+          // Progress: 1 when bottom of trigger is at top of viewport
+          // This range covers the full visibility of the trigger element
+          const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + rect.height)));
+          setScrollProgress(progress);
+        } else {
+          // If not intersecting, decide if progress should be 0 or 1 based on position
+          const rect = entry.boundingClientRect;
+          if (rect.bottom < 0) { // Trigger is above viewport
+            setScrollProgress(1);
+          } else if (rect.top > window.innerHeight) { // Trigger is below viewport
+            setScrollProgress(0);
+          }
         }
-      });
+      },
+      { 
+        threshold: Array.from({ length: 101 }, (_, i) => i / 100), // Observe every 1% change
+        rootMargin: "0px" // Consider full viewport for intersection
+      }
+    );
+
+    observer.observe(triggerElement);
+
+    // Add a scroll listener to update progress when the trigger element is visible
+    // This is for finer-grained updates than IntersectionObserver alone might provide
+    // for the scrollProgress calculation within the visible range.
+    const handleScroll = () => {
+        if (isVisible) { // Only update if the section is generally visible
+            const currentTriggerEl = document.querySelector(triggerElementSelector);
+            if(currentTriggerEl){
+                const rect = currentTriggerEl.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + rect.height)));
+                setScrollProgress(progress);
+            }
+        }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Initial calculation
 
     return () => {
-        window.removeEventListener('scroll', handleScroll);
-        if (rafId) { // Ensure rafId is defined before cancelling
-            cancelAnimationFrame(rafId);
-        }
-    }
-  }, [animationScrollHeightVH]); // animationScrollHeightVH dependency is fine if it dictates wrapper height
+      observer.unobserve(triggerElement);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [triggerElementSelector, isVisible]); // Re-run if selector changes or isVisible state changes (for re-eval on scroll)
 
   const scrollThresholds = {
-    maskZoomStart: 0.05,
-    maskZoomEnd: 0.6,   
-    finalTextStart: 0.5, 
-    finalTextEnd: 0.85,  
+    maskZoomStart: 0.1, // Start mask zoom a bit later in trigger's visibility
+    maskZoomEnd: 0.7,   // End mask zoom when trigger is mostly through
+    finalTextStart: 0.55, 
+    finalTextEnd: 0.9,  
   };
 
   const mainBgInitialScale = 1.5;
   const mainBgTargetScale = 1;
   const mainBgScaleProgress = Math.min(1, scrollProgress / scrollThresholds.maskZoomEnd);
   const mainBgScale = mainBgInitialScale - mainBgScaleProgress * (mainBgInitialScale - mainBgTargetScale);
-  const mainBgTranslateY = scrollProgress * 2; 
+  const mainBgTranslateY = scrollProgress * 1; // Very subtle parallax
 
   const bgObjectInitialScale = 0.5;
   const bgObjectTargetScale = 1.1;
   const bgObjectScale = bgObjectInitialScale + scrollProgress * (bgObjectTargetScale - bgObjectInitialScale);
-  const bgObjectTranslateY = -scrollProgress * 5; 
+  const bgObjectTranslateY = -scrollProgress * 3; 
   const bgObjectOpacity = Math.max(0.05, 0.6 - scrollProgress * 0.55); 
 
   const initialMaskScale = 50; 
@@ -190,10 +195,15 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const svgMaskUrl = `url(#${uniqueMaskId})`;
 
   return (
-    <div ref={heroWrapperRef} className="relative" style={{ height: `${animationScrollHeightVH}vh` }}>
-      <div ref={stickyContainerRef} className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
-        
-        <div
+    <div 
+        ref={fixedHeroContainerRef} 
+        className="fixed top-0 left-0 w-full h-screen flex flex-col items-center justify-center overflow-hidden transition-opacity duration-500 ease-in-out"
+        style={{
+            opacity: isVisible ? 1 : 0,
+            pointerEvents: isVisible ? 'auto' : 'none',
+        }}
+    >
+        <div // This inner div is for layering, not for scroll mechanics
           className="absolute inset-0 bg-cover bg-center -z-30"
           style={{ 
             backgroundImage: `url(${mainBackgroundImageUrl})`,
@@ -278,7 +288,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
                 {children}
             </div>
         )}
-      </div>
     </div>
   );
 };
