@@ -7,49 +7,54 @@ import TextMaskEffect from './TextMaskEffect';
 interface TextToSVGMaskProps {
   text: string;
   maskId: string;
-  textClass?: string;
   fontFamily?: string;
   fontWeight?: string | number;
-  // Position and scale of the text within the 0-1 objectBoundingBox space
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
+  targetMaskTextHeightVH?: number; // Desired height of the text as % of viewport height
+  // These are now relative to the SVG container for the text mask
+  svgX?: string; // e.g., "50%"
+  svgY?: string; // e.g., "50%"
 }
 
 const TextToSVGMask: React.FC<TextToSVGMaskProps> = ({
   text,
   maskId,
-  textClass = "text-8xl font-orbitron font-bold", // Default styling for the mask text
-  fontFamily = "Orbitron, sans-serif", // Ensure Orbitron is loaded
+  fontFamily = "Orbitron, sans-serif",
   fontWeight = "bold",
-  x = 0.05, // Start text slightly inset
-  y = 0.65, // Baseline for text, adjust based on font. SVG y is baseline.
-  width = 0.9, // Use 90% of width
-  height = 0.5, // Use 50% of height for text
+  targetMaskTextHeightVH = 15, // Aim for text to be roughly 15vh tall in the mask
+  svgX = "50%",
+  svgY = "50%",
 }) => {
-  // Estimate font size relative to viewBox for SVG text
-  // This is a rough estimate and might need adjustment
-  const estimatedFontSizeForSVG = 0.25 * (height); // e.g. 25% of the allocated height
-  
+  // The SVG for the mask will itself be scaled by the parent div.
+  // We define the text size within this SVG relative to its own viewBox.
+  // A common viewBox for text is 0 0 1000 100 (width 1000, height 100 for sizing text)
+  // Let's make text occupy a good portion of this viewBox height, e.g. 80 units.
+  const svgTextFontSize = 80; // Arbitrary units within the text's own SVG viewBox
+
   return (
-    <svg className="rockstar-svg-mask-defs">
+    <svg className="rockstar-svg-mask-defs" aria-hidden="true">
       <defs>
         <mask id={maskId} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
           <rect x="0" y="0" width="1" height="1" fill="white" />
-          <svg x={x} y={y - height} width={width} height={height} viewBox={`0 0 ${100 * width / height} 100`} preserveAspectRatio="xMidYMin meet">
+          {/* This inner SVG is positioned and scaled to fit within the 0-1 objectBoundingBox space.
+              Its viewBox defines its internal coordinate system.
+              The text is then positioned within this inner SVG.
+          */}
+          <svg x="0.05" y="0.25" width="0.9" height="0.5" // Example: text area occupies center 90% width, 50% height
+               viewBox="0 0 1000 200" // Adjusted viewBox for potentially better text scaling control
+               preserveAspectRatio="xMidYMid meet">
             <text 
-              x="50%" 
-              y="50%" 
-              dy="0.35em" // Vertically center-ish based on dominant-baseline
-              fill="black" 
+              x={svgX} 
+              y={svgY}
+              dominantBaseline="middle" // Better for vertical centering
               textAnchor="middle" 
+              fill="black" 
               fontFamily={fontFamily}
               fontWeight={fontWeight}
-              fontSize={`${estimatedFontSizeForSVG}px`} // Font size in SVG units
-              className={textClass} // Apply Tailwind classes if they affect SVG text attributes (some might not)
+              fontSize={svgTextFontSize} // Font size in viewBox units
+              letterSpacing="0.01em" // Adjust letter spacing if needed
+              className="uppercase" // Apply general text styling if desired for mask shape
             >
-              {text.toUpperCase()}
+              {text}
             </text>
           </svg>
         </mask>
@@ -84,21 +89,26 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const heroWrapperRef = useRef<HTMLDivElement>(null); 
-  const uniqueMaskId = useId(); // Generate a unique ID for the mask
+  const stickyContainerRef = useRef<HTMLDivElement>(null);
+  const uniqueMaskId = useId(); 
 
   useEffect(() => {
     const heroElement = heroWrapperRef.current;
-    if (!heroElement) return;
+    const stickyElement = stickyContainerRef.current;
+    if (!heroElement || !stickyElement) return;
 
     let rafId: number;
     const handleScroll = () => {
       cancelAnimationFrame(rafId); 
       rafId = requestAnimationFrame(() => {
-        if (heroElement) { 
+        if (heroElement && stickyElement) { 
             const viewportHeight = window.innerHeight;
+            // Total scrollable distance for the animation is the height of the wrapper minus one viewport height
             const scrollableParentHeight = heroElement.scrollHeight - viewportHeight;
-            const heroTopOffsetFromDocument = heroElement.getBoundingClientRect().top + window.scrollY;
-            const amountScrolledRelativeToHeroStart = Math.max(0, window.scrollY - heroTopOffsetFromDocument);
+            // How much the top of the *sticky container's parent* (heroWrapperRef) has scrolled *above* the top of the viewport.
+            // This ensures progress is 0 when the sticky container just starts sticking.
+            const heroWrapperRect = heroElement.getBoundingClientRect();
+            const amountScrolledRelativeToHeroStart = Math.max(0, -heroWrapperRect.top);
 
             let progress = 0;
             if (scrollableParentHeight > 0) {
@@ -112,7 +122,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); 
+    handleScroll(); // Initial calculation
 
     return () => {
         window.removeEventListener('scroll', handleScroll);
@@ -121,7 +131,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   }, [animationScrollHeightVH]);
 
   const scrollThresholds = {
-    initialFadeEnd: 0.15, 
     maskZoomStart: 0.05,
     maskZoomEnd: 0.6,   
     finalTextStart: 0.5, 
@@ -132,17 +141,13 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const mainBgTargetScale = 1;
   const mainBgScaleProgress = Math.min(1, scrollProgress / scrollThresholds.maskZoomEnd);
   const mainBgScale = mainBgInitialScale - mainBgScaleProgress * (mainBgInitialScale - mainBgTargetScale);
-  const mainBgTranslateY = scrollProgress * 5; 
+  const mainBgTranslateY = scrollProgress * 2; // Reduced parallax for less movement
 
   const bgObjectInitialScale = 0.5;
   const bgObjectTargetScale = 1.1;
   const bgObjectScale = bgObjectInitialScale + scrollProgress * (bgObjectTargetScale - bgObjectInitialScale);
-  const bgObjectTranslateY = -scrollProgress * 10; 
+  const bgObjectTranslateY = -scrollProgress * 5; 
   const bgObjectOpacity = Math.max(0.05, 0.6 - scrollProgress * 0.55); 
-
-  // Initial Title Text - STAYS STATIC and gets covered by mask
-  // No animation for opacity, scale, or transform for the initial title itself.
-  // It will be revealed/hidden by the mask overlay.
 
   const initialMaskScale = 50; 
   const targetMaskScale = 1;
@@ -150,16 +155,15 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   if (scrollProgress >= scrollThresholds.maskZoomStart) {
     maskProgress = Math.min(1, (scrollProgress - scrollThresholds.maskZoomStart) / (scrollThresholds.maskZoomEnd - scrollThresholds.maskZoomStart));
   }
-  const currentMaskScale = initialMaskScale - (initialMaskScale - targetMaskScale) * Math.pow(maskProgress, 2); // Smoother exponential scaling
-  const maskOverlayOpacity = maskProgress > 0 ? 1 : 0; 
+  const currentMaskScale = initialMaskScale - (initialMaskScale - targetMaskScale) * Math.pow(maskProgress, 1.5); // Adjusted exponent for feel
+  const maskOverlayOpacity = maskProgress > 0.01 ? 1 : 0; // Fade in smoothly
 
   const finalMaskedTextContent = textToMask || title;
-
   const svgMaskUrl = `url(#${uniqueMaskId})`;
 
   return (
     <div ref={heroWrapperRef} className="relative" style={{ height: `${animationScrollHeightVH}vh` }}>
-      <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
+      <div ref={stickyContainerRef} className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
         
         <div
           className="absolute inset-0 bg-cover bg-center -z-30"
@@ -186,11 +190,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Layer 2: Initial Title Text (STATIC, will be covered by mask) */}
-        <div 
-          className="relative text-center px-4 z-10" 
-          // No dynamic style based on scrollProgress here
-        >
+        <div className="relative text-center px-4 z-10">
           <h1 className={cn(
               "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect mb-4 md:mb-6"
               )} data-text={title}>
@@ -203,14 +203,13 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           )}
         </div>
 
-        {/* Layer 3: SVG Masked Overlay */}
         <div
           className="absolute inset-0 z-20" 
           style={{
             backgroundColor: 'hsl(var(--background))', 
             opacity: maskOverlayOpacity,
             transform: `scale(${Math.max(targetMaskScale, currentMaskScale)})`,
-            transformOrigin: 'center center', // Default, adjust if logo anchor is different
+            transformOrigin: 'center 40%', // Adjusted origin
             willChange: 'transform, opacity',
             mask: svgMaskUrl,
             WebkitMask: svgMaskUrl,
@@ -218,31 +217,21 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
         />
         
         {logoMaskPathD && logoMaskViewBox ? (
-           <svg className="rockstar-svg-mask-defs">
+           <svg className="rockstar-svg-mask-defs" aria-hidden="true">
              <defs>
                <mask id={uniqueMaskId} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
                  <rect x="0" y="0" width="1" height="1" fill="white" />
-                 {/* Scale and position the provided SVG path within the 0-1 box.
-                     This assumes the path needs to be centered and scaled down.
-                     Adjust x, y, width, height as needed based on logo aspect ratio.
-                 */}
-                 <svg viewBox={logoMaskViewBox} x="0.2" y="0.3" width="0.6" height="0.4" preserveAspectRatio="xMidYMid meet">
+                 <svg viewBox={logoMaskViewBox} x="0.1" y="0.1" width="0.8" height="0.8" preserveAspectRatio="xMidYMid meet">
                     <path d={logoMaskPathD} fill="black" />
                  </svg>
                </mask>
              </defs>
            </svg>
         ) : (
-          // Fallback to dynamic text mask if no pathD is provided
           <TextToSVGMask 
-            text={title} 
+            text={title} // Use the main title for the mask shape
             maskId={uniqueMaskId}
-            // Adjust styling/positioning for text mask as needed
-            textClass="text-6xl md:text-7xl lg:text-8xl" // Slightly smaller for mask
-            fontFamily="Orbitron, sans-serif" 
-            fontWeight="bold"
-            y={0.6} // Adjust baseline for Orbitron
-            height={0.3} // Smaller height allocation for title text mask
+            targetMaskTextHeightVH={20} // Adjust desired height of text in mask
           />
         )}
         
@@ -256,7 +245,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
         {children && (
             <div 
                 className="absolute bottom-[10vh] md:bottom-[15vh] z-50 transition-opacity duration-500"
-                style={{ opacity: scrollProgress > scrollThresholds.finalTextStart ? 1 : 0 }}
+                style={{ opacity: scrollProgress > scrollThresholds.finalTextStart + 0.1 ? 1 : 0 }} // Children appear slightly after text starts
             >
                 {children}
             </div>
