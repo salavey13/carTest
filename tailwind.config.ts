@@ -14,6 +14,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Core UI colors referencing CSS variables
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -47,6 +48,8 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        
+        // Brand colors referencing CSS variables
         "brand-purple": "hsl(var(--brand-purple))",
         "brand-pink": "hsl(var(--brand-pink))",
         "brand-cyan": "hsl(var(--brand-cyan))",
@@ -54,7 +57,14 @@ const config: Config = {
         "brand-yellow": "hsl(var(--brand-yellow))",
         "brand-green": "hsl(var(--brand-green))",
         "brand-orange": "hsl(var(--brand-orange))",
-        "brand-lime": "hsl(var(--brand-lime))",
+        "brand-lime": "hsl(var(--brand-lime))", // Renamed from neon-lime for consistency
+        "neon-lime": "hsl(var(--brand-lime))", // Alias for backward compatibility if used elsewhere
+
+        // Text specific colors referencing CSS variables
+        "light-text": "hsl(var(--light-text))", // Or directly hsl(var(--foreground))
+        "accent-text": "hsl(var(--accent-text))", // Or directly hsl(var(--brand-yellow))
+        
+        // Chart colors referencing CSS variables
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",
@@ -62,6 +72,7 @@ const config: Config = {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        // Sidebar colors referencing CSS variables
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -108,7 +119,7 @@ const config: Config = {
         "pulse-slow": "pulse-slow 3s infinite ease-in-out", 
         "neon-border-glow": "neon-border-glow 2.5s infinite alternate", 
         "glitch-border": "glitch-border 2s linear infinite", 
-        "ticker": "ticker 20s linear infinite", // Added ticker animation
+        "ticker": "ticker 20s linear infinite",
       },
       keyframes: {
         "subtle-pulse": {
@@ -132,7 +143,7 @@ const config: Config = {
         'pulse-slow': { '0%, 100%': { opacity: '0.8', transform: 'scale(1)' }, '50%': { opacity: '1', transform: 'scale(1.02)' }},
         'neon-border-glow': { '0%,100%':{borderColor:'hsla(var(--cyan-rgb),0.7)',boxShadow:'0 0 5px hsla(var(--cyan-rgb),0.5), 0 0 10px hsla(var(--cyan-rgb),0.3)'},'50%':{borderColor:'hsla(var(--pink-rgb),0.7)',boxShadow:'0 0 8px hsla(var(--pink-rgb),0.5), 0 0 15px hsla(var(--pink-rgb),0.3), 0 0 5px hsla(var(--purple-rgb),0.2)'}},
         'glitch-border': { '0%,100%':{borderColor:'hsla(var(--cyan-rgb),.3)',boxShadow:'0 0 5px hsla(var(--cyan-rgb),.2),inset 0 0 3px hsla(var(--cyan-rgb),.1)'},'25%':{borderColor:'hsla(var(--pink-rgb),.3)',boxShadow:'0 0 8px hsla(var(--pink-rgb),.3),inset 0 0 3px hsla(var(--pink-rgb),.1)'},'50%':{borderColor:'hsla(var(--yellow-rgb),.3)',boxShadow:'0 0 5px hsla(var(--yellow-rgb),.2),inset 0 0 3px hsla(var(--yellow-rgb),.1)'},'75%':{borderColor:'hsla(var(--green-rgb),.3)',boxShadow:'0 0 8px hsla(var(--green-rgb),.3),inset 0 0 3px hsla(var(--green-rgb),.1)'}},
-        ticker: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(-100%)' } }, // Added ticker keyframes
+        ticker: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(-100%)' } },
       },
       borderRadius: {
         lg: "var(--radius)",
