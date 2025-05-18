@@ -1,9 +1,11 @@
 import type * as Fa6Icons from "react-icons/fa6";
-
+// DO NOT MODIFY. USE FOR REFERENCE ONLY AS GROUND TRUTH FOR ICON EXISTSNCE. DO NOT TRY TO UPDATE IT'S PERFECTION
 // Full Icon Name Map (Lowercase to PascalCase)
 // This map is crucial for VibeContentRenderer to correctly find and render icons
 // when they are specified in lowercase in the input string (e.g., <fauser /> or ::fauser::)
 export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
+  faplaycircle: "FaCirclePlay",
+  faimageslash: "FaImage",
   fa42group: "Fa42Group",
   fa500px: "Fa500Px",
   faaccessibleicon: "FaAccessibleIcon",
