@@ -28,28 +28,42 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   animationScrollHeightVH = 300, 
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
-  const heroWrapperRef = useRef<HTMLDivElement>(null); 
+  const heroWrapperRef = useRef<HTMLDivElement>(null); // Ref for the outer scrollable container
+  const stickyContentRef = useRef<HTMLDivElement>(null); // Ref for the sticky content part
 
   useEffect(() => {
-    const heroElement = heroWrapperRef.current;
-    if (!heroElement) return;
+    const scrollableElement = heroWrapperRef.current;
+    if (!scrollableElement) return;
 
     let rafId: number;
     const handleScroll = () => {
       cancelAnimationFrame(rafId); 
       rafId = requestAnimationFrame(() => {
-        if (heroElement) { 
-            const rect = heroElement.getBoundingClientRect();
-            const scrollDistanceForAnimation = window.innerHeight * (animationScrollHeightVH / 100);
-            const scrolledAmount = Math.max(0, -rect.top);
-            const progress = Math.min(1, scrolledAmount / scrollDistanceForAnimation);
-            setScrollProgress(progress);
+        // Progress is calculated based on how much the heroWrapperRef has scrolled out of view
+        // relative to its total scrollable height (animationScrollHeightVH - 100vh for the sticky part)
+        const viewportHeight = window.innerHeight;
+        const totalScrollableDistance = viewportHeight * (animationScrollHeightVH / 100 - 1); // Exclude the 100vh screen part
+        const currentScrollY = window.scrollY;
+        const heroTopOffset = scrollableElement.offsetTop; // Get the initial top offset of the wrapper
+
+        // Calculate scrolled amount *within the component's scrollable area*
+        const scrolledAmountInComponent = Math.max(0, currentScrollY - heroTopOffset);
+        
+        let progress = 0;
+        if (totalScrollableDistance > 0) {
+            progress = Math.min(1, scrolledAmountInComponent / totalScrollableDistance);
+        } else if (scrolledAmountInComponent > 0) { // If animation height is just 100vh, progress can be 0 or 1
+            progress = 1;
         }
+        
+        setScrollProgress(progress);
       });
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); 
+    // Initial calculation in case the page loads scrolled
+    // Needs a slight delay for elements to be in place, or call after mount.
+    requestAnimationFrame(handleScroll); 
 
     return () => {
         window.removeEventListener('scroll', handleScroll);
@@ -59,35 +73,35 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
 
   // Main Background
   const mainBgTranslateY = scrollProgress * 10; // vh
-  const mainBgScale = 1 + scrollProgress * 0.05;
+  const mainBgScale = 1 + scrollProgress * 0.1;
 
   // Background Object/Icon
-  const bgObjectInitialScale = 0.8;
-  const bgObjectTargetScale = 1.5;
+  const bgObjectInitialScale = 0.7;
+  const bgObjectTargetScale = 1.3;
   const bgObjectScale = bgObjectInitialScale + scrollProgress * (bgObjectTargetScale - bgObjectInitialScale);
-  const bgObjectTranslateY = -scrollProgress * 25; // vh
-  const bgObjectOpacity = Math.max(0, 1 - scrollProgress * 1.2);
+  const bgObjectTranslateY = -scrollProgress * 15; // vh
+  const bgObjectOpacity = Math.max(0.1, 1 - scrollProgress * 0.7); // Keep it slightly visible
 
-  // Original Title Text (fades out and scales down slightly)
+  // Original Title Text (fades out and scales down slightly, moves behind mask)
   const titleTextInitialScale = 1;
-  const titleTextTargetScale = 0.7;
+  const titleTextTargetScale = 0.8;
   const titleTextScale = titleTextInitialScale - scrollProgress * (titleTextInitialScale - titleTextTargetScale);
-  const titleTextTranslateY = scrollProgress * 40; // vh - moves down and away
-  const titleTextOpacity = Math.max(0, 1 - scrollProgress * 2); 
+  const titleTextTranslateY = scrollProgress * 15; // vh - moves down slowly
+  const titleTextOpacity = Math.max(0, 1 - scrollProgress * 2.5); // Fades out quicker
 
   // Foreground Icon
-  const fgIconInitialScale = 0.3;
-  const fgIconTargetScale = 3.5; // Make it zoom much larger
+  const fgIconInitialScale = 0.2;
+  const fgIconTargetScale = 4; 
   const fgIconScale = fgIconInitialScale + scrollProgress * (fgIconTargetScale - fgIconInitialScale); 
-  const fgIconTranslateY = -scrollProgress * 70; // vh - moves up faster
-  const fgIconOpacity = Math.max(0, 1 - scrollProgress * 1.1);
+  const fgIconTranslateY = -scrollProgress * 80; // vh 
+  const fgIconOpacity = Math.max(0, 1 - scrollProgress * 1.0);
 
 
   const maskTextContent = textToMask || title;
 
   return (
     <div ref={heroWrapperRef} className="relative" style={{ height: `${animationScrollHeightVH}vh` }}>
-      <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
+      <div ref={stickyContentRef} className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
         {/* Main Background */}
         <div
           className="absolute inset-0 bg-cover bg-center -z-30"
@@ -97,7 +111,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
             willChange: 'transform',
           }}
         />
-        <div className="absolute inset-0 bg-black/80 -z-20"></div> {/* Darker Overlay */}
+        <div className="absolute inset-0 bg-black/70 -z-20"></div>
 
         {/* Large Background Icon/Object */}
         {backgroundImageObjectUrl && (
@@ -113,7 +127,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Original Title Text (fades out) */}
+        {/* Original Title Text (fades out, stays behind mask) */}
         <div 
           className="relative text-center px-4 z-10" 
           style={{ 
@@ -134,7 +148,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           )}
         </div>
 
-        {/* Text Mask Effect - This text appears */}
+        {/* Text Mask Effect - this appears "through" the original title */}
         <TextMaskEffect text={maskTextContent} scrollProgress={scrollProgress} />
 
         {/* Foreground Icon */}
@@ -145,7 +159,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
               transform: `translate(-50%, -50%) scale(${fgIconScale}) translateY(${fgIconTranslateY}vh)`, 
               opacity: fgIconOpacity,
               willChange: 'transform, opacity',
-              zIndex: 30 
+              zIndex: 40 // Ensure foreground icon is on top of TextMaskEffect (z-20) and original title (z-10)
             }}
           >
             <VibeContentRenderer content={`::${foregroundIconName}::`} className={cn(foregroundIconSize, "text-brand-pink opacity-70")} />
@@ -153,7 +167,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
         )}
         
         {/* Children (e.g., buttons) */}
-        {children && <div className="absolute bottom-[10vh] md:bottom-[15vh] z-40">{children}</div>}
+        {children && <div className="absolute bottom-[10vh] md:bottom-[15vh] z-50">{children}</div>}
       </div>
     </div>
   );
