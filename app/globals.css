@@ -1,12 +1,11 @@
+/* /app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Orbitron Font Import - Moved to top for clarity */
+/* Font Imports */
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap");
-/* Inter Font Import (if not loaded elsewhere and needed for base sans) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-/* Comic Neue for specific use cases, keep it if needed, but not for main theme */
 @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
 
 .font-comic {
@@ -14,85 +13,84 @@
 }
 
 :root {
-  /* CyberVice Theme - Dark Mode Default - Adjusted Pastel-like Palette */
-  --background: 263 80% 7%;        /* Deep dark blue/purple */
-  --foreground: 0 0% 94%;        /* Light gray for text */
-  --card: 264 65% 13%;          /* Slightly lighter dark blue/purple */
-  --card-foreground: 0 0% 94%;   /* Light gray for card text */
-  --popover: 264 70% 10%;         /* Darker popover background */
-  --popover-foreground: 0 0% 94%; /* Light gray for popover text */
-  --muted: 263 30% 25%;          /* Muted purple/gray */
-  --muted-foreground: 0 0% 65%;  /* Mid-gray for muted text */
-  --destructive: 0 80% 60%;     /* Slightly softer red */
-  --destructive-foreground: 0 0% 95%; /* Light text on destructive */
+  /* Core Theme Colors (Dark Mode Default) */
+  --background: 263 80% 7%;        
+  --foreground: 0 0% 94%;        
+  --card: 264 65% 13%;          
+  --card-foreground: 0 0% 94%;   
+  --popover: 264 70% 10%;         
+  --popover-foreground: 0 0% 94%; 
+  --muted: 263 30% 25%;          
+  --muted-foreground: 0 0% 65%;  
+  --destructive: 0 75% 55%;     /* Slightly darker and less saturated red */
+  --destructive-foreground: 0 0% 95%; /* Keep light text for destructive */
   --radius: 0.75rem;
 
-  /* --- Adjusted Brand Colors (Pastel-like for Dark Mode) --- */
-  --brand-purple: 270 65% 65%;    /* Softer Purple */
-  --brand-pink: 330 70% 70%;      /* Softer Pink */
-  --brand-cyan: 180 60% 60%;      /* Softer Cyan */
-  --brand-blue: 210 70% 65%;      /* Softer Blue */
-  --brand-yellow: 50 75% 60%;     /* Softer Yellow */
-  --brand-green: 145 45% 55%;     /* Muted Green */
-  --brand-orange: 28 65% 55%;     /* Muted Orange */
-  --neon-lime: 80 65% 60%;        /* Muted Lime */
+  /* Brand Colors (Adjusted Pastel-like for Dark Mode) */
+  --brand-purple: 270 65% 65%;    
+  --brand-pink: 330 70% 70%;      
+  --brand-cyan: 180 60% 60%;      
+  --brand-blue: 210 70% 65%;      
+  --brand-yellow: 50 75% 60%;     
+  --brand-green: 145 45% 55%;     
+  --brand-orange: 28 65% 55%;     
+  --brand-lime: 80 65% 60%;        
 
-  /* --- Base Colors derived from Adjusted Brand Colors --- */
-  --primary: 270 65% 65%;         /* Based on softer purple */
-  --primary-foreground: 270 10% 15%; /* Darker foreground for primary */
-  --secondary: 180 60% 60%;       /* Based on softer cyan */
-  --secondary-foreground: 180 10% 15%; /* Darker foreground for secondary */
-  --accent: 50 75% 60%;           /* Based on softer yellow */
-  --accent-foreground: 50 15% 15%;   /* Darker foreground for accent */
+  /* Derived UI Element Colors - Button specific foregrounds updated */
+  --primary: hsl(var(--brand-purple));
+  --primary-foreground: 270 80% 96%; /* Light text for purple button */
+  --secondary: hsl(var(--brand-cyan));
+  --secondary-foreground: 180 80% 96%; /* Light text for cyan button */
+  --accent: hsl(var(--brand-yellow));
+  --accent-foreground: 50 30% 15%;   /* Dark text for yellow button */
   
-  /* --- UI Element Colors derived from Adjusted Base/Brand --- */
-  --border: 270 50% 40%;          /* Darker muted purple border */
-  --input: 270 50% 35%;           /* Even darker input background */
-  --ring: 270 65% 70%;            /* Slightly lighter purple for focus rings */
+  --border: hsl(var(--brand-purple) / 0.5); /* Adjusted border opacity */       
+  --input: hsl(var(--brand-purple) / 0.3);          
+  --ring: hsl(var(--brand-cyan));           
 
-  /* --- RGB Versions for Shadows/Gradients (Update these based on final HSL) --- */
-  --brand-purple-rgb: 165, 110, 220; 
-  --brand-pink-rgb: 242, 128, 170;
-  --brand-cyan-rgb: 102, 204, 204;
-  --brand-blue-rgb: 115, 163, 230;
-  --brand-yellow-rgb: 229, 191, 76;
-  --brand-green-rgb: 93, 184, 127;
-  --brand-orange-rgb: 219, 138, 88;
-  --neon-lime-rgb: 169, 216, 107;
+  /* RGB Versions for Shadows/Gradients */
+  --purple-rgb: 165, 110, 220; 
+  --pink-rgb: 242, 128, 170;
+  --cyan-rgb: 102, 204, 204;
+  --blue-rgb: 115, 163, 230;
+  --yellow-rgb: 229, 191, 76;
+  --green-rgb: 93, 184, 127;
+  --orange-rgb: 219, 138, 88;
+  --lime-rgb: 169, 216, 107;
 
-  /* --- Static Dark Background RGB --- */
-  --dark-bg-rgb: 13, 2, 33;
-  --dark-card-rgb: 26, 10, 61; /* Equivalent to hsl(var(--card)) */
-  --glow-color-rgb: 242, 128, 170; /* Soft pink for glow (used by tailwind.config) */
+  /* Static Background RGB Values */
+  --bg-rgb: 13, 2, 33; 
+  --card-rgb: 26, 10, 61;  
+  --default-glow-rgb: var(--pink-rgb);
 
-  /* --- Chart Colors (Using adjusted brand colors) --- */
-  --chart-1: 270 65% 65%; /* Purple */
-  --chart-2: 180 60% 60%; /* Cyan */
-  --chart-3: 50 75% 60%;  /* Yellow */
-  --chart-4: 210 70% 65%; /* Blue */
-  --chart-5: 28 65% 55%;  /* Orange */
+  /* Chart Colors */
+  --chart-1: hsl(var(--brand-purple));
+  --chart-2: hsl(var(--brand-cyan));
+  --chart-3: hsl(var(--brand-yellow));
+  --chart-4: hsl(var(--brand-blue));
+  --chart-5: hsl(var(--brand-orange));
 
-  /* --- Sidebar Colors (Adjusted similarly) --- */
-  --sidebar-background: 263 75% 10%; /* Slightly lighter than main bg */
-  --sidebar-foreground: 0 0% 85%;   /* Slightly dimmer text */
-  --sidebar-primary: 270 65% 70%;    /* Lighter purple for sidebar primary */
-  --sidebar-primary-foreground: 270 10% 15%; 
-  --sidebar-accent: 180 60% 65%;     /* Lighter cyan for sidebar accent */
-  --sidebar-accent-foreground: 180 10% 15%;
-  --sidebar-border: 270 50% 30%;    /* Darker border */
-  --sidebar-ring: 270 65% 75%;       /* Lighter ring */
+  /* Sidebar Colors */
+  --sidebar-background: 263 75% 10%; 
+  --sidebar-foreground: 0 0% 85%;   
+  --sidebar-primary: hsl(var(--brand-purple) / 0.9); 
+  --sidebar-primary-foreground: 270 80% 96%; 
+  --sidebar-accent: hsl(var(--brand-cyan) / 0.9);     
+  --sidebar-accent-foreground: 180 80% 96%;
+  --sidebar-border: hsl(var(--brand-purple) / 0.3);    
+  --sidebar-ring: hsl(var(--brand-cyan) / 0.95);       
 
-  /* --- Standard colors RGB for shadows --- */
-  --red-500-rgb: 239, 68, 68; /* Standard Red */
-  --gray-500-rgb: 107, 114, 128; /* Standard Gray */
+  /* Standard colors RGB for shadows */
+  --red-500-rgb: 239, 68, 68; 
+  --gray-500-rgb: 107, 114, 128; 
 
-  /* --- Text Colors --- */
-  --light-text: 0 0% 94%;          /* Consistent light text */
-  --accent-text: 50 75% 60%;       /* Derived from adjusted yellow */
+  /* Text Colors */
+  --light-text: hsl(var(--foreground));      
+  --accent-text: hsl(var(--brand-yellow));       
 }
 
-/* Ensure .dark mirrors the :root settings */
 .dark {
+  /* Values are identical to :root for now, as dark mode is default */
   --background: 263 80% 7%;
   --foreground: 0 0% 94%;
   --card: 264 65% 13%;
@@ -101,9 +99,8 @@
   --popover-foreground: 0 0% 94%;
   --muted: 263 30% 25%;
   --muted-foreground: 0 0% 65%;
-  --destructive: 0 80% 60%;
-  --destructive-foreground: 0 0% 95%;
-  --radius: 0.75rem;
+  --destructive: 0 75% 55%;     
+  --destructive-foreground: 0 0% 95%; 
   
   --brand-purple: 270 65% 65%;
   --brand-pink: 330 70% 70%;
@@ -112,52 +109,52 @@
   --brand-yellow: 50 75% 60%;
   --brand-green: 145 45% 55%;
   --brand-orange: 28 65% 55%;
-  --neon-lime: 80 65% 60%;
+  --brand-lime: 80 65% 60%;
 
-  --primary: 270 65% 65%;
-  --primary-foreground: 270 10% 15%;
-  --secondary: 180 60% 60%;
-  --secondary-foreground: 180 10% 15%;
-  --accent: 50 75% 60%;
-  --accent-foreground: 50 15% 15%;
+  --primary: hsl(var(--brand-purple));
+  --primary-foreground: 270 80% 96%; 
+  --secondary: hsl(var(--brand-cyan));
+  --secondary-foreground: 180 80% 96%; 
+  --accent: hsl(var(--brand-yellow));
+  --accent-foreground: 50 30% 15%;   
 
-  --border: 270 50% 40%;
-  --input: 270 50% 35%;
-  --ring: 270 65% 70%;
+  --border: hsl(var(--brand-purple) / 0.5);
+  --input: hsl(var(--brand-purple) / 0.3);
+  --ring: hsl(var(--brand-cyan));
 
-  --brand-purple-rgb: 165, 110, 220;
-  --brand-pink-rgb: 242, 128, 170;
-  --brand-cyan-rgb: 102, 204, 204;
-  --brand-blue-rgb: 115, 163, 230;
-  --brand-yellow-rgb: 229, 191, 76;
-  --brand-green-rgb: 93, 184, 127;
-  --brand-orange-rgb: 219, 138, 88;
-  --neon-lime-rgb: 169, 216, 107;
+  --purple-rgb: 165, 110, 220; 
+  --pink-rgb: 242, 128, 170;
+  --cyan-rgb: 102, 204, 204;
+  --blue-rgb: 115, 163, 230;
+  --yellow-rgb: 229, 191, 76;
+  --green-rgb: 93, 184, 127;
+  --orange-rgb: 219, 138, 88;
+  --lime-rgb: 169, 216, 107;
   
-  --dark-bg-rgb: 13, 2, 33;
-  --dark-card-rgb: 26, 10, 61;
-  --glow-color-rgb: 242, 128, 170; 
+  --bg-rgb: 13, 2, 33;
+  --card-rgb: 26, 10, 61;
+  --default-glow-rgb: var(--pink-rgb); 
   
-  --chart-1: 270 65% 65%;
-  --chart-2: 180 60% 60%;
-  --chart-3: 50 75% 60%;
-  --chart-4: 210 70% 65%;
-  --chart-5: 28 65% 55%;
+  --chart-1: hsl(var(--brand-purple));
+  --chart-2: hsl(var(--brand-cyan));
+  --chart-3: hsl(var(--brand-yellow));
+  --chart-4: hsl(var(--brand-blue));
+  --chart-5: hsl(var(--brand-orange));
 
   --sidebar-background: 263 75% 10%;
   --sidebar-foreground: 0 0% 85%;
-  --sidebar-primary: 270 65% 70%;
-  --sidebar-primary-foreground: 270 10% 15%;
-  --sidebar-accent: 180 60% 65%;
-  --sidebar-accent-foreground: 180 10% 15%;
-  --sidebar-border: 270 50% 30%;
-  --sidebar-ring: 270 65% 75%;
+  --sidebar-primary: hsl(var(--brand-purple) / 0.9);
+  --sidebar-primary-foreground: 270 80% 96%;
+  --sidebar-accent: hsl(var(--brand-cyan) / 0.9);
+  --sidebar-accent-foreground: 180 80% 96%;
+  --sidebar-border: hsl(var(--brand-purple) / 0.3);
+  --sidebar-ring: hsl(var(--brand-cyan) / 0.95);
   
   --red-500-rgb: 239, 68, 68;
   --gray-500-rgb: 107, 114, 128;
   
-  --light-text: 0 0% 94%;
-  --accent-text: 50 75% 60%;
+  --light-text: hsl(var(--foreground));
+  --accent-text: hsl(var(--brand-yellow));
 }
 
 @layer base {
@@ -173,7 +170,6 @@
   h1 { 
     @apply text-4xl md:text-5xl; 
     @apply uppercase tracking-wider; 
-    /* Copied styles from .gta-vibe-text-effect directly here */
     background-image: linear-gradient(
       to top, 
       hsl(var(--brand-orange)), 
@@ -202,7 +198,7 @@
     font-family: 'Orbitron', sans-serif; 
   }
   section {
-    scroll-margin-top: 96px; 
+    scroll-margin-top: 96px; /* Standard scroll margin for sections */
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -233,20 +229,15 @@
     user-select: none;
   }
 
-  /* Class to fix icon color when inside .gta-vibe-text-effect */
   .gta-icon-fix {
     -webkit-text-fill-color: currentColor !important;
     text-fill-color: currentColor !important;
-    /* Default color, can be overridden by specific text color classes */
     color: hsl(var(--brand-cyan)); 
-    filter: drop-shadow(0 0 3px hsla(var(--brand-cyan-rgb), 0.7)) drop-shadow(0 0 1px black); /* Added subtle black outline for pop */
-
+    filter: drop-shadow(0 0 3px hsla(var(--cyan-rgb), 0.7)) drop-shadow(0 0 1px black);
   }
-  /* Ensure direct svg children also get fixed if react-icons renders them as such */
   .gta-vibe-text-effect > svg.gta-icon-fix {
      fill: currentColor !important;
   }
-
 
   .input-cyber {
     @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
@@ -262,12 +253,13 @@
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
   }
 
-  .text-gta-style-heading-styleguide {
+  /* This class is for specific H1 on style guide, can be removed if H1 base style is enough */
+  .text-gta-style-heading-styleguide { 
     @apply gta-vibe-text-effect; 
   }
 }
 
-/* Moved custom utilities to be after @tailwind utilities */
+/* Custom utilities moved to tailwind.config.js keyframes and animations */
 @layer utilities {
   .text-shadow-brand-yellow {
     text-shadow: 0 0 15px hsl(var(--brand-yellow)); 
@@ -275,93 +267,99 @@
   .filter-drop-shadow-brand-yellow { 
     filter: drop-shadow(0 0 15px hsl(var(--brand-yellow)));
   }
+  /* Other text-shadows or filters can be added here if not part of a component style */
 }
 
-/* === Styles moved from /app/page.tsx === */
+/* Homepage specific styles - kept for reference, can be refactored or moved */
 .homepage-wrapper {
-  @apply min-h-screen bg-dark-bg text-foreground relative overflow-x-hidden pt-20 pb-28;
+  @apply min-h-screen text-foreground relative overflow-x-hidden pt-20 pb-28;
+  background-color: hsl(var(--background));
 }
 .homepage-bg-effects-container {
   @apply absolute inset-0 z-0 overflow-hidden pointer-events-none;
 }
 .homepage-bg-pulse-fast {
-  @apply absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50;
+  @apply absolute top-[-15%] left-[-15%] w-3/5 h-3/5 rounded-full blur-[150px] opacity-50;
+  background-color: hsl(var(--brand-purple) / 0.2);
   animation: bg_pulse_fast 8s cubic-bezier(0.4,0,0.6,1) infinite;
 }
 .homepage-bg-pulse-slow {
-  @apply absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 bg-brand-pink/15 rounded-full blur-[180px] opacity-40;
+  @apply absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 rounded-full blur-[180px] opacity-40;
+  background-color: hsl(var(--brand-pink) / 0.15);
   animation: bg_pulse_slow 10s cubic-bezier(0.4,0,0.6,1) infinite 1s;
 }
-@keyframes bg_pulse_fast { 
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(1.05); }
-}
-@keyframes bg_pulse_slow { 
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.25; transform: scale(1.03); }
-}
+/* Keyframes for bg_pulse_fast and bg_pulse_slow are in tailwind.config.ts */
+
 .loading-spinner-cyber {
   border-width: 4px;
   border-radius: 9999px; 
-  --tw-border-opacity: 0.5; 
-  border-top-color: hsla(var(--brand-cyan), var(--tw-border-opacity));
-  border-left-color: hsla(var(--brand-pink), var(--tw-border-opacity));
-  border-right-color: hsla(var(--brand-pink), var(--tw-border-opacity));
-  border-bottom-color: hsla(var(--brand-purple), var(--tw-border-opacity));
+  border-top-color: hsl(var(--brand-cyan) / 0.5);
+  border-left-color: hsl(var(--brand-pink) / 0.5);
+  border-right-color: hsl(var(--brand-pink) / 0.5);
+  border-bottom-color: hsl(var(--brand-purple) / 0.5);
   border-style: solid;
   box-shadow: 0 0 25px hsl(var(--brand-cyan)), 0 0 15px hsl(var(--brand-pink));
 }
 .avatar-cyber {
-  @apply rounded-full border-2 border-brand-pink/80 object-cover;
-  box-shadow: 0 0 10px hsla(var(--brand-pink), 0.5); 
+  @apply rounded-full border-2 object-cover;
+  border-color: hsl(var(--brand-pink) / 0.8);
+  box-shadow: 0 0 10px hsla(var(--pink-rgb), 0.5); 
 }
 .featured-quest-card {
-  @apply bg-dark-card/90 backdrop-blur-md border border-brand-purple/50 shadow-xl overflow-hidden transition-all duration-300;
+  @apply backdrop-blur-md shadow-xl overflow-hidden transition-all duration-300;
+  background-color: hsl(var(--card) / 0.9);
+  border: 1px solid hsl(var(--brand-purple) / 0.5); 
 }
 .featured-quest-card:hover {
-  @apply border-brand-pink/70 shadow-brand-pink/30;
+  border-color: hsl(var(--brand-pink) / 0.7);
+  box-shadow: 0 0 20px hsla(var(--pink-rgb), 0.3);
 }
 .featured-quest-image-overlay {
   @apply absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none;
 }
 .activity-card-cyber {
-  @apply bg-gradient-to-br from-brand-pink/95 via-pink-600/90 to-purple-600/90 backdrop-blur-sm border border-brand-pink/70 shadow-2xl shadow-brand-pink/30 text-black rounded-xl md:rounded-2xl;
+  @apply backdrop-blur-sm shadow-2xl text-black rounded-xl md:rounded-2xl;
+  background-image: linear-gradient(to bottom right, hsl(var(--brand-pink) / 0.95), hsl(var(--brand-purple) / 0.9));
+  border: 1px solid hsl(var(--brand-pink) / 0.7); 
+  box-shadow: 0 0 30px hsla(var(--pink-rgb), 0.3);
 }
 .bottom-nav-cyber {
-  @apply fixed bottom-0 left-0 right-0 bg-dark-bg/90 backdrop-blur-xl border-t-2 border-brand-purple/60 z-40 py-1.5 px-1;
+  @apply fixed bottom-0 left-0 right-0 backdrop-blur-xl z-40 py-1.5 px-1;
+  background-color: hsl(var(--background) / 0.9);
+  border-top: 2px solid hsl(var(--brand-purple) / 0.6);
   box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
 }
 .bottom-nav-item {
   @apply flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md transition-colors;
 }
 .bottom-nav-item:hover {
-  @apply bg-muted/30;
+  background-color: hsl(var(--muted) / 0.3);
 }
 .bottom-nav-item:active {
-  @apply bg-muted/50;
+  background-color: hsl(var(--muted) / 0.5);
 }
 .bottom-nav-item:focus {
-  @apply bg-muted/40; 
+  background-color: hsl(var(--muted) / 0.4); 
   outline: 2px solid transparent; 
   outline-offset: 2px;
   box-shadow: 0 0 0 1px hsl(var(--brand-cyan)); 
 }
 .active-bottom-link {
-  @apply bg-card/70; 
+  background-color: hsl(var(--card) / 0.7);
 }
 .current-nav-glow {
   text-shadow: 0 0 6px currentColor, 0 0 10px currentColor;
 }
 .bottom-nav-item-central {
-  @apply text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4 border-dark-bg;
+  @apply text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4;
+  border-color: hsl(var(--background));
 }
 .bottom-nav-item-central:hover {
-  @apply border-brand-pink;
+  border-color: hsl(var(--brand-pink));
 }
 .bottom-nav-item-central:focus {
-  @apply ring-4 ring-brand-pink/50;
+  box-shadow: 0 0 0 4px hsl(var(--brand-pink) / 0.5); 
 }
-/* === End of Styles moved from /app/page.tsx === */
 
 .repo-xml-content-wrapper {
   width: 100%;
@@ -373,69 +371,58 @@
     min-width: 1024px;
     transform: scale(0.7);
     transform-origin: top left;
-    width: 1463px; /* 1024 / 0.7 */
+    width: 1463px; 
   }
 }
 
-@keyframes ticker {0% { transform: translateX(100%); } 100% { transform: translateX(-100%); }}
-.animate-ticker { animation: ticker 20s linear infinite; }
-
 .text-shadow-neon { text-shadow: 0 0 5px hsl(var(--brand-pink)), 0 0 10px hsl(var(--brand-pink)), 0 0 15px hsl(var(--brand-purple)), 0 0 20px hsl(var(--brand-purple));}
-.text-shadow-cyber { text-shadow: 0 0 4px rgba(var(--brand-cyan-rgb), 0.8), 0 0 10px rgba(var(--brand-pink-rgb), 0.6); }
+.text-shadow-cyber { text-shadow: 0 0 4px hsla(var(--cyan-rgb), 0.8), 0 0 10px hsla(var(--pink-rgb), 0.6); }
 
-.animate-gradient-shift { animation: gradientShift 10s infinite linear; }
-@keyframes gradientShift { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; }}
-
-.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px); }
-.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px); }
+.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px); }
+.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px); }
 
 .simple-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-.simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--dark-card-rgb), 0.5); }
-.simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsla(var(--brand-purple), 0.7); border-radius: 4px; border: 1px solid hsla(var(--brand-pink), 0.3); }
-.simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsla(var(--brand-pink), 0.8); }
-.simple-scrollbar { scrollbar-width: thin; scrollbar-color: hsla(var(--brand-purple), 0.7) hsla(var(--dark-card-rgb), 0.5); }
+.simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--card-rgb), 0.5); }
+.simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsl(var(--brand-purple) / 0.7); border-radius: 4px; border: 1px solid hsl(var(--brand-pink) / 0.3); }
+.simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--brand-pink) / 0.8); }
+.simple-scrollbar { scrollbar-width: thin; scrollbar-color: hsl(var(--brand-purple) / 0.7) hsla(var(--card-rgb), 0.5); }
 
-.cyber-text { font-family: "Orbitron", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--brand-cyan)); text-shadow: 0 0 3px hsla(var(--brand-cyan), 0.7), 0 0 5px hsla(var(--brand-cyan), 0.5), 0 0 8px hsla(var(--brand-pink), 0.6); }
-.cyber-text.glitch-heavy { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.025em -0.025em 0 hsla(var(--brand-green), 0.75), -0.01em 0.025em 0 hsla(var(--brand-cyan), 0.75); }
-
-@keyframes glitch { 0% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); } 14% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); } 15% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); } 49% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); } 50% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); } 99% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); } 100% { text-shadow: -0.025em 0 0 hsla(var(--brand-pink), 0.75), -0.025em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em -0.05em 0 hsla(var(--brand-cyan), 0.75); }}
-.glitch { position: relative; animation: glitch 1s linear infinite; }
-.glitch::before, .glitch::after { content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: inherit; overflow: hidden; clip: rect(0, 900px, 0, 0); }
-.glitch::before { left: 2px; text-shadow: -1px 0 hsla(var(--brand-purple), 0.7); animation: glitch-anim-1 2s infinite linear alternate-reverse; }
-.glitch::after { left: -2px; text-shadow: -1px 0 hsla(var(--brand-cyan), 0.7); animation: glitch-anim-2 2s infinite linear alternate-reverse; }
-@keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
-@keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
+.cyber-text { font-family: "Orbitron", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--brand-cyan)); text-shadow: 0 0 3px hsl(var(--brand-cyan) / 0.7), 0 0 5px hsl(var(--brand-cyan) / 0.5), 0 0 8px hsl(var(--brand-pink) / 0.6); }
+.cyber-text.glitch-heavy { text-shadow: 0.05em 0 0 hsl(var(--brand-pink) / 0.75), -0.025em -0.025em 0 hsl(var(--brand-green) / 0.75), -0.01em 0.025em 0 hsl(var(--brand-cyan) / 0.75); }
 
 .text-gradient { background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-@keyframes glow { 0% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); } 50% { text-shadow: 0 0 20px hsla(var(--brand-pink), 0.8), 0 0 30px hsla(var(--brand-purple), 0.5); } 100% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); }}
-.text-glow { animation: glow 2.5s infinite ease-in-out; }
-
-@keyframes pulse-slow { 0%, 100% { opacity: 0.8; transform: scale(1); } 50% { opacity: 1; transform: scale(1.02); }}
-.animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
+@keyframes glow { 0% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); } 50% { text-shadow: 0 0 20px hsla(var(--pink-rgb), 0.8), 0 0 30px hsla(var(--purple-rgb), 0.5); } 100% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); }}
+.text-glow { animation: glow 2.5s infinite ease-in-out; } /* Now managed by Tailwind JIT */
 
 input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-clear { display: none; }
 .comic-bubble { position: relative; background: hsl(var(--card)); border: 2px solid hsl(var(--brand-pink)); border-radius: 15px; color: hsl(var(--foreground));}
 
-@keyframes neon-border-glow { 0%, 100% { border-color: hsla(var(--brand-cyan), 0.7); box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.5), 0 0 10px hsla(var(--brand-cyan), 0.3); } 50% { border-color: hsla(var(--brand-pink), 0.7); box-shadow: 0 0 8px hsla(var(--brand-pink), 0.5), 0 0 15px hsla(var(--brand-pink), 0.3), 0 0 5px hsla(var(--brand-purple), 0.2); }}
-.border-neon-glow { animation: neon-border-glow 2.5s infinite alternate; }
+@keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }} 
 
-@keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }}
+.shadow-glow { box-shadow: 0 0 10px hsla(var(--cyan-rgb), 0.5); }
+.shadow-glow:hover { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.7), 0 0 5px hsla(var(--pink-rgb), 0.3); }
+.shadow-yellow-glow { box-shadow: 0 0 15px hsla(var(--yellow-rgb), 0.4), 0 0 30px hsla(var(--yellow-rgb), 0.2); }
+.hover\:shadow-yellow-glow:hover { box-shadow: 0 0 20px hsla(var(--yellow-rgb), 0.6), 0 0 40px hsla(var(--yellow-rgb), 0.3); }
+.shadow-purple-glow { box-shadow: 0 0 15px hsla(var(--purple-rgb), 0.4), 0 0 30px hsla(var(--purple-rgb), 0.2); }
+.shadow-green-glow { box-shadow: 0 0 15px hsla(var(--green-rgb), 0.4), 0 0 30px hsla(var(--green-rgb), 0.2); }
+.shadow-pink-glow { box-shadow: 0 0 15px hsla(var(--pink-rgb), 0.4), 0 0 30px hsla(var(--pink-rgb), 0.2); }
+.shadow-blue-glow { box-shadow: 0 0 15px hsla(var(--blue-rgb), 0.4), 0 0 30px hsla(var(--blue-rgb), 0.2); }
+.shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2); }
+.shadow-orange-glow { box-shadow: 0 0 15px hsla(var(--orange-rgb), 0.4), 0 0 30px hsla(var(--orange-rgb), 0.2); }
 
-.shadow-glow { box-shadow: 0 0 10px hsla(var(--brand-cyan), 0.5); }
-.shadow-glow:hover { box-shadow: 0 0 15px hsla(var(--brand-cyan), 0.7), 0 0 5px hsla(var(--brand-pink), 0.3); }
-.shadow-yellow-glow { box-shadow: 0 0 15px hsla(var(--brand-yellow-rgb), 0.4), 0 0 30px hsla(var(--brand-yellow-rgb), 0.2); }
-.hover\:shadow-yellow-glow:hover { box-shadow: 0 0 20px hsla(var(--brand-yellow-rgb), 0.6), 0 0 40px hsla(var(--brand-yellow-rgb), 0.3); }
-.shadow-purple-glow { box-shadow: 0 0 15px hsla(var(--brand-purple-rgb), 0.4), 0 0 30px hsla(var(--brand-purple-rgb), 0.2); }
-.shadow-green-glow { box-shadow: 0 0 15px hsla(var(--brand-green-rgb), 0.4), 0 0 30px hsla(var(--brand-green-rgb), 0.2); }
-.shadow-pink-glow { box-shadow: 0 0 15px hsla(var(--brand-pink-rgb), 0.4), 0 0 30px hsla(var(--brand-pink-rgb), 0.2); }
-.shadow-blue-glow { box-shadow: 0 0 15px hsla(var(--brand-blue-rgb), 0.4), 0 0 30px hsla(var(--brand-blue-rgb), 0.2); }
-.shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--brand-cyan-rgb), 0.4), 0 0 30px hsla(var(--brand-cyan-rgb), 0.2); }
-.shadow-orange-glow { box-shadow: 0 0 15px hsla(var(--brand-orange-rgb), 0.4), 0 0 30px hsla(var(--brand-orange-rgb), 0.2); }
-
-@keyframes glitch-border { 0% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2), inset 0 0 3px rgba(var(--brand-cyan-rgb), 0.1); }  25% { border-color: rgba(var(--brand-pink-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-pink-rgb), 0.3), inset 0 0 3px rgba(var(--brand-pink-rgb), 0.1); }  50% { border-color: rgba(var(--brand-yellow-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-yellow-rgb), 0.2), inset 0 0 3px rgba(var(--brand-yellow-rgb), 0.1); }  75% { border-color: rgba(var(--brand-green-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-green-rgb), 0.3), inset 0 0 3px rgba(var(--brand-green-rgb), 0.1); }  100% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2), inset 0 0 3px rgba(var(--brand-cyan-rgb), 0.1); }}
-.glitch-border-animate { animation: glitch-border 2s linear infinite; }
-
-.highlight-scroll { transition: outline 0.5s ease-out; outline: 2px solid hsla(var(--brand-green), 0.7); outline-offset: 2px; box-shadow: 0 0 15px hsla(var(--brand-green), 0.5); }
+.highlight-scroll { transition: outline 0.5s ease-out; outline: 2px solid hsl(var(--brand-green) / 0.7); outline-offset: 2px; box-shadow: 0 0 15px hsl(var(--brand-green) / 0.5); }
 .text-animated-gradient { @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange; background-size: 200% auto; animation: gradient-text-flow 3s linear infinite; }
-@keyframes gradient-text-flow { to { background-position: 200% center; }}
-@keyframes wiggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); }}
+
+.tutorial-hero-bg-mask { 
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
+/* Added for RockstarHeroSection SVG mask */
+.rockstar-svg-mask-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none; /* Make sure defs don't interfere with interaction */
+}
