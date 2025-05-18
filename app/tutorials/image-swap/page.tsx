@@ -21,7 +21,6 @@ import NextLevelTeaser from '../NextLevelTeaser';
 const imageSwapTutorialTranslations = {
   ru: {
     pageTitle: "Миссия 1: Охота на Битый Пиксель",
-    // pageSubtitle removed
     steps: [ 
       { id: 1, title: "Шаг 1: Захват URL Старого Артефакта", description: "Первая задача, оперативник: обнаружить в кодовой базе изображение, требующее замены. Найдя, скопируй его полный URL. Это твоя основная цель!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaLink", color: "brand-pink" },
       { id: 2, title: "Шаг 2: Развертывание Нового Актива", description: "Далее, загрузи свой новенький, сияющий файл замены. Рекомендуем Supabase Storage для гладкой интеграции, но подойдет любой публично доступный URL. Защити новую ссылку!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaUpload", color: "brand-blue" },
@@ -35,7 +34,6 @@ const imageSwapTutorialTranslations = {
   },
   wtf: {
     pageTitle: "КАРТИНКИ МЕНЯТЬ – КАК ДВА БАЙТА ПЕРЕСЛАТЬ!",
-    // pageSubtitle removed
     steps: [ 
       { id: 1, title: "ШАГ 1: КОПИРУЙ СТАРЫЙ URL", description: "Нашел картинку в коде? КОПИРНИ ЕЕ АДРЕС. Всё.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaCopy", color: "brand-pink" },
       { id: 2, title: "ШАГ 2: ЗАЛЕЙ НОВУЮ, КОПИРУЙ URL", description: "Загрузи НОВУЮ картинку. КОПИРНИ ЕЕ АДРЕС. Изи.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaCloudArrowUp", color: "brand-blue" },
@@ -106,7 +104,6 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         titleClassNameForMask="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect"
-        // subtitle prop removed
         textToMask="SLY13" 
         triggerElementSelector={`#${heroTriggerElementId}`}
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
@@ -127,9 +124,9 @@ function ImageSwapTutorialContent() {
         </Button>
       </RockstarHeroSection>
       
-      <div id={heroTriggerElementId} style={{ height: '300vh' }} aria-hidden="true" /> {/* Increased height */}
+      <div id={heroTriggerElementId} style={{ height: '250vh' }} aria-hidden="true" /> {/* Adjusted height */}
 
-      <TutorialContentContainer className="-mt-[100vh] relative">
+      <TutorialContentContainer className="relative"> {/* Removed -mt-[100vh] */}
         <div className="space-y-16 md:space-y-24">
           {stepsToRender.map((step, index) => {
             const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
@@ -154,9 +151,10 @@ function ImageSwapTutorialContent() {
                       <VibeContentRenderer content={step.description} />
                     </p>
                     {step.id === 3 && ( 
-                      <Button asChild size="lg" className={cn( 
-                        "inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-semibold rounded-md text-background transition-colors shadow-lg mt-4",
-                        "bg-brand-yellow hover:bg-brand-yellow/90 focus:ring-2 focus:ring-brand-yellow focus:ring-offset-2 focus:ring-offset-background active:scale-95 transform hover:scale-105"
+                      <Button asChild variant="default" size="lg" className={cn( 
+                        "inline-flex items-center justify-center px-8 py-3 text-base font-semibold rounded-md transition-colors shadow-lg mt-4",
+                        "active:scale-95 transform hover:scale-105" // Base classes for primary
+                        // Specific primary color classes are handled by variant="default"
                         )}>
                         <Link href="/repo-xml?flow=imageSwap">
                            <VibeContentRenderer content="К Студии SUPERVIBE <FaArrowUpRightFromSquare />" />
