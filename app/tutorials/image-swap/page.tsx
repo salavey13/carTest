@@ -103,7 +103,7 @@ function ImageSwapTutorialContent() {
     <TutorialPageContainer>
       <RockstarHeroSection 
         title={t.pageTitle} 
-        titleClassNameForMask="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect"
+        // titleClassNameForMask is now handled internally by RockstarHeroSection if needed via unique ID
         textToMask="SLY13" 
         triggerElementSelector={`#${heroTriggerElementId}`}
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
@@ -124,9 +124,9 @@ function ImageSwapTutorialContent() {
         </Button>
       </RockstarHeroSection>
       
-      <div id={heroTriggerElementId} style={{ height: '250vh' }} aria-hidden="true" /> {/* Adjusted height */}
+      <div id={heroTriggerElementId} style={{ height: '250vh' }} aria-hidden="true" />
 
-      <TutorialContentContainer className="relative"> {/* Removed -mt-[100vh] */}
+      <TutorialContentContainer className="relative">
         <div className="space-y-16 md:space-y-24">
           {stepsToRender.map((step, index) => {
             const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
@@ -153,8 +153,7 @@ function ImageSwapTutorialContent() {
                     {step.id === 3 && ( 
                       <Button asChild variant="default" size="lg" className={cn( 
                         "inline-flex items-center justify-center px-8 py-3 text-base font-semibold rounded-md transition-colors shadow-lg mt-4",
-                        "active:scale-95 transform hover:scale-105" // Base classes for primary
-                        // Specific primary color classes are handled by variant="default"
+                        "active:scale-95 transform hover:scale-105"
                         )}>
                         <Link href="/repo-xml?flow=imageSwap">
                            <VibeContentRenderer content="К Студии SUPERVIBE <FaArrowUpRightFromSquare />" />
