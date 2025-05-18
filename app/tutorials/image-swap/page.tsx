@@ -109,11 +109,10 @@ function ImageSwapTutorialContent() {
         textToMask={t.pageTitle} 
         animationScrollHeightVH={300} 
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
-        // Example: Use a large, simple icon for backgroundImageObjectUrl for testing
-        // backgroundImageObjectUrl="https://www.transparentpng.com/thumb/bleach/ capitán-hitsugaya-toshiro-bleach-png-pictures- G9xYm8.png" // replace with a real large icon URL
-        foregroundIconName="FaSatelliteDish" 
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg" // Example icon on background
+        foregroundIconName="FaStar" 
         foregroundIconSize="text-7xl md:text-9xl lg:text-[10rem]"
-        // revealedBackgroundImageUrl will use default placeholder
+        // revealedBackgroundImageUrl="/assets/images/abstract-light-streaks.jpg" // Uses default
       >
         <Button 
             onClick={toggleMode} 
