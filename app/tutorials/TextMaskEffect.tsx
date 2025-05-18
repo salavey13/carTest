@@ -5,51 +5,64 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 
 interface TextMaskEffectProps {
   text: string;
-  scrollProgress: number; // 0 to 1
+  scrollProgress: number; // Overall scroll progress from parent (0 to 1)
+  animationStartProgress?: number; // When this component's animation should start (0 to 1)
+  animationEndProgress?: number;   // When this component's animation should end (0 to 1)
 }
 
-const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ text, scrollProgress }) => {
-  const initialScale = 15; 
+const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ 
+  text, 
+  scrollProgress,
+  animationStartProgress = 0.5, // Default: start at 50% of parent's scroll
+  animationEndProgress = 0.85    // Default: end at 85% of parent's scroll
+}) => {
+  
+  const initialScale = 1.25; 
   const targetScale = 1;   
-
-  // Animation phases based on scrollProgress
-  const fadeInStart = 0.15; // Start revealing a bit later
-  const fadeInEnd = 0.5;   // Text fully opaque and at target scale
-  const holdStart = fadeInEnd;
-  const holdEnd = 0.8;     // Text stays fully visible
-  const fadeOutStart = holdEnd;
-  const fadeOutEnd = 1.0;    // Text fully faded out by the end of the scroll
 
   let currentOpacity = 0;
   let currentScale = initialScale;
+  let inRangeProgress = 0;
 
-  if (scrollProgress <= fadeInStart) {
+  if (scrollProgress <= animationStartProgress) {
     currentOpacity = 0;
     currentScale = initialScale;
-  } else if (scrollProgress < fadeInEnd) {
-    const progressInRange = (scrollProgress - fadeInStart) / (fadeInEnd - fadeInStart);
-    currentOpacity = progressInRange; // Fade in
-    currentScale = initialScale - (initialScale - targetScale) * progressInRange; // Scale from initialScale down to targetScale
-  } else if (scrollProgress < holdEnd) {
+  } else if (scrollProgress < animationEndProgress) {
+    const duration = animationEndProgress - animationStartProgress;
+    inRangeProgress = duration > 0 ? (scrollProgress - animationStartProgress) / duration : 1;
+    
+    currentOpacity = inRangeProgress; // Fade in
+    currentScale = initialScale - (initialScale - targetScale) * inRangeProgress; // Scale from initial down to target
+  } else { // scrollProgress >= animationEndProgress
     currentOpacity = 1;
     currentScale = targetScale; // Stay at normal size and full opacity
-  } else if (scrollProgress < fadeOutEnd) {
-    const progressInRange = (scrollProgress - holdEnd) / (fadeOutEnd - holdEnd);
-    currentOpacity = 1 - progressInRange; // Fade out
-    currentScale = targetScale + progressInRange * 0.3; // Scale slightly up as it fades
-  } else { // scrollProgress >= fadeOutEnd
-    currentOpacity = 0;
-    currentScale = targetScale + 0.3;
   }
   
   currentOpacity = Math.max(0, Math.min(1, currentOpacity));
-  currentScale = Math.max(targetScale, currentScale); // Don't let it get smaller than target if scaling out
+  currentScale = Math.max(targetScale, currentScale); 
+
+  // Dynamic gradient for text (as per video concept)
+  // Gradient moves from bottom to top
+  const gradientStopTop = 100 - (inRangeProgress * 100); // Moves from 100 down to 0
+  const gradientStopBottom = gradientStopTop + 100; // Maintain 100% spread for gradient
+  
+  const dynamicGradientStyle: React.CSSProperties = {
+    backgroundImage: `linear-gradient(
+      to bottom, 
+      hsl(var(--brand-pink) / ${0.3 + currentOpacity * 0.7}) ${gradientStopTop}%, 
+      hsl(var(--brand-yellow) / ${0.8 + currentOpacity * 0.2}) ${gradientStopBottom}%
+    )`,
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    color: 'transparent',
+    textShadow: `0 2px 10px hsla(var(--brand-yellow-rgb), ${currentOpacity * 0.3})`,
+  };
 
 
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" 
-      // z-20 to be above original title (z-10) but below foreground icon (z-40) if it exists
+      className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none" 
+      // z-30 to be above SVG mask overlay (z-20)
     >
       <div
         className="text-center px-4"
@@ -59,15 +72,13 @@ const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ text, scrollProgress })
           willChange: 'opacity, transform',
         }}
       >
-        {/* This is the text that appears "through" the mask effect */}
         <h1
           className={cn(
             "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold",
-            // Style for the "revealed" text, distinct from the initial title
-            "text-transparent bg-clip-text bg-gradient-to-br from-brand-yellow via-brand-orange to-brand-pink",
-            "px-4" 
+            "px-4" // Ensure padding if text is long
           )}
-          data-text={text} 
+          style={dynamicGradientStyle}
+          data-text={text} // For potential pseudo-element effects if needed
         >
           <VibeContentRenderer content={text} />
         </h1>
