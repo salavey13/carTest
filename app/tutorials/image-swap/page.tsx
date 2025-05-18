@@ -102,10 +102,10 @@ function ImageSwapTutorialContent() {
   return (
     <TutorialPageContainer>
       <RockstarHeroSection 
-        title={t.pageTitle}
-        textToMask="SLY13" 
+        title={t.pageTitle} 
+        // textToMask prop removed as SLY13 text is removed
         triggerElementSelector={`#${heroTriggerElementId}`}
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/purple-abstract-bg.jpeg" // New background
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         <Button 
