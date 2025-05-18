@@ -29,6 +29,10 @@ interface ImageReplaceToolProps {
     onCancel: () => void;
 }
 
+// --- Constants ---
+const MAX_VIDEO_SIZE_MB = 13;
+const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+
 // --- Component ---
 export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl, onReplaceConfirmed, onCancel }) => {
     const [newImageUrlInput, setNewImageUrlInput] = useState("");
@@ -39,6 +43,12 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
+            if (file.type.startsWith("video/") && file.size > MAX_VIDEO_SIZE_BYTES) {
+                toast.error(`Видео файл слишком большой! Макс. размер: ${MAX_VIDEO_SIZE_MB}MB.`);
+                setUploadedFile(null);
+                event.target.value = ""; // Clear the input
+                return;
+            }
             setUploadedFile(file);
             setNewImageUrlInput(""); 
             setUploadedUrl(null); 
@@ -50,7 +60,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         if (!file) return;
         setIsUploading(true);
         setUploadedUrl(null);
-        toast.info("Загрузка картинки...");
+        toast.info(`Загрузка ${file.type.startsWith("video/") ? 'видео' : 'картинки'}...`);
 
         const formData = new FormData();
         const bucketName = "about"; 
@@ -63,9 +73,9 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
             if (result.success && result.data && result.data.length > 0 && result.data[0].url) {
                 const uploadedUrlResult = result.data[0].url;
                 setUploadedUrl(uploadedUrlResult);
-                toast.success("Картинка загружена!");
+                toast.success(`${file.type.startsWith("video/") ? 'Видео' : 'Картинка'} загруженa!`);
             } else {
-                const errorMsg = result.error || result.failed?.[0]?.error || "Не удалось загрузить картинку.";
+                const errorMsg = result.error || result.failed?.[0]?.error || `Не удалось загрузить ${file.type.startsWith("video/") ? 'видео' : 'картинку'}.`;
                 throw new Error(errorMsg);
             }
         } catch (error) {
@@ -93,7 +103,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
             variants={childVariants}
             className="w-full mt-2 p-3 bg-gray-700/80 backdrop-blur-sm border border-blue-500/50 rounded-lg shadow-lg flex flex-col gap-3"
         >
-            <p className="text-xs text-gray-300">Заменить эту картинку:</p>
+            <p className="text-xs text-gray-300">Заменить это изображение/видео:</p>
             <Input
                 type="text"
                 readOnly
@@ -101,7 +111,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                 className="w-full p-1 text-xs bg-gray-800 border border-gray-600 rounded text-gray-400 truncate"
                 title={oldImageUrl}
             />
-            <p className="text-xs text-gray-300">Новой картинкой:</p>
+            <p className="text-xs text-gray-300">Новым изображением/видео (до {MAX_VIDEO_SIZE_MB}MB для видео):</p>
             <div className="flex items-center gap-2">
                 <Button
                     variant="outline"
@@ -120,7 +130,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                 <input
                     id="image-upload-input-tool"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/mp4"
                     onChange={handleFileChange}
                     className="hidden"
                     disabled={isUploading}
@@ -155,10 +165,10 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     onClick={handleConfirm}
                     disabled={!canConfirm}
                     size="sm"
-                    className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center" // Added flex items-center
+                    className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center" 
                 >
                      <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
-                     <span>Заменить</span> {/* Wrapped text in a span */}
+                     <span>Заменить</span>
                 </Button>
             </div>
         </motion.div>
