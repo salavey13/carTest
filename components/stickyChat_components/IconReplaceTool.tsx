@@ -21,20 +21,37 @@ interface IconReplaceToolProps {
 export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInput = "", onReplaceConfirmed, onCancel }) => {
     const [oldIcon, setOldIcon] = useState(oldIconNameInput);
     const [newIcon, setNewIcon] = useState("");
-    // Props string removed for simplicity for now
-    // const [propsString, setPropsString] = useState("");
+    // const [propsString, setPropsString] = useState(""); // Props string removed for simplicity for now
 
-    const normalizeIconName = (name: string): string => {
-        let n = name.trim();
-        if (n.toLowerCase().startsWith("fa-")) {
-            // Convert fa-kebab-case to FaPascalCase
-            return "Fa" + n.substring(3).split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+    const normalizeIconName = useCallback((name: string): string => {
+        let processingName = name.trim();
+        if (!processingName) return "";
+
+        // 1. Handle fa-kebab-case (e.g., fa-magic-wand -> FaMagicWand)
+        if (processingName.toLowerCase().startsWith("fa-")) {
+            const parts = processingName.substring(3).split('-');
+            // Ensure each part after "fa-" is PascalCased
+            processingName = parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+            return "Fa" + processingName;
         }
-        if (n.length > 0 && !n.startsWith("Fa")) {
-            return "Fa" + n.charAt(0).toUpperCase() + n.slice(1);
+
+        // 2. Strip any "Fa" or "fa" prefix to get the core name
+        // This helps to avoid "FaFaMagicWand" if input is "FaMagicWand" or "famagicwand"
+        if (processingName.toLowerCase().startsWith("fa")) {
+            processingName = processingName.substring(2);
         }
-        return n;
-    };
+
+        // 3. Ensure the core name is PascalCased (e.g. "magicWand" -> "MagicWand")
+        if (processingName.length > 0) {
+            processingName = processingName.charAt(0).toUpperCase() + processingName.slice(1);
+        } else {
+            // This case means the input was likely just "fa" or "Fa" before stripping
+            return ""; 
+        }
+        
+        // 4. Prepend "Fa" to the PascalCased core name
+        return "Fa" + processingName;
+    }, []);
 
     const handleConfirm = useCallback(() => {
         const normalizedOldIcon = normalizeIconName(oldIcon);
@@ -44,12 +61,16 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
             toast.error("Укажите имя старой и новой иконки (например, FaBeer или beer).");
             return;
         }
-        // Basic check, VibeContentRenderer will handle actual validation
-        if (!normalizedOldIcon.startsWith("Fa") || !normalizedNewIcon.startsWith("Fa")) {
-             toast.warning("Имя иконки должно быть в PascalCase и начинаться с 'Fa' (например, FaBeer). Попробую нормализовать...");
+        
+        // Basic check, VibeContentRenderer will handle actual validation later
+        // This warning is mostly for user feedback during input.
+        if (!normalizedOldIcon.startsWith("Fa") || !normalizedOldIcon.charAt(2).match(/[A-Z]/) || 
+            !normalizedNewIcon.startsWith("Fa") || !normalizedNewIcon.charAt(2).match(/[A-Z]/)
+           ) {
+             toast.warning("Имя иконки должно быть в PascalCase и начинаться с 'Fa' (например, FaBeer). Попробовал нормализовать. Проверьте результат.");
         }
         onReplaceConfirmed({ oldIconName: normalizedOldIcon, newIconName: normalizedNewIcon });
-    }, [oldIcon, newIcon, onReplaceConfirmed]);
+    }, [oldIcon, newIcon, onReplaceConfirmed, normalizeIconName]);
 
     const canConfirm = oldIcon.trim().length > 0 && newIcon.trim().length > 0;
 
@@ -59,11 +80,11 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
             className="w-full mt-2 p-3 pb-4 bg-gray-700/80 backdrop-blur-sm border border-cyan-500/50 rounded-lg shadow-lg flex flex-col gap-3"
         >
             <p className="text-xs text-gray-300 font-semibold flex items-center gap-1">
-                <VibeContentRenderer content="::FaExchangeAlt::" /> Замена Иконки (Fa6)
+                <VibeContentRenderer content="::FaIcons::" /> Замена Иконки (Fa6)
             </p>
             
             <div>
-                <label htmlFor="old-icon-input" className="block text-xs text-gray-400 mb-0.5">Старая иконка (напр. FaBeer или beer):</label>
+                <label htmlFor="old-icon-input" className="block text-xs text-gray-400 mb-0.5">Старая иконка (напр. FaBeer, beer, fa-beer):</label>
                 <Input
                     id="old-icon-input"
                     type="text"
@@ -75,7 +96,7 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
             </div>
 
             <div>
-                <label htmlFor="new-icon-input" className="block text-xs text-gray-400 mb-0.5">Новая иконка (напр. FaCoffee или coffee):</label>
+                <label htmlFor="new-icon-input" className="block text-xs text-gray-400 mb-0.5">Новая иконка (напр. FaCoffee, coffee, fa-coffee):</label>
                 <Input
                     id="new-icon-input"
                     type="text"
@@ -105,10 +126,10 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                     onClick={handleConfirm}
                     disabled={!canConfirm}
                     size="sm"
-                    className="text-xs bg-cyan-600 hover:bg-cyan-500 flex items-center" // Added flex items-center
+                    className="text-xs bg-cyan-600 hover:bg-cyan-500 flex items-center"
                 >
                     <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
-                    <span>Заменить Иконку</span> {/* Wrapped text in a span */}
+                    <span>Заменить Иконку</span>
                 </Button>
             </div>
         </motion.div>

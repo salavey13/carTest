@@ -20,7 +20,7 @@ import {
     Achievement,
     PERKS_BY_LEVEL,
     ALL_ACHIEVEMENTS,
-    CYBERFIT_METADATA_KEY // IMPORTED
+    CYBERFIT_METADATA_KEY
 } from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
@@ -98,7 +98,7 @@ interface RepoXmlPageContextType {
     triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>;
     triggerSelectHighlighted: () => void;
     triggerAddSelectedToKwork: (clearSelection?: boolean) => Promise<void>;
-    triggerCopyKwork: () => Promise<void>; // Changed return type from Promise<boolean> to Promise<void>
+    triggerCopyKwork: () => Promise<void>; 
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
@@ -155,7 +155,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     triggerFetch: async () => { logger.warn("triggerFetch called on default context value"); },
     triggerSelectHighlighted: () => { logger.warn("triggerSelectHighlighted called on default context value"); },
     triggerAddSelectedToKwork: async () => { logger.warn("triggerAddSelectedToKwork called on default context value"); },
-    triggerCopyKwork: async () => { logger.warn("triggerCopyKwork called on default context value"); }, // Default void promise
+    triggerCopyKwork: async () => { logger.warn("triggerCopyKwork called on default context value"); }, 
     triggerAskAi: async () => { logger.warn("triggerAskAi called on default context value"); return { success: false, error: "Context not ready" }; },
     triggerParseResponse: async () => { logger.warn("triggerParseResponse called on default context value"); },
     triggerSelectAllParsed: () => { logger.warn("triggerSelectAllParsed called on default context value"); },
@@ -227,9 +227,25 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             appToastHook = useAppToast();
         } catch (e: any) {
             logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR initializing useAppToast:", e);
-            appToastHook = { success: (m) => logger.error("Toast (success) suppressed, hook failed:", m), error: (m) => logger.error("Toast (error) suppressed, hook failed:", m), info: (m) => logger.warn("Toast (info) suppressed, hook failed:", m), warning: (m) => logger.warn("Toast (warning) suppressed, hook failed:", m), loading: (m) => logger.warn("Toast (loading) suppressed, hook failed:", m), message: (m) => logger.warn("Toast (message) suppressed, hook failed:", m), custom: (m) => logger.warn("Toast (custom) suppressed, hook failed:", m), dismiss: () => logger.warn("Toast (dismiss) suppressed, hook failed"), };
+            appToastHook = { success: (m) => logger.error("Toast (success) suppressed, hook failed:", m), error: (m) => logger.error("Toast (error) suppressed, hook failed:", m), info: (m) => logger.warn("Toast (info) suppressed, hook failed:", m), warning: (m) => logger.warn("Toast (warning) suppressed, hook failed:", m), loading: (m) => logger.warn("Toast (loading) suppressed, hook failed:", m), message: (m) => logger.warn("Toast (message) suppressed, hook failed:", m), custom: (m) => logger.warn("Toast (custom) suppressed, hook failed:", m), dismiss: () => logger.warn("Toast (dismiss) suppressed, hook failed"), addToastToHistory: () => logger.warn("Toast (addToastToHistory) suppressed, hook failed") };
         }
-        const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => { if (!appToastHook?.message) { logger.error("addToastStable: appToast invalid", { message, type }); return; } const toastOptions = duration ? { ...options, duration } : options; switch (type) { case 'success': appToastHook.success(message, toastOptions); break; case 'error': appToastHook.error(message, toastOptions); break; case 'info': appToastHook.info(message, toastOptions); break; case 'warning': appToastHook.warning(message, toastOptions); break; case 'loading': appToastHook.loading(message, toastOptions); break; case 'message': default: appToastHook.message(message, toastOptions); break; } }, [appToastHook]);
+        const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => { 
+            if (!appToastHook || typeof appToastHook.success !== 'function') { // More robust check
+                logger.error("addToastStable: appToastHook is invalid or incomplete.", { message, type, appToastHookExists: !!appToastHook });
+                console.error(`TOAST FALLBACK (${type}): ${typeof message === 'string' ? message : 'ReactNode message'}`, options);
+                return;
+            }
+            const toastOptions = duration ? { ...options, duration } : options; 
+            switch (type) { 
+                case 'success': appToastHook.success(message, toastOptions); break; 
+                case 'error': appToastHook.error(message, toastOptions); break; 
+                case 'info': appToastHook.info(message, toastOptions); break; 
+                case 'warning': appToastHook.warning(message, toastOptions); break; 
+                case 'loading': appToastHook.loading(message, toastOptions); break; 
+                case 'message': 
+                default: appToastHook.message(message, toastOptions); break; 
+            } 
+        }, [appToastHook]);
         const setFetchStatusStateStable = useCallback((status: FetchStatus | ((prevState: FetchStatus) => FetchStatus)) => setFetchStatusState(status), []);
         const setRepoUrlEnteredStateStable = useCallback((entered: boolean | ((prevState: boolean) => boolean)) => setRepoUrlEnteredState(entered), []);
         const setSelectedFetcherFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => setSelectedFetcherFilesState(files), []);
@@ -284,7 +300,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }, []); 
 
         const handleSetFilesFetchedStable = useCallback(async (
-            fetched: boolean, // This is the result of the primary file fetch operation
+            fetched: boolean, 
             allFiles: FileNode[],
             primaryHighlight: string | null,
             secondaryHighlights: Record<ImportCategory, string[]>
@@ -300,7 +316,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         
             logger.debug(`${flowLogPrefix} Context: handleSetFilesFetchedStable. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
             
-            // Set initial UI states based on the fetch operation
             setFilesFetchedState(fetched);
             if (fetched) { setAllFetchedFilesStateStable(allFiles ?? []); }
             else { setAllFetchedFilesStateStable([]); }
@@ -318,14 +333,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     const taskToProcess = activeVisualTask;
                     const taskType = currentImgTask ? 'ImageSwap' : 'IconSwap';
         
-                    if (fetched) { // If initial files were fetched successfully for the visual task
+                    if (fetched) { 
                         const targetFileExists = (allFiles ?? []).some(f => f.path === taskToProcess.targetPath);
                         if (!targetFileExists) {
-                            finalFetchStatusDeterminedByFetch = 'error'; // Still an error for this specific flow
+                            finalFetchStatusDeterminedByFetch = 'error'; 
                             addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Целевой файл ${taskToProcess.targetPath} не найден!`, 'error', 5000);
-                            setAssistantLoadingStateStable(false); // Ensure loading state is reset
+                            setAssistantLoadingStateStable(false); 
                         } else {
-                            // File needed for visual task exists, proceed with assistant
                             if (assistantRef.current?.handleDirectImageReplace) {
                                 setAssistantLoadingStateStable(true);
                                 const replaceResult = await assistantRef.current.handleDirectImageReplace(taskToProcess, allFiles ?? []);
@@ -337,14 +351,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                             } else {
                                 addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену (${taskType}).`, 'error', 7000);
                             }
-                            // Reset task states after attempt, regardless of success
                             if (taskType === 'ImageSwap') setImageReplaceTaskStateStable(null);
                             if (taskType === 'IconSwap') setIconReplaceTaskStateStable(null);
                             setAssistantLoadingStateStable(false);
                             logger.info(`${flowLogPrefix} Context: ${taskType} task processing finished and cleared.`);
                         }
-                    } else { // Initial file fetch failed for the visual task flow
-                        // finalFetchStatusDeterminedByFetch is already 'error'
+                    } else { 
                         addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Не удалось загрузить файлы.`, 'error', 5000);
                         setAssistantLoadingStateStable(false);
                     }
@@ -370,20 +382,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         } else { scrollToSectionStable('executor'); }
                     } else {
                         addToastStable(`Ошибка Исправления: Целевой файл ${currentPendingFlow.targetPath} не найден!`, 'error', 5000);
-                        finalFetchStatusDeterminedByFetch = 'error'; // This specific flow step failed
+                        finalFetchStatusDeterminedByFetch = 'error'; 
                     }
                     setPendingFlowDetailsStateStable(null);
         
-                } else { // Generic fetch or unhandled flow
+                } else { 
                     if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                     if (fetched && !currentImgTask && !currentIconTask && !currentPendingFlow && dbUser?.user_id) {
                         questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] });
                     }
                 }
         
-                // Process questResult toast logic safely, after main async operations
                 if (questResult) {
-                    // Access CYBERFIT_METADATA_KEY safely here as it's imported
                     const updatedProfileLevel = questResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.level; 
                     const firstFetchAchDef = ALL_ACHIEVEMENTS.find(a => a.id === 'first_fetch_completed');
                     const kvAwardedForQuest = firstFetchAchDef?.kiloVibesAward || 0;
@@ -401,12 +411,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                 }
         
-            } catch (error: any) { // Catch errors from the async block
+            } catch (error: any) { 
                 logger.error(`${flowLogPrefix} Context: CRITICAL ERROR in handleSetFilesFetchedStable's async logic:`, error);
                 addToastStable(`Критическая ошибка при обработке файлов: ${error.message || "Проверьте консоль."}`, "error", 7000);
-                finalFetchStatusDeterminedByFetch = 'error'; // Ensure status reflects the critical error
+                finalFetchStatusDeterminedByFetch = 'error'; 
             } finally {
-                // This will always run, ensuring the UI reflects the *initial file fetch* status
                 setFetchStatusStateStable(finalFetchStatusDeterminedByFetch);
                 logger.info(`${flowLogPrefix} Context: handleSetFilesFetchedStable finished. Final UI fetchStatus set to: ${finalFetchStatusDeterminedByFetch}`);
             }
@@ -414,7 +423,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setIconReplaceTaskStateStable, 
              setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
-             setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal
+             setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal, setFilesFetchedState, setPrimaryHighlightPathState
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
@@ -550,10 +559,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
         
         const triggerCopyKwork = useCallback(async (): Promise<void> => {
-            // This function is called when the "Copy System Prompt" button is clicked.
-            // Its only responsibility now is to log the CyberFitness achievement.
-            // The actual copying of the system prompt happens in RequestInput.tsx.
-            // The copying of the main kwork input happens via useKworkInput.handleCopyToClipboard.
             if (dbUser?.user_id) {
                 logger.debug("[RepoXmlPageContext triggerCopyKwork] Attempting to log 'system_prompt_copied' achievement.");
                 const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'system_prompt_copied');
@@ -564,7 +569,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } else {
                 logger.warn("[RepoXmlPageContext triggerCopyKwork] Cannot log 'system_prompt_copied': dbUser.user_id is missing.");
             }
-        }, [dbUser, addToastStable, logger]); // Updated dependencies
+        }, [dbUser, addToastStable, logger]); 
 
         const triggerAskAi = useCallback(async () => { addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
         
@@ -846,7 +851,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             triggerUpdateBranchStable, 
             triggerCreateNewPRStable, 
             triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
-            addToastStable, dbUser, // Added dbUser to dependencies of contextValue if triggerCopyKwork needs it
+            addToastStable, dbUser, 
         ]);
 
         return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
