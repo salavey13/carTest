@@ -51,7 +51,7 @@ export interface CyberFitnessProfile {
   featuresUsed: Record<string, boolean | number | string>; 
 }
 
-export const CYBERFIT_METADATA_KEY = "cyberFitness"; // EXPORT ADDED
+export const CYBERFIT_METADATA_KEY = "cyberFitness";
 const MAX_DAILY_LOG_ENTRIES = 30; 
 
 export interface Achievement { 
@@ -129,7 +129,7 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "integration_github_connected", name: "GitHub Синхронизирован", description: "Интеграция с GitHub подтверждена.", icon: "FaGithub", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_github_connected === true },
     { id: "integration_vercel_connected", name: "Vercel Подключен", description: "Интеграция с Vercel подтверждена.", icon: "FaBolt", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_vercel_connected === true },
     { id: "integration_supabase_connected", name: "Supabase Интегрирован", description: "Интеграция с Supabase подтверждена.", icon: "FaDatabase", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_supabase_connected === true },
-    { id: "integration_aistudio_connected", name: "AI Studio Активен", description: "Интеграция с AI Studio (OpenAI/Gemini/Claude) подтверждена.", icon: "FaRobot", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_aistudio_connected === true },
+    { id: "integration_aistudio_connected", name: "AI Studio Активен", description: "Интеграция с AI Studio (OpenAI/Gemini/Claude) подтверждена.", icon: "FaRobot", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_aistudio_connected === true }, // Key is lowercase 's'
     { id: "curious_scrollerman", name: "Любопытный Скроллермен", description: "Проявил недюжинное любопытство, изучая просторы приложения скроллом. Респект!", icon: "FaAngleDoubleDown", kiloVibesAward: 5, checkCondition: (p) => p.featuresUsed?.scrolled_like_a_maniac === true },
     { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу.", icon: "FaBolt", checkCondition: () => false, isQuest: true, kiloVibesAward: 25, unlocksPerks: ["Доступ к СуперВайб Студии"] },
     { id: "first_fetch_completed", name: "Квест: Первая Загрузка", description: "Успешно загружены файлы.", icon: "FaDownload", checkCondition: () => false, isQuest: true, kiloVibesAward: 75, unlocksPerks: PERKS_BY_LEVEL[1] },
@@ -703,7 +703,7 @@ export const logCyberFitnessAction = async (
         kiloVibesFromAction += count * 20; 
     } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
         const featureDetails = countOrDetails as { featureName: string; featureValue?: string | number | boolean };
-        const featureName = featureDetails.featureName;
+        const featureName = featureDetails.featureName; // This will be the correctly cased feature name (e.g., integration_aistudio_connected)
         const featureValue = featureDetails.featureValue !== undefined ? featureDetails.featureValue : true;
 
         if (currentProfile.featuresUsed?.[featureName] !== featureValue) { 
@@ -757,7 +757,7 @@ export const logCyberFitnessAction = async (
 
 export const checkAndUnlockFeatureAchievement = async (
     userId: string,
-    featureName: keyof Exclude<CyberFitnessProfile['featuresUsed'], undefined> | string,
+    featureName: keyof Exclude<CyberFitnessProfile['featuresUsed'], undefined> | string, // This type is fine, the value passed will be corrected string
     featureValue: string | number | boolean = true 
 ): Promise<{ success: boolean; newAchievements?: Achievement[], error?: string }> => {
     logger.log(`[CyberFitness CheckFeatureAchievement ENTRY] User_id: ${userId}, Feature: ${featureName}, Value: ${featureValue}`);
@@ -766,7 +766,7 @@ export const checkAndUnlockFeatureAchievement = async (
         return { success: false, error: "User ID (string) and feature name required."};
     }
     const details: { featureName: string; featureValue?: string | number | boolean } = { 
-        featureName: String(featureName),
+        featureName: String(featureName), // Ensure it's a string for logCyberFitnessAction
         featureValue: featureValue 
     };
     
