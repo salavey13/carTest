@@ -1,3 +1,4 @@
+// /app/style-guide/page.tsx
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,9 +29,9 @@ const ColorSwatch = ({ name, className, hslVar }: { name: string, className: str
 
 export default function StyleGuide() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground p-4 pt-24 pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground p-4 pb-16"> {/* Removed pt-24 */}
       <div className="container mx-auto space-y-16">
-        <header className="text-center mb-12">
+        <header className="text-center mb-12 mt-16 md:mt-20"> {/* Added margin-top here instead */}
           <h1 
             className={cn(
               "text-5xl md:text-6xl font-bold mb-2",
