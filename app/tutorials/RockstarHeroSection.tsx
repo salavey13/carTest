@@ -4,14 +4,19 @@ import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
 import TextMaskEffect from './TextMaskEffect';
 
+// Placeholder for logo path data if not provided
+const DEFAULT_LOGO_MASK_PATH_D = "M10 10 H 190 V 90 H 10 Z"; // A simple rectangle
+const DEFAULT_LOGO_MASK_VIEWBOX = "0 0 200 100";
+
+
 interface RockstarHeroSectionProps {
   title: string;
   subtitle?: string; 
-  textToMask?: string; 
+  textToMask?: string; // Text for the final reveal using TextMaskEffect
   mainBackgroundImageUrl?: string;
-  backgroundImageObjectUrl?: string; // For a large icon/object in the background layer
-  // foregroundIconName?: string; // Temporarily removed for focus
-  // foregroundIconSize?: string; 
+  backgroundImageObjectUrl?: string; 
+  logoMaskPathD?: string; // SVG path data for the logo mask
+  logoMaskViewBox?: string; // viewBox for the logoMaskPathD
   children?: React.ReactNode; 
   animationScrollHeightVH?: number; 
 }
@@ -22,10 +27,10 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   textToMask,
   mainBackgroundImageUrl = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg", 
   backgroundImageObjectUrl, 
-  // foregroundIconName,    
-  // foregroundIconSize = "text-6xl",
+  logoMaskPathD = DEFAULT_LOGO_MASK_PATH_D,
+  logoMaskViewBox = DEFAULT_LOGO_MASK_VIEWBOX,
   children,
-  animationScrollHeightVH = 200, // Default to 2 screen heights for animation
+  animationScrollHeightVH = 300, // Increased for more scroll room
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const heroWrapperRef = useRef<HTMLDivElement>(null); 
@@ -40,19 +45,15 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
       rafId = requestAnimationFrame(() => {
         if (heroElement) { 
             const viewportHeight = window.innerHeight;
-            // The total distance over which the parent (heroWrapperRef) scrolls WHILE the sticky content is active.
-            // This is the total height of heroWrapperRef minus one screen height (for the sticky part).
             const scrollableParentHeight = heroElement.scrollHeight - viewportHeight;
-            
-            // How much the top of the heroWrapperRef has scrolled *above* the top of the viewport.
             const heroTopOffsetFromDocument = heroElement.getBoundingClientRect().top + window.scrollY;
             const amountScrolledRelativeToHeroStart = Math.max(0, window.scrollY - heroTopOffsetFromDocument);
 
             let progress = 0;
             if (scrollableParentHeight > 0) {
                 progress = Math.min(1, amountScrolledRelativeToHeroStart / scrollableParentHeight);
-            } else if (amountScrolledRelativeToHeroStart > 0) { // If animation height is just 100vh or less
-                progress = 1; // Considered fully scrolled for animation purposes
+            } else if (amountScrolledRelativeToHeroStart > 0) { 
+                progress = 1; 
             }
             setScrollProgress(progress);
         }
@@ -68,45 +69,72 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     }
   }, [animationScrollHeightVH]);
 
-  // Main Background
-  const mainBgTranslateY = scrollProgress * 8; // vh, slower parallax
-  const mainBgScale = 1 + scrollProgress * 0.03; // very subtle zoom
+  // Animation Parameters (tuned based on common GTA-like effects)
+  const scrollThresholds = {
+    initialFadeEnd: 0.15, // Initial content fades out by 15%
+    maskZoomStart: 0.05,  // Mask starts zooming slightly after initial fade begins
+    maskZoomEnd: 0.6,   // Mask zoom completes by 60%
+    finalTextStart: 0.5, // Final text starts appearing at 50%
+    finalTextEnd: 0.85,   // Final text fully visible by 85%
+  };
 
-  // Background Object/Icon
+  // --- Main Background ---
+  const mainBgInitialScale = 1.5;
+  const mainBgTargetScale = 1;
+  // Scale from 1.5 down to 1 over 0% to 85% (maskZoomEnd adjusted)
+  const mainBgScale = mainBgInitialScale - scrollProgress * (mainBgInitialScale - mainBgTargetScale) * (1 / scrollThresholds.maskZoomEnd);
+  const mainBgTranslateY = scrollProgress * 5; // vh, subtle parallax
+
+
+  // --- Background Object/Icon (Optional decorative layer) ---
   const bgObjectInitialScale = 0.5;
   const bgObjectTargetScale = 1.1;
   const bgObjectScale = bgObjectInitialScale + scrollProgress * (bgObjectTargetScale - bgObjectInitialScale);
-  const bgObjectTranslateY = -scrollProgress * 12; // vh
-  const bgObjectOpacity = Math.max(0.05, 0.8 - scrollProgress * 0.7); 
+  const bgObjectTranslateY = -scrollProgress * 10; // vh
+  const bgObjectOpacity = Math.max(0.05, 0.6 - scrollProgress * 0.55); 
 
-  // Original Title Text (fades out and scales down, moves behind mask)
+
+  // --- Initial Title Text ---
+  const titleTextProgress = Math.min(1, scrollProgress / scrollThresholds.initialFadeEnd);
   const titleTextInitialScale = 1;
-  const titleTextTargetScale = 0.6;
-  const titleTextScale = titleTextInitialScale - scrollProgress * (titleTextInitialScale - titleTextTargetScale);
-  const titleTextTranslateY = scrollProgress * 25; // vh - moves down
-  const titleTextOpacity = Math.max(0, 1 - scrollProgress * 3); // Fades out relatively quickly
+  const titleTextTargetScale = 0.7;
+  const titleTextScale = titleTextInitialScale - titleTextProgress * (titleTextInitialScale - titleTextTargetScale);
+  const titleTextTranslateY = titleTextProgress * 30; // vh - moves down
+  const titleTextOpacity = Math.max(0, 1 - titleTextProgress * 1.5); // Fades out quickly
 
 
-  const maskTextContent = textToMask || title;
+  // --- SVG Masked Overlay ---
+  const initialMaskScale = 50; // Very large to make the logo cutout appear small
+  const targetMaskScale = 1;
+  // Exponential scaling for smoother zoom, occurring between maskZoomStart and maskZoomEnd
+  let maskProgress = 0;
+  if (scrollProgress >= scrollThresholds.maskZoomStart) {
+    maskProgress = Math.min(1, (scrollProgress - scrollThresholds.maskZoomStart) / (scrollThresholds.maskZoomEnd - scrollThresholds.maskZoomStart));
+  }
+  // Using Math.pow for exponential curve, e.g. Math.pow(maskProgress, 3) for cubic
+  const currentMaskScale = initialMaskScale - (initialMaskScale - targetMaskScale) * Math.pow(maskProgress, 2);
+  const maskOverlayOpacity = maskProgress > 0 ? 1 : 0; // Become visible when zoom starts
+
+  const finalMaskedTextContent = textToMask || title; // Text for TextMaskEffect
 
   return (
-    // This is the scrollable container that defines the animation duration
     <div ref={heroWrapperRef} className="relative" style={{ height: `${animationScrollHeightVH}vh` }}>
-      {/* This is the STICKY container that holds all animated elements */}
       <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
         
-        {/* Layer 1: Main Background */}
+        {/* Layer 0: Main Background */}
         <div
           className="absolute inset-0 bg-cover bg-center -z-30"
           style={{ 
             backgroundImage: `url(${mainBackgroundImageUrl})`,
-            transform: `translateY(${mainBgTranslateY}vh) scale(${mainBgScale})`, 
+            transform: `translateY(${mainBgTranslateY}vh) scale(${Math.max(mainBgTargetScale, mainBgScale)})`, 
             willChange: 'transform',
           }}
         />
-        <div className="absolute inset-0 bg-black/70 -z-20"></div>
+        
+        {/* Optional: Dark overlay on background image if needed */}
+        {/* <div className="absolute inset-0 bg-black/30 -z-20"></div> */}
 
-        {/* Layer 2: Large Background Icon/Object */}
+        {/* Layer 1: Large Background Icon/Object (Decorative) */}
         {backgroundImageObjectUrl && (
           <div
             className="absolute inset-0 flex items-center justify-center -z-10 pointer-events-none"
@@ -116,7 +144,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
               willChange: 'opacity, transform',
             }}
           >
-            {/* Using a div with background image for better scaling/positioning as a layer */}
             <div 
               className="w-[60%] md:w-[40%] aspect-square bg-contain bg-no-repeat bg-center opacity-20"
               style={{ backgroundImage: `url(${backgroundImageObjectUrl})`}}
@@ -124,13 +151,14 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Layer 3: Original Title Text (fades out, stays behind mask) */}
+        {/* Layer 2: Initial Title Text (fades out) */}
         <div 
           className="relative text-center px-4 z-10" 
           style={{ 
             transform: `scale(${titleTextScale}) translateY(${titleTextTranslateY}vh)`, 
             opacity: titleTextOpacity,
             willChange: 'transform, opacity',
+            visibility: titleTextOpacity > 0 ? 'visible' : 'hidden',
           }}
         >
           <h1 className={cn(
@@ -145,11 +173,54 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           )}
         </div>
 
-        {/* Layer 4: Text Mask Effect - this appears "through" the original title */}
-        <TextMaskEffect text={maskTextContent} scrollProgress={scrollProgress} />
+        {/* Layer 3: SVG Masked Overlay (The "GTA Logo Reveal") */}
+        <div
+          className="absolute inset-0 z-20" // Above initial title, below final text
+          style={{
+            backgroundColor: 'hsl(var(--background))', // Color of the overlay that gets masked
+            opacity: maskOverlayOpacity,
+            transform: `scale(${Math.max(targetMaskScale, currentMaskScale)})`,
+            transformOrigin: 'center center', // Adjust as needed e.g. 'center 25%'
+            willChange: 'transform, opacity',
+            mask: 'url(#rockstarLogoMask)',
+            WebkitMask: 'url(#rockstarLogoMask)',
+          }}
+        />
+        <svg className="rockstar-svg-mask-defs">
+          <defs>
+            <mask id="rockstarLogoMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
+              {/* Rect fills the mask with white (opaque for the overlay) */}
+              <rect x="0" y="0" width="1" height="1" fill="white" />
+              {/* Path is filled with black (transparent area in overlay, revealing background) */}
+              {/* The path needs to be scaled and positioned relative to its viewBox to appear correctly */}
+              {/* For simplicity, this example assumes the path is drawn to fit a 0-1, 0-1 coordinate system */}
+              {/* A more robust solution would involve JS to calculate transform for the path based on logo container */}
+              <svg viewBox={logoMaskViewBox} x="0.25" y="0.35" width="0.5" height="0.3" preserveAspectRatio="xMidYMid meet">
+                 <path d={logoMaskPathD} fill="black" />
+              </svg>
+            </mask>
+          </defs>
+        </svg>
         
-        {/* Layer 5: Children (e.g., buttons) */}
-        {children && <div className="absolute bottom-[10vh] md:bottom-[15vh] z-50">{children}</div>}
+
+        {/* Layer 4: Final Revealed Text (TextMaskEffect component) */}
+        {/* Pass scrollProgress directly, TextMaskEffect will manage its own timeline */}
+        <TextMaskEffect 
+            text={finalMaskedTextContent} 
+            scrollProgress={scrollProgress} 
+            animationStartProgress={scrollThresholds.finalTextStart}
+            animationEndProgress={scrollThresholds.finalTextEnd}
+        />
+        
+        {/* Layer 5: Children (e.g., buttons) - appear when final text is somewhat visible */}
+        {children && (
+            <div 
+                className="absolute bottom-[10vh] md:bottom-[15vh] z-50 transition-opacity duration-500"
+                style={{ opacity: scrollProgress > scrollThresholds.finalTextStart ? 1 : 0 }}
+            >
+                {children}
+            </div>
+        )}
       </div>
     </div>
   );
