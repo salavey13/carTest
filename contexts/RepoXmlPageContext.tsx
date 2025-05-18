@@ -30,7 +30,7 @@ export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: 
 export interface IconReplaceTask { targetPath: string; oldIconName: string; newIconName: string; componentProps?: string; } 
 
 export interface PendingFlowDetails {
-    type: 'ImageSwap' | 'ErrorFix' | 'IconSwap'; 
+    type: 'ImageSwap' | 'ErrorFix' | 'IconSwap' | 'GenericIdea'; 
     targetPath: string;
     details: any; 
 }
@@ -230,7 +230,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             appToastHook = { success: (m) => logger.error("Toast (success) suppressed, hook failed:", m), error: (m) => logger.error("Toast (error) suppressed, hook failed:", m), info: (m) => logger.warn("Toast (info) suppressed, hook failed:", m), warning: (m) => logger.warn("Toast (warning) suppressed, hook failed:", m), loading: (m) => logger.warn("Toast (loading) suppressed, hook failed:", m), message: (m) => logger.warn("Toast (message) suppressed, hook failed:", m), custom: (m) => logger.warn("Toast (custom) suppressed, hook failed:", m), dismiss: () => logger.warn("Toast (dismiss) suppressed, hook failed"), addToastToHistory: () => logger.warn("Toast (addToastToHistory) suppressed, hook failed") };
         }
         const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => { 
-            if (!appToastHook || typeof appToastHook.success !== 'function') { // More robust check
+            if (!appToastHook || typeof appToastHook.success !== 'function') { 
                 logger.error("addToastStable: appToastHook is invalid or incomplete.", { message, type, appToastHookExists: !!appToastHook });
                 console.error(`TOAST FALLBACK (${type}): ${typeof message === 'string' ? message : 'ReactNode message'}`, options);
                 return;
@@ -312,7 +312,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             const flowLogPrefix = currentImgTask ? '[Flow 1 - Image Swap]'
                 : currentIconTask ? '[Flow X - Icon Swap]'
                 : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]'
-                : '[Flow 2 - Generic Idea]');
+                : (currentPendingFlow?.type === 'GenericIdea' ? '[Flow G - Generic Idea]'
+                : '[Flow 2 - Default Fetch]'));
         
             logger.debug(`${flowLogPrefix} Context: handleSetFilesFetchedStable. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
             
@@ -386,6 +387,39 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     }
                     setPendingFlowDetailsStateStable(null);
         
+                } else if (currentPendingFlow?.type === 'GenericIdea' && fetched) {
+                    const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
+                    if (targetFileExists && primaryHighlight === currentPendingFlow.targetPath) { // Ensure primaryHighlight matches expected targetPath
+                        const ideaText = currentPendingFlow.details.idea;
+                        setKworkInputValueStateStable(ideaText);
+                        logger.info(`${flowLogPrefix} Context: Set kworkInputValue for GenericIdea: "${ideaText.substring(0, 50)}..."`);
+    
+                        if (fetcherRef?.current?.handleAddSelected) {
+                            logger.info(`${flowLogPrefix} Context: GenericIdea - attempting to auto-add primary highlight '${primaryHighlight}' to kwork.`);
+                            setSelectedFetcherFilesStateStable(new Set([primaryHighlight]));
+                            setTimeout(async () => { 
+                                 try {
+                                     if (fetcherRef.current?.handleAddSelected) {
+                                         await fetcherRef.current.handleAddSelected(); 
+                                         logger.info(`${flowLogPrefix} Context: Added primary file '${primaryHighlight}' to kwork for GenericIdea using current selection.`);
+                                     }
+                                 } catch (addErr) {
+                                     logger.error(`${flowLogPrefix} Context: Error calling handleAddSelected for GenericIdea:`, addErr);
+                                 }
+                            }, 150);
+                        } else {
+                            logger.warn(`${flowLogPrefix} Context: GenericIdea - fetcherRef not ready for auto-adding context for '${primaryHighlight}'.`);
+                        }
+    
+                        if (dbUser?.user_id) {
+                            questResult = await updateUserCyberFitnessProfile(dbUser.user_id, { completedQuests: ['first_fetch_completed'] }); 
+                        }
+                        scrollToSectionStable('kwork-input-section');
+                    } else {
+                        addToastStable(`Ошибка Generic Idea: Целевой файл ${currentPendingFlow.targetPath} (primary: ${primaryHighlight}) не найден или не совпадает!`, 'error', 5000);
+                        finalFetchStatusDeterminedByFetch = 'error'; 
+                    }
+                    setPendingFlowDetailsStateStable(null);
                 } else { 
                     if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                     if (fetched && !currentImgTask && !currentIconTask && !currentPendingFlow && dbUser?.user_id) {
@@ -423,7 +457,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setIconReplaceTaskStateStable, 
              setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
-             setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal, setFilesFetchedState, setPrimaryHighlightPathState
+             setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal, setFilesFetchedState, setPrimaryHighlightPathState, setSelectedFetcherFilesStateStable
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
@@ -478,6 +512,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 setImageReplaceTaskStateStable(null); 
                 setIconReplaceTaskStateStable(null);
                 logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for ErrorFix. Cleared visual tasks.`);
+            } else if (flowType === 'GenericIdea') {
+                setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
+                setImageReplaceTaskStateStable(null); 
+                setIconReplaceTaskStateStable(null);
+                logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for GenericIdea. Cleared visual tasks.`);
             } else { 
                 setPendingFlowDetailsStateStable(null); setImageReplaceTaskStateStable(null); setIconReplaceTaskStateStable(null);
                 logger.log(`${flowLogPrefix} Context: Unknown or generic flow type. Clearing all specific task details.`);
@@ -501,11 +540,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let branchToFetch: string | null = null;
             let branchNameToSeek = potentialBranchNameProvided;
 
-            if (flowType === 'ImageSwap' || flowType === 'IconSwap') { 
-                logger.log(`${flowLogPrefix} Context: Visual Swap flow. Always fetching from default branch (null).`);
-                branchToFetch = null; 
+            if (flowType === 'ImageSwap' || flowType === 'IconSwap' || flowType === 'GenericIdea') { 
+                logger.log(`${flowLogPrefix} Context: ${flowType} flow. Fetching from branch: ${branchNameToSeek || 'default'}.`);
+                branchToFetch = branchNameToSeek || null; // Use provided branch or default
             } 
-            else if (branchNameToSeek) { 
+            else if (branchNameToSeek) { // For ErrorFix or other future specific flows that need PR check
                 try { 
                     const checkResult = await checkExistingPrBranch(repoUrlToCheck, branchNameToSeek);
                     if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
@@ -554,7 +593,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); }
         }, [addToastStable, fetcherRef, dbUser?.user_id, logger]); 
 
-        const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
+        const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
         const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
         

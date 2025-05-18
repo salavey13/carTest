@@ -13,7 +13,7 @@ import {
     IconReplaceTask, 
     SimplePullRequest, 
     FetchStatus,
-    PendingFlowDetails // Ensure PendingFlowDetails is imported
+    PendingFlowDetails 
 } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
@@ -89,8 +89,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const ideaFromUrl = ideaProp ?? ""; 
     logger.debug(`[RepoTxtFetcher] Props: highlightedPath='${highlightedPathFromUrl}', idea='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : 'null'}'`);
 
-    // autoFetch memo removed as per strategy to fix loop
-
     const importantFiles = useMemo(() => [
         "package.json", "app/layout.tsx",
         "tailwind.config.ts",
@@ -130,8 +128,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         imageReplaceTask: imageReplaceTask || (iconReplaceTask as unknown as ImageReplaceTask | null),
         highlightedPathFromUrl,
         importantFiles, 
-        // autoFetch: false, // Explicitly false or remove prop if hook updated
-        ideaFromUrl, // Still needed for useRepoFetcher's internal logic if any
+        ideaFromUrl, 
         isSettingsModalOpen,
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
         loadingPrs,
@@ -169,7 +166,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
         logger.debug(`${logPrefix} Evaluating. ideaSignature: '${currentIdeaSignature}', lastProcessed: '${lastProcessedIdeaSignatureRef.current}', initialIdeaProcessed: ${initialIdeaProcessedRef.current}, isPreChecking: ${isPreChecking}, repoUrlValid: ${!!repoUrl && repoUrl.includes("github.com")}`);
         
-        if (!ideaFromUrl || !highlightedPathFromUrl) {
+        if (!ideaFromUrl && !highlightedPathFromUrl) { // No idea AND no path
             if (initialIdeaProcessedRef.current) {
                 logger.debug(`${logPrefix} No idea/path from props, resetting initialIdeaProcessedRef & lastProcessedIdeaSignatureRef.`);
                 initialIdeaProcessedRef.current = false;
@@ -178,6 +175,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             logger.debug(`${logPrefix} Skipping: No ideaFromUrl or highlightedPathFromUrl.`);
             return;
         }
+        
+        // If only idea is present, but no path, we might want to just set the kwork input if repo is already loaded.
+        // However, the current flow relies on path for context fetching. For now, require path.
+        if (!highlightedPathFromUrl && ideaFromUrl) {
+            logger.debug(`${logPrefix} Skipping: ideaFromUrl present, but no highlightedPathFromUrl. Path is required for context fetching.`);
+            // If we want to support idea-only to populate kwork on an already loaded repo, add logic here.
+            // For now, if an idea comes through URL, it's assumed to be for a specific context (path).
+            return;
+        }
+        
+        // If no idea, but path is present (e.g., from error overlay click), skip idea processing.
+        if (!ideaFromUrl && highlightedPathFromUrl) {
+             logger.debug(`${logPrefix} Skipping idea processing: No ideaFromUrl, but highlightedPathFromUrl is present. Fetch will proceed based on path if repo URL is set.`);
+             // The useRepoFetcher's own logic will handle fetching based on highlightedPathFromUrl if repoUrl is valid and no tasks active.
+             return;
+        }
+
 
         if (initialIdeaProcessedRef.current && lastProcessedIdeaSignatureRef.current === currentIdeaSignature) {
             logger.info(`${logPrefix} Skipping: Idea signature '${currentIdeaSignature}' has already been processed by this component instance.`);
@@ -185,7 +199,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         }
         
         if (!repoUrl || !repoUrl.includes("github.com")) {
-            logger.debug(`${logPrefix} Skipping: Repo URL not valid or not GitHub.`);
+            logger.debug(`${logPrefix} Skipping: Repo URL not valid or not GitHub. Will wait for settings modal / manual input.`);
             return;
         }
         
@@ -236,7 +250,17 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                     detailsToProcess = parsedDetailsFromUrl;
                 }
             } catch (e) { logger.error(`${logPrefix} Failed to parse ErrorFix details from ideaProp:`, e); }
+        } else if (ideaFromUrl && highlightedPathFromUrl) { // Generic Idea condition
+            if (pendingFlowDetails?.type === 'GenericIdea' && 
+                pendingFlowDetails.targetPath === highlightedPathFromUrl && 
+                pendingFlowDetails.details?.idea === ideaFromUrl) {
+                taskMatchesActiveContext = true;
+            } else {
+                flowTypeToAction = 'GenericIdea';
+                detailsToProcess = { idea: ideaFromUrl }; 
+            }
         }
+
 
         if (taskMatchesActiveContext) {
             logger.info(`${logPrefix} Task from ideaProp signature '${currentIdeaSignature}' matches an active context task/flow. Skipping re-trigger and marking as processed.`);
@@ -245,7 +269,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             return;
         }
 
-        if (flowTypeToAction && detailsToProcess) {
+        if (flowTypeToAction && detailsToProcess && highlightedPathFromUrl) { // Ensure targetPath is available
             logger.info(`${logPrefix} Triggering PreCheckAndFetch for ${flowTypeToAction} with signature '${currentIdeaSignature}'.`);
             initialIdeaProcessedRef.current = true; 
             lastProcessedIdeaSignatureRef.current = currentIdeaSignature;
@@ -256,16 +280,16 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                 branchNameToUse,
                 flowTypeToAction,
                 detailsToProcess,
-                highlightedPathFromUrl
+                highlightedPathFromUrl // This is the targetPath for the flow
             ).then(() => {
                 logger.log(`${logPrefix} triggerPreCheckAndFetch for ${flowTypeToAction} completed successfully via ideaProp.`);
             }).catch(err => {
                 logger.error(`${logPrefix} Error during triggerPreCheckAndFetch for ${flowTypeToAction} via ideaProp:`, err);
-                initialIdeaProcessedRef.current = false; // Allow retry if trigger itself failed
+                initialIdeaProcessedRef.current = false; 
                 lastProcessedIdeaSignatureRef.current = null;
             });
-        } else if (ideaFromUrl) {
-             logger.warn(`${logPrefix} ideaProp ("${ideaFromUrl.substring(0,30)}...") did not match a known flow pattern or failed to parse. No auto-trigger. Marking as processed to avoid loop.`);
+        } else if (ideaFromUrl) { 
+             logger.warn(`${logPrefix} ideaProp ("${ideaFromUrl.substring(0,30)}...") provided, but conditions for a known flow (ImageSwap, IconSwap, ErrorFix, GenericIdea with path) were not met. Or targetPath (highlightedPathFromUrl) was missing. No auto-trigger. Marking as processed to avoid loop.`);
              initialIdeaProcessedRef.current = true;
              lastProcessedIdeaSignatureRef.current = currentIdeaSignature;
         }
@@ -283,7 +307,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              logger.debug("[Effect Scroll] SKIPPED (wrong status or automated flow active)", { fetchStatus, isAutomatedFlowActive });
              return;
         }
-        // ... (rest of scroll logic as before) ...
+        
         let cleanupScroll = () => {}; 
         const scrollToFile = (path: string, block: ScrollLogicalPosition = "center") => {
              const el = document.getElementById(`file-${path}`);
@@ -322,11 +346,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         }
     }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, iconReplaceTask, pendingFlowDetails, fetchedFiles.length, scrollToSection, toastInfo, logger]);
 
-    // ... (rest of the component, including useImperativeHandle, local handlers, derived states for rendering, and JSX)
-    // No changes to useImperativeHandle and other callbacks from the provided correct version.
-    // The JSX rendering logic for currentVisualTask would also remain the same.
-
-    // ... (Previous correct useImperativeHandle, local handlers, derived states, and JSX rendering logic)
      useEffect(() => {
         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START");
         if (assistantRef?.current?.updateRepoUrl) {
@@ -360,8 +379,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              logger.debug(`[Imperative] selectHighlightedFiles called.`);
              selectHighlightedFiles();
         },
-        handleAddSelected: (filesToAdd?: Set<string>, allFiles?: FileNode[]) => {
+        handleAddSelected: (filesToAdd?: Set<string>, allFilesList?: FileNode[]) => { // Changed param name for clarity
             logger.debug(`[Imperative] handleAddSelected called.`);
+            // The actual handleAddSelected from useKworkInput uses context selectedFetcherFiles.
+            // This imperative version is mostly a pass-through trigger.
+            // If specific files need to be added here, the logic in useKworkInput or context needs to support it.
+            // For now, it will use the current selection from context.
             handleAddSelected(); 
             return Promise.resolve(); 
         },
@@ -635,8 +658,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     } catch (renderError: any) {
         logger.fatal("[RepoTxtFetcher] CRITICAL RENDER ERROR:", renderError);
         return <div className="text-red-500 p-4">Критическая ошибка рендеринга Экстрактора: {renderError.message}</div>;
-    } finally {
-        logger.log("[RepoTxtFetcher] END Render");
     }
 });
 RepoTxtFetcher.displayName = 'RepoTxtFetcher';
