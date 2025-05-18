@@ -196,7 +196,7 @@
     font-family: 'Orbitron', sans-serif; 
   }
   section {
-    scroll-margin-top: 96px; 
+    scroll-margin-top: 96px; /* Standard scroll margin for sections */
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -251,11 +251,13 @@
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
   }
 
+  /* This class is for specific H1 on style guide, can be removed if H1 base style is enough */
   .text-gta-style-heading-styleguide { 
     @apply gta-vibe-text-effect; 
   }
 }
 
+/* Custom utilities moved to tailwind.config.js keyframes and animations */
 @layer utilities {
   .text-shadow-brand-yellow {
     text-shadow: 0 0 15px hsl(var(--brand-yellow)); 
@@ -263,8 +265,10 @@
   .filter-drop-shadow-brand-yellow { 
     filter: drop-shadow(0 0 15px hsl(var(--brand-yellow)));
   }
+  /* Other text-shadows or filters can be added here if not part of a component style */
 }
 
+/* Homepage specific styles - kept for reference, can be refactored or moved */
 .homepage-wrapper {
   @apply min-h-screen text-foreground relative overflow-x-hidden pt-20 pb-28;
   background-color: hsl(var(--background));
@@ -282,14 +286,8 @@
   background-color: hsl(var(--brand-pink) / 0.15);
   animation: bg_pulse_slow 10s cubic-bezier(0.4,0,0.6,1) infinite 1s;
 }
-@keyframes bg_pulse_fast { 
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(1.05); }
-}
-@keyframes bg_pulse_slow { 
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.25; transform: scale(1.03); }
-}
+/* Keyframes for bg_pulse_fast and bg_pulse_slow are in tailwind.config.ts */
+
 .loading-spinner-cyber {
   border-width: 4px;
   border-radius: 9999px; 
@@ -375,17 +373,11 @@
   }
 }
 
-@keyframes ticker {0% { transform: translateX(100%); } 100% { transform: translateX(-100%); }}
-/* .animate-ticker defined in tailwind.config.ts */
-
 .text-shadow-neon { text-shadow: 0 0 5px hsl(var(--brand-pink)), 0 0 10px hsl(var(--brand-pink)), 0 0 15px hsl(var(--brand-purple)), 0 0 20px hsl(var(--brand-purple));}
 .text-shadow-cyber { text-shadow: 0 0 4px hsla(var(--cyan-rgb), 0.8), 0 0 10px hsla(var(--pink-rgb), 0.6); }
 
-/* .animate-gradient-shift defined in tailwind.config.ts */
-/* @keyframes gradientShift { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; }} */
-
-.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px); }
-.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px); }
+.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px); }
+.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px); }
 
 .simple-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
 .simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--card-rgb), 0.5); }
@@ -396,27 +388,14 @@
 .cyber-text { font-family: "Orbitron", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--brand-cyan)); text-shadow: 0 0 3px hsl(var(--brand-cyan) / 0.7), 0 0 5px hsl(var(--brand-cyan) / 0.5), 0 0 8px hsl(var(--brand-pink) / 0.6); }
 .cyber-text.glitch-heavy { text-shadow: 0.05em 0 0 hsl(var(--brand-pink) / 0.75), -0.025em -0.025em 0 hsl(var(--brand-green) / 0.75), -0.01em 0.025em 0 hsl(var(--brand-cyan) / 0.75); }
 
-/* .glitch and related animations defined in tailwind.config.ts */
-/* @keyframes glitch { ... } */
-/* .glitch { ... } */
-/* .glitch::before, .glitch::after { ... } */
-/* @keyframes glitch-anim-1 { ... } */
-/* @keyframes glitch-anim-2 { ... } */
-
 .text-gradient { background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 @keyframes glow { 0% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); } 50% { text-shadow: 0 0 20px hsla(var(--pink-rgb), 0.8), 0 0 30px hsla(var(--purple-rgb), 0.5); } 100% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); }}
-.text-glow { animation: glow 2.5s infinite ease-in-out; }
-
-/* .animate-pulse-slow and pulse-slow keyframes defined in tailwind.config.ts */
-/* @keyframes pulse-slow { ... } */
+.text-glow { animation: glow 2.5s infinite ease-in-out; } /* Now managed by Tailwind JIT */
 
 input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-clear { display: none; }
 .comic-bubble { position: relative; background: hsl(var(--card)); border: 2px solid hsl(var(--brand-pink)); border-radius: 15px; color: hsl(var(--foreground));}
 
-/* .border-neon-glow and neon-border-glow keyframes defined in tailwind.config.ts */
-/* @keyframes neon-border-glow { ... } */
-
-@keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }} /* Keep if used for non-Tailwind managed elements */
+@keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }} 
 
 .shadow-glow { box-shadow: 0 0 10px hsla(var(--cyan-rgb), 0.5); }
 .shadow-glow:hover { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.7), 0 0 5px hsla(var(--pink-rgb), 0.3); }
@@ -429,12 +408,8 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 .shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2); }
 .shadow-orange-glow { box-shadow: 0 0 15px hsla(var(--orange-rgb), 0.4), 0 0 30px hsla(var(--orange-rgb), 0.2); }
 
-/* .glitch-border-animate and glitch-border keyframes defined in tailwind.config.ts */
-/* @keyframes glitch-border { ... } */
-
 .highlight-scroll { transition: outline 0.5s ease-out; outline: 2px solid hsl(var(--brand-green) / 0.7); outline-offset: 2px; box-shadow: 0 0 15px hsl(var(--brand-green) / 0.5); }
 .text-animated-gradient { @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange; background-size: 200% auto; animation: gradient-text-flow 3s linear infinite; }
-/* gradient-text-flow and wiggle keyframes defined in tailwind.config.ts */
 
 .tutorial-hero-bg-mask { 
   -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
