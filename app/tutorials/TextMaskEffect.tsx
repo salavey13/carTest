@@ -9,59 +9,67 @@ interface TextMaskEffectProps {
 }
 
 const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ text, scrollProgress }) => {
-  // Text starts very large and transparent, then zooms in and becomes opaque
-  const initialScale = 10; // Start very large (zoomed in)
-  const targetScale = 1;   // End at normal size
+  // Mask Text (this is the text that zooms in and becomes visible)
+  // It starts very large and transparent, then zooms to normal size and full opacity, then fades/zooms out.
+  const revealStart = 0.1;  // Start revealing/zooming in the mask text
+  const fullyVisibleStart = 0.3; // Mask text is at its target scale and opacity
+  const visibleEnd = 0.7;   // Mask text starts to fade/scale out
+  const revealEnd = 0.9;    // Mask text is fully faded/scaled out
 
-  // Opacity: 0 at start, 1 in the middle, 0 at end
-  // Let's make it appear from progress 0.1 to 0.5, then stay, then fade from 0.8 to 1.0
-  let currentOpacity;
-  if (scrollProgress < 0.1) {
-    currentOpacity = 0;
-  } else if (scrollProgress < 0.5) {
-    currentOpacity = (scrollProgress - 0.1) / (0.5 - 0.1); // Fade in
-  } else if (scrollProgress < 0.8) {
-    currentOpacity = 1; // Stay visible
+  let maskOpacity;
+  let maskScale;
+
+  if (scrollProgress < revealStart) {
+    maskOpacity = 0;
+    maskScale = 3; // Start large and off-screen (or very transparent)
+  } else if (scrollProgress < fullyVisibleStart) {
+    const progressInRange = (scrollProgress - revealStart) / (fullyVisibleStart - revealStart);
+    maskOpacity = progressInRange; // Fade in
+    maskScale = 3 - (2 * progressInRange); // Scale from 3 down to 1
+  } else if (scrollProgress < visibleEnd) {
+    maskOpacity = 1;
+    maskScale = 1; // Stay at normal size and full opacity
+  } else if (scrollProgress < revealEnd) {
+    const progressInRange = (scrollProgress - visibleEnd) / (revealEnd - visibleEnd);
+    maskOpacity = 1 - progressInRange; // Fade out
+    maskScale = 1 + progressInRange * 0.5; // Scale slightly up as it fades
   } else {
-    currentOpacity = 1 - (scrollProgress - 0.8) / (1.0 - 0.8); // Fade out
+    maskOpacity = 0;
+    maskScale = 1.5;
   }
-  currentOpacity = Math.max(0, Math.min(1, currentOpacity));
-
-
-  // Scale: from initialScale to targetScale as opacity becomes 1, then stays targetScale
-  let currentScale;
-   if (scrollProgress < 0.1) {
-    currentScale = initialScale;
-  } else if (scrollProgress < 0.5) {
-    // Interpolate scale from initialScale down to targetScale as opacity goes from 0 to 1
-    const scaleProgress = (scrollProgress - 0.1) / (0.5 - 0.1);
-    currentScale = initialScale - (initialScale - targetScale) * scaleProgress;
-  } else {
-    currentScale = targetScale; // Stay at target scale
-  }
-  currentScale = Math.max(targetScale, currentScale);
+  
+  maskOpacity = Math.max(0, Math.min(1, maskOpacity));
+  maskScale = Math.max(1, maskScale); // Ensure scale doesn't go below 1 during main visibility
 
 
   return (
     <div
       className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" 
-      style={{
-        opacity: currentOpacity,
-        transform: `scale(${currentScale})`,
-        willChange: 'opacity, transform',
-      }}
+      // This div is the "mask" itself, its background should match the page background
+      // to hide the original title text. Or, the original title text fades out.
+      // The text INSIDE this div is what appears to be revealed.
     >
-      <h1
-        className={cn(
-          "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold text-center",
-          // Different style for the "revealed" text
-          "text-transparent bg-clip-text bg-gradient-to-br from-brand-yellow via-brand-orange to-brand-pink",
-          "px-4"
-        )}
-        data-text={text} // For potential CSS glitch on this text too, if desired
+      <div
+        className="text-center px-4"
+        style={{
+          opacity: maskOpacity,
+          transform: `scale(${maskScale})`,
+          willChange: 'opacity, transform',
+        }}
       >
-        <VibeContentRenderer content={text} />
-      </h1>
+        <h1
+          className={cn(
+            "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold",
+            // This text uses a different style to differentiate from the original title
+            "text-transparent bg-clip-text bg-gradient-to-br from-brand-yellow via-brand-orange to-brand-pink",
+            "px-4" // Added padding for safety
+          )}
+          // Using data-text here allows CSS glitch effect on this text too, if desired
+          data-text={text} 
+        >
+          <VibeContentRenderer content={text} />
+        </h1>
+      </div>
     </div>
   );
 };
