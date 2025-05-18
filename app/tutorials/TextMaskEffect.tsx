@@ -6,64 +6,62 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 interface TextMaskEffectProps {
   text: string;
   scrollProgress: number; // 0 to 1
-  baseTitleZIndex?: number; // To position mask correctly relative to the base title
 }
 
-const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ text, scrollProgress, baseTitleZIndex = 10 }) => {
-  // Mask starts fully opaque and large, then shrinks and fades to reveal text underneath.
-  // Animation occurs, for example, between 10% and 70% of the total hero scroll.
-  const animationStart = 0.1; // When the mask starts to change
-  const animationEnd = 0.7;   // When the mask has fully "disappeared"
+const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ text, scrollProgress }) => {
+  // Text starts very large and transparent, then zooms in and becomes opaque
+  const initialScale = 10; // Start very large (zoomed in)
+  const targetScale = 1;   // End at normal size
 
-  let currentOpacity = 1;
-  let currentScale = 3; // Start large, e.g., 300%
-
-  if (scrollProgress < animationStart) {
-    currentOpacity = 1;
-    currentScale = 3;
-  } else if (scrollProgress > animationEnd) {
+  // Opacity: 0 at start, 1 in the middle, 0 at end
+  // Let's make it appear from progress 0.1 to 0.5, then stay, then fade from 0.8 to 1.0
+  let currentOpacity;
+  if (scrollProgress < 0.1) {
     currentOpacity = 0;
-    currentScale = 0.5; // Shrink down significantly
+  } else if (scrollProgress < 0.5) {
+    currentOpacity = (scrollProgress - 0.1) / (0.5 - 0.1); // Fade in
+  } else if (scrollProgress < 0.8) {
+    currentOpacity = 1; // Stay visible
   } else {
-    // Normalize progress within the animation phase (0 to 1)
-    const phaseProgress = (scrollProgress - animationStart) / (animationEnd - animationStart);
-    currentOpacity = 1 - phaseProgress;      // Fades from 1 to 0
-    currentScale = 3 - (phaseProgress * 2.5); // Scales from 3 down to 0.5
+    currentOpacity = 1 - (scrollProgress - 0.8) / (1.0 - 0.8); // Fade out
   }
-  
-  // This element acts as the mask. It contains the same text but will be animated.
-  // It is positioned above the static title.
+  currentOpacity = Math.max(0, Math.min(1, currentOpacity));
+
+
+  // Scale: from initialScale to targetScale as opacity becomes 1, then stays targetScale
+  let currentScale;
+   if (scrollProgress < 0.1) {
+    currentScale = initialScale;
+  } else if (scrollProgress < 0.5) {
+    // Interpolate scale from initialScale down to targetScale as opacity goes from 0 to 1
+    const scaleProgress = (scrollProgress - 0.1) / (0.5 - 0.1);
+    currentScale = initialScale - (initialScale - targetScale) * scaleProgress;
+  } else {
+    currentScale = targetScale; // Stay at target scale
+  }
+  currentScale = Math.max(targetScale, currentScale);
+
+
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" 
       style={{
-        zIndex: baseTitleZIndex + 5, // Ensure it's above the base title but below the foreground icon
         opacity: currentOpacity,
         transform: `scale(${currentScale})`,
         willChange: 'opacity, transform',
-        // This background ensures it covers the text beneath it before fading/shrinking.
-        // Should match the page's main background for seamless effect.
-        // backgroundColor: 'hsl(var(--background))', // Or a specific masking color
       }}
     >
-      <div className="text-center px-4">
-        {/* The text content of the mask. Styling can be identical to the main title,
-            or it can be a solid color block if the effect is purely about covering/uncovering.
-            For now, let's assume it's styled like the title and has the same data-text attribute. */}
-        <h1
-          className={cn(
-            "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect",
-            // "text-background" // If we want the mask text to be background-colored to "erase"
-            // Or a different color if the mask is a visual element itself.
-            // For a simple reveal, this styling might not even matter if opacity is 0 initially.
-            // Let's give it a slightly different, more solid appearance for testing the mask.
-            "text-transparent bg-clip-text bg-gradient-to-br from-brand-pink to-brand-purple"
-          )}
-          data-text={text} // Important for ::before/::after glitch effects if .gta-vibe-text-effect uses it
-        >
-          <VibeContentRenderer content={text} />
-        </h1>
-      </div>
+      <h1
+        className={cn(
+          "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold text-center",
+          // Different style for the "revealed" text
+          "text-transparent bg-clip-text bg-gradient-to-br from-brand-yellow via-brand-orange to-brand-pink",
+          "px-4"
+        )}
+        data-text={text} // For potential CSS glitch on this text too, if desired
+      >
+        <VibeContentRenderer content={text} />
+      </h1>
     </div>
   );
 };
