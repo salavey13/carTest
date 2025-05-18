@@ -12,7 +12,6 @@ import { useAppContext } from '@/contexts/AppContext';
 import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from '@/hooks/useAppToast';
 
-// Import new structural components
 import TutorialPageContainer from '../TutorialPageContainer';
 import RockstarHeroSection from '../RockstarHeroSection';
 import TutorialContentContainer from '../TutorialContentContainer';
@@ -107,19 +106,19 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        // Example image URLs - replace with your actual assets
-        // mainBackgroundImageUrl="https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2670&q=80"
-        // foregroundImageUrl="https://www.transparentpng.com/thumb/character/DzrPAs-character- φωτογραφίες.png" // Example PNG
-        // revealedBackgroundImageUrl="https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2574&q=80"
+        animationScrollHeightVH={300} // Example: 3 screens high for scroll effect
+        // mainBackgroundImageUrl="/path/to/your/main-hero-bg.jpg"
+        // foregroundImageUrl="/path/to/your/foreground-object.png"
+        // revealedBackgroundImageUrl="/path/to/your/revealed-bg.jpg"
       >
         <Button 
             onClick={toggleMode} 
             variant="outline" 
             className={cn(
-            "bg-card/80 backdrop-blur-md hover:bg-brand-pink/20 transition-all duration-200 text-sm px-6 py-3 shadow-lg hover:shadow-brand-pink/30",
+            "bg-card/80 backdrop-blur-md hover:bg-pink-500/30 transition-all duration-200 text-sm px-6 py-3 shadow-lg hover:shadow-pink-500/40",
             "focus:ring-2 focus:ring-offset-2 focus:ring-offset-background",
-            currentMode === 'ru' ? "border-brand-pink/70 text-brand-pink hover:text-brand-pink focus:ring-brand-pink" 
-                                 : "border-brand-blue/70 text-brand-blue hover:text-brand-blue focus:ring-brand-blue"
+            currentMode === 'ru' ? "border-pink-500/70 text-pink-400 hover:text-pink-300 focus:ring-pink-500" 
+                                 : "border-blue-500/70 text-blue-400 hover:text-blue-300 focus:ring-blue-500"
             )}
         >
             <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
@@ -135,7 +134,7 @@ function ImageSwapTutorialContent() {
             return (
               <TutorialStepSection 
                 key={step.id} 
-                className={cn(index > 0 && "border-t border-border/20 pt-12 md:pt-16")} 
+                className={cn(index > 0 && "pt-12 md:pt-16")} // border-t removed for now, handled by NextLevelTeaser before it
                 isLastStep={index === stepsToRender.length -1}
               >
                 <div className={cn(
