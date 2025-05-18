@@ -102,8 +102,7 @@ function ImageSwapTutorialContent() {
   return (
     <TutorialPageContainer>
       <RockstarHeroSection 
-        title={t.pageTitle} 
-        // titleClassNameForMask is now handled internally by RockstarHeroSection if needed via unique ID
+        title={t.pageTitle}
         textToMask="SLY13" 
         triggerElementSelector={`#${heroTriggerElementId}`}
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
