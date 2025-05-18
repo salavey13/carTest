@@ -56,11 +56,6 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
   "brand-green": { text: "text-brand-green", border: "border-brand-green", shadow: "shadow-green-glow" },
 };
 
-// Placeholder SVG path for "oneSitePls" or similar text
-const OSP_LOGO_PATH_D = "M20,70 Q40,20 70,40 T120,70 M20,70 H120 M140,70 Q160,20 190,40 T240,70 M140,70 H240 M260,70 Q280,20 310,40 T360,70 M260,70 H360";
-const OSP_LOGO_VIEWBOX = "0 0 380 100";
-
-
 function ImageSwapTutorialContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -110,12 +105,11 @@ function ImageSwapTutorialContent() {
       <RockstarHeroSection 
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
-        textToMask={t.pageTitle.substring(0,20)} // Use a portion of title for the final text reveal for variety
-        logoMaskPathD={OSP_LOGO_PATH_D} // Pass the SVG path data for the mask
-        logoMaskViewBox={OSP_LOGO_VIEWBOX} // Pass the viewBox for the mask
+        textToMask={t.pageTitle.substring(0,20)} 
+        // Not passing logoMaskPathD, so it will use TextToSVGMask with title
         animationScrollHeightVH={300} 
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-18-01-29-18-375_org.telegram.messenger-a58d2b7f-775f-482f-ba0c-7735a3ca2335.jpg"
-        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png" // Example background object
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         <Button 
             onClick={toggleMode} 

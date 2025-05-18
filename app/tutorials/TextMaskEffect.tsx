@@ -5,16 +5,16 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 
 interface TextMaskEffectProps {
   text: string;
-  scrollProgress: number; // Overall scroll progress from parent (0 to 1)
-  animationStartProgress?: number; // When this component's animation should start (0 to 1)
-  animationEndProgress?: number;   // When this component's animation should end (0 to 1)
+  scrollProgress: number; 
+  animationStartProgress?: number; 
+  animationEndProgress?: number;   
 }
 
 const TextMaskEffect: React.FC<TextMaskEffectProps> = ({ 
   text, 
   scrollProgress,
-  animationStartProgress = 0.5, // Default: start at 50% of parent's scroll
-  animationEndProgress = 0.85    // Default: end at 85% of parent's scroll
+  animationStartProgress = 0.5, 
+  animationEndProgress = 0.85    
 }) => {
   
   const initialScale = 1.25; 
@@ -31,38 +31,37 @@ const TextMaskEffect: React.FC<TextMaskEffectProps> = ({
     const duration = animationEndProgress - animationStartProgress;
     inRangeProgress = duration > 0 ? (scrollProgress - animationStartProgress) / duration : 1;
     
-    currentOpacity = inRangeProgress; // Fade in
-    currentScale = initialScale - (initialScale - targetScale) * inRangeProgress; // Scale from initial down to target
-  } else { // scrollProgress >= animationEndProgress
+    currentOpacity = inRangeProgress; 
+    currentScale = initialScale - (initialScale - targetScale) * inRangeProgress; 
+  } else { 
     currentOpacity = 1;
-    currentScale = targetScale; // Stay at normal size and full opacity
+    currentScale = targetScale; 
   }
   
   currentOpacity = Math.max(0, Math.min(1, currentOpacity));
   currentScale = Math.max(targetScale, currentScale); 
 
-  // Dynamic gradient for text (as per video concept)
-  // Gradient moves from bottom to top
-  const gradientStopTop = 100 - (inRangeProgress * 100); // Moves from 100 down to 0
-  const gradientStopBottom = gradientStopTop + 100; // Maintain 100% spread for gradient
+  // Dynamic gradient for text
+  // The gradient reveals from bottom to top as inRangeProgress goes from 0 to 1
+  const gradientTopPosition = 100 - (inRangeProgress * 100); // from 100% (all transparent) to 0% (all color1)
+  const gradientBottomPosition = gradientTopPosition + 100; // Maintain a 100% spread
   
   const dynamicGradientStyle: React.CSSProperties = {
-    backgroundImage: `linear-gradient(
-      to bottom, 
-      hsl(var(--brand-pink) / ${0.3 + currentOpacity * 0.7}) ${gradientStopTop}%, 
-      hsl(var(--brand-yellow) / ${0.8 + currentOpacity * 0.2}) ${gradientStopBottom}%
+    backgroundImage: `linear-gradient(to top, 
+      hsl(var(--brand-yellow)) ${gradientTopPosition}%, 
+      hsl(var(--brand-pink)) ${gradientBottomPosition}%
     )`,
     WebkitBackgroundClip: 'text',
     backgroundClip: 'text',
     color: 'transparent',
-    textShadow: `0 2px 10px hsla(var(--brand-yellow-rgb), ${currentOpacity * 0.3})`,
+    // Add a subtle text shadow that fades in with opacity
+    textShadow: `0 1px 3px hsla(var(--brand-orange-rgb), ${currentOpacity * 0.3}), 0 2px 8px hsla(var(--brand-yellow-rgb), ${currentOpacity * 0.2})`,
   };
 
 
   return (
     <div
       className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none" 
-      // z-30 to be above SVG mask overlay (z-20)
     >
       <div
         className="text-center px-4"
@@ -75,10 +74,10 @@ const TextMaskEffect: React.FC<TextMaskEffectProps> = ({
         <h1
           className={cn(
             "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold",
-            "px-4" // Ensure padding if text is long
+            "px-4" 
           )}
           style={dynamicGradientStyle}
-          data-text={text} // For potential pseudo-element effects if needed
+          data-text={text} 
         >
           <VibeContentRenderer content={text} />
         </h1>

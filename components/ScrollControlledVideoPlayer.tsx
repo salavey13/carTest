@@ -151,7 +151,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         setDebugCalculatedTime(newTime);
     }
     return { shouldBeScrollControlled, newTime };
-  }, [videoDuration, src, showDebugOverlay]);
+  }, [videoDuration, showDebugOverlay]); // Removed src from deps as it's stable for this callback
 
   const masterScrollHandler = useCallback(() => {
     const now = performance.now();
@@ -228,19 +228,23 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
             window.addEventListener('scroll', masterScrollHandler, { passive: true });
             window.addEventListener('resize', masterScrollHandler, { passive: true });
         } else { 
+            // Video is visible but NOT under scroll control
             if (videoBottom <= 0 && videoTop < 0) { 
-                logger.debug(`[ScrollVideo ${src.split('/').pop()}] Visible (passed top), Not ScrollControlled. Looping from end.`);
+                // Video has scrolled completely past the top of the viewport
+                logger.debug(`[ScrollVideo ${src.split('/').pop()}] Visible (passed top), Not ScrollControlled. Setting loop=true, playing from end.`);
                 if (video.readyState >= video.HAVE_METADATA && !video.seeking && videoDuration > 0) {
+                    // Set to near end for looping from a visually continuous point
                     video.currentTime = Math.max(0, videoDuration - 0.1); 
                 }
-                video.loop = true;
+                video.loop = true; // Enable looping
                 if (showDebugOverlay) setDebugIsLooping(true);
                 if (video.paused) {
                     video.play().catch(e => logger.warn(`[ScrollVideo Play Fail ${src.split('/').pop()}] PassedTop Loop: ${e.message}`));
                 }
             } else { 
-                logger.debug(`[ScrollVideo ${src.split('/').pop()}] Visible, Not ScrollControlled, Initial/Bottom. Frame 0, paused.`);
-                video.loop = false;
+                // Video is visible at the bottom or just entered, but not yet scroll-controlled
+                logger.debug(`[ScrollVideo ${src.split('/').pop()}] Visible, Not ScrollControlled, Initial/Bottom. Frame 0, paused, loop=false.`);
+                video.loop = false; // Disable looping for initial state
                 if (showDebugOverlay) setDebugIsLooping(false);
                 if (!video.paused) video.pause();
                 if (video.currentTime !== 0 && !video.seeking && video.readyState >= video.HAVE_METADATA) video.currentTime = 0;
@@ -268,6 +272,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         preload="metadata" 
         playsInline
         muted
+        loop // Initial loop state, will be controlled by useEffect
       >
         Your browser does not support the video tag.
       </video>
@@ -280,7 +285,7 @@ const ScrollControlledVideoPlayer: React.FC<ScrollControlledVideoPlayerProps> = 
         <div className="absolute top-2 left-2 bg-black/70 text-white text-xs p-2 rounded font-mono z-50 pointer-events-none max-w-[calc(100%-1rem)] overflow-hidden">
           <div>Src: {src.split('/').pop()?.substring(0,30)}</div>
           <div>ScrollCtrl: {isUnderScrollControl ? 'YES' : 'NO'}</div>
-          <div>Looping: {debugIsLooping ? 'YES' : 'NO'}</div>
+          <div>Looping(JS): {debugIsLooping ? 'YES' : 'NO'}</div>
           <div>Visible(IO): {isVisible ? 'YES' : 'NO'}</div>
           <div>Top: {debugVideoTop.toFixed(0)}, Bot: {debugVideoBottom.toFixed(0)}</div>
           <div>CalcPrg: {debugCalculatedProgress.toFixed(3)}</div>
