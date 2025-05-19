@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -10,11 +10,11 @@ import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import TutorialLoader from '../tutorials/TutorialLoader'; 
+import RockstarHeroSection from '../tutorials/RockstarHeroSection'; 
 import { useAppContext } from '@/contexts/AppContext';
 import { fetchUserCyberFitnessProfile, QUEST_ORDER, isQuestUnlocked as checkQuestUnlocked } from '@/hooks/cyberFitnessSupabase';
 import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
 
 interface TutorialLink {
   href: string;
@@ -45,7 +45,7 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 const pageTranslations = {
     ru: {
         pageTitle: "VIBE ТРЕНИРОВКА",
-        pageSubtitleTraining: "", 
+        pageSubtitleTraining: "Это твоя личная тренировочная площадка. Прокачивай скиллы, выполняй миссии, становись кибер-магом!", 
         trainingTitle: "VIBE ТРЕНИРОВКА",
         missionsTitle: "::FaGraduationCap:: Взломай Матрицу Кода: Твои Первые Миссии!",
         missionsSubtitle: "Обычные туториалы – для зубрил. Эти – твой SPEEDRUN к скиллу. На каждой миссии есть WTF-кнопка – это как секретный уровень, только для самых дерзких. НЕ ЗАССЫ, ЖМИ!",
@@ -69,6 +69,7 @@ function StartTrainingContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { dbUser, isAuthenticated } = useAppContext();
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
 
   const initialMode = searchParams.get('mode') === 'wtf' ? 'wtf' : 'ru';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialMode);
@@ -87,7 +88,6 @@ function StartTrainingContent() {
   const togglePageMode = () => {
     const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
     setCurrentMode(newMode);
-    // Update URL without full page reload to reflect mode change for potential refresh/sharing
     const currentPath = window.location.pathname;
     if (newMode === 'wtf') {
       router.replace(`${currentPath}?mode=wtf`);
@@ -114,14 +114,13 @@ function StartTrainingContent() {
       }
       setLoadingProfile(false);
     } else if (!isAuthenticated) {
-      setLoadingProfile(false); // Not authenticated, no profile to load
+      setLoadingProfile(false); 
     }
   }, [isAuthenticated, dbUser?.user_id]);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
-
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -167,143 +166,147 @@ function StartTrainingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 flex flex-col items-center justify-start">
-      <header className={cn("text-center mb-8 md:mb-10", currentMode === 'wtf' && "animate-pulse")}>
-          <h1 className={cn(
-            "text-4xl sm:text-5xl font-orbitron font-bold cyber-text glitch",
-            currentMode === 'wtf' ? "text-brand-pink" : "text-brand-green"
-           )} data-text={t.pageTitle}>
-             <VibeContentRenderer content={t.pageTitle} />
-          </h1>
-          {currentMode === 'wtf' && (
-            <p className="text-md sm:text-lg text-gray-300 font-mono max-w-xl mx-auto mt-3">
-                <VibeContentRenderer content={t.pageSubtitleTraining} />
-            </p>
-          )}
-      </header>
+    <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
+      <RockstarHeroSection
+        title={t.pageTitle}
+        subtitle={currentMode === 'ru' ? t.pageSubtitleTraining : pageTranslations.wtf.pageSubtitleTraining}
+        triggerElementSelector={`#${heroTriggerId}`}
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg"
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
+      >
+         <Button 
+            onClick={togglePageMode} 
+            variant="outline" 
+            size="lg"
+            className={cn(
+              "bg-card/80 backdrop-blur-md hover:bg-pink-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              currentMode === 'ru' 
+                ? "border-pink-500/80 text-pink-400 hover:text-pink-200 focus:ring-2 focus:ring-pink-500" 
+                : "border-blue-500/80 text-blue-400 hover:text-blue-200 focus:ring-2 focus:ring-blue-500"
+            )}
+        >
+          <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+        </Button>
+      </RockstarHeroSection>
+
+      {/* This div acts as a spacer to push content below the fixed RockstarHeroSection */}
+      {/* Its height determines how much scroll is needed before content is fully visible */}
+      <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
       
-      <Button 
-        onClick={togglePageMode} 
-        variant="outline" 
-        className={cn(
-          "mb-8 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
-          "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
-        )}
-      >
-        <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
-      </Button>
+      {/* Actual page content starts here, positioned relatively */}
+      <div className="container mx-auto px-4 py-12 md:py-16 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.2 : 0.1 }}
+          className="w-full max-w-md mb-12 mx-auto" 
+        >
+          <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
+            <CardHeader className="p-6 md:p-8 border-b border-brand-green/40">
+              <FaDumbbell className="text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)]" />
+              <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text={currentMode === 'wtf' ? "ФИЗУХА (СКИП)" : "VIBE ТРЕНИРОВКА"}>
+                 <VibeContentRenderer content={t.trainingTitle} />
+              </CardTitle>
+            </CardHeader>
 
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.2 : 0.1 }}
-        className="w-full max-w-md mb-12"
-      >
-        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
-          <CardHeader className="p-6 md:p-8 border-b border-brand-green/40">
-            <FaDumbbell className="text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)]" />
-            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text={currentMode === 'wtf' ? "ФИЗУХА (СКИП)" : "VIBE ТРЕНИРОВКА"}>
-               <VibeContentRenderer content={t.trainingTitle} />
-            </CardTitle>
-          </CardHeader>
+            <CardContent className="space-y-8 p-6 md:p-8">
+              <section>
+                <h2 className="text-2xl font-orbitron font-semibold text-light-text mb-2">{currentExercise}</h2>
+                <p className="text-7xl md:text-8xl font-mono font-bold text-brand-pink my-6 tracking-wider drop-shadow-lg text-shadow-neon"> 
+                  {formatTime(timer)}
+                </p>
+                <p className="text-muted-foreground font-mono">Следующее: {nextExercise}</p>
+              </section>
 
-          <CardContent className="space-y-8 p-6 md:p-8">
-            <section>
-              <h2 className="text-2xl font-orbitron font-semibold text-light-text mb-2">{currentExercise}</h2>
-              <p className="text-7xl md:text-8xl font-mono font-bold text-brand-pink my-6 tracking-wider drop-shadow-lg text-shadow-neon"> 
-                {formatTime(timer)}
-              </p>
-              <p className="text-muted-foreground font-mono">Следующее: {nextExercise}</p>
-            </section>
+              <section className="grid grid-cols-2 gap-4">
+                <Button
+                  onClick={handleStartPause}
+                  size="lg" 
+                  className="col-span-2 bg-gradient-to-r from-brand-green to-neon-lime text-black hover:brightness-110 font-orbitron text-lg py-3.5 shadow-lg hover:shadow-brand-green/50 transform hover:scale-105 transition-all duration-300"
+                >
+                  {isActive && !isPaused ? <FaPause className="mr-2.5" /> : <FaPlay className="mr-2.5" />}
+                  {isActive && !isPaused ? "Пауза" : isActive && isPaused ? "Продолжить" : "Старт"}
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  variant="outline"
+                  className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-white font-orbitron py-3 text-base shadow-md hover:shadow-brand-blue/30 transform hover:scale-105 transition-all duration-300"
+                  disabled={!isActive} 
+                >
+                  <FaForward className="mr-2" /> Далее
+                </Button>
+                <Button
+                  onClick={handleComplete}
+                  variant="destructive" 
+                  className="bg-brand-red hover:bg-brand-red/80 text-destructive-foreground font-orbitron py-3 text-base shadow-md hover:shadow-brand-red/40 transform hover:scale-105 transition-all duration-300"
+                  disabled={!isActive && timer === 120}
+                >
+                  <FaFlagCheckered className="mr-2" /> Завершить
+                </Button>
+              </section>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-            <section className="grid grid-cols-2 gap-4">
-              <Button
-                onClick={handleStartPause}
-                size="lg" 
-                className="col-span-2 bg-gradient-to-r from-brand-green to-neon-lime text-black hover:brightness-110 font-orbitron text-lg py-3.5 shadow-lg hover:shadow-brand-green/50 transform hover:scale-105 transition-all duration-300"
-              >
-                {isActive && !isPaused ? <FaPause className="mr-2.5" /> : <FaPlay className="mr-2.5" />}
-                {isActive && !isPaused ? "Пауза" : isActive && isPaused ? "Продолжить" : "Старт"}
-              </Button>
-              <Button
-                onClick={handleNext}
-                variant="outline"
-                className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-white font-orbitron py-3 text-base shadow-md hover:shadow-brand-blue/30 transform hover:scale-105 transition-all duration-300"
-                disabled={!isActive} 
-              >
-                <FaForward className="mr-2" /> Далее
-              </Button>
-              <Button
-                onClick={handleComplete}
-                variant="destructive" 
-                className="bg-brand-red hover:bg-brand-red/80 text-destructive-foreground font-orbitron py-3 text-base shadow-md hover:shadow-brand-red/40 transform hover:scale-105 transition-all duration-300"
-                disabled={!isActive && timer === 120}
-              >
-                <FaFlagCheckered className="mr-2" /> Завершить
-              </Button>
-            </section>
-          </CardContent>
-        </Card>
-      </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.4 : 0.3 }}
+          className="w-full max-w-2xl mx-auto" 
+        >
+          <Card className={cn("bg-dark-card/80 backdrop-blur-md border shadow-xl", currentMode === 'wtf' ? "border-brand-pink/70 shadow-pink-glow" : "border-brand-purple/50 shadow-purple-glow")}>
+            <CardHeader className="pb-4">
+              <CardTitle className={cn("text-2xl font-orbitron flex items-center justify-center gap-2", currentMode === 'wtf' ? "text-brand-pink gta-vibe-text-effect" : "text-brand-purple")}>
+                  <VibeContentRenderer content={t.missionsTitle} />
+              </CardTitle>
+              <CardDescription className="text-muted-foreground font-mono text-center">
+                  <VibeContentRenderer content={t.missionsSubtitle} />
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 md:p-6">
+              {loadingProfile && <TutorialLoader />}
+              {!loadingProfile && tutorialLinks.map((link) => {
+                const colorConfig = colorClasses[link.color as keyof typeof colorClasses] || { text: "text-primary", border: "border-primary", shadow: "hover:shadow-primary/50", bgHover: "hover:bg-primary/10", ring: "focus:ring-primary" };
+                const wtfColorConfig = colorClasses["brand-pink-wtf"];
+                const isUnlocked = cyberProfile ? checkQuestUnlocked(link.questId, cyberProfile.completedQuests, QUEST_ORDER) : false;
+                
+                const buttonCard = (
+                   <Card 
+                      className={cn(
+                          "flex flex-col items-center justify-between p-4 rounded-lg border-2 bg-dark-card/60 backdrop-blur-sm transition-all duration-200 transform",
+                          isUnlocked ? `${colorConfig.border} ${colorConfig.shadow} hover:scale-[1.03] hover:-translate-y-1` : "border-muted/30 opacity-60 cursor-not-allowed"
+                      )}
+                    >
+                      <VibeContentRenderer content={`::${link.icon}::`} className={cn("text-5xl mb-2 drop-shadow-[0_0_8px_currentColor]", isUnlocked ? colorConfig.text : "text-muted-foreground")} />
+                      <span className={cn("font-orbitron text-md font-semibold leading-tight text-center mb-3", isUnlocked ? colorConfig.text : "text-muted-foreground")}>{link.title}</span>
+                      <div className="flex flex-col gap-2 w-full mt-auto">
+                          <Button asChild variant="outline" className={cn("w-full text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white focus:text-white", !isUnlocked && "pointer-events-none opacity-50")}>
+                              <Link href={link.href} onClick={(e) => !isUnlocked && e.preventDefault()}>Унылый Гайд</Link>
+                          </Button>
+                          <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon", !isUnlocked && "pointer-events-none opacity-50")}>
+                              <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}>WTF-РЕЖИМ ::FaBiohazard::</Link>
+                          </Button>
+                      </div>
+                  </Card>
+                );
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.4 : 0.3 }}
-        className="w-full max-w-2xl"
-      >
-        <Card className={cn("bg-dark-card/80 backdrop-blur-md border shadow-xl", currentMode === 'wtf' ? "border-brand-pink/70 shadow-pink-glow" : "border-brand-purple/50 shadow-purple-glow")}>
-          <CardHeader className="pb-4">
-            <CardTitle className={cn("text-2xl font-orbitron flex items-center justify-center gap-2", currentMode === 'wtf' ? "text-brand-pink gta-vibe-text-effect" : "text-brand-purple")}>
-                <VibeContentRenderer content={t.missionsTitle} />
-            </CardTitle>
-            <CardDescription className="text-muted-foreground font-mono text-center">
-                <VibeContentRenderer content={t.missionsSubtitle} />
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 md:p-6">
-            {loadingProfile && <TutorialLoader />}
-            {!loadingProfile && tutorialLinks.map((link) => {
-              const colorConfig = colorClasses[link.color as keyof typeof colorClasses] || { text: "text-primary", border: "border-primary", shadow: "hover:shadow-primary/50", bgHover: "hover:bg-primary/10", ring: "focus:ring-primary" };
-              const wtfColorConfig = colorClasses["brand-pink-wtf"];
-              const isUnlocked = cyberProfile ? checkQuestUnlocked(link.questId, cyberProfile.completedQuests, QUEST_ORDER) : false;
-              
-              const buttonCard = (
-                 <Card 
-                    className={cn(
-                        "flex flex-col items-center justify-between p-4 rounded-lg border-2 bg-dark-card/60 backdrop-blur-sm transition-all duration-200 transform",
-                        isUnlocked ? `${colorConfig.border} ${colorConfig.shadow} hover:scale-[1.03] hover:-translate-y-1` : "border-muted/30 opacity-60 cursor-not-allowed"
-                    )}
-                  >
-                    <VibeContentRenderer content={`::${link.icon}::`} className={cn("text-5xl mb-2 drop-shadow-[0_0_8px_currentColor]", isUnlocked ? colorConfig.text : "text-muted-foreground")} />
-                    <span className={cn("font-orbitron text-md font-semibold leading-tight text-center mb-3", isUnlocked ? colorConfig.text : "text-muted-foreground")}>{link.title}</span>
-                    <div className="flex flex-col gap-2 w-full mt-auto">
-                        <Button asChild variant="outline" className={cn("w-full text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white focus:text-white", !isUnlocked && "pointer-events-none opacity-50")}>
-                            <Link href={link.href} onClick={(e) => !isUnlocked && e.preventDefault()}>Унылый Гайд</Link>
-                        </Button>
-                        <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon", !isUnlocked && "pointer-events-none opacity-50")}>
-                            <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}>WTF-РЕЖИМ ::FaBiohazard::</Link>
-                        </Button>
-                    </div>
-                </Card>
-              );
-
-              return isUnlocked ? buttonCard : (
-                <TooltipProvider key={link.href + "-tooltip"}>
-                  <Tooltip delayDuration={100}>
-                    <TooltipTrigger asChild>
-                      <div>{buttonCard}</div>
-                    </TooltipTrigger>
-                    <TooltipContent className="bg-black/80 text-brand-orange border-brand-orange/50 font-mono">
-                      <p>{t.lockedMissionTooltip}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </motion.div>
+                return isUnlocked ? buttonCard : (
+                  <TooltipProvider key={link.href + "-tooltip"}>
+                    <Tooltip delayDuration={100}>
+                      <TooltipTrigger asChild>
+                        <div>{buttonCard}</div>
+                      </TooltipTrigger>
+                      <TooltipContent className="bg-black/80 text-brand-orange border-brand-orange/50 font-mono">
+                        <p>{t.lockedMissionTooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </div>
   );
 }

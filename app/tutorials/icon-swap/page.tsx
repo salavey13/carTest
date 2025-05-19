@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,12 @@ import TutorialLoader from '../TutorialLoader';
 import { useAppContext } from '@/contexts/AppContext';
 import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from '@/hooks/useAppToast';
+
+import TutorialPageContainer from '../TutorialPageContainer';
+import RockstarHeroSection from '../RockstarHeroSection';
+import TutorialContentContainer from '../TutorialContentContainer';
+import TutorialStepSection from '../TutorialStepSection';
+import NextLevelTeaser from '../NextLevelTeaser';
 
 const iconSwapTutorialTranslations = {
   ru: {
@@ -58,7 +64,7 @@ const iconSwapTutorialTranslations = {
       }
     ],
     nextLevelTitle: "::FaAward:: Навык 'Разминирование Иконок' Получен!",
-    nextLevelText: "Отличная работа, сапёр! Теперь ты можешь поддерживать визуальную целостность интерфейсов. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> готова к новым задачам.",
+    nextLevelText: "Отличная работа, сапёр! Теперь ты можешь поддерживать визуальную целостность интерфейсов. <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> ждет!",
     tryLiveButton: "::FaTools:: Перейти в Студию",
     toggleButtonToWtf: "::FaPooStorm:: Врубить Режим БОГА (WTF?!)",
   },
@@ -94,15 +100,15 @@ const iconSwapTutorialTranslations = {
         id: 4,
         title: "ШАГ 4: GG WP! ИКОНКА ЦЕЛА!",
         description: "Автоматика всё сделает: PR, мердж. Обнови страницу – иконка ИДЕАЛЬНА! Ты – боженька UX!",
-        icon: "FaCheckCircle", 
+        icon: "FaCircleCheck", 
         color: "brand-green",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step4_profit.mp4"
       }
     ],
     nextLevelTitle: "::FaCrown:: ИКОНКИ ПОДЧИНЯЮТСЯ ТЕБЕ!",
-    nextLevelText: "Ты теперь повелитель иконок! Го в <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ломать дальше... или чинить.",
+    nextLevelText: "Ты теперь повелитель иконок! Го на <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующую Миссию</Link>, там РЕАЛЬНЫЕ ДЕЛА.",
     tryLiveButton: "::FaHammer:: В Студию, РАБОТЯГА!",
-    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", // Only show return to normal if started in WTF
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
 };
 
@@ -119,6 +125,7 @@ function IconSwapTutorialContent() {
   const router = useRouter();
   const { dbUser, isAuthenticated } = useAppContext();
   const { addToast } = useAppToast();
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger"; 
 
   const initialModeFromUrl = searchParams.get('mode') === 'wtf';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
@@ -130,7 +137,7 @@ function IconSwapTutorialContent() {
     if (isAuthenticated && dbUser?.user_id) {
       const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
       if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
-        addToast(`::FaCheckCircle:: Миссия "${iconSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+        addToast(`::FaCircleCheck:: Миссия "${iconSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
       }
       result.newAchievements?.forEach(ach => {
         addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
@@ -145,11 +152,7 @@ function IconSwapTutorialContent() {
   const toggleMode = () => {
     const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
     setCurrentMode(newMode);
-    // If switching to WTF, update URL and then this button will disappear
-    if (newMode === 'wtf') {
-      router.replace(`/tutorials/icon-swap?mode=wtf`);
-    }
-    // No need to update URL if switching back to RU, as button won't be there.
+    router.replace(`/tutorials/icon-swap${newMode === 'wtf' ? '?mode=wtf' : ''}`, { scroll: false });
   };
   
   useEffect(() => {
@@ -160,57 +163,65 @@ function IconSwapTutorialContent() {
   }, [searchParams, currentMode]);
 
   const stepsToRender = t.steps;
-  const pageMainColor = "brand-purple"; 
+  const pageMainColorKey = "brand-purple"; 
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-indigo-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
-      <div
-        className="absolute inset-0 bg-repeat opacity-[0.04] -z-10"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(139, 92, 246, 0.1) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(139, 92, 246, 0.1) 1px, transparent 1px)`,
-          backgroundSize: '45px 45px',
-        }}
-      ></div>
+    <TutorialPageContainer>
+      <RockstarHeroSection
+        title={t.pageTitle}
+        subtitle={t.pageSubtitle}
+        triggerElementSelector={`#${heroTriggerId}`}
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" 
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
+      >
+        {!initialModeFromUrl && currentMode === 'ru' && (
+           <Button 
+            onClick={toggleMode} 
+            variant="outline" 
+            size="lg"
+            className={cn(
+              "bg-card/80 backdrop-blur-md hover:bg-pink-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              "border-pink-500/80 text-pink-400 hover:text-pink-200 focus:ring-2 focus:ring-pink-500"
+            )}
+          >
+            <VibeContentRenderer content={iconSwapTutorialTranslations.ru.toggleButtonToWtf} />
+          </Button>
+        )}
+        {initialModeFromUrl && currentMode === 'wtf' && (
+           <Button 
+            onClick={toggleMode} 
+            variant="outline" 
+            size="lg"
+            className={cn(
+              "bg-card/80 backdrop-blur-md hover:bg-blue-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-blue-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              "border-blue-500/80 text-blue-400 hover:text-blue-200 focus:ring-2 focus:ring-blue-500"
+            )}
+          >
+            <VibeContentRenderer content={iconSwapTutorialTranslations.wtf.toggleButtonToNormal} />
+          </Button>
+        )}
+      </RockstarHeroSection>
 
-      <div className="container mx-auto px-4">
-        <header className="text-center mb-12 md:mb-16">
-          <h1 className={cn(
-            "text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold cyber-text glitch mb-4",
-             colorClasses[pageMainColor]?.text || "text-brand-purple"
-            )} data-text={t.pageTitle}>
-            <VibeContentRenderer content={t.pageTitle} />
-          </h1>
-          <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
-            <VibeContentRenderer content={t.pageSubtitle} />
-          </p>
-          {!initialModeFromUrl && currentMode === 'ru' && ( // Show toggle only if not initially in WTF mode
-             <Button 
-              onClick={toggleMode} 
-              variant="outline" 
-              className={cn(
-                "mt-6 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
-                "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
-              )}
-            >
-              <VibeContentRenderer content={iconSwapTutorialTranslations.ru.toggleButtonToWtf} />
-            </Button>
-           )}
-        </header>
+      <div id={heroTriggerId} style={{ height: '250vh' }} aria-hidden="true" />
 
+      <TutorialContentContainer className="relative">
         <div className="space-y-12 md:space-y-20">
           {stepsToRender.map((step, index) => {
-            const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
+            const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
             const hasVideo = !!(step as any).videoSrc && typeof (step as any).videoSrc === 'string';
 
             return (
-              <section key={step.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-10 md:pt-14")}>
+              <TutorialStepSection 
+                key={step.id} 
+                className={cn(index > 0 && "pt-12 md:pt-16")} 
+                isLastStep={index === stepsToRender.length -1}
+              >
                 <div className={cn(
                   "flex flex-col gap-6 md:gap-10",
                   index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
                 )}>
                   <div className={cn("space-y-4 flex flex-col items-start justify-center", hasVideo ? "md:w-2/5 lg:w-1/3" : "w-full")}>
-                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center gap-3", stepColor.text)}>
+                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center gap-3", stepColorData.text)}>
                       <VibeContentRenderer content={`::${step.icon}::`} className="text-3xl opacity-90" />
                       <VibeContentRenderer content={step.title} />
                     </h2>
@@ -221,7 +232,7 @@ function IconSwapTutorialContent() {
 
                   {hasVideo && (
                     <div className="md:w-3/5 lg:w-2/3">
-                      <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColor.border, stepColor.shadow, "bg-black")}>
+                      <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColorData.border, stepColorData.shadow, "bg-black")}>
                         <ScrollControlledVideoPlayer 
                           src={(step as any).videoSrc}
                           className="w-full" 
@@ -230,33 +241,20 @@ function IconSwapTutorialContent() {
                     </div>
                   )}
                 </div>
-              </section>
+              </TutorialStepSection>
             );
           })}
         </div>
-
-        <section className={cn(
-            "mt-20 md:mt-32 text-center pt-12 md:pt-16",
-            colorClasses[pageMainColor]?.border ? `border-t ${colorClasses[pageMainColor]?.border}/40` : "border-t border-brand-purple/40"
-            )}>
-          <h2 className={cn("text-3xl md:text-4xl font-orbitron mb-6", colorClasses[pageMainColor]?.text || "text-brand-purple")}>
-             <VibeContentRenderer content={t.nextLevelTitle} />
-          </h2>
-          <p className="text-lg md:text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-8">
-            <VibeContentRenderer content={t.nextLevelText} />
-          </p>
-          <Button asChild className={cn(
-             "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
-             "shadow-xl",
-             pageMainColor === "brand-purple" && "bg-brand-purple hover:bg-brand-purple/80 hover:shadow-purple-glow/60",
-             )}>
-            <Link href="/repo-xml">
-                <VibeContentRenderer content={t.tryLiveButton} />
-            </Link>
-          </Button>
-        </section>
-      </div>
-    </div>
+      </TutorialContentContainer>
+      
+      <NextLevelTeaser 
+        title={t.nextLevelTitle}
+        text={t.nextLevelText}
+        buttonText={t.tryLiveButton}
+        buttonLink="/start-training"
+        mainColorClassKey={pageMainColorKey}
+      />
+    </TutorialPageContainer>
   );
 }
 
