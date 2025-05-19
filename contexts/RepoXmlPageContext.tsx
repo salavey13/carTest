@@ -119,6 +119,7 @@ interface RepoXmlPageContextType {
     fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
     assistantRef: MutableRefObject<AICodeAssistantRef | null>;
     addToast: (message: string | React.ReactNode, type?: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message', duration?: number, options?: any) => void;
+    processTelegramStartParam: (payload: string) => void; // New function to process start_param
 }
 
 const defaultContextValue: Partial<RepoXmlPageContextType> = {
@@ -173,6 +174,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     triggerClearKworkInput: () => { logger.warn("triggerClearKworkInput called on default context value"); },
     kworkInputRef: { current: null }, aiResponseInputRef: { current: null }, fetcherRef: { current: null }, assistantRef: { current: null },
     addToast: () => { logger.warn("addToast called on default context value"); },
+    processTelegramStartParam: () => { logger.warn("processTelegramStartParam called on default context value"); },
 };
 
 const RepoXmlPageContext = createContext<RepoXmlPageContextType>(defaultContextValue as RepoXmlPageContextType);
@@ -211,7 +213,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         const [showComponentsState, setShowComponentsState] = useState<boolean>(true);
         
-        const { dbUser } = useAppContext(); 
+        const { dbUser, startParamPayload: appContextStartParam } = useAppContext(); // Get startParamPayload from AppContext
+        const startParamProcessedRef = useRef(false); // To process start_param only once
 
         const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
         const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -867,6 +870,60 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
               selectedFetcherFilesState.size, selectedAssistantFilesState.size, 
               isPreCheckingState, pendingFlowDetailsState 
             ]);
+        
+        const processTelegramStartParamStable = useCallback((payload: string) => {
+            logger.info(`[RepoXmlPageContext] Processing Telegram start_param: ${payload}`);
+            try {
+                // Example parsing: path_<encoded_path>_idea_<encoded_idea_string>
+                const pathMarker = "_path_";
+                const ideaMarker = "_idea_";
+
+                const pathStartIndex = payload.indexOf(pathMarker);
+                const ideaStartIndex = payload.indexOf(ideaMarker);
+
+                if (pathStartIndex === -1 || ideaStartIndex === -1 || ideaStartIndex <= pathStartIndex) {
+                    throw new Error("Invalid start_param format: missing or misplaced markers.");
+                }
+
+                const encodedPath = payload.substring(pathStartIndex + pathMarker.length, ideaStartIndex);
+                const encodedIdea = payload.substring(ideaStartIndex + ideaMarker.length);
+
+                const targetPath = decodeURIComponent(encodedPath);
+                const idea = decodeURIComponent(encodedIdea);
+                
+                logger.info(`[RepoXmlPageContext] Parsed from start_param - Path: ${targetPath}, Idea: ${idea}`);
+
+                if (!targetPath || !idea) {
+                    throw new Error("Invalid start_param format: path or idea is empty after decoding.");
+                }
+
+                if (fetcherRef.current) {
+                    fetcherRef.current.setInitialPathAndIdea(targetPath, idea);
+                    addToastStable("Параметры запуска из Telegram применены!", "success");
+                } else {
+                    // Fallback or queue if ref not ready - for now, just log and potentially toast.
+                    logger.warn("[RepoXmlPageContext] FetcherRef not ready when processing start_param. Parameters might not be fully applied immediately.");
+                    addToastStable("Параметры запуска из Telegram получены, но компонент Fetcher еще не готов. Попробуйте обновить.", "warning");
+                }
+                // The RepoTxtFetcher component will then handle this initialPath and initialIdea
+                // in its own useEffect to trigger preCheckAndFetch.
+
+            } catch (e: any) {
+                logger.error("[RepoXmlPageContext] Error parsing Telegram start_param:", e);
+                addToastStable(`Ошибка обработки параметров запуска: ${e.message}`, "error");
+            }
+        }, [addToastStable, fetcherRef]);
+
+        useEffect(() => {
+            if (appContextStartParam && !startParamProcessedRef.current && repoUrlStateRef.current) { // Check if repoUrl is also set
+                logger.info(`[RepoXmlPageContext useEffect for start_param] Found appContextStartParam: ${appContextStartParam}. Processing...`);
+                processTelegramStartParamStable(appContextStartParam);
+                startParamProcessedRef.current = true; 
+            } else if (appContextStartParam && !startParamProcessedRef.current && !repoUrlStateRef.current) {
+                logger.warn("[RepoXmlPageContext useEffect for start_param] appContextStartParam found, but repoUrl is not set yet. Delaying processing.");
+            }
+        }, [appContextStartParam, processTelegramStartParamStable, repoUrlState]); // Added repoUrlState as dependency
+
 
         const contextValue = useMemo((): RepoXmlPageContextType => ({
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, iconReplaceTask: iconReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 
@@ -880,6 +937,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
+            processTelegramStartParam: processTelegramStartParamStable,
         }), [
             fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, iconReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, 
             secondaryHighlightPathsStateInternal, 
@@ -890,7 +948,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             triggerUpdateBranchStable, 
             triggerCreateNewPRStable, 
             triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
-            addToastStable, dbUser, 
+            addToastStable, dbUser, processTelegramStartParamStable,
         ]);
 
         return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );

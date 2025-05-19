@@ -100,6 +100,7 @@ export function useTelegram() {
   const [isAuthenticating, setIsAuthenticating] = useState(true); 
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
+  const [startParam, setStartParam] = useState<string | null>(null);
 
   const handleAuthentication = useCallback(
     async (userToAuth: WebAppUser): Promise<AuthResult> => {
@@ -178,6 +179,7 @@ export function useTelegram() {
     setDbUser(null); 
     setTgUser(null);
     setIsInTelegramContext(false); // Assume not in TG context until proven otherwise
+    setStartParam(null); // Reset startParam
     globalLogger.log("[HOOK_TELEGRAM EFFECT_MAIN_INIT] STEP 1: All relevant states reset to initial values.");
 
     const initialize = async () => {
@@ -192,6 +194,7 @@ export function useTelegram() {
       let authCandidate: WebAppUser | null = null;
       let inTgContextReal = false; // Is there any Telegram.WebApp.initData at all?
       let tempTgWebApp: TelegramWebApp | null = null; 
+      let rawStartParam: string | null = null;
 
       try { 
         globalLogger.log("[HOOK_TELEGRAM initialize TRY_BLOCK_START] STEP 3: Checking for window.Telegram.WebApp...");
@@ -206,13 +209,19 @@ export function useTelegram() {
           }
           
           inTgContextReal = !!telegram.initData && telegram.initData.length > 0; 
+          rawStartParam = telegram.initDataUnsafe?.start_param || null;
+          if (isMounted && rawStartParam) {
+            setStartParam(rawStartParam);
+            globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 3.1.1: start_param found: "${rawStartParam}" and set to state.`);
+          }
           
           globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.2: Telegram WebApp context details:", {
               rawInitDataExists: inTgContextReal,
               initDataUnsafeUserExists: !!telegram.initDataUnsafe?.user,
               initDataUnsafeUserId: telegram.initDataUnsafe?.user?.id,
               initDataStringFirst60: telegram.initData?.substring(0,60) || "N/A",
-              platform: telegram.platform
+              platform: telegram.platform,
+              startParam: rawStartParam
           });
           
           if (isMounted) {
@@ -323,7 +332,7 @@ export function useTelegram() {
       } finally { 
         if (isMounted) {
           setIsAuthenticating(false); 
-          globalLogger.info(`[HOOK_TELEGRAM initialize ASYNC_FN_FINALLY] STEP 8: isAuthenticating set to false. Final State Hint: isAuth: ${isAuthenticated}, TGUser: ${tgUser?.id}, DBUser: ${dbUser?.id}, Err: ${error?.message}`);
+          globalLogger.info(`[HOOK_TELEGRAM initialize ASYNC_FN_FINALLY] STEP 8: isAuthenticating set to false. Final State Hint: isAuth: ${isAuthenticated}, TGUser: ${tgUser?.id}, DBUser: ${dbUser?.id}, Err: ${error?.message}, StartParam: ${startParam}`);
         } else {
           globalLogger.warn("[HOOK_TELEGRAM initialize ASYNC_FN_FINALLY] (WARN) Component unmounted before finally block could set isAuthenticating to false.");
         }
@@ -343,12 +352,12 @@ export function useTelegram() {
     globalLogger.log(`[HOOK_TELEGRAM EFFECT_ISLOADING_CHECK] isAuthenticating: ${isAuthenticating}, isLoading: ${isLoading}`);
     if (!isAuthenticating && isLoading) { // Only change isLoading if it's currently true and auth finished
       setIsLoading(false); 
-      globalLogger.info(`[HOOK_TELEGRAM EFFECT_ISLOADING_SET] isAuthenticating is false. Setting isLoading to false. Final Hook State Snapshot: TGUser: ${tgUser?.id}, DBUser: ${dbUser?.user_id}, isAuthenticated: ${isAuthenticated}, isInTGContext: ${isInTelegramContext}, Error: ${error?.message}`);
+      globalLogger.info(`[HOOK_TELEGRAM EFFECT_ISLOADING_SET] isAuthenticating is false. Setting isLoading to false. Final Hook State Snapshot: TGUser: ${tgUser?.id}, DBUser: ${dbUser?.user_id}, isAuthenticated: ${isAuthenticated}, isInTGContext: ${isInTelegramContext}, Error: ${error?.message}, StartParam: ${startParam}`);
     } else if (isAuthenticating && !isLoading) { // Should not happen if logic is correct, but as a safe guard
         setIsLoading(true);
         globalLogger.warn(`[HOOK_TELEGRAM EFFECT_ISLOADING_SET] isAuthenticating is true, but isLoading was false. Correcting isLoading to true.`);
     }
-  }, [isAuthenticating, isLoading, tgUser, dbUser, isAuthenticated, isInTelegramContext, error]);
+  }, [isAuthenticating, isLoading, tgUser, dbUser, isAuthenticated, isInTelegramContext, error, startParam]);
 
   const isAdmin = useCallback(() => {
     if (!dbUser) {
@@ -384,6 +393,7 @@ export function useTelegram() {
         isAdmin, 
         isLoading, 
         error,
+        startParam, // Add startParam to the returned object
         openLink: (url: string) => safeWebAppCall('openLink', url),
         close: () => safeWebAppCall('close'),
         showPopup: (params: any) => safeWebAppCall('showPopup', params), 
@@ -402,6 +412,6 @@ export function useTelegram() {
     return finalContextData;
   }, [
       tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAuthenticating, isAdmin, 
-      isLoading, error, safeWebAppCall
+      isLoading, error, startParam, safeWebAppCall
   ]);
 }
