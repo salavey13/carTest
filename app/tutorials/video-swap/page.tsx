@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -57,7 +57,7 @@ const videoSwapTutorialTranslations = {
       }
     ],
     nextLevelTitle: "::FaFilm:: Киномеханик Готов!",
-    nextLevelText: "Отличная работа, Агент! Ты освоил замену видео. <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих новых подвигов с видео-контентом. *Заметка: для видео используется тот же ImageSwap флоу в студии.*",
+    nextLevelText: "Отличная работа, Агент! Ты освоил замену видео. <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> ждет. *Заметка: для видео используется тот же ImageSwap флоу в студии.*",
     tryLiveButton: "::FaWandMagicSparkles:: Попробовать в Студии",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
   },
@@ -99,7 +99,7 @@ const videoSwapTutorialTranslations = {
       }
     ],
     nextLevelTitle: "::FaPhotoFilm:: ТЫ ТЕПЕРЬ ВИДЕО-МАГНАТ!",
-    nextLevelText: "Картинки, иконки, видосы... Что дальше? Весь Голливуд твой! <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет.",
+    nextLevelText: "Картинки, иконки, видосы... Что дальше? Весь Голливуд твой! <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> ждет.",
     tryLiveButton: "::FaVideoCamera:: В Монтажную!",
     toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
@@ -119,6 +119,7 @@ function VideoSwapTutorialContent() {
   const router = useRouter();
   const { dbUser, isAuthenticated } = useAppContext();
   const { addToast } = useAppToast();
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
 
   const initialModeFromUrl = searchParams.get('mode') === 'wtf';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
@@ -157,15 +158,14 @@ function VideoSwapTutorialContent() {
 
   const stepsToRender = t.steps; 
   const pageMainColorKey = "brand-cyan"; 
-  const heroTriggerElementId = "video-swap-hero-trigger";
 
   return (
     <TutorialPageContainer>
       <RockstarHeroSection
         title={t.pageTitle}
         subtitle={t.pageSubtitle}
-        triggerElementSelector={`#${heroTriggerElementId}`}
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/abstract-blue-lines-network.jpeg"
+        triggerElementSelector={`#${heroTriggerId}`}
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" 
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         {!initialModeFromUrl && currentMode === 'ru' && (
@@ -196,7 +196,7 @@ function VideoSwapTutorialContent() {
         )}
       </RockstarHeroSection>
       
-      <div id={heroTriggerElementId} style={{ height: '250vh' }} aria-hidden="true" />
+      <div id={heroTriggerId} style={{ height: '250vh' }} aria-hidden="true" />
 
       <TutorialContentContainer className="relative">
         <div className="space-y-12 md:space-y-20">
@@ -245,7 +245,7 @@ function VideoSwapTutorialContent() {
         title={t.nextLevelTitle}
         text={t.nextLevelText}
         buttonText={t.tryLiveButton}
-        buttonLink="/repo-xml?flow=imageSwap" // Using imageSwap flow as per prompt
+        buttonLink="/start-training" 
         mainColorClassKey={pageMainColorKey}
       />
     </TutorialPageContainer>

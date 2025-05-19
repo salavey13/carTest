@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,12 @@ import TutorialLoader from '../TutorialLoader';
 import { useAppContext } from '@/contexts/AppContext';
 import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from '@/hooks/useAppToast';
+
+import TutorialPageContainer from '../TutorialPageContainer';
+import RockstarHeroSection from '../RockstarHeroSection';
+import TutorialContentContainer from '../TutorialContentContainer';
+import TutorialStepSection from '../TutorialStepSection';
+import NextLevelTeaser from '../NextLevelTeaser';
 
 
 const inceptionSwapTutorialTranslations = {
@@ -47,7 +53,7 @@ const inceptionSwapTutorialTranslations = {
       }
     ],
     nextLevelTitle: "::FaProjectDiagram:: Миссия Выполнена, Архитектор!",
-    nextLevelText: "Ты постиг Дзен разработки на oneSitePls. Теперь ты видишь код. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> — твой верстак, а идеи — твои чертежи. Строй будущее!",
+    nextLevelText: "Ты постиг Дзен разработки на oneSitePls. Теперь ты видишь код. <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> — твой верстак, а идеи — твои чертежи. Строй будущее!",
     tryLiveButton: "::FaTools:: В SUPERVIBE Studio",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
   },
@@ -85,7 +91,7 @@ const inceptionSwapTutorialTranslations = {
       }
     ],
     nextLevelTitle: "::FaSatelliteDish:: ТЫ ПОДКЛЮЧЕН К ИСТОЧНИКУ!",
-    nextLevelText: "РЕАЛЬНОСТЬ – ЭТО КОД. ТЫ – ЕГО АРХИТЕКТОР. <Link href='/repo-xml' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> – ТВОЯ КИБЕРДЕКА. ВРЕМЯ ЛОМАТЬ СИСТЕМУ!",
+    nextLevelText: "РЕАЛЬНОСТЬ – ЭТО КОД. ТЫ – ЕГО АРХИТЕКТОР. <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> – ТВОЯ КИБЕРДЕКА. ВРЕМЯ ЛОМАТЬ СИСТЕМУ!",
     tryLiveButton: "::FaLaptopCode:: В БОЙ!",
     toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
@@ -104,6 +110,7 @@ function InceptionSwapTutorialContent() {
   const router = useRouter();
   const { dbUser, isAuthenticated } = useAppContext();
   const { addToast } = useAppToast();
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
 
   const initialModeFromUrl = searchParams.get('mode') === 'wtf';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
@@ -143,55 +150,63 @@ function InceptionSwapTutorialContent() {
   }, [searchParams, currentMode]);
 
   const stepsToRender = t.steps;
-  const pageMainColor = "brand-lime"; 
+  const pageMainColorKey = "brand-lime"; 
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-green-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
-      <div
-        className="absolute inset-0 bg-repeat opacity-[0.04] -z-10"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(174, 255, 0, 0.1) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(174, 255, 0, 0.1) 1px, transparent 1px)`,
-          backgroundSize: '45px 45px',
-        }}
-      ></div>
-
-      <div className="container mx-auto px-4">
-        <header className="text-center mb-12 md:mb-16">
-          <h1 className={cn(
-            "text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold cyber-text glitch mb-4",
-            colorClasses[pageMainColor]?.text || "text-neon-lime"
-          )} data-text={t.pageTitle}>
-            <VibeContentRenderer content={t.pageTitle} />
-          </h1>
-          <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
-            <VibeContentRenderer content={t.pageSubtitle} />
-          </p>
-          {!initialModeFromUrl && currentMode === 'ru' && (
+    <TutorialPageContainer>
+      <RockstarHeroSection
+        title={t.pageTitle}
+        subtitle={t.pageSubtitle}
+        triggerElementSelector={`#${heroTriggerId}`}
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" 
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
+      >
+        {!initialModeFromUrl && currentMode === 'ru' && (
            <Button 
             onClick={toggleMode} 
             variant="outline" 
+            size="lg"
             className={cn(
-              "mt-6 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
-              "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink" 
+              "bg-card/80 backdrop-blur-md hover:bg-pink-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              "border-pink-500/80 text-pink-400 hover:text-pink-200 focus:ring-2 focus:ring-pink-500" 
             )}
           >
             <VibeContentRenderer content={inceptionSwapTutorialTranslations.ru.toggleButtonToWtf} />
           </Button>
           )}
-        </header>
+        {initialModeFromUrl && currentMode === 'wtf' && (
+           <Button 
+            onClick={toggleMode} 
+            variant="outline" 
+            size="lg"
+            className={cn(
+              "bg-card/80 backdrop-blur-md hover:bg-blue-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-blue-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              "border-blue-500/80 text-blue-400 hover:text-blue-200 focus:ring-2 focus:ring-blue-500"
+            )}
+          >
+            <VibeContentRenderer content={inceptionSwapTutorialTranslations.wtf.toggleButtonToNormal} />
+          </Button>
+        )}
+      </RockstarHeroSection>
 
+      <div id={heroTriggerId} style={{ height: '250vh' }} aria-hidden="true" />
+
+      <TutorialContentContainer className="relative">
         <div className="space-y-12 md:space-y-16">
           {stepsToRender.map((step, index) => {
-            const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
+            const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
 
             return (
-              <section key={step.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-10 md:pt-12")}>
+              <TutorialStepSection 
+                key={step.id} 
+                className={cn(index > 0 && "pt-12 md:pt-16")} 
+                isLastStep={index === stepsToRender.length -1}
+              >
                 <div className={cn(
                   "flex flex-col items-center text-center gap-4 md:gap-6",
                 )}>
                   <div className={cn("space-y-3 flex flex-col items-center justify-center w-full max-w-2xl")}>
-                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center justify-center gap-3", stepColor.text)}>
+                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center justify-center gap-3", stepColorData.text)}>
                       <VibeContentRenderer content={`::${step.icon}::`} className="text-3xl opacity-90" />
                       <VibeContentRenderer content={step.title} />
                     </h2>
@@ -200,36 +215,22 @@ function InceptionSwapTutorialContent() {
                     </div>
                   </div>
                 </div>
-              </section>
+              </TutorialStepSection>
             );
           })}
         </div>
-
-        <section className={cn(
-            "mt-20 md:mt-24 text-center pt-12 md:pt-16",
-            colorClasses[pageMainColor]?.border ? `border-t ${colorClasses[pageMainColor]?.border}/40` : "border-t border-neon-lime/40"
-            )}>
-          <h2 className={cn("text-3xl md:text-4xl font-orbitron mb-6", colorClasses[pageMainColor]?.text || "text-neon-lime")}>
-             <VibeContentRenderer content={t.nextLevelTitle} />
-          </h2>
-          <p className="text-lg md:text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-8">
-            <VibeContentRenderer content={t.nextLevelText} />
-          </p>
-          <Button asChild className={cn(
-             "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
-             "shadow-xl",
-             pageMainColor === "brand-lime" && "bg-neon-lime hover:bg-neon-lime/80 text-black hover:shadow-neon-lime/60",
-             )}>
-            <Link href="/repo-xml">
-                <VibeContentRenderer content={t.tryLiveButton} />
-            </Link>
-          </Button>
-        </section>
-      </div>
-    </div>
+      </TutorialContentContainer>
+      
+      <NextLevelTeaser 
+        title={t.nextLevelTitle}
+        text={t.nextLevelText}
+        buttonText={t.tryLiveButton}
+        buttonLink="/start-training" 
+        mainColorClassKey={pageMainColorKey}
+      />
+    </TutorialPageContainer>
   );
 }
-
 
 export default function InceptionSwapTutorialPage() {
   return (
