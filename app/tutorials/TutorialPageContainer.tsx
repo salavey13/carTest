@@ -12,7 +12,6 @@ const TutorialPageContainer: React.FC<TutorialPageContainerProps> = ({ children,
     <div className={cn(
       "relative min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-brand-pink/30 selection:text-brand-pink",
       className
-      // Removed pt-24 and pb-20, RockstarHeroSection will manage its own full-height space
     )}>
       {children}
     </div>

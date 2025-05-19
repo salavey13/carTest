@@ -103,9 +103,8 @@ function ImageSwapTutorialContent() {
     <TutorialPageContainer>
       <RockstarHeroSection 
         title={t.pageTitle} 
-        // textToMask prop removed as SLY13 text is removed
         triggerElementSelector={`#${heroTriggerElementId}`}
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/purple-abstract-bg.jpeg" // New background
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/dark-moody-car-road.jpg" 
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         <Button 
