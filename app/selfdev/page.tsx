@@ -224,7 +224,7 @@ export default function SelfDevLandingPage() {
                        <TooltipTrigger asChild>
                          <span>
                            <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-lime-900/30">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s801.png" alt="Персонализация аутрича с помощью AI" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" alt="Персонализация аутрича с помощью AI" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
