@@ -1,4 +1,3 @@
-// /app/start-training/page.tsx
 "use client";
 import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -6,7 +5,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell } from "react-icons/fa6";
+// Removed direct Fa6 icon imports that are now handled by VibeContentRenderer for buttons
+// FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell
 import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
@@ -60,8 +60,8 @@ const pageTranslations = {
         trainingTitle: "::FaDumbbell:: ФИЗУХА ДЛЯ КИБЕР-АТЛЕТА (МОЖНО СКИПНУТЬ, ЕСЛИ ТЫ ДРИЩ)",
         missionsTitle: "::FaGamepad:: GTA Vibe Missions ::FaStreetView::",
         missionsSubtitle: "Хватит катать вату! Это не школа, это GTA Vibe! Пройди эти миссии, чтобы стать реальным пацаном в кодинге. WTF-режим – для тех, кто не боится запачкать руки и сломать пару правил. GO GO GO!",
-        toggleButtonToWtf: "::FaPooStorm:: Врубить WTF-Режим СТРАНИЦЫ!", // This text remains for WTF mode, button switches to Normal
-        toggleButtonToNormal: "::FaBook:: Вернуть Норм Вид", // This text is for Ru mode, button switches to WTF
+        toggleButtonToWtf: "::FaPooStorm:: Врубить WTF-Режим СТРАНИЦЫ!", 
+        toggleButtonToNormal: "::FaBook:: Вернуть Норм Вид", 
         lockedMissionTooltip: "СНАЧАЛА ПРЕДЫДУЩУЮ, НУБАС!",
     }
 }
@@ -170,9 +170,8 @@ function StartTrainingContent() {
     <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
       <RockstarHeroSection
         title={t.pageTitle}
-        subtitle={t.pageSubtitleTraining} // Subtitle passed here now
+        subtitle={t.pageSubtitleTraining} 
         triggerElementSelector={`#${heroTriggerId}`}
-        // mainBackgroundImageUrl uses new default from RockstarHeroSection if not overridden
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
          <Button 
@@ -186,7 +185,6 @@ function StartTrainingContent() {
                 : "bg-brand-blue/10 border-2 border-brand-blue text-brand-blue shadow-md shadow-brand-blue/40 hover:bg-brand-blue/20 hover:text-white hover:shadow-blue-glow focus:ring-2 focus:ring-brand-blue"
             )}
         >
-          {/* Text of button depends on current mode, leads to the OTHER mode */}
           <VibeContentRenderer content={currentMode === 'ru' ? pageTranslations.ru.toggleButtonToWtf : pageTranslations.wtf.toggleButtonToNormal} />
         </Button>
       </RockstarHeroSection>
@@ -202,7 +200,7 @@ function StartTrainingContent() {
         >
           <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
             <CardHeader className="p-6 md:p-8 border-b border-brand-green/40">
-              <FaDumbbell className="text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)]" />
+              <VibeContentRenderer content='::FaDumbbell className="text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)]"::' />
               <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text={currentMode === 'wtf' ? "ФИЗУХА (СКИП)" : "VIBE ТРЕНИРОВКА"}>
                  <VibeContentRenderer content={t.trainingTitle} />
               </CardTitle>
@@ -223,7 +221,7 @@ function StartTrainingContent() {
                   size="lg" 
                   className="col-span-2 bg-gradient-to-r from-brand-green to-neon-lime text-black hover:brightness-110 font-orbitron text-lg py-3.5 shadow-lg hover:shadow-brand-green/50 transform hover:scale-105 transition-all duration-300"
                 >
-                  {isActive && !isPaused ? <FaPause className="mr-2.5" /> : <FaPlay className="mr-2.5" />}
+                  {isActive && !isPaused ? <VibeContentRenderer content='::FaPause className="mr-2.5"::' /> : <VibeContentRenderer content='::FaPlay className="mr-2.5"::' />}
                   {isActive && !isPaused ? "Пауза" : isActive && isPaused ? "Продолжить" : "Старт"}
                 </Button>
                 <Button
@@ -232,7 +230,7 @@ function StartTrainingContent() {
                   className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-white font-orbitron py-3 text-base shadow-md hover:shadow-brand-blue/30 transform hover:scale-105 transition-all duration-300"
                   disabled={!isActive} 
                 >
-                  <FaForward className="mr-2" /> Далее
+                  <VibeContentRenderer content='::FaForward className="mr-2"::' /> Далее
                 </Button>
                 <Button
                   onClick={handleComplete}
@@ -240,7 +238,7 @@ function StartTrainingContent() {
                   className="bg-brand-red hover:bg-brand-red/80 text-destructive-foreground font-orbitron py-3 text-base shadow-md hover:shadow-brand-red/40 transform hover:scale-105 transition-all duration-300"
                   disabled={!isActive && timer === 120}
                 >
-                  <FaFlagCheckered className="mr-2" /> Завершить
+                  <VibeContentRenderer content='::FaFlagCheckered className="mr-2"::' /> Завершить
                 </Button>
               </section>
             </CardContent>
@@ -280,10 +278,10 @@ function StartTrainingContent() {
                       <span className={cn("font-orbitron text-md font-semibold leading-tight text-center mb-3", isUnlocked ? colorConfig.text : "text-muted-foreground")}>{link.title}</span>
                       <div className="flex flex-col gap-2 w-full mt-auto">
                           <Button asChild variant="outline" className={cn("w-full text-xs py-2", colorConfig.text, colorConfig.border, colorConfig.bgHover, colorConfig.ring, "hover:text-white focus:text-white", !isUnlocked && "pointer-events-none opacity-50")}>
-                              <Link href={link.href} onClick={(e) => !isUnlocked && e.preventDefault()}>Унылый Гайд</Link>
+                              <Link href={link.href} onClick={(e) => !isUnlocked && e.preventDefault()}><VibeContentRenderer content="Унылый Гайд" /></Link>
                           </Button>
                           <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon", !isUnlocked && "pointer-events-none opacity-50")}>
-                              <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}>WTF-РЕЖИМ ::FaUpLong::</Link>
+                              <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}><VibeContentRenderer content="WTF-РЕЖИМ ::FaBiohazard::" /></Link>
                           </Button>
                       </div>
                   </Card>
