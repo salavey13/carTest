@@ -1,3 +1,4 @@
+// /lib/iconNameMap.ts
 import type * as Fa6Icons from "react-icons/fa6";
 // DO NOT MODIFY. USE FOR REFERENCE ONLY AS GROUND TRUTH FOR ICON EXISTSNCE. DO NOT TRY TO UPDATE IT'S PERFECTION
 // Full Icon Name Map (Lowercase to PascalCase)
@@ -741,6 +742,8 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fachartpie: "FaChartPie",
   fachartsimple: "FaChartSimple",
   facheckdouble: "FaCheckDouble",
+
+facheckcircle: "FaCircleCheck",
   fachecktoslot: "FaCheckToSlot",
   facheck: "FaCheck",
   facheese: "FaCheese",
