@@ -1,3 +1,4 @@
+// /app/start-training/page.tsx
 "use client";
 import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -27,7 +28,7 @@ interface TutorialLink {
 }
 
 const tutorialLinks: TutorialLink[] = [
-  { href: "/tutorials/image-swap", wtfHref: "/tutorials/image-swap?mode=wtf", title: "Миссия 1: Битый Пиксель", icon: "FaExchangeAlt", color: "brand-green", questId: "image-swap-mission" },
+  { href: "/tutorials/image-swap", wtfHref: "/tutorials/image-swap?mode=wtf", title: "Миссия 1: Битый Пиксель", icon: "FaArrowRightArrowLeft", color: "brand-green", questId: "image-swap-mission" },
   { href: "/tutorials/icon-swap", wtfHref: "/tutorials/icon-swap?mode=wtf", title: "Миссия 2: Сапёр Иконок", icon: "FaBomb", color: "brand-red", questId: "icon-swap-mission" },
   { href: "/tutorials/video-swap", wtfHref: "/tutorials/video-swap?mode=wtf", title: "Миссия 3: Видео-Рендер", icon: "FaVideo", color: "brand-cyan", questId: "video-swap-mission" },
   { href: "/tutorials/inception-swap", wtfHref: "/tutorials/inception-swap?mode=wtf", title: "Миссия 4: Inception Swap", icon: "FaInfinity", color: "brand-lime", questId: "inception-swap-mission" },
