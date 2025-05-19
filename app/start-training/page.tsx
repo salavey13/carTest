@@ -1,3 +1,4 @@
+// /app/start-training/page.tsx
 "use client";
 import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -282,7 +283,7 @@ function StartTrainingContent() {
                               <Link href={link.href} onClick={(e) => !isUnlocked && e.preventDefault()}>Унылый Гайд</Link>
                           </Button>
                           <Button asChild variant="default" className={cn("w-full text-xs py-2 font-bold", wtfColorConfig.text, wtfColorConfig.border, wtfColorConfig.bgHover, wtfColorConfig.ring, "bg-brand-pink hover:bg-brand-pink/90 active:bg-brand-pink text-shadow-neon", !isUnlocked && "pointer-events-none opacity-50")}>
-                              <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}>WTF-РЕЖИМ ::FaBiohazard::</Link>
+                              <Link href={link.wtfHref} onClick={(e) => !isUnlocked && e.preventDefault()}>WTF-РЕЖИМ ::FaUpLong::</Link>
                           </Button>
                       </div>
                   </Card>
