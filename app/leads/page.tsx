@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; // Assuming this path
 import { cn } from '@/lib/utils'; // Assuming this path
 // You might want specific icons for this page
-// import { FaMagnifyingGlassDollar, FaUsers, FaTools, FaBrain, FaRocket, FaNetworkWired, FaClipboardList, FaGithub } from 'react-icons/fa6';
+// import { FaMagnifyingGlassDollar, FaUsers, FaToolbox, FaBrain, FaRocket, FaNetworkWired, FaClipboardList, FaGithub } from 'react-icons/fa6';
 
 const LeadGenerationHQPage = () => {
   const pageTheme = {
@@ -137,7 +137,7 @@ const LeadGenerationHQPage = () => {
           <Card className={cn("bg-dark-card/80 backdrop-blur-md", pageTheme.borderColor, pageTheme.shadowColor)}>
             <CardHeader>
               <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
-                <VibeContentRenderer content="::FaTools:: Scout's Arsenal: Tools & Tactics" />
+                <VibeContentRenderer content="::FaToolbox:: Scout's Arsenal: Tools & Tactics" />
               </CardTitle>
               <CardDescription className="font-mono">Equipping the Scout for maximum leverage in the digital wilds.</CardDescription>
             </CardHeader>
