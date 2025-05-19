@@ -12,6 +12,11 @@ import { useAppContext } from '@/contexts/AppContext';
 import { markTutorialAsCompleted } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from '@/hooks/useAppToast';
 
+import TutorialPageContainer from '../TutorialPageContainer';
+import RockstarHeroSection from '../RockstarHeroSection';
+import TutorialContentContainer from '../TutorialContentContainer';
+import TutorialStepSection from '../TutorialStepSection';
+import NextLevelTeaser from '../NextLevelTeaser';
 
 const videoSwapTutorialTranslations = {
   ru: {
@@ -140,9 +145,7 @@ function VideoSwapTutorialContent() {
   const toggleMode = () => {
     const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
     setCurrentMode(newMode);
-    if (newMode === 'wtf') {
-      router.replace(`/tutorials/video-swap?mode=wtf`);
-    }
+    router.replace(`/tutorials/video-swap${newMode === 'wtf' ? '?mode=wtf' : ''}`, { scroll: false });
   };
 
   useEffect(() => {
@@ -153,57 +156,66 @@ function VideoSwapTutorialContent() {
   }, [searchParams, currentMode]);
 
   const stepsToRender = t.steps; 
-  const pageMainColor = "brand-cyan"; 
+  const pageMainColorKey = "brand-cyan"; 
+  const heroTriggerElementId = "video-swap-hero-trigger";
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-blue-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
-      <div
-        className="absolute inset-0 bg-repeat opacity-[0.04] -z-10"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(0, 194, 255, 0.1) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(0, 194, 255, 0.1) 1px, transparent 1px)`,
-          backgroundSize: '45px 45px',
-        }}
-      ></div>
-
-      <div className="container mx-auto px-4">
-        <header className="text-center mb-12 md:mb-16">
-          <h1 className={cn(
-            "text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold cyber-text glitch mb-4",
-            colorClasses[pageMainColor]?.text || "text-brand-cyan"
-          )} data-text={t.pageTitle}>
-            <VibeContentRenderer content={t.pageTitle} />
-          </h1>
-          <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
-            <VibeContentRenderer content={t.pageSubtitle} />
-          </p>
-          {!initialModeFromUrl && currentMode === 'ru' && (
+    <TutorialPageContainer>
+      <RockstarHeroSection
+        title={t.pageTitle}
+        subtitle={t.pageSubtitle}
+        triggerElementSelector={`#${heroTriggerElementId}`}
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/abstract-blue-lines-network.jpeg"
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
+      >
+        {!initialModeFromUrl && currentMode === 'ru' && (
            <Button 
             onClick={toggleMode} 
             variant="outline" 
+            size="lg"
             className={cn(
-              "mt-6 bg-card/50 hover:bg-brand-pink/20 transition-all duration-200 text-sm px-4 py-2",
-               "border-brand-pink/70 text-brand-pink/90 hover:text-brand-pink"
+              "bg-card/80 backdrop-blur-md hover:bg-pink-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              "border-pink-500/80 text-pink-400 hover:text-pink-200 focus:ring-2 focus:ring-pink-500"
             )}
           >
             <VibeContentRenderer content={videoSwapTutorialTranslations.ru.toggleButtonToWtf} />
           </Button>
-          )}
-        </header>
+        )}
+        {initialModeFromUrl && currentMode === 'wtf' && (
+           <Button 
+            onClick={toggleMode} 
+            variant="outline" 
+            size="lg"
+            className={cn(
+              "bg-card/80 backdrop-blur-md hover:bg-blue-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-blue-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+               "border-blue-500/80 text-blue-400 hover:text-blue-200 focus:ring-2 focus:ring-blue-500"
+            )}
+          >
+            <VibeContentRenderer content={videoSwapTutorialTranslations.wtf.toggleButtonToNormal} />
+          </Button>
+        )}
+      </RockstarHeroSection>
+      
+      <div id={heroTriggerElementId} style={{ height: '250vh' }} aria-hidden="true" />
 
+      <TutorialContentContainer className="relative">
         <div className="space-y-12 md:space-y-20">
           {stepsToRender.map((step, index) => {
-            const stepColor = colorClasses[step.color] || colorClasses["brand-purple"];
-            const hasVideo = step.hasOwnProperty('videoSrc') && (step as any).videoSrc;
+            const stepColorData = colorClasses[step.color as keyof typeof colorClasses] || colorClasses["brand-purple"];
+            const hasVideo = !!(step as any).videoSrc && typeof (step as any).videoSrc === 'string';
 
             return (
-              <section key={step.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-10 md:pt-14")}>
+              <TutorialStepSection 
+                key={step.id} 
+                className={cn(index > 0 && "pt-12 md:pt-16")} 
+                isLastStep={index === stepsToRender.length -1}
+              >
                 <div className={cn(
                   "flex flex-col gap-6 md:gap-10",
                   index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"
                 )}>
                   <div className={cn("space-y-4 flex flex-col items-start justify-center", hasVideo ? "md:w-2/5 lg:w-1/3" : "w-full")}>
-                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center gap-3", stepColor.text)}>
+                    <h2 className={cn("text-3xl md:text-4xl font-orbitron flex items-center gap-3", stepColorData.text)}>
                       <VibeContentRenderer content={`::${step.icon}::`} className="text-3xl opacity-90" />
                       <VibeContentRenderer content={step.title} />
                     </h2>
@@ -214,7 +226,7 @@ function VideoSwapTutorialContent() {
 
                   {hasVideo && (
                     <div className="md:w-3/5 lg:w-2/3">
-                      <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColor.border, stepColor.shadow, "bg-black")}>
+                      <div className={cn("rounded-xl overflow-hidden border-2 shadow-2xl", stepColorData.border, stepColorData.shadow, "bg-black")}>
                         <ScrollControlledVideoPlayer 
                           src={(step as any).videoSrc}
                           className="w-full" 
@@ -223,35 +235,20 @@ function VideoSwapTutorialContent() {
                     </div>
                   )}
                 </div>
-              </section>
+              </TutorialStepSection>
             );
           })}
         </div>
-
-        <section className={cn(
-            "mt-20 md:mt-32 text-center pt-12 md:pt-16",
-            colorClasses[pageMainColor]?.border ? `border-t ${colorClasses[pageMainColor]?.border}/40` : "border-t border-brand-cyan/40"
-            )}>
-          <h2 className={cn("text-3xl md:text-4xl font-orbitron mb-6", colorClasses[pageMainColor]?.text || "text-brand-cyan")}>
-             <VibeContentRenderer content={t.nextLevelTitle} />
-          </h2>
-          <p className="text-lg md:text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-8">
-            <VibeContentRenderer content={t.nextLevelText} />
-          </p>
-          <Button asChild className={cn(
-             "inline-flex items-center justify-center px-8 py-4 border border-transparent text-lg font-semibold rounded-full text-black transition-transform transform hover:scale-105",
-             "shadow-xl",
-             pageMainColor === "brand-cyan" && "bg-brand-cyan hover:bg-brand-cyan/80 hover:shadow-cyan-glow/60",
-             pageMainColor === "brand-green" && "bg-brand-green hover:bg-brand-green/80 hover:shadow-green-glow/60",
-             pageMainColor === "brand-purple" && "bg-brand-purple hover:bg-brand-purple/80 hover:shadow-purple-glow/60"
-             )}>
-            <Link href="/repo-xml?flow=imageSwap">
-                <VibeContentRenderer content={t.tryLiveButton} />
-            </Link>
-          </Button>
-        </section>
-      </div>
-    </div>
+      </TutorialContentContainer>
+      
+      <NextLevelTeaser 
+        title={t.nextLevelTitle}
+        text={t.nextLevelText}
+        buttonText={t.tryLiveButton}
+        buttonLink="/repo-xml?flow=imageSwap" // Using imageSwap flow as per prompt
+        mainColorClassKey={pageMainColorKey}
+      />
+    </TutorialPageContainer>
   );
 }
 
