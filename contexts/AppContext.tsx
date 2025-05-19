@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { createContext, useContext, useEffect, useMemo } from "react"; // Removed useState as it's not directly used here
+import { createContext, useContext, useEffect, useMemo, useState } from "react"; // Added useState
 import { useTelegram } from "@/hooks/useTelegram";
 // import { debugLogger } from "@/lib/debugLogger"; // Keep if specific debugs needed for AppContext itself
 import { logger as globalLogger } from "@/lib/logger"; 
@@ -14,20 +14,34 @@ import { toast } from "sonner";
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   // isAuthenticating is already part of ReturnType<typeof useTelegram>
+  startParamPayload: string | null; // Added to store the parsed start_param
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const telegramData = useTelegram(); // This now contains all states including isLoading, isAuthenticating, error etc.
+  const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (telegramData.tg && telegramData.tg.initDataUnsafe?.start_param) {
+      const rawStartParam = telegramData.tg.initDataUnsafe.start_param;
+      globalLogger.info(`[AppContext] Received start_param: ${rawStartParam}`);
+      setStartParamPayload(rawStartParam);
+    }
+  }, [telegramData.tg]);
+
 
   // contextValue simply passes through what useTelegram provides.
   // useMemo here ensures that the context object reference only changes if telegramData itself changes.
   const contextValue = useMemo(() => {
     // No need for extensive debug logging here for memoization itself,
     // as the primary source of truth and logging is useTelegram.
-    return telegramData;
-  }, [telegramData]); // Dependency array is just telegramData
+    return {
+        ...telegramData,
+        startParamPayload, // Add startParamPayload to the context
+    };
+  }, [telegramData, startParamPayload]); // Dependency array is telegramData and startParamPayload
 
   useEffect(() => {
     globalLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value changed. Current state from context:", {
@@ -42,6 +56,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       inTelegram: contextValue.isInTelegramContext,
       mockUserEnv: process.env.NEXT_PUBLIC_USE_MOCK_USER,
       platform: contextValue.platform,
+      startParamPayload: contextValue.startParamPayload, // Log the payload
     });
   }, [contextValue]); // Log whenever the memoized contextValue changes
 
@@ -153,6 +168,8 @@ export const useAppContext = (): AppContextData => {
         initData: undefined, 
         initDataUnsafe: undefined,
         colorScheme: 'dark',
+        startParam: null, // Added from useTelegram
+        startParamPayload: null, // Added to AppContextData
      } as AppContextData; 
   }
 
