@@ -100,7 +100,7 @@ const iconSwapTutorialTranslations = {
         id: 4,
         title: "ШАГ 4: GG WP! ИКОНКА ЦЕЛА!",
         description: "Автоматика всё сделает: PR, мердж. Обнови страницу – иконка ИДЕАЛЬНА! Ты – боженька UX!",
-        icon: "FaCheckCircle", 
+        icon: "FaCircleCheck", 
         color: "brand-green",
         videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-icon-swap-wtf/step4_profit.mp4"
       }
@@ -137,7 +137,7 @@ function IconSwapTutorialContent() {
     if (isAuthenticated && dbUser?.user_id) {
       const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
       if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
-        addToast(`::FaCheckCircle:: Миссия "${iconSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+        addToast(`::FaCircleCheck:: Миссия "${iconSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
       }
       result.newAchievements?.forEach(ach => {
         addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });

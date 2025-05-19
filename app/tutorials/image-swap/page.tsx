@@ -61,7 +61,7 @@ function ImageSwapTutorialContent() {
   const router = useRouter();
   const { dbUser, isAuthenticated } = useAppContext();
   const { addToast } = useAppToast();
-  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger"; // Unique ID for trigger
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger"; 
 
   const initialModeFromUrl = searchParams.get('mode') === 'wtf';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
@@ -73,7 +73,7 @@ function ImageSwapTutorialContent() {
     if (isAuthenticated && dbUser?.user_id) {
       const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
       if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
-        addToast(`::FaCheckCircle:: Миссия "${imageSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+        addToast(`::FaCircleCheck:: Миссия "${imageSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
       }
       result.newAchievements?.forEach(ach => {
         addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });

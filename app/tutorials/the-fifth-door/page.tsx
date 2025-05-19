@@ -136,7 +136,7 @@ function TheFifthDoorTutorialContent() {
     if (isAuthenticated && dbUser?.user_id) {
       const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
       if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
-        addToast(`::FaCheckCircle:: Миссия "${theFifthDoorTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+        addToast(`::FaCircleCheck:: Миссия "${theFifthDoorTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
       }
       result.newAchievements?.forEach(ach => {
         addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
@@ -239,7 +239,7 @@ function TheFifthDoorTutorialContent() {
         title={t.nextLevelTitle}
         text={t.nextLevelText}
         buttonText={t.tryLiveButton}
-        buttonLink="/repo-xml" // Финальный тизер ведет в студию
+        buttonLink="/repo-xml" 
         mainColorClassKey={pageMainColorKey}
       />
     </TutorialPageContainer>

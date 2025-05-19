@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import TutorialLoader from '../tutorials/TutorialLoader'; 
-import RockstarHeroSection from '../tutorials/RockstarHeroSection'; // Import RockstarHeroSection
+import RockstarHeroSection from '../tutorials/RockstarHeroSection'; 
 import { useAppContext } from '@/contexts/AppContext';
 import { fetchUserCyberFitnessProfile, QUEST_ORDER, isQuestUnlocked as checkQuestUnlocked } from '@/hooks/cyberFitnessSupabase';
 import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
@@ -189,14 +189,17 @@ function StartTrainingContent() {
         </Button>
       </RockstarHeroSection>
 
+      {/* This div acts as a spacer to push content below the fixed RockstarHeroSection */}
+      {/* Its height determines how much scroll is needed before content is fully visible */}
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
       
-      <div className="container mx-auto px-4 py-12 md:py-16 relative z-10"> {/* Content starts after hero */}
+      {/* Actual page content starts here, positioned relatively */}
+      <div className="container mx-auto px-4 py-12 md:py-16 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.2 : 0.1 }}
-          className="w-full max-w-md mb-12 mx-auto" // Added mx-auto
+          className="w-full max-w-md mb-12 mx-auto" 
         >
           <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
             <CardHeader className="p-6 md:p-8 border-b border-brand-green/40">
@@ -249,7 +252,7 @@ function StartTrainingContent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: currentMode === 'wtf' ? 0.4 : 0.3 }}
-          className="w-full max-w-2xl mx-auto" // Added mx-auto
+          className="w-full max-w-2xl mx-auto" 
         >
           <Card className={cn("bg-dark-card/80 backdrop-blur-md border shadow-xl", currentMode === 'wtf' ? "border-brand-pink/70 shadow-pink-glow" : "border-brand-purple/50 shadow-purple-glow")}>
             <CardHeader className="pb-4">
