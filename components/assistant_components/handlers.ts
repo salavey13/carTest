@@ -1,3 +1,4 @@
+// /components/assistant_components/handlers.ts
 "use client";
     
 import { useCallback } from 'react';
@@ -11,8 +12,9 @@ import {
     useRepoXmlPageContext,
     SimplePullRequest,
     ImageReplaceTask,
-    IconReplaceTask, // Import IconReplaceTask
-    FileNode
+    IconReplaceTask, 
+    FileNode,
+    RepoXmlPageContextType 
 } from '@/contexts/RepoXmlPageContext';
 import {
     ValidationIssue,
@@ -43,7 +45,7 @@ type UseCodeParsingAndValidationReturn = {
     isParsing: boolean;
     parseAndValidateResponse: (response: string) => Promise<{ files: ValidationFileEntry[]; description: string; issues: ValidationIssue[]; }>;
     autoFixIssues: (filesToFix: ValidationFileEntry[], issuesToFix: ValidationIssue[]) => ValidationFileEntry[];
-    setParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>; 
+    setHookParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>; // Corrected name to match hook's export
     setValidationStatus: React.Dispatch<React.SetStateAction<ValidationStatus>>;
     setValidationIssues: React.Dispatch<React.SetStateAction<ValidationIssue[]>>;
     setIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
@@ -75,7 +77,7 @@ interface UseAICodeAssistantHandlersProps {
     setRepoUrlStateLocal: React.Dispatch<React.SetStateAction<string>>;
     codeParserHook: UseCodeParsingAndValidationReturn;
     appContext: ReturnType<typeof useAppContext>;
-    pageContext: ReturnType<typeof useRepoXmlPageContext>;
+    pageContext: RepoXmlPageContextType; 
     aiResponseInputRefPassed: React.MutableRefObject<HTMLTextAreaElement | null>;
     kworkInputRefPassed: React.MutableRefObject<HTMLTextAreaElement | null>;
     setJustParsedFlagForScrollFix: React.Dispatch<React.SetStateAction<boolean>>;
@@ -94,14 +96,16 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
 
     const { user, dbUser } = appContext; 
     const {
-        setParsedFiles: setHookParsedFiles, 
+        setHookParsedFiles, // Use directly, as it's correctly named in the type now
         setValidationStatus, setValidationIssues, parseAndValidateResponse, autoFixIssues, validationIssues, validationStatus, rawDescription, setRawDescription
     } = codeParserHook;
     const {
         contextOpenPrs, targetBranchName, repoUrlFromContext, setAssistantLoading, triggerGetOpenPRs, 
         triggerUpdateBranch, 
         triggerCreateNewPR,  
-        setFilesParsed, setSelectedAssistantFiles, setContextIsParsing: setPageContextIsParsing, setRequestCopied, 
+        setFilesParsed, setSelectedAssistantFiles, 
+        setIsParsing: setPageContextIsParsing, 
+        setRequestCopied, 
         selectedAssistantFiles, setAiResponseHasContent, allFetchedFiles, addToast 
     } = pageContext;
 
@@ -118,7 +122,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         if (imageReplaceTask || iconReplaceTask) { toast.warn("Разбор не нужен для задачи замены."); return; }
         if (!response.trim()) { toast.warn("Нет ответа AI для разбора."); return; }
         logger.log("[Handler Parse] Starting parse...");
-        setPageContextIsParsing(true); setAssistantLoading(true); 
+        setPageContextIsParsing(true); 
+        setAssistantLoading(true); 
         try {
             const { files: newlyParsedFiles, description: parsedRawDesc, issues: parseValidationIssues } = await parseAndValidateResponse(response);
             setHookParsedFiles(newlyParsedFiles); 
@@ -143,7 +148,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             setFilesParsed(false); setHookParsedFiles([]); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set());
             setValidationStatus('error'); setValidationIssues([{type: 'parseError', message: `Ошибка парсинга ответа: ${error?.message ?? '?'}`, fixable: false, restorable: false, id:'parse_error', fileId: 'general', filePath: 'N/A', severity: 'error'}]);
         } finally {
-            setPageContextIsParsing(false); setAssistantLoading(false);
+            setPageContextIsParsing(false); 
+            setAssistantLoading(false);
             logger.log("[Handler Parse] Finished.");
         }
      }, [
@@ -658,53 +664,68 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
 
                 if (oldIconName.toLowerCase() === newIconName.toLowerCase() && !componentProps) {
                     logger.info(`[Handler DirectIconReplace] Old and new icon names are the same ('${oldIconName}' -> '${newIconName}') and no props. Skipping replacement.`);
-                    replacementOccurred = true; // Effectively, no change needed.
+                    replacementOccurred = true; 
                 } else {
                     const oldIconRegexBase = oldIconName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
                     
-                    // Add 'i' flag for case-insensitive matching
                     const componentRegex = new RegExp(`<${oldIconRegexBase}(\\s+[^>]*)?\\s*\\/?>`, 'gi');
                     const vibeSyntaxRegex = new RegExp(`::${oldIconRegexBase}(\\s+[^:]*)?::`, 'gi');
+                    const stringLiteralRegex = new RegExp(`(["'])${oldIconRegexBase}\\1`, 'gi');
 
                     let tempContent = updatedContent;
+                    let currentReplacementOccurred = false;
 
                     if (componentRegex.test(tempContent)) {
-                        // When replacing, use the newIconName as provided (preserving its case)
                         tempContent = tempContent.replace(componentRegex, (_match, p1) => {
-                            // p1 contains existing attributes if any. Preserve them if new props are not defined.
-                            // If new props ARE defined, they should overwrite/be additive.
-                            // For simplicity, if componentProps exists, it's used entirely.
-                            // A more sophisticated merge could be done if needed.
                             const existingAttrs = p1 ? p1.trim() : '';
                             let finalAttrs = componentProps ? componentProps.trim() : existingAttrs;
                             if (componentProps && existingAttrs && !componentProps.includes(existingAttrs) && !existingAttrs.includes(componentProps)) {
-                                // Rudimentary merge: just append. A real merge would parse attributes.
-                                // finalAttrs = `${existingAttrs} ${componentProps.trim()}`;
-                                // For now, let new props override if specified
                                 finalAttrs = componentProps.trim();
                             }
                             return `<${newIconName}${finalAttrs ? ' ' + finalAttrs : ''} />`;
                         });
-                        replacementOccurred = true;
+                        currentReplacementOccurred = true;
                         logger.info(`[Handler DirectIconReplace] Replaced component syntax: ${oldIconName} -> ${newIconName}`);
                     }
+                    
                     if (vibeSyntaxRegex.test(tempContent)) { 
                         tempContent = tempContent.replace(vibeSyntaxRegex, (_match, p1) => {
                             const existingAttrs = p1 ? p1.trim() : '';
                             let finalAttrs = componentProps ? componentProps.trim() : existingAttrs;
                              if (componentProps && existingAttrs && !componentProps.includes(existingAttrs) && !existingAttrs.includes(componentProps)) {
-                                finalAttrs = componentProps.trim(); // Override logic similar to above
+                                finalAttrs = componentProps.trim(); 
                             }
                             return `::${newIconName}${finalAttrs ? ' ' + finalAttrs : ''}::`;
                         });
-                        replacementOccurred = true; 
+                        currentReplacementOccurred = true; 
                         logger.info(`[Handler DirectIconReplace] Replaced Vibe syntax: ${oldIconName} -> ${newIconName}`);
                     }
+                    
+                    if (stringLiteralRegex.test(tempContent)) {
+                        stringLiteralRegex.lastIndex = 0; 
+                        let newFileContent = "";
+                        let lastIndex = 0;
+                        let match;
+                        while((match = stringLiteralRegex.exec(tempContent)) !== null) {
+                            newFileContent += tempContent.substring(lastIndex, match.index);
+                            const quote = match[1]; 
+                            newFileContent += `${quote}${newIconName}${quote}`; 
+                            lastIndex = match.index + match[0].length;
+                        }
+                        newFileContent += tempContent.substring(lastIndex);
+                        if (tempContent !== newFileContent) {
+                             tempContent = newFileContent;
+                             currentReplacementOccurred = true;
+                             logger.info(`[Handler DirectIconReplace] Replaced string literal syntax: "${oldIconName}" -> "${newIconName}"`);
+                        }
+                    }
+                    
                     updatedContent = tempContent;
+                    replacementOccurred = currentReplacementOccurred;
 
                     if (!replacementOccurred) {
-                        logger.warn(`[Handler DirectIconReplace] Old icon "${oldIconName}" (case-insensitive) not found in file ${task.targetPath}`);
-                        throw new Error(`Старая иконка "${oldIconName}" не найдена в файле.`);
+                        logger.warn(`[Handler DirectIconReplace] Old icon "${oldIconName}" (case-insensitive) not found in file ${task.targetPath} in any format (component, Vibe, string literal).`);
+                        throw new Error(`Старая иконка "${oldIconName}" не найдена в файле ни в одном из форматов.`);
                     }
                 }
             }
@@ -722,7 +743,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             const newBranchName = `fix/${isActualImageTask ? 'img' : 'icon'}-${task.targetPath.replace(/[\/\.]/g, "-")}-${Date.now()}`;
             logger.info(`[Handler Direct${taskTypeForLog}] Always creating new branch: ${newBranchName}`);
 
-            // Skip PR creation if content hasn't actually changed
             if (targetFile.content === updatedContent) {
                 logger.info(`[Handler Direct${taskTypeForLog}] Content for ${task.targetPath} did not change. Skipping PR creation.`);
                 toast.info(`Содержимое файла ${task.targetPath.split('/').pop()} не изменилось. PR не требуется.`, { id: toastId, duration: 5000 });
@@ -773,7 +793,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         repoUrlForForm, setAssistantLoading, setIsProcessingPR, setImageReplaceError,
         triggerCreateNewPR, 
         triggerGetOpenPRs,
-        setImageReplaceTask, setIconReplaceTask, addToast // Ensure setIconReplaceTask is listed if it's used
+        setImageReplaceTask, setIconReplaceTask, addToast 
     ]);
     
     return {
