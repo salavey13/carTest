@@ -17,7 +17,6 @@ import TutorialContentContainer from '../TutorialContentContainer';
 import TutorialStepSection from '../TutorialStepSection';
 import NextLevelTeaser from '../NextLevelTeaser';
 
-
 const inceptionSwapTutorialTranslations = {
   ru: {
     pageTitle: "Миссия 4: ::FaInfinity:: Inception Swap",
@@ -56,6 +55,7 @@ const inceptionSwapTutorialTranslations = {
     nextLevelText: "Ты постиг Дзен разработки на oneSitePls. Теперь ты видишь код. <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> — твой верстак, а идеи — твои чертежи. Строй будущее!",
     tryLiveButton: "::FaTools:: В SUPERVIBE Studio",
     toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   },
   wtf: {
     pageTitle: "::FaBomb:: ВСЁ ЕСТЬ КОД! WTF?!",
@@ -93,6 +93,7 @@ const inceptionSwapTutorialTranslations = {
     nextLevelTitle: "::FaSatelliteDish:: ТЫ ПОДКЛЮЧЕН К ИСТОЧНИКУ!",
     nextLevelText: "РЕАЛЬНОСТЬ – ЭТО КОД. ТЫ – ЕГО АРХИТЕКТОР. <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> – ТВОЯ КИБЕРДЕКА. ВРЕМЯ ЛОМАТЬ СИСТЕМУ!",
     tryLiveButton: "::FaLaptopCode:: В БОЙ!",
+    toggleButtonToWtf: "::FaPooStorm:: Включить Режим БОГА (WTF?!)", 
     toggleButtonToNormal: "::FaBook:: Вернуть Скучную Инструкцию", 
   }
 };
@@ -137,8 +138,15 @@ function InceptionSwapTutorialContent() {
   const toggleMode = () => {
     const newMode = currentMode === 'ru' ? 'wtf' : 'ru';
     setCurrentMode(newMode);
-    if (newMode === 'wtf') {
-      router.replace(`/tutorials/inception-swap?mode=wtf`);
+    // router.replace(`/tutorials/inception-swap${newMode === 'wtf' ? '?mode=wtf' : ''}`, { scroll: false });
+    // Per original logic, this button only appears in RU mode to go to WTF, so no need to toggle back if started in WTF
+     if (newMode === 'wtf') {
+      router.replace(`/tutorials/inception-swap?mode=wtf`, { scroll: false });
+    } else {
+      // If currentMode was 'wtf' (meaning button was "back to normal") and we are here,
+      // it means user clicked "back to normal".
+      // We should remove the ?mode=wtf query param.
+      router.replace(`/tutorials/inception-swap`, { scroll: false });
     }
   };
 
@@ -158,30 +166,31 @@ function InceptionSwapTutorialContent() {
         title={t.pageTitle}
         subtitle={t.pageSubtitle}
         triggerElementSelector={`#${heroTriggerId}`}
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" 
+        // mainBackgroundImageUrl uses new default from RockstarHeroSection if not overridden
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
-        {!initialModeFromUrl && currentMode === 'ru' && (
+        {/* Logic for button visibility based on original page structure */}
+        {currentMode === 'ru' && (
            <Button 
             onClick={toggleMode} 
             variant="outline" 
             size="lg"
             className={cn(
-              "bg-card/80 backdrop-blur-md hover:bg-pink-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
-              "border-pink-500/80 text-pink-400 hover:text-pink-200 focus:ring-2 focus:ring-pink-500" 
+              "backdrop-blur-lg transition-all duration-300 font-orbitron active:scale-95 transform hover:scale-105 focus:ring-offset-background",
+              "bg-brand-pink/10 border-2 border-brand-pink text-brand-pink shadow-md shadow-brand-pink/40 hover:bg-brand-pink/20 hover:text-white hover:shadow-pink-glow focus:ring-2 focus:ring-brand-pink" 
             )}
           >
             <VibeContentRenderer content={inceptionSwapTutorialTranslations.ru.toggleButtonToWtf} />
           </Button>
           )}
-        {initialModeFromUrl && currentMode === 'wtf' && (
+        {currentMode === 'wtf' && initialModeFromUrl && ( // Show "back to normal" only if started in WTF
            <Button 
             onClick={toggleMode} 
             variant="outline" 
             size="lg"
             className={cn(
-              "bg-card/80 backdrop-blur-md hover:bg-blue-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-blue-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
-              "border-blue-500/80 text-blue-400 hover:text-blue-200 focus:ring-2 focus:ring-blue-500"
+              "backdrop-blur-lg transition-all duration-300 font-orbitron active:scale-95 transform hover:scale-105 focus:ring-offset-background",
+              "bg-brand-blue/10 border-2 border-brand-blue text-brand-blue shadow-md shadow-brand-blue/40 hover:bg-brand-blue/20 hover:text-white hover:shadow-blue-glow focus:ring-2 focus:ring-brand-blue"
             )}
           >
             <VibeContentRenderer content={inceptionSwapTutorialTranslations.wtf.toggleButtonToNormal} />

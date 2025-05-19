@@ -32,6 +32,7 @@ const imageSwapTutorialTranslations = {
     nextLevelText: "Основы у тебя в кармане, Агент! Готов применить эти навыки в реальном бою? <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> ждет!",
     tryLiveButton: "<FaWandMagicSparkles /> Попробовать в Студии",
     toggleButtonToWtf: "<FaPooStorm /> Включить Режим БОГА (WTF?!)",
+    toggleButtonToNormal: "<FaBookOpen /> Вернуть Скучную Инструкцию", 
   },
   wtf: {
     pageTitle: "КАРТИНКИ МЕНЯТЬ – КАК ДВА БАЙТА ПЕРЕСЛАТЬ!",
@@ -45,6 +46,7 @@ const imageSwapTutorialTranslations = {
     nextLevelTitle: "<FaRocket /> ТЫ ПРОКАЧАЛСЯ, БРО!",
     nextLevelText: "Менять картинки – это для лохов. Ты уже ПРО. Го на <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующую Миссию</Link>, там РЕАЛЬНЫЕ ДЕЛА.",
     tryLiveButton: "<FaArrowRight /> В Студию, НЕ ТОРМОЗИ!",
+    toggleButtonToWtf: "<FaPooStorm /> Включить Режим БОГА (WTF?!)", // Should match RU version for consistency if button always visible
     toggleButtonToNormal: "<FaBookOpen /> Вернуть Скучную Инструкцию", 
   }
 };
@@ -107,7 +109,7 @@ function ImageSwapTutorialContent() {
         title={t.pageTitle} 
         subtitle={t.pageSubtitle}
         triggerElementSelector={`#${heroTriggerId}`}
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" 
+        // mainBackgroundImageUrl uses new default from RockstarHeroSection if not overridden
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         <Button 
@@ -115,13 +117,13 @@ function ImageSwapTutorialContent() {
             variant="outline" 
             size="lg"
             className={cn(
-              "bg-card/80 backdrop-blur-md hover:bg-pink-600/30 transition-all duration-200 font-semibold shadow-xl hover:shadow-pink-600/50 focus:ring-offset-background active:scale-95 transform hover:scale-105",
+              "backdrop-blur-lg transition-all duration-300 font-orbitron active:scale-95 transform hover:scale-105 focus:ring-offset-background",
               currentMode === 'ru' 
-                ? "border-pink-500/80 text-pink-400 hover:text-pink-200 focus:ring-2 focus:ring-pink-500" 
-                : "border-blue-500/80 text-blue-400 hover:text-blue-200 focus:ring-2 focus:ring-blue-500"
+                ? "bg-brand-pink/10 border-2 border-brand-pink text-brand-pink shadow-md shadow-brand-pink/40 hover:bg-brand-pink/20 hover:text-white hover:shadow-pink-glow focus:ring-2 focus:ring-brand-pink" 
+                : "bg-brand-blue/10 border-2 border-brand-blue text-brand-blue shadow-md shadow-brand-blue/40 hover:bg-brand-blue/20 hover:text-white hover:shadow-blue-glow focus:ring-2 focus:ring-brand-blue"
             )}
         >
-            <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+            <VibeContentRenderer content={currentMode === 'ru' ? imageSwapTutorialTranslations.ru.toggleButtonToWtf : imageSwapTutorialTranslations.wtf.toggleButtonToNormal} />
         </Button>
       </RockstarHeroSection>
       

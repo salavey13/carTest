@@ -1,62 +1,16 @@
 "use client";
-import React, { useState, useEffect, useRef, useId } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
 
-interface TextToSVGMaskProps {
-  text: string;
-  maskId: string;
-  svgX?: string; 
-  svgY?: string; 
-}
-
-const TextToSVGMask: React.FC<TextToSVGMaskProps> = ({
-  text,
-  maskId,
-  svgX = "50%",
-  svgY = "50%", 
-}) => {
-  const fontFamily = `"Orbitron", sans-serif`; 
-  const fontWeight = "bold";
-  const fontSize = "100"; 
-  const letterSpacing = "0.01em";
-
-  return (
-    <svg className="rockstar-svg-mask-defs" aria-hidden="true">
-      <defs>
-        <mask id={maskId} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
-          <rect x="0" y="0" width="1" height="1" fill="white" />
-          <svg x="0.02" y="0.05" width="0.96" height="0.9" 
-               viewBox="0 0 1000 250" 
-               preserveAspectRatio="xMidYMid meet">
-            <text 
-              x={svgX} 
-              y={svgY}
-              dominantBaseline="central" 
-              textAnchor="middle" 
-              fill="black" 
-              fontFamily={fontFamily}
-              fontWeight={fontWeight}
-              fontSize={fontSize} 
-              letterSpacing={letterSpacing}
-              className="uppercase" 
-            >
-              {text.toUpperCase()}
-            </text>
-          </svg>
-        </mask>
-      </defs>
-    </svg>
-  );
-};
+// TextToSVGMask and related logic for mask are removed as per request to disable mask layer.
 
 interface RockstarHeroSectionProps {
   title: string;
   subtitle?: string; 
   mainBackgroundImageUrl?: string;
   backgroundImageObjectUrl?: string; 
-  logoMaskPathD?: string; 
-  logoMaskViewBox?: string; 
+  // logoMaskPathD and logoMaskViewBox are removed as mask is disabled
   children?: React.ReactNode; 
   triggerElementSelector: string;
 }
@@ -64,10 +18,10 @@ interface RockstarHeroSectionProps {
 const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   title,
   subtitle,
-  mainBackgroundImageUrl = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/purple-abstract-bg.jpeg", 
+  mainBackgroundImageUrl = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg", 
   backgroundImageObjectUrl, 
-  logoMaskPathD,
-  logoMaskViewBox,
+  // logoMaskPathD, (removed)
+  // logoMaskViewBox, (removed)
   children,
   triggerElementSelector,
 }) => {
@@ -76,9 +30,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const fixedHeroContainerRef = useRef<HTMLDivElement>(null);
   const fadeOverlayRef = useRef<HTMLDivElement>(null); 
   
-  const baseUniqueId = useId(); 
-  const sanitizedBaseId = baseUniqueId.replace(/:/g, "-");
-  const uniqueMaskId = `mask-${sanitizedBaseId}`;
+  // UniqueMaskId and related logic are removed as mask is disabled.
 
   useEffect(() => {
     const triggerElement = document.querySelector(triggerElementSelector);
@@ -132,17 +84,19 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   }, [isVisible, triggerElementSelector]);
 
   const scrollThresholds = {
-    maskZoomStart: 0.05, 
-    maskZoomEnd: 0.75,
+    // maskZoomStart and maskZoomEnd are removed
     fadeOverlayStart: 0.65, 
     fadeOverlayEnd: 0.95,   
   };
 
   const mainBgInitialScale = 1.5;
   const mainBgTargetScale = 1;
+  // Adjusted mainBgScaleProgress to depend on scrollProgress up to fadeOverlayStart
   let mainBgScaleProgress = 0;
-  if (scrollProgress >= scrollThresholds.maskZoomStart) {
-    mainBgScaleProgress = Math.min(1, (scrollProgress - scrollThresholds.maskZoomStart) / (scrollThresholds.maskZoomEnd - scrollThresholds.maskZoomStart));
+  if (scrollThresholds.fadeOverlayStart > 0) {
+    mainBgScaleProgress = Math.min(1, scrollProgress / scrollThresholds.fadeOverlayStart);
+  } else {
+    mainBgScaleProgress = scrollProgress >= 0.01 ? 1 : 0; // If fadeOverlayStart is 0, scale immediately
   }
   const mainBgScale = mainBgInitialScale - mainBgScaleProgress * (mainBgInitialScale - mainBgTargetScale);
   const mainBgTranslateY = scrollProgress * 1; 
@@ -153,16 +107,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const bgObjectTranslateY = -scrollProgress * 3; 
   const bgObjectOpacity = Math.max(0.05, 0.6 - scrollProgress * 0.55); 
 
-  const initialMaskScale = 50; 
-  const targetMaskScale = 1;
-  let maskProgress = 0;
-  if (scrollProgress >= scrollThresholds.maskZoomStart) {
-    maskProgress = Math.min(1, (scrollProgress - scrollThresholds.maskZoomStart) / (scrollThresholds.maskZoomEnd - scrollThresholds.maskZoomStart));
-  }
-  const currentMaskScale = initialMaskScale - (initialMaskScale - targetMaskScale) * Math.pow(maskProgress, 1.5); 
-  const maskOverlayOpacity = maskProgress > 0.01 ? maskProgress : 0; 
-
-  const svgMaskUrl = `url(#${uniqueMaskId})`;
+  // Mask related calculations (maskProgress, currentMaskScale, maskOverlayOpacity, svgMaskUrl) are removed.
 
   let fadeOverlayProgress = 0;
   if (scrollProgress >= scrollThresholds.fadeOverlayStart) {
@@ -208,51 +153,24 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Layer 3: Initial Title & Subtitle (Static) z-10 */}
+        {/* Layer 3: Title (Static, centrally aligned) z-10 */}
         <div className="relative text-center px-4 z-10" style={{ opacity: heroContentOverallOpacity }}>
-          <h1 className={cn("text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold gta-vibe-text-effect mb-4 md:mb-6")} data-text={title}>
+          <h1 className={cn(
+              "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold mb-4 md:mb-6",
+              "gta-vibe-text-effect", 
+              "animate-glitch"        
+            )} 
+            data-text={title}
+          >
             <VibeContentRenderer content={title} />
           </h1>
-          {subtitle && (
-            <p className="text-lg sm:text-xl md:text-2xl text-gray-300/70 font-mono max-w-3xl mx-auto">
-              <VibeContentRenderer content={subtitle} />
-            </p>
-          )}
+          {/* Subtitle is moved to the bottom section */}
         </div>
 
-        {/* Layer 4: Masked Overlay z-20 */}
-        <div
-          className="absolute inset-0 z-20" 
-          style={{
-            backgroundColor: 'hsl(var(--background))', 
-            opacity: maskOverlayOpacity * heroContentOverallOpacity, 
-            transform: `scale(${Math.max(targetMaskScale, currentMaskScale)})`,
-            transformOrigin: 'center center', 
-            willChange: 'transform, opacity',
-            mask: svgMaskUrl,
-            WebkitMask: svgMaskUrl,
-          }}
-        />
+        {/* Layer 4: Masked Overlay z-20 - REMOVED */}
+        {/* SVG Mask Definitions - REMOVED */}
         
-        {logoMaskPathD && logoMaskViewBox ? (
-           <svg className="rockstar-svg-mask-defs" aria-hidden="true">
-             <defs>
-               <mask id={uniqueMaskId} maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
-                 <rect x="0" y="0" width="1" height="1" fill="white" />
-                 <svg viewBox={logoMaskViewBox} x="0.1" y="0.1" width="0.8" height="0.8" preserveAspectRatio="xMidYMid meet">
-                    <path d={logoMaskPathD} fill="black" />
-                 </svg>
-               </mask>
-             </defs>
-           </svg>
-        ) : (
-          <TextToSVGMask 
-            text={title} 
-            maskId={uniqueMaskId}
-          />
-        )}
-        
-        {/* Gradient Fade Overlay - z-40 (above mask, below children) */}
+        {/* Gradient Fade Overlay - z-40 (above background, below content at bottom) */}
         <div
           ref={fadeOverlayRef}
           className="absolute inset-0 z-40 pointer-events-none"
@@ -263,15 +181,25 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           }}
         />
         
-        {/* Layer 6: Children (Buttons, etc.) z-50 */}
-        {children && (
-            <div 
-                className="absolute bottom-[10vh] md:bottom-[15vh] z-50" 
-                style={{ opacity: heroContentOverallOpacity > 0.1 ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }} 
-            >
-                {children}
-            </div>
-        )}
+        {/* Layer 6: Subtitle and Children (Buttons, etc.) z-50, at the bottom */}
+        <div 
+            className="absolute bottom-[8vh] md:bottom-[10vh] w-full px-4 text-center z-50 flex flex-col items-center gap-4 md:gap-6" 
+            style={{ 
+                opacity: heroContentOverallOpacity > 0.1 ? 1 : 0, 
+                transition: 'opacity 0.3s ease-in-out' 
+            }} 
+        >
+            {subtitle && (
+                <p className="text-lg sm:text-xl md:text-2xl text-light-text/80 font-mono max-w-3xl mx-auto">
+                    <VibeContentRenderer content={subtitle} />
+                </p>
+            )}
+            {children && (
+                <div className={cn(subtitle ? "mt-2 md:mt-4" : "")}>
+                     {children}
+                </div>
+            )}
+        </div>
     </div>
   );
 };
