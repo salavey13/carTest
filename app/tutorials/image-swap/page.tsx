@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback } from 'react'; 
+import React, { useState, useEffect, Suspense, useCallback, useId } from 'react'; 
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import NextLevelTeaser from '../NextLevelTeaser';
 const imageSwapTutorialTranslations = {
   ru: {
     pageTitle: "Миссия 1: Охота на Битый Пиксель",
+    pageSubtitle: "Первая миссия, Агент! Научись быстро заменять изображения в коде, используя мощь SUPERVIBE Studio. Это твой первый шаг к мастерству.",
     steps: [ 
       { id: 1, title: "Шаг 1: Захват URL Старого Артефакта", description: "Первая задача, оперативник: обнаружить в кодовой базе изображение, требующее замены. Найдя, скопируй его полный URL. Это твоя основная цель!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaLink", color: "brand-pink" },
       { id: 2, title: "Шаг 2: Развертывание Нового Актива", description: "Далее, загрузи свой новенький, сияющий файл замены. Рекомендуем Supabase Storage для гладкой интеграции, но подойдет любой публично доступный URL. Защити новую ссылку!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaUpload", color: "brand-blue" },
@@ -28,12 +29,13 @@ const imageSwapTutorialTranslations = {
       { id: 4, title: "Шаг 4: Операция Успешна! Анализ PR", description: "Миссия выполнена! Pull Request с заменой изображения сгенерирован автоматически. Осталось лишь проверить, смерджить и наслаждаться результатом. Профит!", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4", icon: "FaCheckDouble", color: "brand-green" }
     ],
     nextLevelTitle: "<FaPlayCircle /> Новый Уровень Разблокирован!",
-    nextLevelText: "Основы у тебя в кармане, Агент! Готов применить эти навыки в реальном бою? <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих команд.",
+    nextLevelText: "Основы у тебя в кармане, Агент! Готов применить эти навыки в реальном бою? <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующая Миссия</Link> ждет!",
     tryLiveButton: "<FaWandMagicSparkles /> Попробовать в Студии",
     toggleButtonToWtf: "<FaPooStorm /> Включить Режим БОГА (WTF?!)",
   },
   wtf: {
     pageTitle: "КАРТИНКИ МЕНЯТЬ – КАК ДВА БАЙТА ПЕРЕСЛАТЬ!",
+    pageSubtitle: "Это твой первый урок, салага! Научись менять картинки или проваливай!",
     steps: [ 
       { id: 1, title: "ШАГ 1: КОПИРУЙ СТАРЫЙ URL", description: "Нашел картинку в коде? КОПИРНИ ЕЕ АДРЕС. Всё.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4", icon: "FaCopy", color: "brand-pink" },
       { id: 2, title: "ШАГ 2: ЗАЛЕЙ НОВУЮ, КОПИРУЙ URL", description: "Загрузи НОВУЮ картинку. КОПИРНИ ЕЕ АДРЕС. Изи.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4", icon: "FaCloudArrowUp", color: "brand-blue" },
@@ -41,7 +43,7 @@ const imageSwapTutorialTranslations = {
       { id: 4, title: "ШАГ 4: PR ГОТОВ! ТЫ КРАСАВЧИК!", description: "PR создан. Проверь, смерджи. Всё! Ты поменял картинку быстрее, чем заварил дошик.", videoSrc: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4", icon: "FaThumbsUp", color: "brand-green" }
     ],
     nextLevelTitle: "<FaRocket /> ТЫ ПРОКАЧАЛСЯ, БРО!",
-    nextLevelText: "Менять картинки – это для лохов. Ты уже ПРО. Го в <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link>, там РЕАЛЬНЫЕ ДЕЛА.",
+    nextLevelText: "Менять картинки – это для лохов. Ты уже ПРО. Го на <Link href='/start-training' class='text-brand-blue hover:underline font-semibold'>Следующую Миссию</Link>, там РЕАЛЬНЫЕ ДЕЛА.",
     tryLiveButton: "<FaArrowRight /> В Студию, НЕ ТОРМОЗИ!",
     toggleButtonToNormal: "<FaBookOpen /> Вернуть Скучную Инструкцию", 
   }
@@ -59,6 +61,7 @@ function ImageSwapTutorialContent() {
   const router = useRouter();
   const { dbUser, isAuthenticated } = useAppContext();
   const { addToast } = useAppToast();
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger"; // Unique ID for trigger
 
   const initialModeFromUrl = searchParams.get('mode') === 'wtf';
   const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>(initialModeFromUrl ? 'wtf' : 'ru');
@@ -97,14 +100,14 @@ function ImageSwapTutorialContent() {
 
   const stepsToRender = t.steps;
   const pageMainColorKey = "brand-green"; 
-  const heroTriggerElementId = "hero-trigger-element";
 
   return (
     <TutorialPageContainer>
       <RockstarHeroSection 
         title={t.pageTitle} 
-        triggerElementSelector={`#${heroTriggerElementId}`}
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/content/dark-moody-car-road.jpg" 
+        subtitle={t.pageSubtitle}
+        triggerElementSelector={`#${heroTriggerId}`}
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//Screenshot_2025-05-17-11-07-09-401_org.telegram.messenger.jpg" 
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png"
       >
         <Button 
@@ -122,7 +125,7 @@ function ImageSwapTutorialContent() {
         </Button>
       </RockstarHeroSection>
       
-      <div id={heroTriggerElementId} style={{ height: '250vh' }} aria-hidden="true" />
+      <div id={heroTriggerId} style={{ height: '250vh' }} aria-hidden="true" />
 
       <TutorialContentContainer className="relative">
         <div className="space-y-16 md:space-y-24">
@@ -181,7 +184,7 @@ function ImageSwapTutorialContent() {
         title={t.nextLevelTitle}
         text={t.nextLevelText}
         buttonText={t.tryLiveButton}
-        buttonLink="/repo-xml?flow=imageSwap"
+        buttonLink="/start-training"
         mainColorClassKey={pageMainColorKey}
       />
     </TutorialPageContainer>
