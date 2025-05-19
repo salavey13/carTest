@@ -122,7 +122,7 @@ function InceptionSwapTutorialContent() {
     if (isAuthenticated && dbUser?.user_id) {
       const result = await markTutorialAsCompleted(dbUser.user_id, tutorialQuestId);
       if (result.success && result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
-        addToast(`::FaCheckCircle:: Миссия "${inceptionSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
+        addToast(`::FaCircleCheck:: Миссия "${inceptionSwapTutorialTranslations.ru.pageTitle}" пройдена! +${result.kiloVibesAwarded} KiloVibes!`, "success");
       }
       result.newAchievements?.forEach(ach => {
         addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
