@@ -34,15 +34,19 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
   labels,
   sectionsCollapsed,
 }) => {
-  const navItems = [
-    { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "fachevronup" }, // Используем одинарную стрелку для консистентности
-    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "fausershield" },
-    { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "fatoolbox" },
-    { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "fatablelist" },
-    { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "fadiagramproject" },
-    { ref: sectionRefs.assetsRef, labelKey: 'navToAssets', iconName: "facubes" },
-    { ref: sectionRefs.zionRef, labelKey: 'navToZion', iconName: "facomments" },
+  const allNavItems = [
+    { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "fachevronup", alwaysVisible: true }, 
+    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "fausershield", alwaysVisible: false },
+    { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "fatoolbox", alwaysVisible: true },
+    { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "fatablelist", alwaysVisible: true },
+    { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "fadiagramproject", alwaysVisible: false },
+    { ref: sectionRefs.assetsRef, labelKey: 'navToAssets', iconName: "facubes", alwaysVisible: false },
+    { ref: sectionRefs.zionRef, labelKey: 'navToZion', iconName: "facomments", alwaysVisible: false },
   ];
+
+  const visibleNavItems = allNavItems.filter(item => 
+    item.alwaysVisible || !sectionsCollapsed
+  );
 
   return (
     <motion.nav
@@ -51,7 +55,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
     >
-      {navItems.map((item) => (
+      {visibleNavItems.map((item) => (
         <Button
           key={item.labelKey}
           variant="ghost"
