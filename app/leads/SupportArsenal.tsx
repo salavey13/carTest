@@ -23,7 +23,7 @@ interface SupportArsenalProps {
   isLoading: boolean;
   onRawKworksInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onProcessedCsvChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onCopyToClipboard: (textToCopy: string, successMessage: string) => void;
+  onCopyToClipboard: (textToCopy: string, successMessage: string, achievementId?: string) => void;
   onUploadCsvToSupabase: () => void;
   onScrollToSection: (ref: React.RefObject<HTMLDivElement>) => void;
   kworkSearchLinks: KworkSearchLink[];
@@ -63,7 +63,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
       </CardHeader>
       <CardContent className="space-y-8 sm:space-y-10 font-mono">
         <div id="rawKworksInputAnchor">
-          <h4 className={cn("text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2", pageTheme.accentColor)}>
+          <h4 className={cn("text-lg sm:text-xl font-orbitron font-bold mb-3 sm:mb-4 flex items-center gap-2", pageTheme.accentColor)}>
             <VibeContentRenderer content={t.rawKworksInputTitle} />
           </h4>
           <p className="text-xs sm:text-sm text-gray-300 mb-3 pl-2">
@@ -71,7 +71,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
           </p>
           <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4 pl-2">
             {kworkSearchLinks.map(link => (
-              <Button key={link.name} variant="outline" size="xs" asChild className={cn("text-[0.65rem] sm:text-xs py-1 px-1.5 sm:px-2", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20 transform hover:scale-105`)}>
+              <Button key={link.name} variant="outline" size="xs" asChild className={cn("text-[0.65rem] sm:text-xs py-1 px-1.5 sm:px-2 font-mono", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20 transform hover:scale-105`)}>
                 <a href={link.url} target="_blank" rel="noopener noreferrer"><VibeContentRenderer content={link.name} /></a>
               </Button>
             ))}
@@ -86,7 +86,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
         </div>
 
         <div>
-          <h4 className={cn("text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2", pageTheme.accentColor)}>
+          <h4 className={cn("text-lg sm:text-xl font-orbitron font-bold mb-3 sm:mb-4 flex items-center gap-2", pageTheme.accentColor)}>
             <VibeContentRenderer content={t.promptButtonsTitle} />
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -97,7 +97,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
                 onCopyToClipboard(textToCopy, "Промпт 'KWorks -> CSV' скопирован! Шаг 1 пройден, оперативник!");
               }}
               disabled={!rawKworksInput.trim()}
-              className="w-full bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
+              className="w-full bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
               <VibeContentRenderer content="::facopy::" />
               <span className="flex-grow whitespace-normal">
@@ -108,20 +108,20 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
               variant="destructive"
               onClick={() => {
                 const intergalacticPrompt = PROMPT_INTERGALACTIC_PIPELINE(rawKworksInput || "СЫРЫЕ ДАННЫЕ С KWORK ОТСУТСТВУЮТ. ПРОВЕРЬТЕ ВВОД.");
-                onCopyToClipboard(intergalacticPrompt, "МЕЖГАЛАКТИЧЕСКИЙ ПРОМПТ СКОПИРОВАН! AI, ГОТОВЬСЯ К ПЕРЕГРУЗКЕ!");
+                onCopyToClipboard(intergalacticPrompt, "МЕЖГАЛАКТИЧЕСКИЙ ПРОМПТ СКОПИРОВАН! AI, ГОТОВЬСЯ К ПЕРЕГРУЗКЕ!", 'leads_ai_pipeline_used');
                 if (offerSectionRef.current) {
                   setTimeout(() => onScrollToSection(offerSectionRef), 300);
                 }
               }}
               disabled={!rawKworksInput.trim()}
-              className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transform hover:scale-105 px-3"
+              className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-orbitron font-bold transform hover:scale-105 px-3"
             >
               <VibeContentRenderer content="::fameteor:: ВСЁ СРАЗУ В AI!" />
             </Button>
             <Button
               variant="secondary"
               onClick={() => onCopyToClipboard(PROMPT_OFFER_V2_CYBERVIBE_OUTREACH, "Промпт 'CSV + Оффер' скопирован! Передайте AI вместе с CSV.")}
-              className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
+              className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
               <VibeContentRenderer content="::facopy::" />
               <span className="flex-grow whitespace-normal">
@@ -131,7 +131,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
             <Button
               variant="secondary"
               onClick={() => onCopyToClipboard(PROMPT_FIND_TWEAKS, "Промпт 'CSV + Твики' скопирован! Передайте AI вместе с CSV.")}
-              className="w-full bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
+              className="w-full bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
               <VibeContentRenderer content="::facopy::" />
               <span className="flex-grow whitespace-normal">
@@ -141,7 +141,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
             <Button
               variant="secondary"
               onClick={() => onCopyToClipboard(PROMPT_FIND_MISSING_FEATURES, "Промпт 'CSV + Фичи' скопирован! Передайте AI вместе с CSV.")}
-              className="w-full bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
+              className="w-full bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
               <VibeContentRenderer content="::facopy::" />
               <span className="flex-grow whitespace-normal">
@@ -155,7 +155,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
         </div>
 
         <div ref={offerSectionRef} id="finalCsvUploadAnchor">
-          <h4 className={cn("text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2 pt-4 sm:pt-6 border-t", pageTheme.accentColor, `${pageTheme.borderColor}/30`)}>
+          <h4 className={cn("text-lg sm:text-xl font-orbitron font-bold mb-3 sm:mb-4 flex items-center gap-2 pt-4 sm:pt-6 border-t", pageTheme.accentColor, `${pageTheme.borderColor}/30`)}>
             <VibeContentRenderer content={t.finalCsvInputTitle} />
           </h4>
           <p className="text-xs sm:text-sm text-gray-300 mb-3 pl-2">
@@ -171,7 +171,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
           <Button
             onClick={onUploadCsvToSupabase}
             disabled={isLoading || !processedCsvForUpload.trim()}
-            className={cn("w-full sm:w-auto bg-brand-lime/80 text-black hover:bg-brand-lime flex items-center justify-center gap-2 py-2.5 sm:py-3 text-sm sm:text-base transform hover:scale-105", (isLoading || !processedCsvForUpload.trim()) && "opacity-50 cursor-not-allowed")}
+            className={cn("w-full sm:w-auto bg-brand-lime/80 text-black hover:bg-brand-lime flex items-center justify-center gap-2 py-2.5 sm:py-3 text-sm sm:text-base font-orbitron font-semibold transform hover:scale-105", (isLoading || !processedCsvForUpload.trim()) && "opacity-50 cursor-not-allowed")}
           >
             <VibeContentRenderer content={isLoading ? "::faspinner className='animate-spin':: ДЕСАНТИРОВАНИЕ..." : t.uploadLeadsButton} />
           </Button>
