@@ -10,19 +10,21 @@ type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 
 interface CsvLeadRow {
   client_name?: string;
-  kwork_url?: string;
+  kwork_url?: string; // Это будет lead_url
   project_description: string; // Обязательное поле
   budget_range?: string;
-  deadline_info?: string;
-  client_kwork_history?: string;
-  current_kwork_offers_count?: string;
+  deadline_info?: string; // Это поле отсутствует в таблице leads, но может быть в CSV
+  client_kwork_history?: string; // Это поле отсутствует в таблице leads, но может быть в CSV
+  current_kwork_offers_count?: string; // Это поле отсутствует в таблице leads, но может быть в CSV
   raw_html_description?: string;
   generated_offer?: string;
   identified_tweaks?: string; // Предполагаем, что это строка JSON
   missing_features?: string; // Предполагаем, что это строка JSON
-  status?: string; // Добавим статус из CSV, если есть
-  source?: string; // Добавим источник из CSV
-  // Другие поля из твоего CSV, если есть
+  status?: string;
+  source?: string;
+  // Поля, которых нет в таблице leads, но могут быть в CSV для информации:
+  // deadline_info, client_kwork_history, current_kwork_offers_count
+  // Они не будут напрямую вставлены, если для них нет колонок.
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -74,7 +76,11 @@ export async function uploadLeadsFromCsv(
     const parseResult = Papa.parse<CsvLeadRow>(csvContent.trim(), {
       header: true,
       skipEmptyLines: 'greedy',
-      transformHeader: header => header.trim(),
+      transformHeader: header => {
+        // Приводим заголовки CSV к именам полей таблицы, если возможно
+        if (header.trim().toLowerCase() === 'kwork_url') return 'lead_url';
+        return header.trim();
+      },
       transform: value => (typeof value === 'string' ? value.trim() : value),
     });
 
@@ -106,23 +112,30 @@ export async function uploadLeadsFromCsv(
         try { featuresJson = JSON.parse(row.missing_features); }
         catch (e) { localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${row.kwork_url}: ${(e as Error).message}`); }
       }
-
-      leadsToUpsert.push({
+      
+      // Формируем объект для вставки/обновления, используя поля из DDL
+      const leadEntry: LeadInsert = {
         client_name: row.client_name || null,
-        lead_url: row.kwork_url || null, // Должен быть UNIQUE, если не NULL
+        lead_url: row.kwork_url || null, // kwork_url из CSV маппится на lead_url
         project_description: row.project_description,
         budget_range: row.budget_range || null,
-        deadline_info: row.deadline_info || null,
-        client_kwork_history: row.client_kwork_history || null,
-        current_kwork_offers_count: row.current_kwork_offers_count || null,
         raw_html_description: row.raw_html_description || null,
         generated_offer: row.generated_offer || null,
         identified_tweaks: tweaksJson,
         missing_features: featuresJson,
-        status: row.status || 'raw_data', // Если статус приходит из CSV
-        source: row.source || 'csv_upload', // Можно добавить колонку source в CSV
-        // assigned_to_support: currentUserId, // Автоматически назначаем Саппорту, который загрузил
-      });
+        status: row.status || 'raw_data', 
+        source: row.source || 'csv_upload',
+        // posted_at и similarity_score могут быть null, если их нет в CSV
+        // или если они требуют специальной обработки (например, парсинг даты)
+        // client_kwork_history, deadline_info, current_kwork_offers_count - нет в DDL, пропускаем
+      };
+
+      // Если lead_url пустой, делаем его null, чтобы избежать ошибки уникальности для пустых строк
+      if (leadEntry.lead_url === '') {
+        leadEntry.lead_url = null;
+      }
+      
+      leadsToUpsert.push(leadEntry);
     }
 
     if (leadsToUpsert.length === 0 && localErrors.length > 0) {
@@ -131,11 +144,16 @@ export async function uploadLeadsFromCsv(
     if (leadsToUpsert.length === 0) {
         return { success: false, message: "Нет данных для загрузки после обработки CSV."};
     }
+    
+    // Важно: для onConflict: 'lead_url' это поле должно быть UNIQUE NOT NULL или PRIMARY KEY.
+    // Если lead_url может быть NULL и при этом не уникален, upsert по нему не сработает как ожидается для NULL значений.
+    // PostgreSQL не считает NULL значения равными друг другу для UNIQUE constraints.
+    // Если lead_url может быть NULL, лучше реализовать логику "найти или создать" вручную или использовать другой уникальный идентификатор.
+    // Для простоты, предполагаем, что если lead_url есть, он уникален. Если его нет, это будет INSERT.
 
-    // Используем onConflict для обновления, если lead_url уже существует
     const { data, error, count } = await supabaseAdmin
       .from('leads')
-      .upsert(leadsToUpsert, { onConflict: 'lead_url', ignoreDuplicates: false }) // ignoreDuplicates: false чтобы count отражал кол-во затронутых строк
+      .upsert(leadsToUpsert, { onConflict: 'lead_url', ignoreDuplicates: false }) 
       .select();
 
     if (error) {
@@ -159,17 +177,26 @@ export async function updateLeadStatus(
   currentUserId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   
-  const lead = await supabaseAdmin.from('leads').select('assigned_to_tank, assigned_to_carry, assigned_to_support').eq('id', leadId).single();
+  const { data: leadData, error: leadError } = await supabaseAdmin.from('leads').select('assigned_to_tank, assigned_to_carry, assigned_to_support').eq('id', leadId).single();
   let canUpdate = false;
-  if (lead.data) {
-    canUpdate = await verifyUserPermissions(currentUserId, 
-        (lead.data.assigned_to_tank === currentUserId && ['tank']) || 
-        (lead.data.assigned_to_carry === currentUserId && ['carry']) || 
-        (lead.data.assigned_to_support === currentUserId && ['support']) || 
-        ['support'] // Саппорт может менять статус любого лида
-    , ['admin']);
-  } else {
-     canUpdate = await verifyUserPermissions(currentUserId, ['support'], ['admin']); // Если лид не найден, только админ/саппорт могут создать его через этот путь (маловероятно)
+  if (leadError) {
+      logger.error(`Lead ${leadId} not found for status update: ${leadError.message}`);
+      // Если лид не найден, только админ/саппорт могут (теоретически) его создать, но это не логика обновления
+      canUpdate = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
+      if (!canUpdate) return { success: false, message: "Ошибка: Лид не найден и нет прав на создание." };
+  } else if (leadData) {
+    const assignedTank = leadData.assigned_to_tank === currentUserId;
+    const assignedCarry = leadData.assigned_to_carry === currentUserId;
+    const assignedSupport = leadData.assigned_to_support === currentUserId;
+    
+    // Роли для проверки, если пользователь является назначенным лицом
+    const assignedRoles: string[] = [];
+    if (assignedTank) assignedRoles.push('tank');
+    if (assignedCarry) assignedRoles.push('carry');
+    if (assignedSupport) assignedRoles.push('support');
+
+    // Саппорт может менять статус любого лида, или если это назначенный пользователь
+    canUpdate = await verifyUserPermissions(currentUserId, ['support', ...assignedRoles], ['admin']);
   }
   
   if (!canUpdate) {
@@ -224,7 +251,7 @@ export async function assignLead(
       logger.error(`Ошибка назначения лида ${leadId} на ${assigneeType} ${assigneeId}:`, error);
       return { success: false, message: `Ошибка БД: ${error.message}` };
     }
-    const successMsg = `Лид ${leadId.substring(0,8)}... ${assigneeId ? `назначен на ${assigneeType} ${assigneeId.substring(0,8)}...` : `снят с назначения ${assigneeType}`}.`;
+    const successMsg = `Лид ${leadId.substring(0,8)}... ${assigneeId ? `назначен на ${assigneeType} ${(assigneeId).substring(0,8)}...` : `снят с назначения ${assigneeType}`}.`;
     logger.info(successMsg);
     return { success: true, message: successMsg };
   } catch (error) {
@@ -233,15 +260,13 @@ export async function assignLead(
   }
 }
 
-
 export async function fetchLeadsForDashboard(
   currentUserId: string,
-  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' // Добавил 'my' для универсальности
+  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' // Добавлены статусные фильтры
 ): Promise<{ success: boolean; data?: LeadRow[]; error?: string }> {
   if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
 
   try {
-    // Сначала получаем роль и статус текущего пользователя
     const { data: currentUserData, error: userError } = await supabaseAdmin
       .from('users')
       .select('role, status')
@@ -256,33 +281,30 @@ export async function fetchLeadsForDashboard(
     const { role: currentUserRole, status: currentUserStatus } = currentUserData;
     let query = supabaseAdmin.from('leads').select('*').order('created_at', { ascending: false });
 
+    // Логика фильтрации в зависимости от роли и статуса
     if (currentUserStatus === 'admin' || currentUserRole === 'support') {
-      // Админы и Саппорты видят все или отфильтрованные по роли других
-      if (filter === 'tank') query = query.neq('assigned_to_tank', null); // Показываем все, где есть назначенный танк
-      else if (filter === 'carry') query = query.neq('assigned_to_carry', null); // Показываем все, где есть назначенный кэрри
-      // 'all' и 'support' для них означают все лиды
+      // Админы и Саппорты:
+      if (filter === 'tank') query = query.neq('assigned_to_tank', null);
+      else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
+      else if (filter === 'support') query = query.neq('assigned_to_support', null); // или .eq('assigned_to_support', currentUserId) если "мои саппортные"
+      else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
+      // 'all' и 'my' (если my для саппорта = все назначенные ему) для них могут означать разные вещи.
+      // Для саппорта 'my' может означать лиды, где он assigned_to_support
+      else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
+      // Для админа 'my' не имеет смысла без доп. логики, так что 'all' или ничего.
+
     } else if (currentUserRole === 'tank') {
-      // Танки видят только свои лиды
       query = query.eq('assigned_to_tank', currentUserId);
+      if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
+      // Фильтр 'my' для танка уже применен. 'all' для танка - все его лиды.
     } else if (currentUserRole === 'carry') {
-      // Кэрри видят только свои лиды
       query = query.eq('assigned_to_carry', currentUserId);
+      if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
     } else {
-      // Другие роли (или если роль не определена) не видят ничего, кроме своих (если есть такой фильтр)
-       if (filter === 'my') { // Общий фильтр "мои", если вдруг понадобится
-         query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
-       } else {
-        return { success: true, data: [] }; // По умолчанию ничего не показываем
-       }
+      // Другие роли не видят ничего по умолчанию
+      return { success: true, data: [] };
     }
     
-    // Применяем общий фильтр, если он не 'all' и пользователь не админ/саппорт (для которых 'all' уже применен)
-    if (filter !== 'all' && !(currentUserStatus === 'admin' || currentUserRole === 'support')) {
-        if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
-        // Фильтры 'tank' и 'carry' уже применены выше для соответствующих ролей
-    }
-
-
     const { data, error } = await query;
 
     if (error) {
