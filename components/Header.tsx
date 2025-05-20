@@ -157,7 +157,15 @@ export default function Header() {
   const [isMounted, setIsMounted] = useState(false);
 
   const t = useCallback((key: string) => {
-    return translations[language][key] || translations['en'][key] || key;
+    const langDict = translations[language];
+    if (langDict && langDict[key] !== undefined) {
+      return langDict[key];
+    }
+    const enDict = translations['en'];
+    if (enDict && enDict[key] !== undefined) {
+      return enDict[key];
+    }
+    return key;
   }, [language]);
 
   useEffect(() => {
