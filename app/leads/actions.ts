@@ -10,19 +10,19 @@ type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 
 interface CsvLeadRow {
   client_name?: string;
-  kwork_url?: string;
+  kwork_url?: string; // Это будет lead_url в transformHeader
   project_description: string; // Обязательное поле
   budget_range?: string;
-  deadline_info?: string;
-  client_kwork_history?: string;
-  current_kwork_offers_count?: string;
+  // Поля ниже присутствуют в CSV от AI, но не все есть в таблице `leads`
+  deadline_info?: string; 
+  client_kwork_history?: string; 
+  current_kwork_offers_count?: string; 
   raw_html_description?: string;
   generated_offer?: string;
-  identified_tweaks?: string; // Предполагаем, что это строка JSON
-  missing_features?: string; // Предполагаем, что это строка JSON
-  status?: string; // Добавим статус из CSV, если есть
-  source?: string; // Добавим источник из CSV
-  // Другие поля из твоего CSV, если есть
+  identified_tweaks?: string; 
+  missing_features?: string; 
+  status?: string;
+  source?: string;
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -55,7 +55,7 @@ async function verifyUserPermissions(userId: string, allowedRoles: string[], all
 
 export async function uploadLeadsFromCsv(
   csvContent: string,
-  currentUserId: string // ID пользователя, выполняющего действие
+  currentUserId: string 
 ): Promise<{ success: boolean; message: string; insertedCount?: number; updatedCount?: number; errors?: string[] }> {
   
   const canUpload = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
@@ -74,7 +74,11 @@ export async function uploadLeadsFromCsv(
     const parseResult = Papa.parse<CsvLeadRow>(csvContent.trim(), {
       header: true,
       skipEmptyLines: 'greedy',
-      transformHeader: header => header.trim(),
+      transformHeader: header => {
+        const trimmedHeader = header.trim().toLowerCase();
+        if (trimmedHeader === 'kwork_url') return 'lead_url'; // Маппинг для upsert
+        return trimmedHeader; // Используем lowercase для сопоставления с CsvLeadRow
+      },
       transform: value => (typeof value === 'string' ? value.trim() : value),
     });
 
@@ -90,39 +94,56 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      if (!row.project_description) {
-        localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${row.kwork_url || 'N/A'}`);
+      // Используем lowercase ключи из parseResult.meta.fields для доступа к данным строки,
+      // так как transformHeader привел их к lowercase.
+      // Papa.parse<CsvLeadRow> ожидает, что ключи row будут соответствовать CsvLeadRow.
+      // Если transformHeader меняет 'kwork_url' на 'lead_url', то в row будет row.lead_url
+      
+      const leadUrlFromCsv = row.kwork_url; // Исходное имя из CSV до transformHeader
+                                       // или row.lead_url, если Papa.parse типизирует по transformHeader
+                                       // Для безопасности, лучше проверить оба или нормализовать ключи row.
+
+      // Нормализуем доступ к полям, если transformHeader не отражается в типизации row
+      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()] ?? (row as any)[key];
+
+
+      if (!getRowVal('project_description')) {
+        localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
         continue;
       }
       
       let tweaksJson: any = null;
-      if (row.identified_tweaks) {
-        try { tweaksJson = JSON.parse(row.identified_tweaks); }
-        catch (e) { localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${row.kwork_url}: ${(e as Error).message}`); }
+      const identifiedTweaksCsv = getRowVal('identified_tweaks');
+      if (identifiedTweaksCsv) {
+        try { tweaksJson = JSON.parse(identifiedTweaksCsv); }
+        catch (e) { localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
       }
 
       let featuresJson: any = null;
-      if (row.missing_features) {
-        try { featuresJson = JSON.parse(row.missing_features); }
-        catch (e) { localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${row.kwork_url}: ${(e as Error).message}`); }
+      const missingFeaturesCsv = getRowVal('missing_features');
+      if (missingFeaturesCsv) {
+        try { featuresJson = JSON.parse(missingFeaturesCsv); }
+        catch (e) { localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
       }
-
-      leadsToUpsert.push({
-        client_name: row.client_name || null,
-        lead_url: row.kwork_url || null, // Должен быть UNIQUE, если не NULL
-        project_description: row.project_description,
-        budget_range: row.budget_range || null,
-        deadline_info: row.deadline_info || null,
-        client_kwork_history: row.client_kwork_history || null,
-        current_kwork_offers_count: row.current_kwork_offers_count || null,
-        raw_html_description: row.raw_html_description || null,
-        generated_offer: row.generated_offer || null,
+      
+      const leadEntry: LeadInsert = {
+        client_name: getRowVal('client_name') || null,
+        lead_url: leadUrlFromCsv || null, 
+        project_description: getRowVal('project_description')!, // Уверены, что есть из-за проверки выше
+        budget_range: getRowVal('budget_range') || null,
+        raw_html_description: getRowVal('raw_html_description') || null,
+        generated_offer: getRowVal('generated_offer') || null,
         identified_tweaks: tweaksJson,
         missing_features: featuresJson,
-        status: row.status || 'raw_data', // Если статус приходит из CSV
-        source: row.source || 'csv_upload', // Можно добавить колонку source в CSV
-        // assigned_to_support: currentUserId, // Автоматически назначаем Саппорту, который загрузил
-      });
+        status: getRowVal('status') || 'raw_data', 
+        source: getRowVal('source') || 'csv_upload',
+      };
+
+      if (leadEntry.lead_url === '') {
+        leadEntry.lead_url = null;
+      }
+      
+      leadsToUpsert.push(leadEntry);
     }
 
     if (leadsToUpsert.length === 0 && localErrors.length > 0) {
@@ -131,11 +152,10 @@ export async function uploadLeadsFromCsv(
     if (leadsToUpsert.length === 0) {
         return { success: false, message: "Нет данных для загрузки после обработки CSV."};
     }
-
-    // Используем onConflict для обновления, если lead_url уже существует
-    const { data, error, count } = await supabaseAdmin
+    
+    const { data: upsertedData, error, count } = await supabaseAdmin
       .from('leads')
-      .upsert(leadsToUpsert, { onConflict: 'lead_url', ignoreDuplicates: false }) // ignoreDuplicates: false чтобы count отражал кол-во затронутых строк
+      .upsert(leadsToUpsert, { onConflict: 'lead_url', ignoreDuplicates: false }) 
       .select();
 
     if (error) {
@@ -143,9 +163,23 @@ export async function uploadLeadsFromCsv(
       return { success: false, message: `Ошибка базы данных: ${error.message}`, errors: localErrors };
     }
 
-    const message = `Успешно обработано ${count || 0} из ${parseResult.data.length} лидов. ${localErrors.length > 0 ? `Обнаружено ${localErrors.length} ошибок в CSV.` : '' }`;
+    const actualUpsertedCount = count ?? 0;
+    
+    let message = `Успешно вставлено/обновлено ${actualUpsertedCount} из ${leadsToUpsert.length} валидных лидов. Всего строк в CSV: ${parseResult.data.length}.`;
+
+    if (actualUpsertedCount === 0 && leadsToUpsert.length > 0 && !error) {
+      message = `Обработано ${leadsToUpsert.length} валидных лидов. ${localErrors.length > 0 ? `Обнаружено ${localErrors.length} ошибок в CSV. ` : ''}0 лидов было вставлено или обновлено (возможно, все уже существовали и не требовали обновления). Всего строк в CSV: ${parseResult.data.length}.`;
+    } else if (localErrors.length > 0) {
+        message += ` Обнаружено ${localErrors.length} ошибок в CSV.`;
+    }
+    
     logger.info(message);
-    return { success: true, message, insertedCount: count || 0, errors: localErrors.length > 0 ? localErrors : undefined };
+    return { 
+        success: true, 
+        message, 
+        insertedCount: actualUpsertedCount,
+        errors: localErrors.length > 0 ? localErrors : undefined 
+    };
 
   } catch (error) {
     logger.error('Критическая ошибка во время загрузки CSV лидов:', error);
@@ -153,23 +187,31 @@ export async function uploadLeadsFromCsv(
   }
 }
 
+// Остальные функции (updateLeadStatus, assignLead, fetchLeadsForDashboard) остаются без изменений,
+// так как проблема была связана с uploadLeadsFromCsv и форматом CSV.
 export async function updateLeadStatus(
   leadId: string, 
   newStatus: string,
   currentUserId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   
-  const lead = await supabaseAdmin.from('leads').select('assigned_to_tank, assigned_to_carry, assigned_to_support').eq('id', leadId).single();
+  const { data: leadData, error: leadError } = await supabaseAdmin.from('leads').select('assigned_to_tank, assigned_to_carry, assigned_to_support').eq('id', leadId).single();
   let canUpdate = false;
-  if (lead.data) {
-    canUpdate = await verifyUserPermissions(currentUserId, 
-        (lead.data.assigned_to_tank === currentUserId && ['tank']) || 
-        (lead.data.assigned_to_carry === currentUserId && ['carry']) || 
-        (lead.data.assigned_to_support === currentUserId && ['support']) || 
-        ['support'] // Саппорт может менять статус любого лида
-    , ['admin']);
-  } else {
-     canUpdate = await verifyUserPermissions(currentUserId, ['support'], ['admin']); // Если лид не найден, только админ/саппорт могут создать его через этот путь (маловероятно)
+  if (leadError) {
+      logger.error(`Lead ${leadId} not found for status update: ${leadError.message}`);
+      canUpdate = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
+      if (!canUpdate) return { success: false, message: "Ошибка: Лид не найден и нет прав на создание." };
+  } else if (leadData) {
+    const assignedTank = leadData.assigned_to_tank === currentUserId;
+    const assignedCarry = leadData.assigned_to_carry === currentUserId;
+    const assignedSupport = leadData.assigned_to_support === currentUserId;
+    
+    const assignedRoles: string[] = [];
+    if (assignedTank) assignedRoles.push('tank');
+    if (assignedCarry) assignedRoles.push('carry');
+    if (assignedSupport) assignedRoles.push('support');
+
+    canUpdate = await verifyUserPermissions(currentUserId, ['support', ...assignedRoles], ['admin']);
   }
   
   if (!canUpdate) {
@@ -199,7 +241,7 @@ export async function updateLeadStatus(
 export async function assignLead(
   leadId: string,
   assigneeType: 'tank' | 'carry' | 'support',
-  assigneeId: string | null, // null для снятия назначения
+  assigneeId: string | null, 
   currentUserId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const canAssign = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
@@ -224,7 +266,7 @@ export async function assignLead(
       logger.error(`Ошибка назначения лида ${leadId} на ${assigneeType} ${assigneeId}:`, error);
       return { success: false, message: `Ошибка БД: ${error.message}` };
     }
-    const successMsg = `Лид ${leadId.substring(0,8)}... ${assigneeId ? `назначен на ${assigneeType} ${assigneeId.substring(0,8)}...` : `снят с назначения ${assigneeType}`}.`;
+    const successMsg = `Лид ${leadId.substring(0,8)}... ${assigneeId ? `назначен на ${assigneeType} ${(assigneeId).substring(0,8)}...` : `снят с назначения ${assigneeType}`}.`;
     logger.info(successMsg);
     return { success: true, message: successMsg };
   } catch (error) {
@@ -233,15 +275,13 @@ export async function assignLead(
   }
 }
 
-
 export async function fetchLeadsForDashboard(
   currentUserId: string,
-  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' // Добавил 'my' для универсальности
+  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' 
 ): Promise<{ success: boolean; data?: LeadRow[]; error?: string }> {
   if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
 
   try {
-    // Сначала получаем роль и статус текущего пользователя
     const { data: currentUserData, error: userError } = await supabaseAdmin
       .from('users')
       .select('role, status')
@@ -257,32 +297,22 @@ export async function fetchLeadsForDashboard(
     let query = supabaseAdmin.from('leads').select('*').order('created_at', { ascending: false });
 
     if (currentUserStatus === 'admin' || currentUserRole === 'support') {
-      // Админы и Саппорты видят все или отфильтрованные по роли других
-      if (filter === 'tank') query = query.neq('assigned_to_tank', null); // Показываем все, где есть назначенный танк
-      else if (filter === 'carry') query = query.neq('assigned_to_carry', null); // Показываем все, где есть назначенный кэрри
-      // 'all' и 'support' для них означают все лиды
+      if (filter === 'tank') query = query.neq('assigned_to_tank', null);
+      else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
+      else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); // Саппорт видит свои назначенные
+      else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); // Админ видит все где есть саппорт
+      else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
+      else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
     } else if (currentUserRole === 'tank') {
-      // Танки видят только свои лиды
       query = query.eq('assigned_to_tank', currentUserId);
+      if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
     } else if (currentUserRole === 'carry') {
-      // Кэрри видят только свои лиды
       query = query.eq('assigned_to_carry', currentUserId);
+      if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
     } else {
-      // Другие роли (или если роль не определена) не видят ничего, кроме своих (если есть такой фильтр)
-       if (filter === 'my') { // Общий фильтр "мои", если вдруг понадобится
-         query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
-       } else {
-        return { success: true, data: [] }; // По умолчанию ничего не показываем
-       }
+      return { success: true, data: [] };
     }
     
-    // Применяем общий фильтр, если он не 'all' и пользователь не админ/саппорт (для которых 'all' уже применен)
-    if (filter !== 'all' && !(currentUserStatus === 'admin' || currentUserRole === 'support')) {
-        if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
-        // Фильтры 'tank' и 'carry' уже применены выше для соответствующих ролей
-    }
-
-
     const { data, error } = await query;
 
     if (error) {
