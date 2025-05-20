@@ -20,7 +20,7 @@ interface Lead {
   id?: string; 
   source?: string;
   lead_url?: string;
-  client_name?: string | null; // client_name может быть null
+  client_name?: string | null; 
   project_description?: string;
   raw_html_description?: string | null;
   budget_range?: string | null;
@@ -40,7 +40,7 @@ interface Lead {
   updated_at?: string; 
 }
 
-interface TeamUser { // Упрощенный тип для отображения в UI
+interface TeamUser { 
   user_id: string;
   username?: string | null;
   role?: string | null;
@@ -55,19 +55,17 @@ const LeadGenerationHQPage = () => {
   const [leads, setLeads] = useState<Lead[]>([]); 
   const [isLoading, setIsLoading] = useState(false);
   const [currentFilter, setCurrentFilter] = useState('all'); 
-  const [teamMembers, setTeamMembers] = useState<TeamUser[]>([]); // Для селекторов назначения
+  const [teamMembers, setTeamMembers] = useState<TeamUser[]>([]); 
 
-  // --- Refs для скролла ---
   const rolesSectionRef = useRef<HTMLDivElement>(null);
   const arsenalSectionRef = useRef<HTMLDivElement>(null);
-  const offerSectionRef = useRef<HTMLDivElement>(null); // Ref для секции с полем финального CSV
+  const offerSectionRef = useRef<HTMLDivElement>(null); 
   const workflowSectionRef = useRef<HTMLDivElement>(null);
   const assetsSectionRef = useRef<HTMLDivElement>(null);
   const zionSectionRef = useRef<HTMLDivElement>(null);
   const dashboardSectionRef = useRef<HTMLDivElement>(null);
 
-  // --- Тексты (только русский) ---
-  const t_dynamic_links = { // Динамические ссылки вынесены для VibeContentRenderer
+  const t_dynamic_links = { 
     linkToRepoXml: "<Link href='/repo-xml' class='text-brand-purple hover:underline'>SUPERVIBE Studio</Link>",
     linkToJumpstart: "<Link href='/jumpstart' class='text-brand-lime hover:underline'>Jumpstart Kit</Link>",
     linkToSelfDev: "<Link href='/selfdev' class='text-brand-green hover:underline'>Кодекс SelfDev</Link>",
@@ -84,49 +82,49 @@ const LeadGenerationHQPage = () => {
   const t = { 
     pageTitle: "КОЦ 'Сетевой Дозор'",
     pageSubtitle: `Бойцы КиберОтряда! Это ваш командный пункт для захвата лидов и доминации в Supervibe-стиле. Роли распределены, цели определены, VIBE активирован. Трансмутируем инфу в профит!`,
-    rolesTitle: "::FaUserShield:: КиберОтряд: Роли и Протоколы Действий",
+    rolesTitle: "::fausershield:: КиберОтряд: Роли и Протоколы Действий",
     rolesSubtitle: `Экипаж машины боевой, заряженный на VIBE-победу и тотальное превосходство. Узнай больше о нашей философии в ${t_dynamic_links.linkToSelfDev} и ${t_dynamic_links.linkToPurposeProfit}.`,
-    carryRoleTitle: "::FaBrain:: Кэрри (Ты, Павел)",
+    carryRoleTitle: "::fabrain:: Кэрри (Ты, Павел)",
     carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создаешь и внедряешь прорывные фичи в ${t_dynamic_links.linkToRepoXml}. Решаешь нетривиальные задачи разработки, определяя вектор эволюции платформы. Твой код – закон. Смотри ${t_dynamic_links.linkToAbout} Кэрри.`,
-    tanksRoleTitle: "::FaShieldHalved:: Танки (Штурмовики Кастомизации)",
+    tanksRoleTitle: "::fashieldhalved:: Танки (Штурмовики Кастомизации)",
     tanksRoleDesc: "Броневой кулак кастомизации и адаптации. Принимают на себя 'урон' от сложных клиентских запросов, AI-артефактов. Трансмутируют базовые модули в уникальные клиентские решения, используя реактивную мощь Supervibe Studio. Их девиз: 'Прорвемся и Улучшим!'",
     tanksRoleLeverages: `Основное вооружение: ${t_dynamic_links.linkToTutorials} (включая Замену Изображений, Охоту на Иконки, Видео-Интеграцию, Inception Swap-Маневры).`,
-    supportRoleTitle: "::FaHeadset:: Саппорт (Дозорные Сети)",
+    supportRoleTitle: "::faheadset:: Саппорт (Дозорные Сети)",
     supportRoleDesc: `Информационно-логистический хаб и голос отряда. Идентифицируют, фильтруют и обрабатывают входящие сигналы (лиды). Готовят разведданные, CSV для AI-обработки и целеуказания для Танков и Кэрри. Ведут первичные переговоры, обеспечивая бесперебойную связь и снабжение отряда задачами.`,
-    supportArsenalTitle: "::FaToolbox:: Арсенал Саппорта: Протоколы Автоматизации 'Судный День'",
+    supportArsenalTitle: "::fatoolbox:: Арсенал Саппорта: Протоколы Автоматизации 'Судный День'",
     supportArsenalSubtitle: `Высокотехнологичное снаряжение для информационной войны и эффективной вербовки. Геймеры, это для вас – превращаем рутину в квест в нашем ${t_dynamic_links.linkToCyberDevOS}!`,
-    rawKworksInputTitle: "::FaBinoculars:: Этап 1: 'Сбор трофеев' (Поток KWorks)",
+    rawKworksInputTitle: "::fabinoculars:: Этап 1: 'Сбор трофеев' (Поток KWorks)",
     rawKworksInputDesc: "Саппорт! Копируй сюда ВСЮ страницу с проектами Kwork или другой биржи. Наш AI-парсер, как верный дрон, извлечет из этого хаоса структурированные данные о лидах. Чем больше данных, тем точнее прицел!",
     rawKworksInputPlaceholder: "Ctrl+A, Ctrl+C со страницы Kwork... и Ctrl+V сюда, оперативник!",
-    promptButtonsTitle: "::FaBolt:: Этап 2: 'Нейро-алхимия' (AI-Обработка Лидов):",
+    promptButtonsTitle: "::fabolt:: Этап 2: 'Нейро-алхимия' (AI-Обработка Лидов):",
     promptButtonKworksToCsv: "1. 'Трансмутация Хаоса': Текст KWorks -> CSV Таблицу Лидов",
     promptButtonCsvToOffer: "2. 'Заряд Убеждения': CSV + Промпт Оффера -> CSV с Колонкой 'Оффер'",
     promptButtonCsvToTweaks: "3. 'Чертежи для Танков': CSV + Промпт Твиков -> CSV с Колонкой 'Твики'",
     promptButtonCsvToFeatures: "4. 'R&D для Кэрри': CSV + Промпт Фич -> CSV с Колонкой 'Новые Фичи'",
     promptButtonInstruction: "Инструкция для Саппорта-Геймера: 1. Заполни поле 'Сбор трофеев'. 2. Жми кнопку 'Трансмутация Хаоса', скопируй промпт. 3. Скармливай AI (ChatGPT/Claude) этот промпт + текст из поля -> получишь CSV-код. 4. Копируй этот CSV-код. 5. Жми кнопки 2, 3, 4 последовательно. Каждый раз копируй промпт и отдавай AI ВМЕСТЕ с ПОСЛЕДНИМ полученным CSV-кодом. AI будет ДОБАВЛЯТЬ новые колонки. Финальный CSV – в поле ниже.",
-    finalCsvInputTitle: "::FaFileArrowUp:: Этап 3: 'Десант в ЦОД' (Загрузка Финального CSV)",
+    finalCsvInputTitle: "::fafilearrowup:: Этап 3: 'Десант в ЦОД' (Загрузка Финального CSV)",
     finalCsvInputDesc: "Саппорт, сюда вставляй ПОЛНОСТЬЮ обработанный AI CSV-файл (уже с колонками 'generated_offer', 'identified_tweaks', 'missing_features'). Одна кнопка – и лиды улетают в нашу базу Supabase, а команда получает уведомления!",
     finalCsvInputPlaceholder: "Вставь сюда финальный CSV-код от AI...",
-    uploadLeadsButton: "::FaCloudArrowUp:: ДЕСАНТИРОВАТЬ ЛИДЫ В SUPABASE!",
-    leadsDashboardTitle: "::FaTableList:: Оперативный Дашборд 'Око Войны'",
+    uploadLeadsButton: "::facloudarrowup:: ДЕСАНТИРОВАТЬ ЛИДЫ В SUPABASE!",
+    leadsDashboardTitle: "::fatablelist:: Оперативный Дашборд 'Око Войны'",
     leadsDashboardDesc: "КиберОтряд, здесь ваши цели! Обновляйте статусы, назначайте ответственных, координируйте атаку! Фильтруйте задачи по ролям – каждый видит свой фронт работ.",
-    kworkSearchLink1: "::FaSquareArrowUpRight:: TWA (Kwork)", 
-    kworkSearchLink2: "::FaSquareArrowUpRight:: Mini Apps (Kwork)",
-    kworkSearchLink3: "::FaSquareArrowUpRight:: Нейро-Боты (Kwork)",
-    kworkSearchLink4: "::FaSquareArrowUpRight:: AI Разработка (Kwork)",
-    offerTitle: "::FaBullhorn:: Протокол 'Сирена': Создание Убойного Предложения", 
+    kworkSearchLink1: "::fasquarearrowupright:: TWA (Kwork)", 
+    kworkSearchLink2: "::fasquarearrowupright:: Mini Apps (Kwork)",
+    kworkSearchLink3: "::fasquarearrowupright:: Нейро-Боты (Kwork)",
+    kworkSearchLink4: "::fasquarearrowupright:: AI Разработка (Kwork)",
+    offerTitle: "::fabullhorn:: Протокол 'Сирена': Создание Убойного Предложения", 
     offerSubtitle: "AI-заряженное послание, превращающее цели в союзников.",
-    workflowTitle: "::FaDiagramProject:: Боевой Порядок: От Сигнала до VIBE-Победы",
+    workflowTitle: "::fadiagramproject:: Боевой Порядок: От Сигнала до VIBE-Победы",
     workflowSubtitle: "Скоординированная атака нашего КиберОтряда.",
-    workflowStep1: "1. ::FaSearchDollar:: **Саппорт:** Обнаруживает сигнал (лид) на Kwork/др., собирает первичные данные, передает Оракулу для квалификации, готовит целеуказания.",
-    workflowStep2: "2. ::FaRobot:: **Саппорт/AI-Оракул:** Генерирует и отправляет персонализированное предложение (возможно, с AI-сгенерированным концептом/макетом).",
-    workflowStep3: `3. ::FaComments:: **Клиент:** При положительном ответе – сеанс связи (созвон) или доразведка. ${t_dynamic_links.linkToGamePlan} – стратегическая карта для этих переговоров. Детали стратегии также в ${t_dynamic_links.linkToPPlan}.`,
+    workflowStep1: "1. ::fasearchdollar:: **Саппорт:** Обнаруживает сигнал (лид) на Kwork/др., собирает первичные данные, передает Оракулу для квалификации, готовит целеуказания.",
+    workflowStep2: "2. ::farobot:: **Саппорт/AI-Оракул:** Генерирует и отправляет персонализированное предложение (возможно, с AI-сгенерированным концептом/макетом).",
+    workflowStep3: `3. ::facomments:: **Клиент:** При положительном ответе – сеанс связи (созвон) или доразведка. ${t_dynamic_links.linkToGamePlan} – стратегическая карта для этих переговоров. Детали стратегии также в ${t_dynamic_links.linkToPPlan}.`,
     workflowStep4: "4. **Развертывание Сил:**",
-    workflowStep4Tank: `::FaShieldHalved:: **Танки:** Берут на себя кастомизацию по целеуказаниям Саппорта (ссылки ${t_dynamic_links.linkToRepoXml}). Применяют всю огневую мощь Студии для штурма клиентских задач.`,
-    workflowStep4Carry: `::FaBrain:: **Кэрри (Павел):** Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра ${t_dynamic_links.linkToRepoXml}.`,
-    workflowStep5: "5. ::FaRocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
-    workflowStep6: `6. ::FaBolt:: **Анализ Результатов и Адаптация:** <Link href='/repo-xml#cybervibe-section' class='text-brand-cyan hover:underline'>Петля CyberVibe</Link> обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
-    assetsTitle: "::FaCubes:: Использование Трофейных Активов CyberVibe",
+    workflowStep4Tank: `::fashieldhalved:: **Танки:** Берут на себя кастомизацию по целеуказаниям Саппорта (ссылки ${t_dynamic_links.linkToRepoXml}). Применяют всю огневую мощь Студии для штурма клиентских задач.`,
+    workflowStep4Carry: `::fabrain:: **Кэрри (Павел):** Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра ${t_dynamic_links.linkToRepoXml}.`,
+    workflowStep5: "5. ::farocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
+    workflowStep6: `6. ::fabolt:: **Анализ Результатов и Адаптация:** <Link href='/repo-xml#cybervibe-section' class='text-brand-cyan hover:underline'>Петля CyberVibe</Link> обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
+    assetsTitle: "::facubes:: Использование Трофейных Активов CyberVibe",
     assetsSubtitle: "Наш внутренний арсенал для внешнего доминирования.",
     assetJumpstartTitle: "Jumpstart Kit: 'Первый Удар'",
     assetJumpstartDesc: `Наш главный таран для прорыва обороны. Предложите AI-сгенерированный каркас TWA на основе идеи клиента. Мгновенная демонстрация мощи и скорости. Подробнее о ${t_dynamic_links.linkToJumpstart}.`,
@@ -140,7 +138,7 @@ const LeadGenerationHQPage = () => {
     assetTutorialsDesc: `Демонстрируют конкретные боевые возможности (замена медиа, деактивация мин). Можно показывать клиентам для иллюстрации простоты модификаций или использовать для подготовки новобранцев в отряд Танков. Доступны в ${t_dynamic_links.linkToTutorials}.`,
     assetCyberDevOSTitle: "CyberDev OS (Геймификация): 'Путь Воина'",
     assetCyberDevOSDesc: `Демонстрирует философию 'непрерывной прокачки'. Уникальное УБП – клиенты не просто заказывают приложение, они подключаются к саморазвивающейся экосистеме. Вперед, в ${t_dynamic_links.linkToCyberDevOS}!`,
-    zionTitle: "::FaComments:: Цитадель 'Зион': Комьюнити-Реактор",
+    zionTitle: "::facomments:: Цитадель 'Зион': Комьюнити-Реактор",
     zionSubtitle: "Ваш Telegram-канал/чат: узел связи КиберОтряда и вербовочный пункт для будущих VIBE-адептов.",
     zionP1: `**Зион (${t_dynamic_links.linkToZion}):** Это не просто флудилка, это ваш оперативный штаб, центр поддержки и инкубатор гениальных идей.`,
     zionList1: "**Координация Танков:** Обсуждение сложных маневров кастомизации, обмен боевым опытом, разработка новых тактик.",
@@ -149,14 +147,14 @@ const LeadGenerationHQPage = () => {
     zionList4: "**Школа Молодого Бойца:** Перспективные члены комьюнити, проявившие талант, могут проходить подготовку для зачисления в отряд Танков.",
     ctaTitle: "АКТИВИРОВАТЬ ПРОТОКОЛ 'СЕТЕВОЙ ДОЗОР'!", 
     ctaSubtitle: `Система в боевой готовности. КиберОтряд укомплектован. Саппорты, к оружию! Начинаем сбор кибер-трофеев в этом ${t_dynamic_links.linkToLeads}. Да пребудет с нами VIBE и AI!`,
-    ctaButtonText: "::FaBolt:: НАЧАТЬ ШТУРM РЫНКА!", 
-    navToRoles: "::FaUserShield:: К Ролям",
-    navToArsenal: "::FaToolbox:: К Арсеналу",
-    navToOffer: "::FaBullhorn:: К Офферам", // Ref для offerSectionRef теперь указывает на секцию с полем финального CSV
-    navToWorkflow: "::FaDiagramProject:: К Процессу",
-    navToAssets: "::FaCubes:: К Активам",
-    navToZion: "::FaComments:: К Зиону",
-    navToDashboard: "::FaTableList:: К Дашборду",
+    ctaButtonText: "::fabolt:: НАЧАТЬ ШТУРM РЫНКА!", 
+    navToRoles: "::fausershield:: К Ролям",
+    navToArsenal: "::fatoolbox:: К Арсеналу",
+    navToOffer: "::fabullhorn:: К Офферам", 
+    navToWorkflow: "::fadiagramproject:: К Процессу",
+    navToAssets: "::facubes:: К Активам",
+    navToZion: "::facomments:: К Зиону",
+    navToDashboard: "::fatablelist:: К Дашборду",
   };
 
   const pageTheme = {
@@ -173,17 +171,16 @@ const LeadGenerationHQPage = () => {
     { name: t.kworkSearchLink2, url: "https://kwork.ru/projects?c=all&q=telegram+mini+app&keyword=telegram" },
     { name: t.kworkSearchLink3, url: "https://kwork.ru/projects?c=all&q=telegram+%D0%B1%D0%BE%D1%82+%D0%BD%D0%B5%D0%B9%D1%80%D0%BE%D1%81%D0%B5%D1%82%D1%8C&keyword=telegram" }, 
     { name: t.kworkSearchLink4, url: "https://kwork.ru/projects?c=all&q=AI+разработка&keyword=AI" },
-    { name: "::FaSquareArrowUpRight:: TWA React (Kwork)", url: "https://kwork.ru/projects?c=all&q=TWA+React&keyword=TWA" },
-    { name: "::FaSquareArrowUpRight:: Telegram App Next.js (Kwork)", url: "https://kwork.ru/projects?c=all&q=Telegram+App+Next.js&keyword=Telegram" },
-    { name: "::FaSquareArrowUpRight:: Миниприложение Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Миниприложение+Telegram&keyword=Telegram" },
-    { name: "::FaSquareArrowUpRight:: Разработка WebApp Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Разработка+WebApp+Telegram&keyword=Telegram" },
-    { name: "::FaSquareArrowUpRight:: Supabase Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Supabase+Telegram&keyword=Supabase" },
-    { name: "::FaSquareArrowUpRight:: AI Telegram Bot (Kwork)", url: "https://kwork.ru/projects?c=all&q=AI+Telegram+Bot&keyword=AI" },
+    { name: "::fasquarearrowupright:: TWA React (Kwork)", url: "https://kwork.ru/projects?c=all&q=TWA+React&keyword=TWA" },
+    { name: "::fasquarearrowupright:: Telegram App Next.js (Kwork)", url: "https://kwork.ru/projects?c=all&q=Telegram+App+Next.js&keyword=Telegram" },
+    { name: "::fasquarearrowupright:: Миниприложение Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Миниприложение+Telegram&keyword=Telegram" },
+    { name: "::fasquarearrowupright:: Разработка WebApp Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Разработка+WebApp+Telegram&keyword=Telegram" },
+    { name: "::fasquarearrowupright:: Supabase Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Supabase+Telegram&keyword=Supabase" },
+    { name: "::fasquarearrowupright:: AI Telegram Bot (Kwork)", url: "https://kwork.ru/projects?c=all&q=AI+Telegram+Bot&keyword=AI" },
   ];
 
   const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement>) => {
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); // Изменено на 'center' для лучшего позиционирования
-    // Добавим небольшую подсветку при скролле для UX
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
     if (ref.current) {
       ref.current.classList.add('ring-2', 'ring-brand-orange', 'transition-all', 'duration-1000', 'ease-out');
       setTimeout(() => {
@@ -282,7 +279,6 @@ const LeadGenerationHQPage = () => {
     setIsLoading(false);
   }, [currentUserId, fetchLeadsFromSupabaseCallback, currentFilter]);
 
-  // ЗАГЛУШКА: Загрузка списка членов команды. Реализуй Server Action.
   useEffect(() => {
     const fetchTeam = async () => {
       setTeamMembers([
@@ -296,18 +292,17 @@ const LeadGenerationHQPage = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
+    <div className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-20 sm:pt-24 pb-20 overflow-x-hidden">
       <div
-        className="absolute inset-0 bg-repeat opacity-[0.03] z-0" // Чуть уменьшил грид
+        className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
           backgroundImage: `linear-gradient(to right, hsl(var(--brand-orange-hsl)) 0.5px, transparent 0.5px),
                             linear-gradient(to bottom, hsl(var(--brand-orange-hsl)) 0.5px, transparent 0.5px)`,
-          backgroundSize: '40px 40px', 
+          backgroundSize: '30px 30px sm:40px sm:40px', 
         }}
       ></div>
       
-      {/* Плавающая навигация по странице */}
-      <div className="fixed top-[80px] left-2 md:left-4 z-50 flex flex-col space-y-1 bg-black/60 backdrop-blur-sm p-1.5 rounded-lg border border-gray-700/50 max-h-[calc(100vh-100px)] overflow-y-auto simple-scrollbar shadow-xl">
+      <div className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-2 z-50 flex md:hidden flex-col space-y-1 bg-black/60 backdrop-blur-sm p-1.5 rounded-lg border border-gray-700/50 max-h-[calc(100vh-120px)] overflow-y-auto simple-scrollbar shadow-xl">
         { [
             { ref: rolesSectionRef, labelKey: 'navToRoles' }, { ref: arsenalSectionRef, labelKey: 'navToArsenal' },
             { ref: offerSectionRef, labelKey: 'navToOffer' }, { ref: workflowSectionRef, labelKey: 'navToWorkflow' },
@@ -320,62 +315,61 @@ const LeadGenerationHQPage = () => {
         ))}
       </div>
 
-      <div className="relative z-10 container mx-auto px-4">
-        <header className="text-center mb-12 md:mb-16">
-          <VibeContentRenderer content={`::FaCrosshairs className="mx-auto text-7xl mb-5 ${pageTheme.primaryColor} animate-ping animation-delay-1000"::`} />
-          <h1 className={cn("text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold cyber-text glitch mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
+      <div className="relative z-10 container mx-auto px-4 pl-28 sm:pl-32 md:px-4">
+        <header className="text-center mb-10 md:mb-16">
+          <VibeContentRenderer content={`::facrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping animation-delay-1000"::`} />
+          <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
             <VibeContentRenderer content={t.pageTitle} />
           </h1>
-          <CardDescription className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
+          <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-300 font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
             <VibeContentRenderer content={t.pageSubtitle} />
           </CardDescription>
         </header>
 
-        <div className="space-y-12 md:space-y-16">
+        <div className="space-y-10 md:space-y-16">
           {/* Roles Section */}
           <div ref={rolesSectionRef} id="rolesSectionAnchor">
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
               <CardHeader>
-                <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
+                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.rolesTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.rolesSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.rolesSubtitle} /></CardDescription>
               </CardHeader>
-              <CardContent className="grid md:grid-cols-3 gap-6 font-mono">
-                <div className={cn("p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                  <h3 className={cn("text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
-                  <p className="text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.carryRoleDesc} /></p>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
+                <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                  <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
+                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.carryRoleDesc} /></p>
                 </div>
-                <div className={cn("p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                  <h3 className={cn("text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
-                  <p className="text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.tanksRoleDesc} /></p>
+                <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                  <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
+                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.tanksRoleDesc} /></p>
                   <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={t.tanksRoleLeverages} /></p>
                 </div>
-                <div className={cn("p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                  <h3 className={cn("text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
-                  <p className="text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.supportRoleDesc} /></p>
+                <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                  <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
+                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.supportRoleDesc} /></p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Support's Arsenal - Enhanced for Automation */}
+          {/* Support's Arsenal */}
           <div ref={arsenalSectionRef} id="arsenalSectionAnchor">
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
               <CardHeader>
-                <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
+                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.supportArsenalTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.supportArsenalSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.supportArsenalSubtitle} /></CardDescription>
               </CardHeader>
-              <CardContent className="space-y-10 font-mono">
-                {/* Kwork Recon & Data Ingestion */}
-                <div id="rawKworksInputAnchor"> {/* Якорь для скролла к этому полю */}
-                  <h4 className={cn("text-xl font-bold mb-4 flex items-center gap-2", pageTheme.accentColor)}><VibeContentRenderer content={t.rawKworksInputTitle} /></h4>
-                  <p className="text-sm text-gray-300 mb-3 pl-2"><VibeContentRenderer content={t.rawKworksInputDesc} /></p>
-                  <div className="flex flex-wrap gap-2 mb-4 pl-2">
+              <CardContent className="space-y-8 sm:space-y-10 font-mono">
+                <div id="rawKworksInputAnchor">
+                  <h4 className={cn("text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2", pageTheme.accentColor)}><VibeContentRenderer content={t.rawKworksInputTitle} /></h4>
+                  <p className="text-xs sm:text-sm text-gray-300 mb-3 pl-2"><VibeContentRenderer content={t.rawKworksInputDesc} /></p>
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4 pl-2">
                       {kworkSearchLinks.map(link => (
-                          <Button key={link.name} variant="outline" size="sm" asChild className={cn("text-xs py-1 px-2", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20 transform hover:scale-105`)}>
+                          <Button key={link.name} variant="outline" size="xs" asChild className={cn("text-[0.65rem] sm:text-xs py-1 px-1.5 sm:px-2", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20 transform hover:scale-105`)}>
                           <a href={link.url} target="_blank" rel="noopener noreferrer"><VibeContentRenderer content={link.name} /></a>
                           </Button>
                       ))}
@@ -384,26 +378,24 @@ const LeadGenerationHQPage = () => {
                       value={rawKworksInput}
                       onChange={(e) => setRawKworksInput(e.target.value)}
                       placeholder={t.rawKworksInputPlaceholder}
-                      rows={10} // Увеличил для удобства
-                      className="w-full p-3 border rounded bg-gray-800/70 border-brand-orange/50 text-gray-200 focus:ring-2 focus:ring-brand-orange outline-none placeholder-gray-500 font-mono text-sm scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shadow-inner"
+                      rows={8} 
+                      className="w-full p-2 sm:p-3 border rounded bg-gray-800/70 border-brand-orange/50 text-gray-200 focus:ring-2 focus:ring-brand-orange outline-none placeholder-gray-500 font-mono text-xs sm:text-sm scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shadow-inner"
                   />
                 </div>
 
-                {/* Prompt Generation Buttons */}
                 <div>
-                  <h4 className={cn("text-xl font-bold mb-4 flex items-center gap-2", pageTheme.accentColor)}><VibeContentRenderer content={t.promptButtonsTitle} /></h4>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"> {/* Увеличил gap */}
+                  <h4 className={cn("text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2", pageTheme.accentColor)}><VibeContentRenderer content={t.promptButtonsTitle} /></h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                       <Button 
                           variant="secondary" 
                           onClick={() => {
                               const textToCopy = PROMPT_KWORKS_TO_CSV.replace("{{RAW_KWORKS_TEXT_BLOCK}}", rawKworksInput || "СКОПИРУЙТЕ_СЮДА_ТЕКСТ_С_KWORK");
                               handleCopyToClipboard(textToCopy, "Промпт 'KWorks -> CSV' скопирован! Шаг 1 пройден, оперативник!");
-                              // Авто-скролл не нужен здесь, т.к. следующий шаг - использование AI
                           }}
                           disabled={!rawKworksInput.trim()}
-                          className="bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
                       >
-                          <VibeContentRenderer content="::FaCopy::" /> <VibeContentRenderer content={t.promptButtonKworksToCsv}/>
+                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonKworksToCsv}/>
                       </Button>
                        <Button 
                           variant="destructive" 
@@ -415,52 +407,51 @@ const LeadGenerationHQPage = () => {
                               }
                           }}
                           disabled={!rawKworksInput.trim()}
-                          className="bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm font-bold transform hover:scale-105" 
+                          className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transform hover:scale-105" 
                       >
-                          <VibeContentRenderer content="::FaMeteor:: ВСЁ СРАЗУ В AI!" />
+                          <VibeContentRenderer content="::fameteor:: ВСЁ СРАЗУ В AI!" />
                       </Button>
                       <Button 
                           variant="secondary" 
                           onClick={() => handleCopyToClipboard(PROMPT_OFFER_V2_CYBERVIBE_OUTREACH, "Промпт 'CSV + Оффер' скопирован! Передайте AI вместе с CSV.")}
-                          className="bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
                       >
-                          <VibeContentRenderer content="::FaCopy::" /> <VibeContentRenderer content={t.promptButtonCsvToOffer}/>
+                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonCsvToOffer}/>
                       </Button>
                       <Button 
                           variant="secondary" 
                           onClick={() => handleCopyToClipboard(PROMPT_FIND_TWEAKS, "Промпт 'CSV + Твики' скопирован! Передайте AI вместе с CSV.")}
-                          className="bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
                       >
-                          <VibeContentRenderer content="::FaCopy::" /> <VibeContentRenderer content={t.promptButtonCsvToTweaks}/>
+                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonCsvToTweaks}/>
                       </Button>
                       <Button 
                           variant="secondary" 
                           onClick={() => handleCopyToClipboard(PROMPT_FIND_MISSING_FEATURES, "Промпт 'CSV + Фичи' скопирован! Передайте AI вместе с CSV.")}
-                          className="bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
                       >
-                          <VibeContentRenderer content="::FaCopy::" /> <VibeContentRenderer content={t.promptButtonCsvToFeatures}/>
+                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonCsvToFeatures}/>
                       </Button>
                   </div>
-                 <p className="text-xs text-gray-400 mt-3 pl-2"><VibeContentRenderer content={t.promptButtonInstruction}/></p>
+                 <p className="text-[0.7rem] sm:text-xs text-gray-400 mt-3 pl-2"><VibeContentRenderer content={t.promptButtonInstruction}/></p>
               </div>
               
-              {/* Upload Processed Leads */}
-              <div ref={offerSectionRef} id="finalCsvUploadAnchor"> {/* Якорь и ref */}
-                <h4 className={cn("text-xl font-bold mb-4 flex items-center gap-2 pt-6 border-t", pageTheme.accentColor, `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={t.finalCsvInputTitle}/></h4>
-                <p className="text-sm text-gray-300 mb-3 pl-2"><VibeContentRenderer content={t.finalCsvInputDesc} /></p>
+              <div ref={offerSectionRef} id="finalCsvUploadAnchor">
+                <h4 className={cn("text-lg sm:text-xl font-bold mb-3 sm:mb-4 flex items-center gap-2 pt-4 sm:pt-6 border-t", pageTheme.accentColor, `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={t.finalCsvInputTitle}/></h4>
+                <p className="text-xs sm:text-sm text-gray-300 mb-3 pl-2"><VibeContentRenderer content={t.finalCsvInputDesc} /></p>
                 <Textarea 
                     value={processedCsvForUpload}
                     onChange={(e) => setProcessedCsvForUpload(e.target.value)}
                     placeholder={t.finalCsvInputPlaceholder}
-                    rows={8} // Увеличил для удобства
-                    className="w-full p-3 mb-3 border rounded bg-gray-800/70 border-brand-lime/50 text-gray-200 focus:ring-2 focus:ring-brand-lime outline-none placeholder-gray-500 font-mono text-sm scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shadow-inner"
+                    rows={6} 
+                    className="w-full p-2 sm:p-3 mb-3 border rounded bg-gray-800/70 border-brand-lime/50 text-gray-200 focus:ring-2 focus:ring-brand-lime outline-none placeholder-gray-500 font-mono text-xs sm:text-sm scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 shadow-inner"
                 />
                 <Button 
                     onClick={handleUploadCsvToSupabase} 
                     disabled={isLoading || !processedCsvForUpload.trim()}
-                    className={cn("bg-brand-lime/80 text-black hover:bg-brand-lime flex items-center justify-center gap-2 py-3 text-base transform hover:scale-105", (isLoading || !processedCsvForUpload.trim()) && "opacity-50 cursor-not-allowed")}
+                    className={cn("w-full sm:w-auto bg-brand-lime/80 text-black hover:bg-brand-lime flex items-center justify-center gap-2 py-2.5 sm:py-3 text-sm sm:text-base transform hover:scale-105", (isLoading || !processedCsvForUpload.trim()) && "opacity-50 cursor-not-allowed")}
                 >
-                    <VibeContentRenderer content={isLoading ? "::FaSpinner className='animate-spin':: ДЕСАНТИРОВАНИЕ..." : t.uploadLeadsButton}/>
+                    <VibeContentRenderer content={isLoading ? "::faspinner className='animate-spin':: ДЕСАНТИРОВАНИЕ..." : t.uploadLeadsButton}/>
                 </Button>
               </div>
             </CardContent>
@@ -471,22 +462,22 @@ const LeadGenerationHQPage = () => {
           <div ref={dashboardSectionRef} id="dashboardSectionAnchor">
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
             <CardHeader>
-                <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
+                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.leadsDashboardTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.leadsDashboardDesc} /></CardDescription>
-                 <div className="flex flex-wrap gap-2 pt-2">
+                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.leadsDashboardDesc} /></CardDescription>
+                 <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2">
                     {['all', 'my', 'support', 'tank', 'carry', 'new', 'in_progress', 'interested'].map(filter => ( 
                         <Button
                             key={filter}
                             variant={currentFilter === filter ? "default" : "outline"}
-                            size="sm"
+                            size="xs"
                             onClick={() => {
                                 setCurrentFilter(filter);
                                 fetchLeadsFromSupabaseCallback(filter); 
                             }}
                             className={cn(
-                                "text-xs px-3 py-1 transform hover:scale-105",
+                                "text-[0.65rem] sm:text-xs px-2 sm:px-3 py-1 transform hover:scale-105",
                                 currentFilter === filter 
                                 ? `${pageTheme.buttonGradient} text-black shadow-md` 
                                 : `${pageTheme.borderColor} ${pageTheme.primaryColor} hover:bg-opacity-20 hover:text-white`
@@ -497,56 +488,56 @@ const LeadGenerationHQPage = () => {
                               filter === 'support' ? 'Задачи Саппорта' :
                               filter === 'tank' ? 'Задачи Танков' :
                               filter === 'carry' ? 'Задачи Кэрри' :
-                              filter === 'new' ? '::FaExclamationCircle:: Новые' : // Добавил иконки статусам
-                              filter === 'in_progress' ? '::FaHourglassHalf:: В Работе' :
-                              filter === 'interested' ? '::FaFire:: Интерес' :
+                              filter === 'new' ? '::facircleexclamation:: Новые' : 
+                              filter === 'in_progress' ? '::fahourglasshalf:: В Работе' :
+                              filter === 'interested' ? '::fafire:: Интерес' :
                               filter.charAt(0).toUpperCase() + filter.slice(1)
                            }
                         </Button>
                     ))}
                  </div>
             </CardHeader>
-            <CardContent className="font-mono">
+            <CardContent className="font-mono text-xs sm:text-sm">
                 {leads.length === 0 && !isLoading ? (
-                    <p className="text-gray-400 text-center py-4">По фильтру '{currentFilter}' кибер-целей не обнаружено. Время для <Button variant="link" onClick={() => scrollToSection(arsenalSectionRef)} className={cn("p-0 h-auto text-base", pageTheme.primaryColor)}>'Сбора трофеев'</Button>!</p>
+                    <p className="text-gray-400 text-center py-4">По фильтру '{currentFilter}' кибер-целей не обнаружено. Время для <Button variant="link" onClick={() => scrollToSection(arsenalSectionRef)} className={cn("p-0 h-auto text-sm sm:text-base", pageTheme.primaryColor)}>'Сбора трофеев'</Button>!</p>
                 ) : isLoading && leads.length === 0 ? (
-                    <div className="text-center py-4"><VibeContentRenderer content="::FaSpinner className='animate-spin text-2xl text-brand-orange':: Загрузка данных из ЦОД..." /></div>
+                    <div className="text-center py-4"><VibeContentRenderer content="::faspinner className='animate-spin text-xl sm:text-2xl text-brand-orange':: Загрузка данных из ЦОД..." /></div>
                 ) : (
                     <div className="overflow-x-auto simple-scrollbar">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs text-brand-orange uppercase bg-gray-950/70">
+                        <table className="w-full text-left">
+                            <thead className="text-[0.7rem] sm:text-xs text-brand-orange uppercase bg-gray-950/70">
                                 <tr>
-                                    <th scope="col" className="px-3 py-2">Клиент</th>
-                                    <th scope="col" className="px-3 py-2 hidden md:table-cell">Проект (суть)</th>
-                                    <th scope="col" className="px-3 py-2 hidden lg:table-cell">Бюджет</th>
-                                    <th scope="col" className="px-3 py-2">Статус</th>
-                                    <th scope="col" className="px-3 py-2">Назначен</th>
-                                    <th scope="col" className="px-3 py-2">Действия</th>
+                                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Клиент</th>
+                                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden md:table-cell">Проект (суть)</th>
+                                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden lg:table-cell">Бюджет</th>
+                                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Статус</th>
+                                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Назначен</th>
+                                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Действия</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {leads.map(lead => (
                                     <tr key={lead.id} className="bg-gray-900/50 border-b border-gray-800 hover:bg-gray-800/70 transition-colors">
-                                        <td className="px-3 py-2 font-medium text-gray-200 whitespace-nowrap">
+                                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap">
                                             <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline text-brand-cyan flex items-center gap-1">
-                                                {lead.client_name || 'N/A'} <VibeContentRenderer content="::FaSquareArrowUpRight className='text-2xs'::"/>
+                                                {lead.client_name || 'N/A'} <VibeContentRenderer content="::fasquarearrowupright className='text-[0.6rem] sm:text-2xs'::"/>
                                             </a>
-                                            {lead.similarity_score && <span className='block text-xs text-gray-500' title={`Сходство: ${lead.similarity_score}%`}>S: {lead.similarity_score}%</span>}
+                                            {lead.similarity_score && <span className='block text-[0.65rem] sm:text-xs text-gray-500' title={`Сходство: ${lead.similarity_score}%`}>S: {lead.similarity_score}%</span>}
                                         </td>
-                                        <td className="px-3 py-2 text-gray-300 truncate max-w-[200px] md:max-w-xs hidden md:table-cell" title={lead.project_description}>{lead.project_description?.substring(0,70)}...</td>
-                                        <td className="px-3 py-2 text-gray-400 hidden lg:table-cell">{lead.budget_range || '-'}</td>
-                                        <td className="px-3 py-2">
+                                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-300 truncate max-w-[150px] sm:max-w-[200px] md:max-w-xs hidden md:table-cell" title={lead.project_description}>{lead.project_description?.substring(0,70)}...</td>
+                                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400 hidden lg:table-cell">{lead.budget_range || '-'}</td>
+                                        <td className="px-2 sm:px-3 py-1.5 sm:py-2">
                                             <select 
                                                 value={lead.status} 
                                                 onChange={(e) => lead.id && handleUpdateLeadStatus(lead.id, e.target.value)}
                                                 disabled={isLoading}
                                                 className={cn(
-                                                    "bg-gray-700 border border-gray-600 text-gray-200 text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1.5 appearance-none",
-                                                    lead.status === 'new' && 'ring-2 ring-yellow-400',
-                                                    lead.status === 'in_progress' && 'ring-2 ring-blue-400',
-                                                    lead.status === 'interested' && 'ring-2 ring-pink-400',
-                                                    lead.status === 'closed_won' && 'bg-green-700/50 ring-2 ring-green-400',
-                                                    lead.status === 'closed_lost' && 'bg-red-700/50 ring-2 ring-red-400',
+                                                    "bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none",
+                                                    lead.status === 'new' && 'ring-1 sm:ring-2 ring-yellow-400',
+                                                    lead.status === 'in_progress' && 'ring-1 sm:ring-2 ring-blue-400',
+                                                    lead.status === 'interested' && 'ring-1 sm:ring-2 ring-pink-400',
+                                                    lead.status === 'closed_won' && 'bg-green-700/50 ring-1 sm:ring-2 ring-green-400',
+                                                    lead.status === 'closed_lost' && 'bg-red-700/50 ring-1 sm:ring-2 ring-red-400',
                                                   )}
                                             >
                                                 <option value="new">Новый</option>
@@ -560,8 +551,7 @@ const LeadGenerationHQPage = () => {
                                                 <option value="closed_lost">Провал</option>
                                             </select>
                                         </td>
-                                        <td className="px-3 py-2 text-gray-400">
-                                          {/* WIP: Выпадающий список для назначения */}
+                                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400">
                                           <select
                                             value={lead.assigned_to_tank || lead.assigned_to_carry || lead.assigned_to_support || ''}
                                             onChange={(e) => {
@@ -575,7 +565,7 @@ const LeadGenerationHQPage = () => {
                                                 }
                                             }}
                                             disabled={isLoading}
-                                            className="bg-gray-700 border border-gray-600 text-gray-200 text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1.5 appearance-none"
+                                            className="bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none"
                                           >
                                             <option value="">Никому</option>
                                             <optgroup label="Танки">
@@ -592,9 +582,8 @@ const LeadGenerationHQPage = () => {
                                             </optgroup>
                                           </select>
                                         </td>
-                                        <td className="px-3 py-2 text-xs space-x-1">
-                                            {/* TODO: Модалка с деталями лида, включая сгенерированный оффер, твики, фичи */}
-                                            <Button variant="ghost" size="icon" className="text-brand-yellow hover:text-yellow-300 h-7 w-7 p-1" title="Детали Лида (WIP)" disabled={isLoading}><VibeContentRenderer content="::FaCircleInfo::"/></Button>
+                                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs space-x-1">
+                                            <Button variant="ghost" size="icon" className="text-brand-yellow hover:text-yellow-300 h-6 w-6 sm:h-7 sm:w-7 p-1" title="Детали Лида (WIP)" disabled={isLoading}><VibeContentRenderer content="::facircleinfo::"/></Button>
                                         </td>
                                     </tr>
                                 ))}
@@ -610,18 +599,18 @@ const LeadGenerationHQPage = () => {
           <div ref={workflowSectionRef}>
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
               <CardHeader>
-                <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
+                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.workflowTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.workflowSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.workflowSubtitle} /></CardDescription>
               </CardHeader>
-              <CardContent className="font-mono text-sm text-gray-300 space-y-4">
+              <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-3 sm:space-y-4">
                   <VibeContentRenderer content={`1. ${t.workflowStep1}`} />
                   <VibeContentRenderer content={`2. ${t.workflowStep2}`} />
                   <VibeContentRenderer content={`3. ${t.workflowStep3}`} />
                   <div>
                       <VibeContentRenderer content={`4. ${t.workflowStep4}`} />
-                      <ul className="list-disc list-inside pl-6 mt-1 space-y-1">
+                      <ul className="list-disc list-inside pl-4 sm:pl-6 mt-1 space-y-1">
                           <li><VibeContentRenderer content={t.tanksRoleDesc.split(".")[0] + "."} /></li>
                           <li><VibeContentRenderer content={t.carryRoleDesc.split(".")[0] + "."} /></li>
                       </ul>
@@ -636,26 +625,26 @@ const LeadGenerationHQPage = () => {
           <div ref={assetsSectionRef}>
              <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
               <CardHeader>
-                <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
+                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.assetsTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.assetsSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.assetsSubtitle} /></CardDescription>
               </CardHeader>
-              <CardContent className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 font-mono text-sm">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 font-mono text-xs sm:text-sm">
                 {[
-                  { titleKey: 'assetJumpstartTitle', descKey: 'assetJumpstartDesc', linkKey: 'linkToJumpstart', icon: '::FaRocket::' },
-                  { titleKey: 'assetStudioTitle', descKey: 'assetStudioDesc', linkKey: 'linkToRepoXml', icon: '::FaWandMagicSparkles::' },
-                  { titleKey: 'assetPhilosophyTitle', descKey: 'assetPhilosophyDesc', linkKey: 'linkToSelfDev', secondaryLinkKey: 'linkToPurposeProfit', icon: '::FaBookOpen::' },
-                  { titleKey: 'assetPlansTitle', descKey: 'assetPlansDesc', linkKey: 'linkToGamePlan', secondaryLinkKey: 'linkToPPlan', icon: '::FaClipboardList::' },
-                  { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', linkKey: 'linkToTutorials', icon: '::FaGraduationCap::' },
-                  { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', linkKey: 'linkToCyberDevOS', icon: '::FaGamepad::' },
+                  { titleKey: 'assetJumpstartTitle', descKey: 'assetJumpstartDesc', linkKey: 'linkToJumpstart', icon: '::farocket::' },
+                  { titleKey: 'assetStudioTitle', descKey: 'assetStudioDesc', linkKey: 'linkToRepoXml', icon: '::fawandmagicsparkles::' },
+                  { titleKey: 'assetPhilosophyTitle', descKey: 'assetPhilosophyDesc', linkKey: 'linkToSelfDev', secondaryLinkKey: 'linkToPurposeProfit', icon: '::fabookopen::' },
+                  { titleKey: 'assetPlansTitle', descKey: 'assetPlansDesc', linkKey: 'linkToGamePlan', secondaryLinkKey: 'linkToPPlan', icon: '::faclipboardlist::' },
+                  { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', linkKey: 'linkToTutorials', icon: '::fagraduationcap::' },
+                  { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', linkKey: 'linkToCyberDevOS', icon: '::fagamepad::' },
                 ].map(asset => (
-                  <div key={asset.titleKey} className={cn("p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
-                    <h5 className={cn("font-bold mb-1.5 flex items-center gap-2", pageTheme.accentColor)}>
+                  <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
+                    <h5 className={cn("font-bold mb-1 sm:mb-1.5 flex items-center gap-1.5 sm:gap-2", pageTheme.accentColor)}>
                       <VibeContentRenderer content={asset.icon} />
                       <VibeContentRenderer content={t[asset.titleKey as keyof typeof t]} />
                     </h5>
-                    <div className="text-gray-300 text-xs leading-snug"><VibeContentRenderer content={t[asset.descKey as keyof typeof t]} /></div>
+                    <div className="text-gray-300 text-[0.7rem] sm:text-xs leading-snug"><VibeContentRenderer content={t[asset.descKey as keyof typeof t]} /></div>
                   </div>
                 ))}
               </CardContent>
@@ -666,14 +655,14 @@ const LeadGenerationHQPage = () => {
           <div ref={zionSectionRef}>
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
               <CardHeader>
-                <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
+                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.zionTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.zionSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.zionSubtitle} /></CardDescription>
               </CardHeader>
-             <CardContent className="font-mono text-sm text-gray-300 space-y-3">
+             <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-2 sm:space-y-3">
               <p><VibeContentRenderer content={t.zionP1} /></p>
-              <ul className="list-disc list-inside pl-4 space-y-2">
+              <ul className="list-disc list-inside pl-3 sm:pl-4 space-y-1.5 sm:space-y-2">
                 <li><VibeContentRenderer content={t.zionList1} /></li>
                 <li><VibeContentRenderer content={t.zionList2} /></li>
                 <li><VibeContentRenderer content={t.zionList3} /></li>
@@ -684,18 +673,18 @@ const LeadGenerationHQPage = () => {
           </div>
           
           {/* Call to Action */}
-          <section className="text-center mt-16 py-10">
-            <VibeContentRenderer content={`::FaRocket className="mx-auto text-7xl mb-8 ${pageTheme.primaryColor} animate-bounce"::`} />
-            <h2 className={cn("text-4xl md:text-5xl font-orbitron font-bold mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
+          <section className="text-center mt-12 sm:mt-16 py-8 sm:py-10">
+            <VibeContentRenderer content={`::farocket className="mx-auto text-5xl sm:text-7xl mb-6 sm:mb-8 ${pageTheme.primaryColor} animate-bounce"::`} />
+            <h2 className={cn("text-3xl sm:text-4xl md:text-5xl font-orbitron font-bold mb-4 sm:mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
               <VibeContentRenderer content={t.ctaTitle} />
             </h2>
-            <p className="text-xl text-gray-300 font-mono max-w-2xl mx-auto mb-10">
+            <p className="text-lg sm:text-xl text-gray-300 font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
               <VibeContentRenderer content={t.ctaSubtitle} />
             </p>
             <Button 
-                size="xl" 
+                size="lg" 
                 onClick={() => scrollToSection(arsenalSectionRef)} 
-                className={cn("font-orbitron text-xl py-5 px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(255,108,0,0.8)]`)}
+                className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(255,108,0,0.8)]`)}
             >
               <VibeContentRenderer content={t.ctaButtonText} />
             </Button>
