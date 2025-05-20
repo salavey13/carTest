@@ -15,7 +15,6 @@ import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
 import * as Fa6Icons from "react-icons/fa6"; 
 import { iconNameMap } from "@/lib/iconNameMap";
 
-
 interface PageInfo {
   path: string;
   name: string; 
@@ -33,13 +32,14 @@ const allPages: PageInfo[] = [
   // Core Vibe
   { path: "/", name: "Home", icon: "FaBrain", group: "Core Vibe", isImportant: true, color: "cyan" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: "FaWandMagicSparkles", group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
+  { path: "/leads", name: "Leads HQ", icon: "FaCrosshairs", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev", name: "SelfDev Path", icon: "FaRoad", group: "Core Vibe", isImportant: true, color: "green" },
   { path: "/p-plan", name: "VIBE Plan", icon: "FaUserNinja", group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
   { path: "/game-plan", name: "Game Plan", icon: "FaFilm", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
   // GTA Vibe Missions
-  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "faexchangealt", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" }, 
+  { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "FaArrowRightArrowLeft", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" }, 
   { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "GTA Vibe Missions", isImportant: true, color: "red", isHot: true, questId: "icon-swap-mission" },
   { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "GTA Vibe Missions", isImportant: true, color: "cyan", isHot: true, questId: "video-swap-mission" },
   { path: "/tutorials/inception-swap", name: "Inception Swap Mission", icon: "FaInfinity", group: "GTA Vibe Missions", isImportant: true, color: "lime", isHot: true, questId: "inception-swap-mission" },
@@ -52,7 +52,7 @@ const allPages: PageInfo[] = [
   { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange"},
   { path: "/start-training", name: "Start Training", icon: "FaDumbbell", group: "CyberFitness", color: "green", isImportant: true},
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue" },  
-  { path: "/partner", name: "Alliance Perks", icon: "fabookuser", group: "CyberFitness", color: "purple"}, 
+  { path: "/partner", name: "Alliance Perks", icon: "FaUsers", group: "CyberFitness", color: "purple"}, 
   
   // Content & Tools
   { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
@@ -98,7 +98,7 @@ const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
 
 const translations: Record<string, Record<string, string>> = {
   en: {
-    "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
+    "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "Leads HQ": "Leads HQ", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
     "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission", "Video Render Mission": "Video Render Mission", "Inception Swap Mission": "Inception Swap Mission", "The Fifth Door Mission": "The Fifth Door Mission",
     "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
     "Vibe Schematics": "Vibe Schematics", "Start Training": "Start Training", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
@@ -109,7 +109,7 @@ const translations: Record<string, Record<string, string>> = {
     "Core Vibe": "Core Vibe", "GTA Vibe Missions": "GTA Vibe Missions", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
   ru: {
-    "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
+    "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "Leads HQ": "КОЦ 'Дозор'", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
     "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок", "Video Render Mission": "Миссия: Видео-Рендер", "Inception Swap Mission": "Миссия: Inception Swap", "The Fifth Door Mission": "Миссия: Пятая Дверь",
     "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
     "Vibe Schematics": "Схемы Вайба", "Start Training": "Начать Тренировку", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
@@ -315,26 +315,26 @@ export default function Header() {
             animate={{ opacity: 1, clipPath: 'circle(150% at calc(100% - 3rem) 3rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
             transition={{ type: "tween", ease: "easeOut", duration: 0.3 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-16 pb-10 px-4 md:pt-20 simple-scrollbar" 
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-16 md:pt-20 pb-10 px-4 simple-scrollbar max-h-[80vh] sm:max-h-screen" 
           >
             <button
               onClick={() => setIsNavOpen(false)}
-              className="fixed top-3 left-1/2 -translate-x-1/2 z-[51] p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10" 
+              className="fixed top-3 left-1/2 -translate-x-1/2 z-[51] p-1.5 sm:p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10" 
               aria-label={t("Close navigation")}
-            ><X className="h-6 w-6 sm:h-7 sm:w-7" /></button>
+            ><X className="h-5 w-5 sm:h-6 sm:w-6" /></button>
 
-            <div className="container mx-auto max-w-4xl xl:max-w-5xl mt-8"> 
-              <div className="relative mb-6">
+            <div className="container mx-auto max-w-4xl xl:max-w-5xl mt-4 sm:mt-8"> 
+              <div className="relative mb-4 sm:mb-6">
                 <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-dark-card/80 border-2 border-brand-cyan/50 rounded-lg text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:border-transparent text-base font-mono shadow-md"
+                  className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 bg-dark-card/80 border-2 border-brand-cyan/50 rounded-lg text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:border-transparent text-sm sm:text-base font-mono shadow-md"
                   aria-label={t("Search pages...")}
                 />
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-brand-cyan/70 pointer-events-none" />
+                <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-brand-cyan/70 pointer-events-none" />
               </div>
               
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {profileLoading && <div className="text-center text-brand-cyan font-mono"><VibeContentRenderer content="::FaSpinner className='animate-spin':: Загрузка профиля агента..."/></div>}
                 {!profileLoading && groupOrder.map(groupName => {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
@@ -347,18 +347,18 @@ export default function Header() {
                   return (
                     <div key={groupName}>
                        <h3 className={cn(
-                        "text-xl font-orbitron mb-3 flex items-center gap-x-2.5 justify-center py-2",
-                        "gta-vibe-text-effect" // Apply to all group titles
+                        "text-lg sm:text-xl font-orbitron mb-2 sm:mb-3 flex items-center gap-x-2 sm:gap-x-2.5 justify-center py-1.5 sm:py-2",
+                        "gta-vibe-text-effect"
                         )}>
                         {IconComponent && (
-                          <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : 'purple']?.text || 'text-brand-cyan')} />
+                          <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : 'purple']?.text || 'text-brand-cyan')} />
                         )}
                         <span>{t(groupName)}</span>
                         {IconComponent && isGtaVibeGroup && ( 
-                           <IconComponent className={cn("w-6 h-6 gta-icon-fix", tileColorClasses['pink']?.text || 'text-brand-cyan')} />
+                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses['pink']?.text || 'text-brand-cyan')} />
                         )}
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1.5 sm:gap-2 md:gap-2.5">
                         {pagesInGroup.map((page) => {
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
@@ -371,9 +371,9 @@ export default function Header() {
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
                                 "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.02] hover:-translate-y-0.5 shadow-md hover:shadow-lg",
-                                "p-1.5", 
+                                "p-1 sm:p-1.5", 
                                 page.isImportant 
-                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 sm:col-span-2 shadow-lg hover:shadow-xl" 
+                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 shadow-lg hover:shadow-xl" // col-span-1 for mobile
                                   : "bg-dark-card/70 hover:bg-dark-card/90 col-span-1",
                                 tileBaseColorClass, 
                                 tileShadow, 
@@ -382,7 +382,7 @@ export default function Header() {
                               title={page.translatedName}
                             >
                               {page.isHot && (
-                                <span title={t("Hot")} className="absolute top-1 right-1 text-base text-brand-orange animate-pulse" aria-label={t("Hot")}>
+                                <span title={t("Hot")} className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 text-sm sm:text-base text-brand-orange animate-pulse" aria-label={t("Hot")}>
                                   <VibeContentRenderer content="::FaFire::" />
                                 </span>
                               )}
@@ -390,23 +390,23 @@ export default function Header() {
                                 <RenderIconFromPage 
                                     icon={page.icon} 
                                     className={cn(
-                                        "transition-transform duration-200 group-hover:scale-110 mb-1.5", 
+                                        "transition-transform duration-200 group-hover:scale-110 mb-1 sm:mb-1.5", 
                                         page.isImportant 
-                                            ? "h-7 w-7 sm:h-8 sm:w-8" 
-                                            : "h-6 w-6 sm:h-7 sm:w-7" 
+                                            ? "h-6 w-6 sm:h-7 sm:h-7 md:h-8 md:w-8" // smaller for mobile
+                                            : "h-5 w-5 sm:h-6 sm:h-6 md:h-7 md:w-7"  // smaller for mobile
                                     )}
                                 />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-[0.9rem] md:text-base" 
-                                    : "text-light-text/90 group-hover:text-white text-xs md:text-sm" 
+                                    ? "text-white text-[0.75rem] sm:text-[0.85rem] md:text-base" // smaller for mobile
+                                    : "text-light-text/90 group-hover:text-white text-[0.65rem] sm:text-xs md:text-sm" // smaller for mobile
                               )}>
                                 {page.translatedName}
                               </span>
                               {page.isAdminOnly && (
-                                <span title={t("Admin Only")} className="absolute bottom-1 right-1 text-[0.65rem] text-red-400/80 bg-black/60 rounded-full px-1 py-0.5 leading-none">
+                                <span title={t("Admin Only")} className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1 text-[0.6rem] sm:text-[0.65rem] text-red-400/80 bg-black/60 rounded-full px-0.5 sm:px-1 py-0.5 leading-none">
                                   ADMIN
                                 </span>
                               )}
@@ -415,13 +415,13 @@ export default function Header() {
                         })}
                       </div>
                       {groupOrder.indexOf(groupName) < groupOrder.length -1 && Object.values(groupedAndFilteredPages).filter(g => g && g.length > 0).indexOf(pagesInGroup) < Object.values(groupedAndFilteredPages).filter(g => g && g.length > 0).length -1 && (
-                        <hr className="my-4 border-gray-700/50"/>
+                        <hr className="my-3 sm:my-4 border-gray-700/50"/>
                       )}
                     </div>
                   );
                 })}
                 {!profileLoading && Object.values(groupedAndFilteredPages).every(g => !g || g.length === 0) && (
-                  <p className="text-center text-gray-500 text-sm md:text-base mt-6 md:mt-8 font-mono">
+                  <p className="text-center text-gray-500 text-xs sm:text-sm md:text-base mt-4 sm:mt-6 md:mt-8 font-mono">
                     {t("No pages found matching")} "{searchTerm}"
                   </p>
                 )}
