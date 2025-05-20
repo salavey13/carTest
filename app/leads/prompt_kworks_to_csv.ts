@@ -12,8 +12,12 @@ export const PROMPT_KWORKS_TO_CSV = `
 *   \`client_kwork_history\`: (String | null) Информация об истории клиента на бирже.
 *   \`current_kwork_offers_count\`: (String | null) Количество предложений по проекту.
 *   \`raw_html_description\`: (String | null) HTML-код описания проекта (опционально, если легко извлечь).
-*   \`initial_relevance_score\`: (Number) Оценка от 1 до 10, насколько проект релевантен для Supervibe Studio (учитывая стек React/Next.js, TWA, боты). 10 - идеальное совпадение.
-*   \`key_features_requested_list\`: (Array of Strings) JSON-массив строк с ключевыми функциями, которые запрашивает клиент, извлеченными из описания.
+*   \`initial_relevance_score\`: (Number) Оценка от 1 до 10, насколько проект релевантен для Supervibe Studio.
+    *   **Критерии высокой оценки (8-10):** Явное упоминание "Telegram Mini App", "Telegram Web App", "TWA", "React", "Next.js", "Supabase". Проекты, связанные с "ботами", "приложениями для Telegram", "сервисами онлайн тренировок", "арендой авто".
+    *   **Критерии средней оценки (5-7):** Общие веб-задачи, где наш стек может подойти, но нет явных указаний на TWA или наш стек.
+    *   **Критерии низкой оценки (1-4):** Явное упоминание технологий, которые мы НЕ ИСПОЛЬЗУЕМ (например, PHP, WordPress, Bitrix, Vue.js для фронтенда, Python для фронтенда, мобильная разработка на Swift/Kotlin/Flutter).
+*   \`key_features_requested_list\`: (Array of Strings) JSON-массив строк с ключевыми функциями, которые запрашивает клиент, извлеченными из описания. Будь краток и выделяй суть.
+*   \`project_type_guess\`: (String | null) Твоя попытка классифицировать проект. Возможные значения: "TWA_Training", "TWA_CarRental", "TWA_Ecommerce", "TWA_Utility", "Bot_AI", "Bot_Simple", "Web_NextJS_App", "Web_Other_Stack", "Mobile_Native", "Design_Only", "Unknown". Выбери наиболее подходящее или "Unknown".
 
 **Инструкции по извлечению данных для каждого ключа:**
 
@@ -25,8 +29,9 @@ export const PROMPT_KWORKS_TO_CSV = `
 6.  **\`client_kwork_history\`**: Информация об истории клиента. Обычно "Размещено проектов на бирже: X". Запиши как есть. Если нет, значение \`null\`.
 7.  **\`current_kwork_offers_count\`**: Количество предложений. Обычно "Предложений: X". Запиши как есть. Если нет, значение \`null\`.
 8.  **\`raw_html_description\`**: HTML-код описания. Если сложно или отсутствует, значение \`null\`.
-9.  **\`initial_relevance_score\`**: Твоя оценка релевантности проекта (1-10).
+9.  **\`initial_relevance_score\`**: Твоя оценка релевантности проекта (1-10) на основе вышеописанных критериев.
 10. **\`key_features_requested_list\`**: Список ключевых фич в виде массива строк (например, ["разработка фронтенда", "сервис онлайн тренировок", "интеграция с Telegram"]).
+11. **\`project_type_guess\`**: Твоя классификация проекта.
 
 **Правила форматирования JSON:**
 *   Весь вывод должен быть одним валидным JSON-массивом.
@@ -60,7 +65,8 @@ export const PROMPT_KWORKS_TO_CSV = `
   "current_kwork_offers_count": "Предложений: 5",
   "raw_html_description": null,
   "initial_relevance_score": 9,
-  "key_features_requested_list": ["telegram mini app", "разработка фронтенда", "сервис по онлайн тренировкам"]
+  "key_features_requested_list": ["telegram mini app", "разработка фронтенда", "сервис по онлайн тренировкам"],
+  "project_type_guess": "TWA_Training"
 }
 \`\`\`
 
