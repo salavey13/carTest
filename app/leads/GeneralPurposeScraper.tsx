@@ -4,11 +4,10 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { Textarea } from '@/components/ui/textarea'; // Not used directly in this component
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-// import { scrapePageContent } from './actions'; // Assuming this action will be created
+// import { scrapePageContent } from './actions'; // Будет раскомментировано после реализации
 
 interface GeneralPurposeScraperProps {
   pageTheme: {
@@ -17,16 +16,16 @@ interface GeneralPurposeScraperProps {
     borderColor: string;
     shadowColor: string;
   };
-  t_dynamic_links: Record<string, string>;
+  t_dynamic_links: Record<string, string>; // Может понадобиться для ссылок в описании
   onScrapedData: (data: string) => void; 
 }
 
 const predefinedSearchButtons = [
-  { label: "TWA (Kwork)", keywords: "telegram web app, twa, mini app", site: "kwork" , siteUrl: "https://kwork.ru/projects?c=all&q="},
-  { label: "AI Боты (Kwork)", keywords: "telegram бот нейросеть, ai telegram bot", site: "kwork", siteUrl: "https://kwork.ru/projects?c=all&q=" },
-  { label: "Next.js (Kwork)", keywords: "next.js, react, supabase", site: "kwork", siteUrl: "https://kwork.ru/projects?c=all&q=" },
-  { label: "TWA (Habr Freelance)", keywords: "telegram web app, twa", site: "habr", siteUrl: "https://freelance.habr.com/tasks?q=" },
-  { label: "AI Боты (Habr Freelance)", keywords: "telegram бот ai, нейросеть", site: "habr", siteUrl: "https://freelance.habr.com/tasks?q=" },
+  { id: "kwork_twa", label: "TWA (Kwork)", keywords: "telegram web app, twa, mini app", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" }, // c=114 это "Разработка ботов и приложений"
+  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", keywords: "telegram бот нейросеть, ai telegram bot", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" },
+  { id: "kwork_nextjs", label: "Next.js (Kwork)", keywords: "next.js, react, supabase", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=41" }, // c=41 это "Веб-программирование"
+  { id: "habr_twa", label: "TWA (Habr Freelance)", keywords: "telegram web app, twa", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+  { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", keywords: "telegram бот ai, нейросеть", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
 ];
 
 
@@ -41,49 +40,54 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
 
   const handlePredefinedSearch = (search: typeof predefinedSearchButtons[0]) => {
     setKeywords(search.keywords);
-    // Construct search URL if needed, or use a generic placeholder for now
-    // For Kwork/Habr, we'd typically form a search query URL.
-    // For this example, let's just set the keywords. User can manually put a URL too.
-    if (search.siteUrl && search.keywords) {
-        setTargetUrl(search.siteUrl + encodeURIComponent(search.keywords));
+    if (search.siteUrlFormat) {
+        const searchUrl = search.siteUrlFormat.replace("{keywords}", encodeURIComponent(search.keywords));
+        setTargetUrl(searchUrl);
+        toast.info(`Запрос "${search.label}" подготовлен. URL для скрейпинга: ${searchUrl}. Нажмите "Запустить Зонд".`, {duration: 3000});
     } else {
-        setTargetUrl(''); // Clear URL if only keywords are set
+        setTargetUrl(''); 
+        toast.info(`Ключевые слова "${search.keywords}" установлены. Укажите URL вручную или выберите другой протокол.`, {duration: 3000});
     }
-    toast.info(`Запрос "${search.label}" подготовлен. Нажмите "Запустить Скрейпер".`, {duration: 2000});
   };
 
   const handleScrape = async () => {
     const urlToScrape = targetUrl.trim();
-    if (!urlToScrape && !keywords.trim()) { // Allow scraping by keywords in future, for now URL is primary
-      toast.warning("Введите URL для скрейпинга или выберите готовый запрос.");
+    if (!urlToScrape) { 
+      toast.warning("Введите URL для скрейпинга. Поле 'Ключевые слова' пока используется для формирования URL через кнопки.");
       return;
     }
-    if (!urlToScrape) {
-        toast.warning("Пока что скрейпер работает только по прямому URL. Пожалуйста, укажите URL.");
-        return;
-    }
-
 
     setIsScraping(true);
-    const toastId = toast.loading(`Запускаю кибер-пауков на ${urlToScrape}...`);
+    const toastId = toast.loading(`::faspinner className='animate-spin':: Зонд отправлен на ${urlToScrape}...`);
 
     try {
-      // const result = await scrapePageContent(urlToScrape); // SERVER ACTION
-      // MOCKUP:
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const result = { success: true, content: `--- MOCK SCRAPED DATA from "${urlToScrape}" ---\n\nПроект X: ... описание ...\nПроект Y: ... описание ...` };
-
+      // ЗАГЛУШКА: Раскомментировать и использовать реальное действие после его создания
+      // const result = await scrapePageContent(urlToScrape); 
+      
+      // Начало Мока для демонстрации
+      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1500));
+      const mockSuccess = Math.random() > 0.15; // 85% шанс успеха
+      let result;
+      if (mockSuccess) {
+        result = { 
+          success: true, 
+          content: `--- MOCK SCRAPED DATA from "${urlToScrape}" ---\n\nПроект "Супер Бот Альфа": Нужен TWA для управления космическим флотом. Стек: React, Supabase. Бюджет: 100000 кредитов. Сроки: до конца цикла.\n\nПроект "Нейро-Консультант Гамма": Разработка AI для анализа данных с дальних сенсоров. Требуется интеграция с протоколом X-Omega. Оплата по факту обнаружения аномалий.\n\nКворк от @Zorg77: "Сделаю простого бота для Telegram за еду. Опыт есть."\n\n--- КОНЕЦ ДАННЫХ ЗОНДА ---`
+        };
+      } else {
+        result = { success: false, error: "Сигнал с зонда потерян. Возможно, анти-скрейпер система или метеоритный дождь." };
+      }
+      // Конец Мока
 
       if (result.success && result.content) {
         onScrapedData(result.content);
-        toast.success("Кибер-пауки вернулись с добычей! Данные добавлены в 'Сбор трофеев'.", { id: toastId });
+        toast.success("::facheckcircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'.", { id: toastId, duration: 4000 });
         setKeywords(''); 
         setTargetUrl(''); 
       } else {
-        toast.error(`Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`, { id: toastId });
+        toast.error(`::faexclamationtriangle:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`, { id: toastId, duration: 6000 });
       }
     } catch (error: any) {
-      toast.error(`Критическая ошибка скрейпера: ${error.message}`, { id: toastId });
+      toast.error(`::facbomb:: Критическая ошибка зонда: ${error.message}`, { id: toastId, duration: 6000 });
     } finally {
       setIsScraping(false);
     }
@@ -93,36 +97,35 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
     <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
       <CardHeader>
         <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
-          <VibeContentRenderer content="::fasatellitedish className='animate-pulse':: Универсальный Кибер-Скрейпер (WIP)" />
+          <VibeContentRenderer content="::fasatellitedish className='animate-pulse text-2xl sm:text-3xl':: Универсальный Кибер-Скрейпер" />
         </CardTitle>
         <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">
-          Этот модуль в разработке. Цель: автоматический сбор данных с Kwork, Habr Freelance и других площадок по ключевым словам или URL.
-          Собранный текст будет автоматически добавлен в поле &quot;Сбор трофеев&quot; выше для AI-обработки.
+          <VibeContentRenderer content="::fainfocircle:: Выберите **Быстрый Протокол Разведки** или введите **URL** целевой страницы. Зонд соберет текстовый контент, который будет добавлен в поле 'Сбор трофеев' для дальнейшей AI-обработки."/>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 font-mono">
         <div>
             <label className={cn("block text-sm font-medium mb-2", pageTheme.accentColor)}>
-                <VibeContentRenderer content="::falistcheck:: Готовые запросы (экспериментально):"/>
+                <VibeContentRenderer content="::falistcheck className='text-base':: Быстрые Протоколы Разведки:"/>
             </label>
             <div className="flex flex-wrap gap-2 mb-4">
                 {predefinedSearchButtons.map(search => (
                     <Button 
-                        key={search.label}
+                        key={search.id}
                         variant="outline"
                         size="sm"
                         onClick={() => handlePredefinedSearch(search)}
                         disabled={isScraping}
-                        className={cn("text-xs", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20`)}
+                        className={cn("text-xs px-2.5 py-1.5", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20 transform hover:scale-105 transition-all duration-150`)}
                     >
-                        {search.label}
+                        <VibeContentRenderer content={`::fa${search.site === 'kwork' ? 'k' : 'h'} className='mr-1.5 text-xs':: ${search.label}`}/>
                     </Button>
                 ))}
             </div>
         </div>
         <div>
           <label htmlFor="scraper-keywords" className={cn("block text-sm font-medium mb-1", pageTheme.accentColor)}>
-            <VibeContentRenderer content="::fakey:: Ключевые слова (для справки, пока не используются для авто-поиска):"/>
+            <VibeContentRenderer content="::fakeyboard className='text-base':: Ключевые Маячки (для справки):"/>
           </label>
           <Input
             id="scraper-keywords"
@@ -130,36 +133,36 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
             placeholder="Например: telegram mini app, next.js, supabase, ai"
-            className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/50 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm"
+            className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/30 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm"
             disabled={isScraping}
           />
         </div>
         <div>
           <label htmlFor="scraper-url" className={cn("block text-sm font-medium mb-1", pageTheme.accentColor)}>
-            <VibeContentRenderer content="::falink:: URL для парсинга (одна страница):"/>
+            <VibeContentRenderer content="::falink className='text-base':: Целевые Координаты (URL для парсинга):"/>
           </label>
           <Input
             id="scraper-url"
             type="url"
             value={targetUrl}
             onChange={(e) => setTargetUrl(e.target.value)}
-            placeholder="Например: https://kwork.ru/projects?c=114"
+            placeholder="https://kwork.ru/projects?c=114 или https://freelance.habr.com/tasks"
             className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/50 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm"
             disabled={isScraping}
           />
         </div>
         <Button
           onClick={handleScrape}
-          disabled={isScraping || !targetUrl.trim()} // Пока кнопка активна только если есть URL
+          disabled={isScraping || !targetUrl.trim()} 
           className={cn(
-            "w-full sm:w-auto bg-brand-cyan/80 text-black hover:bg-brand-cyan flex items-center justify-center gap-2 py-2.5 text-sm sm:text-base transform hover:scale-105",
-            (isScraping || !targetUrl.trim()) && "opacity-50 cursor-not-allowed"
+            "w-full sm:w-auto bg-gradient-to-r from-brand-cyan to-brand-blue text-white hover:opacity-90 flex items-center justify-center gap-2 py-2.5 text-sm sm:text-base font-semibold transform hover:scale-105 transition-all duration-150 shadow-md hover:shadow-lg",
+            (isScraping || !targetUrl.trim()) && "opacity-60 cursor-not-allowed hover:scale-100"
           )}
         >
-          <VibeContentRenderer content={isScraping ? "::faspinner className='animate-spin':: Скрейпинг..." : "::faspider className='text-lg':: Запустить Скрейпер"} />
+          <VibeContentRenderer content={isScraping ? "::faspinner className='animate-spin text-lg':: Зонд в полёте..." : "::faspider className='text-lg':: Запустить Зонд-Охотник!"} />
         </Button>
         <p className="text-xs text-gray-400">
-          <VibeContentRenderer content="::fatriangleexclamation className='text-yellow-400 text-sm':: Внимание: Используйте с осторожностью и уважайте `robots.txt` сайтов. Чрезмерный скрейпинг может привести к блокировке IP." />
+          <VibeContentRenderer content="::fatriangleexclamation className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке." />
         </p>
       </CardContent>
     </Card>
