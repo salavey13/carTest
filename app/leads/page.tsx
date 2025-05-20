@@ -13,8 +13,7 @@ import LeadsPageRightNav from './LeadsPageRightNav';
 import SupportArsenal from './SupportArsenal';
 import LeadsDashboard from './LeadsDashboard';
 import GeneralPurposeScraper from './GeneralPurposeScraper';
-import { FaAnglesDown, FaAnglesUp } from "react-icons/fa6";
-
+// Иконки FaAnglesDown и FaAnglesUp импортируются через VibeContentRenderer, нет необходимости в прямом импорте
 
 interface Lead {
   id?: string; 
@@ -126,8 +125,8 @@ const LeadGenerationHQPage = () => {
     workflowStep2: "2. ::farobot:: **Саппорт/AI-Оракул:** Генерирует и отправляет персонализированное предложение (возможно, с AI-сгенерированным концептом/макетом).",
     workflowStep3: `3. ::facomments:: **Клиент:** При положительном ответе – сеанс связи (созвон) или доразведка. ${t_dynamic_links.linkToGamePlan} – стратегическая карта для этих переговоров. Детали стратегии также в ${t_dynamic_links.linkToPPlan}.`,
     workflowStep4: "4. **Развертывание Сил:**",
-    workflowStep4Tank: `::fashieldhalved:: **Танки:** Берут на себя кастомизацию по целеуказаниям Саппорта (ссылки ${t_dynamic_links.linkToRepoXml}). Применяют всю огневую мощь Студии для штурма клиентских задач.`,
-    workflowStep4Carry: `::fabrain:: **Кэрри (Павел):** Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра ${t_dynamic_links.linkToRepoXml}.`,
+    workflowStep4Tank: `::fashieldhalved:: **Танки:** ${t_dynamic_links.linkToRepoXml} Берут на себя кастомизацию по целеуказаниям Саппорта. Применяют всю огневую мощь Студии для штурма клиентских задач.`,
+    workflowStep4Carry: `::fabrain:: **Кэрри (Павел):** ${t_dynamic_links.linkToRepoXml} Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра.`,
     workflowStep5: "5. ::farocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
     workflowStep6: `6. ::fabolt:: **Анализ Результатов и Адаптация:** <Link href='/repo-xml#cybervibe-section' class='text-brand-cyan hover:underline'>Петля CyberVibe</Link> обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
     assetsTitle: "::facubes:: Использование Трофейных Активов CyberVibe",
@@ -157,13 +156,13 @@ const LeadGenerationHQPage = () => {
     navToTop: "::fachevronup:: К Началу",
     navToRoles: "::fausershield:: К Ролям",
     navToArsenal: "::fatoolbox:: К Арсеналу",
-    navToOffer: "::fabullhorn:: К Офферам", // Deprecated, offerSectionRef is inside arsenal
+    navToOffer: "::fabullhorn:: К Офферам", 
     navToWorkflow: "::fadiagramproject:: К Процессу",
     navToAssets: "::facubes:: К Активам",
     navToZion: "::facomments:: К Зиону",
     navToDashboard: "::fatablelist:: К Дашборду",
-    collapseAllSections: "::faanglesup:: Свернуть Инфо-Блоки",
-    expandAllSections: "::faanglesdown:: Развернуть Инфо-Блоки",
+    collapseAllSections: "::faanglesup:: Свернуть Инфо-Блоки", // Изменено для VibeContentRenderer
+    expandAllSections: "::faanglesdown:: Развернуть Инфо-Блоки", // Изменено для VibeContentRenderer
   };
 
   const pageTheme = {
@@ -346,7 +345,7 @@ const LeadGenerationHQPage = () => {
         className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-orange/20 hover:text-brand-orange backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10"
         title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
       >
-        {sectionsCollapsed ? <VibeContentRenderer content="::faanglesdown className='w-5 h-5'::" /> : <VibeContentRenderer content="::faanglesup className='w-5 h-5'::" />}
+        <VibeContentRenderer content={sectionsCollapsed ? "::faanglesdown className='w-5 h-5'::" : "::faanglesup className='w-5 h-5'::"} />
       </Button>
       
       <LeadsPageRightNav 
@@ -460,12 +459,12 @@ const LeadGenerationHQPage = () => {
                 <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-3 sm:space-y-4">
                     <VibeContentRenderer content={`1. ${t.workflowStep1}`} />
                     <VibeContentRenderer content={`2. ${t.workflowStep2}`} />
-                    <VibeContentRenderer content={`3. ${t.workflowStep3}`} />
+                    <p><VibeContentRenderer content={t.workflowStep3} /></p> {/* Ensure this is on its own line */}
                     <div>
-                        <VibeContentRenderer content={`4. ${t.workflowStep4}`} />
-                        <ul className="list-disc list-inside pl-4 sm:pl-6 mt-1 space-y-1">
-                            <li><VibeContentRenderer content={t.tanksRoleDesc.split(".")[0] + "."} /></li>
-                            <li><VibeContentRenderer content={t.carryRoleDesc.split(".")[0] + "."} /></li>
+                        <VibeContentRenderer content={t.workflowStep4} />
+                        <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> {/* Removed list-disc for cleaner look */}
+                           <li><VibeContentRenderer content={`::fashieldhalved:: **Танки:** ${t.tanksRoleDesc.split('.')[0] + '.'}`} /></li>
+                           <li><VibeContentRenderer content={`::fabrain:: **Кэрри (Павел):** ${t.carryRoleDesc.split('.')[0] + '.'}`} /></li>
                         </ul>
                     </div>
                     <VibeContentRenderer content={`5. ${t.workflowStep5}`} />
