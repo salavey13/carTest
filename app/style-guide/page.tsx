@@ -1,22 +1,17 @@
-"use client"; // Add this for client components like useState, etc.
+"use client"; 
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem
-} from "@/components/ui/dropdown-menu";
-import {
-  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
-} from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem
-} from "@/components/ui/select";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import VibeContentRenderer from "@/components/VibeContentRenderer";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
 const ColorSwatch = ({ name, className, hslVar }: { name: string, className: string, hslVar?: string }) => (
@@ -57,10 +52,10 @@ export default function StyleGuide() {
                 <ColorSwatch name="Purple" className="bg-brand-purple" hslVar="--brand-purple" />
                 <ColorSwatch name="Pink" className="bg-brand-pink" hslVar="--brand-pink" />
                 <ColorSwatch name="Cyan" className="bg-brand-cyan" hslVar="--brand-cyan" />
-                <ColorSwatch name="Blue" className="bg-brand-blue" hslVar="--brand-blue" />
+                <ColorSwatch name="Orange" className="bg-brand-orange" hslVar="--brand-orange" />
                 <ColorSwatch name="Yellow" className="bg-brand-yellow" hslVar="--brand-yellow" />
                 <ColorSwatch name="Green" className="bg-brand-green" hslVar="--brand-green" />
-                <ColorSwatch name="Orange" className="bg-brand-orange" hslVar="--brand-orange" />
+                <ColorSwatch name="Blue" className="bg-brand-blue" hslVar="--brand-blue" />
                 <ColorSwatch name="Lime" className="bg-brand-lime" hslVar="--brand-lime" />
               </div>
             </div>
@@ -70,10 +65,11 @@ export default function StyleGuide() {
                 <ColorSwatch name="Background" className="bg-background" hslVar="--background" />
                 <ColorSwatch name="Foreground" className="bg-foreground border-destructive" hslVar="--foreground" />
                 <ColorSwatch name="Card" className="bg-card" hslVar="--card" />
+                <ColorSwatch name="Popover" className="bg-popover" hslVar="--popover" />
                 <ColorSwatch name="Primary" className="bg-primary" hslVar="--primary" />
                 <ColorSwatch name="Secondary" className="bg-secondary" hslVar="--secondary" />
-                <ColorSwatch name="Accent" className="bg-accent" hslVar="--accent" />
                 <ColorSwatch name="Muted" className="bg-muted" hslVar="--muted" />
+                <ColorSwatch name="Accent" className="bg-accent" hslVar="--accent" />
                 <ColorSwatch name="Destructive" className="bg-destructive" hslVar="--destructive" />
                 <ColorSwatch name="Border" className="bg-border" hslVar="--border" />
                 <ColorSwatch name="Input" className="bg-input" hslVar="--input" />
@@ -146,7 +142,7 @@ function greet(name: string) {
               <Button variant="secondary">Secondary <VibeContentRenderer content="::FaGears::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="accent">Accent <VibeContentRenderer content="::FaPaintbrush::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="destructive">Destructive <VibeContentRenderer content="::FaTrash::" className="ml-2 h-3 w-3"/></Button>
-              <Button variant="outline">Outline <VibeContentRenderer content="::FaEyeSlash::" className="ml-2 h-3 w-3"/></Button>
+              <Button variant="outline">Outline <VibeContentRenderer content="::FaSquarePen::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="ghost">Ghost <VibeContentRenderer content="::FaCode::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="link">Link <VibeContentRenderer content="::FaLink::" className="ml-2 h-3 w-3"/></Button>
             </div>
@@ -169,7 +165,8 @@ function greet(name: string) {
                 <Button><VibeContentRenderer content="::FaFloppyDisk::" className="mr-2 h-4 w-4" /> Save Changes</Button>
                 <Button variant="outline"><VibeContentRenderer content="::FaPaperPlane::" className="mr-2 h-4 w-4" /> Submit</Button>
                 <Button variant="destructive" size="icon"><VibeContentRenderer content="::FaTrash::" /></Button>
-             </div>
+                <Button variant="ghost" size="icon" className="rounded-full"><VibeContentRenderer content="::FaUser::" /></Button>
+            </div>
           </div>
         </section>
 
@@ -183,21 +180,17 @@ function greet(name: string) {
                 <Input id="input-normal" placeholder="Placeholder..." className="input-cyber" />
               </div>
               <div>
-                 <Label htmlFor="input-focus">Focus State</Label>
-                 <Input id="input-focus" placeholder="Focus on me" className="input-cyber focus:ring-2 focus:ring-ring focus:border-ring" />
+                <Label htmlFor="input-error">Error Input</Label>
+                <Input id="input-error" placeholder="Error state" className="input-cyber border-destructive focus:ring-destructive" />
               </div>
               <div>
                 <Label htmlFor="input-disabled">Disabled Input</Label>
-                <Input id="input-disabled" placeholder="Can't touch this" className="input-cyber" disabled />
+                <Input id="input-disabled" placeholder="Disabled" className="input-cyber" disabled />
               </div>
               <div>
                 <Label htmlFor="textarea-normal">Textarea</Label>
-                <Textarea id="textarea-normal" placeholder="Type long text here..." className="textarea-cyber simple-scrollbar" /> 
+                <Textarea id="textarea-normal" placeholder="Type your message here." className="textarea-cyber simple-scrollbar" />
               </div>
-               <div>
-                 <Label htmlFor="textarea-focus">Textarea Focus</Label>
-                 <Textarea id="textarea-focus" placeholder="Focus on textarea" className="textarea-cyber simple-scrollbar focus:ring-2 focus:ring-ring focus:border-ring" /> 
-               </div>
               <div>
                 <Label htmlFor="textarea-disabled">Disabled Textarea</Label>
                 <Textarea id="textarea-disabled" placeholder="Disabled textarea" className="textarea-cyber simple-scrollbar" disabled /> 
@@ -211,7 +204,7 @@ function greet(name: string) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="chill">Chill <VibeContentRenderer content="::FaSnowflake::"/></SelectItem>
-                  <SelectItem value="focus">Focus <VibeContentRenderer content="::FaBrain::"/></SelectItem>
+                  <SelectItem value="cyber">Cyber <VibeContentRenderer content="::FaRobot::"/></SelectItem>
                   <SelectItem value="hype">Hype <VibeContentRenderer content="::FaBolt::"/></SelectItem>
                 </SelectContent>
               </Select>
@@ -220,19 +213,21 @@ function greet(name: string) {
                 <Checkbox id="checkbox-terms" />
                 <Label htmlFor="checkbox-terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Accept terms and conditions</Label>
               </div>
+              <RadioGroup defaultValue="option-one" className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="option-one" id="radio-one" />
+                  <Label htmlFor="radio-one">Option One</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="option-two" id="radio-two" />
+                  <Label htmlFor="radio-two">Option Two</Label>
+                </div>
+              </RadioGroup>
               <div className="flex items-center space-x-2">
-                  <Checkbox id="checkbox-disabled" disabled />
-                  <Label htmlFor="checkbox-disabled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Disabled Checkbox</Label>
+                  <Switch id="switch-airplane" />
+                  <Label htmlFor="switch-airplane">Airplane Mode</Label>
               </div>
                <div className="flex items-center space-x-2">
-                 <Switch id="switch-airplane" />
-                 <Label htmlFor="switch-airplane">Airplane Mode</Label>
-               </div>
-               <div className="flex items-center space-x-2">
-                 <Switch id="switch-dark" defaultChecked className="data-[state=checked]:bg-primary"/>
-                 <Label htmlFor="switch-dark">Dark Mode <VibeContentRenderer content="::FaMoon::" className="inline ml-1"/></Label>
-               </div>
-              <div className="flex items-center space-x-2">
                   <Switch id="switch-disabled" disabled />
                   <Label htmlFor="switch-disabled">Disabled Switch</Label>
               </div>
@@ -249,40 +244,38 @@ function greet(name: string) {
             <Card className="bg-card border-brand-purple/50 shadow-lg shadow-purple-glow"> 
               <CardHeader>
                 <CardTitle className="font-orbitron text-brand-purple">Стандартная Карта</CardTitle>
-                <CardDescription className="font-mono">Базовый вид карточки</CardDescription>
+                <CardDescription>Описание для стандартной карты.</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">Контент карточки здесь. Можно добавить текст, кнопки или другие элементы.</p>
+                <p>Контент карты. Здесь может быть любая информация, отображаемая в теле карточки.</p>
               </CardContent>
               <CardFooter>
-                <Button variant="secondary" size="sm">Действие</Button>
+                <Button variant="secondary" className="w-full">Действие</Button>
               </CardFooter>
             </Card>
-             <Card className="bg-card border-brand-pink/60 shadow-xl shadow-pink-glow animate-neon-border-glow">
+
+            <Card className="border-brand-pink/60 shadow-pink-glow">
               <CardHeader>
-                <CardTitle className="font-orbitron text-gradient">Карта с Эффектами</CardTitle>
-                <CardDescription className="font-mono text-muted-foreground">Применены neon-glow и text-gradient</CardDescription>
+                 <CardTitle className="font-orbitron text-brand-pink flex items-center gap-2">
+                    <VibeContentRenderer content="::FaLightbulb::" /> Карта с Иконкой
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-shadow-pink-glow text-sm">Этот контент светится. А рамка переливается!</p>
+                <VibeContentRenderer content="Эта карта использует иконку в заголовке и имеет **розовый** акцент. ::FaRocket color='var(--brand-pink)'::" />
               </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="link" size="sm" className="text-brand-cyan">Подробнее</Button>
-                 <Button variant="ghost" size="sm">Отмена</Button>
-              </CardFooter>
             </Card>
-             <Card className="bg-gradient-to-br from-brand-cyan/20 via-card to-brand-blue/20 border-border shadow-inner">
+
+            <Card className="border-brand-cyan/50 bg-gradient-to-br from-card to-black/30 shadow-cyan-glow">
                <CardHeader>
-                <CardTitle className="font-orbitron text-brand-cyan cyber-text" data-text="Кибер-Карта">Кибер-Карта</CardTitle>
-               </CardHeader>
-               <CardContent>
-                 <p className="text-sm font-mono text-muted-foreground">Использует градиентный фон и cyber-text для заголовка.</p>
-                 <div className="mt-4 h-20 bg-grid-pattern-pink rounded-md flex items-center justify-center text-xs text-brand-pink/50 border border-brand-pink/20">Grid Pattern Demo</div>
-               </CardContent>
-              <CardFooter>
-                 <Button className="w-full" variant="accent">Активировать Протокол</Button>
-              </CardFooter>
-             </Card>
+                <CardTitle className="font-orbitron text-brand-cyan">Карта с градиентом</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>Эта карта использует градиентный фон и голубой акцент.</p>
+                <Button variant="outline" className="mt-4 border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 hover:text-brand-cyan">
+                  <VibeContentRenderer content="::FaPlay::" className="mr-2" /> Начать
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </section>
 
@@ -296,10 +289,13 @@ function greet(name: string) {
                     <Button variant="outline">Открыть Меню <VibeContentRenderer content="::FaGears::" className="ml-2 h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56">
-                    <DropdownMenuItem><VibeContentRenderer content="::FaUser:: Профиль"/> </DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard:: Биллинг"/></DropdownMenuItem>
-                    <DropdownMenuItem disabled><VibeContentRenderer content="::FaLifeRing:: Поддержка (Неактивно)"/></DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaRightFromBracket:: Выйти"/></DropdownMenuItem>
+                    <DropdownMenuLabel>Мой Аккаунт</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem><VibeContentRenderer content="::FaUser::" className="mr-2 h-4 w-4" /> Профиль</DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard::" className="mr-2 h-4 w-4" /> Биллинг</DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaKeyboard::" className="mr-2 h-4 w-4" /> Горячие клавиши</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive focus:bg-destructive/20 focus:text-destructive-foreground"><VibeContentRenderer content="::FaRightFromBracket::" className="mr-2 h-4 w-4" /> Выйти</DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
@@ -339,19 +335,18 @@ function greet(name: string) {
                      Glitch Border (animate-glitch-border)
                  </div>
                   <div className="h-20 sm:h-24 rounded-lg bg-grid-pattern flex items-center justify-center text-xs text-brand-purple/70 border border-brand-purple/20">
-                      Grid Pattern (.bg-grid-pattern)
-                  </div>
+                       Grid Pattern (.bg-grid-pattern)
+                   </div>
                   <div className="h-20 sm:h-24 rounded-lg bg-grid-pattern-pink flex items-center justify-center text-xs text-brand-pink/70 border border-brand-pink/20">
-                      Pink Grid Pattern (.bg-grid-pattern-pink)
-                  </div>
+                       Pink Grid Pattern (.bg-grid-pattern-pink)
+                   </div>
                  <div className="h-20 sm:h-24 overflow-y-auto simple-scrollbar border border-border rounded p-2 text-xs"> 
-                    <h4 className="font-bold mb-1">Custom Scrollbar (.simple-scrollbar)</h4>
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-                 </div>
+                     <h4 className="font-bold mb-1">Custom Scrollbar (.simple-scrollbar)</h4>
+                     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                  </div>
              </div>
           </div>
         </section>
-
       </div>
     </div>
   );
