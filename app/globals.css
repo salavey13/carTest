@@ -1,345 +1,433 @@
+/* /app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Base Layer: Foundational styles and custom properties */
-@layer base {
-  :root {
-    /* Brand Colors (HSL format for easy opacity adjustments) */
-    --brand-purple-hsl: 270, 70%, 60%; /* #854CDE */
-    --brand-pink-hsl: 330, 80%, 65%;   /* #F564A9 */
-    --brand-cyan-hsl: 190, 85%, 55%;   /* #34D3E8 */
-    --brand-orange-hsl: 25, 100%, 50%; /* #FF6C00 */
-    --brand-yellow-hsl: 50, 100%, 55%; /* #FFD94A */
-    --brand-green-hsl: 140, 60%, 50%;  /* #4CAF50 */
-    --brand-blue-hsl: 210, 80%, 60%;   /* #4A90E2 */
-    --brand-lime-hsl: 80, 70%, 55%;    /* #A9D84F */
-    --neon-lime-hsl: var(--brand-lime-hsl); /* Alias for consistency */
+/* Font Imports */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
 
-    /* Shadcn UI Base Colors (Dark Theme - HSL format) */
-    --background-hsl: 240, 15%, 8%; /* #11131A - Very dark, slightly cool */
-    --foreground-hsl: 220, 15%, 85%; /* #CACFE6 - Light gray, slightly cool for text */
-    --card-hsl: 240, 12%, 10%; /* #151820 - Darker than background, cool */
-    --card-foreground-hsl: var(--foreground-hsl);
-    --popover-hsl: 240, 18%, 7%; /* #0E1016 - Even darker for popovers */
-    --popover-foreground-hsl: var(--foreground-hsl);
-    --primary-hsl: var(--brand-purple-hsl);
-    --primary-foreground-hsl: 255, 100%, 100%; /* White */
-    --secondary-hsl: var(--brand-pink-hsl);
-    --secondary-foreground-hsl: 255, 100%, 100%; /* White */
-    --muted-hsl: 230, 10%, 25%; /* #363A4D - Muted cool gray */
-    --muted-foreground-hsl: 220, 10%, 55%; /* #7F8499 - Lighter muted gray for less important text */
-    --accent-hsl: var(--brand-cyan-hsl);
-    --accent-foreground-hsl: 240, 15%, 8%; /* Dark color for text on accent */
-    --destructive-hsl: 0, 70%, 55%; /* #D94A4A - Red */
-    --destructive-foreground-hsl: 255, 100%, 100%; /* White */
-    --border-hsl: 230, 10%, 30%; /* #42465C - Slightly lighter than muted for borders */
-    --input-hsl: 230, 10%, 20%; /* #2B2F40 - Dark input background */
-    --ring-hsl: var(--brand-cyan-hsl); /* Focus ring color */
-    --radius: 0.5rem;
+.font-comic {
+  font-family: 'Comic Neue', cursive;
+}
 
-    /* Derived CSS Variables (Automatically calculated) */
-    --brand-purple: hsl(var(--brand-purple-hsl));
-    --brand-pink: hsl(var(--brand-pink-hsl));
-    --brand-cyan: hsl(var(--brand-cyan-hsl));
-    --brand-orange: hsl(var(--brand-orange-hsl));
-    --brand-yellow: hsl(var(--brand-yellow-hsl));
-    --brand-green: hsl(var(--brand-green-hsl));
-    --brand-blue: hsl(var(--brand-blue-hsl));
-    --brand-lime: hsl(var(--brand-lime-hsl));
-    --neon-lime: hsl(var(--neon-lime-hsl));
+:root {
+  /* Core Theme Colors (Dark Mode Default) */
+  --background: 263 80% 7%;        
+  --foreground: 0 0% 94%;        
+  --card: 264 65% 13%;          
+  --card-foreground: 0 0% 94%;   
+  --popover: 264 70% 10%;         
+  --popover-foreground: 0 0% 94%; 
+  --muted: 263 30% 25%;          
+  --muted-foreground: 0 0% 65%;  
+  --destructive: 0 75% 55%;     /* Slightly darker and less saturated red */
+  --destructive-foreground: 0 0% 95%; /* Keep light text for destructive */
+  --radius: 0.75rem;
 
-    --background: hsl(var(--background-hsl));
-    --foreground: hsl(var(--foreground-hsl));
-    --card: hsl(var(--card-hsl));
-    --card-foreground: hsl(var(--card-foreground-hsl));
-    --popover: hsl(var(--popover-hsl));
-    --popover-foreground: hsl(var(--popover-foreground-hsl));
-    --primary: hsl(var(--primary-hsl));
-    --primary-foreground: hsl(var(--primary-foreground-hsl));
-    --secondary: hsl(var(--secondary-hsl));
-    --secondary-foreground: hsl(var(--secondary-foreground-hsl));
-    --muted: hsl(var(--muted-hsl));
-    --muted-foreground: hsl(var(--muted-foreground-hsl));
-    --accent: hsl(var(--accent-hsl));
-    --accent-foreground: hsl(var(--accent-foreground-hsl));
-    --destructive: hsl(var(--destructive-hsl));
-    --destructive-foreground: hsl(var(--destructive-foreground-hsl));
-    --border: hsl(var(--border-hsl));
-    --input: hsl(var(--input-hsl));
-    --ring: hsl(var(--ring-hsl));
-  }
+  /* Brand Colors (Adjusted Pastel-like for Dark Mode) */
+  --brand-purple: 270 65% 65%;    
+  --brand-pink: 330 70% 70%;      
+  --brand-cyan: 180 60% 60%;      
+  --brand-blue: 210 70% 65%;      
+  --brand-yellow: 50 75% 60%;     
+  --brand-green: 145 45% 55%;     
+  --brand-orange: 28 65% 55%;     
+  --brand-lime: 80 65% 60%;        
 
-  /* RGB versions for effects requiring them (e.g., box shadows with alpha) */
-  --purple-rgb: 133, 76, 222;
-  --pink-rgb: 245, 100, 169;
-  --cyan-rgb: 52, 211, 232;
-  --orange-rgb: 255, 108, 0;
-  --yellow-rgb: 255, 217, 74;
-  --green-rgb: 76, 175, 80;
-  --blue-rgb: 74, 144, 226;
+  /* Derived UI Element Colors - Button specific foregrounds updated */
+  --primary: hsl(var(--brand-purple));
+  --primary-foreground: 270 80% 96%; /* Light text for purple button */
+  --secondary: hsl(var(--brand-cyan));
+  --secondary-foreground: 180 80% 96%; /* Light text for cyan button */
+  --accent: hsl(var(--brand-yellow));
+  --accent-foreground: 50 30% 15%;   /* Dark text for yellow button */
+  
+  --border: hsl(var(--brand-purple) / 0.5); /* Adjusted border opacity */       
+  --input: hsl(var(--brand-purple) / 0.3);          
+  --ring: hsl(var(--brand-cyan));           
+
+  /* RGB Versions for Shadows/Gradients */
+  --purple-rgb: 165, 110, 220; 
+  --pink-rgb: 242, 128, 170;
+  --cyan-rgb: 102, 204, 204;
+  --blue-rgb: 115, 163, 230;
+  --yellow-rgb: 229, 191, 76;
+  --green-rgb: 93, 184, 127;
+  --orange-rgb: 219, 138, 88;
   --lime-rgb: 169, 216, 107;
   --neon-lime-rgb: var(--lime-rgb); /* Alias for consistency */
+
 
   /* Static Background RGB Values */
   --bg-rgb: 13, 2, 33; 
   --card-rgb: 26, 10, 61;  
-  --accent-rgb: var(--cyan-rgb);
+  --default-glow-rgb: var(--pink-rgb);
 
-  /* Custom text colors not directly from Shadcn theme */
-  --light-text: hsl(220, 15%, 92%); /* Slightly lighter than foreground for specific highlights */
-  --accent-text: hsl(var(--brand-cyan-hsl)); /* Alias for brand cyan text */
+  /* Chart Colors */
+  --chart-1: hsl(var(--brand-purple));
+  --chart-2: hsl(var(--brand-cyan));
+  --chart-3: hsl(var(--brand-yellow));
+  --chart-4: hsl(var(--brand-blue));
+  --chart-5: hsl(var(--brand-orange));
 
-  /* Header Height - Used for scroll margin, etc. */
-  --header-height: 60px; /* Default for mobile */
+  /* Sidebar Colors */
+  --sidebar-background: 263 75% 10%; 
+  --sidebar-foreground: 0 0% 85%;   
+  --sidebar-primary: hsl(var(--brand-purple) / 0.9); 
+  --sidebar-primary-foreground: 270 80% 96%; 
+  --sidebar-accent: hsl(var(--brand-cyan) / 0.9);     
+  --sidebar-accent-foreground: 180 80% 96%;
+  --sidebar-border: hsl(var(--brand-purple) / 0.3);    
+  --sidebar-ring: hsl(var(--brand-cyan) / 0.95);       
+
+  /* Standard colors RGB for shadows */
+  --red-500-rgb: 239, 68, 68; 
+  --gray-500-rgb: 107, 114, 128; 
+
+  /* Text Colors */
+  --light-text: hsl(var(--foreground));      
+  --accent-text: hsl(var(--brand-yellow));       
 }
-@media (min-width: 640px) { /* sm breakpoint */
-  :root {
-    --header-height: 70px;
-  }
-}
-@media (min-width: 768px) { /* md breakpoint */
-  :root {
-    --header-height: 70px;
-  }
+
+.dark {
+  /* Values are identical to :root for now, as dark mode is default */
+  --background: 263 80% 7%;
+  --foreground: 0 0% 94%;
+  --card: 264 65% 13%;
+  --card-foreground: 0 0% 94%;
+  --popover: 264 70% 10%;
+  --popover-foreground: 0 0% 94%;
+  --muted: 263 30% 25%;
+  --muted-foreground: 0 0% 65%;
+  --destructive: 0 75% 55%;     
+  --destructive-foreground: 0 0% 95%; 
+  
+  --brand-purple: 270 65% 65%;
+  --brand-pink: 330 70% 70%;
+  --brand-cyan: 180 60% 60%;
+  --brand-blue: 210 70% 65%;
+  --brand-yellow: 50 75% 60%;
+  --brand-green: 145 45% 55%;
+  --brand-orange: 28 65% 55%;
+  --brand-lime: 80 65% 60%;
+
+  --primary: hsl(var(--brand-purple));
+  --primary-foreground: 270 80% 96%; 
+  --secondary: hsl(var(--brand-cyan));
+  --secondary-foreground: 180 80% 96%; 
+  --accent: hsl(var(--brand-yellow));
+  --accent-foreground: 50 30% 15%;   
+
+  --border: hsl(var(--brand-purple) / 0.5);
+  --input: hsl(var(--brand-purple) / 0.3);
+  --ring: hsl(var(--brand-cyan));
+
+  --purple-rgb: 165, 110, 220; 
+  --pink-rgb: 242, 128, 170;
+  --cyan-rgb: 102, 204, 204;
+  --blue-rgb: 115, 163, 230;
+  --yellow-rgb: 229, 191, 76;
+  --green-rgb: 93, 184, 127;
+  --orange-rgb: 219, 138, 88;
+  --lime-rgb: 169, 216, 107;
+  --neon-lime-rgb: var(--lime-rgb);
+  
+  --bg-rgb: 13, 2, 33;
+  --card-rgb: 26, 10, 61;
+  --default-glow-rgb: var(--pink-rgb); 
+  
+  --chart-1: hsl(var(--brand-purple));
+  --chart-2: hsl(var(--brand-cyan));
+  --chart-3: hsl(var(--brand-yellow));
+  --chart-4: hsl(var(--brand-blue));
+  --chart-5: hsl(var(--brand-orange));
+
+  --sidebar-background: 263 75% 10%;
+  --sidebar-foreground: 0 0% 85%;
+  --sidebar-primary: hsl(var(--brand-purple) / 0.9);
+  --sidebar-primary-foreground: 270 80% 96%;
+  --sidebar-accent: hsl(var(--brand-cyan) / 0.9);
+  --sidebar-accent-foreground: 180 80% 96%;
+  --sidebar-border: hsl(var(--brand-purple) / 0.3);
+  --sidebar-ring: hsl(var(--brand-cyan) / 0.95);
+  
+  --red-500-rgb: 239, 68, 68;
+  --gray-500-rgb: 107, 114, 128;
+  
+  --light-text: hsl(var(--foreground));
+  --accent-text: hsl(var(--brand-yellow));
 }
 
 @layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground min-h-screen; 
-    font-feature-settings: "rlig" 1, "calt" 1; /* Enable ligatures and contextual alternates */
+  body {
+    @apply bg-background text-foreground; 
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  h1, h2, h3, h4, h5, h6 { @apply font-orbitron; }
-  h1 { @apply text-4xl font-bold lg:text-5xl; }
-  h2 { @apply text-3xl font-semibold lg:text-4xl; }
-  h3 { @apply text-2xl font-semibold lg:text-3xl; }
-  h4 { @apply text-xl font-semibold lg:text-2xl; }
-  p { @apply leading-relaxed; } /* Improved readability */
+  h1 { 
+    @apply text-4xl md:text-5xl; 
+    @apply uppercase tracking-wider; 
+    background-image: linear-gradient(
+      to top, 
+      hsl(var(--brand-orange)), 
+      hsl(var(--brand-pink)) 50%, 
+      hsl(var(--brand-purple))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-fill-color: transparent;
+    text-shadow:
+      0px 2px 1px hsla(var(--brand-purple), 0.85), 
+      0px 2px 3px hsla(var(--brand-purple), 0.65),
+      0px 0px 5px hsla(var(--brand-pink), 0.75),   
+      0px 0px 10px hsla(var(--brand-pink), 0.55),
+      0px -2px 1px hsla(var(--brand-blue), 0.85),  
+      0px -2px 3px hsla(var(--brand-blue), 0.65);
+    user-select: none;
+  }
+  h2 { @apply text-3xl md:text-4xl; } 
+  h3 { @apply text-2xl md:text-3xl; } 
+  h4 { @apply text-xl md:text-2xl; } 
+  h5 { @apply text-lg md:text-xl; } 
+  h6 { @apply text-base md:text-lg; } 
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif; 
+  }
+  section {
+    scroll-margin-top: 96px; /* Standard scroll margin for sections */
+  }
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
 }
 
-/* Custom scrollbar styles */
-.simple-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-hsl)) hsl(var(--background-hsl));
-}
-.simple-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.simple-scrollbar::-webkit-scrollbar-track {
-  background: hsl(var(--background-hsl) / 0.5);
-  border-radius: 10px;
-}
-.simple-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-hsl));
-  border-radius: 10px;
-  border: 2px solid hsl(var(--background-hsl) / 0.5);
-}
-.simple-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-hsl) / 0.8);
+@layer components {
+  .gta-vibe-text-effect {
+    font-family: 'Orbitron', sans-serif; 
+    @apply tracking-wider uppercase; 
+    background-image: linear-gradient(
+      to top, 
+      hsl(var(--brand-orange)), 
+      hsl(var(--brand-pink)) 50%, 
+      hsl(var(--brand-purple))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-fill-color: transparent;
+    text-shadow:
+      0px 2px 1px hsla(var(--brand-purple), 0.85), 
+      0px 2px 3px hsla(var(--brand-purple), 0.65),
+      0px 0px 5px hsla(var(--brand-pink), 0.75),   
+      0px 0px 10px hsla(var(--brand-pink), 0.55),
+      0px -2px 1px hsla(var(--brand-blue), 0.85),  
+      0px -2px 3px hsla(var(--brand-blue), 0.65);
+    user-select: none;
+  }
+
+  .gta-icon-fix {
+    -webkit-text-fill-color: currentColor !important;
+    text-fill-color: currentColor !important;
+    color: hsl(var(--brand-cyan)); 
+    filter: drop-shadow(0 0 3px hsla(var(--cyan-rgb), 0.7)) drop-shadow(0 0 1px black);
+  }
+  .gta-vibe-text-effect > svg.gta-icon-fix {
+     fill: currentColor !important;
+  }
+
+  .input-cyber {
+    @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
+           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+  .input-cyber:disabled {
+      @apply opacity-50 cursor-not-allowed;
+  }
+  .textarea-cyber {
+      @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+             focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
+             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+
+  /* This class is for specific H1 on style guide, can be removed if H1 base style is enough */
+  .text-gta-style-heading-styleguide { 
+    @apply gta-vibe-text-effect; 
+  }
 }
 
-/* GTA Vibe Text Effect Base Class */
-.gta-vibe-text-effect {
-  font-family: 'Pricedown', 'Orbitron', sans-serif; /* Pricedown first, fallback to Orbitron */
-  -webkit-text-stroke: 1px black; /* Standard stroke */
-  text-stroke: 1px black; /* Standard stroke for other browsers */
-  paint-order: stroke fill;
-  letter-spacing: 0.05em; /* Slightly wider letter spacing */
-  text-transform: uppercase; /* All caps */
-  font-weight: 900; /* Ensure Pricedown is bold if available, Orbitron too */
-  
-  /* Default gradient - can be overridden by utility classes */
-  @apply bg-gradient-to-b from-gray-200 via-gray-400 to-gray-500 bg-clip-text text-transparent;
-
-  /* Default shadow - can be overridden or enhanced */
-  filter: drop-shadow(2px 2px 0px black) drop-shadow(-1px -1px 0px rgba(255,255,255,0.2));
+/* Custom utilities moved to tailwind.config.js keyframes and animations */
+@layer utilities {
+  .text-shadow-brand-yellow {
+    text-shadow: 0 0 15px hsl(var(--brand-yellow)); 
+  }
+  .filter-drop-shadow-brand-yellow { 
+    filter: drop-shadow(0 0 15px hsl(var(--brand-yellow)));
+  }
+  /* Other text-shadows or filters can be added here if not part of a component style */
 }
 
-/* GTA Vibe Text Color Variants */
-.gta-vibe-text-pink { @apply from-brand-pink/90 via-brand-pink to-pink-700/90; }
-.gta-vibe-text-purple { @apply from-brand-purple/90 via-brand-purple to-purple-700/90; }
-.gta-vibe-text-cyan { @apply from-brand-cyan/90 via-brand-cyan to-cyan-700/90; }
-.gta-vibe-text-orange { @apply from-brand-orange/90 via-brand-orange to-orange-700/90; }
-.gta-vibe-text-yellow { @apply from-brand-yellow/90 via-brand-yellow to-yellow-700/90; }
-.gta-vibe-text-green { @apply from-brand-green/90 via-brand-green to-green-700/90; }
-.gta-vibe-text-lime { @apply from-brand-lime/90 via-brand-lime to-lime-700/90; }
-.gta-vibe-text-blue { @apply from-brand-blue/90 via-brand-blue to-blue-700/90; }
-.gta-vibe-text-white { @apply from-gray-100 via-gray-300 to-gray-400; }
+/* Homepage specific styles - kept for reference, can be refactored or moved */
+.homepage-wrapper {
+  @apply min-h-screen text-foreground relative overflow-x-hidden pt-20 pb-28;
+  background-color: hsl(var(--background));
+}
+.homepage-bg-effects-container {
+  @apply absolute inset-0 z-0 overflow-hidden pointer-events-none;
+}
+.homepage-bg-pulse-fast {
+  @apply absolute top-[-15%] left-[-15%] w-3/5 h-3/5 rounded-full blur-[150px] opacity-50;
+  background-color: hsl(var(--brand-purple) / 0.2);
+  animation: bg_pulse_fast 8s cubic-bezier(0.4,0,0.6,1) infinite;
+}
+.homepage-bg-pulse-slow {
+  @apply absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 rounded-full blur-[180px] opacity-40;
+  background-color: hsl(var(--brand-pink) / 0.15);
+  animation: bg_pulse_slow 10s cubic-bezier(0.4,0,0.6,1) infinite 1s;
+}
+/* Keyframes for bg_pulse_fast and bg_pulse_slow are in tailwind.config.ts */
 
-/* Specific for icons within the GTA text effect, ensuring they inherit color correctly */
-/* For direct SVG children (icons) */
-.gta-vibe-text-effect > svg {
-  -webkit-text-fill-color: currentColor !important; /* For Safari/Chrome */
-  text-fill-color: currentColor !important; /* Standard */
-  fill: currentColor !important; /* Ensure fill is also current color */
+.loading-spinner-cyber {
+  border-width: 4px;
+  border-radius: 9999px; 
+  border-top-color: hsl(var(--brand-cyan) / 0.5);
+  border-left-color: hsl(var(--brand-pink) / 0.5);
+  border-right-color: hsl(var(--brand-pink) / 0.5);
+  border-bottom-color: hsl(var(--brand-purple) / 0.5);
+  border-style: solid;
+  box-shadow: 0 0 25px hsl(var(--brand-cyan)), 0 0 15px hsl(var(--brand-pink));
+}
+.avatar-cyber {
+  @apply rounded-full border-2 object-cover;
+  border-color: hsl(var(--brand-pink) / 0.8);
+  box-shadow: 0 0 10px hsla(var(--pink-rgb), 0.5); 
+}
+.featured-quest-card {
+  @apply backdrop-blur-md shadow-xl overflow-hidden transition-all duration-300;
+  background-color: hsl(var(--card) / 0.9);
+  border: 1px solid hsl(var(--brand-purple) / 0.5); 
+}
+.featured-quest-card:hover {
+  border-color: hsl(var(--brand-pink) / 0.7);
+  box-shadow: 0 0 20px hsla(var(--pink-rgb), 0.3);
+}
+.featured-quest-image-overlay {
+  @apply absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none;
+}
+.activity-card-cyber {
+  @apply backdrop-blur-sm shadow-2xl text-black rounded-xl md:rounded-2xl;
+  background-image: linear-gradient(to bottom right, hsl(var(--brand-pink) / 0.95), hsl(var(--brand-purple) / 0.9));
+  border: 1px solid hsl(var(--brand-pink) / 0.7); 
+  box-shadow: 0 0 30px hsla(var(--pink-rgb), 0.3);
+}
+.bottom-nav-cyber {
+  @apply fixed bottom-0 left-0 right-0 backdrop-blur-xl z-40 py-1.5 px-1;
+  background-color: hsl(var(--background) / 0.9);
+  border-top: 2px solid hsl(var(--brand-purple) / 0.6);
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+}
+.bottom-nav-item {
+  @apply flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md transition-colors;
+}
+.bottom-nav-item:hover {
+  background-color: hsl(var(--muted) / 0.3);
+}
+.bottom-nav-item:active {
+  background-color: hsl(var(--muted) / 0.5);
+}
+.bottom-nav-item:focus {
+  background-color: hsl(var(--muted) / 0.4); 
+  outline: 2px solid transparent; 
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px hsl(var(--brand-cyan)); 
+}
+.active-bottom-link {
+  background-color: hsl(var(--card) / 0.7);
+}
+.current-nav-glow {
+  text-shadow: 0 0 6px currentColor, 0 0 10px currentColor;
+}
+.bottom-nav-item-central {
+  @apply text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4;
+  border-color: hsl(var(--background));
+}
+.bottom-nav-item-central:hover {
+  border-color: hsl(var(--brand-pink));
+}
+.bottom-nav-item-central:focus {
+  box-shadow: 0 0 0 4px hsl(var(--brand-pink) / 0.5); 
 }
 
-/* Fix for GTA icons to ensure proper color fill when nested or has complex structure */
-.gta-icon-fix {
-  -webkit-text-fill-color: currentColor !important;
-  text-fill-color: currentColor !important;
-  filter: drop-shadow(0 0 3px hsla(var(--cyan-rgb), 0.7)) drop-shadow(0 0 1px black);
-}
-.gta-vibe-text-effect > svg.gta-icon-fix,
-.gta-vibe-text-effect > span > svg.gta-icon-fix { /* Target icons inside spans as well */
-   fill: currentColor !important;
-   /* Example: color: hsl(var(--brand-purple)); if specific color needed */
-}
-
-.input-cyber {
-  @apply bg-black/50 border-2 border-brand-cyan/30 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/50 placeholder-gray-500/70 text-brand-lime caret-brand-pink;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-.textarea-cyber {
-  @apply bg-black/50 border-2 border-brand-purple/30 focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/50 placeholder-gray-500/70 text-brand-lime caret-brand-pink;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-/* Orbitron font specific styles if needed */
-.font-orbitron {
-  font-family: 'Orbitron', sans-serif; /* Ensure Orbitron is used */
-}
-section {
-  scroll-margin-top: 80px; /* Standard scroll margin for sections */
-}
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-/* Cyber text effect (text-shadow based) */
-.cyber-text {
-  text-shadow: 
-    0 0 2px hsl(var(--foreground-hsl) / 0.6),
-    0 0 5px hsl(var(--brand-cyan-hsl) / 0.5), /* Primary glow color */
-    0 0 10px hsl(var(--brand-pink-hsl) / 0.4), /* Secondary glow color */
-    0 0 15px hsl(var(--brand-purple-hsl) / 0.3); /* Tertiary glow color */
-  transition: text-shadow 0.3s ease-out;
-}
-.cyber-text:hover {
-  text-shadow: 
-    0 0 3px hsl(var(--foreground-hsl) / 0.7),
-    0 0 8px hsl(var(--brand-cyan-hsl) / 0.7),
-    0 0 15px hsl(var(--brand-pink-hsl) / 0.6),
-    0 0 25px hsl(var(--brand-purple-hsl) / 0.5);
-}
-
-/* Glitch animation */
-@keyframes glitch-anim { 0%, 100% { clip-path: inset(0 0 0 0); } 5% { clip-path: inset(0.8em 0 0.2em 0); } 10% { clip-path: inset(0.2em 0 0.8em 0); } 15% { clip-path: inset(0.5em 0 0.5em 0); } 20% { clip-path: inset(0.3em 0 0.7em 0); } 25% { clip-path: inset(0.7em 0 0.3em 0); } 30% { clip-path: inset(0.1em 0 0.9em 0); } 35% { clip-path: inset(0.9em 0 0.1em 0); } 40% { clip-path: inset(0.4em 0 0.6em 0); } 45% { clip-path: inset(0.6em 0 0.4em 0); } 50% { clip-path: inset(0 0 0 0); } }
-.animate-glitch {
-  position: relative;
-  animation: glitch-anim 3s infinite steps(1); /* Faster and more frequent glitches */
-}
-.animate-glitch::before, .animate-glitch::after {
-  content: attr(data-text); /* Use data-text attribute for glitch content */
-  position: absolute;
-  top: 0;
-  left: 0;
+.repo-xml-content-wrapper {
   width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: transparent; /* Or match body background */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.animate-glitch::before {
-  left: 2px;
-  text-shadow: -1px 0 red; /* Use brand colors for glitch effect */
-  animation: glitch-anim-before 3s infinite steps(1) reverse; /* Faster and more frequent */
-}
-.animate-glitch::after {
-  left: -2px;
-  text-shadow: -1px 0 blue; /* Use brand colors for glitch effect */
-  animation: glitch-anim-after 3s infinite steps(1) reverse; /* Faster and more frequent */
-}
-@keyframes glitch-anim-before { 0%, 100% { clip-path: inset(0 0 0 0); } 5% { clip-path: inset(0.1em 0 0.9em 0); } 10% { clip-path: inset(0.9em 0 0.1em 0); } 15% { clip-path: inset(0.3em 0 0.7em 0); } 20% { clip-path: inset(0.7em 0 0.3em 0); } 25% { clip-path: inset(0.5em 0 0.5em 0); } 30% { clip-path: inset(0.8em 0 0.2em 0); } 35% { clip-path: inset(0.2em 0 0.8em 0); } 40% { clip-path: inset(0.6em 0 0.4em 0); } 45% { clip-path: inset(0.4em 0 0.6em 0); } 50% { clip-path: inset(0 0 0 0); } }
-@keyframes glitch-anim-after { 0%, 100% { clip-path: inset(0 0 0 0); } 5% { clip-path: inset(0.4em 0 0.6em 0); } 10% { clip-path: inset(0.6em 0 0.4em 0); } 15% { clip-path: inset(0.8em 0 0.2em 0); } 20% { clip-path: inset(0.2em 0 0.8em 0); } 25% { clip-path: inset(0.1em 0 0.9em 0); } 30% { clip-path: inset(0.9em 0 0.1em 0); } 35% { clip-path: inset(0.3em 0 0.7em 0); } 40% { clip-path: inset(0.7em 0 0.3em 0); } 45% { clip-path: inset(0.5em 0 0.5em 0); } 50% { clip-path: inset(0 0 0 0); } }
-
-/* Neon Border Glow Animation */
-@keyframes neon-border-glow-anim {
-  0%, 100% { border-color: hsl(var(--brand-cyan-hsl)); box-shadow: 0 0 5px hsl(var(--brand-cyan-hsl)), 0 0 10px hsl(var(--brand-cyan-hsl) / 0.7), 0 0 15px hsl(var(--brand-cyan-hsl) / 0.5), inset 0 0 5px hsl(var(--brand-cyan-hsl) / 0.3); }
-  50% { border-color: hsl(var(--brand-pink-hsl)); box-shadow: 0 0 8px hsl(var(--brand-pink-hsl)), 0 0 15px hsl(var(--brand-pink-hsl) / 0.7), 0 0 20px hsl(var(--brand-pink-hsl) / 0.5), inset 0 0 8px hsl(var(--brand-pink-hsl) / 0.3); }
-}
-.animate-neon-border-glow {
-  border: 2px solid;
-  animation: neon-border-glow-anim 4s linear infinite;
+@media (max-width: 767px) {
+  .repo-xml-content-wrapper {
+    min-width: 1024px;
+    transform: scale(0.7);
+    transform-origin: top left;
+    width: 1463px; 
+  }
 }
 
-/* Glitch Border Animation */
-@keyframes glitch-border-anim {
-  0%, 100% { border-color: hsl(var(--border-hsl)); }
-  10%, 14%, 80%, 84% { border-color: hsl(var(--brand-red-hsl)); } /* Assuming you have --brand-red-hsl or use destructive */
-  12%, 82% { border-color: hsl(var(--brand-blue-hsl)); }
-}
-.animate-glitch-border {
-  animation: glitch-border-anim 2s infinite steps(1);
-}
+.text-shadow-neon { text-shadow: 0 0 5px hsl(var(--brand-pink)), 0 0 10px hsl(var(--brand-pink)), 0 0 15px hsl(var(--brand-purple)), 0 0 20px hsl(var(--brand-purple));}
+.text-shadow-cyber { text-shadow: 0 0 4px hsla(var(--cyan-rgb), 0.8), 0 0 10px hsla(var(--pink-rgb), 0.6); }
 
-/* Text Glow (Subtle) */
-.text-glow {
-  text-shadow: 0 0 8px hsl(var(--foreground-hsl) / 0.5), 0 0 12px hsl(var(--brand-cyan-hsl) / 0.3);
-}
+.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px); }
+.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px); }
 
-/* Pulse Slow Animation */
-@keyframes pulse-slow-anim {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-.animate-pulse-slow {
-  animation: pulse-slow-anim 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+.simple-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--card-rgb), 0.5); }
+.simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsl(var(--brand-purple) / 0.7); border-radius: 4px; border: 1px solid hsl(var(--brand-pink) / 0.3); }
+.simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--brand-pink) / 0.8); }
+.simple-scrollbar { scrollbar-width: thin; scrollbar-color: hsl(var(--brand-purple) / 0.7) hsla(var(--card-rgb), 0.5); }
 
-/* Gradient Text */
-.text-gradient {
-  @apply bg-gradient-to-r from-brand-purple via-brand-pink to-brand-cyan;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+.cyber-text { font-family: "Orbitron", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--brand-cyan)); text-shadow: 0 0 3px hsl(var(--brand-cyan) / 0.7), 0 0 5px hsl(var(--brand-cyan) / 0.5), 0 0 8px hsl(var(--brand-pink) / 0.6); }
+.cyber-text.glitch-heavy { text-shadow: 0.05em 0 0 hsl(var(--brand-pink) / 0.75), -0.025em -0.025em 0 hsl(var(--brand-green) / 0.75), -0.01em 0.025em 0 hsl(var(--brand-cyan) / 0.75); }
 
-/* Neon Text Shadow */
-.text-shadow-neon {
-  text-shadow:
-    0 0 5px hsl(var(--brand-cyan-hsl) / 0.8),
-    0 0 10px hsl(var(--brand-cyan-hsl) / 0.6),
-    0 0 15px hsl(var(--brand-cyan-hsl) / 0.4),
-    0 0 20px hsl(var(--brand-pink-hsl) / 0.5),
-    0 0 25px hsl(var(--brand-pink-hsl) / 0.3);
-}
+.text-gradient { background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+@keyframes glow { 0% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); } 50% { text-shadow: 0 0 20px hsla(var(--pink-rgb), 0.8), 0 0 30px hsla(var(--purple-rgb), 0.5); } 100% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); }}
+.text-glow { animation: glow 2.5s infinite ease-in-out; } /* Now managed by Tailwind JIT */
 
-/* Cyber Text Shadow (Alternative) */
-.text-shadow-cyber {
-  text-shadow: 
-    1px 1px 0px hsl(var(--brand-purple-hsl) / 0.7), 
-    -1px -1px 0px hsl(var(--brand-green-hsl) / 0.7),
-    0px 0px 4px hsl(var(--foreground-hsl) / 0.5);
-}
+input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-clear { display: none; }
+.comic-bubble { position: relative; background: hsl(var(--card)); border: 2px solid hsl(var(--brand-pink)); border-radius: 15px; color: hsl(var(--foreground));}
 
-/* Grid Background Pattern */
-.bg-grid-pattern {
-  background-image: 
-    linear-gradient(hsl(var(--brand-purple-hsl) / 0.1) 1px, transparent 1px), 
-    linear-gradient(to right, hsl(var(--brand-purple-hsl) / 0.1) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-.bg-grid-pattern-pink {
-  background-image: 
-    linear-gradient(hsl(var(--brand-pink-hsl) / 0.1) 1px, transparent 1px), 
-    linear-gradient(to right, hsl(var(--brand-pink-hsl) / 0.1) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
+@keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }} 
 
-/* Clear browser default search input cancel button */
-input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-clear { display: none; width:0; height:0; }
-
-/* Custom Shadow Glows */
+.shadow-glow { box-shadow: 0 0 10px hsla(var(--cyan-rgb), 0.5); }
+.shadow-glow:hover { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.7), 0 0 5px hsla(var(--pink-rgb), 0.3); }
+.shadow-yellow-glow { box-shadow: 0 0 15px hsla(var(--yellow-rgb), 0.4), 0 0 30px hsla(var(--yellow-rgb), 0.2); }
+.hover\:shadow-yellow-glow:hover { box-shadow: 0 0 20px hsla(var(--yellow-rgb), 0.6), 0 0 40px hsla(var(--yellow-rgb), 0.3); }
 .shadow-purple-glow { box-shadow: 0 0 15px hsla(var(--purple-rgb), 0.4), 0 0 30px hsla(var(--purple-rgb), 0.2); }
+.shadow-green-glow { box-shadow: 0 0 15px hsla(var(--green-rgb), 0.4), 0 0 30px hsla(var(--green-rgb), 0.2); }
 .shadow-pink-glow { box-shadow: 0 0 15px hsla(var(--pink-rgb), 0.4), 0 0 30px hsla(var(--pink-rgb), 0.2); }
+.shadow-blue-glow { box-shadow: 0 0 15px hsla(var(--blue-rgb), 0.4), 0 0 30px hsla(var(--blue-rgb), 0.2); }
 .shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2); }
 .shadow-orange-glow { box-shadow: 0 0 15px hsla(var(--orange-rgb), 0.4), 0 0 30px hsla(var(--orange-rgb), 0.2); }
 .shadow-neon-lime { box-shadow: 0 0 15px hsla(var(--neon-lime-rgb), 0.4), 0 0 30px hsla(var(--neon-lime-rgb), 0.2); }
 
+
 .highlight-scroll { transition: outline 0.5s ease-out; outline: 2px solid hsl(var(--brand-green) / 0.7); outline-offset: 2px; box-shadow: 0 0 15px hsl(var(--brand-green) / 0.5); }
 .text-animated-gradient { @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange; background-size: 200% auto; animation: gradient-text-flow 3s linear infinite; }
 
-@keyframes gradient-text-flow {
-  to { background-position: 200% center; }
+.tutorial-hero-bg-mask { 
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
+/* Added for RockstarHeroSection SVG mask */
+.rockstar-svg-mask-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none; /* Make sure defs don't interfere with interaction */
 }
