@@ -27,7 +27,7 @@ ${PROMPT_OFFER_V2_CYBERVIBE_OUTREACH}
 ---
 
 **ЭТАП 3: ОПРЕДЕЛЕНИЕ ТВИНКОВ ДЛЯ ТАНКОВ (Промпт: PROMPT_FIND_TWEAKS)**
-*   **Вход:** Твой рабочий массив лидов (уже обогащенный офферами). Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\` и **\`current_lead.project_type_guess\`**.
+*   **Вход:** Твой рабочий массив лидов (уже обогащенный офферами). Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\` и **\`current_lead.project_type_guess\`**. Передай в промпт \`PROMPT_FIND_TWEAKS\` список известных фич SuperVibe для более точного определения.
 *   **Задача:** Для КАЖДОГО лида, используя логику из \`PROMPT_FIND_TWEAKS\` (см. ниже), определи задачи по кастомизации ("твики") и верни их как **JSON-массив объектов твиков**.
 *   **Промежуточный Результат Этапа 3 (для твоего внутреннего использования):** Для каждого лида – \`identified_tweaks_json_array\` (массив объектов). Добавь это как новое поле.
 
@@ -36,7 +36,7 @@ ${PROMPT_FIND_TWEAKS}
 ---
 
 **ЭТАП 4: ЗАДАЧИ R&D ДЛЯ КЭРРИ (Промпт: PROMPT_FIND_MISSING_FEATURES)**
-*   **Вход:** Твой рабочий массив лидов. Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\`, **\`current_lead.project_type_guess\`** и \`current_lead.identified_tweaks_json_array\`.
+*   **Вход:** Твой рабочий массив лидов. Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\`, **\`current_lead.project_type_guess\`** и \`current_lead.identified_tweaks_json_array\`. Передай в промпт \`PROMPT_FIND_MISSING_FEATURES\` список известных фич SuperVibe.
 *   **Задача:** Для КАЖДОГО лида, используя логику из \`PROMPT_FIND_MISSING_FEATURES\` (см. ниже), определи принципиально новые/сложные фичи и верни их как **JSON-массив объектов фич**.
 *   **Промежуточный Результат Этапа 4 (для твоего внутреннего использования):** Для каждого лида – \`missing_features_json_array\` (массив объектов). Добавь это как новое поле.
 
@@ -48,7 +48,7 @@ ${PROMPT_FIND_MISSING_FEATURES}
 
 1.  **Анализ и Ранжирование:** После выполнения всех четырех этапов для ВСЕХ лидов, ранжируй их по следующим критериям (в порядке убывания важности):
     1.  **Высокий \`initial_relevance_score\` (8-10):** Сильное совпадение со стеком (React, Next.js, TWA, Supabase).
-    2.  **Соответствие \`project_type_guess\` готовым решениям:** Проекты типа "TWA_Training", "TWA_CarRental" получают бонус, так как у нас есть готовые компоненты.
+    2.  **Соответствие \`project_type_guess\` известным готовым решениям SuperVibe:** Проекты типа "TWA_Training", "TWA_CarRental", "TWA_WheelOfFortune" и т.д. получают ЗНАЧИТЕЛЬНЫЙ бонус.
     3.  **Ясность требований:** Проекты с четко описанными задачами предпочтительнее.
     4.  **Адекватность бюджета к объему работ:** Оценивается на основе описания и фич. Если бюджет явно мал для всего, но есть четкий MVP, это нормально.
     5.  **Минимальное количество СЛОЖНЫХ \`missing_features\` (задач для "Кэрри"):** Проекты, требующие в основном "твиков" для "Танков", быстрее в реализации.
