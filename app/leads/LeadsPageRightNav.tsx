@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { VibeContentRenderer } from '@/components/VibeContentRenderer'; // Используем VibeContentRenderer
+import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
 
 interface LeadsPageRightNavProps {
   scrollToSection: (ref: React.RefObject<HTMLDivElement>) => void;
@@ -25,7 +25,7 @@ interface LeadsPageRightNavProps {
     navToAssets: string;
     navToZion: string;
   };
-  sectionsCollapsed: boolean; // To potentially change behavior or appearance if needed
+  sectionsCollapsed: boolean; 
 }
 
 const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
@@ -35,13 +35,13 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
   sectionsCollapsed,
 }) => {
   const navItems = [
-    { ref: sectionRefs.topRef, labelKey: 'navToTop', icon: "::fachevronsup::" },
-    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', icon: "::fausershield::" },
-    { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', icon: "::fatoolbox::" },
-    { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', icon: "::fatablelist::" },
-    { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', icon: "::fadiagramproject::" },
-    { ref: sectionRefs.assetsRef, labelKey: 'navToAssets', icon: "::facubes::" },
-    { ref: sectionRefs.zionRef, labelKey: 'navToZion', icon: "::facomments::" },
+    { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "fachevronup" }, // Используем одинарную стрелку для консистентности
+    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "fausershield" },
+    { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "fatoolbox" },
+    { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "fatablelist" },
+    { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "fadiagramproject" },
+    { ref: sectionRefs.assetsRef, labelKey: 'navToAssets', iconName: "facubes" },
+    { ref: sectionRefs.zionRef, labelKey: 'navToZion', iconName: "facomments" },
   ];
 
   return (
@@ -61,7 +61,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
           title={labels[item.labelKey as keyof typeof labels]}
           aria-label={labels[item.labelKey as keyof typeof labels]}
         >
-          <VibeContentRenderer content={`${item.icon} className='text-lg sm:text-xl'`} />
+          <VibeContentRenderer content={`::${item.iconName} className='text-lg sm:text-xl'::`} />
         </Button>
       ))}
     </motion.nav>
