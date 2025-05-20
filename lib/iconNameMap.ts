@@ -6,6 +6,7 @@ import type * as Fa6Icons from "react-icons/fa6";
 // when they are specified in lowercase in the input string (e.g., <fauser /> or ::fauser::)
 export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faplaycircle: "FaCirclePlay",
+    fasearchdollar: "FaSearchDollar",
   faimageslash: "FaImage",
   fa42group: "Fa42Group",
   fa500px: "Fa500Px",
