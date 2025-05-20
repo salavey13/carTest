@@ -233,12 +233,12 @@
   .gta-icon-fix {
     -webkit-text-fill-color: currentColor !important;
     text-fill-color: currentColor !important;
-    /* color: hsl(var(--brand-cyan));  Removed to inherit from parent */
     filter: drop-shadow(0 0 3px hsla(var(--cyan-rgb), 0.7)) drop-shadow(0 0 1px black);
   }
-  .gta-vibe-text-effect > svg.gta-icon-fix {
+  .gta-vibe-text-effect > svg.gta-icon-fix,
+  .gta-vibe-text-effect > span > svg.gta-icon-fix { /* Target icons inside spans as well */
      fill: currentColor !important;
-     /* color: hsl(var(--brand-purple)); For example, if you want icons within GTA text to have a specific color */
+     /* Example: color: hsl(var(--brand-purple)); if specific color needed */
   }
 
   .input-cyber {
