@@ -29,10 +29,12 @@ interface PageInfo {
 }
 
 const allPages: PageInfo[] = [
+  // Vibe HQ
+  { path: "/repo-xml", name: "SUPERVIBE Studio", icon: "FaWandMagicSparkles", group: "Vibe HQ", isImportant: true, color: "purple", isHot: true },
+  { path: "/leads", name: "Leads HQ", icon: "FaCrosshairs", group: "Vibe HQ", isImportant: true, color: "orange", isHot: true },
+
   // Core Vibe
   { path: "/", name: "Home", icon: "FaBrain", group: "Core Vibe", isImportant: true, color: "cyan" },
-  { path: "/repo-xml", name: "SUPERVIBE Studio", icon: "FaWandMagicSparkles", group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
-  { path: "/leads", name: "Leads HQ", icon: "FaCrosshairs", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev", name: "SelfDev Path", icon: "FaRoad", group: "Core Vibe", isImportant: true, color: "green" },
   { path: "/p-plan", name: "VIBE Plan", icon: "FaUserNinja", group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
   { path: "/game-plan", name: "Game Plan", icon: "FaFilm", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
@@ -85,9 +87,10 @@ const allPages: PageInfo[] = [
   { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red" },
 ];
 
-const groupOrder = ["Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
+const groupOrder = ["Vibe HQ", "Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 
 const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
+    "Vibe HQ": "FaStar",
     "Core Vibe": "FaBolt",
     "GTA Vibe Missions": "FaGamepad", 
     "CyberFitness": "FaDumbbell", 
@@ -106,7 +109,7 @@ const translations: Record<string, Record<string, string>> = {
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
     "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
     "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot",
-    "Core Vibe": "Core Vibe", "GTA Vibe Missions": "GTA Vibe Missions", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
+    "Vibe HQ": "Vibe HQ", "Core Vibe": "Core Vibe", "GTA Vibe Missions": "GTA Vibe Missions", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
   ru: {
     "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "Leads HQ": "КОЦ 'Дозор'", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
@@ -117,7 +120,7 @@ const translations: Record<string, Record<string, string>> = {
     "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
     "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
     "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥",
-    "Core Vibe": "Ядро Вайба", "GTA Vibe Missions": "GTA Vibe Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
+    "Vibe HQ": "Vibe HQ", "Core Vibe": "Ядро Вайба", "GTA Vibe Missions": "GTA Vibe Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
   }
 };
 
@@ -315,7 +318,7 @@ export default function Header() {
             animate={{ opacity: 1, clipPath: 'circle(150% at calc(100% - 3rem) 3rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
             transition={{ type: "tween", ease: "easeOut", duration: 0.3 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-16 md:pt-20 pb-10 px-4 simple-scrollbar max-h-[80vh] sm:max-h-screen" 
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-16 md:pt-20 pb-10 px-4 simple-scrollbar max-h-[85vh] sm:max-h-screen" 
           >
             <button
               onClick={() => setIsNavOpen(false)}
@@ -343,6 +346,8 @@ export default function Header() {
                   const groupIconKey = groupIcons[groupName] as keyof typeof Fa6Icons | undefined;
                   const IconComponent = groupIconKey ? Fa6Icons[groupIconKey] : null;
                   const isGtaVibeGroup = groupName === "GTA Vibe Missions";
+                  const isVibeHQGroup = groupName === "Vibe HQ";
+
 
                   return (
                     <div key={groupName}>
@@ -351,14 +356,22 @@ export default function Header() {
                         "gta-vibe-text-effect"
                         )}>
                         {IconComponent && (
-                          <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : 'purple']?.text || 'text-brand-cyan')} />
+                          <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
                         )}
                         <span>{t(groupName)}</span>
-                        {IconComponent && isGtaVibeGroup && ( 
-                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses['pink']?.text || 'text-brand-cyan')} />
+                        {IconComponent && (isGtaVibeGroup || isVibeHQGroup) && ( 
+                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
                         )}
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-1.5 sm:gap-2 md:gap-2.5">
+                      <div className={cn(
+                        "grid gap-1.5 sm:gap-2 md:gap-2.5",
+                        "grid-cols-2", // Base for smallest screens
+                        "sm:grid-cols-2", // Small screens
+                        "md:grid-cols-3", // Medium screens
+                        "lg:grid-cols-4", // Large screens
+                        "xl:grid-cols-5", // Extra large screens
+                        "2xl:grid-cols-6"  // 2XL screens
+                      )}>
                         {pagesInGroup.map((page) => {
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
@@ -373,7 +386,7 @@ export default function Header() {
                                 "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.02] hover:-translate-y-0.5 shadow-md hover:shadow-lg",
                                 "p-1 sm:p-1.5", 
                                 page.isImportant 
-                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 shadow-lg hover:shadow-xl" // col-span-1 for mobile
+                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 sm:col-span-2 shadow-lg hover:shadow-xl" // Important takes more space on sm+
                                   : "bg-dark-card/70 hover:bg-dark-card/90 col-span-1",
                                 tileBaseColorClass, 
                                 tileShadow, 
@@ -392,16 +405,16 @@ export default function Header() {
                                     className={cn(
                                         "transition-transform duration-200 group-hover:scale-110 mb-1 sm:mb-1.5", 
                                         page.isImportant 
-                                            ? "h-6 w-6 sm:h-7 sm:h-7 md:h-8 md:w-8" // smaller for mobile
-                                            : "h-5 w-5 sm:h-6 sm:h-6 md:h-7 md:w-7"  // smaller for mobile
+                                            ? "h-6 w-6 sm:h-7 sm:h-7 md:h-8 md:w-8" 
+                                            : "h-5 w-5 sm:h-6 sm:h-6 md:h-7 md:w-7" 
                                     )}
                                 />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-[0.75rem] sm:text-[0.85rem] md:text-base" // smaller for mobile
-                                    : "text-light-text/90 group-hover:text-white text-[0.65rem] sm:text-xs md:text-sm" // smaller for mobile
+                                    ? "text-white text-[0.75rem] sm:text-[0.85rem] md:text-base" 
+                                    : "text-light-text/90 group-hover:text-white text-[0.65rem] sm:text-xs md:text-sm" 
                               )}>
                                 {page.translatedName}
                               </span>
