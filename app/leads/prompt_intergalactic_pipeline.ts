@@ -19,7 +19,7 @@ ${PROMPT_KWORKS_TO_CSV.replace("{{RAW_KWORKS_TEXT_BLOCK}}", rawKworksTextBlock)}
 
 **ЭТАП 2: ГЕНЕРАЦИЯ УБОЙНЫХ ОФФЕРОВ (Промпт: PROMPT_OFFER_V2_CYBERVIBE_OUTREACH)**
 *   **Вход:** \`leads_stage1_json_array\`.
-*   **Задача:** Для КАЖДОГО объекта лида (\`current_lead\`) из \`leads_stage1_json_array\`, используя данные из него (например, \`current_lead.client_name\`, \`current_lead.project_description\`, \`current_lead.key_features_requested_list\`) и логику из \`PROMPT_OFFER_V2_CYBERVIBE_OUTREACH\` (см. ниже), сгенерируй персонализированный оффер.
+*   **Задача:** Для КАЖДОГО объекта лида (\`current_lead\`) из \`leads_stage1_json_array\`, используя данные из него (например, \`current_lead.client_name\`, \`current_lead.project_description\`, \`current_lead.key_features_requested_list\`, \`current_lead.deadline_info\`, \`current_lead.client_kwork_history\`, \`current_lead.current_kwork_offers_count\`) и логику из \`PROMPT_OFFER_V2_CYBERVIBE_OUTREACH\` (см. ниже), сгенерируй персонализированный оффер.
 *   **Промежуточный Результат Этапа 2 (для твоего внутреннего использования):** Для каждого лида – \`generated_offer_string\`. Добавь это как новое поле к каждому объекту лида в твоем рабочем массиве.
 
 ---
@@ -49,15 +49,12 @@ ${PROMPT_FIND_MISSING_FEATURES}
 1.  **Анализ и Ранжирование:** После выполнения всех четырех этапов для ВСЕХ лидов из "Сырых Данных Kwork", у тебя будет массив обогащенных объектов лидов. Ранжируй эти лиды, используя в первую очередь \`initial_relevance_score\` (из данных Этапа 1), затем количество и сложность твиков и недостающих фич.
 2.  **Выбор ТОП-Лидов:** Выбери **ТОП-3 НАИБОЛЕЕ ПЕРСПЕКТИВНЫХ ЛИДА** (или менее, если всего найдено меньше).
 3.  **Генерация CSV:** Для каждого выбранного ТОП-лида сформируй строку CSV.
-    *   **Заголовок CSV (первая строка вывода):** \`"client_name","kwork_url","project_description","budget_range","deadline_info","client_kwork_history","current_kwork_offers_count","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source"\`
+    *   **Заголовок CSV (первая строка вывода):** \`"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source"\`
     *   **Строки данных CSV (для каждого ТОП-лида):**
         *   \`client_name\`: из данных Этапа 1 (\`current_lead.client_name\`)
-        *   \`kwork_url\`: из данных Этапа 1 (\`current_lead.kwork_url\`)
+        *   \`kwork_url\`: из данных Этапа 1 (\`current_lead.kwork_url\`) (Будет преобразовано в \`lead_url\` при импорте)
         *   \`project_description\`: из данных Этапа 1 (\`current_lead.project_description\`)
         *   \`budget_range\`: из данных Этапа 1 (\`current_lead.budget_range\`)
-        *   \`deadline_info\`: из данных Этапа 1 (\`current_lead.deadline_info\`)
-        *   \`client_kwork_history\`: из данных Этапа 1 (\`current_lead.client_kwork_history\`)
-        *   \`current_kwork_offers_count\`: из данных Этапа 1 (\`current_lead.current_kwork_offers_count\`)
         *   \`raw_html_description\`: из данных Этапа 1 (\`current_lead.raw_html_description\`)
         *   \`generated_offer\`: строка оффера из Этапа 2 (\`current_lead.generated_offer_string\`)
         *   \`identified_tweaks\`: **JSON-строка** (stringified) из \`current_lead.identified_tweaks_json_array\` (Этап 3). Если массив пуст, используй \`"[]"\`.
@@ -69,11 +66,12 @@ ${PROMPT_FIND_MISSING_FEATURES}
         *   Все текстовые поля, включая JSON-строки, должны быть заключены в двойные кавычки (\`"\`).
         *   Двойные кавычки внутри текстовых полей экранируются удвоением (\`""\`).
         *   Если значение поля отсутствует (например, \`budget_range\` был \`null\` на Этапе 1), используй пустую строку в CSV (\`""\`).
+    *   **Поля, не включенные в финальный CSV (но могут быть использованы на промежуточных этапах):** \`deadline_info\`, \`client_kwork_history\`, \`current_kwork_offers_count\`.
 
 **Пример финального CSV-вывода (для одного лида):**
 \`\`\`csv
-"client_name","kwork_url","project_description","budget_range","deadline_info","client_kwork_history","current_kwork_offers_count","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source"
-"urik99","https://kwork.ru/projects/2840722","Разработка telegram mini app...","до 10 000 ₽ / до 30 000 ₽","1 д. 17 ч.","Размещено проектов на бирже: 2","Предложений: 5","","Привет, urik99! ... ваш оффер ...","[{""tweak_description"":""Интеграция дизайна..."",""estimated_complexity"":""medium"",...}]","[{""feature_description"":""Новая фича Х..."",""reason_for_carry"":""Сложная логика..."",...}]","analyzed_by_pipeline","kwork_pipeline_top3"
+"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source"
+"urik99","https://kwork.ru/projects/2840722","Разработка telegram mini app...","до 10 000 ₽ / до 30 000 ₽","","Привет, urik99! ... ваш оффер ...","[{""tweak_description"":""Интеграция дизайна..."",""estimated_complexity"":""medium"",...}]","[{""feature_description"":""Новая фича Х..."",""reason_for_carry"":""Сложная логика..."",...}]","analyzed_by_pipeline","kwork_pipeline_top3"
 \`\`\`
 *(Если несколько ТОП-лидов, каждая новая строка данных будет под заголовком)*
 
