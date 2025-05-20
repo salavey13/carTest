@@ -393,9 +393,12 @@ const LeadGenerationHQPage = () => {
                               handleCopyToClipboard(textToCopy, "Промпт 'KWorks -> CSV' скопирован! Шаг 1 пройден, оперативник!");
                           }}
                           disabled={!rawKworksInput.trim()}
-                          className="w-full bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
                       >
-                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonKworksToCsv}/>
+                          <VibeContentRenderer content="::facopy::" />
+                          <span className="flex-grow whitespace-normal">
+                            <VibeContentRenderer content={t.promptButtonKworksToCsv}/>
+                          </span>
                       </Button>
                        <Button 
                           variant="destructive" 
@@ -407,30 +410,39 @@ const LeadGenerationHQPage = () => {
                               }
                           }}
                           disabled={!rawKworksInput.trim()}
-                          className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transform hover:scale-105" 
+                          className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-bold transform hover:scale-105 px-3" 
                       >
                           <VibeContentRenderer content="::fameteor:: ВСЁ СРАЗУ В AI!" />
                       </Button>
                       <Button 
                           variant="secondary" 
                           onClick={() => handleCopyToClipboard(PROMPT_OFFER_V2_CYBERVIBE_OUTREACH, "Промпт 'CSV + Оффер' скопирован! Передайте AI вместе с CSV.")}
-                          className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
                       >
-                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonCsvToOffer}/>
+                          <VibeContentRenderer content="::facopy::" />
+                          <span className="flex-grow whitespace-normal">
+                            <VibeContentRenderer content={t.promptButtonCsvToOffer}/>
+                          </span>
                       </Button>
                       <Button 
                           variant="secondary" 
                           onClick={() => handleCopyToClipboard(PROMPT_FIND_TWEAKS, "Промпт 'CSV + Твики' скопирован! Передайте AI вместе с CSV.")}
-                          className="w-full bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
                       >
-                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonCsvToTweaks}/>
+                          <VibeContentRenderer content="::facopy::" />
+                          <span className="flex-grow whitespace-normal">
+                            <VibeContentRenderer content={t.promptButtonCsvToTweaks}/>
+                          </span>
                       </Button>
                       <Button 
                           variant="secondary" 
                           onClick={() => handleCopyToClipboard(PROMPT_FIND_MISSING_FEATURES, "Промпт 'CSV + Фичи' скопирован! Передайте AI вместе с CSV.")}
-                          className="w-full bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105"
+                          className="w-full bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3"
                       >
-                          <VibeContentRenderer content="::facopy::" /> <VibeContentRenderer content={t.promptButtonCsvToFeatures}/>
+                          <VibeContentRenderer content="::facopy::" />
+                           <span className="flex-grow whitespace-normal">
+                            <VibeContentRenderer content={t.promptButtonCsvToFeatures}/>
+                          </span>
                       </Button>
                   </div>
                  <p className="text-[0.7rem] sm:text-xs text-gray-400 mt-3 pl-2"><VibeContentRenderer content={t.promptButtonInstruction}/></p>
