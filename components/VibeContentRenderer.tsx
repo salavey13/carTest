@@ -58,6 +58,7 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             return <></>;
         }
 
+        // Ensure we are dealing with an Element node before accessing properties like .name or .children
         if (domNode instanceof Element && domNode.name) {
             const nodeName = domNode.name;
             const lowerCaseName = nodeName.toLowerCase();
