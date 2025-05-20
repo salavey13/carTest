@@ -15,6 +15,9 @@ import { PROMPT_FIND_MISSING_FEATURES } from './prompt_find_missing_features';
 import { PROMPT_INTERGALACTIC_PIPELINE } from './prompt_intergalactic_pipeline';
 import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard } from './actions'; 
 import { toast } from 'sonner';
+import LeadsPageRightNav from './LeadsPageRightNav';
+import { FaAnglesDown, FaAnglesUp } from "react-icons/fa6";
+
 
 interface Lead {
   id?: string; 
@@ -56,14 +59,19 @@ const LeadGenerationHQPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentFilter, setCurrentFilter] = useState('all'); 
   const [teamMembers, setTeamMembers] = useState<TeamUser[]>([]); 
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
 
+  const pageTopRef = useRef<HTMLDivElement>(null);
+  const headerSectionRef = useRef<HTMLDivElement>(null);
   const rolesSectionRef = useRef<HTMLDivElement>(null);
   const arsenalSectionRef = useRef<HTMLDivElement>(null);
-  const offerSectionRef = useRef<HTMLDivElement>(null); 
+  const offerSectionRef = useRef<HTMLDivElement>(null); // Note: this is inside arsenalSection for layout
   const workflowSectionRef = useRef<HTMLDivElement>(null);
   const assetsSectionRef = useRef<HTMLDivElement>(null);
   const zionSectionRef = useRef<HTMLDivElement>(null);
   const dashboardSectionRef = useRef<HTMLDivElement>(null);
+  const ctaSectionRef = useRef<HTMLDivElement>(null);
+
 
   const t_dynamic_links = { 
     linkToRepoXml: "<Link href='/repo-xml' class='text-brand-purple hover:underline'>SUPERVIBE Studio</Link>",
@@ -148,13 +156,16 @@ const LeadGenerationHQPage = () => {
     ctaTitle: "АКТИВИРОВАТЬ ПРОТОКОЛ 'СЕТЕВОЙ ДОЗОР'!", 
     ctaSubtitle: `Система в боевой готовности. КиберОтряд укомплектован. Саппорты, к оружию! Начинаем сбор кибер-трофеев в этом ${t_dynamic_links.linkToLeads}. Да пребудет с нами VIBE и AI!`,
     ctaButtonText: "::fabolt:: НАЧАТЬ ШТУРM РЫНКА!", 
+    navToTop: "::fachevronsup:: К Началу",
     navToRoles: "::fausershield:: К Ролям",
     navToArsenal: "::fatoolbox:: К Арсеналу",
-    navToOffer: "::fabullhorn:: К Офферам", 
+    navToOffer: "::fabullhorn:: К Офферам", // Deprecated, offerSectionRef is inside arsenal
     navToWorkflow: "::fadiagramproject:: К Процессу",
     navToAssets: "::facubes:: К Активам",
     navToZion: "::facomments:: К Зиону",
     navToDashboard: "::fatablelist:: К Дашборду",
+    collapseAllSections: "::faanglesup:: Свернуть Инфо-Блоки",
+    expandAllSections: "::faanglesdown:: Развернуть Инфо-Блоки",
   };
 
   const pageTheme = {
@@ -291,8 +302,32 @@ const LeadGenerationHQPage = () => {
     fetchTeam();
   }, []);
 
+  const toggleAllSections = useCallback(() => {
+    setSectionsCollapsed(prev => !prev);
+  }, []);
+
+  const rightNavSectionRefs = {
+    topRef: pageTopRef,
+    rolesRef: rolesSectionRef,
+    arsenalRef: arsenalSectionRef,
+    dashboardRef: dashboardSectionRef,
+    workflowRef: workflowSectionRef,
+    assetsRef: assetsSectionRef,
+    zionRef: zionSectionRef,
+  };
+  const rightNavLabels = {
+    navToTop: t.navToTop,
+    navToRoles: t.navToRoles,
+    navToArsenal: t.navToArsenal,
+    navToDashboard: t.navToDashboard,
+    navToWorkflow: t.navToWorkflow,
+    navToAssets: t.navToAssets,
+    navToZion: t.navToZion,
+  };
+
+
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-20 sm:pt-24 pb-20 overflow-x-hidden">
+    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-20 sm:pt-24 pb-20 overflow-x-hidden">
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
@@ -301,60 +336,70 @@ const LeadGenerationHQPage = () => {
           backgroundSize: '30px 30px sm:40px sm:40px', 
         }}
       ></div>
-      
-      <div className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-2 z-50 flex md:hidden flex-col space-y-1 bg-black/60 backdrop-blur-sm p-1.5 rounded-lg border border-gray-700/50 max-h-[calc(100vh-120px)] overflow-y-auto simple-scrollbar shadow-xl">
-        { [
-            { ref: rolesSectionRef, labelKey: 'navToRoles' }, { ref: arsenalSectionRef, labelKey: 'navToArsenal' },
-            { ref: offerSectionRef, labelKey: 'navToOffer' }, { ref: workflowSectionRef, labelKey: 'navToWorkflow' },
-            { ref: assetsSectionRef, labelKey: 'navToAssets' }, { ref: zionSectionRef, labelKey: 'navToZion' },
-            { ref: dashboardSectionRef, labelKey: 'navToDashboard' }
-          ].map(item => (
-             <Button key={item.labelKey} variant="ghost" size="sm" onClick={() => scrollToSection(item.ref)} className="text-xs text-gray-300 hover:bg-brand-orange/20 hover:text-brand-orange justify-start px-2 py-1 h-auto">
-                <VibeContentRenderer content={t[item.labelKey as keyof typeof t]} />
-             </Button>
-        ))}
-      </div>
 
-      <div className="relative z-10 container mx-auto px-4 pl-28 sm:pl-32 md:px-4">
-        <header className="text-center mb-10 md:mb-16">
-          <VibeContentRenderer content={`::facrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping animation-delay-1000"::`} />
-          <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
-            <VibeContentRenderer content={t.pageTitle} />
-          </h1>
-          <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-300 font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
-            <VibeContentRenderer content={t.pageSubtitle} />
-          </CardDescription>
-        </header>
+      <Button
+        onClick={toggleAllSections}
+        variant="outline"
+        size="icon"
+        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-orange/20 hover:text-brand-orange backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10"
+        title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
+      >
+        {sectionsCollapsed ? <FaAnglesDown className="w-5 h-5" /> : <FaAnglesUp className="w-5 h-5" />}
+      </Button>
+      
+      <LeadsPageRightNav 
+        scrollToSection={scrollToSection}
+        sectionRefs={rightNavSectionRefs}
+        labels={rightNavLabels}
+        sectionsCollapsed={sectionsCollapsed}
+      />
+      
+      <div className="relative z-10 container mx-auto px-4 sm:px-6">
+        {!sectionsCollapsed && (
+          <div ref={headerSectionRef}>
+            <header className="text-center mb-10 md:mb-16">
+            <VibeContentRenderer content={`::facrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping animation-delay-1000"::`} />
+            <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
+                <VibeContentRenderer content={t.pageTitle} />
+            </h1>
+            <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-300 font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
+                <VibeContentRenderer content={t.pageSubtitle} />
+            </CardDescription>
+            </header>
+          </div>
+        )}
 
         <div className="space-y-10 md:space-y-16">
           {/* Roles Section */}
-          <div ref={rolesSectionRef} id="rolesSectionAnchor">
-            <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
-              <CardHeader>
-                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
-                  <VibeContentRenderer content={t.rolesTitle} />
-                </CardTitle>
-                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.rolesSubtitle} /></CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
-                <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                  <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
-                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.carryRoleDesc} /></p>
-                </div>
-                <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                  <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
-                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.tanksRoleDesc} /></p>
-                  <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={t.tanksRoleLeverages} /></p>
-                </div>
-                <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                  <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
-                  <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.supportRoleDesc} /></p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {!sectionsCollapsed && (
+            <div ref={rolesSectionRef} id="rolesSectionAnchor">
+                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <CardHeader>
+                    <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
+                    <VibeContentRenderer content={t.rolesTitle} />
+                    </CardTitle>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.rolesSubtitle} /></CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                    <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
+                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.carryRoleDesc} /></p>
+                    </div>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                    <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
+                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.tanksRoleDesc} /></p>
+                    <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={t.tanksRoleLeverages} /></p>
+                    </div>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                    <h3 className={cn("text-xl sm:text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
+                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.supportRoleDesc} /></p>
+                    </div>
+                </CardContent>
+                </Card>
+            </div>
+          )}
 
-          {/* Support's Arsenal */}
+          {/* Support's Arsenal - ALWAYS VISIBLE */}
           <div ref={arsenalSectionRef} id="arsenalSectionAnchor">
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
               <CardHeader>
@@ -470,7 +515,7 @@ const LeadGenerationHQPage = () => {
           </Card>
           </div>
           
-          {/* Leads Dashboard */}
+          {/* Leads Dashboard - ALWAYS VISIBLE */}
           <div ref={dashboardSectionRef} id="dashboardSectionAnchor">
             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
             <CardHeader>
@@ -608,99 +653,107 @@ const LeadGenerationHQPage = () => {
           </div>
 
           {/* Workflow Section */}
-          <div ref={workflowSectionRef}>
-            <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
-              <CardHeader>
-                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
-                  <VibeContentRenderer content={t.workflowTitle} />
-                </CardTitle>
-                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.workflowSubtitle} /></CardDescription>
-              </CardHeader>
-              <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-3 sm:space-y-4">
-                  <VibeContentRenderer content={`1. ${t.workflowStep1}`} />
-                  <VibeContentRenderer content={`2. ${t.workflowStep2}`} />
-                  <VibeContentRenderer content={`3. ${t.workflowStep3}`} />
-                  <div>
-                      <VibeContentRenderer content={`4. ${t.workflowStep4}`} />
-                      <ul className="list-disc list-inside pl-4 sm:pl-6 mt-1 space-y-1">
-                          <li><VibeContentRenderer content={t.tanksRoleDesc.split(".")[0] + "."} /></li>
-                          <li><VibeContentRenderer content={t.carryRoleDesc.split(".")[0] + "."} /></li>
-                      </ul>
-                  </div>
-                  <VibeContentRenderer content={`5. ${t.workflowStep5}`} />
-                  <VibeContentRenderer content={`6. ${t.workflowStep6}`} />
-              </CardContent>
-            </Card>
-          </div>
+          {!sectionsCollapsed && (
+            <div ref={workflowSectionRef}>
+                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <CardHeader>
+                    <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
+                    <VibeContentRenderer content={t.workflowTitle} />
+                    </CardTitle>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.workflowSubtitle} /></CardDescription>
+                </CardHeader>
+                <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-3 sm:space-y-4">
+                    <VibeContentRenderer content={`1. ${t.workflowStep1}`} />
+                    <VibeContentRenderer content={`2. ${t.workflowStep2}`} />
+                    <VibeContentRenderer content={`3. ${t.workflowStep3}`} />
+                    <div>
+                        <VibeContentRenderer content={`4. ${t.workflowStep4}`} />
+                        <ul className="list-disc list-inside pl-4 sm:pl-6 mt-1 space-y-1">
+                            <li><VibeContentRenderer content={t.tanksRoleDesc.split(".")[0] + "."} /></li>
+                            <li><VibeContentRenderer content={t.carryRoleDesc.split(".")[0] + "."} /></li>
+                        </ul>
+                    </div>
+                    <VibeContentRenderer content={`5. ${t.workflowStep5}`} />
+                    <VibeContentRenderer content={`6. ${t.workflowStep6}`} />
+                </CardContent>
+                </Card>
+            </div>
+          )}
 
           {/* Assets Section */}
-          <div ref={assetsSectionRef}>
-             <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
-              <CardHeader>
-                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
-                  <VibeContentRenderer content={t.assetsTitle} />
-                </CardTitle>
-                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.assetsSubtitle} /></CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 font-mono text-xs sm:text-sm">
-                {[
-                  { titleKey: 'assetJumpstartTitle', descKey: 'assetJumpstartDesc', linkKey: 'linkToJumpstart', icon: '::farocket::' },
-                  { titleKey: 'assetStudioTitle', descKey: 'assetStudioDesc', linkKey: 'linkToRepoXml', icon: '::fawandmagicsparkles::' },
-                  { titleKey: 'assetPhilosophyTitle', descKey: 'assetPhilosophyDesc', linkKey: 'linkToSelfDev', secondaryLinkKey: 'linkToPurposeProfit', icon: '::fabookopen::' },
-                  { titleKey: 'assetPlansTitle', descKey: 'assetPlansDesc', linkKey: 'linkToGamePlan', secondaryLinkKey: 'linkToPPlan', icon: '::faclipboardlist::' },
-                  { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', linkKey: 'linkToTutorials', icon: '::fagraduationcap::' },
-                  { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', linkKey: 'linkToCyberDevOS', icon: '::fagamepad::' },
-                ].map(asset => (
-                  <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
-                    <h5 className={cn("font-bold mb-1 sm:mb-1.5 flex items-center gap-1.5 sm:gap-2", pageTheme.accentColor)}>
-                      <VibeContentRenderer content={asset.icon} />
-                      <VibeContentRenderer content={t[asset.titleKey as keyof typeof t]} />
-                    </h5>
-                    <div className="text-gray-300 text-[0.7rem] sm:text-xs leading-snug"><VibeContentRenderer content={t[asset.descKey as keyof typeof t]} /></div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+          {!sectionsCollapsed && (
+            <div ref={assetsSectionRef}>
+                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <CardHeader>
+                    <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
+                    <VibeContentRenderer content={t.assetsTitle} />
+                    </CardTitle>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.assetsSubtitle} /></CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 font-mono text-xs sm:text-sm">
+                    {[
+                    { titleKey: 'assetJumpstartTitle', descKey: 'assetJumpstartDesc', linkKey: 'linkToJumpstart', icon: '::farocket::' },
+                    { titleKey: 'assetStudioTitle', descKey: 'assetStudioDesc', linkKey: 'linkToRepoXml', icon: '::fawandmagicsparkles::' },
+                    { titleKey: 'assetPhilosophyTitle', descKey: 'assetPhilosophyDesc', linkKey: 'linkToSelfDev', secondaryLinkKey: 'linkToPurposeProfit', icon: '::fabookopen::' },
+                    { titleKey: 'assetPlansTitle', descKey: 'assetPlansDesc', linkKey: 'linkToGamePlan', secondaryLinkKey: 'linkToPPlan', icon: '::faclipboardlist::' },
+                    { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', linkKey: 'linkToTutorials', icon: '::fagraduationcap::' },
+                    { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', linkKey: 'linkToCyberDevOS', icon: '::fagamepad::' },
+                    ].map(asset => (
+                    <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
+                        <h5 className={cn("font-bold mb-1 sm:mb-1.5 flex items-center gap-1.5 sm:gap-2", pageTheme.accentColor)}>
+                        <VibeContentRenderer content={asset.icon} />
+                        <VibeContentRenderer content={t[asset.titleKey as keyof typeof t]} />
+                        </h5>
+                        <div className="text-gray-300 text-[0.7rem] sm:text-xs leading-snug"><VibeContentRenderer content={t[asset.descKey as keyof typeof t]} /></div>
+                    </div>
+                    ))}
+                </CardContent>
+                </Card>
+            </div>
+          )}
 
           {/* Zion Section */}
-          <div ref={zionSectionRef}>
-            <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
-              <CardHeader>
-                <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
-                  <VibeContentRenderer content={t.zionTitle} />
-                </CardTitle>
-                <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.zionSubtitle} /></CardDescription>
-              </CardHeader>
-             <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-2 sm:space-y-3">
-              <p><VibeContentRenderer content={t.zionP1} /></p>
-              <ul className="list-disc list-inside pl-3 sm:pl-4 space-y-1.5 sm:space-y-2">
-                <li><VibeContentRenderer content={t.zionList1} /></li>
-                <li><VibeContentRenderer content={t.zionList2} /></li>
-                <li><VibeContentRenderer content={t.zionList3} /></li>
-                <li><VibeContentRenderer content={t.zionList4} /></li>
-              </ul>
-            </CardContent>
-          </Card>
-          </div>
+          {!sectionsCollapsed && (
+            <div ref={zionSectionRef}>
+                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <CardHeader>
+                    <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
+                    <VibeContentRenderer content={t.zionTitle} />
+                    </CardTitle>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400"><VibeContentRenderer content={t.zionSubtitle} /></CardDescription>
+                </CardHeader>
+                <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-2 sm:space-y-3">
+                <p><VibeContentRenderer content={t.zionP1} /></p>
+                <ul className="list-disc list-inside pl-3 sm:pl-4 space-y-1.5 sm:space-y-2">
+                    <li><VibeContentRenderer content={t.zionList1} /></li>
+                    <li><VibeContentRenderer content={t.zionList2} /></li>
+                    <li><VibeContentRenderer content={t.zionList3} /></li>
+                    <li><VibeContentRenderer content={t.zionList4} /></li>
+                </ul>
+                </CardContent>
+            </Card>
+            </div>
+          )}
           
           {/* Call to Action */}
-          <section className="text-center mt-12 sm:mt-16 py-8 sm:py-10">
-            <VibeContentRenderer content={`::farocket className="mx-auto text-5xl sm:text-7xl mb-6 sm:mb-8 ${pageTheme.primaryColor} animate-bounce"::`} />
-            <h2 className={cn("text-3xl sm:text-4xl md:text-5xl font-orbitron font-bold mb-4 sm:mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
-              <VibeContentRenderer content={t.ctaTitle} />
-            </h2>
-            <p className="text-lg sm:text-xl text-gray-300 font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
-              <VibeContentRenderer content={t.ctaSubtitle} />
-            </p>
-            <Button 
-                size="lg" 
-                onClick={() => scrollToSection(arsenalSectionRef)} 
-                className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(255,108,0,0.8)]`)}
-            >
-              <VibeContentRenderer content={t.ctaButtonText} />
-            </Button>
-          </section>
+          {!sectionsCollapsed && (
+            <section ref={ctaSectionRef} className="text-center mt-12 sm:mt-16 py-8 sm:py-10">
+                <VibeContentRenderer content={`::farocket className="mx-auto text-5xl sm:text-7xl mb-6 sm:mb-8 ${pageTheme.primaryColor} animate-bounce"::`} />
+                <h2 className={cn("text-3xl sm:text-4xl md:text-5xl font-orbitron font-bold mb-4 sm:mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
+                <VibeContentRenderer content={t.ctaTitle} />
+                </h2>
+                <p className="text-lg sm:text-xl text-gray-300 font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
+                <VibeContentRenderer content={t.ctaSubtitle} />
+                </p>
+                <Button 
+                    size="lg" 
+                    onClick={() => scrollToSection(arsenalSectionRef)} 
+                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(255,108,0,0.8)]`)}
+                >
+                <VibeContentRenderer content={t.ctaButtonText} />
+                </Button>
+            </section>
+          )}
         </div>
       </div>
     </div>
