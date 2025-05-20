@@ -4,16 +4,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// import { Textarea } from '@/components/ui/textarea'; // Moved to SupportArsenal
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { useAppContext } from '@/contexts/AppContext'; 
-// Prompts are now used inside SupportArsenal
-// import { PROMPT_OFFER_V2_CYBERVIBE_OUTREACH } from './prompt_offer';
-// import { PROMPT_KWORKS_TO_CSV } from './prompt_kworks_to_csv';
-// import { PROMPT_FIND_TWEAKS } from './prompt_find_tweaks';
-// import { PROMPT_FIND_MISSING_FEATURES } from './prompt_find_missing_features';
-// import { PROMPT_INTERGALACTIC_PIPELINE } from './prompt_intergalactic_pipeline';
 import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard } from './actions'; 
 import { toast } from 'sonner';
 import LeadsPageRightNav from './LeadsPageRightNav';
@@ -161,7 +154,7 @@ const LeadGenerationHQPage = () => {
     ctaTitle: "АКТИВИРОВАТЬ ПРОТОКОЛ 'СЕТЕВОЙ ДОЗОР'!", 
     ctaSubtitle: `Система в боевой готовности. КиберОтряд укомплектован. Саппорты, к оружию! Начинаем сбор кибер-трофеев в этом ${t_dynamic_links.linkToLeads}. Да пребудет с нами VIBE и AI!`,
     ctaButtonText: "::fabolt:: НАЧАТЬ ШТУРM РЫНКА!", 
-    navToTop: "::fachevronsup:: К Началу",
+    navToTop: "::fachevronup:: К Началу",
     navToRoles: "::fausershield:: К Ролям",
     navToArsenal: "::fatoolbox:: К Арсеналу",
     navToOffer: "::fabullhorn:: К Офферам", // Deprecated, offerSectionRef is inside arsenal
@@ -331,8 +324,8 @@ const LeadGenerationHQPage = () => {
   };
 
   const handleScrapedData = (data: string) => {
-    setRawKworksInput(prev => `${prev}\n\n--- Собрано Скрейпером ---\n${data}`.trim());
-    scrollToSection(arsenalSectionRef); // Scroll to arsenal to see the data
+    setRawKworksInput(prev => `${prev}\n\n--- Собрано Скрейпером (${new Date().toLocaleTimeString()}) ---\n${data}`.trim());
+    scrollToSection(arsenalSectionRef); 
   };
 
   return (
@@ -353,7 +346,7 @@ const LeadGenerationHQPage = () => {
         className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-orange/20 hover:text-brand-orange backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10"
         title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
       >
-        {sectionsCollapsed ? <FaAnglesDown className="w-5 h-5" /> : <FaAnglesUp className="w-5 h-5" />}
+        {sectionsCollapsed ? <VibeContentRenderer content="::faanglesdown className='w-5 h-5'::" /> : <VibeContentRenderer content="::faanglesup className='w-5 h-5'::" />}
       </Button>
       
       <LeadsPageRightNav 
