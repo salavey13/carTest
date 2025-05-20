@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/hooks/supabase'; // Используем admin 
 import type { Database } from "@/types/database.types";
 import { logger } from '@/lib/logger';
 import Papa from 'papaparse';
+import * as cheerio from 'cheerio';
 
 type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
@@ -94,17 +95,8 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      // Используем lowercase ключи из parseResult.meta.fields для доступа к данным строки,
-      // так как transformHeader привел их к lowercase.
-      // Papa.parse<CsvLeadRow> ожидает, что ключи row будут соответствовать CsvLeadRow.
-      // Если transformHeader меняет 'kwork_url' на 'lead_url', то в row будет row.lead_url
-      
-      const leadUrlFromCsv = row.kwork_url; // Исходное имя из CSV до transformHeader
-                                       // или row.lead_url, если Papa.parse типизирует по transformHeader
-                                       // Для безопасности, лучше проверить оба или нормализовать ключи row.
-
-      // Нормализуем доступ к полям, если transformHeader не отражается в типизации row
       const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()] ?? (row as any)[key];
+      const leadUrlFromCsv = getRowVal('kwork_url') || getRowVal('lead_url');
 
 
       if (!getRowVal('project_description')) {
@@ -129,7 +121,7 @@ export async function uploadLeadsFromCsv(
       const leadEntry: LeadInsert = {
         client_name: getRowVal('client_name') || null,
         lead_url: leadUrlFromCsv || null, 
-        project_description: getRowVal('project_description')!, // Уверены, что есть из-за проверки выше
+        project_description: getRowVal('project_description')!, 
         budget_range: getRowVal('budget_range') || null,
         raw_html_description: getRowVal('raw_html_description') || null,
         generated_offer: getRowVal('generated_offer') || null,
@@ -187,8 +179,6 @@ export async function uploadLeadsFromCsv(
   }
 }
 
-// Остальные функции (updateLeadStatus, assignLead, fetchLeadsForDashboard) остаются без изменений,
-// так как проблема была связана с uploadLeadsFromCsv и форматом CSV.
 export async function updateLeadStatus(
   leadId: string, 
   newStatus: string,
@@ -299,10 +289,13 @@ export async function fetchLeadsForDashboard(
     if (currentUserStatus === 'admin' || currentUserRole === 'support') {
       if (filter === 'tank') query = query.neq('assigned_to_tank', null);
       else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
-      else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); // Саппорт видит свои назначенные
-      else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); // Админ видит все где есть саппорт
+      else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); 
+      else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); 
       else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
       else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
+      else if (filter === 'my' && currentUserStatus === 'admin') { // Админ в "мои" видит все где он либо танк либо кэрри либо саппорт
+        query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
+      }
     } else if (currentUserRole === 'tank') {
       query = query.eq('assigned_to_tank', currentUserId);
       if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
@@ -325,5 +318,136 @@ export async function fetchLeadsForDashboard(
   } catch (error) {
     logger.error('Критическая ошибка при загрузке лидов для дашборда:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Неожиданная серверная ошибка.' };
+  }
+}
+
+
+export async function scrapePageContent(
+  targetUrl: string
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  if (!targetUrl) {
+    return { success: false, error: "URL не указан." };
+  }
+
+  try {
+    logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl}`);
+    const response = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+      signal: AbortSignal.timeout(15000), // Тайм-аут 15 секунд
+    });
+
+    if (!response.ok) {
+      logger.error(`[Scraper] Ошибка HTTP: ${response.status} ${response.statusText} для URL: ${targetUrl}`);
+      return { success: false, error: `Ошибка HTTP: ${response.status} ${response.statusText}` };
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    // Удаляем ненужные элементы
+    $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, dialog, [role="dialog"], [aria-hidden="true"]').remove();
+    $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove(); // Удаляем попапы и баннеры
+
+
+    // Пытаемся найти основной контент (эвристика)
+    let mainContentSelector = '';
+    const contentSelectors = [
+        'article', 'main', '[role="main"]', 
+        '.content', '#content', '.main-content', '#main-content', 
+        '.project-description', '.task__description', '.job-description', // специфичные для Kwork/Habr
+        '.entry-content', '.post-body', '.page-content',
+        '.text-content', '.article-body', '.job_show_description' // Общие и специфичные
+    ];
+
+    let $targetElement = $('body'); // По умолчанию весь body
+
+    for (const selector of contentSelectors) {
+        const $candidate = $(selector);
+        if ($candidate.length > 0) {
+            // Выбираем самый большой контейнер, если их несколько
+            let largestCandidateHtml = "";
+            $candidate.each((_i, el) => {
+                const currentHtml = $(el).html();
+                if (currentHtml && currentHtml.length > largestCandidateHtml.length) {
+                    largestCandidateHtml = currentHtml;
+                    $targetElement = $(el); // Обновляем $targetElement на самый большой
+                    mainContentSelector = selector;
+                }
+            });
+            if(largestCandidateHtml) break; // Если нашли хотя бы один подходящий, выходим
+        }
+    }
+    
+    if (mainContentSelector) {
+        logger.info(`[Scraper] Найден основной контент по селектору: ${mainContentSelector}`);
+    } else {
+        logger.warn(`[Scraper] Основной контент не найден по селекторам, используется весь body.`);
+    }
+
+    // Извлечение текста из выбранного элемента (или body)
+    // Сначала получим HTML, чтобы затем работать с текстовыми нодами, избегая ненужных пробелов от display:none
+    const targetHtml = $targetElement.html() || "";
+    const $temp = cheerio.load(`<body>${targetHtml}</body>`); // Оборачиваем в body для корректной работы .text()
+    
+    let textContent = "";
+    // Собираем текст только из видимых элементов (простая эвристика - элементы без display:none)
+    // и из наиболее вероятных текстовых контейнеров
+    $temp('body').find('p, div, span, li, td, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label')
+        .each(function() {
+            // Проверяем, что элемент не содержит только другие блочные элементы
+            const $this = $(this);
+            // Собираем текст, если он не пустой
+            const elementText = $this.text().trim();
+            if (elementText) {
+                 // Добавляем точку или пробел, если текст не заканчивается знаком препинания
+                 if (textContent.length > 0 && !/[\s\.\?!;,:]$/.test(textContent.slice(-1))) {
+                    textContent += ". ";
+                }
+                textContent += elementText + (elementText.match(/[.?!]$/) ? " " : ". ");
+            }
+        });
+    
+    // Очистка текста
+    textContent = textContent
+      .replace(/\s\s+/g, ' ')       // Заменяем множественные пробелы на один
+      .replace(/\n\s*\n/g, '\n')    // Удаляем пустые строки или строки только с пробелами
+      .replace(/(\r\n|\n|\r)/gm, " ") // Заменяем переносы строк на пробелы для лучшей читаемости AI
+      .replace(/\s\s+/g, ' ')
+      .trim();
+    
+    // Фильтрация коротких строк, которые часто являются мусором
+    const MIN_LINE_LENGTH_FOR_MEANING = 25; // Минимальная длина строки, чтобы считать ее значащей
+    const meaningfulLines = textContent.split('. ') // Разбиваем по точкам (предполагая, что это предложения)
+        .map(line => line.trim())
+        .filter(line => line.length >= MIN_LINE_LENGTH_FOR_MEANING && line.match(/[а-яА-Яa-zA-Z]{3,}/)) // Строка должна быть не короче N символов и содержать слово
+        .join('. ')
+        .trim();
+    
+    textContent = meaningfulLines;
+
+    if (!textContent) {
+      logger.warn(`[Scraper] Не удалось извлечь значимый контент из URL: ${targetUrl}. Возможно, страница сильно завязана на JS-рендеринг, имеет нестандартную структуру или содержит только очень короткие строки.`);
+      return { success: false, error: "Не удалось извлечь контент. Страница может быть пустой, требовать JS или содержать только короткие строки." };
+    }
+    
+    const MAX_LENGTH = 25000; 
+    if (textContent.length > MAX_LENGTH) {
+        textContent = textContent.substring(0, MAX_LENGTH) + "\n\n--- СОДЕРЖИМОЕ ОБРЕЗАНО ИЗ-ЗА ПРЕВЫШЕНИЯ ЛИМИТА ---";
+        logger.warn(`[Scraper] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
+    }
+
+    logger.info(`[Scraper] Успешно собран контент с URL: ${targetUrl}. Длина: ${textContent.length}`);
+    return { success: true, content: textContent };
+
+  } catch (error: any) {
+    logger.error(`[Scraper] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error);
+    if (error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
+        return { success: false, error: 'Тайм-аут запроса к целевому URL. Сервер не ответил вовремя.' };
+    }
+    return { success: false, error: `Ошибка скрейпинга: ${error.message}` };
   }
 }
