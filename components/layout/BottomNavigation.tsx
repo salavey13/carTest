@@ -9,6 +9,7 @@ import {
   FaGithub,
   FaChartLine,
   FaUserNinja,
+  FaCrosshairs, // Added for Leads
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -26,8 +27,9 @@ const navItems = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink" },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green" },
   { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentral: true, centralColor: "from-brand-orange to-brand-yellow"},
+  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentral: true, centralColor: "from-brand-purple to-brand-pink"}, // Added Leads item
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan" },
-  { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow" }, // Added Profile link
+  { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow" },
 ];
 
 interface BottomNavigationProps {
@@ -41,27 +43,25 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
       variants={bottomNavVariants}
       initial="hidden"
       animate="visible"
-      className="bottom-nav-cyber" // This class is defined in globals.css and handles fixed positioning
+      className="bottom-nav-cyber" 
     >
-      <div className="container mx-auto flex justify-around items-center max-w-xs sm:max-w-sm">
+      <div className="container mx-auto flex justify-around items-center max-w-md sm:max-w-lg px-1"> {/* Adjusted max-w for 6 items */}
         {navItems.map((item) => {
-          // For exact match on "/", otherwise startsWith for nested routes
           const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
-          // logger.debug(`[BottomNavigation] Item: ${item.label}, href: ${item.href}, isActive: ${isActive}`); // Reduced verbosity
           
           return item.isCentral ? (
             <Button
               asChild
               size="icon"
               className={cn(
-                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor}`, // Kept gradient
-                isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-dark-bg shadow-lg shadow-brand-cyan/60" // Use theme color for ring
+                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor} mx-0.5 sm:mx-1`, 
+                isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-dark-bg shadow-lg shadow-brand-cyan/60"
               )}
               key={item.label}
               aria-current={isActive ? "page" : undefined}
             >
               <Link href={item.href}>
-                <item.icon className="w-6 h-6 sm:w-7 sm:h-7 text-black" /> {/* Ensure icon color is contrast */}
+                <item.icon className="w-6 h-6 sm:w-7 sm:h-7 text-black" /> 
                 <span className="sr-only">{item.label}</span>
               </Link>
             </Button>
@@ -70,15 +70,15 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               asChild
               variant="ghost"
               className={cn(
-                "bottom-nav-item", // Base styles from globals.css
-                isActive && "active-bottom-link" // Generic active class for background
+                "bottom-nav-item", 
+                isActive && "active-bottom-link" 
               )}
               key={item.label}
               aria-current={isActive ? "page" : undefined}
             >
               <Link href={item.href} className={cn(
                 "flex flex-col items-center justify-center w-full h-full",
-                 item.color, // Apply color class for text/icon (e.g., text-brand-pink)
+                 item.color, 
                  isActive ? "opacity-100 current-nav-glow" : "opacity-70 hover:opacity-100"
               )}>
                 <item.icon className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
