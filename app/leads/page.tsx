@@ -16,7 +16,6 @@ import { PROMPT_INTERGALACTIC_PIPELINE } from './prompt_intergalactic_pipeline';
 import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard } from './actions'; 
 import { toast } from 'sonner';
 
-
 interface Lead {
   id?: string; 
   source?: string;
@@ -296,7 +295,6 @@ const LeadGenerationHQPage = () => {
     fetchTeam();
   }, []);
 
-
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-24 pb-20 overflow-x-hidden">
       <div
@@ -322,7 +320,6 @@ const LeadGenerationHQPage = () => {
         ))}
       </div>
 
-
       <div className="relative z-10 container mx-auto px-4">
         <header className="text-center mb-12 md:mb-16">
           <VibeContentRenderer content={`::FaCrosshairs className="mx-auto text-7xl mb-5 ${pageTheme.primaryColor} animate-ping animation-delay-1000"::`} />
@@ -342,17 +339,17 @@ const LeadGenerationHQPage = () => {
                 <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.rolesTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={rolesSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.rolesSubtitle} /></CardDescription>
               </CardHeader>
               <CardContent className="grid md:grid-cols-3 gap-6 font-mono">
                 <div className={cn("p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
                   <h3 className={cn("text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
-                  <p className="text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={carryRoleDesc} /></p>
+                  <p className="text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.carryRoleDesc} /></p>
                 </div>
                 <div className={cn("p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
                   <h3 className={cn("text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
                   <p className="text-sm text-gray-300 leading-relaxed"><VibeContentRenderer content={t.tanksRoleDesc} /></p>
-                  <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={tanksRoleLeverages} /></p>
+                  <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}><VibeContentRenderer content={t.tanksRoleLeverages} /></p>
                 </div>
                 <div className={cn("p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
                   <h3 className={cn("text-2xl font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
@@ -369,7 +366,7 @@ const LeadGenerationHQPage = () => {
                 <CardTitle className={cn("text-3xl font-orbitron flex items-center gap-3", pageTheme.primaryColor)}>
                   <VibeContentRenderer content={t.supportArsenalTitle} />
                 </CardTitle>
-                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={supportArsenalSubtitle} /></CardDescription>
+                <CardDescription className="font-mono text-gray-400"><VibeContentRenderer content={t.supportArsenalSubtitle} /></CardDescription>
               </CardHeader>
               <CardContent className="space-y-10 font-mono">
                 {/* Kwork Recon & Data Ingestion */}
