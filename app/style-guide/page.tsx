@@ -1,22 +1,26 @@
-"use client"; 
-
+// /app/style-guide/page.tsx
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem
+} from "@/components/ui/dropdown-menu";
+import {
+  Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
+} from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
 const ColorSwatch = ({ name, className, hslVar }: { name: string, className: string, hslVar?: string }) => (
   <div className="flex flex-col items-center space-y-1">
-    <div className={cn("w-12 h-12 sm:w-16 sm:h-16 rounded-md border border-border", className)}></div>
+    <div className={cn("w-16 h-16 rounded-md border border-border", className)}></div>
     <span className="text-xs font-mono font-semibold">{name}</span>
     {hslVar && <code className="text-xs text-muted-foreground">{hslVar}</code>}
     {className.startsWith('bg-') && !hslVar && <code className="text-xs text-muted-foreground">.{className}</code>}
@@ -25,12 +29,12 @@ const ColorSwatch = ({ name, className, hslVar }: { name: string, className: str
 
 export default function StyleGuide() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground p-4 pb-16">
-      <div className="container mx-auto space-y-12 md:space-y-16">
-        <header className="text-center mb-10 md:mb-12 mt-16 md:mt-20">
+    <div className="min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground p-4 pb-16"> {/* Removed pt-24 */}
+      <div className="container mx-auto space-y-16">
+        <header className="text-center mb-12 mt-16 md:mt-20"> {/* Added margin-top here instead */}
           <h1 
             className={cn(
-              "text-4xl sm:text-5xl md:text-6xl font-bold mb-2",
+              "text-5xl md:text-6xl font-bold mb-2",
               "gta-vibe-text-effect", 
               "animate-glitch" 
             )}
@@ -38,38 +42,37 @@ export default function StyleGuide() {
           >
             CYBERVIBE STYLE GUIDE
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground font-mono">
+          <p className="text-lg text-muted-foreground font-mono">
             Визуальный язык и компоненты платформы oneSitePls.
           </p>
         </header>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaPalette::" /> Цветовая Палитра</h2>
-          <div className="space-y-6 md:space-y-8">
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaPalette::" /> Цветовая Палитра</h2>
+          <div className="space-y-8">
             <div>
-              <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 font-orbitron text-brand-yellow">Брендовые Цвета (HSL Vars)</h3>
-              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4">
+              <h3 className="text-xl font-semibold mb-4 font-orbitron text-brand-yellow">Брендовые Цвета (HSL Vars)</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
                 <ColorSwatch name="Purple" className="bg-brand-purple" hslVar="--brand-purple" />
                 <ColorSwatch name="Pink" className="bg-brand-pink" hslVar="--brand-pink" />
                 <ColorSwatch name="Cyan" className="bg-brand-cyan" hslVar="--brand-cyan" />
-                <ColorSwatch name="Orange" className="bg-brand-orange" hslVar="--brand-orange" />
+                <ColorSwatch name="Blue" className="bg-brand-blue" hslVar="--brand-blue" />
                 <ColorSwatch name="Yellow" className="bg-brand-yellow" hslVar="--brand-yellow" />
                 <ColorSwatch name="Green" className="bg-brand-green" hslVar="--brand-green" />
-                <ColorSwatch name="Blue" className="bg-brand-blue" hslVar="--brand-blue" />
+                <ColorSwatch name="Orange" className="bg-brand-orange" hslVar="--brand-orange" />
                 <ColorSwatch name="Lime" className="bg-brand-lime" hslVar="--brand-lime" />
               </div>
             </div>
             <div>
-              <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 font-orbitron text-brand-yellow">Основные Цвета UI (HSL Vars)</h3>
-              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5 gap-3 sm:gap-4"> {/* Adjusted xl cols */}
+              <h3 className="text-xl font-semibold mb-4 font-orbitron text-brand-yellow">Основные Цвета UI (HSL Vars)</h3>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                 <ColorSwatch name="Background" className="bg-background" hslVar="--background" />
                 <ColorSwatch name="Foreground" className="bg-foreground border-destructive" hslVar="--foreground" />
                 <ColorSwatch name="Card" className="bg-card" hslVar="--card" />
-                <ColorSwatch name="Popover" className="bg-popover" hslVar="--popover" />
                 <ColorSwatch name="Primary" className="bg-primary" hslVar="--primary" />
                 <ColorSwatch name="Secondary" className="bg-secondary" hslVar="--secondary" />
-                <ColorSwatch name="Muted" className="bg-muted" hslVar="--muted" />
                 <ColorSwatch name="Accent" className="bg-accent" hslVar="--accent" />
+                <ColorSwatch name="Muted" className="bg-muted" hslVar="--muted" />
                 <ColorSwatch name="Destructive" className="bg-destructive" hslVar="--destructive" />
                 <ColorSwatch name="Border" className="bg-border" hslVar="--border" />
                 <ColorSwatch name="Input" className="bg-input" hslVar="--input" />
@@ -77,25 +80,25 @@ export default function StyleGuide() {
               </div>
             </div>
              <div>
-                <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 font-orbitron text-brand-yellow">Текстовые Цвета</h3>
-                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                <h3 className="text-xl font-semibold mb-4 font-orbitron text-brand-yellow">Текстовые Цвета</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div className="space-y-1">
-                        <p className="text-foreground text-base sm:text-lg p-2 bg-card rounded">Foreground</p>
-                        <p className="text-card-foreground text-base sm:text-lg p-2 bg-card rounded">Card FG</p>
-                        <p className="text-popover-foreground text-base sm:text-lg p-2 bg-popover rounded">Popover FG</p>
+                        <p className="text-foreground text-lg p-2 bg-card rounded">Foreground</p>
+                        <p className="text-card-foreground text-lg p-2 bg-card rounded">Card FG</p>
+                        <p className="text-popover-foreground text-lg p-2 bg-popover rounded">Popover FG</p>
                     </div>
                      <div className="space-y-1">
-                        <p className="text-primary-foreground text-base sm:text-lg p-2 bg-primary rounded">Primary FG</p>
-                        <p className="text-secondary-foreground text-base sm:text-lg p-2 bg-secondary rounded">Secondary FG</p>
-                        <p className="text-accent-foreground text-base sm:text-lg p-2 bg-accent rounded">Accent FG</p>
+                        <p className="text-primary-foreground text-lg p-2 bg-primary rounded">Primary FG</p>
+                        <p className="text-secondary-foreground text-lg p-2 bg-secondary rounded">Secondary FG</p>
+                        <p className="text-accent-foreground text-lg p-2 bg-accent rounded">Accent FG</p>
                      </div>
                     <div className="space-y-1">
-                        <p className="text-destructive-foreground text-base sm:text-lg p-2 bg-destructive rounded">Destructive FG</p>
-                        <p className="text-muted-foreground text-base sm:text-lg p-2 bg-card rounded">Muted FG</p>
+                        <p className="text-destructive-foreground text-lg p-2 bg-destructive rounded">Destructive FG</p>
+                        <p className="text-muted-foreground text-lg p-2 bg-card rounded">Muted FG</p>
                     </div>
                     <div className="space-y-1">
-                         <p className="text-light-text text-base sm:text-lg p-2 bg-background rounded">Light Text</p>
-                         <p className="text-accent-text text-base sm:text-lg p-2 bg-background rounded">Accent Text</p>
+                         <p className="text-light-text text-lg p-2 bg-background rounded">Light Text</p>
+                         <p className="text-accent-text text-lg p-2 bg-background rounded">Accent Text</p>
                     </div>
                 </div>
             </div>
@@ -103,25 +106,25 @@ export default function StyleGuide() {
         </section>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaFont::" /> Типографика</h2>
-          <div className="space-y-3 sm:space-y-4 bg-card p-4 sm:p-6 rounded-lg border border-border">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold">H1: Orbitron Заголовок</h1>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-orbitron">H2: Orbitron Заголовок</h2>
-            <h3 className="text-2xl sm:text-3xl md:text-4xl font-orbitron">H3: Orbitron Заголовок</h3>
-            <h4 className="text-xl sm:text-2xl md:text-3xl font-orbitron">H4: Orbitron Заголовок</h4>
-            <h5 className="text-lg sm:text-xl md:text-2xl font-orbitron">H5: Orbitron Заголовок</h5>
-            <h6 className="text-base sm:text-lg md:text-xl font-orbitron">H6: Orbitron Заголовок</h6>
-            <p className="text-base sm:text-lg">Основной текст (Inter Regular, text-lg): The quick brown fox jumps over the lazy dog. Эталонная фраза, служащая для проверки правильности отображения шрифтов.</p>
-            <p className="text-sm sm:text-base">Основной текст (Inter Regular, base): The quick brown fox jumps over the lazy dog. Эталонная фраза, служащая для проверки правильности отображения шрифтов.</p>
-            <p className="text-xs sm:text-sm">Маленький текст (Inter Regular, text-sm): The quick brown fox jumps over the lazy dog.</p>
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaFont::" /> Типографика</h2>
+          <div className="space-y-4 bg-card p-6 rounded-lg border border-border">
+            <h1 className="text-5xl md:text-6xl font-bold">H1: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h1>
+            <h2 className="text-4xl md:text-5xl font-orbitron">H2: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h2>
+            <h3 className="text-3xl md:text-4xl font-orbitron">H3: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h3>
+            <h4 className="text-2xl md:text-3xl font-orbitron">H4: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h4>
+            <h5 className="text-xl md:text-2xl font-orbitron">H5: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h5>
+            <h6 className="text-lg md:text-xl font-orbitron">H6: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h6>
+            <p className="text-lg">Основной текст (Inter Regular, text-lg): The quick brown fox jumps over the lazy dog. Эталонная фраза, служащая для проверки правильности отображения шрифтов.</p>
+            <p>Основной текст (Inter Regular, base): The quick brown fox jumps over the lazy dog. Эталонная фраза, служащая для проверки правильности отображения шрифтов.</p>
+            <p className="text-sm">Маленький текст (Inter Regular, text-sm): The quick brown fox jumps over the lazy dog.</p>
             <p className="text-xs">Очень маленький текст (Inter Regular, text-xs): The quick brown fox jumps over the lazy dog.</p>
             <p>Текст с <strong className="font-semibold">жирным выделением (semibold)</strong> и <em className="italic">курсивом</em>.</p>
-            <blockquote className="border-l-4 border-brand-purple pl-3 sm:pl-4 italic text-muted-foreground">
+            <blockquote className="border-l-4 border-brand-purple pl-4 italic text-muted-foreground">
               Блок цитаты: "Stay hungry. Stay foolish." - Steve Jobs
             </blockquote>
-            <code className="bg-muted px-1 py-0.5 rounded text-xs sm:text-sm font-mono">inline code snippet</code>
-            <pre className="bg-muted p-3 sm:p-4 rounded-md overflow-x-auto simple-scrollbar"> 
-              <code className="text-xs sm:text-sm font-mono">
+            <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">inline code snippet</code>
+            <pre className="bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar"> 
+              <code className="text-sm font-mono">
                 {`// Code Block Example
 function greet(name: string) {
   console.log(\`Hello, \${name}!\`);
@@ -129,109 +132,110 @@ function greet(name: string) {
               </code>
             </pre>
             <p><a href="#" className="text-brand-blue hover:underline">Ссылка (text-brand-blue)</a></p>
-            <p className="font-mono text-xs sm:text-sm">Моноширинный текст (font-mono): Used for code, variables, etc. 1234567890</p>
+            <p className="font-mono">Моноширинный текст (font-mono): Used for code, variables, etc. 1234567890</p>
           </div>
         </section>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaHandPointer::" /> Кнопки</h2>
-          <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Варианты</h3>
-            <div className="flex flex-wrap gap-2 sm:gap-4 items-center justify-center sm:justify-start">
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaHandPointer::" /> Кнопки</h2>
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Варианты</h3>
+            <div className="flex flex-wrap gap-4 items-center">
               <Button variant="default">Primary <VibeContentRenderer content="::FaStar::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="secondary">Secondary <VibeContentRenderer content="::FaGears::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="accent">Accent <VibeContentRenderer content="::FaPaintbrush::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="destructive">Destructive <VibeContentRenderer content="::FaTrash::" className="ml-2 h-3 w-3"/></Button>
-              <Button variant="outline">Outline <VibeContentRenderer content="::FaSquarePen::" className="ml-2 h-3 w-3"/></Button>
+              <Button variant="outline">Outline <VibeContentRenderer content="::FaEyeSlash::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="ghost">Ghost <VibeContentRenderer content="::FaCode::" className="ml-2 h-3 w-3"/></Button>
               <Button variant="link">Link <VibeContentRenderer content="::FaLink::" className="ml-2 h-3 w-3"/></Button>
             </div>
-             <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Размеры</h3>
-            <div className="flex flex-wrap gap-2 sm:gap-4 items-center justify-center sm:justify-start">
+             <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Размеры</h3>
+            <div className="flex flex-wrap gap-4 items-center">
               <Button size="sm">Small</Button>
               <Button size="default">Default</Button>
               <Button size="lg">Large</Button>
               <Button size="icon"><VibeContentRenderer content="::FaPlus::" /></Button>
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Состояния</h3>
-             <div className="flex flex-wrap gap-2 sm:gap-4 items-center justify-center sm:justify-start">
+            <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Состояния</h3>
+             <div className="flex flex-wrap gap-4 items-center">
               <Button variant="default">Normal</Button>
               <Button variant="default" className="hover:bg-primary/90">Hover (Simulated)</Button>
               <Button variant="default" className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background">Focus (Click Me)</Button>
               <Button variant="default" disabled>Disabled</Button>
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">С иконками</h3>
-             <div className="flex flex-wrap gap-2 sm:gap-4 items-center justify-center sm:justify-start">
+            <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">С иконками</h3>
+             <div className="flex flex-wrap gap-4 items-center">
                 <Button><VibeContentRenderer content="::FaFloppyDisk::" className="mr-2 h-4 w-4" /> Save Changes</Button>
                 <Button variant="outline"><VibeContentRenderer content="::FaPaperPlane::" className="mr-2 h-4 w-4" /> Submit</Button>
                 <Button variant="destructive" size="icon"><VibeContentRenderer content="::FaTrash::" /></Button>
-                <Button variant="ghost" size="icon" className="rounded-full"><VibeContentRenderer content="::FaUser::" /></Button>
-            </div>
+             </div>
           </div>
         </section>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaKeyboard::" /> Элементы Форм</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Inputs & Textarea</h3>
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaKeyboard::" /> Элементы Форм</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Inputs & Textarea</h3>
               <div>
                 <Label htmlFor="input-normal">Normal Input</Label>
                 <Input id="input-normal" placeholder="Placeholder..." className="input-cyber" />
               </div>
               <div>
-                <Label htmlFor="input-error">Error Input</Label>
-                <Input id="input-error" placeholder="Error state" className="input-cyber border-destructive focus:ring-destructive" />
+                 <Label htmlFor="input-focus">Focus State</Label>
+                 <Input id="input-focus" placeholder="Focus on me" className="input-cyber focus:ring-2 focus:ring-ring focus:border-ring" />
               </div>
               <div>
                 <Label htmlFor="input-disabled">Disabled Input</Label>
-                <Input id="input-disabled" placeholder="Disabled" className="input-cyber" disabled />
+                <Input id="input-disabled" placeholder="Can't touch this" className="input-cyber" disabled />
               </div>
               <div>
                 <Label htmlFor="textarea-normal">Textarea</Label>
-                <Textarea id="textarea-normal" placeholder="Type your message here." className="textarea-cyber simple-scrollbar" />
+                <Textarea id="textarea-normal" placeholder="Type long text here..." className="textarea-cyber simple-scrollbar" /> 
               </div>
+               <div>
+                 <Label htmlFor="textarea-focus">Textarea Focus</Label>
+                 <Textarea id="textarea-focus" placeholder="Focus on textarea" className="textarea-cyber simple-scrollbar focus:ring-2 focus:ring-ring focus:border-ring" /> 
+               </div>
               <div>
                 <Label htmlFor="textarea-disabled">Disabled Textarea</Label>
                 <Textarea id="textarea-disabled" placeholder="Disabled textarea" className="textarea-cyber simple-scrollbar" disabled /> 
               </div>
             </div>
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Select</h3>
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Select</h3>
               <Select>
                 <SelectTrigger className="input-cyber">
                   <SelectValue placeholder="Select a Vibe" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="chill">Chill <VibeContentRenderer content="::FaSnowflake::"/></SelectItem>
-                  <SelectItem value="cyber">Cyber <VibeContentRenderer content="::FaRobot::"/></SelectItem>
+                  <SelectItem value="focus">Focus <VibeContentRenderer content="::FaBrain::"/></SelectItem>
                   <SelectItem value="hype">Hype <VibeContentRenderer content="::FaBolt::"/></SelectItem>
                 </SelectContent>
               </Select>
-              <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow mt-4 md:mt-6">Toggles</h3>
+              <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mt-6">Toggles</h3>
                <div className="flex items-center space-x-2">
                 <Checkbox id="checkbox-terms" />
                 <Label htmlFor="checkbox-terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Accept terms and conditions</Label>
               </div>
-              <RadioGroup defaultValue="option-one" className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="option-one" id="radio-one" />
-                  <Label htmlFor="radio-one">Option One</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="option-two" id="radio-two" />
-                  <Label htmlFor="radio-two">Option Two</Label>
-                </div>
-              </RadioGroup>
               <div className="flex items-center space-x-2">
-                  <Switch id="switch-airplane" />
-                  <Label htmlFor="switch-airplane">Airplane Mode</Label>
+                  <Checkbox id="checkbox-disabled" disabled />
+                  <Label htmlFor="checkbox-disabled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Disabled Checkbox</Label>
               </div>
                <div className="flex items-center space-x-2">
+                 <Switch id="switch-airplane" />
+                 <Label htmlFor="switch-airplane">Airplane Mode</Label>
+               </div>
+               <div className="flex items-center space-x-2">
+                 <Switch id="switch-dark" defaultChecked className="data-[state=checked]:bg-primary"/>
+                 <Label htmlFor="switch-dark">Dark Mode <VibeContentRenderer content="::FaMoon::" className="inline ml-1"/></Label>
+               </div>
+              <div className="flex items-center space-x-2">
                   <Switch id="switch-disabled" disabled />
                   <Label htmlFor="switch-disabled">Disabled Switch</Label>
               </div>
-               <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow mt-4 md:mt-6">Slider</h3>
+               <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mt-6">Slider</h3>
               <Slider defaultValue={[66]} max={100} step={1} className="[&>span:first-child]:bg-brand-pink"/>
               <Slider defaultValue={[33]} max={100} step={1} disabled />
             </div>
@@ -239,114 +243,114 @@ function greet(name: string) {
         </section>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaIdCard::" /> Карточки</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaIdCard::" /> Карточки</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="bg-card border-brand-purple/50 shadow-lg shadow-purple-glow"> 
               <CardHeader>
                 <CardTitle className="font-orbitron text-brand-purple">Стандартная Карта</CardTitle>
-                <CardDescription>Описание для стандартной карты.</CardDescription>
+                <CardDescription className="font-mono">Базовый вид карточки</CardDescription>
               </CardHeader>
               <CardContent>
-                <p>Контент карты. Здесь может быть любая информация, отображаемая в теле карточки.</p>
+                <p className="text-sm">Контент карточки здесь. Можно добавить текст, кнопки или другие элементы.</p>
               </CardContent>
               <CardFooter>
-                <Button variant="secondary" className="w-full">Действие</Button>
+                <Button variant="secondary" size="sm">Действие</Button>
               </CardFooter>
             </Card>
-
-            <Card className="border-brand-pink/60 shadow-pink-glow">
+             <Card className="bg-card border-brand-pink/60 shadow-xl shadow-pink-glow animate-neon-border-glow">
               <CardHeader>
-                 <CardTitle className="font-orbitron text-brand-pink flex items-center gap-2">
-                    <VibeContentRenderer content="::FaLightbulb::" /> Карта с Иконкой
-                </CardTitle>
+                <CardTitle className="font-orbitron text-gradient">Карта с Эффектами</CardTitle>
+                <CardDescription className="font-mono text-muted-foreground">Применены neon-glow и text-gradient</CardDescription>
               </CardHeader>
               <CardContent>
-                <VibeContentRenderer content="Эта карта использует иконку в заголовке и имеет **розовый** акцент. ::FaRocket color='var(--brand-pink)'::" />
+                <p className="text-shadow-pink-glow text-sm">Этот контент светится. А рамка переливается!</p>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button variant="link" size="sm" className="text-brand-cyan">Подробнее</Button>
+                 <Button variant="ghost" size="sm">Отмена</Button>
+              </CardFooter>
             </Card>
-
-            <Card className="border-brand-cyan/50 bg-gradient-to-br from-card to-black/30 shadow-cyan-glow">
+             <Card className="bg-gradient-to-br from-brand-cyan/20 via-card to-brand-blue/20 border-border shadow-inner">
                <CardHeader>
-                <CardTitle className="font-orbitron text-brand-cyan">Карта с градиентом</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>Эта карта использует градиентный фон и голубой акцент.</p>
-                <Button variant="outline" className="mt-4 border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 hover:text-brand-cyan">
-                  <VibeContentRenderer content="::FaPlay::" className="mr-2" /> Начать
-                </Button>
-              </CardContent>
-            </Card>
+                <CardTitle className="font-orbitron text-brand-cyan cyber-text" data-text="Кибер-Карта">Кибер-Карта</CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <p className="text-sm font-mono text-muted-foreground">Использует градиентный фон и cyber-text для заголовка.</p>
+                 <div className="mt-4 h-20 bg-grid-pattern-pink rounded-md flex items-center justify-center text-xs text-brand-pink/50 border border-brand-pink/20">Grid Pattern Demo</div>
+               </CardContent>
+              <CardFooter>
+                 <Button className="w-full" variant="accent">Активировать Протокол</Button>
+              </CardFooter>
+             </Card>
           </div>
         </section>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaDiagramProject::" /> Другие Элементы</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaDiagramProject::" /> Другие Элементы</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div>
-                <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow mb-3 sm:mb-4">Dropdown Menu</h3>
+                <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mb-4">Dropdown Menu</h3>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                     <Button variant="outline">Открыть Меню <VibeContentRenderer content="::FaGears::" className="ml-2 h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56">
-                    <DropdownMenuLabel>Мой Аккаунт</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem><VibeContentRenderer content="::FaUser::" className="mr-2 h-4 w-4" /> Профиль</DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard::" className="mr-2 h-4 w-4" /> Биллинг</DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaKeyboard::" className="mr-2 h-4 w-4" /> Горячие клавиши</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive focus:bg-destructive/20 focus:text-destructive-foreground"><VibeContentRenderer content="::FaRightFromBracket::" className="mr-2 h-4 w-4" /> Выйти</DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaUser:: Профиль"/> </DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard:: Биллинг"/></DropdownMenuItem>
+                    <DropdownMenuItem disabled><VibeContentRenderer content="::FaLifeRing:: Поддержка (Неактивно)"/></DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaRightFromBracket:: Выйти"/></DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
             <div>
-                <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow mb-3 sm:mb-4">Пример с VibeContentRenderer</h3>
-                 <div className="bg-card p-3 sm:p-4 rounded-lg border border-border space-y-2">
-                    <VibeContentRenderer content="Это **жирный** текст с иконкой ::FaStar color='gold':: и *курсивом*." className="text-xs sm:text-sm"/>
-                    <VibeContentRenderer content="Ссылка на [Google](https://google.com) ::FaGoogle:: и FontAwesome ::FaFontAwesome::" className="text-xs sm:text-sm"/>
-                    <VibeContentRenderer content="Ошибка: ::faInvalidIcon:: <FaNonExistent />" className="text-xs sm:text-sm"/>
+                <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mb-4">Пример с VibeContentRenderer</h3>
+                 <div className="bg-card p-4 rounded-lg border border-border space-y-2">
+                    <VibeContentRenderer content="Это **жирный** текст с иконкой ::FaStar color='gold':: и *курсивом*." className="text-sm"/>
+                    <VibeContentRenderer content="Ссылка на [Google](https://google.com) ::FaGoogle:: и FontAwesome ::FaFontAwesome::" className="text-sm"/>
+                    <VibeContentRenderer content="Ошибка: ::faInvalidIcon:: <FaNonExistent />" className="text-sm"/>
                  </div>
             </div>
           </div>
         </section>
 
         <section>
-          <h2 className="text-2xl sm:text-3xl font-orbitron mb-4 sm:mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaPaintbrush::" /> Эффекты и Утилиты</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-             <div className="space-y-3 sm:space-y-4">
-                <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Текстовые Эффекты</h3>
-                 <p className="cyber-text text-base sm:text-lg" data-text="Cyber Text (.cyber-text)">Cyber Text (.cyber-text)</p>
-                 <p className="text-base sm:text-lg text-gradient">Text Gradient (.text-gradient)</p>
-                 <p className="text-base sm:text-lg text-glow animate-pulse-slow">Text Glow + Pulse Slow</p> 
-                 <p className="text-base sm:text-lg text-shadow-neon">Neon Shadow (.text-shadow-neon)</p>
-                 <p className="text-base sm:text-lg text-shadow-cyber">Cyber Shadow (.text-shadow-cyber)</p>
-                 <p className="text-base sm:text-lg text-animated-gradient">Animated Gradient Text</p>
-                 <p className="text-base sm:text-lg animate-glitch" data-text="Glitch Effect (animate-glitch)">Glitch Effect (animate-glitch)</p>
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><VibeContentRenderer content="::FaPaintbrush::" /> Эффекты и Утилиты</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="space-y-4">
+                <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Текстовые Эффекты</h3>
+                 <p className="cyber-text text-lg" data-text="Cyber Text (.cyber-text)">Cyber Text (.cyber-text)</p>
+                 <p className="text-lg text-gradient">Text Gradient (.text-gradient)</p>
+                 <p className="text-lg text-glow animate-pulse-slow">Text Glow + Pulse Slow</p> 
+                 <p className="text-lg text-shadow-neon">Neon Shadow (.text-shadow-neon)</p>
+                 <p className="text-lg text-shadow-cyber">Cyber Shadow (.text-shadow-cyber)</p>
+                 <p className="text-lg text-animated-gradient">Animated Gradient Text</p>
+                 <p className="text-lg animate-glitch" data-text="Glitch Effect (animate-glitch)">Glitch Effect (animate-glitch)</p>
              </div>
-             <div className="space-y-3 sm:space-y-4">
-                 <h3 className="text-lg sm:text-xl font-semibold font-orbitron text-brand-yellow">Элементы с Эффектами</h3>
-                 <div className="p-3 sm:p-4 rounded-lg border-2 animate-neon-border-glow bg-card">
+             <div className="space-y-4">
+                 <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Элементы с Эффектами</h3>
+                 <div className="p-4 rounded-lg border-2 animate-neon-border-glow bg-card">
                      Border Neon Glow (animate-neon-border-glow)
                  </div>
-                  <div className="p-3 sm:p-4 rounded-lg border border-brand-purple/50 bg-card shadow-purple-glow">
+                  <div className="p-4 rounded-lg border border-brand-purple/50 bg-card shadow-purple-glow">
                      Shadow Glow (shadow-purple-glow)
                  </div>
-                 <div className="p-3 sm:p-4 rounded-lg border border-dashed border-border animate-glitch-border bg-card">
+                 <div className="p-4 rounded-lg border border-dashed border-border animate-glitch-border bg-card">
                      Glitch Border (animate-glitch-border)
                  </div>
-                  <div className="h-20 sm:h-24 rounded-lg bg-grid-pattern flex items-center justify-center text-xs text-brand-purple/70 border border-brand-purple/20">
-                       Grid Pattern (.bg-grid-pattern)
-                   </div>
-                  <div className="h-20 sm:h-24 rounded-lg bg-grid-pattern-pink flex items-center justify-center text-xs text-brand-pink/70 border border-brand-pink/20">
-                       Pink Grid Pattern (.bg-grid-pattern-pink)
-                   </div>
-                 <div className="h-20 sm:h-24 overflow-y-auto simple-scrollbar border border-border rounded p-2 text-xs"> 
-                     <h4 className="font-bold mb-1">Custom Scrollbar (.simple-scrollbar)</h4>
-                     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                  <div className="h-24 rounded-lg bg-grid-pattern flex items-center justify-center text-sm text-brand-purple/70 border border-brand-purple/20">
+                      Grid Pattern (.bg-grid-pattern)
                   </div>
+                  <div className="h-24 rounded-lg bg-grid-pattern-pink flex items-center justify-center text-sm text-brand-pink/70 border border-brand-pink/20">
+                      Pink Grid Pattern (.bg-grid-pattern-pink)
+                  </div>
+                 <div className="h-24 overflow-y-auto simple-scrollbar border border-border rounded p-2 text-xs"> 
+                    <h4 className="font-bold mb-1">Custom Scrollbar (.simple-scrollbar)</h4>
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                 </div>
              </div>
           </div>
         </section>
+
       </div>
     </div>
   );
