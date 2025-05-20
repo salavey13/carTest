@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-// import { scrapePageContent } from './actions'; // Будет раскомментировано после реализации
+import { scrapePageContent } from './actions';
 
 interface GeneralPurposeScraperProps {
   pageTheme: {
@@ -16,16 +16,16 @@ interface GeneralPurposeScraperProps {
     borderColor: string;
     shadowColor: string;
   };
-  t_dynamic_links: Record<string, string>; // Может понадобиться для ссылок в описании
+  t_dynamic_links: Record<string, string>; 
   onScrapedData: (data: string) => void; 
 }
 
 const predefinedSearchButtons = [
-  { id: "kwork_twa", label: "TWA (Kwork)", keywords: "telegram web app, twa, mini app", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" }, // c=114 это "Разработка ботов и приложений"
-  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", keywords: "telegram бот нейросеть, ai telegram bot", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" },
-  { id: "kwork_nextjs", label: "Next.js (Kwork)", keywords: "next.js, react, supabase", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=41" }, // c=41 это "Веб-программирование"
-  { id: "habr_twa", label: "TWA (Habr Freelance)", keywords: "telegram web app, twa", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-  { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", keywords: "telegram бот ai, нейросеть", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+  { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app, twa, mini app", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" }, 
+  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть, ai telegram bot", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" },
+  { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js, react, supabase", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=41" }, 
+  { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app, twa", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+  { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai, нейросеть", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
 ];
 
 
@@ -61,23 +61,8 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
     const toastId = toast.loading(`::faspinner className='animate-spin':: Зонд отправлен на ${urlToScrape}...`);
 
     try {
-      // ЗАГЛУШКА: Раскомментировать и использовать реальное действие после его создания
-      // const result = await scrapePageContent(urlToScrape); 
+      const result = await scrapePageContent(urlToScrape); 
       
-      // Начало Мока для демонстрации
-      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1500));
-      const mockSuccess = Math.random() > 0.15; // 85% шанс успеха
-      let result;
-      if (mockSuccess) {
-        result = { 
-          success: true, 
-          content: `--- MOCK SCRAPED DATA from "${urlToScrape}" ---\n\nПроект "Супер Бот Альфа": Нужен TWA для управления космическим флотом. Стек: React, Supabase. Бюджет: 100000 кредитов. Сроки: до конца цикла.\n\nПроект "Нейро-Консультант Гамма": Разработка AI для анализа данных с дальних сенсоров. Требуется интеграция с протоколом X-Omega. Оплата по факту обнаружения аномалий.\n\nКворк от @Zorg77: "Сделаю простого бота для Telegram за еду. Опыт есть."\n\n--- КОНЕЦ ДАННЫХ ЗОНДА ---`
-        };
-      } else {
-        result = { success: false, error: "Сигнал с зонда потерян. Возможно, анти-скрейпер система или метеоритный дождь." };
-      }
-      // Конец Мока
-
       if (result.success && result.content) {
         onScrapedData(result.content);
         toast.success("::facheckcircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'.", { id: toastId, duration: 4000 });
@@ -162,7 +147,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
           <VibeContentRenderer content={isScraping ? "::faspinner className='animate-spin text-lg':: Зонд в полёте..." : "::faspider className='text-lg':: Запустить Зонд-Охотник!"} />
         </Button>
         <p className="text-xs text-gray-400">
-          <VibeContentRenderer content="::fatriangleexclamation className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке." />
+          <VibeContentRenderer content="::fatriangleexclamation className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке. Не используйте для массового парсинга без прокси и задержек." />
         </p>
       </CardContent>
     </Card>
