@@ -24,6 +24,8 @@ interface CsvLeadRow {
   missing_features?: string; 
   status?: string;
   source?: string;
+  initial_relevance_score?: string; // Добавлено, PapaParse читает все как строки сначала
+  project_type_guess?: string;   // Добавлено
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -80,7 +82,14 @@ export async function uploadLeadsFromCsv(
         if (trimmedHeader === 'kwork_url') return 'lead_url'; // Маппинг для upsert
         return trimmedHeader; // Используем lowercase для сопоставления с CsvLeadRow
       },
-      transform: value => (typeof value === 'string' ? value.trim() : value),
+      transform: (value, header) => {
+        const trimmedValue = typeof value === 'string' ? value.trim() : value;
+        if (header === 'initial_relevance_score') {
+          const num = parseInt(trimmedValue as string, 10);
+          return isNaN(num) ? null : num;
+        }
+        return trimmedValue;
+      }
     });
 
     if (parseResult.errors.length > 0) {
@@ -95,9 +104,9 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()] ?? (row as any)[key];
-      const leadUrlFromCsv = getRowVal('kwork_url') || getRowVal('lead_url');
-
+      // transformHeader уже привел все заголовки к lowerCase, поэтому обращаемся напрямую по lowerCase ключу
+      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()];
+      const leadUrlFromCsv = getRowVal('kwork_url'); // 'kwork_url' это уже 'lead_url' после transformHeader
 
       if (!getRowVal('project_description')) {
         localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
@@ -106,16 +115,21 @@ export async function uploadLeadsFromCsv(
       
       let tweaksJson: any = null;
       const identifiedTweaksCsv = getRowVal('identified_tweaks');
-      if (identifiedTweaksCsv) {
+      if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string') {
         try { tweaksJson = JSON.parse(identifiedTweaksCsv); }
         catch (e) { localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
+      } else if (typeof identifiedTweaksCsv === 'object') { // Если PapaParse уже распарсил как объект (маловероятно для строки CSV, но на всякий случай)
+        tweaksJson = identifiedTweaksCsv;
       }
+
 
       let featuresJson: any = null;
       const missingFeaturesCsv = getRowVal('missing_features');
-      if (missingFeaturesCsv) {
+      if (missingFeaturesCsv && typeof missingFeaturesCsv === 'string') {
         try { featuresJson = JSON.parse(missingFeaturesCsv); }
         catch (e) { localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
+      } else if (typeof missingFeaturesCsv === 'object') {
+        featuresJson = missingFeaturesCsv;
       }
       
       const leadEntry: LeadInsert = {
@@ -129,6 +143,8 @@ export async function uploadLeadsFromCsv(
         missing_features: featuresJson,
         status: getRowVal('status') || 'raw_data', 
         source: getRowVal('source') || 'csv_upload',
+        initial_relevance_score: typeof getRowVal('initial_relevance_score') === 'number' ? getRowVal('initial_relevance_score') : null,
+        project_type_guess: getRowVal('project_type_guess') || null,
       };
 
       if (leadEntry.lead_url === '') {
@@ -321,7 +337,6 @@ export async function fetchLeadsForDashboard(
   }
 }
 
-
 export async function scrapePageContent(
   targetUrl: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
@@ -349,9 +364,8 @@ export async function scrapePageContent(
     const $ = cheerio.load(html);
 
     // Удаляем ненужные элементы
-    $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, dialog, [role="dialog"], [aria-hidden="true"]').remove();
+    $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, [role="dialog"], [aria-hidden="true"]').remove();
     $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove(); // Удаляем попапы и баннеры
-
 
     // Пытаемся найти основной контент (эвристика)
     let mainContentSelector = '';
@@ -363,22 +377,21 @@ export async function scrapePageContent(
         '.text-content', '.article-body', '.job_show_description' // Общие и специфичные
     ];
 
-    let $targetElement = $('body'); // По умолчанию весь body
+    let $targetElement = $('body'); 
 
     for (const selector of contentSelectors) {
         const $candidate = $(selector);
         if ($candidate.length > 0) {
-            // Выбираем самый большой контейнер, если их несколько
             let largestCandidateHtml = "";
             $candidate.each((_i, el) => {
                 const currentHtml = $(el).html();
                 if (currentHtml && currentHtml.length > largestCandidateHtml.length) {
                     largestCandidateHtml = currentHtml;
-                    $targetElement = $(el); // Обновляем $targetElement на самый большой
+                    $targetElement = $(el); 
                     mainContentSelector = selector;
                 }
             });
-            if(largestCandidateHtml) break; // Если нашли хотя бы один подходящий, выходим
+            if(largestCandidateHtml) break; 
         }
     }
     
@@ -388,43 +401,52 @@ export async function scrapePageContent(
         logger.warn(`[Scraper] Основной контент не найден по селекторам, используется весь body.`);
     }
 
-    // Извлечение текста из выбранного элемента (или body)
-    // Сначала получим HTML, чтобы затем работать с текстовыми нодами, избегая ненужных пробелов от display:none
     const targetHtml = $targetElement.html() || "";
-    const $temp = cheerio.load(`<body>${targetHtml}</body>`); // Оборачиваем в body для корректной работы .text()
+    const $temp = cheerio.load(`<body>${targetHtml}</body>`); 
     
     let textContent = "";
-    // Собираем текст только из видимых элементов (простая эвристика - элементы без display:none)
-    // и из наиболее вероятных текстовых контейнеров
-    $temp('body').find('p, div, span, li, td, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label')
+    // Собираем текст, стараясь сохранить структуру предложений
+    $temp('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label')
         .each(function() {
-            // Проверяем, что элемент не содержит только другие блочные элементы
             const $this = $(this);
-            // Собираем текст, если он не пустой
-            const elementText = $this.text().trim();
+            // Проверяем, что элемент не содержит только другие блочные элементы или только пробелы
+            // Это помогает избежать дублирования текста от родительских div'ов, если текст уже взят из дочерних p
+            const elementText = $this.clone().children().remove().end().text().trim(); // Текст только этого элемента, без дочерних
+
             if (elementText) {
-                 // Добавляем точку или пробел, если текст не заканчивается знаком препинания
-                 if (textContent.length > 0 && !/[\s\.\?!;,:]$/.test(textContent.slice(-1))) {
-                    textContent += ". ";
+                 // Добавляем пробел, если предыдущий текст не заканчивается пробелом
+                 if (textContent.length > 0 && !/\s$/.test(textContent.slice(-1))) {
+                    textContent += " ";
                 }
-                textContent += elementText + (elementText.match(/[.?!]$/) ? " " : ". ");
+                textContent += elementText;
+                // Если текущий текст не заканчивается знаком препинания, добавляем точку.
+                if (!/[.?!;,:]$/.test(elementText.slice(-1))) {
+                    textContent += ".";
+                }
+                 // Всегда добавляем пробел после блока текста для разделения
+                textContent += " ";
             }
         });
     
     // Очистка текста
     textContent = textContent
       .replace(/\s\s+/g, ' ')       // Заменяем множественные пробелы на один
-      .replace(/\n\s*\n/g, '\n')    // Удаляем пустые строки или строки только с пробелами
-      .replace(/(\r\n|\n|\r)/gm, " ") // Заменяем переносы строк на пробелы для лучшей читаемости AI
-      .replace(/\s\s+/g, ' ')
+      .replace(/\s+\./g, '.')       // Убираем пробел перед точкой (например, "слово . " -> "слово. ")
+      .replace(/\.{2,}/g, '.')      // Заменяем многоточия или двойные точки на одну
+      .replace(/(\r\n|\n|\r)/gm, " ") // Заменяем переносы строк на пробелы
+      .replace(/\s\s+/g, ' ')       // Повторно убираем множественные пробелы
       .trim();
     
-    // Фильтрация коротких строк, которые часто являются мусором
-    const MIN_LINE_LENGTH_FOR_MEANING = 25; // Минимальная длина строки, чтобы считать ее значащей
-    const meaningfulLines = textContent.split('. ') // Разбиваем по точкам (предполагая, что это предложения)
+    const MIN_LINE_LENGTH_FOR_MEANING = 20; // Немного уменьшил для гибкости
+    const meaningfulLines = textContent.split('.') // Разбиваем по точкам (предполагая, что это предложения)
         .map(line => line.trim())
-        .filter(line => line.length >= MIN_LINE_LENGTH_FOR_MEANING && line.match(/[а-яА-Яa-zA-Z]{3,}/)) // Строка должна быть не короче N символов и содержать слово
-        .join('. ')
+        .filter(line => {
+            if (line.length < MIN_LINE_LENGTH_FOR_MEANING) return false;
+            // Содержит хотя бы одно слово из 3+ букв и не является просто набором символов
+            return /[a-zA-Zа-яА-Я]{3,}/.test(line) && !/^[^\w\s]*$/.test(line.replace(/\s/g, ''));
+        })
+        .map(line => line.endsWith('.') ? line : line + '.') // Убедимся, что каждая "значащая строка" заканчивается точкой
+        .join(' ') // Соединяем значащие строки пробелом
         .trim();
     
     textContent = meaningfulLines;
@@ -445,7 +467,7 @@ export async function scrapePageContent(
 
   } catch (error: any) {
     logger.error(`[Scraper] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error);
-    if (error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
+    if (error.name === 'AbortError' || error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
         return { success: false, error: 'Тайм-аут запроса к целевому URL. Сервер не ответил вовремя.' };
     }
     return { success: false, error: `Ошибка скрейпинга: ${error.message}` };

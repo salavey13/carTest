@@ -16,7 +16,6 @@ import GeneralPurposeScraper from './GeneralPurposeScraper';
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 
-
 interface Lead {
   id?: string; 
   source?: string;
@@ -385,7 +384,7 @@ const LeadGenerationHQPage = () => {
         {!sectionsCollapsed && (
           <div ref={headerSectionRef}>
             <header className="text-center mb-10 md:mb-16">
-            <VibeContentRenderer content={`::facrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping animation-delay-1000"::`} />
+            <VibeContentRenderer content={`::facrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping"::`} />
             <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
                 <VibeContentRenderer content={t.pageTitle} />
             </h1>
