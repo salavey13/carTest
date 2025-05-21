@@ -38,7 +38,7 @@ export const PROMPT_FIND_TWEAKS = `
   "tweak_description": "Изменить цветовую схему и шрифты для карточек тренировок согласно предоставленному Figma-макету.",
   "estimated_complexity": "low",
   "relevant_supervibe_capability": "Кастомизация стилей существующего компонента TrainingCard.tsx с помощью AI-инструментов SUPERVIBE Studio (Tailwind/SCSS).",
-  "target_file_guess": "`/components/cards/TrainingCard.tsx`, `/app/globals.css`",
+  "target_file_guess": "\`/components/cards/TrainingCard.tsx\`, \`/app/globals.css\`",
   "generated_repo_xml_link_idea": "UpdateTrainingCardStylesFromFigma"
 }
 \`\`\`
