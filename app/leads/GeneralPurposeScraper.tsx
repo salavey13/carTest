@@ -16,23 +16,23 @@ interface GeneralPurposeScraperProps {
     borderColor: string;
     shadowColor: string;
   };
-  t_dynamic_links: Record<string, string>; 
+  t_dynamic_links: Record<string, any>; // Changed to any for flexibility with new link rendering
   onScrapedData: (data: string) => void; 
   onSuccessfulScrape?: () => void; // Optional callback for achievements
 }
 
 const predefinedSearchButtons = [
-  { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app, twa, mini app", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" }, 
-  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть, ai telegram bot", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=114" },
-  { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js, react, supabase", siteUrlFormat: "https://kwork.ru/projects?q={keywords}&c=41" }, 
+  { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app, twa, mini app", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" }, 
+  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть, ai telegram bot", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" },
+  { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js, react, supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" }, 
+  { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" },
   { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app, twa", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
   { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai, нейросеть", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
 ];
 
-
 const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
   pageTheme,
-  t_dynamic_links,
+  t_dynamic_links, // This prop might need adjustment if it was specifically for VibeContentRenderer HTML strings
   onScrapedData,
   onSuccessfulScrape,
 }) => {
@@ -71,8 +71,8 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
       if (result.success && result.content) {
         onScrapedData(result.content);
         toast.success(<VibeContentRenderer content="::facheckcircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'." />, { id: toastId, duration: 4000 });
-        setKeywords(''); 
-        setTargetUrl(''); 
+        // setKeywords(''); // Не очищаем ключевые слова, чтобы пользователь мог их видеть
+        // setTargetUrl(''); // Не очищаем URL, если пользователь хочет повторить или немного изменить
         onSuccessfulScrape?.(); // Call achievement callback
       } else {
         toast.error(<VibeContentRenderer content={`::faexclamationtriangle:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
@@ -88,7 +88,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
     <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
       <CardHeader>
         <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
-          <VibeContentRenderer content="::faTools className='animate-pulse text-2xl sm:text-3xl':: Универсальный Кибер-Скрейпер" />
+          <VibeContentRenderer content="::FaTools className='animate-pulse text-2xl sm:text-3xl':: Универсальный Кибер-Скрейпер" />
         </CardTitle>
         <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">
           <VibeContentRenderer content="::fainfocircle:: Выберите **Быстрый Протокол Разведки** или введите **URL** целевой страницы. Зонд соберет текстовый контент, который будет добавлен в поле 'Сбор трофеев' для дальнейшей AI-обработки."/>
@@ -116,17 +116,18 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
         </div>
         <div>
           <label htmlFor="scraper-keywords" className={cn("block text-sm font-medium mb-1 font-orbitron", pageTheme.accentColor)}>
-            <VibeContentRenderer content="::fakeyboard className='text-base':: Ключевые Маячки (для справки):"/>
+            <VibeContentRenderer content="::fakeyboard className='text-base':: Ключевые Маячки (для URL):"/>
           </label>
           <Input
             id="scraper-keywords"
             type="text"
             value={keywords}
             onChange={(e) => setKeywords(e.target.value)}
-            placeholder="Например: telegram mini app, next.js, supabase, ai"
+            placeholder="Например: telegram mini app (для Kwork/Habr кнопок)"
             className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/30 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm font-mono"
             disabled={isScraping}
           />
+           <p className="text-[0.65rem] text-gray-500 mt-1 pl-1">Это поле используется кнопками выше для генерации URL. Для ручного скрейпинга важно поле URL ниже.</p>
         </div>
         <div>
           <label htmlFor="scraper-url" className={cn("block text-sm font-medium mb-1 font-orbitron", pageTheme.accentColor)}>
@@ -137,7 +138,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
             type="url"
             value={targetUrl}
             onChange={(e) => setTargetUrl(e.target.value)}
-            placeholder="https://kwork.ru/projects?c=114 или https://freelance.habr.com/tasks"
+            placeholder="https://kwork.ru/projects?c=11&q=ключевое_слово"
             className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/50 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm font-mono"
             disabled={isScraping}
           />
