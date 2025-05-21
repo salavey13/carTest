@@ -1,38 +1,30 @@
-// /app/expmind/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAppContext } from "@/contexts/AppContext";
-// Removed Tooltip imports
-import {
-  FaBrain, FaUserAstronaut, FaLock, FaFlaskVial, FaClipboardList, FaChartLine,
-  FaCheckDouble, FaRegLightbulb, FaRoute, FaBan, FaRocket,
-  FaFaceSadTear, // Corrected from FaSadTear
-  FaPersonRunning, // Corrected from FaRunning
-  FaMagnifyingGlassDollar, // Corrected from FaSearchDollar
-  FaTriangleExclamation, // Corrected from FaExclamationTriangle
-} from "react-icons/fa6"; // Specify fa6 explicitly if needed, or keep as fa if library handles it
-import { LuActivity, LuEye, LuClipboardCheck, LuRotateCcw, LuPauseCircle, LuPlayCircle, LuThumbsUp, LuThumbsDown, LuZap } from "react-icons/lu"; // Lucide icons
-
-import { debugLogger } from "@/lib/debugLogger";
+import { useAppToast } from "@/hooks/useAppToast";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { debugLogger as logger } from "@/lib/debugLogger"; // debugLogger, а не просто logger
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 type Language = 'en' | 'ru';
 
-// Placeholder for image URLs - replace with actual URLs if available
-const STORAGE_BASE_URL_EXP = "https://placehold.co"; // Placeholder URL base
+const STORAGE_BASE_URL_EXP = "https://placehold.co"; 
+const PLACEHOLDER_BLUR_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; 
 
-const PLACEHOLDER_BLUR_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // Tiny transparent png
-
-// --- Section Data ---
 const sections = [
   {
     id: "intro-mindset",
-    icon: FaBrain,
+    icon: "::FaBrain::",
     titleEn: "Understanding Mindsets",
     titleRu: "Понимание Мышления",
     pointsEn: [
@@ -53,21 +45,19 @@ const sections = [
     imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/1a1a2e/00FF9D/png?text=Линза+Мышления`,
     imageAltEn: "Conceptual image: A lens representing a mindset shaping perception",
     imageAltRu: "Концептуальное изображение: Линза, представляющая мышление, формирующее восприятие",
-    // Removed tooltipRu
   },
   {
     id: "speaker-journey",
-    icon: FaRoute, // Kept icon
+    icon: "::FaRoute::", 
     titleEn: "Speaker's Journey: Linear vs. Experimental",
     titleRu: "Путь Спикера: Линейный против Экспериментального",
-    // Nested structure for the two paths
     subSections: [
         {
             titleEn: "Chapter 1: The Linear Path (Autopilot)",
             titleRu: "Глава 1: Линейный Путь (Автопилот)",
-            borderColor: "border-red-500", // Use semantic color
+            borderColor: "border-red-500", 
             textColor: "text-red-400",
-            icon: FaTriangleExclamation, // Corrected icon
+            icon: "::FaTriangleExclamation::", 
             pointsEn: [
                 "Followed <strong class='font-semibold text-red-400'>traditional scripts</strong>: good grades -> Google -> corporate ladder.",
                 "External success masked internal <strong class='font-semibold text-red-400'>emptiness, boredom, and burnout</strong>.",
@@ -88,9 +78,9 @@ const sections = [
         {
             titleEn: "Chapter 2: The Experimental Path (Conscious Choice)",
             titleRu: "Глава 2: Экспериментальный Путь (Сознательный Выбор)",
-            borderColor: "border-green-500", // Use semantic color
+            borderColor: "border-green-500", 
             textColor: "text-green-400",
-            icon: LuZap, // More dynamic icon
+            icon: "::LuZap::", 
             pointsEn: [
                 "Shifted focus to <strong class='font-semibold text-green-400'>genuine curiosity</strong>, independent of validation.",
                 "Studied neuroscience (PhD) based on fascination with the brain.",
@@ -109,34 +99,32 @@ const sections = [
             imageAltRu: "Иллюстрация извилистого, адаптивного пути, ведущего вверх с точками открытий",
         }
     ],
-    // Removed tooltipRu
   },
   {
     id: "blocking-mindsets",
-    icon: FaLock,
+    icon: "::FaLock::",
     titleEn: "Three Subconscious Traps",
     titleRu: "Три Подсознательные Ловушки",
     introEn: "These mindsets often operate unconsciously, preventing us from living fulfilling, conscious lives. They exist on a spectrum of Curiosity and Ambition:",
     introRu: "Эти установки часто действуют неосознанно, мешая нам жить полноценной, сознательной жизнью. Они существуют на спектре Любопытства и Амбиций:",
-    // Grid layout for mindsets
     gridItems: [
         {
             titleEn: "Cynical Mindset", titleRu: "Циничное Мышление",
-            icon: FaFaceSadTear, color: "gray", // Corrected icon
+            icon: "::FaFaceSadTear::", color: "gray", 
             pointsEn: ["Low Curiosity, Low Ambition.", "Lost drive, mocks earnestness.", "Stuck in survival mode."],
             pointsRu: ["Низкое Любопытство, Низкие Амбиции.", "Потерял(а) драйв, высмеивает искренность.", "Застрял(а) в режиме выживания."],
             leadsToEn: "Doomscrolling, negativity, 'what's the point?'", leadsToRu: "Думскроллинг, негатив, 'какой смысл?'"
         },
         {
             titleEn: "Escapist Mindset", titleRu: "Эскапистское Мышление",
-            icon: FaPersonRunning, color: "blue", // Corrected icon
+            icon: "::FaPersonRunning::", color: "blue", 
             pointsEn: ["High Curiosity, Low Ambition.", "Curious but avoids responsibility.", "Seeks escape."],
             pointsRu: ["Высокое Любопытство, Низкие Амбиции.", "Любопытен(на), но избегает ответственности.", "Ищет побега."],
             leadsToEn: "Binge-watching, retail therapy, endless dream planning.", leadsToRu: "Запойный просмотр, шопинг-терапия, бесконечное планирование мечты."
         },
         {
             titleEn: "Perfectionist Mindset", titleRu: "Перфекционистское Мышление",
-            icon: FaMagnifyingGlassDollar, color: "red", // Corrected icon
+            icon: "::FaMagnifyingGlassDollar::", color: "red", 
             pointsEn: ["Low Curiosity, High Ambition.", "Escapes uncertainty via work.", "Defers happiness for external goals."],
             pointsRu: ["Низкое Любопытство, Высокие Амбиции.", "Избегает неопределенности через работу.", "Откладывает счастье ради внешних целей."],
             leadsToEn: "Overworking, toxic productivity, burnout.", leadsToRu: "Переработки, токсичная продуктивность, выгорание."
@@ -144,11 +132,10 @@ const sections = [
     ],
     outroEn: "Crucially, these mindsets are <strong class='font-semibold text-brand-yellow'>fluid</strong> and not fixed. Awareness is the first step to change.",
     outroRu: "Важно: эти установки <strong class='font-semibold text-brand-yellow'>гибки</strong> и не являются неизменными. Осознанность – первый шаг к изменению.",
-    // Removed tooltipRu
   },
   {
     id: "experimental-mindset",
-    icon: FaFlaskVial,
+    icon: "::FaFlaskVial::",
     titleEn: "The Alternative: Experimental Mindset",
     titleRu: "Альтернатива: Экспериментальное Мышление",
     pointsEn: [
@@ -173,16 +160,14 @@ const sections = [
     imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/1a1a2e/AEFF00/png?text=Цикл+Эксп.+Мышления`,
     imageAltEn: "Diagram showing a cycle: Curiosity -> Experiment -> Data/Learning -> Adapt -> Repeat",
     imageAltRu: "Диаграмма цикла: Любопытство -> Эксперимент -> Данные/Обучение -> Адаптация -> Повтор",
-    // Removed tooltipRu
   },
   {
     id: "pact-framework",
-    icon: FaClipboardList,
+    icon: "::FaClipboardList::",
     titleEn: "Designing Tiny Experiments: The PACT Framework",
     titleRu: "Дизайн Крошечных Экспериментов: Фреймворк PACT",
     introEn: "Based on the scientific method, use PACT to design your experiments:",
     introRu: "На основе научного метода, используйте PACT для дизайна экспериментов:",
-    // PACT structure
     pactItems: [
         { letter: "P", titleEn: "Purposeful", titleRu: "Целенаправленный", descEn: "Driven by genuine curiosity; something you care about exploring.", descRu: "Движимый подлинным любопытством; то, что вам интересно исследовать.", color: "pink" },
         { letter: "A", titleEn: "Actionable", titleRu: "Действенный", descEn: "Start *now* with current resources; no complex prerequisites.", descRu: "Начать *сейчас* с текущими ресурсами; без сложных предварительных условий.", color: "blue" },
@@ -191,27 +176,26 @@ const sections = [
     ],
     outroEn: "Different from habits (assumed long-term good) & KPIs (outcome-focused). PACTs prioritize <strong class='font-semibold text-brand-yellow'>learning and exploration</strong> within a defined scope.",
     outroRu: "Отличается от привычек (предполагаемая долгосрочная польза) и KPI (фокус на результате). PACTы ставят в приоритет <strong class='font-semibold text-brand-yellow'>обучение и исследование</strong> в заданных рамках.",
-    // Removed tooltipRu
   },
   {
     id: "analyzing-data",
-    icon: FaChartLine,
+    icon: "::FaChartLine::",
     titleEn: "Learning from Experiments: Internal & External Data",
     titleRu: "Обучение на Экспериментах: Внутренние и Внешние Данные",
     introEn: "After your PACT period, analyze the data considering both:",
     introRu: "После завершения периода PACT, проанализируйте данные, учитывая оба аспекта:",
-    subSections: [ // Using subSections for structure
+    subSections: [ 
       {
         titleEn: "External Data", titleRu: "Внешние Данные",
         borderColor: "border-brand-cyan", textColor: "text-brand-cyan",
-        icon: LuEye,
+        icon: "::LuEye::",
         pointsEn: ["Observable results: metrics, feedback, tangible outcomes.", "Did it achieve conventional success?"],
         pointsRu: ["Наблюдаемые результаты: метрики, обратная связь, ощутимые итоги.", "Достигнут ли конвенциональный успех?"],
       },
       {
         titleEn: "Internal Data", titleRu: "Внутренние Данные",
         borderColor: "border-brand-orange", textColor: "text-brand-orange",
-        icon: LuActivity,
+        icon: "::LuActivity::",
         pointsEn: ["How did it *feel*? Energized, anxious, bored?", "Did you enjoy the process? (Keep simple notes during PACT)."],
         pointsRu: ["Как это *ощущалось*? Энергия, тревога, скука?", "Понравился ли процесс? (Делайте простые заметки во время PACT)."],
       }
@@ -231,20 +215,19 @@ const sections = [
     ],
     decisionTitleEn: "Based on analysis, decide:", decisionTitleRu: "На основе анализа, решите:",
     decisionPointsEn: [
-        { icon: LuPlayCircle, color: "green", text: "<strong>Persist:</strong> Worked well internally & externally. Continue/make habit." },
-        { icon: LuPauseCircle, color: "orange", text: "<strong>Pause:</strong> Not working now. Stop this experiment." },
-        { icon: LuRotateCcw, color: "blue", text: "<strong>Pivot:</strong> Make a tweak based on data, run a new experiment." }
+        { icon: "::LuPlayCircle::", color: "green", text: "<strong>Persist:</strong> Worked well internally & externally. Continue/make habit." },
+        { icon: "::LuPauseCircle::", color: "orange", text: "<strong>Pause:</strong> Not working now. Stop this experiment." },
+        { icon: "::LuRotateCcw::", color: "blue", text: "<strong>Pivot:</strong> Make a tweak based on data, run a new experiment." }
     ],
      decisionPointsRu: [
-        { icon: LuPlayCircle, color: "green", text: "<strong>Продолжать:</strong> Сработало хорошо внутренне и внешне. Продолжить/сделать привычкой." },
-        { icon: LuPauseCircle, color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." },
-        { icon: LuRotateCcw, color: "blue", text: "<strong>Разворот:</strong> Внести небольшое изменение на основе данных, запустить новый эксперимент." }
+        { icon: "::LuPlayCircle::", color: "green", text: "<strong>Продолжать:</strong> Сработало хорошо внутренне и внешне. Продолжить/сделать привычкой." },
+        { icon: "::LuPauseCircle::", color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." },
+        { icon: "::LuRotateCcw::", color: "blue", text: "<strong>Разворот:</strong> Внести небольшое изменение на основе данных, запустить новый эксперимент." }
     ],
-    // Removed tooltipRu
   },
   {
     id: "conclusion",
-    icon: FaCheckDouble,
+    icon: "::FaCheckDouble::",
     titleEn: "Why Embrace the Experimental Mindset?",
     titleRu: "Зачем Принимать Экспериментальное Мышление?",
     pointsEn: [
@@ -265,24 +248,21 @@ const sections = [
     imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/1a1a2e/9D00FF/png?text=Живи+Осознанно`,
     imageAltEn: "Abstract image representing growth, adaptability, and intentional living",
     imageAltRu: "Абстрактное изображение, представляющее рост, адаптивность и осознанную жизнь",
-    // Removed tooltipRu
   },
 ];
 
-// --- Component ---
 export default function ExperimentalMindsetPage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
-  const [selectedLang, setSelectedLang] = useState<Language>('ru'); // Default to RU
+  const [selectedLang, setSelectedLang] = useState<Language>('ru'); 
 
   useEffect(() => {
     setIsMounted(true);
-    // Basic language detection (can be refined)
     const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ru';
-    const initialLang = browserLang === 'ru' ? 'ru' : 'en'; // Prioritize browser RU, default EN otherwise
+    const initialLang = browserLang === 'ru' ? 'ru' : 'en'; 
     setSelectedLang(initialLang);
-    debugLogger.log(`[ExpMindPage] Mounted. Browser lang: ${browserLang}, Initial selected: ${initialLang}`);
-  }, []); // Run only once on mount
+    logger.log(`[ExpMindPage] Mounted. Browser lang: ${browserLang}, Initial selected: ${initialLang}`);
+  }, []); 
 
   if (!isMounted) {
     return (
@@ -294,17 +274,15 @@ export default function ExperimentalMindsetPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
-      {/* Subtle Background Grid */}
       <div
-        className="absolute inset-0 bg-repeat opacity-[0.03] z-0" // Reduced opacity further
+        className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
           backgroundImage: `linear-gradient(to right, rgba(0, 255, 157, 0.4) 1px, transparent 1px),
                             linear-gradient(to bottom, rgba(0, 255, 157, 0.4) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px', // Slightly larger grid
+          backgroundSize: '60px 60px', 
         }}
       ></div>
 
-      {/* Removed TooltipProvider */}
       <div className="relative z-10 container mx-auto px-4">
         <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-green/30 shadow-[0_0_30px_rgba(0,255,157,0.3)]">
           <CardHeader className="text-center border-b border-brand-green/20 pb-4">
@@ -322,14 +300,13 @@ export default function ExperimentalMindsetPage() {
           </CardHeader>
 
           <CardContent className="space-y-12 p-4 md:p-8">
-            {/* Language Toggle */}
             <div className="flex justify-center space-x-2 mb-8">
                <Button
                  variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
                  size="sm"
                  onClick={() => setSelectedLang('ru')}
                  className={cn(
-                     "border-brand-green/50", // Use main theme color
+                     "border-brand-green/50", 
                      selectedLang === 'ru' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                  )}
                >
@@ -340,7 +317,7 @@ export default function ExperimentalMindsetPage() {
                   size="sm"
                   onClick={() => setSelectedLang('en')}
                   className={cn(
-                     "border-brand-blue/50", // Keep contrast for EN
+                     "border-brand-blue/50", 
                      selectedLang === 'en' ? 'bg-brand-blue/20 text-brand-blue hover:bg-brand-blue/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                   )}
                >
@@ -348,10 +325,7 @@ export default function ExperimentalMindsetPage() {
                </Button>
             </div>
 
-            {/* Sections */}
             {sections.map((section, index) => {
-              const IconComponent = section.icon;
-              // Simple color rotation or assign based on index/theme
               const themeColor = ["text-brand-green", "text-brand-pink", "text-brand-yellow", "text-neon-lime", "text-brand-blue", "text-brand-orange", "text-brand-purple"][index % 7];
               const borderColor = themeColor.replace("text-", "border-");
               const currentTitle = selectedLang === 'en' ? section.titleEn : section.titleRu;
@@ -363,17 +337,13 @@ export default function ExperimentalMindsetPage() {
 
               return (
                 <section key={section.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
-                  {/* Title */}
                   <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4 font-orbitron`}>
-                    <IconComponent className={`mr-3 ${themeColor}/80`} /> {currentTitle}
+                    <VibeContentRenderer content={`${section.icon} className='mr-3 ${themeColor}/80'`} /> {currentTitle}
                   </h2>
 
-                  {/* Intro Paragraph */}
                   {currentIntro && <p className="text-gray-300 leading-relaxed mb-4">{currentIntro}</p>}
 
-                   {/* SubSections (e.g., Speaker's Journey) */}
                    {section.subSections && section.subSections.map((sub, subIndex) => {
-                     const SubIcon = sub.icon;
                      const subTitle = selectedLang === 'en' ? sub.titleEn : sub.titleRu;
                      const subPoints = selectedLang === 'en' ? sub.pointsEn : sub.pointsRu;
                      const subImgUrl = selectedLang === 'en' ? sub.imageUrlEn : sub.imageUrlRu;
@@ -382,7 +352,7 @@ export default function ExperimentalMindsetPage() {
                      return (
                        <div key={`${section.id}-sub-${subIndex}`} className={`ml-4 pl-4 border-l-2 ${sub.borderColor} space-y-3 mb-6`}>
                          <h3 className={`flex items-center text-xl font-semibold ${sub.textColor}`}>
-                           <SubIcon className="mr-2" /> {subTitle}
+                           <VibeContentRenderer content={`${sub.icon} className='mr-2'`} /> {subTitle}
                          </h3>
                          <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
                            {subPoints.map((point, i) => (
@@ -402,21 +372,19 @@ export default function ExperimentalMindsetPage() {
                      );
                    })}
 
-                   {/* Grid Items (e.g., Blocking Mindsets) */}
                    {section.gridItems && (
                      <div className="grid md:grid-cols-3 gap-4 my-4">
                        {section.gridItems.map((item, itemIndex) => {
-                         const ItemIcon = item.icon; // Icon already corrected in section data
                          const itemTitle = selectedLang === 'en' ? item.titleEn : item.titleRu;
                          const itemPoints = selectedLang === 'en' ? item.pointsEn : item.pointsRu;
                          const itemLeadsTo = selectedLang === 'en' ? item.leadsToEn : item.leadsToRu;
-                         const itemColorClass = `text-brand-${item.color}` // Assuming brand colors like brand-gray, brand-blue, brand-red exist
-                         const itemBorderColorClass = `border-brand-${item.color}/40`
+                         const itemColorClass = `text-brand-${item.color}`;
+                         const itemBorderColorClass = `border-brand-${item.color}/40`;
 
                          return (
                            <div key={`${section.id}-grid-${itemIndex}`} className={`bg-gray-950/50 p-4 rounded-lg border ${itemBorderColorClass}`}>
                              <h4 className={`flex items-center font-bold ${itemColorClass} mb-2 text-lg`}>
-                               <ItemIcon className="mr-2" /> {itemTitle}
+                               <VibeContentRenderer content={`${item.icon} className='mr-2'`} /> {itemTitle}
                              </h4>
                              <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 mb-2 pl-1">
                               {itemPoints.map((point, i) => <li key={`${selectedLang}-${section.id}-grid-${itemIndex}-p-${i}`}>{point}</li>)}
@@ -430,11 +398,10 @@ export default function ExperimentalMindsetPage() {
                      </div>
                    )}
 
-                   {/* PACT Items */}
                    {section.pactItems && (
                       <div className="space-y-5 my-4">
                         {section.pactItems.map((item, itemIndex) => {
-                           const itemColorClass = `text-brand-${item.color}`; // e.g., text-brand-pink
+                           const itemColorClass = `text-brand-${item.color}`;
                            const itemBorderColorClass = `border-brand-${item.color}/50`;
                            const itemBgColorClass = `bg-brand-${item.color}/10`;
                            const itemTitle = selectedLang === 'en' ? item.titleEn : item.titleRu;
@@ -455,7 +422,6 @@ export default function ExperimentalMindsetPage() {
                       </div>
                    )}
 
-                  {/* Standard Points (only if no subSections or gridItems) */}
                   {!section.subSections && !section.gridItems && !section.pactItems && currentPoints.length > 0 && (
                     <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
                       {currentPoints.map((point, i) => (
@@ -464,7 +430,6 @@ export default function ExperimentalMindsetPage() {
                     </ul>
                   )}
 
-                  {/* Example Block (for Analysis section) */}
                   {section.exampleTitleEn && (
                      <div className="mt-4 p-3 border border-gray-600/50 rounded-md bg-black/20">
                          <h4 className="font-semibold text-brand-yellow mb-2">{selectedLang === 'en' ? section.exampleTitleEn : section.exampleTitleRu}</h4>
@@ -476,18 +441,16 @@ export default function ExperimentalMindsetPage() {
                      </div>
                   )}
 
-                  {/* Decision Block (for Analysis section) */}
                   {section.decisionTitleEn && (
                      <div className="mt-4">
                          <h4 className="font-semibold text-gray-300 mb-3">{selectedLang === 'en' ? section.decisionTitleEn : section.decisionTitleRu}</h4>
                           <div className="grid md:grid-cols-3 gap-3">
                               {(selectedLang === 'en' ? section.decisionPointsEn : section.decisionPointsRu).map((item, i) => {
-                                  const DecisionIcon = item.icon;
-                                  const decisionColorClass = `text-brand-${item.color}`; // Assuming brand colors map
+                                  const decisionColorClass = `text-brand-${item.color}`;
                                   const decisionBorderColorClass = `border-brand-${item.color}/40`;
                                   return (
                                       <div key={`${selectedLang}-${section.id}-dec-${i}`} className={`flex items-center space-x-2 p-2 rounded border ${decisionBorderColorClass} bg-gray-950/60`}>
-                                          <DecisionIcon className={`flex-shrink-0 h-5 w-5 ${decisionColorClass}`} />
+                                          <VibeContentRenderer content={`${item.icon} className='flex-shrink-0 h-5 w-5 ${decisionColorClass}'`} />
                                           <p className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: item.text }}></p>
                                       </div>
                                   );
@@ -496,10 +459,8 @@ export default function ExperimentalMindsetPage() {
                      </div>
                   )}
 
-                  {/* Image (if exists and no subsections/grid) */}
                   {currentImageUrl && !section.subSections && !section.gridItems && (
                     <div className={`my-6 p-2 border ${borderColor}/30 rounded-lg bg-black/30 max-w-md mx-auto`}>
-                      {/* Removed Tooltip, TooltipTrigger, TooltipContent */}
                       <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 relative">
                         <Image
                           src={currentImageUrl} alt={currentImageAlt} width={600} height={338}
@@ -512,19 +473,16 @@ export default function ExperimentalMindsetPage() {
                     </div>
                   )}
 
-                   {/* Outro Paragraph */}
                   {currentOutro && <p className="text-gray-300 leading-relaxed mt-4 italic" dangerouslySetInnerHTML={{ __html: currentOutro }}></p>}
 
                 </section>
               );
             })}
 
-            {/* Concluding section */}
             <section className="text-center pt-8 border-t border-brand-green/20 mt-10">
                <p className="text-gray-400 italic">
                  {selectedLang === 'ru' ? "Резюме основано на видео. Применение требует практики и саморефлексии." : "Summary based on video insights. Application requires practice and self-reflection."}
                </p>
-               {/* Optional link back to related concepts */}
                <p className="mt-4 text-gray-300">
                  Explore related concepts in <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                </p>
@@ -533,7 +491,6 @@ export default function ExperimentalMindsetPage() {
           </CardContent>
         </Card>
       </div>
-      {/* Removed closing TooltipProvider */}
     </div>
   );
 }
