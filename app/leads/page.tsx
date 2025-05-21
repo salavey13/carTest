@@ -74,17 +74,17 @@ const LeadGenerationHQPage = () => {
   const ctaSectionRef = useRef<HTMLDivElement>(null);
 
   const t_dynamic_links = { 
-    linkToRepoXml: "<Link href='/repo-xml' class='text-brand-purple hover:underline'>SUPERVIBE Studio</Link>",
-    linkToJumpstart: "<Link href='/jumpstart' class='text-brand-lime hover:underline'>Jumpstart Kit</Link>",
-    linkToSelfDev: "<Link href='/selfdev' class='text-brand-green hover:underline'>Кодекс SelfDev</Link>",
-    linkToPurposeProfit: "<Link href='/purpose-profit' class='text-brand-pink hover:underline'>скрижали 'Цель и Прибыль'</Link>",
-    linkToGamePlan: "<Link href='/game-plan' class='text-brand-blue hover:underline'>Гейм План</Link>",
-    linkToPPlan: "<Link href='/p-plan' class='text-brand-yellow hover:underline'>VIBE План</Link>",
-    linkToTutorials: "<Link href='/start-training' class='text-brand-cyan hover:underline'>Арсенал Приемов и Тактик</Link>",
-    linkToCyberDevOS: "<Link href='/selfdev/gamified' class='text-brand-orange hover:underline'>CyberDev OS</Link>",
-    linkToAbout: "<Link href='/about' class='text-brand-purple hover:underline'>личное дело</Link>",
-    linkToLeads: "<Link href='/leads' class='text-brand-orange hover:underline'>КОЦ 'Сетевой Дозор'</Link>",
-    linkToZion: "<Link href='https://t.me/salavey_channel' target='_blank' rel='noopener noreferrer' class='text-brand-cyan hover:underline'>Цитадель 'Зион' (@salavey_channel)</Link>",
+    linkToRepoXml: "<link href='/repo-xml' class='text-brand-purple hover:underline'>SUPERVIBE Studio</link>",
+    linkToJumpstart: "<link href='/jumpstart' class='text-brand-lime hover:underline'>Jumpstart Kit</link>",
+    linkToSelfDev: "<link href='/selfdev' class='text-brand-green hover:underline'>Кодекс SelfDev</link>",
+    linkToPurposeProfit: "<link href='/purpose-profit' class='text-brand-pink hover:underline'>скрижали 'Цель и Прибыль'</link>",
+    linkToGamePlan: "<link href='/game-plan' class='text-brand-blue hover:underline'>Гейм План</link>",
+    linkToPPlan: "<link href='/p-plan' class='text-brand-yellow hover:underline'>VIBE План</link>",
+    linkToTutorials: "<link href='/start-training' class='text-brand-cyan hover:underline'>Арсенал Приемов и Тактик</link>",
+    linkToCyberDevOS: "<link href='/selfdev/gamified' class='text-brand-orange hover:underline'>CyberDev OS</link>",
+    linkToAbout: "<link href='/about' class='text-brand-purple hover:underline'>личное дело</link>",
+    linkToLeads: "<link href='/leads' class='text-brand-orange hover:underline'>КОЦ 'Сетевой Дозор'</link>",
+    linkToZion: "<link href='https://t.me/salavey_channel' target='_blank' rel='noopener noreferrer' class='text-brand-cyan hover:underline'>Цитадель 'Зион' (@salavey_channel)</link>",
   };
   
   const t = { 
@@ -131,7 +131,7 @@ const LeadGenerationHQPage = () => {
     workflowStep4Tank: `::fashieldhalved:: **Танки:** ${t_dynamic_links.linkToRepoXml} Берут на себя кастомизацию по целеуказаниям Саппорта. Применяют всю огневую мощь Студии для штурма клиентских задач.`,
     workflowStep4Carry: `::fabrain:: **Кэрри (Павел):** ${t_dynamic_links.linkToRepoXml} Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра.`,
     workflowStep5: "5. ::farocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
-    workflowStep6: `6. ::fabolt:: **Анализ Результатов и Адаптация:** <Link href='/repo-xml#cybervibe-section' class='text-brand-cyan hover:underline'>Петля CyberVibe</Link> обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
+    workflowStep6: `6. ::fabolt:: **Анализ Результатов и Адаптация:** <link href='/repo-xml#cybervibe-section' class='text-brand-cyan hover:underline'>Петля CyberVibe</link> обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
     assetsTitle: "::facubes:: Использование Трофейных Активов CyberVibe",
     assetsSubtitle: "Наш внутренний арсенал для внешнего доминирования.",
     assetJumpstartTitle: "Jumpstart Kit: 'Первый Удар'",
