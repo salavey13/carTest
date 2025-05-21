@@ -28,14 +28,6 @@ interface CsvLeadRow {
   project_type_guess?: string;   // Добавлено
 }
 
-// Массив User-Agent'ов для большей вариативности (пока не используется активно)
-// const USER_AGENTS = [
-//   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-//   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15',
-//   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-//   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0'
-// ];
-
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
   if (!userId) return false;
   if (!supabaseAdmin) {
@@ -351,7 +343,6 @@ export async function scrapePageContent(
   if (!targetUrl) {
     return { success: false, error: "URL не указан." };
   }
-  // const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]; // Раскомментировать для случайного User-Agent
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
   logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl} с User-Agent: ${userAgent}`);
 
@@ -361,10 +352,8 @@ export async function scrapePageContent(
         'User-Agent': userAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        // 'Cache-Control': 'no-cache', // Можно добавить для попытки получить свежую версию
-        // 'Pragma': 'no-cache',
       },
-      signal: AbortSignal.timeout(20000), // Увеличил тайм-аут до 20 секунд
+      signal: AbortSignal.timeout(20000), 
     });
     logger.info(`[Scraper] Получен ответ от ${targetUrl}. Статус: ${response.status} ${response.statusText}`);
 
@@ -379,51 +368,57 @@ export async function scrapePageContent(
     const $ = cheerio.load(html);
     
     logger.debug(`[Scraper] HTML перед удалением элементов (первые 500 симв.): ${$('body').html()?.substring(0,500)}`);
-    // Удаляем ненужные элементы
     $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, [role="dialog"], [aria-hidden="true"]').remove();
-    $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove(); // Удаляем попапы и баннеры
+    $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove();
     logger.debug(`[Scraper] Ненужные элементы удалены.`);
 
-    // Пытаемся найти основной контент (эвристика)
-    let mainContentSelector = '';
     const contentSelectors = [
-        'article', 'main', '[role="main"]', 
-        '.content', '#content', '.main-content', '#main-content', 
-        '.project-description', '.task__description', '.job-description', // специфичные для Kwork/Habr
-        '.entry-content', '.post-body', '.page-content',
-        '.text-content', '.article-body', '.job_show_description', '.description', // Общие и специфичные
-        '[itemprop="description"]' // Часто используется для описаний
+      'article', '.article-content', '.entry-content', '.post-body', '.post-content', // Блоги и статьи
+      'main[role="main"]', 'main', // Основной контент
+      '.project-description', '.task__description', '.job-description', '.vacancy-description', // Описания проектов/вакансий
+      '.product-description', '[itemprop="description"]', // Описания продуктов
+      '.text-content', '.content-text', '.article-text', // Общие текстовые блоки
+      '.job_show_description', '.b-description__text', // Специфичные для некоторых сайтов
+      '.page-content', '.content', '#content', '.main-content', '#main-content', // Общие контейнеры
+      'section', // В крайнем случае секции
     ];
     logger.debug(`[Scraper] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
 
-    let $targetElement = $('body'); 
-    let foundSpecificContent = false;
+    let $targetElement: cheerio.Cheerio<cheerio.Element> | null = null;
+    let maxTextLength = 0;
+    let mainContentSelectorUsed = 'body (fallback)';
 
     for (const selector of contentSelectors) {
-        const $candidate = $(selector);
-        if ($candidate.length > 0) {
-            let largestCandidateHtml = "";
-            $candidate.each((_i, el) => {
-                const currentHtml = $(el).html();
-                if (currentHtml && currentHtml.length > largestCandidateHtml.length) {
-                    largestCandidateHtml = currentHtml;
-                    $targetElement = $(el); 
-                    mainContentSelector = selector;
-                    foundSpecificContent = true;
+        const $candidates = $(selector);
+        if ($candidates.length > 0) {
+            logger.debug(`[Scraper] Найдены кандидаты по селектору '${selector}': ${$candidates.length} шт.`);
+            $candidates.each((_i, el) => {
+                const $currentCandidate = $(el);
+                // Клонируем, чтобы не изменять оригинал, удаляем скрипты и стили на всякий случай еще раз из кандидата
+                const $clone = $currentCandidate.clone();
+                $clone.find('script, style, nav, footer, header, aside, form, button, input, textarea, select, iframe, link, meta, svg, img, figure').remove();
+                const textSample = $clone.text().replace(/\s\s+/g, ' ').trim();
+                
+                if (textSample.length > maxTextLength) {
+                    maxTextLength = textSample.length;
+                    $targetElement = $currentCandidate; // Берем оригинальный элемент, а не клон
+                    mainContentSelectorUsed = selector;
+                    logger.info(`[Scraper] Новый лучший кандидат по селектору '${selector}', длина текста: ${maxTextLength}`);
                 }
             });
-            if(largestCandidateHtml) {
-                logger.info(`[Scraper] Найден основной контент по селектору: ${mainContentSelector}. Длина HTML: ${largestCandidateHtml.length}`);
-                break; 
-            }
         }
     }
-    
-    if (!foundSpecificContent) {
-        logger.warn(`[Scraper] Основной контент не найден по селекторам, используется весь body.`);
-    }
-    logger.debug(`[Scraper] HTML выбранного элемента ('${mainContentSelector || 'body'}') перед извлечением текста (первые 500 симв.): ${$targetElement.html()?.substring(0,500)}`);
 
+    if (!$targetElement || maxTextLength < 100) { // Если лучший кандидат все равно слишком мал или не найден
+      $targetElement = $('body');
+      mainContentSelectorUsed = 'body (fallback)';
+      logger.warn(`[Scraper] Специфичный контент не найден или слишком мал (maxTextLength: ${maxTextLength}). Используется весь body.`);
+    } else {
+      logger.info(`[Scraper] Финально выбран контент по селектору: ${mainContentSelectorUsed}.`);
+    }
+    
+    logger.debug(`[Scraper] HTML выбранного элемента ('${mainContentSelectorUsed}') перед извлечением текста (первые 500 симв.): ${$targetElement.html()?.substring(0,500)}`);
+    
     const targetHtmlForText = $targetElement.html() || "";
     const $tempForText = cheerio.load(`<body>${targetHtmlForText}</body>`); 
     
@@ -431,36 +426,34 @@ export async function scrapePageContent(
     $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a')
         .each(function() {
             const $this = $(this);
-            const elementText = $this.clone().children().remove().end().text().trim();
-
+            const elementText = $this.clone().children().remove().end().text().replace(/\s\s+/g, ' ').trim();
             if (elementText) {
                 extractedTexts.push(elementText);
             }
         });
     
     logger.debug(`[Scraper] Извлечено ${extractedTexts.length} текстовых фрагментов. Пример: "${extractedTexts.slice(0,5).join(' | ')}"`);
-    let textContent = extractedTexts.join(". "); // Соединяем фрагменты через точку и пробел
+    let textContent = extractedTexts.join(". "); 
     
     logger.debug(`[Scraper] Текст после первичного соединения (до очистки, первые 500 симв.): ${textContent.substring(0,500)}`);
-    // Очистка текста
     textContent = textContent
-      .replace(/\s\s+/g, ' ')       // Заменяем множественные пробелы на один
-      .replace(/\s+\./g, '.')       // Убираем пробел перед точкой (например, "слово . " -> "слово.")
-      .replace(/\.{2,}/g, '.')      // Заменяем многоточия или двойные точки на одну
-      .replace(/\s*\.\s*/g, '. ')   // Нормализуем точки: "слово.слово" -> "слово. слово", "слово .слово" -> "слово. слово"
-      .replace(/(\r\n|\n|\r)/gm, " ") // Заменяем переносы строк на пробелы
-      .replace(/\s\s+/g, ' ')       // Повторно убираем множественные пробелы
+      .replace(/\s\s+/g, ' ')       
+      .replace(/\s+\./g, '.')       
+      .replace(/\.{2,}/g, '.')      
+      .replace(/\s*\.\s*/g, '. ')   
+      .replace(/(\r\n|\n|\r)+/gm, " ") 
+      .replace(/\s\s+/g, ' ')       
       .trim();
     logger.debug(`[Scraper] Текст после основной очистки (первые 500 симв.): ${textContent.substring(0,500)}`);
     
-    const MIN_LINE_LENGTH_FOR_MEANING = 15; // Снизил порог для большей гибкости
-    const MIN_SIGNIFICANT_CONTENT_LENGTH = 100; // Минимальная общая длина контента, чтобы считать его не пустым
+    const MIN_LINE_LENGTH_FOR_MEANING = 10; 
+    const MIN_SIGNIFICANT_CONTENT_LENGTH = 50; 
 
     const meaningfulLines = textContent.split('.') 
         .map(line => line.trim())
         .filter(line => {
             if (line.length < MIN_LINE_LENGTH_FOR_MEANING) return false;
-            return /[a-zA-Zа-яА-Я]{3,}/.test(line) && !/^[^\w\s\p{P}]*$/.test(line.replace(/\s/g, '')); // Учитываем пунктуацию в не-мусорных строках
+            return /[a-zA-Zа-яА-Я]{2,}/.test(line) && !/^[^\w\s\p{P}]*$/.test(line.replace(/\s/g, ''));
         })
         .map(line => line.endsWith('.') ? line : line + '.') 
         .join(' ') 

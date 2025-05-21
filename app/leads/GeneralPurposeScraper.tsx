@@ -28,6 +28,10 @@ const predefinedSearchButtons = [
   { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
   { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
   { id: "kwork_webapp", label: "WebApp (Kwork)", site: "kwork", keywords: "webapp", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "kwork_react", label: "React (Kwork)", site: "kwork", keywords: "react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "kwork_twa_react", label: "TWA React (Kwork)", site: "kwork", keywords: "twa react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "kwork_tg_bot", label: "TG Бот (Kwork)", site: "kwork", keywords: "telegram бот", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "kwork_parser", label: "Парсер (Kwork)", site: "kwork", keywords: "парсер", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
   { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" }, // Habr использует 'q'
   { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
 ];
@@ -38,27 +42,27 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
   onScrapedData,
   onSuccessfulScrape,
 }) => {
-  const [keywords, setKeywords] = useState('');
+  const [keywordsInput, setKeywordsInput] = useState(''); // Renamed from keywords to avoid confusion
   const [targetUrl, setTargetUrl] = useState(''); 
   const [isScraping, setIsScraping] = useState(false);
 
   const handlePredefinedSearch = (search: typeof predefinedSearchButtons[0]) => {
-    setKeywords(search.keywords); 
+    setKeywordsInput(search.keywords); // Set the input field for user reference
     if (search.siteUrlFormat) {
-        const encodedKeywords = encodeURIComponent(search.keywords); // Всегда кодируем ключевые слова
+        const encodedKeywords = encodeURIComponent(search.keywords); 
         const searchUrl = search.siteUrlFormat.replace("{keywords}", encodedKeywords);
         setTargetUrl(searchUrl);
         toast.info(`Запрос "${search.label}" подготовлен. URL для скрейпинга: ${searchUrl}. Нажмите "Запустить Зонд".`, {duration: 3000});
     } else {
         setTargetUrl(''); 
-        toast.info(`Ключевые слова "${search.keywords}" установлены. Укажите URL вручную или выберите другой протокол.`, {duration: 3000});
+        toast.info(`Ключевые слова "${search.keywords}" установлены (для справки). Укажите URL вручную.`, {duration: 3000});
     }
   };
 
   const handleScrape = async () => {
     const urlToScrape = targetUrl.trim();
     if (!urlToScrape) { 
-      toast.warning("Введите URL для скрейпинга. Поле 'Ключевые слова' пока используется для формирования URL через кнопки.");
+      toast.warning("Введите URL для скрейпинга в поле 'Целевые Координаты'.");
       return;
     }
 
@@ -92,7 +96,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
           <VibeContentRenderer content="::FaTools className='animate-pulse text-2xl sm:text-3xl':: Универсальный Кибер-Скрейпер" />
         </CardTitle>
         <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">
-          <VibeContentRenderer content="::facircleinfo:: Выберите **Быстрый Протокол Разведки** или введите **URL** целевой страницы. Зонд соберет текстовый контент, который будет добавлен в поле 'Сбор трофеев' для дальнейшей AI-обработки."/>
+          <VibeContentRenderer content="::facircleinfo:: Выберите **Быстрый Протокол Разведки** (кнопки ниже установят и ключевые слова, и URL) или введите **URL** целевой страницы напрямую для скрейпинга."/>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 font-mono">
@@ -117,18 +121,18 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
         </div>
         <div>
           <label htmlFor="scraper-keywords" className={cn("block text-sm font-medium mb-1 font-orbitron", pageTheme.accentColor)}>
-            <VibeContentRenderer content="::fakeyboard className='text-base':: Ключевые Маячки (для URL):"/>
+            <VibeContentRenderer content="::fakeyboard className='text-base':: Ключевые Маячки (для информации):"/>
           </label>
           <Input
             id="scraper-keywords"
             type="text"
-            value={keywords}
-            onChange={(e) => setKeywords(e.target.value)}
-            placeholder="Например: telegram mini app (для Kwork/Habr кнопок)"
+            value={keywordsInput}
+            onChange={(e) => setKeywordsInput(e.target.value)}
+            placeholder="Ключевые слова (заполняются кнопками выше)"
             className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/30 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm font-mono"
             disabled={isScraping}
           />
-           <p className="text-[0.65rem] text-gray-500 mt-1 pl-1">Это поле используется кнопками выше для генерации URL. Для ручного скрейпинга важно поле URL ниже.</p>
+           <p className="text-[0.65rem] text-gray-500 mt-1 pl-1">Это поле заполняется при нажатии на кнопки "Быстрых Протоколов" для справки. Для ручного скрейпинга используйте поле URL ниже.</p>
         </div>
         <div>
           <label htmlFor="scraper-url" className={cn("block text-sm font-medium mb-1 font-orbitron", pageTheme.accentColor)}>
@@ -142,6 +146,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
             placeholder="https://kwork.ru/projects?c=11&keyword=ключевое_слово&a=1"
             className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/50 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm font-mono"
             disabled={isScraping}
+            required
           />
         </div>
         <Button
