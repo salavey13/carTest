@@ -28,6 +28,14 @@ interface CsvLeadRow {
   project_type_guess?: string;   // Добавлено
 }
 
+// Массив User-Agent'ов для большей вариативности (пока не используется активно)
+// const USER_AGENTS = [
+//   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+//   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15',
+//   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+//   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0'
+// ];
+
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
   if (!userId) return false;
   if (!supabaseAdmin) {
@@ -343,29 +351,38 @@ export async function scrapePageContent(
   if (!targetUrl) {
     return { success: false, error: "URL не указан." };
   }
+  // const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)]; // Раскомментировать для случайного User-Agent
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+  logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl} с User-Agent: ${userAgent}`);
 
   try {
-    logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl}`);
     const response = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'User-Agent': userAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        // 'Cache-Control': 'no-cache', // Можно добавить для попытки получить свежую версию
+        // 'Pragma': 'no-cache',
       },
-      signal: AbortSignal.timeout(15000), // Тайм-аут 15 секунд
+      signal: AbortSignal.timeout(20000), // Увеличил тайм-аут до 20 секунд
     });
+    logger.info(`[Scraper] Получен ответ от ${targetUrl}. Статус: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
-      logger.error(`[Scraper] Ошибка HTTP: ${response.status} ${response.statusText} для URL: ${targetUrl}`);
+      const errorText = await response.text().catch(() => "Не удалось прочитать тело ошибки");
+      logger.error(`[Scraper] Ошибка HTTP: ${response.status} ${response.statusText} для URL: ${targetUrl}. Тело ответа (если есть): ${errorText.substring(0,500)}`);
       return { success: false, error: `Ошибка HTTP: ${response.status} ${response.statusText}` };
     }
 
     const html = await response.text();
+    logger.debug(`[Scraper] HTML получен, длина: ${html.length}. Начинаю парсинг Cheerio.`);
     const $ = cheerio.load(html);
-
+    
+    logger.debug(`[Scraper] HTML перед удалением элементов (первые 500 симв.): ${$('body').html()?.substring(0,500)}`);
     // Удаляем ненужные элементы
     $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, [role="dialog"], [aria-hidden="true"]').remove();
     $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove(); // Удаляем попапы и баннеры
+    logger.debug(`[Scraper] Ненужные элементы удалены.`);
 
     // Пытаемся найти основной контент (эвристика)
     let mainContentSelector = '';
@@ -374,10 +391,13 @@ export async function scrapePageContent(
         '.content', '#content', '.main-content', '#main-content', 
         '.project-description', '.task__description', '.job-description', // специфичные для Kwork/Habr
         '.entry-content', '.post-body', '.page-content',
-        '.text-content', '.article-body', '.job_show_description' // Общие и специфичные
+        '.text-content', '.article-body', '.job_show_description', '.description', // Общие и специфичные
+        '[itemprop="description"]' // Часто используется для описаний
     ];
+    logger.debug(`[Scraper] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
 
     let $targetElement = $('body'); 
+    let foundSpecificContent = false;
 
     for (const selector of contentSelectors) {
         const $candidate = $(selector);
@@ -389,71 +409,69 @@ export async function scrapePageContent(
                     largestCandidateHtml = currentHtml;
                     $targetElement = $(el); 
                     mainContentSelector = selector;
+                    foundSpecificContent = true;
                 }
             });
-            if(largestCandidateHtml) break; 
+            if(largestCandidateHtml) {
+                logger.info(`[Scraper] Найден основной контент по селектору: ${mainContentSelector}. Длина HTML: ${largestCandidateHtml.length}`);
+                break; 
+            }
         }
     }
     
-    if (mainContentSelector) {
-        logger.info(`[Scraper] Найден основной контент по селектору: ${mainContentSelector}`);
-    } else {
+    if (!foundSpecificContent) {
         logger.warn(`[Scraper] Основной контент не найден по селекторам, используется весь body.`);
     }
+    logger.debug(`[Scraper] HTML выбранного элемента ('${mainContentSelector || 'body'}') перед извлечением текста (первые 500 симв.): ${$targetElement.html()?.substring(0,500)}`);
 
-    const targetHtml = $targetElement.html() || "";
-    const $temp = cheerio.load(`<body>${targetHtml}</body>`); 
+    const targetHtmlForText = $targetElement.html() || "";
+    const $tempForText = cheerio.load(`<body>${targetHtmlForText}</body>`); 
     
-    let textContent = "";
-    // Собираем текст, стараясь сохранить структуру предложений
-    $temp('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label')
+    let extractedTexts: string[] = [];
+    $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a')
         .each(function() {
             const $this = $(this);
-            // Проверяем, что элемент не содержит только другие блочные элементы или только пробелы
-            // Это помогает избежать дублирования текста от родительских div'ов, если текст уже взят из дочерних p
-            const elementText = $this.clone().children().remove().end().text().trim(); // Текст только этого элемента, без дочерних
+            const elementText = $this.clone().children().remove().end().text().trim();
 
             if (elementText) {
-                 // Добавляем пробел, если предыдущий текст не заканчивается пробелом
-                 if (textContent.length > 0 && !/\s$/.test(textContent.slice(-1))) {
-                    textContent += " ";
-                }
-                textContent += elementText;
-                // Если текущий текст не заканчивается знаком препинания, добавляем точку.
-                if (!/[.?!;,:]$/.test(elementText.slice(-1))) {
-                    textContent += ".";
-                }
-                 // Всегда добавляем пробел после блока текста для разделения
-                textContent += " ";
+                extractedTexts.push(elementText);
             }
         });
     
+    logger.debug(`[Scraper] Извлечено ${extractedTexts.length} текстовых фрагментов. Пример: "${extractedTexts.slice(0,5).join(' | ')}"`);
+    let textContent = extractedTexts.join(". "); // Соединяем фрагменты через точку и пробел
+    
+    logger.debug(`[Scraper] Текст после первичного соединения (до очистки, первые 500 симв.): ${textContent.substring(0,500)}`);
     // Очистка текста
     textContent = textContent
       .replace(/\s\s+/g, ' ')       // Заменяем множественные пробелы на один
-      .replace(/\s+\./g, '.')       // Убираем пробел перед точкой (например, "слово . " -> "слово. ")
+      .replace(/\s+\./g, '.')       // Убираем пробел перед точкой (например, "слово . " -> "слово.")
       .replace(/\.{2,}/g, '.')      // Заменяем многоточия или двойные точки на одну
+      .replace(/\s*\.\s*/g, '. ')   // Нормализуем точки: "слово.слово" -> "слово. слово", "слово .слово" -> "слово. слово"
       .replace(/(\r\n|\n|\r)/gm, " ") // Заменяем переносы строк на пробелы
       .replace(/\s\s+/g, ' ')       // Повторно убираем множественные пробелы
       .trim();
+    logger.debug(`[Scraper] Текст после основной очистки (первые 500 симв.): ${textContent.substring(0,500)}`);
     
-    const MIN_LINE_LENGTH_FOR_MEANING = 20; // Немного уменьшил для гибкости
-    const meaningfulLines = textContent.split('.') // Разбиваем по точкам (предполагая, что это предложения)
+    const MIN_LINE_LENGTH_FOR_MEANING = 15; // Снизил порог для большей гибкости
+    const MIN_SIGNIFICANT_CONTENT_LENGTH = 100; // Минимальная общая длина контента, чтобы считать его не пустым
+
+    const meaningfulLines = textContent.split('.') 
         .map(line => line.trim())
         .filter(line => {
             if (line.length < MIN_LINE_LENGTH_FOR_MEANING) return false;
-            // Содержит хотя бы одно слово из 3+ букв и не является просто набором символов
-            return /[a-zA-Zа-яА-Я]{3,}/.test(line) && !/^[^\w\s]*$/.test(line.replace(/\s/g, ''));
+            return /[a-zA-Zа-яА-Я]{3,}/.test(line) && !/^[^\w\s\p{P}]*$/.test(line.replace(/\s/g, '')); // Учитываем пунктуацию в не-мусорных строках
         })
-        .map(line => line.endsWith('.') ? line : line + '.') // Убедимся, что каждая "значащая строка" заканчивается точкой
-        .join(' ') // Соединяем значащие строки пробелом
+        .map(line => line.endsWith('.') ? line : line + '.') 
+        .join(' ') 
         .trim();
     
+    logger.debug(`[Scraper] Текст после фильтрации осмысленных строк (длина: ${meaningfulLines.length}, первые 500 симв.): ${meaningfulLines.substring(0,500)}`);
     textContent = meaningfulLines;
 
-    if (!textContent) {
-      logger.warn(`[Scraper] Не удалось извлечь значимый контент из URL: ${targetUrl}. Возможно, страница сильно завязана на JS-рендеринг, имеет нестандартную структуру или содержит только очень короткие строки.`);
-      return { success: false, error: "Не удалось извлечь контент. Страница может быть пустой, требовать JS или содержать только короткие строки." };
+    if (!textContent || textContent.length < MIN_SIGNIFICANT_CONTENT_LENGTH) {
+      logger.warn(`[Scraper] Не удалось извлечь значимый контент (длина ${textContent?.length || 0}) из URL: ${targetUrl}. Возможно, это honeypot, страница-заглушка, капча, или требует JS-рендеринга / имеет нестандартную структуру.`);
+      return { success: false, error: `Не удалось извлечь контент (длина ${textContent?.length || 0}). Страница может быть пустой, требовать JS или быть honeypot.` };
     }
     
     const MAX_LENGTH = 25000; 
@@ -462,13 +480,16 @@ export async function scrapePageContent(
         logger.warn(`[Scraper] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
     }
 
-    logger.info(`[Scraper] Успешно собран контент с URL: ${targetUrl}. Длина: ${textContent.length}`);
+    logger.info(`[Scraper] Успешно собран контент с URL: ${targetUrl}. Финальная длина: ${textContent.length}`);
     return { success: true, content: textContent };
 
   } catch (error: any) {
-    logger.error(`[Scraper] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error);
+    logger.error(`[Scraper] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error.stack);
     if (error.name === 'AbortError' || error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
         return { success: false, error: 'Тайм-аут запроса к целевому URL. Сервер не ответил вовремя.' };
+    }
+    if (error.message.toLowerCase().includes('invalidcharactererror')) {
+        return { success: false, error: 'Ошибка парсинга HTML: невалидный символ. Возможно, проблема с кодировкой страницы.'};
     }
     return { success: false, error: `Ошибка скрейпинга: ${error.message}` };
   }
