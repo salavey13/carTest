@@ -1,3 +1,4 @@
+// /contexts/RepoXmlPageContext.tsx
 "use client";
 
 import React, {
@@ -119,7 +120,7 @@ interface RepoXmlPageContextType {
     fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
     assistantRef: MutableRefObject<AICodeAssistantRef | null>;
     addToast: (message: string | React.ReactNode, type?: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message', duration?: number, options?: any) => void;
-    processTelegramStartParam: (payload: string) => void;
+    processTelegramStartParam: (payload: string) => void; // New function to process start_param
 }
 
 const defaultContextValue: Partial<RepoXmlPageContextType> = {
@@ -213,8 +214,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         const [showComponentsState, setShowComponentsState] = useState<boolean>(true);
         
-        const { dbUser, startParamPayload: appContextStartParam } = useAppContext(); 
-        const startParamProcessedRef = useRef(false); 
+        const { dbUser, startParamPayload: appContextStartParam } = useAppContext(); // Get startParamPayload from AppContext
+        const startParamProcessedRef = useRef(false); // To process start_param only once
 
         const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
         const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -230,22 +231,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             appToastHook = useAppToast();
         } catch (e: any) {
             logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR initializing useAppToast:", e);
-            appToastHook = { 
-                success: (m) => { console.error("Toast (success) FALLBACK:", m); logger.error("Toast (success) FALLBACK:", m); },
-                error: (m) => { console.error("Toast (error) FALLBACK:", m); logger.error("Toast (error) FALLBACK:", m); },
-                info: (m) => { console.warn("Toast (info) FALLBACK:", m); logger.warn("Toast (info) FALLBACK:", m); },
-                warning: (m) => { console.warn("Toast (warning) FALLBACK:", m); logger.warn("Toast (warning) FALLBACK:", m); },
-                loading: (m) => { console.warn("Toast (loading) FALLBACK:", m); logger.warn("Toast (loading) FALLBACK:", m); },
-                message: (m) => { console.warn("Toast (message) FALLBACK:", m); logger.warn("Toast (message) FALLBACK:", m); },
-                custom: (m) => { console.warn("Toast (custom) FALLBACK:", m); logger.warn("Toast (custom) FALLBACK:", m); },
-                dismiss: () => { console.warn("Toast (dismiss) FALLBACK"); logger.warn("Toast (dismiss) FALLBACK"); },
-                addToastToHistory: () => { console.warn("Toast (addToastToHistory) FALLBACK"); logger.warn("Toast (addToastToHistory) FALLBACK"); },
-            };
+            appToastHook = { success: (m) => logger.error("Toast (success) suppressed, hook failed:", m), error: (m) => logger.error("Toast (error) suppressed, hook failed:", m), info: (m) => logger.warn("Toast (info) suppressed, hook failed:", m), warning: (m) => logger.warn("Toast (warning) suppressed, hook failed:", m), loading: (m) => logger.warn("Toast (loading) suppressed, hook failed:", m), message: (m) => logger.warn("Toast (message) suppressed, hook failed:", m), custom: (m) => logger.warn("Toast (custom) suppressed, hook failed:", m), dismiss: () => logger.warn("Toast (dismiss) suppressed, hook failed"), addToastToHistory: () => logger.warn("Toast (addToastToHistory) suppressed, hook failed") };
         }
         const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => { 
-            if (!appToastHook || typeof appToastHook.success !== 'function' || typeof appToastHook.error !== 'function' || typeof appToastHook.info !== 'function' || typeof appToastHook.warning !== 'function' || typeof appToastHook.loading !== 'function' || typeof appToastHook.message !== 'function') { 
-                logger.error("addToastStable: appToastHook is invalid or incomplete. Toasting to console.", { message, type, appToastHookExists: !!appToastHook, hookType: typeof appToastHook });
-                console.error(`CONSOLE TOAST FALLBACK (${type}): ${typeof message === 'string' ? message : 'ReactNode message'}`, options);
+            if (!appToastHook || typeof appToastHook.success !== 'function') { 
+                logger.error("addToastStable: appToastHook is invalid or incomplete.", { message, type, appToastHookExists: !!appToastHook });
+                console.error(`TOAST FALLBACK (${type}): ${typeof message === 'string' ? message : 'ReactNode message'}`, options);
                 return;
             }
             const toastOptions = duration ? { ...options, duration } : options; 
@@ -884,6 +875,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const processTelegramStartParamStable = useCallback((payload: string) => {
             logger.info(`[RepoXmlPageContext] Processing Telegram start_param: ${payload}`);
             try {
+                // Example parsing: path_<encoded_path>_idea_<encoded_idea_string>
                 const pathMarker = "_path_";
                 const ideaMarker = "_idea_";
 
@@ -910,9 +902,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     fetcherRef.current.setInitialPathAndIdea(targetPath, idea);
                     addToastStable("Параметры запуска из Telegram применены!", "success");
                 } else {
+                    // Fallback or queue if ref not ready - for now, just log and potentially toast.
                     logger.warn("[RepoXmlPageContext] FetcherRef not ready when processing start_param. Parameters might not be fully applied immediately.");
                     addToastStable("Параметры запуска из Telegram получены, но компонент Fetcher еще не готов. Попробуйте обновить.", "warning");
                 }
+                // The RepoTxtFetcher component will then handle this initialPath and initialIdea
+                // in its own useEffect to trigger preCheckAndFetch.
 
             } catch (e: any) {
                 logger.error("[RepoXmlPageContext] Error parsing Telegram start_param:", e);
@@ -921,14 +916,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }, [addToastStable, fetcherRef]);
 
         useEffect(() => {
-            if (appContextStartParam && !startParamProcessedRef.current && repoUrlStateRef.current) {
-                logger.info(`[RepoXmlPageContext useEffect for start_param] Found appContextStartParam: ${appContextStartParam}. Repo URL is set. Processing...`);
+            if (appContextStartParam && !startParamProcessedRef.current && repoUrlStateRef.current) { // Check if repoUrl is also set
+                logger.info(`[RepoXmlPageContext useEffect for start_param] Found appContextStartParam: ${appContextStartParam}. Processing...`);
                 processTelegramStartParamStable(appContextStartParam);
                 startParamProcessedRef.current = true; 
             } else if (appContextStartParam && !startParamProcessedRef.current && !repoUrlStateRef.current) {
                 logger.warn("[RepoXmlPageContext useEffect for start_param] appContextStartParam found, but repoUrl is not set yet. Delaying processing.");
             }
-        }, [appContextStartParam, processTelegramStartParamStable, repoUrlState]);
+        }, [appContextStartParam, processTelegramStartParamStable, repoUrlState]); // Added repoUrlState as dependency
 
         const contextValue = useMemo((): RepoXmlPageContextType => ({
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, iconReplaceTask: iconReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 

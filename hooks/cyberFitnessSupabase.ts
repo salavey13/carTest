@@ -1,3 +1,4 @@
+// /hooks/cyberFitnessSupabase.ts
 "use client"; 
 import { supabaseAdmin } from './supabase'; 
 import { updateUserMetadata as genericUpdateUserMetadata, fetchUserData as genericFetchUserData } from './supabase'; 
@@ -51,7 +52,7 @@ export interface CyberFitnessProfile {
   featuresUsed: Record<string, boolean | number | string>; 
 }
 
-export const CYBERFIT_METADATA_KEY = "cyberFitness"; 
+export const CYBERFIT_METADATA_KEY = "cyberFitness"; // EXPORT ADDED
 const MAX_DAILY_LOG_ENTRIES = 30; 
 
 export interface Achievement { 
@@ -82,7 +83,7 @@ const COGNITIVE_OS_VERSIONS = [
     "v0.9 Singularity Pilot", "v1.0 Ascended Node", "v1.1 Vibe Master", "v1.2 Digital Demiurge",
     "v1.3 Context Commander", "v1.4 Vibe Channeler", "v1.5 Nexus Oracle", "v1.6 Reality Shaper", "vX.X Transcendent UI", 
 ]; 
-export const PERKS_BY_LEVEL: Record<number, string[]> = {
+const PERKS_BY_LEVEL: Record<number, string[]> = {
     1: ["Авто-PR для Замены Изображений", "Базовый Захват Файлов", "Понимание Контекста Одного Файла"],
     2: ["Обработка Простых Идей (1 файл)", "Многофайловый Контекст (до 5 файлов)", "Парсинг Ответа AI"],
     3: ["Создание PR (Новая Ветка)", "Обновление Существующей Ветки", "Анализ Логов Ошибок (ErrorFix Flow)"],
@@ -140,18 +141,11 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "video-swap-mission", name: "Миссия: Видео-Рендер", description: "Заменил видео-файл, как будто так и надо!", icon: "FaVideo", kiloVibesAward: 15, checkCondition: (p) => p.completedQuests.includes("video-swap-mission") },
     { id: "inception-swap-mission", name: "Миссия: Inception Swap", description: "Осознал 4-шаговый паттерн! Ты почти Нео.", icon: "FaInfinity", kiloVibesAward: 15, checkCondition: (p) => p.completedQuests.includes("inception-swap-mission") },
     { id: "the-fifth-door-mission", name: "Миссия: Пятая Дверь", description: "Вышел из Матрицы! Полный контроль!", icon: "FaKey", kiloVibesAward: 50, checkCondition: (p) => p.completedQuests.includes("the-fifth-door-mission") },
-    // Новые ачивки для Leads и StickyChat (добавлены в старый массив)
-    { id: 'leads_first_scrape_success', name: 'Зонд-Первопроходец', description: 'Успешно использовал Кибер-Скрейпер для сбора данных.', icon: 'FaSatelliteDish', kiloVibesAward: 75, checkCondition: (p) => p.featuresUsed?.leads_first_scrape_success === true },
-    { id: 'leads_first_csv_upload', name: 'Десантник Данных', description: 'Успешно загрузил первый CSV с лидами в Supabase.', icon: 'FaCloudArrowUp', kiloVibesAward: 150, checkCondition: (p) => p.featuresUsed?.leads_first_csv_upload === true },
-    { id: 'leads_ai_pipeline_used', name: 'Межгалактический Конвейер', description: 'Использовал "Межгалактический промпт" для полной обработки лидов.', icon: 'FaMeteor', kiloVibesAward: 100, checkCondition: (p) => p.featuresUsed?.leads_ai_pipeline_used === true },
-    { id: 'image_replace_initiated', name: 'Визуальный Твик', description: 'Инициировал замену изображения через Xuinity.', icon: 'FaImages', kiloVibesAward: 40, checkCondition: (p) => p.featuresUsed?.image_replace_initiated === true },
-    { id: 'icon_replace_initiated', name: 'Символист', description: 'Инициировал замену иконки через Xuinity.', icon: 'FaIcons', kiloVibesAward: 40, checkCondition: (p) => p.featuresUsed?.icon_replace_initiated === true },
-    { id: 'idea_sent_to_studio', name: 'Искра Вдохновения', description: 'Отправил идею в SUPERVIBE Studio через Xuinity.', icon: 'FaLightbulb', kiloVibesAward: 50, checkCondition: (p) => p.featuresUsed?.idea_sent_to_studio === true },
 ];
 
-export const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
+const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
-    activeQuests: QUEST_ORDER.length > 0 ? [QUEST_ORDER[0]] : [], 
+    activeQuests: [QUEST_ORDER[0]], 
     completedQuests: [], unlockedPerks: [],
     cognitiveOSVersion: COGNITIVE_OS_VERSIONS[0], lastActivityTimestamp: new Date(0).toISOString(), 
     dailyActivityLog: [], achievements: [],
@@ -169,7 +163,7 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
         ...defaultProfile,
         ...existingProfile,
         dailyActivityLog: Array.isArray(existingProfile.dailyActivityLog) ? existingProfile.dailyActivityLog.map(log => ({ 
-            date: typeof log.date === 'string' ? log.date : new Date().toISOString().split('T')[0],
+            date: log.date,
             filesExtracted: log.filesExtracted || 0,
             tokensProcessed: log.tokensProcessed || 0,
             kworkRequestsSent: log.kworkRequestsSent || 0,
@@ -178,7 +172,7 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
             focusTimeMinutes: log.focusTimeMinutes || 0,
         })) : defaultProfile.dailyActivityLog,
         achievements: Array.isArray(existingProfile.achievements) ? existingProfile.achievements : defaultProfile.achievements,
-        activeQuests: Array.isArray(existingProfile.activeQuests) && existingProfile.activeQuests.length > 0 ? existingProfile.activeQuests : (QUEST_ORDER.length > 0 ? [QUEST_ORDER[0]] : []),
+        activeQuests: Array.isArray(existingProfile.activeQuests) ? existingProfile.activeQuests : defaultProfile.activeQuests,
         completedQuests: Array.isArray(existingProfile.completedQuests) ? existingProfile.completedQuests : defaultProfile.completedQuests, 
         unlockedPerks: Array.isArray(existingProfile.unlockedPerks) ? existingProfile.unlockedPerks : defaultProfile.unlockedPerks,
         featuresUsed: typeof existingProfile.featuresUsed === 'object' && existingProfile.featuresUsed !== null ? existingProfile.featuresUsed : defaultProfile.featuresUsed,
@@ -194,13 +188,8 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
         cognitiveOSVersion: typeof existingProfile.cognitiveOSVersion === 'string' && existingProfile.cognitiveOSVersion ? existingProfile.cognitiveOSVersion : (COGNITIVE_OS_VERSIONS[existingProfile.level || 0] || defaultProfile.cognitiveOSVersion),
         lastActivityTimestamp: typeof existingProfile.lastActivityTimestamp === 'string' ? existingProfile.lastActivityTimestamp : defaultProfile.lastActivityTimestamp,
     };
-     if (finalProfile.activeQuests.length === 0 && finalProfile.completedQuests.length < QUEST_ORDER.length) {
-        for (const questId of QUEST_ORDER) {
-            if (!finalProfile.completedQuests.includes(questId)) {
-                finalProfile.activeQuests.push(questId);
-                break; 
-            }
-        }
+     if (finalProfile.activeQuests.length === 0 && finalProfile.completedQuests.length === 0 && QUEST_ORDER.length > 0) {
+        finalProfile.activeQuests = [QUEST_ORDER[0]];
     }
   }
   
@@ -825,7 +814,7 @@ export const markTutorialAsCompleted = async (
   };
 };
 
-export const isQuestUnlocked = (questId: string, completedQuests: string[] | undefined, questOrder: string[] = QUEST_ORDER): boolean => { // Добавил = QUEST_ORDER
+export const isQuestUnlocked = (questId: string, completedQuests: string[] | undefined, questOrder: string[]): boolean => {
   const questIndex = questOrder.indexOf(questId);
   if (questIndex === -1) {
     logger.warn(`[isQuestUnlocked] Quest ID "${questId}" not found in QUEST_ORDER. Assuming locked.`);
@@ -872,10 +861,10 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
                 return {
                     id: achievementId,
                     name: `Достигнут Уровень ${level}!`,
-                    description: `Вы достигли ${level}-го уровня КиберФитнеса! Новые перки и возможности открыты.`,
+                    description: `Вы достигли ${level}-го уровня КиберФитнеса. Новые перки и возможности открыты.`,
                     icon: 'FaStar',
                     checkCondition: () => true, 
-                    kiloVibesAward: 0, // Динамические ачивки не дают доп. очков, очки за уровень уже начислены
+                    kiloVibesAward: 0, 
                     isDynamic: true,
                 };
             }
@@ -889,7 +878,7 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
             description: `Вы успешно применили и освоили схему '${schematicNamePartFromId}'.`,
             icon: 'FaTasks', 
             checkCondition: () => true,
-            kiloVibesAward: 0, // Аналогично
+            kiloVibesAward: 0, 
             isDynamic: true,
         };
     }
@@ -899,3 +888,5 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
 };
 
 export const TOKEN_ESTIMATION_FACTOR = 4;
+
+export { PERKS_BY_LEVEL };

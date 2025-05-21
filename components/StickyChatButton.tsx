@@ -1,3 +1,4 @@
+// /components/StickyChatButton.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -42,7 +43,6 @@ interface Suggestion { id: string; text: string; link?: string; action?: () => v
 interface GitHubProfile { login: string; avatar_url: string; html_url: string; name?: string | null; }
 interface IconReplaceDetails { oldIconName: string; newIconName: string; componentProps?: string; }
 
-
 // --- Animation Variants ---
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
@@ -65,7 +65,6 @@ const isIconNameInput = (input: string): boolean => {
     const trimmed = input.trim();
     return /^(Fa[A-Z0-9][a-zA-Z0-9]*|fa-[a-z0-9-]+)$/i.test(trimmed) && !trimmed.includes(" ") && trimmed.length > 2;
 };
-
 
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
