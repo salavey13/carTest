@@ -76,7 +76,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
         toast.success(<VibeContentRenderer content="::facheckcircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'." />, { id: toastId, duration: 4000 });
         onSuccessfulScrape?.(); 
       } else {
-        toast.error(<VibeContentRenderer content={`::faexclamationtriangle:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
+        toast.error(<VibeContentRenderer content={`::fatriangleexclamation:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
       }
     } catch (error: any) {
       toast.error(<VibeContentRenderer content={`::facbomb:: Критическая ошибка зонда: ${error.message}`} />, { id: toastId, duration: 6000 });
@@ -92,7 +92,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
           <VibeContentRenderer content="::FaTools className='animate-pulse text-2xl sm:text-3xl':: Универсальный Кибер-Скрейпер" />
         </CardTitle>
         <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">
-          <VibeContentRenderer content="::fainfocircle:: Выберите **Быстрый Протокол Разведки** или введите **URL** целевой страницы. Зонд соберет текстовый контент, который будет добавлен в поле 'Сбор трофеев' для дальнейшей AI-обработки."/>
+          <VibeContentRenderer content="::facircleinfo:: Выберите **Быстрый Протокол Разведки** или введите **URL** целевой страницы. Зонд соберет текстовый контент, который будет добавлен в поле 'Сбор трофеев' для дальнейшей AI-обработки."/>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 font-mono">
