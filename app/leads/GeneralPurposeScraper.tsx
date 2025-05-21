@@ -43,11 +43,9 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
   const [isScraping, setIsScraping] = useState(false);
 
   const handlePredefinedSearch = (search: typeof predefinedSearchButtons[0]) => {
-    setKeywords(search.keywords); // Устанавливаем ключевое слово в input для информации
+    setKeywords(search.keywords); 
     if (search.siteUrlFormat) {
-        // Для Kwork, используем keywords как есть, так как они обычно однословные или короткие фразы
-        // Для Habr, encodeURIComponent всё еще полезен для более сложных запросов
-        const encodedKeywords = search.site === 'habr' ? encodeURIComponent(search.keywords) : search.keywords;
+        const encodedKeywords = encodeURIComponent(search.keywords); // Всегда кодируем ключевые слова
         const searchUrl = search.siteUrlFormat.replace("{keywords}", encodedKeywords);
         setTargetUrl(searchUrl);
         toast.info(`Запрос "${search.label}" подготовлен. URL для скрейпинга: ${searchUrl}. Нажмите "Запустить Зонд".`, {duration: 3000});
