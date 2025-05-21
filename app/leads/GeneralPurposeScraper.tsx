@@ -16,23 +16,25 @@ interface GeneralPurposeScraperProps {
     borderColor: string;
     shadowColor: string;
   };
-  t_dynamic_links: Record<string, any>; // Changed to any for flexibility with new link rendering
+  t_dynamic_links: Record<string, any>; 
   onScrapedData: (data: string) => void; 
-  onSuccessfulScrape?: () => void; // Optional callback for achievements
+  onSuccessfulScrape?: () => void; 
 }
 
 const predefinedSearchButtons = [
-  { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app, twa, mini app", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" }, 
-  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть, ai telegram bot", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" },
-  { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js, react, supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" }, 
-  { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&q={keywords}" },
-  { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app, twa", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-  { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai, нейросеть", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+  { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
+  { id: "kwork_mini_app", label: "Mini App (Kwork)", site: "kwork", keywords: "mini app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
+  { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
+  { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "kwork_webapp", label: "WebApp (Kwork)", site: "kwork", keywords: "webapp", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+  { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" }, // Habr использует 'q'
+  { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
 ];
 
 const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
   pageTheme,
-  t_dynamic_links, // This prop might need adjustment if it was specifically for VibeContentRenderer HTML strings
+  t_dynamic_links, 
   onScrapedData,
   onSuccessfulScrape,
 }) => {
@@ -41,9 +43,12 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
   const [isScraping, setIsScraping] = useState(false);
 
   const handlePredefinedSearch = (search: typeof predefinedSearchButtons[0]) => {
-    setKeywords(search.keywords);
+    setKeywords(search.keywords); // Устанавливаем ключевое слово в input для информации
     if (search.siteUrlFormat) {
-        const searchUrl = search.siteUrlFormat.replace("{keywords}", encodeURIComponent(search.keywords));
+        // Для Kwork, используем keywords как есть, так как они обычно однословные или короткие фразы
+        // Для Habr, encodeURIComponent всё еще полезен для более сложных запросов
+        const encodedKeywords = search.site === 'habr' ? encodeURIComponent(search.keywords) : search.keywords;
+        const searchUrl = search.siteUrlFormat.replace("{keywords}", encodedKeywords);
         setTargetUrl(searchUrl);
         toast.info(`Запрос "${search.label}" подготовлен. URL для скрейпинга: ${searchUrl}. Нажмите "Запустить Зонд".`, {duration: 3000});
     } else {
@@ -71,9 +76,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
       if (result.success && result.content) {
         onScrapedData(result.content);
         toast.success(<VibeContentRenderer content="::facheckcircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'." />, { id: toastId, duration: 4000 });
-        // setKeywords(''); // Не очищаем ключевые слова, чтобы пользователь мог их видеть
-        // setTargetUrl(''); // Не очищаем URL, если пользователь хочет повторить или немного изменить
-        onSuccessfulScrape?.(); // Call achievement callback
+        onSuccessfulScrape?.(); 
       } else {
         toast.error(<VibeContentRenderer content={`::faexclamationtriangle:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
       }
@@ -138,7 +141,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
             type="url"
             value={targetUrl}
             onChange={(e) => setTargetUrl(e.target.value)}
-            placeholder="https://kwork.ru/projects?c=11&q=ключевое_слово"
+            placeholder="https://kwork.ru/projects?c=11&keyword=ключевое_слово&a=1"
             className="w-full p-2 border rounded bg-gray-800/70 border-brand-cyan/50 text-gray-200 focus:ring-2 focus:ring-brand-cyan outline-none placeholder-gray-500 text-xs sm:text-sm font-mono"
             disabled={isScraping}
           />
