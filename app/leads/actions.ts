@@ -11,21 +11,21 @@ type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
 
 interface CsvLeadRow {
   client_name?: string;
-  kwork_url?: string; // Это будет lead_url в transformHeader
-  project_description: string; // Обязательное поле
+  lead_url?: string; 
+  project_description: string; 
   budget_range?: string;
-  // Поля ниже присутствуют в CSV от AI, но не все есть в таблице `leads`
-  deadline_info?: string; 
-  client_kwork_history?: string; 
-  current_kwork_offers_count?: string; 
   raw_html_description?: string;
   generated_offer?: string;
   identified_tweaks?: string; 
   missing_features?: string; 
   status?: string;
   source?: string;
-  initial_relevance_score?: string; // Добавлено, PapaParse читает все как строки сначала
-  project_type_guess?: string;   // Добавлено
+  similarity_score?: string; // Changed from initial_relevance_score
+  project_type_guess?: string;
+  // These fields might be in the CSV from AI but are not directly in CsvLeadRow for DB mapping.
+  // deadline_info?: string; 
+  // client_kwork_history?: string; 
+  // current_kwork_offers_count?: string; 
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -79,13 +79,17 @@ export async function uploadLeadsFromCsv(
       skipEmptyLines: 'greedy',
       transformHeader: header => {
         const trimmedHeader = header.trim().toLowerCase();
-        if (trimmedHeader === 'kwork_url') return 'lead_url'; // Маппинг для upsert
-        return trimmedHeader; // Используем lowercase для сопоставления с CsvLeadRow
+        // Ensure kwork_url from CSV maps to lead_url for DB
+        if (trimmedHeader === 'kwork_url') return 'lead_url'; 
+        return trimmedHeader; 
       },
       transform: (value, header) => {
+        const headerStr = String(header).toLowerCase(); // Ensure header is treated as string for comparison
         const trimmedValue = typeof value === 'string' ? value.trim() : value;
-        if (header === 'initial_relevance_score') {
-          const num = parseInt(trimmedValue as string, 10);
+        
+        // Correctly parse similarity_score
+        if (headerStr === 'similarity_score') {
+          const num = parseFloat(trimmedValue as string); // Use parseFloat for potential decimals
           return isNaN(num) ? null : num;
         }
         return trimmedValue;
@@ -94,7 +98,15 @@ export async function uploadLeadsFromCsv(
 
     if (parseResult.errors.length > 0) {
       const firstError = parseResult.errors[0];
-      return { success: false, message: `Ошибка парсинга CSV (Строка ${firstError.row + 1}): ${firstError.message}. Проверьте формат.` };
+      let errorMessage = `Ошибка парсинга CSV (Строка ${firstError.row + 1}): ${firstError.message}. Проверьте формат.`;
+      if (firstError.code === 'TooFewFields' || firstError.code === 'TooManyFields') {
+        errorMessage += ` Ожидалось ${parseResult.meta.fields?.length} полей, найдено другое количество.`;
+      }
+      if (firstError.message.includes("Trailing quote")) {
+        errorMessage += ` Возможно, проблема с экранированием кавычек в поле: ${parseResult.meta.fields?.[firstError.index as number] || 'неизвестное поле'}.`;
+      }
+      logger.error("CSV Parsing Error Details:", parseResult.errors);
+      return { success: false, message: errorMessage };
     }
     if (!parseResult.data || parseResult.data.length === 0) {
       return { success: false, message: "Ошибка: CSV не содержит данных." };
@@ -104,9 +116,9 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      // transformHeader уже привел все заголовки к lowerCase, поэтому обращаемся напрямую по lowerCase ключу
+      // getRowVal helper ensures we always query with lowercase keys
       const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()];
-      const leadUrlFromCsv = getRowVal('kwork_url'); // 'kwork_url' это уже 'lead_url' после transformHeader
+      const leadUrlFromCsv = getRowVal('lead_url'); // Already mapped by transformHeader
 
       if (!getRowVal('project_description')) {
         localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
@@ -115,23 +127,28 @@ export async function uploadLeadsFromCsv(
       
       let tweaksJson: any = null;
       const identifiedTweaksCsv = getRowVal('identified_tweaks');
-      if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string') {
-        try { tweaksJson = JSON.parse(identifiedTweaksCsv); }
-        catch (e) { localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
-      } else if (typeof identifiedTweaksCsv === 'object') { // Если PapaParse уже распарсил как объект (маловероятно для строки CSV, но на всякий случай)
-        tweaksJson = identifiedTweaksCsv;
+      if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string' && identifiedTweaksCsv.trim() !== "") {
+        try { 
+          tweaksJson = JSON.parse(identifiedTweaksCsv); 
+        } catch (e) { 
+          logger.error(`Error parsing JSON for 'identified_tweaks' in lead with URL ${leadUrlFromCsv}: ${(e as Error).message}. JSON string: ${identifiedTweaksCsv.substring(0, 100)}...`);
+          localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv || 'N/A'}: ${(e as Error).message.substring(0,150)}`); 
+        }
       }
-
 
       let featuresJson: any = null;
       const missingFeaturesCsv = getRowVal('missing_features');
-      if (missingFeaturesCsv && typeof missingFeaturesCsv === 'string') {
-        try { featuresJson = JSON.parse(missingFeaturesCsv); }
-        catch (e) { localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
-      } else if (typeof missingFeaturesCsv === 'object') {
-        featuresJson = missingFeaturesCsv;
+      if (missingFeaturesCsv && typeof missingFeaturesCsv === 'string' && missingFeaturesCsv.trim() !== "") {
+        try { 
+          featuresJson = JSON.parse(missingFeaturesCsv); 
+        } catch (e) { 
+          logger.error(`Error parsing JSON for 'missing_features' in lead with URL ${leadUrlFromCsv}: ${(e as Error).message}. JSON string: ${missingFeaturesCsv.substring(0, 100)}...`);
+          localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${leadUrlFromCsv || 'N/A'}: ${(e as Error).message.substring(0,150)}`); 
+        }
       }
       
+      const similarityScoreValue = getRowVal('similarity_score');
+
       const leadEntry: LeadInsert = {
         client_name: getRowVal('client_name') || null,
         lead_url: leadUrlFromCsv || null, 
@@ -143,7 +160,8 @@ export async function uploadLeadsFromCsv(
         missing_features: featuresJson,
         status: getRowVal('status') || 'raw_data', 
         source: getRowVal('source') || 'csv_upload',
-        initial_relevance_score: typeof getRowVal('initial_relevance_score') === 'number' ? getRowVal('initial_relevance_score') : null,
+        // Correctly use similarity_score from CSV for the DB similarity_score column
+        similarity_score: typeof similarityScoreValue === 'number' ? Number(similarityScoreValue.toFixed(2)) : null,
         project_type_guess: getRowVal('project_type_guess') || null,
       };
 
@@ -157,7 +175,7 @@ export async function uploadLeadsFromCsv(
     if (leadsToUpsert.length === 0 && localErrors.length > 0) {
         return { success: false, message: "Нет валидных лидов для загрузки.", errors: localErrors };
     }
-    if (leadsToUpsert.length === 0) {
+    if (leadsToUpsert.length === 0 && localErrors.length === 0) { // Added check for no local errors
         return { success: false, message: "Нет данных для загрузки после обработки CSV."};
     }
     
@@ -195,6 +213,8 @@ export async function uploadLeadsFromCsv(
   }
 }
 
+// ... (rest of the file: updateLeadStatus, assignLead, fetchLeadsForDashboard, scrapePageContent - no changes needed there for this issue)
+// Make sure to include the full scrapePageContent function here if it was truncated.
 export async function updateLeadStatus(
   leadId: string, 
   newStatus: string,
@@ -309,7 +329,7 @@ export async function fetchLeadsForDashboard(
       else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); 
       else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
       else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
-      else if (filter === 'my' && currentUserStatus === 'admin') { // Админ в "мои" видит все где он либо танк либо кэрри либо саппорт
+      else if (filter === 'my' && currentUserStatus === 'admin') { 
         query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
       }
     } else if (currentUserRole === 'tank') {
@@ -373,14 +393,14 @@ export async function scrapePageContent(
     logger.debug(`[Scraper] Ненужные элементы удалены.`);
 
     const contentSelectors = [
-      'article', '.article-content', '.entry-content', '.post-body', '.post-content', // Блоги и статьи
-      'main[role="main"]', 'main', // Основной контент
-      '.project-description', '.task__description', '.job-description', '.vacancy-description', // Описания проектов/вакансий
-      '.product-description', '[itemprop="description"]', // Описания продуктов
-      '.text-content', '.content-text', '.article-text', // Общие текстовые блоки
-      '.job_show_description', '.b-description__text', // Специфичные для некоторых сайтов
-      '.page-content', '.content', '#content', '.main-content', '#main-content', // Общие контейнеры
-      'section', // В крайнем случае секции
+      'article', '.article-content', '.entry-content', '.post-body', '.post-content', 
+      'main[role="main"]', 'main', 
+      '.project-description', '.task__description', '.job-description', '.vacancy-description', 
+      '.product-description', '[itemprop="description"]', 
+      '.text-content', '.content-text', '.article-text', 
+      '.job_show_description', '.b-description__text', 
+      '.page-content', '.content', '#content', '.main-content', '#main-content', 
+      'section', 
     ];
     logger.debug(`[Scraper] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
 
@@ -394,14 +414,13 @@ export async function scrapePageContent(
             logger.debug(`[Scraper] Найдены кандидаты по селектору '${selector}': ${$candidates.length} шт.`);
             $candidates.each((_i, el) => {
                 const $currentCandidate = $(el);
-                // Клонируем, чтобы не изменять оригинал, удаляем скрипты и стили на всякий случай еще раз из кандидата
                 const $clone = $currentCandidate.clone();
                 $clone.find('script, style, nav, footer, header, aside, form, button, input, textarea, select, iframe, link, meta, svg, img, figure').remove();
                 const textSample = $clone.text().replace(/\s\s+/g, ' ').trim();
                 
                 if (textSample.length > maxTextLength) {
                     maxTextLength = textSample.length;
-                    $targetElement = $currentCandidate; // Берем оригинальный элемент, а не клон
+                    $targetElement = $currentCandidate; 
                     mainContentSelectorUsed = selector;
                     logger.info(`[Scraper] Новый лучший кандидат по селектору '${selector}', длина текста: ${maxTextLength}`);
                 }
@@ -409,7 +428,7 @@ export async function scrapePageContent(
         }
     }
 
-    if (!$targetElement || maxTextLength < 100) { // Если лучший кандидат все равно слишком мал или не найден
+    if (!$targetElement || maxTextLength < 100) { 
       $targetElement = $('body');
       mainContentSelectorUsed = 'body (fallback)';
       logger.warn(`[Scraper] Специфичный контент не найден или слишком мал (maxTextLength: ${maxTextLength}). Используется весь body.`);
