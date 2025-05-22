@@ -154,13 +154,14 @@ const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
 
 const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | null | undefined): CyberFitnessProfile => {
   const defaultProfile = getDefaultCyberFitnessProfile();
-  let finalProfile = defaultProfile;
+  let finalProfile = { ...defaultProfile }; // Start with a copy of default
 
   if (metadata && typeof metadata === 'object' && metadata[CYBERFIT_METADATA_KEY] && typeof metadata[CYBERFIT_METADATA_KEY] === 'object') {
     const existingProfile = metadata[CYBERFIT_METADATA_KEY] as Partial<CyberFitnessProfile>;
     finalProfile = {
-        ...defaultProfile,
-        ...existingProfile,
+        ...defaultProfile, // Ensure all default fields are present
+        ...existingProfile, // Override with existing data
+        // Ensure specific array/object fields are correctly initialized if missing or of wrong type in DB
         dailyActivityLog: Array.isArray(existingProfile.dailyActivityLog) ? existingProfile.dailyActivityLog.map(log => ({ 
             date: log.date,
             filesExtracted: log.filesExtracted || 0,
@@ -175,17 +176,15 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
         completedQuests: Array.isArray(existingProfile.completedQuests) ? existingProfile.completedQuests : defaultProfile.completedQuests, 
         unlockedPerks: Array.isArray(existingProfile.unlockedPerks) ? existingProfile.unlockedPerks : defaultProfile.unlockedPerks,
         featuresUsed: typeof existingProfile.featuresUsed === 'object' && existingProfile.featuresUsed !== null ? existingProfile.featuresUsed : defaultProfile.featuresUsed,
+        // Ensure numeric fields are numbers and not NaN
         level: typeof existingProfile.level === 'number' && !isNaN(existingProfile.level) ? existingProfile.level : defaultProfile.level,
         kiloVibes: typeof existingProfile.kiloVibes === 'number' && !isNaN(existingProfile.kiloVibes) ? existingProfile.kiloVibes : defaultProfile.kiloVibes,
         focusTimeHours: typeof existingProfile.focusTimeHours === 'number' && !isNaN(existingProfile.focusTimeHours) ? existingProfile.focusTimeHours : defaultProfile.focusTimeHours,
-        skillsLeveled: Array.isArray(existingProfile.unlockedPerks) ? existingProfile.unlockedPerks.length : (typeof existingProfile.skillsLeveled === 'number' ? existingProfile.skillsLeveled : defaultProfile.skillsLeveled),
         totalFilesExtracted: typeof existingProfile.totalFilesExtracted === 'number' ? existingProfile.totalFilesExtracted : defaultProfile.totalFilesExtracted,
         totalTokensProcessed: typeof existingProfile.totalTokensProcessed === 'number' ? existingProfile.totalTokensProcessed : defaultProfile.totalTokensProcessed,
         totalKworkRequestsSent: typeof existingProfile.totalKworkRequestsSent === 'number' ? existingProfile.totalKworkRequestsSent : defaultProfile.totalKworkRequestsSent,
         totalPrsCreated: typeof existingProfile.totalPrsCreated === 'number' ? existingProfile.totalPrsCreated : defaultProfile.totalPrsCreated,
         totalBranchesUpdated: typeof existingProfile.totalBranchesUpdated === 'number' ? existingProfile.totalBranchesUpdated : defaultProfile.totalBranchesUpdated,
-        cognitiveOSVersion: typeof existingProfile.cognitiveOSVersion === 'string' && existingProfile.cognitiveOSVersion ? existingProfile.cognitiveOSVersion : (COGNITIVE_OS_VERSIONS[existingProfile.level || 0] || defaultProfile.cognitiveOSVersion),
-        lastActivityTimestamp: typeof existingProfile.lastActivityTimestamp === 'string' ? existingProfile.lastActivityTimestamp : defaultProfile.lastActivityTimestamp,
     };
      if (finalProfile.activeQuests.length === 0 && finalProfile.completedQuests.length === 0 && QUEST_ORDER.length > 0) {
         finalProfile.activeQuests = [QUEST_ORDER[0]];
@@ -194,7 +193,7 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
   
   const currentLevel = finalProfile.level || 0;
   finalProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[currentLevel] || COGNITIVE_OS_VERSIONS[COGNITIVE_OS_VERSIONS.length -1] || defaultProfile.cognitiveOSVersion;
-  finalProfile.skillsLeveled = new Set(finalProfile.unlockedPerks || []).size;
+  finalProfile.skillsLeveled = new Set(finalProfile.unlockedPerks || []).size; // Always derive skillsLeveled from unlockedPerks
 
   return finalProfile;
 };
@@ -383,7 +382,6 @@ export const updateUserCyberFitnessProfile = async (
       KV Delta: ${updates.kiloVibes ?? 0}, Files Delta: ${updates.totalFilesExtracted ?? 0}, Tokens Delta: ${updates.totalTokensProcessed ?? 0},
       KWorks Delta: ${updates.totalKworkRequestsSent ?? 0}, PRs Delta: ${updates.totalPrsCreated ?? 0}, Branches Delta: ${updates.totalBranchesUpdated ?? 0}.`);
 
-
     const newCyberFitnessProfile: CyberFitnessProfile = {
       ...existingCyberFitnessProfileData, 
       lastActivityTimestamp: new Date().toISOString(), 
@@ -424,7 +422,6 @@ export const updateUserCyberFitnessProfile = async (
                                 newCyberFitnessProfile.unlockedPerks.push(perk);
                             }
                         });
-                        newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
                     }
                 }
             }
@@ -527,6 +524,7 @@ export const updateUserCyberFitnessProfile = async (
             }
         });
     }
+     // Ensure skillsLeveled is always derived from the final set of unlockedPerks
     newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size; 
     
     if (updates.cognitiveOSVersion && typeof updates.cognitiveOSVersion === 'string' && updates.cognitiveOSVersion !== newCyberFitnessProfile.cognitiveOSVersion) {
@@ -549,11 +547,12 @@ export const updateUserCyberFitnessProfile = async (
                             existingPerksSet.add(perk);
                         }
                     });
-                    newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
                 }
             }
         });
     }
+     // Final update of skillsLeveled based on all perk modifications
+    newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
 
     for (const ach of ALL_ACHIEVEMENTS) {
         if (!ach.isQuest && !currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) { 
@@ -570,11 +569,11 @@ export const updateUserCyberFitnessProfile = async (
                         existingPerksSet.add(perk);
                     }
                 });
-                newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
             }
         }
     }
     newCyberFitnessProfile.achievements = Array.from(currentAchievementsSet);
+    newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size; // Final safety net for skillsLeveled
     
     if (newlyUnlockedAchievements.length > 0) {
         logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements (incl. dynamic):`, newlyUnlockedAchievements.map(a => `${a.name} (${a.id}, +${a.kiloVibesAward || 0}KV)`));

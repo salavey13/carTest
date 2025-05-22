@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/hooks/supabase'; // Используем admin 
 import type { Database } from "@/types/database.types";
 import { logger } from '@/lib/logger';
 import Papa from 'papaparse';
+import * as cheerio from 'cheerio';
 
 type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
@@ -23,6 +24,8 @@ interface CsvLeadRow {
   missing_features?: string; 
   status?: string;
   source?: string;
+  initial_relevance_score?: string; // Добавлено, PapaParse читает все как строки сначала
+  project_type_guess?: string;   // Добавлено
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -79,7 +82,14 @@ export async function uploadLeadsFromCsv(
         if (trimmedHeader === 'kwork_url') return 'lead_url'; // Маппинг для upsert
         return trimmedHeader; // Используем lowercase для сопоставления с CsvLeadRow
       },
-      transform: value => (typeof value === 'string' ? value.trim() : value),
+      transform: (value, header) => {
+        const trimmedValue = typeof value === 'string' ? value.trim() : value;
+        if (header === 'initial_relevance_score') {
+          const num = parseInt(trimmedValue as string, 10);
+          return isNaN(num) ? null : num;
+        }
+        return trimmedValue;
+      }
     });
 
     if (parseResult.errors.length > 0) {
@@ -94,18 +104,9 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      // Используем lowercase ключи из parseResult.meta.fields для доступа к данным строки,
-      // так как transformHeader привел их к lowercase.
-      // Papa.parse<CsvLeadRow> ожидает, что ключи row будут соответствовать CsvLeadRow.
-      // Если transformHeader меняет 'kwork_url' на 'lead_url', то в row будет row.lead_url
-      
-      const leadUrlFromCsv = row.kwork_url; // Исходное имя из CSV до transformHeader
-                                       // или row.lead_url, если Papa.parse типизирует по transformHeader
-                                       // Для безопасности, лучше проверить оба или нормализовать ключи row.
-
-      // Нормализуем доступ к полям, если transformHeader не отражается в типизации row
-      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()] ?? (row as any)[key];
-
+      // transformHeader уже привел все заголовки к lowerCase, поэтому обращаемся напрямую по lowerCase ключу
+      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()];
+      const leadUrlFromCsv = getRowVal('kwork_url'); // 'kwork_url' это уже 'lead_url' после transformHeader
 
       if (!getRowVal('project_description')) {
         localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
@@ -114,22 +115,27 @@ export async function uploadLeadsFromCsv(
       
       let tweaksJson: any = null;
       const identifiedTweaksCsv = getRowVal('identified_tweaks');
-      if (identifiedTweaksCsv) {
+      if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string') {
         try { tweaksJson = JSON.parse(identifiedTweaksCsv); }
         catch (e) { localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
+      } else if (typeof identifiedTweaksCsv === 'object') { // Если PapaParse уже распарсил как объект (маловероятно для строки CSV, но на всякий случай)
+        tweaksJson = identifiedTweaksCsv;
       }
+
 
       let featuresJson: any = null;
       const missingFeaturesCsv = getRowVal('missing_features');
-      if (missingFeaturesCsv) {
+      if (missingFeaturesCsv && typeof missingFeaturesCsv === 'string') {
         try { featuresJson = JSON.parse(missingFeaturesCsv); }
         catch (e) { localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
+      } else if (typeof missingFeaturesCsv === 'object') {
+        featuresJson = missingFeaturesCsv;
       }
       
       const leadEntry: LeadInsert = {
         client_name: getRowVal('client_name') || null,
         lead_url: leadUrlFromCsv || null, 
-        project_description: getRowVal('project_description')!, // Уверены, что есть из-за проверки выше
+        project_description: getRowVal('project_description')!, 
         budget_range: getRowVal('budget_range') || null,
         raw_html_description: getRowVal('raw_html_description') || null,
         generated_offer: getRowVal('generated_offer') || null,
@@ -137,6 +143,8 @@ export async function uploadLeadsFromCsv(
         missing_features: featuresJson,
         status: getRowVal('status') || 'raw_data', 
         source: getRowVal('source') || 'csv_upload',
+        initial_relevance_score: typeof getRowVal('initial_relevance_score') === 'number' ? getRowVal('initial_relevance_score') : null,
+        project_type_guess: getRowVal('project_type_guess') || null,
       };
 
       if (leadEntry.lead_url === '') {
@@ -187,8 +195,6 @@ export async function uploadLeadsFromCsv(
   }
 }
 
-// Остальные функции (updateLeadStatus, assignLead, fetchLeadsForDashboard) остаются без изменений,
-// так как проблема была связана с uploadLeadsFromCsv и форматом CSV.
 export async function updateLeadStatus(
   leadId: string, 
   newStatus: string,
@@ -299,10 +305,13 @@ export async function fetchLeadsForDashboard(
     if (currentUserStatus === 'admin' || currentUserRole === 'support') {
       if (filter === 'tank') query = query.neq('assigned_to_tank', null);
       else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
-      else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); // Саппорт видит свои назначенные
-      else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); // Админ видит все где есть саппорт
+      else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); 
+      else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); 
       else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
       else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
+      else if (filter === 'my' && currentUserStatus === 'admin') { // Админ в "мои" видит все где он либо танк либо кэрри либо саппорт
+        query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
+      }
     } else if (currentUserRole === 'tank') {
       query = query.eq('assigned_to_tank', currentUserId);
       if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
@@ -325,5 +334,156 @@ export async function fetchLeadsForDashboard(
   } catch (error) {
     logger.error('Критическая ошибка при загрузке лидов для дашборда:', error);
     return { success: false, error: error instanceof Error ? error.message : 'Неожиданная серверная ошибка.' };
+  }
+}
+
+export async function scrapePageContent(
+  targetUrl: string
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  if (!targetUrl) {
+    return { success: false, error: "URL не указан." };
+  }
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+  logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl} с User-Agent: ${userAgent}`);
+
+  try {
+    const response = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+      signal: AbortSignal.timeout(20000), 
+    });
+    logger.info(`[Scraper] Получен ответ от ${targetUrl}. Статус: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Не удалось прочитать тело ошибки");
+      logger.error(`[Scraper] Ошибка HTTP: ${response.status} ${response.statusText} для URL: ${targetUrl}. Тело ответа (если есть): ${errorText.substring(0,500)}`);
+      return { success: false, error: `Ошибка HTTP: ${response.status} ${response.statusText}` };
+    }
+
+    const html = await response.text();
+    logger.debug(`[Scraper] HTML получен, длина: ${html.length}. Начинаю парсинг Cheerio.`);
+    const $ = cheerio.load(html);
+    
+    logger.debug(`[Scraper] HTML перед удалением элементов (первые 500 симв.): ${$('body').html()?.substring(0,500)}`);
+    $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, [role="dialog"], [aria-hidden="true"]').remove();
+    $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove();
+    logger.debug(`[Scraper] Ненужные элементы удалены.`);
+
+    const contentSelectors = [
+      'article', '.article-content', '.entry-content', '.post-body', '.post-content', // Блоги и статьи
+      'main[role="main"]', 'main', // Основной контент
+      '.project-description', '.task__description', '.job-description', '.vacancy-description', // Описания проектов/вакансий
+      '.product-description', '[itemprop="description"]', // Описания продуктов
+      '.text-content', '.content-text', '.article-text', // Общие текстовые блоки
+      '.job_show_description', '.b-description__text', // Специфичные для некоторых сайтов
+      '.page-content', '.content', '#content', '.main-content', '#main-content', // Общие контейнеры
+      'section', // В крайнем случае секции
+    ];
+    logger.debug(`[Scraper] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
+
+    let $targetElement: cheerio.Cheerio<cheerio.Element> | null = null;
+    let maxTextLength = 0;
+    let mainContentSelectorUsed = 'body (fallback)';
+
+    for (const selector of contentSelectors) {
+        const $candidates = $(selector);
+        if ($candidates.length > 0) {
+            logger.debug(`[Scraper] Найдены кандидаты по селектору '${selector}': ${$candidates.length} шт.`);
+            $candidates.each((_i, el) => {
+                const $currentCandidate = $(el);
+                // Клонируем, чтобы не изменять оригинал, удаляем скрипты и стили на всякий случай еще раз из кандидата
+                const $clone = $currentCandidate.clone();
+                $clone.find('script, style, nav, footer, header, aside, form, button, input, textarea, select, iframe, link, meta, svg, img, figure').remove();
+                const textSample = $clone.text().replace(/\s\s+/g, ' ').trim();
+                
+                if (textSample.length > maxTextLength) {
+                    maxTextLength = textSample.length;
+                    $targetElement = $currentCandidate; // Берем оригинальный элемент, а не клон
+                    mainContentSelectorUsed = selector;
+                    logger.info(`[Scraper] Новый лучший кандидат по селектору '${selector}', длина текста: ${maxTextLength}`);
+                }
+            });
+        }
+    }
+
+    if (!$targetElement || maxTextLength < 100) { // Если лучший кандидат все равно слишком мал или не найден
+      $targetElement = $('body');
+      mainContentSelectorUsed = 'body (fallback)';
+      logger.warn(`[Scraper] Специфичный контент не найден или слишком мал (maxTextLength: ${maxTextLength}). Используется весь body.`);
+    } else {
+      logger.info(`[Scraper] Финально выбран контент по селектору: ${mainContentSelectorUsed}.`);
+    }
+    
+    logger.debug(`[Scraper] HTML выбранного элемента ('${mainContentSelectorUsed}') перед извлечением текста (первые 500 симв.): ${$targetElement.html()?.substring(0,500)}`);
+    
+    const targetHtmlForText = $targetElement.html() || "";
+    const $tempForText = cheerio.load(`<body>${targetHtmlForText}</body>`); 
+    
+    let extractedTexts: string[] = [];
+    $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a')
+        .each(function() {
+            const $this = $(this);
+            const elementText = $this.clone().children().remove().end().text().replace(/\s\s+/g, ' ').trim();
+            if (elementText) {
+                extractedTexts.push(elementText);
+            }
+        });
+    
+    logger.debug(`[Scraper] Извлечено ${extractedTexts.length} текстовых фрагментов. Пример: "${extractedTexts.slice(0,5).join(' | ')}"`);
+    let textContent = extractedTexts.join(". "); 
+    
+    logger.debug(`[Scraper] Текст после первичного соединения (до очистки, первые 500 симв.): ${textContent.substring(0,500)}`);
+    textContent = textContent
+      .replace(/\s\s+/g, ' ')       
+      .replace(/\s+\./g, '.')       
+      .replace(/\.{2,}/g, '.')      
+      .replace(/\s*\.\s*/g, '. ')   
+      .replace(/(\r\n|\n|\r)+/gm, " ") 
+      .replace(/\s\s+/g, ' ')       
+      .trim();
+    logger.debug(`[Scraper] Текст после основной очистки (первые 500 симв.): ${textContent.substring(0,500)}`);
+    
+    const MIN_LINE_LENGTH_FOR_MEANING = 10; 
+    const MIN_SIGNIFICANT_CONTENT_LENGTH = 50; 
+
+    const meaningfulLines = textContent.split('.') 
+        .map(line => line.trim())
+        .filter(line => {
+            if (line.length < MIN_LINE_LENGTH_FOR_MEANING) return false;
+            return /[a-zA-Zа-яА-Я]{2,}/.test(line) && !/^[^\w\s\p{P}]*$/.test(line.replace(/\s/g, ''));
+        })
+        .map(line => line.endsWith('.') ? line : line + '.') 
+        .join(' ') 
+        .trim();
+    
+    logger.debug(`[Scraper] Текст после фильтрации осмысленных строк (длина: ${meaningfulLines.length}, первые 500 симв.): ${meaningfulLines.substring(0,500)}`);
+    textContent = meaningfulLines;
+
+    if (!textContent || textContent.length < MIN_SIGNIFICANT_CONTENT_LENGTH) {
+      logger.warn(`[Scraper] Не удалось извлечь значимый контент (длина ${textContent?.length || 0}) из URL: ${targetUrl}. Возможно, это honeypot, страница-заглушка, капча, или требует JS-рендеринга / имеет нестандартную структуру.`);
+      return { success: false, error: `Не удалось извлечь контент (длина ${textContent?.length || 0}). Страница может быть пустой, требовать JS или быть honeypot.` };
+    }
+    
+    const MAX_LENGTH = 25000; 
+    if (textContent.length > MAX_LENGTH) {
+        textContent = textContent.substring(0, MAX_LENGTH) + "\n\n--- СОДЕРЖИМОЕ ОБРЕЗАНО ИЗ-ЗА ПРЕВЫШЕНИЯ ЛИМИТА ---";
+        logger.warn(`[Scraper] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
+    }
+
+    logger.info(`[Scraper] Успешно собран контент с URL: ${targetUrl}. Финальная длина: ${textContent.length}`);
+    return { success: true, content: textContent };
+
+  } catch (error: any) {
+    logger.error(`[Scraper] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error.stack);
+    if (error.name === 'AbortError' || error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
+        return { success: false, error: 'Тайм-аут запроса к целевому URL. Сервер не ответил вовремя.' };
+    }
+    if (error.message.toLowerCase().includes('invalidcharactererror')) {
+        return { success: false, error: 'Ошибка парсинга HTML: невалидный символ. Возможно, проблема с кодировкой страницы.'};
+    }
+    return { success: false, error: `Ошибка скрейпинга: ${error.message}` };
   }
 }

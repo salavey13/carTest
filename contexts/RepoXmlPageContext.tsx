@@ -1,3 +1,4 @@
+// /contexts/RepoXmlPageContext.tsx
 "use client";
 
 import React, {
@@ -923,7 +924,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 logger.warn("[RepoXmlPageContext useEffect for start_param] appContextStartParam found, but repoUrl is not set yet. Delaying processing.");
             }
         }, [appContextStartParam, processTelegramStartParamStable, repoUrlState]); // Added repoUrlState as dependency
-
 
         const contextValue = useMemo((): RepoXmlPageContextType => ({
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, iconReplaceTask: iconReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 
