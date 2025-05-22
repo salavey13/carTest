@@ -10,7 +10,7 @@ export const PROMPT_INTERGALACTIC_PIPELINE = (rawKworksTextBlock: string) => `
 
 **ЭТАП 1: ТРАНСМУТАЦИЯ ХАОСА В JSON (Промпт: PROMPT_KWORKS_TO_CSV)**
 *   **Вход:** Блок текста "Сырые Данные Kwork".
-*   **Задача:** Используя логику из \`PROMPT_KWORKS_TO_CSV\` (см. ниже), извлеки данные по каждому проекту и представь их в виде **JSON-массива объектов**. Каждый объект – один лид. Этот массив будет твоим основным рабочим набором данных для последующих этапов. Обязательно включи поля \`initial_relevance_score\` и \`project_type_guess\`.
+*   **Задача:** Используя логику из \`PROMPT_KWORKS_TO_CSV\` (см. ниже), извлеки данные по каждому проекту и представь их в виде **JSON-массива объектов**. Каждый объект – один лид. Этот массив будет твоим основным рабочим набором данных для последующих этапов. Обязательно включи поля \`initial_relevance_score\` (это значение будет использовано для колонки \`similarity_score\` в финальном CSV) и \`project_type_guess\`.
 *   **Промежуточный Результат Этапа 1 (для твоего внутреннего использования):** \`leads_stage1_json_array\` (JSON-массив объектов лидов).
 
 ---
@@ -28,7 +28,7 @@ ${PROMPT_OFFER_V2_CYBERVIBE_OUTREACH}
 
 **ЭТАП 3: ОПРЕДЕЛЕНИЕ ТВИНКОВ ДЛЯ ТАНКОВ (Промпт: PROMPT_FIND_TWEAKS)**
 *   **Вход:** Твой рабочий массив лидов (уже обогащенный офферами). Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\` и **\`current_lead.project_type_guess\`**. Передай в промпт \`PROMPT_FIND_TWEAKS\` список известных фич SuperVibe для более точного определения.
-*   **Задача:** Для КАЖДОГО лида, используя логику из \`PROMPT_FIND_TWEAKS\` (см. ниже), определи задачи по кастомизации ("твики") и верни их как **JSON-массив объектов твиков**.
+*   **Задача:** Для КАЖДОГО лида, используя логику из \`PROMPT_FIND_TWEAKS\` (см. ниже), определи задачи по кастомизации ("твики") и верни их как **ВАЛИДНЫЙ JSON-массив объектов твиков**. Если твиков нет, верни пустой массив \`[]\`.
 *   **Промежуточный Результат Этапа 3 (для твоего внутреннего использования):** Для каждого лида – \`identified_tweaks_json_array\` (массив объектов). Добавь это как новое поле.
 
 ---
@@ -36,8 +36,8 @@ ${PROMPT_FIND_TWEAKS}
 ---
 
 **ЭТАП 4: ЗАДАЧИ R&D ДЛЯ КЭРРИ (Промпт: PROMPT_FIND_MISSING_FEATURES)**
-*   **Вход:** Твой рабочий массив лидов. Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\`, **\`current_lead.project_type_guess\`** и \`current_lead.identified_tweaks_json_array\`. Передай в промпт \`PROMPT_FIND_MISSING_FEATURES\` список известных фич SuperVibe.
-*   **Задача:** Для КАЖДОГО лида, используя логику из \`PROMPT_FIND_MISSING_FEATURES\` (см. ниже), определи принципиально новые/сложные фичи и верни их как **JSON-массив объектов фич**.
+*   **Вход:** Твой рабочий массив лидов. Для каждого лида (\`current_lead\`) используй \`current_lead.project_description\`, \`current_lead.key_features_requested_list\`, **\`current_lead.project_type_guess\`** и **ВАЛИДНЫЙ JSON-массив** \`current_lead.identified_tweaks_json_array\`. Передай в промпт \`PROMPT_FIND_MISSING_FEATURES\` список известных фич SuperVibe.
+*   **Задача:** Для КАЖДОГО лида, используя логику из \`PROMPT_FIND_MISSING_FEATURES\` (см. ниже), определи принципиально новые/сложные фичи и верни их как **ВАЛИДНЫЙ JSON-массив объектов фич**. Если фич нет, верни пустой массив \`[]\`.
 *   **Промежуточный Результат Этапа 4 (для твоего внутреннего использования):** Для каждого лида – \`missing_features_json_array\` (массив объектов). Добавь это как новое поле.
 
 ---
@@ -47,14 +47,14 @@ ${PROMPT_FIND_MISSING_FEATURES}
 **ФИНАЛЬНЫЙ ВЫВОД (СТРОГО CSV-СТРОКА):**
 
 1.  **Анализ и Ранжирование:** После выполнения всех четырех этапов для ВСЕХ лидов, ранжируй их по следующим критериям (в порядке убывания важности):
-    1.  **Высокий \`initial_relevance_score\` (8-10):** Сильное совпадение со стеком (React, Next.js, TWA, Supabase).
+    1.  **Высокий \`initial_relevance_score\` (8-10) из Этапа 1:** Сильное совпадение со стеком (React, Next.js, TWA, Supabase).
     2.  **Соответствие \`project_type_guess\` известным готовым решениям SuperVibe:** Проекты типа "TWA_Training", "TWA_CarRental", "TWA_WheelOfFortune" и т.д. получают ЗНАЧИТЕЛЬНЫЙ бонус.
     3.  **Ясность требований:** Проекты с четко описанными задачами предпочтительнее.
     4.  **Адекватность бюджета к объему работ:** Оценивается на основе описания и фич. Если бюджет явно мал для всего, но есть четкий MVP, это нормально.
     5.  **Минимальное количество СЛОЖНЫХ \`missing_features\` (задач для "Кэрри"):** Проекты, требующие в основном "твиков" для "Танков", быстрее в реализации.
 2.  **Выбор ТОП-Лидов:** Выбери **ТОП-3 НАИБОЛЕЕ ПЕРСПЕКТИВНЫХ ЛИДА** по результатам ранжирования (или менее, если всего найдено меньше).
 3.  **Генерация CSV:** Для каждого выбранного ТОП-лида сформируй строку CSV.
-    *   **Заголовок CSV (первая строка вывода):** \`"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","initial_relevance_score","project_type_guess"\`
+    *   **Заголовок CSV (первая строка вывода):** \`"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","similarity_score","project_type_guess"\`
     *   **Строки данных CSV (для каждого ТОП-лида):**
         *   \`client_name\`: из данных Этапа 1.
         *   \`kwork_url\`: из данных Этапа 1 (будет \`lead_url\` при импорте).
@@ -62,22 +62,37 @@ ${PROMPT_FIND_MISSING_FEATURES}
         *   \`budget_range\`: из данных Этапа 1.
         *   \`raw_html_description\`: из данных Этапа 1.
         *   \`generated_offer\`: строка оффера из Этапа 2.
-        *   \`identified_tweaks\`: **JSON-строка** от \`JSON.stringify(current_lead.identified_tweaks_json_array)\`. Если массив пуст, используй \`"[]"\`.
-        *   \`missing_features\`: **JSON-строка** от \`JSON.stringify(current_lead.missing_features_json_array)\`. Если массив пуст, используй \`"[]"\`.
+        *   \`identified_tweaks\`: **JSON-строка** (сформированная по правилам ниже из \`current_lead.identified_tweaks_json_array\`).
+        *   \`missing_features\`: **JSON-строка** (сформированная по правилам ниже из \`current_lead.missing_features_json_array\`).
         *   \`status\`: установи значение \`"analyzed_by_pipeline"\`
         *   \`source\`: установи значение \`"kwork_pipeline_top3"\`
-        *   \`initial_relevance_score\`: из данных Этапа 1.
+        *   \`similarity_score\`: возьми значение из поля \`initial_relevance_score\` из Этапа 1. Если это число, отформатируй его с двумя знаками после запятой (например, 9 -> "9.00"). Если null, используй пустую строку \`""\`.
         *   \`project_type_guess\`: из данных Этапа 1.
-    *   **Форматирование CSV:**
-        *   Разделитель: запятая (,).
-        *   Все текстовые поля, включая JSON-строки, должны быть заключены в двойные кавычки (\`"\`).
-        *   Двойные кавычки внутри текстовых полей экранируются удвоением (\`""\`).
-        *   Отсутствующие значения (null на Этапе 1) -> пустая строка в CSV (\`""\`).
+    *   **Форматирование CSV (НЕУКОСНИТЕЛЬНО СЛЕДОВАТЬ ЭТИМ ПРАВИЛАМ!):**
+        *   **Разделитель:** Запятая (\`,\`).
+        *   **Общее правило для ВСЕХ полей:** Каждое поле в CSV-строке ДОЛЖНО быть заключено в двойные кавычки (например, \`"значение поля"\`).
+        *   **Экранирование двойных кавычек ВНУТРИ ЛЮБОГО ПОЛЯ:** Если внутри оригинального значения поля (например, в тексте \`project_description\`, \`generated_offer\`, или в строках, которые станут JSON-строками для \`identified_tweaks\`/\`missing_features\`) встречается символ двойной кавычки (\`"\`), этот символ ДОЛЖЕН быть ЗАМЕНЕН на ДВЕ двойные кавычки (\`""\`).
+        *   **Форматирование полей \`identified_tweaks\` и \`missing_features\` (Это JSON-строки, требующие ОСОБОГО ВНИМАНИЯ):**
+            1.  **Получи ИСХОДНЫЙ JSON-МАССИВ:** Возьми результат соответствующего этапа, например, \`my_json_array = current_lead.identified_tweaks_json_array\`. Убедись, что это ВАЛИДНЫЙ JSON-массив (например, \`[{ "key": "value" }]\` или пустой массив \`[]\`).
+            2.  **Преобразуй массив в JSON-СТРОКУ:** Используй \`JSON.stringify()\`. \`let json_string_representation = JSON.stringify(my_json_array);\`.
+                *   Пример: если \`my_json_array\` был \`[{ "description": "Задача с \\"кавычками\\"." }]\`, то \`json_string_representation\` станет строкой: \`'[{"description":"Задача с \\\\"кавычками\\\\""."}]'\` (обрати внимание: \`JSON.stringify\` сам корректно экранирует кавычки внутри JSON-строковых значений с помощью \`\\\`").
+            3.  **Подготовь JSON-СТРОКУ для CSV:** Теперь возьми ПОЛУЧЕННУЮ на шаге 2 \`json_string_representation\`. В этой строке ЗАМЕНИ КАЖДЫЙ СИМВОЛ ДВОЙНОЙ КАВЫЧКИ (\`"\`) на ДВЕ ДВОЙНЫЕ КАВЫЧКИ (\`""\`). Пусть результат этой замены будет \`csv_safe_json_content\`.
+                *   Продолжение примера: \`json_string_representation\` = \`'[{"description":"Задача с \\\\"кавычками\\\\""."}]'\`.
+                *   После замены \`"\` на \`""\`, \`csv_safe_json_content\` станет: \`'[{""description"":""Задача с \\\\""кавычками\\\\"""".""}']'\`.
+            4.  **Сформируй ИТОГОВОЕ CSV-ПОЛЕ:** Оберни \`csv_safe_json_content\` из шага 3 в одну пару внешних двойных кавычек.
+                *   Продолжение примера: Итоговое CSV-поле будет: \`"[{""description"":""Задача с \\\\""кавычками\\\\"""".""}']"\`.
+            5.  **Для ПУСТЫХ МАССИВОВ:** Если \`my_json_array\` на шаге 1 был пустым (\`[]\`), то \`json_string_representation\` (шаг 2) будет строка \`"[]"\`. После шага 3 \`csv_safe_json_content\` будет \`"[]"\` (т.к. нет внутренних кавычек для замены). Итоговое CSV-поле (шаг 4) будет \`"[]"\`.
+        *   **Форматирование ОБЫЧНЫХ текстовых полей (\`project_description\`, \`generated_offer\` и др.):**
+            1.  Возьми текстовое значение поля.
+            2.  Замени КАЖДУЮ ВНУТРЕННЮЮ ДВОЙНУЮ КАВЫЧКУ (\`"\`) на ДВЕ ДВОЙНЫЕ КАВЫЧКИ (\`""\`).
+            3.  Заключи результат в ОДНУ ПАРУ ВНЕШНИХ ДВОЙНЫХ КАВЫЧЕК.
+            *   Пример: Если \`generated_offer\` = \`Наш "Супер" оффер!\`, то CSV-поле будет \`"Наш ""Супер"" оффер!"\`.
+        *   **Отсутствующие значения (null на Этапе 1):** Если значение поля на Этапе 1 было \`null\` (например, для \`raw_html_description\`, \`budget_range\`), в CSV это должно быть представлено как пустая строка, заключенная в двойные кавычки: \`""\`.
 
 **Пример финального CSV-вывода (для одного лида):**
 \`\`\`csv
-"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","initial_relevance_score","project_type_guess"
-"urik99","https://kwork.ru/projects/2840722","Разработка telegram mini app...","до 10 000 ₽ / до 30 000 ₽","","Привет, urik99! ... ваш оффер ...","[{""tweak_description"":""Интеграция дизайна..."",""estimated_complexity"":""medium"",...}]","[{""feature_description"":""Новая фича Х..."",""reason_for_carry"":""Сложная логика..."",...}]","analyzed_by_pipeline","kwork_pipeline_top3",9,"TWA_Training"
+"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","similarity_score","project_type_guess"
+"urik99","https://kwork.ru/projects/2840722","Описание с ""цитатой"" внутри.","до 10 000 ₽ / до 30 000 ₽","","Привет, urik99! Наш ""специальный"" оффер...","[{""tweak_description"":""Интеграция дизайна с \\""спецэффектами\\""..."",""estimated_complexity"":""medium""}]","[{""feature_description"":""Новая фича \\""X\\""..."",""reason_for_carry"":""Сложная логика...""}]","analyzed_by_pipeline","kwork_pipeline_top3","9.00","TWA_Training"
 \`\`\`
 *(Если несколько ТОП-лидов, каждая новая строка данных будет под заголовком)*
 
@@ -91,3 +106,5 @@ ${PROMPT_FIND_MISSING_FEATURES}
 ${rawKworksTextBlock || "ЗДЕСЬ ДОЛЖЕН БЫТЬ ТЕКСТ С KWORK"}
 \`\`\`
 `;
+
+// Теперь, если вы попросите "give proper final csv for top 1", я буду использовать этот обновленный промпт.
