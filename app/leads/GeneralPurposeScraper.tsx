@@ -42,12 +42,12 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
   onScrapedData,
   onSuccessfulScrape,
 }) => {
-  const [keywordsInput, setKeywordsInput] = useState(''); // Renamed from keywords to avoid confusion
+  const [keywordsInput, setKeywordsInput] = useState(''); 
   const [targetUrl, setTargetUrl] = useState(''); 
   const [isScraping, setIsScraping] = useState(false);
 
   const handlePredefinedSearch = (search: typeof predefinedSearchButtons[0]) => {
-    setKeywordsInput(search.keywords); // Set the input field for user reference
+    setKeywordsInput(search.keywords); 
     if (search.siteUrlFormat) {
         const encodedKeywords = encodeURIComponent(search.keywords); 
         const searchUrl = search.siteUrlFormat.replace("{keywords}", encodedKeywords);
@@ -80,7 +80,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
         toast.success(<VibeContentRenderer content="::facheckcircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'." />, { id: toastId, duration: 4000 });
         onSuccessfulScrape?.(); 
       } else {
-        toast.error(<VibeContentRenderer content={`::fatriangleexclamation:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
+        toast.error(<VibeContentRenderer content={`::faexclamationtriangle:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
       }
     } catch (error: any) {
       toast.error(<VibeContentRenderer content={`::facbomb:: Критическая ошибка зонда: ${error.message}`} />, { id: toastId, duration: 6000 });
@@ -160,7 +160,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
           <VibeContentRenderer content={isScraping ? "::faspinner className='animate-spin text-lg':: Зонд в полёте..." : "::faspider className='text-lg':: Запустить Зонд-Охотник!"} />
         </Button>
         <p className="text-xs text-gray-400 font-mono">
-          <VibeContentRenderer content="::fatriangleexclamation className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке. Не используйте для массового парсинга без прокси и задержек." />
+          <VibeContentRenderer content="::faexclamationtriangle className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке. Не используйте для массового парсинга без прокси и задержек." />
         </p>
       </CardContent>
     </Card>
