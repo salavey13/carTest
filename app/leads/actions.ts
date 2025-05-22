@@ -20,12 +20,8 @@ interface CsvLeadRow {
   missing_features?: string; 
   status?: string;
   source?: string;
-  similarity_score?: string; // Changed from initial_relevance_score
-  project_type_guess?: string;
-  // These fields might be in the CSV from AI but are not directly in CsvLeadRow for DB mapping.
-  // deadline_info?: string; 
-  // client_kwork_history?: string; 
-  // current_kwork_offers_count?: string; 
+  similarity_score?: string; 
+  project_type_guess?: string; // Это поле должно быть здесь
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -79,17 +75,16 @@ export async function uploadLeadsFromCsv(
       skipEmptyLines: 'greedy',
       transformHeader: header => {
         const trimmedHeader = header.trim().toLowerCase();
-        // Ensure kwork_url from CSV maps to lead_url for DB
         if (trimmedHeader === 'kwork_url') return 'lead_url'; 
+        // project_type_guess уже должен быть в lowercase из CSV, так что дополнительный маппинг не нужен
         return trimmedHeader; 
       },
       transform: (value, header) => {
-        const headerStr = String(header).toLowerCase(); // Ensure header is treated as string for comparison
+        const headerStr = String(header).toLowerCase();
         const trimmedValue = typeof value === 'string' ? value.trim() : value;
         
-        // Correctly parse similarity_score
         if (headerStr === 'similarity_score') {
-          const num = parseFloat(trimmedValue as string); // Use parseFloat for potential decimals
+          const num = parseFloat(trimmedValue as string); 
           return isNaN(num) ? null : num;
         }
         return trimmedValue;
@@ -116,9 +111,10 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      // getRowVal helper ensures we always query with lowercase keys
-      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()];
-      const leadUrlFromCsv = getRowVal('lead_url'); // Already mapped by transformHeader
+      // Helper to get value by lowercase key, as PapaParse headers are now lowercase
+      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key]; // No need for .toLowerCase() here if headers are already LC
+      
+      const leadUrlFromCsv = getRowVal('lead_url');
 
       if (!getRowVal('project_description')) {
         localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
@@ -127,27 +123,33 @@ export async function uploadLeadsFromCsv(
       
       let tweaksJson: any = null;
       const identifiedTweaksCsv = getRowVal('identified_tweaks');
-      if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string' && identifiedTweaksCsv.trim() !== "") {
+      if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string' && identifiedTweaksCsv.trim() !== "" && identifiedTweaksCsv.trim() !== "[]") {
         try { 
           tweaksJson = JSON.parse(identifiedTweaksCsv); 
         } catch (e) { 
-          logger.error(`Error parsing JSON for 'identified_tweaks' in lead with URL ${leadUrlFromCsv}: ${(e as Error).message}. JSON string: ${identifiedTweaksCsv.substring(0, 100)}...`);
+          logger.error(`Error parsing JSON for 'identified_tweaks' in lead with URL ${leadUrlFromCsv}: ${(e as Error).message}. JSON string: ${identifiedTweaksCsv.substring(0, 200)}...`);
           localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv || 'N/A'}: ${(e as Error).message.substring(0,150)}`); 
         }
+      } else if (identifiedTweaksCsv === "[]") {
+        tweaksJson = []; // Handle empty array string
       }
+
 
       let featuresJson: any = null;
       const missingFeaturesCsv = getRowVal('missing_features');
-      if (missingFeaturesCsv && typeof missingFeaturesCsv === 'string' && missingFeaturesCsv.trim() !== "") {
+      if (missingFeaturesCsv && typeof missingFeaturesCsv === 'string' && missingFeaturesCsv.trim() !== "" && missingFeaturesCsv.trim() !== "[]") {
         try { 
           featuresJson = JSON.parse(missingFeaturesCsv); 
         } catch (e) { 
-          logger.error(`Error parsing JSON for 'missing_features' in lead with URL ${leadUrlFromCsv}: ${(e as Error).message}. JSON string: ${missingFeaturesCsv.substring(0, 100)}...`);
+          logger.error(`Error parsing JSON for 'missing_features' in lead with URL ${leadUrlFromCsv}: ${(e as Error).message}. JSON string: ${missingFeaturesCsv.substring(0, 200)}...`);
           localErrors.push(`Ошибка парсинга JSON для 'missing_features' в лиде с URL ${leadUrlFromCsv || 'N/A'}: ${(e as Error).message.substring(0,150)}`); 
         }
+      } else if (missingFeaturesCsv === "[]") {
+        featuresJson = []; // Handle empty array string
       }
       
       const similarityScoreValue = getRowVal('similarity_score');
+      const projectTypeGuessValue = getRowVal('project_type_guess'); // Получаем значение
 
       const leadEntry: LeadInsert = {
         client_name: getRowVal('client_name') || null,
@@ -160,9 +162,8 @@ export async function uploadLeadsFromCsv(
         missing_features: featuresJson,
         status: getRowVal('status') || 'raw_data', 
         source: getRowVal('source') || 'csv_upload',
-        // Correctly use similarity_score from CSV for the DB similarity_score column
         similarity_score: typeof similarityScoreValue === 'number' ? Number(similarityScoreValue.toFixed(2)) : null,
-        project_type_guess: getRowVal('project_type_guess') || null,
+        project_type_guess: projectTypeGuessValue || null, // Используем полученное значение
       };
 
       if (leadEntry.lead_url === '') {
@@ -175,7 +176,7 @@ export async function uploadLeadsFromCsv(
     if (leadsToUpsert.length === 0 && localErrors.length > 0) {
         return { success: false, message: "Нет валидных лидов для загрузки.", errors: localErrors };
     }
-    if (leadsToUpsert.length === 0 && localErrors.length === 0) { // Added check for no local errors
+    if (leadsToUpsert.length === 0 && localErrors.length === 0) {
         return { success: false, message: "Нет данных для загрузки после обработки CSV."};
     }
     
