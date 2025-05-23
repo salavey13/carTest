@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,10 +11,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useAppContext } from "@/contexts/AppContext";
 import { useAppToast } from "@/hooks/useAppToast";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { debugLogger as logger } from "@/lib/debugLogger"; // debugLogger, а не просто logger
+import { debugLogger as logger } from "@/lib/debugLogger";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import RockstarHeroSection from "../tutorials/RockstarHeroSection";
 
 type Language = 'en' | 'ru';
 
@@ -80,7 +81,7 @@ const sections = [
             titleRu: "Глава 2: Экспериментальный Путь (Сознательный Выбор)",
             borderColor: "border-green-500", 
             textColor: "text-green-400",
-            icon: "::LuZap::", 
+            icon: "::FaBolt::", // Changed from ::LuZap::
             pointsEn: [
                 "Shifted focus to <strong class='font-semibold text-green-400'>genuine curiosity</strong>, independent of validation.",
                 "Studied neuroscience (PhD) based on fascination with the brain.",
@@ -188,14 +189,14 @@ const sections = [
       {
         titleEn: "External Data", titleRu: "Внешние Данные",
         borderColor: "border-brand-cyan", textColor: "text-brand-cyan",
-        icon: "::LuEye::",
+        icon: "::FaEye::", // Changed from ::LuEye::
         pointsEn: ["Observable results: metrics, feedback, tangible outcomes.", "Did it achieve conventional success?"],
         pointsRu: ["Наблюдаемые результаты: метрики, обратная связь, ощутимые итоги.", "Достигнут ли конвенциональный успех?"],
       },
       {
         titleEn: "Internal Data", titleRu: "Внутренние Данные",
         borderColor: "border-brand-orange", textColor: "text-brand-orange",
-        icon: "::LuActivity::",
+        icon: "::FaChartSimple::", // Changed from ::LuActivity::
         pointsEn: ["How did it *feel*? Energized, anxious, bored?", "Did you enjoy the process? (Keep simple notes during PACT)."],
         pointsRu: ["Как это *ощущалось*? Энергия, тревога, скука?", "Понравился ли процесс? (Делайте простые заметки во время PACT)."],
       }
@@ -215,14 +216,14 @@ const sections = [
     ],
     decisionTitleEn: "Based on analysis, decide:", decisionTitleRu: "На основе анализа, решите:",
     decisionPointsEn: [
-        { icon: "::LuPlayCircle::", color: "green", text: "<strong>Persist:</strong> Worked well internally & externally. Continue/make habit." },
-        { icon: "::LuPauseCircle::", color: "orange", text: "<strong>Pause:</strong> Not working now. Stop this experiment." },
-        { icon: "::LuRotateCcw::", color: "blue", text: "<strong>Pivot:</strong> Make a tweak based on data, run a new experiment." }
+        { icon: "::FaPlayCircle::", color: "green", text: "<strong>Persist:</strong> Worked well internally & externally. Continue/make habit." }, // Changed from ::LuPlayCircle::
+        { icon: "::FaCirclePause::", color: "orange", text: "<strong>Pause:</strong> Not working now. Stop this experiment." }, // Changed from ::LuPauseCircle::
+        { icon: "::FaArrowRotateLeft::", color: "blue", text: "<strong>Pivot:</strong> Make a tweak based on data, run a new experiment." } // Changed from ::LuRotateCcw::
     ],
      decisionPointsRu: [
-        { icon: "::LuPlayCircle::", color: "green", text: "<strong>Продолжать:</strong> Сработало хорошо внутренне и внешне. Продолжить/сделать привычкой." },
-        { icon: "::LuPauseCircle::", color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." },
-        { icon: "::LuRotateCcw::", color: "blue", text: "<strong>Разворот:</strong> Внести небольшое изменение на основе данных, запустить новый эксперимент." }
+        { icon: "::FaPlayCircle::", color: "green", text: "<strong>Продолжать:</strong> Сработало хорошо внутренне и внешне. Продолжить/сделать привычкой." }, // Changed from ::LuPlayCircle::
+        { icon: "::FaCirclePause::", color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." }, // Changed from ::LuPauseCircle::
+        { icon: "::FaArrowRotateLeft::", color: "blue", text: "<strong>Разворот:</strong> Внести небольшое изменение на основе данных, запустить новый эксперимент." } // Changed from ::LuRotateCcw::
     ],
   },
   {
@@ -255,14 +256,15 @@ export default function ExperimentalMindsetPage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
   const [selectedLang, setSelectedLang] = useState<Language>('ru'); 
+  const heroTriggerId = useId().replace(/:/g, "-") + "-exp-mind-hero-trigger"; // New ID for this page
 
   useEffect(() => {
     setIsMounted(true);
     const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ru';
-    const initialLang = browserLang === 'ru' ? 'ru' : 'en'; 
+    const initialLang = user?.language_code === 'ru' || (!user?.language_code && browserLang === 'ru') ? 'ru' : 'en'; 
     setSelectedLang(initialLang);
     logger.log(`[ExpMindPage] Mounted. Browser lang: ${browserLang}, Initial selected: ${initialLang}`);
-  }, []); 
+  }, [user?.language_code]); 
 
   if (!isMounted) {
     return (
@@ -272,8 +274,24 @@ export default function ExperimentalMindsetPage() {
     );
   }
 
+  // Define translations for the hero section
+  const heroTranslations = {
+    ru: {
+      title: "Экспериментальное Мышление",
+      subtitle: "Жить осознанно через любопытство и эксперименты.",
+      source: "По мотивам видео с Anne-Laure Le Cunff",
+    },
+    en: {
+      title: "The Experimental Mindset",
+      subtitle: "Living Consciously Through Curiosity & Experimentation.",
+      source: "Based on insights from Anne-Laure Le Cunff",
+    }
+  };
+
+  const currentHeroText = heroTranslations[selectedLang];
+
   return (
-    <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
+    <div className="relative min-h-screen overflow-x-hidden pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
@@ -283,47 +301,49 @@ export default function ExperimentalMindsetPage() {
         }}
       ></div>
 
-      <div className="relative z-10 container mx-auto px-4">
-        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-green/30 shadow-[0_0_30px_rgba(0,255,157,0.3)]">
-          <CardHeader className="text-center border-b border-brand-green/20 pb-4">
-            <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="The Experimental Mindset">
-              The Experimental Mindset
-            </CardTitle>
-            <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-               {selectedLang === 'ru'
-                  ? "Жить осознанно через любопытство и эксперименты."
-                  : "Living Consciously Through Curiosity & Experimentation."}
-            </p>
-             <p className="text-sm text-gray-400 mt-1">
-               {selectedLang === 'ru' ? "По мотивам видео с Anne-Laure Le Cunff" : "Based on insights from Anne-Laure Le Cunff"}
-             </p>
-          </CardHeader>
+      <RockstarHeroSection
+        triggerElementSelector={`#${heroTriggerId}`}
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png" // Using the same as cybervibe for consistency
+      >
+        <h1 className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text={currentHeroText.title}>
+          {currentHeroText.title}
+        </h1>
+        <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
+          {currentHeroText.subtitle}
+        </p>
+        <p className="text-sm text-gray-400 mt-1">{currentHeroText.source}</p>
+        <div className="flex justify-center space-x-2 mt-4">
+           <Button
+             variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
+             size="sm"
+             onClick={() => setSelectedLang('ru')}
+             className={cn(
+                 "border-brand-green/50 font-orbitron text-xs backdrop-blur-sm", 
+                 selectedLang === 'ru' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'bg-black/30 text-gray-300 hover:bg-gray-700 hover:text-gray-100'
+             )}
+           >
+             🇷🇺 Русский
+           </Button>
+           <Button
+              variant={selectedLang === 'en' ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setSelectedLang('en')}
+              className={cn(
+                 "border-brand-blue/50 font-orbitron text-xs backdrop-blur-sm", 
+                 selectedLang === 'en' ? 'bg-brand-blue/20 text-brand-blue hover:bg-brand-blue/30' : 'bg-black/30 text-gray-300 hover:bg-gray-700 hover:text-gray-100'
+              )}
+           >
+             🇬🇧 English
+           </Button>
+        </div>
+      </RockstarHeroSection>
 
-          <CardContent className="space-y-12 p-4 md:p-8">
-            <div className="flex justify-center space-x-2 mb-8">
-               <Button
-                 variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
-                 size="sm"
-                 onClick={() => setSelectedLang('ru')}
-                 className={cn(
-                     "border-brand-green/50", 
-                     selectedLang === 'ru' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                 )}
-               >
-                 🇷🇺 Русский
-               </Button>
-               <Button
-                  variant={selectedLang === 'en' ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedLang('en')}
-                  className={cn(
-                     "border-brand-blue/50", 
-                     selectedLang === 'en' ? 'bg-brand-blue/20 text-brand-blue hover:bg-brand-blue/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                  )}
-               >
-                 🇬🇧 English
-               </Button>
-            </div>
+      <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
+
+      <div className="relative z-10 container mx-auto px-4 pt-10">
+        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-green/30 shadow-[0_0_30px_rgba(0,255,157,0.3)]">
+          {/* CardHeader was here, now removed and content moved to RockstarHeroSection */}
+          <CardContent className="space-y-12 p-4 md:p-8 pt-8">
 
             {sections.map((section, index) => {
               const themeColor = ["text-brand-green", "text-brand-pink", "text-brand-yellow", "text-neon-lime", "text-brand-blue", "text-brand-orange", "text-brand-purple"][index % 7];
@@ -338,7 +358,10 @@ export default function ExperimentalMindsetPage() {
               return (
                 <section key={section.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
                   <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4 font-orbitron`}>
-                    <VibeContentRenderer content={`${section.icon} className='mr-3 ${themeColor}/80'`} /> {currentTitle}
+                    <span className={cn('mr-3 text-current/80')}>
+                      <VibeContentRenderer content={section.icon} />
+                    </span>
+                    <VibeContentRenderer content={currentTitle} />
                   </h2>
 
                   {currentIntro && <p className="text-gray-300 leading-relaxed mb-4">{currentIntro}</p>}
@@ -352,7 +375,10 @@ export default function ExperimentalMindsetPage() {
                      return (
                        <div key={`${section.id}-sub-${subIndex}`} className={`ml-4 pl-4 border-l-2 ${sub.borderColor} space-y-3 mb-6`}>
                          <h3 className={`flex items-center text-xl font-semibold ${sub.textColor}`}>
-                           <VibeContentRenderer content={`${sub.icon} className='mr-2'`} /> {subTitle}
+                           <span className="mr-2">
+                             <VibeContentRenderer content={sub.icon} />
+                           </span>
+                           <VibeContentRenderer content={subTitle} />
                          </h3>
                          <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
                            {subPoints.map((point, i) => (
@@ -384,7 +410,10 @@ export default function ExperimentalMindsetPage() {
                          return (
                            <div key={`${section.id}-grid-${itemIndex}`} className={`bg-gray-950/50 p-4 rounded-lg border ${itemBorderColorClass}`}>
                              <h4 className={`flex items-center font-bold ${itemColorClass} mb-2 text-lg`}>
-                               <VibeContentRenderer content={`${item.icon} className='mr-2'`} /> {itemTitle}
+                               <span className="mr-2">
+                                 <VibeContentRenderer content={item.icon} />
+                               </span>
+                               <VibeContentRenderer content={itemTitle} />
                              </h4>
                              <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 mb-2 pl-1">
                               {itemPoints.map((point, i) => <li key={`${selectedLang}-${section.id}-grid-${itemIndex}-p-${i}`}>{point}</li>)}
@@ -450,7 +479,9 @@ export default function ExperimentalMindsetPage() {
                                   const decisionBorderColorClass = `border-brand-${item.color}/40`;
                                   return (
                                       <div key={`${selectedLang}-${section.id}-dec-${i}`} className={`flex items-center space-x-2 p-2 rounded border ${decisionBorderColorClass} bg-gray-950/60`}>
-                                          <VibeContentRenderer content={`${item.icon} className='flex-shrink-0 h-5 w-5 ${decisionColorClass}'`} />
+                                          <span className={cn('flex-shrink-0 h-5 w-5', decisionColorClass)}>
+                                            <VibeContentRenderer content={item.icon} />
+                                          </span>
                                           <p className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: item.text }}></p>
                                       </div>
                                   );
@@ -485,6 +516,10 @@ export default function ExperimentalMindsetPage() {
                </p>
                <p className="mt-4 text-gray-300">
                  Explore related concepts in <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
+               </p>
+               {/* New link to CyberVibePage */}
+               <p className="mt-2 text-gray-300">
+                 Также изучите принципы <Link href="/cybervibe" className="text-brand-yellow hover:underline font-semibold">КиберВайба</Link> для комплексного развития.
                </p>
             </section>
 
