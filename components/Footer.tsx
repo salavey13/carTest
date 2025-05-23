@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt } from "lucide-react"; // Added Bolt
+import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt, BrainCircuit } from "lucide-react"; // Added Bolt
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { FaGithub, FaTelegram } from "react-icons/fa6"; 
@@ -54,7 +54,8 @@ export default function Footer() {
                </li>
                  <li><Link href="/selfdev/gamified" className={footerLinkClass}><Sparkles className="w-3.5 h-3.5 text-brand-pink"/>CyberDev OS</Link></li>
                  <li><Link href="/p-plan" className={footerLinkClass}><Code className="w-3.5 h-3.5 text-brand-yellow"/>VIBE План</Link></li>
-                 <li><Link href="/cybervibe" className={footerLinkClass}><Bolt className="w-3.5 h-3.5 text-brand-yellow"/>CyberVibe Апгрейд</Link></li> {/* New Link Added */}
+                 <li><Link href="/cybervibe" className={footerLinkClass}><Bolt className="w-3.5 h-3.5 text-brand-yellow"/>CyberVibe Апгрейд</Link></li>
+                 <li><Link href="/veritasium" className={footerLinkClass}><BrainCircuit className="w-3.5 h-3.5 text-brand-cyan"/>Озарения Veritasium</Link></li> {/* New Link Added */}
             </ul>
           </div>
 
