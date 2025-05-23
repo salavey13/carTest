@@ -270,7 +270,6 @@ const pageTranslations = {
   }
 };
 
-
 export default function CyberVibePage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
@@ -296,7 +295,6 @@ export default function CyberVibePage() {
   }
   
   const themePalette = ["brand-yellow", "brand-cyan", "brand-orange", "brand-pink", "brand-red", "brand-purple", "brand-green", "brand-blue", "neon-lime"];
-
 
   return (
     <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -334,7 +332,6 @@ export default function CyberVibePage() {
       
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
 
-
       <div className="relative z-10 container mx-auto px-4 pt-10 pb-10"> {/* Added pt-10 */}
         <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-yellow/50 shadow-[0_0_35px_theme(colors.brand-yellow/0.5)]">
           {/* CardHeader removed as title/subtitle are in RockstarHeroSection now */}
@@ -360,7 +357,9 @@ export default function CyberVibePage() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <h2 className={cn(`flex items-center text-2xl md:text-3xl font-semibold mb-3 font-orbitron`, textColorClass)}>
-                    <VibeContentRenderer content={`${section.icon} className='mr-3 ${textColorClass}/80 text-2xl'`} />
+                    <span className={cn(`mr-3 text-current/80`)}>
+                      <VibeContentRenderer content={section.icon} />
+                    </span>
                     <VibeContentRenderer content={section.title} />
                   </h2>
 
