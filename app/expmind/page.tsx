@@ -217,12 +217,12 @@ const sections = [
     decisionTitleEn: "Based on analysis, decide:", decisionTitleRu: "На основе анализа, решите:",
     decisionPointsEn: [
         { icon: "::FaPlayCircle::", color: "green", text: "<strong>Persist:</strong> Worked well internally & externally. Continue/make habit." }, // Changed from ::LuPlayCircle::
-        { icon: "::FaPauseCircle::", color: "orange", text: "<strong>Pause:</strong> Not working now. Stop this experiment." }, // Changed from ::LuPauseCircle::
+        { icon: "::FaCirclePause::", color: "orange", text: "<strong>Pause:</strong> Not working now. Stop this experiment." }, // Changed from ::LuPauseCircle::
         { icon: "::FaArrowRotateLeft::", color: "blue", text: "<strong>Pivot:</strong> Make a tweak based on data, run a new experiment." } // Changed from ::LuRotateCcw::
     ],
      decisionPointsRu: [
         { icon: "::FaPlayCircle::", color: "green", text: "<strong>Продолжать:</strong> Сработало хорошо внутренне и внешне. Продолжить/сделать привычкой." }, // Changed from ::LuPlayCircle::
-        { icon: "::FaPauseCircle::", color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." }, // Changed from ::LuPauseCircle::
+        { icon: "::FaCirclePause::", color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." }, // Changed from ::LuPauseCircle::
         { icon: "::FaArrowRotateLeft::", color: "blue", text: "<strong>Разворот:</strong> Внести небольшое изменение на основе данных, запустить новый эксперимент." } // Changed from ::LuRotateCcw::
     ],
   },
