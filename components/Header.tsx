@@ -63,6 +63,7 @@ const allPages: PageInfo[] = [
   { path: "/ai-work-future", name: "AI & Future of Work", icon: "FaNetworkWired", group: "Content & Tools", color: "cyan" },
   { path: "/advice", name: "Advice Archive", icon: "FaRegLightbulb", group: "Content & Tools", color: "orange" },
   { path: "/expmind", name: "Experimental Mindset", icon: "FaBrain", group: "Content & Tools", color: "pink" },
+  { path: "/veritasium", name: "Veritasium Insights", icon: "FaBookAtlas", group: "Content & Tools", color: "cyan", isImportant: true, isHot: true }, // Added Veritasium Page
   { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "gray" },
   { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "gray" },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green"},
@@ -106,7 +107,7 @@ const translations: Record<string, Record<string, string>> = {
     "Image Swap Mission": "Image Swap Mission", "Icon Demining Mission": "Icon Demining Mission", "Video Render Mission": "Video Render Mission", "Inception Swap Mission": "Inception Swap Mission", "The Fifth Door Mission": "The Fifth Door Mission",
     "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
     "Vibe Schematics": "Vibe Schematics", "Start Training": "Start Training", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
-    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
+    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Veritasium Insights": "Veritasium Insights", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
     "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
     "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot",
@@ -117,7 +118,7 @@ const translations: Record<string, Record<string, string>> = {
     "Image Swap Mission": "Миссия: Битый Пиксель", "Icon Demining Mission": "Миссия: Сапёр Иконок", "Video Render Mission": "Миссия: Видео-Рендер", "Inception Swap Mission": "Миссия: Inception Swap", "The Fifth Door Mission": "Миссия: Пятая Дверь",
     "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
     "Vibe Schematics": "Схемы Вайба", "Start Training": "Начать Тренировку", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
-    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
+    "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Veritasium Insights": "Озарения Veritasium", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
     "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
     "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
     "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥",
@@ -371,11 +372,11 @@ export default function Header() {
                         "gta-vibe-text-effect"
                         )}>
                         {IconComponent && (
-                          <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
+                          <IconComponent className={cn("w-5 h-5 sm:w-6 h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
                         )}
                         <span>{t(groupName)}</span>
                         {IconComponent && (isGtaVibeGroup || isVibeHQGroup) && ( 
-                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
+                           <IconComponent className={cn("w-5 h-5 sm:w-6 h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
                         )}
                       </h3>
                       <div className={cn(
