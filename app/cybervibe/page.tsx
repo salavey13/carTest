@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useId } from "react"; // Added useId
+import React, { useState, useEffect, useId, useCallback } from "react"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -9,8 +9,8 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
-import RockstarHeroSection from "../tutorials/RockstarHeroSection"; // Added import
+import { motion, AnimatePresence } from "framer-motion"; // Import AnimatePresence
+import RockstarHeroSection from "../tutorials/RockstarHeroSection"; 
 
 type Language = 'en' | 'ru';
 
@@ -34,6 +34,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FFEE00/png?text=ТЫ+-+Актив`,
         imageAlt: "Концептуальное изображение личного развития как основного актива",
+        question: {
+          textRu: "Обучение – это в первую очередь инвестиция в себя, а не просто способ получить работу.",
+          textEn: "Learning is primarily an investment in yourself, not just a way to get a job.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Джим Рон подчеркивал, что работа над собой важнее работы.",
+          tipEn: "That's right! Jim Rohn emphasized that working on yourself is more important than working on your job.",
+        },
       },
       {
         id: "goal-setting",
@@ -47,6 +54,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/00FFEE/png?text=Карта+Целей`,
         imageAlt: "Визуализация карты целей и пути к ним",
+        question: {
+          textRu: "Ваши 'почему' (причины) для достижения целей менее важны, чем детальный план действий.",
+          textEn: "Your 'whys' (reasons) for achieving goals are less important than a detailed action plan.",
+          correctAnswer: 'no',
+          tipRu: "Наоборот! Джим Рон говорил, что причины важнее ответов. Они зажигают ваш внутренний огонь.",
+          tipEn: "On the contrary! Jim Rohn said that reasons come first, answers second. They ignite your inner fire.",
+        },
       },
       {
         id: "life-laws",
@@ -61,6 +75,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF9900/png?text=Сезоны+Жизни`,
         imageAlt: "Иллюстрация четырех времен года как метафоры жизненных циклов",
+        question: {
+          textRu: "Зима (трудности) в жизни неизбежна, и нужно просто переждать её, не пытаясь измениться.",
+          textEn: "Winter (difficulties) in life is inevitable, and you just need to wait it out without trying to change.",
+          correctAnswer: 'no',
+          tipRu: "Не совсем! Трудности неизбежны, но важно не просто ждать, а становиться лучше и сильнее в процессе.",
+          tipEn: "Not quite! Difficulties are inevitable, but it's important not just to wait, but to get better and stronger in the process.",
+        },
       },
       {
         id: "action-discipline",
@@ -74,6 +95,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF00FF/png?text=Действие!`,
         imageAlt: "Символ молнии, представляющий действие и энергию",
+        question: {
+          textRu: "Главное отличие успешных людей – это не их идеи, а их способность постоянно действовать и дисциплинировать себя.",
+          textEn: "The main difference between successful people is not their ideas, but their ability to constantly act and discipline themselves.",
+          correctAnswer: 'yes',
+          tipRu: "Совершенно верно! Действие и дисциплина – мост между целями и их достижением.",
+          tipEn: "Absolutely! Action and discipline are the bridge between goals and accomplishment.",
+        },
       },
       {
         id: "attitude-diseases",
@@ -87,6 +115,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF4500/png?text=Позитивный+Настрой`,
         imageAlt: "Щит, отражающий негативные мысли, символизирующий сильное мышление",
+        question: {
+          textRu: "Пессимизм – это лишь реалистичный взгляд на мир, и он не мешает личному развитию.",
+          textEn: "Pessimism is just a realistic view of the world, and it doesn't hinder personal development.",
+          correctAnswer: 'no',
+          tipRu: "На самом деле, пессимизм может быть одним из 'вирусов' мышления. Позитивный настрой открывает больше возможностей.",
+          tipEn: "Actually, pessimism can be one of the 'mind viruses.' A positive attitude opens up more opportunities.",
+        },
       },
       {
         id: "emotions-for-change",
@@ -101,6 +136,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/9400D3/png?text=Эмоции+Перемен`,
         imageAlt: "Яркое пламя, символизирующее силу эмоций",
+        question: {
+          textRu: "Чтобы начать изменения в жизни, достаточно просто иметь сильное желание.",
+          textEn: "To initiate life changes, simply having a strong desire is sufficient.",
+          correctAnswer: 'no',
+          tipRu: "Желание – это топливо, но нужны и другие эмоции, такие как отвращение к текущей ситуации, решение и решимость.",
+          tipEn: "Desire is fuel, but other emotions like disgust with the current situation, decision, and resolve are also needed.",
+        },
       },
       {
         id: "sowing-reaping",
@@ -114,6 +156,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/32CD32/png?text=Посев+и+Жатва`,
         imageAlt: "Росток, пробивающийся из земли, и зрелые колосья",
+        question: {
+          textRu: "Принцип 'Что посеешь, то и пожнёшь' применим только к финансам и не относится к знаниям или отношениям.",
+          textEn: "The 'What you sow, you will reap' principle only applies to finances and not to knowledge or relationships.",
+          correctAnswer: 'no',
+          tipRu: "Этот принцип универсален! Он работает во всех сферах жизни: в знаниях, усилиях, отношениях и финансах.",
+          tipEn: "This principle is universal! It works in all areas of life: knowledge, effort, relationships, and finances.",
+        },
       },
       {
         id: "law-of-use",
@@ -127,6 +176,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/4682B4/png?text=Используй+или+Потеряешь`,
         imageAlt: "Сильная рука, держащая инструмент, символизирующая активное использование",
+        question: {
+          textRu: "Если у вас есть талант или знания, они останутся с вами, даже если вы не будете их активно использовать.",
+          textEn: "If you have a talent or knowledge, it will stay with you even if you don't actively use it.",
+          correctAnswer: 'no',
+          tipRu: "К сожалению, нет. Закон активации гласит: 'Используй или потеряешь'. Таланты и знания угасают без применения.",
+          tipEn: "Unfortunately, no. The Law of Use states: 'Use it or lose it.' Talents and knowledge fade without application.",
+        },
       },
       {
         id: "reading-learning",
@@ -140,6 +196,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/8B4513/png?text=Чтение+-+Сила`,
         imageAlt: "Открытая книга, из которой исходит свет знания",
+        question: {
+          textRu: "Чтение и постоянное обучение – это главный секрет успеха всех выдающихся людей.",
+          textEn: "Reading and continuous learning are the main secrets to success for all outstanding individuals.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Чтение и обучение – это 'топливо' для вашего личного и профессионального роста.",
+          tipEn: "Exactly! Reading and learning are the 'fuel' for your personal and professional growth.",
+        },
       },
     ]
   },
@@ -159,6 +222,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FFEE00/png?text=YOU+-+Asset`,
         imageAlt: "Conceptual image of personal development as the main asset",
+        question: {
+          textRu: "Обучение – это в первую очередь инвестиция в себя, а не просто способ получить работу.",
+          textEn: "Learning is primarily an investment in yourself, not just a way to get a job.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Джим Рон подчеркивал, что работа над собой важнее работы.",
+          tipEn: "That's right! Jim Rohn emphasized that working on yourself is more important than working on your job.",
+        },
       },
       {
         id: "goal-setting",
@@ -172,6 +242,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/00FFEE/png?text=Goal+Map`,
         imageAlt: "Visualization of a goal map and the path to achieve them",
+        question: {
+          textRu: "Ваши 'почему' (причины) для достижения целей менее важны, чем детальный план действий.",
+          textEn: "Your 'whys' (reasons) for achieving goals are less important than a detailed action plan.",
+          correctAnswer: 'no',
+          tipRu: "Наоборот! Джим Рон говорил, что причины важнее ответов. Они зажигают ваш внутренний огонь.",
+          tipEn: "On the contrary! Jim Rohn said that reasons come first, answers second. They ignite your inner fire.",
+        },
       },
       {
         id: "life-laws",
@@ -186,6 +263,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF9900/png?text=Seasons+of+Life`,
         imageAlt: "Illustration of the four seasons as a metaphor for life cycles",
+        question: {
+          textRu: "Зима (трудности) в жизни неизбежна, и нужно просто переждать её, не пытаясь измениться.",
+          textEn: "Winter (difficulties) in life is inevitable, and you just need to wait it out without trying to change.",
+          correctAnswer: 'no',
+          tipRu: "Не совсем! Трудности неизбежны, но важно не просто ждать, а становиться лучше и сильнее в процессе.",
+          tipEn: "Not quite! Difficulties are inevitable, but it's important not just to wait, but to get better and stronger in the process.",
+        },
       },
       {
         id: "action-discipline",
@@ -199,6 +283,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF00FF/png?text=Action!`,
         imageAlt: "Lightning bolt symbol representing action and energy",
+        question: {
+          textRu: "Главное отличие успешных людей – это не их идеи, а их способность постоянно действовать и дисциплинировать себя.",
+          textEn: "The main difference between successful people is not their ideas, but their ability to constantly act and discipline themselves.",
+          correctAnswer: 'yes',
+          tipRu: "Совершенно верно! Действие и дисциплина – мост между целями и их достижением.",
+          tipEn: "Absolutely! Action and discipline are the bridge between goals and accomplishment.",
+        },
       },
       {
         id: "attitude-diseases",
@@ -212,6 +303,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/FF4500/png?text=Positive+Mindset`,
         imageAlt: "A shield reflecting negative thoughts, symbolizing a strong mindset",
+        question: {
+          textRu: "Пессимизм – это лишь реалистичный взгляд на мир, и он не мешает личному развитию.",
+          textEn: "Pessimism is just a realistic view of the world, and it doesn't hinder personal development.",
+          correctAnswer: 'no',
+          tipRu: "На самом деле, пессимизм может быть одним из 'вирусов' мышления. Позитивный настрой открывает больше возможностей.",
+          tipEn: "Actually, pessimism can be one of the 'mind viruses.' A positive attitude opens up more opportunities.",
+        },
       },
       {
         id: "emotions-for-change",
@@ -224,8 +322,15 @@ const pageTranslations = {
           "<strong class='text-brand-yellow'>Desire:</strong> Igniting a strong, passionate desire to achieve a goal.",
           "<strong class='text-brand-purple'>Resolve:</strong> Saying 'I will do it!' and not backing down.",
         ],
-        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/9400D3/png?text=Emotions+of+Change`,
-        imageAlt: "A bright flame symbolizing the power of emotions",
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/9400D3/png?text=Эмоции+Перемен`,
+        imageAlt: "Яркое пламя, символизирующее силу эмоций",
+        question: {
+          textRu: "Чтобы начать изменения в жизни, достаточно просто иметь сильное желание.",
+          textEn: "To initiate life changes, simply having a strong desire is sufficient.",
+          correctAnswer: 'no',
+          tipRu: "Желание – это топливо, но нужны и другие эмоции, такие как отвращение к текущей ситуации, решение и решимость.",
+          tipEn: "Desire is fuel, but other emotions like disgust with the current situation, decision, and resolve are also needed.",
+        },
       },
       {
         id: "sowing-reaping",
@@ -237,34 +342,55 @@ const pageTranslations = {
           "Sow generously and wisely. Your actions today shape your harvest tomorrow.",
           "By creating value (<Link href='/purpose-profit' class='text-brand-blue hover:underline font-semibold'>Purpose</Link>), you ensure a rich harvest (<Link href='/purpose-profit' class='text-brand-blue hover:underline font-semibold'>Profit</Link>).",
         ],
-        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/32CD32/png?text=Sowing+Reaping`,
-        imageAlt: "A sprout breaking through soil and mature ears of wheat",
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/32CD32/png?text=Посев+и+Жатва`,
+        imageAlt: "Росток, пробивающийся из земли, и зрелые колосья",
+        question: {
+          textRu: "Принцип 'Что посеешь, то и пожнёшь' применим только к финансам и не относится к знаниям или отношениям.",
+          textEn: "The 'What you sow, you will reap' principle only applies to finances and not to knowledge or relationships.",
+          correctAnswer: 'no',
+          tipRu: "Этот принцип универсален! Он работает во всех сферах жизни: в знаниях, усилиях, отношениях и финансах.",
+          tipEn: "This principle is universal! It works in all areas of life: knowledge, effort, relationships, and finances.",
+        },
       },
       {
         id: "law-of-use",
         icon: "::FaDumbbell::",
-        title: "Law of Activation: Use It or Lose It",
+        title: "Закон Активации: Используй или Потеряешь",
         points: [
-          "<strong class='text-brand-yellow'>Any talent not used, fades. Any knowledge not applied, is forgotten.</strong>",
+          "<strong class='text-brand-yellow'>Any talent not used, uades. Any knowledge not applied, is forgotten.</strong>",
           "Actively use your skills, ideas, connections. Don't let them 'rust'.",
           "The parable of talents: he who did not use his talent, lost it.",
           "Constant practice and application are key to preserving and multiplying your potential.",
         ],
-        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/4682B4/png?text=Use+It+or+Lose+It`,
-        imageAlt: "A strong hand holding a tool, symbolizing active use",
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/4682B4/png?text=Используй+или+Потеряешь`,
+        imageAlt: "Сильная рука, держащая инструмент, символизирующая активное использование",
+        question: {
+          textRu: "Если у вас есть талант или знания, они останутся с вами, даже если вы не будете их активно использовать.",
+          textEn: "If you have a talent or knowledge, it will stay with you even if you don't actively use it.",
+          correctAnswer: 'no',
+          tipRu: "К сожалению, нет. Закон активации гласит: 'Используй или потеряешь'. Таланты и знания угасают без применения.",
+          tipEn: "Unfortunately, no. The Law of Use states: 'Use it or lose it.' Talents and knowledge fade without application.",
+        },
       },
       {
         id: "reading-learning",
         icon: "::FaBookOpenReader::",
-        title: "Fuel for Growth: Reading & Learning",
+        title: "Топливо для Роста: Чтение и Обучение",
         points: [
-          "<strong class='text-brand-yellow'>All successful people are voracious readers and learners.</strong>",
-          "One book can save you five years of life, warning against mistakes or opening new paths.",
-          "Don't leave your success and development to chance. Make them a subject of study.",
-          "Dive into <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev</Link>, read, analyze, apply. This is your path to mastery in CyberVibe.",
+          "<strong class='text-brand-yellow'>Все успешные люди – ненасытные читатели и ученики.</strong>",
+          "Одна книга может сэкономить тебе пять лет жизни, предостерегая от ошибок или открывая новые пути.",
+          "Не оставляй свой успех и развитие на волю случая. Сделай их предметом изучения.",
+          "Погружайся в <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev</Link>, читай, анализируй, применяй. Это твой путь к мастерству в КиберВайбе.",
         ],
-        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/8B4513/png?text=Reading+is+Power`,
-        imageAlt: "An open book emitting the light of knowledge",
+        imageUrl: `${STORAGE_BASE_URL_CV}/600x338/1a1a2e/8B4513/png?text=Чтение+-+Сила`,
+        imageAlt: "Открытая книга, из которой исходит свет знания",
+        question: {
+          textRu: "Чтение и постоянное обучение – это главный секрет успеха всех выдающихся людей.",
+          textEn: "Reading and continuous learning are the main secrets to success for all outstanding individuals.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Чтение и обучение – это 'топливо' для вашего личного и профессионального роста.",
+          tipEn: "Exactly! Reading and learning are the 'fuel' for your personal and professional growth.",
+        },
       },
     ]
   }
@@ -274,7 +400,13 @@ export default function CyberVibePage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
   const [selectedLang, setSelectedLang] = useState<Language>('ru'); 
-  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger"; // Added for RockstarHeroSection
+  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger"; 
+
+  // Interactive content state
+  const [visibleSectionIds, setVisibleSectionIds] = useState<Set<string>>(new Set());
+  const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, { answered: boolean; correct: boolean }>>({});
+  const [currentActiveQuestionId, setCurrentActiveQuestionId] = useState<string | null>(null);
+  const [showTipFor, setShowTipFor] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -285,6 +417,38 @@ export default function CyberVibePage() {
   }, [user?.language_code]); 
 
   const t = pageTranslations[selectedLang];
+
+  useEffect(() => {
+    // Initialize with the first section when translations are loaded and component is mounted
+    if (isMounted && t && t.sections.length > 0 && visibleSectionIds.size === 0) {
+        setVisibleSectionIds(new Set([t.sections[0].id]));
+        setCurrentActiveQuestionId(t.sections[0].id);
+    }
+  }, [isMounted, t, visibleSectionIds.size]);
+
+  const handleAnswer = useCallback((sectionId: string, userAnswer: 'yes' | 'no', nextSectionId?: string) => {
+    const section = t.sections.find(s => s.id === sectionId);
+    if (!section || !section.question) return;
+
+    const isCorrect = userAnswer === section.question.correctAnswer;
+    setAnsweredQuestions(prev => ({
+        ...prev,
+        [sectionId]: { answered: true, correct: isCorrect }
+    }));
+
+    if (!isCorrect) {
+        setShowTipFor(sectionId);
+    } else {
+        setShowTipFor(null); // Clear tip if answered correctly
+    }
+
+    if (nextSectionId) {
+        setVisibleSectionIds(prev => new Set(prev.add(nextSectionId)));
+        setCurrentActiveQuestionId(nextSectionId);
+    } else {
+        setCurrentActiveQuestionId(null); // No more questions
+    }
+  }, [t.sections]);
 
   if (!isMounted || !t) {
     return (
@@ -332,28 +496,32 @@ export default function CyberVibePage() {
       
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
 
-      <div className="relative z-10 container mx-auto px-4 pt-10 pb-10"> {/* Added pt-10 */}
+      <div className="relative z-10 container mx-auto px-4 pt-10 pb-10">
         <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-xl text-white rounded-2xl border-2 border-brand-yellow/50 shadow-[0_0_35px_theme(colors.brand-yellow/0.5)]">
-          {/* CardHeader removed as title/subtitle are in RockstarHeroSection now */}
-          <CardContent className="space-y-12 p-4 md:p-8 pt-8"> {/* Added pt-8 */}
-            {/* Language toggle buttons were moved to RockstarHeroSection children */}
+          <CardContent className="space-y-12 p-4 md:p-8 pt-8">
 
             {t.sections.map((section, index) => {
               const currentThemeColor = themePalette[index % themePalette.length];
               const textColorClass = `text-${currentThemeColor}`;
               const borderColorClass = `border-${currentThemeColor}/60`;
               const shadowColorClass = `hover:shadow-${currentThemeColor}/30`;
+              const isSectionVisible = visibleSectionIds.has(section.id);
+              const isQuestionAnswered = answeredQuestions[section.id]?.answered;
+              const isCorrectAnswer = answeredQuestions[section.id]?.correct;
+              const nextSection = t.sections[index + 1];
 
               return (
                 <motion.section 
                   key={section.id} 
+                  id={section.id} // Add ID for scrolling
                   className={cn(
                     `space-y-4 border-l-4 pl-4 md:pl-6 py-4 rounded-r-lg bg-dark-card/50 transition-shadow duration-300`,
                      borderColorClass,
-                     shadowColorClass
+                     shadowColorClass,
+                     !isSectionVisible && 'opacity-30 pointer-events-none' // Dim and disable non-visible sections
                   )}
                   initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
+                  animate={{ opacity: isSectionVisible ? 1 : 0.3, x: isSectionVisible ? 0 : -30 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <h2 className={cn(`flex items-center text-2xl md:text-3xl font-semibold mb-3 font-orbitron`, textColorClass)}>
@@ -381,6 +549,67 @@ export default function CyberVibePage() {
                        </div>
                       <p className="text-xs text-center text-gray-400 mt-1 italic">{section.imageAlt}</p>
                     </div>
+                  )}
+
+                  {section.question && !isQuestionAnswered && currentActiveQuestionId === section.id && (
+                      <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className={cn("mt-6 p-4 rounded-lg border", "border-brand-yellow/50 bg-brand-yellow/10")}
+                      >
+                          <p className="text-lg font-semibold text-brand-yellow mb-4">
+                              {selectedLang === 'ru' ? section.question.textRu : section.question.textEn}
+                          </p>
+                          <div className="flex gap-4">
+                              <Button 
+                                  onClick={() => handleAnswer(section.id, 'yes', nextSection?.id)}
+                                  className="bg-brand-green hover:bg-brand-green/80 text-white flex-1"
+                              >
+                                  {selectedLang === 'ru' ? "Да" : "Yes"}
+                              </Button>
+                              <Button 
+                                  onClick={() => handleAnswer(section.id, 'no', nextSection?.id)}
+                                  className="bg-brand-red hover:bg-brand-red/80 text-white flex-1"
+                              >
+                                  {selectedLang === 'ru' ? "Нет" : "No"}
+                              </Button>
+                          </div>
+                      </motion.div>
+                  )}
+
+                  {section.question && isQuestionAnswered && (
+                      <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: 0.1 }}
+                          className="mt-6 p-4 rounded-lg border border-gray-700 bg-gray-900/50"
+                      >
+                          <p className={cn("font-bold text-lg", isCorrectAnswer ? "text-brand-green" : "text-brand-red")}>
+                              {isCorrectAnswer ? (selectedLang === 'ru' ? "Верно!" : "Correct!") : (selectedLang === 'ru' ? "Неверно." : "Incorrect.")}
+                          </p>
+                          {showTipFor === section.id && (
+                              <p className="text-sm text-gray-400 mt-2">
+                                  {selectedLang === 'ru' ? section.question.tipRu : section.question.tipEn}
+                              </p>
+                          )}
+                          {nextSection && (
+                              <Button 
+                                  onClick={() => {
+                                      document.getElementById(nextSection.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                      setShowTipFor(null); // Clear tip after continuing
+                                  }}
+                                  className="mt-4 bg-brand-blue hover:bg-brand-blue/80 text-white font-orbitron"
+                              >
+                                  {selectedLang === 'ru' ? "Продолжить" : "Continue"}
+                              </Button>
+                          )}
+                          {!nextSection && (
+                              <p className="mt-4 text-sm text-gray-400">
+                                  {selectedLang === 'ru' ? "Вы успешно завершили интерактивный курс!" : "You have successfully completed the interactive course!"}
+                              </p>
+                          )}
+                      </motion.div>
                   )}
                 </motion.section>
               );

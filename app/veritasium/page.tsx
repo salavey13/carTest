@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useId } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useId, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppContext } from "@/contexts/AppContext";
@@ -34,6 +34,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/2e1a1a/FF0000/png?text=Революции+Образования`,
         imageAlt: "Старые технологии, обещающие революцию в образовании",
+        question: {
+          textRu: "Томас Эдисон в начале 20 века точно предсказал, что кино полностью заменит учебники в образовании.",
+          textEn: "Thomas Edison accurately predicted in the early 20th century that cinema would completely replace textbooks in education.",
+          correctAnswer: 'no',
+          tipRu: "На самом деле, его предсказание не сбылось. Технологии часто не революционизируют образование так, как ожидается.",
+          tipEn: "Actually, his prediction didn't come true. Technologies often don't revolutionize education as expected.",
+        },
       },
       {
         id: "two-systems",
@@ -47,6 +54,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/FFEE00/png?text=Системы+Мышления`,
         imageAlt: "Две фигуры, символизирующие Систему 1 (быструю) и Систему 2 (медленную)",
+        question: {
+          textRu: "Система 1 нашего мозга отвечает за медленное, осознанное мышление, требующее больших усилий.",
+          textEn: "System 1 of our brain is responsible for slow, conscious thinking that requires significant effort.",
+          correctAnswer: 'no',
+          tipRu: "Нет, за это отвечает Система 2. Система 1 – быстрая и интуитивная.",
+          tipEn: "No, that's System 2. System 1 is fast and intuitive.",
+        },
       },
       {
         id: "cognitive-load",
@@ -59,6 +73,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/FF9900/png?text=Когнитивная+Нагрузка`,
         imageAlt: "Схематичное изображение мозга с индикаторами нагрузки",
+        question: {
+          textRu: "Отвлекающие факторы во время обучения увеличивают полезную когнитивную нагрузку.",
+          textEn: "Distractions during learning increase germane cognitive load.",
+          correctAnswer: 'no',
+          tipRu: "Наоборот, отвлекающие факторы увеличивают *внешнюю* когнитивную нагрузку, которая является нежелательной.",
+          tipEn: "On the contrary, distractions increase *extraneous* cognitive load, which is undesirable.",
+        },
       },
       {
         id: "mastery-chunking",
@@ -72,6 +93,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/4682B4/png?text=Мастерство+и+Чанкинг`,
         imageAlt: "Шахматная доска с фигурами, показывающая паттерны",
+        question: {
+          textRu: "Эксперты лучше запоминают случайное расположение шахматных фигур, чем новички, благодаря чанкингу.",
+          textEn: "Experts remember random chess piece arrangements better than novices due to chunking.",
+          correctAnswer: 'no',
+          tipRu: "Чанкинг работает только с осмысленными паттернами. В случайных ситуациях эксперты не имеют преимущества.",
+          tipEn: "Chunking only works with meaningful patterns. In random situations, experts have no advantage.",
+        },
       },
       {
         id: "implications",
@@ -103,6 +131,13 @@ const pageTranslations = {
             borderColor: "border-neon-lime", textColor: "text-neon-lime",
           },
         ],
+        question: {
+          textRu: "Согласно концепции Veritasium, намеренное усложнение теста (например, плохой шрифт) может улучшить результаты, активируя Систему 2.",
+          textEn: "According to Veritasium's concept, intentionally making a test harder (e.g., bad font) can improve results by activating System 2.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Это увеличивает продуктивную когнитивную нагрузку, заставляя мозг активнее работать.",
+          tipEn: "That's right! This increases germane cognitive load, prompting the brain to work more actively.",
+        },
       },
       {
         id: "ais-role",
@@ -118,6 +153,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/9D00FF/png?text=Социальное+Обучение`,
         imageAlt: "Группа людей, взаимодействующих в процессе обучения",
+        question: {
+          textRu: "Основная проблема образования заключается в недостаточном доступе студентов к информации.",
+          textEn: "The main problem in education is students' lack of access to information.",
+          correctAnswer: 'no',
+          tipRu: "Нет, Дерек Мюллер утверждает, что информация всегда была доступна. Проблема в активации усилий и социальном аспекте обучения.",
+          tipEn: "No, Derek Muller argues that information has always been accessible. The problem lies in activating effort and the social aspect of learning.",
+        },
       },
     ]
   },
@@ -137,6 +179,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/2e1a1a/FF0000/png?text=Education+Revolutions`,
         imageAlt: "Old technologies promising revolution in education",
+        question: {
+          textRu: "Томас Эдисон в начале 20 века точно предсказал, что кино полностью заменит учебники в образовании.",
+          textEn: "Thomas Edison accurately predicted in the early 20th century that cinema would completely replace textbooks in education.",
+          correctAnswer: 'no',
+          tipRu: "На самом деле, его предсказание не сбылось. Технологии часто не революционизируют образование так, как ожидается.",
+          tipEn: "Actually, his prediction didn't come true. Technologies often don't revolutionize education as expected.",
+        },
       },
       {
         id: "two-systems",
@@ -150,6 +199,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/FFEE00/png?text=Systems+of+Thought`,
         imageAlt: "Two figures symbolizing System 1 (fast) and System 2 (slow)",
+        question: {
+          textRu: "Система 1 нашего мозга отвечает за медленное, осознанное мышление, требующее больших усилий.",
+          textEn: "System 1 of our brain is responsible for slow, conscious thinking that requires significant effort.",
+          correctAnswer: 'no',
+          tipRu: "Нет, за это отвечает Система 2. Система 1 – быстрая и интуитивная.",
+          tipEn: "No, that's System 2. System 1 is fast and intuitive.",
+        },
       },
       {
         id: "cognitive-load",
@@ -162,6 +218,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/FF9900/png?text=Cognitive+Load`,
         imageAlt: "Diagram of a brain with load indicators",
+        question: {
+          textRu: "Отвлекающие факторы во время обучения увеличивают полезную когнитивную нагрузку.",
+          textEn: "Distractions during learning increase germane cognitive load.",
+          correctAnswer: 'no',
+          tipRu: "Наоборот, отвлекающие факторы увеличивают *внешнюю* когнитивную нагрузку, которая является нежелательной.",
+          tipEn: "On the contrary, distractions increase *extraneous* cognitive load, which is undesirable.",
+        },
       },
       {
         id: "mastery-chunking",
@@ -175,6 +238,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/4682B4/png?text=Mastery+and+Chunking`,
         imageAlt: "Chess board with pieces illustrating patterns",
+        question: {
+          textRu: "Эксперты лучше запоминают случайное расположение шахматных фигур, чем новички, благодаря чанкингу.",
+          textEn: "Experts remember random chess piece arrangements better than novices due to chunking.",
+          correctAnswer: 'no',
+          tipRu: "Чанкинг работает только с осмысленными паттернами. В случайных ситуациях эксперты не имеют преимущества.",
+          tipEn: "Chunking only works with meaningful patterns. In random situations, experts have no advantage.",
+        },
       },
       {
         id: "implications",
@@ -206,6 +276,13 @@ const pageTranslations = {
             borderColor: "border-neon-lime", textColor: "text-neon-lime",
           },
         ],
+        question: {
+          textRu: "Согласно концепции Veritasium, намеренное усложнение теста (например, плохой шрифт) может улучшить результаты, активируя Систему 2.",
+          textEn: "According to Veritasium's concept, intentionally making a test harder (e.g., bad font) can improve results by activating System 2.",
+          correctAnswer: 'yes',
+          tipRu: "Именно так! Это увеличивает продуктивную когнитивную нагрузку, заставляя мозг активнее работать.",
+          tipEn: "That's right! This increases germane cognitive load, prompting the brain to work more actively.",
+        },
       },
       {
         id: "ais-role",
@@ -221,6 +298,13 @@ const pageTranslations = {
         ],
         imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/9D00FF/png?text=Social+Learning`,
         imageAlt: "A group of people interacting in a learning setting",
+        question: {
+          textRu: "Основная проблема образования заключается в недостаточном доступе студентов к информации.",
+          textEn: "The main problem in education is students' lack of access to information.",
+          correctAnswer: 'no',
+          tipRu: "Нет, Дерек Мюллер утверждает, что информация всегда была доступна. Проблема в активации усилий и социальном аспекте обучения.",
+          tipEn: "No, Derek Muller argues that information has always been accessible. The problem lies in activating effort and the social aspect of learning.",
+        },
       },
     ]
   }
@@ -230,7 +314,14 @@ export default function VeritasiumPage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
   const [selectedLang, setSelectedLang] = useState<Language>('ru'); 
-  const heroTriggerId = useId().replace(/:/g, "-") + "-veritasium-hero-trigger"; // Unique ID for this page
+  const heroTriggerId = useId().replace(/:/g, "-") + "-veritasium-hero-trigger"; 
+
+  // Interactive content state
+  const [visibleSectionIds, setVisibleSectionIds] = useState<Set<string>>(new Set());
+  const [answeredQuestions, setAnsweredQuestions] = useState<Record<string, { answered: boolean; correct: boolean }>>({});
+  const [currentActiveQuestionId, setCurrentActiveQuestionId] = useState<string | null>(null);
+  const [showTipFor, setShowTipFor] = useState<string | null>(null);
+
 
   useEffect(() => {
     setIsMounted(true);
@@ -240,15 +331,47 @@ export default function VeritasiumPage() {
     logger.log(`[VeritasiumPage] Mounted. Browser lang: ${browserLang}, Initial selected: ${initialLang}`);
   }, [user?.language_code]); 
 
-  if (!isMounted) {
+  const t = pageTranslations[selectedLang];
+  
+  useEffect(() => {
+    // Initialize with the first section when translations are loaded and component is mounted
+    if (isMounted && t && t.sections.length > 0 && visibleSectionIds.size === 0) {
+        setVisibleSectionIds(new Set([t.sections[0].id]));
+        setCurrentActiveQuestionId(t.sections[0].id);
+    }
+  }, [isMounted, t, visibleSectionIds.size]);
+
+  const handleAnswer = useCallback((sectionId: string, userAnswer: 'yes' | 'no', nextSectionId?: string) => {
+    const section = t.sections.find(s => s.id === sectionId);
+    if (!section || !section.question) return;
+
+    const isCorrect = userAnswer === section.question.correctAnswer;
+    setAnsweredQuestions(prev => ({
+        ...prev,
+        [sectionId]: { answered: true, correct: isCorrect }
+    }));
+
+    if (!isCorrect) {
+        setShowTipFor(sectionId);
+    } else {
+        setShowTipFor(null); // Clear tip if answered correctly
+    }
+
+    if (nextSectionId) {
+        setVisibleSectionIds(prev => new Set(prev.add(nextSectionId)));
+        setCurrentActiveQuestionId(nextSectionId);
+    } else {
+        setCurrentActiveQuestionId(null); // No more questions
+    }
+  }, [t.sections]);
+
+  if (!isMounted || !t) {
     return (
       <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <p className="text-brand-cyan animate-pulse text-xl font-mono">Загрузка озарений Veritasium...</p>
       </div>
     );
   }
-
-  const t = pageTranslations[selectedLang];
   
   // Adjusted theme palette for Veritasium, slightly different colors but still vibrant
   const themePalette = ["brand-cyan", "brand-yellow", "brand-red", "brand-blue", "brand-pink", "brand-green", "brand-purple", "neon-lime"];
@@ -312,17 +435,23 @@ export default function VeritasiumPage() {
               const textColorClass = `text-${currentThemeColor}`;
               const borderColorClass = `border-${currentThemeColor}/60`;
               const shadowColorClass = `hover:shadow-${currentThemeColor}/30`;
+              const isSectionVisible = visibleSectionIds.has(section.id);
+              const isQuestionAnswered = answeredQuestions[section.id]?.answered;
+              const isCorrectAnswer = answeredQuestions[section.id]?.correct;
+              const nextSection = t.sections[index + 1];
 
               return (
                 <motion.section 
                   key={section.id} 
+                  id={section.id} // Add ID for scrolling
                   className={cn(
                     `space-y-4 border-l-4 pl-4 md:pl-6 py-4 rounded-r-lg bg-dark-card/50 transition-shadow duration-300`,
                      borderColorClass,
-                     shadowColorClass
+                     shadowColorClass,
+                     !isSectionVisible && 'opacity-30 pointer-events-none' // Dim and disable non-visible sections
                   )}
                   initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
+                  animate={{ opacity: isSectionVisible ? 1 : 0.3, x: isSectionVisible ? 0 : -30 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <h2 className={cn(`flex items-center text-2xl md:text-3xl font-semibold mb-4 font-orbitron`, textColorClass)}>
@@ -359,7 +488,6 @@ export default function VeritasiumPage() {
                        </div>
                    ))}
 
-                  {/* Render main section points if no subSections */}
                   {!section.subSections && section.points.length > 0 && (
                     <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed prose prose-sm md:prose-base prose-invert max-w-none prose-strong:font-orbitron prose-a:text-brand-blue hover:prose-a:text-brand-cyan prose-li:marker:text-current">
                       {section.points.map((point, i) => (
@@ -384,6 +512,66 @@ export default function VeritasiumPage() {
 
                   {section.outro && <p className="text-gray-300 leading-relaxed mt-4 italic" dangerouslySetInnerHTML={{ __html: section.outro }}></p>}
 
+                  {section.question && !isQuestionAnswered && currentActiveQuestionId === section.id && (
+                      <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className={cn("mt-6 p-4 rounded-lg border", "border-brand-yellow/50 bg-brand-yellow/10")}
+                      >
+                          <p className="text-lg font-semibold text-brand-yellow mb-4">
+                              {selectedLang === 'ru' ? section.question.textRu : section.question.textEn}
+                          </p>
+                          <div className="flex gap-4">
+                              <Button 
+                                  onClick={() => handleAnswer(section.id, 'yes', nextSection?.id)}
+                                  className="bg-brand-green hover:bg-brand-green/80 text-white flex-1"
+                              >
+                                  {selectedLang === 'ru' ? "Да" : "Yes"}
+                              </Button>
+                              <Button 
+                                  onClick={() => handleAnswer(section.id, 'no', nextSection?.id)}
+                                  className="bg-brand-red hover:bg-brand-red/80 text-white flex-1"
+                              >
+                                  {selectedLang === 'ru' ? "Нет" : "No"}
+                              </Button>
+                          </div>
+                      </motion.div>
+                  )}
+
+                  {section.question && isQuestionAnswered && (
+                      <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: 0.1 }}
+                          className="mt-6 p-4 rounded-lg border border-gray-700 bg-gray-900/50"
+                      >
+                          <p className={cn("font-bold text-lg", isCorrectAnswer ? "text-brand-green" : "text-brand-red")}>
+                              {isCorrectAnswer ? (selectedLang === 'ru' ? "Верно!" : "Correct!") : (selectedLang === 'ru' ? "Неверно." : "Incorrect.")}
+                          </p>
+                          {showTipFor === section.id && (
+                              <p className="text-sm text-gray-400 mt-2">
+                                  {selectedLang === 'ru' ? section.question.tipRu : section.question.tipEn}
+                              </p>
+                          )}
+                          {nextSection && (
+                              <Button 
+                                  onClick={() => {
+                                      document.getElementById(nextSection.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                      setShowTipFor(null); // Clear tip after continuing
+                                  }}
+                                  className="mt-4 bg-brand-blue hover:bg-brand-blue/80 text-white font-orbitron"
+                              >
+                                  {selectedLang === 'ru' ? "Продолжить" : "Continue"}
+                              </Button>
+                          )}
+                           {!nextSection && (
+                              <p className="mt-4 text-sm text-gray-400">
+                                  {selectedLang === 'ru' ? "Вы успешно завершили интерактивный курс!" : "You have successfully completed the interactive course!"}
+                              </p>
+                          )}
+                      </motion.div>
+                  )}
                 </motion.section>
               );
             })}
