@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText } from "lucide-react";
+import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt } from "lucide-react"; // Added Bolt
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { FaGithub, FaTelegram } from "react-icons/fa6"; 
@@ -10,11 +10,6 @@ import { usePathname } from "next/navigation";
 export default function Footer() {
   const { tg, isInTelegramContext } = useAppContext();
   const pathname = usePathname(); 
-
-  // Логика скрытия футера на '/finance-literacy-memo' УДАЛЕНА
-  // if (pathname === '/finance-literacy-memo') {
-  //   return null;
-  // }
 
   const handleShare = () => {
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent("https://t.me/oneSitePlsBot/app") + "&text=" + encodeURIComponent("Зацени oneSitePls - твой AI-Dev ассистент в Telegram!");
@@ -59,6 +54,7 @@ export default function Footer() {
                </li>
                  <li><Link href="/selfdev/gamified" className={footerLinkClass}><Sparkles className="w-3.5 h-3.5 text-brand-pink"/>CyberDev OS</Link></li>
                  <li><Link href="/p-plan" className={footerLinkClass}><Code className="w-3.5 h-3.5 text-brand-yellow"/>VIBE План</Link></li>
+                 <li><Link href="/cybervibe" className={footerLinkClass}><Bolt className="w-3.5 h-3.5 text-brand-yellow"/>CyberVibe Апгрейд</Link></li> {/* New Link Added */}
             </ul>
           </div>
 
