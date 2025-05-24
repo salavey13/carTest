@@ -11,8 +11,8 @@ import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboar
 import { toast } from 'sonner';
 import LeadsPageRightNav from './LeadsPageRightNav';
 import SupportArsenal from './SupportArsenal';
-import LeadsDashboard from './LeadsDashboard';
 import GeneralPurposeScraper from './GeneralPurposeScraper';
+import LeadsDashboard from './LeadsDashboard';
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 
@@ -232,6 +232,13 @@ const LeadGenerationHQPage = () => {
     { id: "kwork_parser", label: "Парсер (Kwork)", site: "kwork", keywords: "парсер", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
     { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" }, // Habr использует 'q'
     { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    // НОВЫЕ КНОПКИ ДЛЯ УЛУЧШЕНИЙ
+    { id: "kwork_car_rental_twa", label: "Аренда Авто (TWA Kwork)", site: "kwork", keywords: "telegram web app аренда авто", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_fitness_twa", label: "Фитнес (TWA Kwork)", site: "kwork", keywords: "telegram web app фитнес тренировки", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_crm_twa", label: "CRM (TWA Kwork)", site: "kwork", keywords: "telegram web app crm", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_admin_panel", label: "Админка (Kwork)", site: "kwork", keywords: "админ панель next.js react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "habr_nextjs_react", label: "Next.js React (Habr)", site: "habr", keywords: "next.js react", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    { id: "habr_supabase_db", label: "Supabase (Habr)", site: "habr", keywords: "supabase база данных", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
   ];
 
    const kworkSearchLinks = [ // Это внешние ссылки для SupportArsenal, оставлены здесь
