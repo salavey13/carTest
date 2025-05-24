@@ -1,11 +1,12 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from 'sonner'; // Need toast for copy functionality
 
 interface Lead {
   id?: string;
@@ -16,9 +17,9 @@ interface Lead {
   raw_html_description?: string | null;
   budget_range?: string | null;
   posted_at?: string | null;
-  similarity_score?: number | null; 
-  initial_relevance_score?: number | null; 
-  project_type_guess?: string | null; 
+  similarity_score?: number | null;
+  initial_relevance_score?: number | null; // This is from AI, maps to similarity_score in DB
+  project_type_guess?: string | null;
   status?: string;
   assigned_to_tank?: string | null;
   assigned_to_carry?: string | null;
@@ -27,8 +28,8 @@ interface Lead {
   supervibe_studio_links?: any;
   github_issue_links?: any;
   generated_offer?: string | null;
-  identified_tweaks?: any; 
-  missing_features?: any; 
+  identified_tweaks?: any; // This is JSONB from DB, might be string or parsed object
+  missing_features?: any; // This is JSONB from DB, might be string or parsed object
   created_at?: string;
   updated_at?: string;
 }
@@ -86,6 +87,20 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
   onScrollToSection,
   arsenalSectionRef,
 }) => {
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
+
+  const toggleExpand = (leadId: string | undefined) => {
+    if (leadId) {
+      setExpandedLeadId(prevId => (prevId === leadId ? null : leadId));
+    }
+  };
+
+  const handleCopyToClipboard = (text: string, message: string) => {
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success(message))
+      .catch(err => toast.error(`Ошибка копирования: ${err.message}`));
+  };
+
   return (
     <TooltipProvider delayDuration={100}>
       <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
@@ -141,144 +156,277 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               <table className="w-full text-left">
                 <thead className="text-[0.7rem] sm:text-xs text-brand-orange uppercase bg-gray-950/70 font-orbitron">
                   <tr>
-                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Клиент (Релевантность)</th>
-                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden md:table-cell">Проект (Суть и Тип)</th>
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Клиент (Р)</th> {/* Abbreviated Relevance */}
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden md:table-cell">Проект</th>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden lg:table-cell">Бюджет</th>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Статус</th>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Назначен</th>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Детали</th>
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2"></th> {/* Column for expand button */}
                   </tr>
                 </thead>
                 <tbody>
                   {leads.map(lead => {
+                    const isExpanded = expandedLeadId === lead.id;
+                    let tweaksParsed: any[] = [];
+                    let featuresParsed: any[] = [];
                     let tweaksCount = 0;
                     let featuresCount = 0;
+
                     try {
                       if (lead.identified_tweaks) {
-                        const parsedTweaks = typeof lead.identified_tweaks === 'string' ? JSON.parse(lead.identified_tweaks) : lead.identified_tweaks;
-                        if (Array.isArray(parsedTweaks)) tweaksCount = parsedTweaks.length;
+                        tweaksParsed = typeof lead.identified_tweaks === 'string' ? JSON.parse(lead.identified_tweaks) : lead.identified_tweaks;
+                        if (Array.isArray(tweaksParsed)) tweaksCount = tweaksParsed.length;
                       }
-                    } catch (e) { /* Ошибка парсинга JSON, count остается 0 */ }
+                    } catch (e) { console.error("Error parsing tweaks JSON:", e); }
                     try {
                       if (lead.missing_features) {
-                        const parsedFeatures = typeof lead.missing_features === 'string' ? JSON.parse(lead.missing_features) : lead.missing_features;
-                        if (Array.isArray(parsedFeatures)) featuresCount = parsedFeatures.length;
+                        featuresParsed = typeof lead.missing_features === 'string' ? JSON.parse(lead.missing_features) : lead.missing_features;
+                        if (Array.isArray(featuresParsed)) featuresCount = featuresParsed.length;
                       }
-                    } catch (e) { /* Ошибка парсинга JSON, count остается 0 */ }
+                    } catch (e) { console.error("Error parsing features JSON:", e); }
+
 
                     return (
-                      <tr key={lead.id} className="bg-gray-900/50 border-b border-gray-800 hover:bg-gray-800/70 transition-colors">
-                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap">
-                          <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline text-brand-cyan flex items-center gap-1 font-semibold">
-                            {lead.client_name || 'N/A'} <VibeContentRenderer content="::FaSquareArrowUpRight className='text-[0.6rem] sm:text-2xs'::" />
-                          </a>
-                          {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-gray-500 italic' title={`Источник: ${lead.source}`}>({lead.source})</span>}
-                          {(lead.initial_relevance_score || lead.similarity_score) && 
-                            <span className={cn('block text-[0.65rem] sm:text-xs font-bold', 
-                                (lead.initial_relevance_score || lead.similarity_score || 0) >= 8 ? 'text-brand-lime' :
-                                (lead.initial_relevance_score || lead.similarity_score || 0) >= 5 ? 'text-brand-yellow' :
-                                'text-brand-orange'
-                              )} 
-                              title={`Релевантность: ${lead.initial_relevance_score || lead.similarity_score}/10`}
-                            >
-                              Р: {lead.initial_relevance_score || lead.similarity_score}/10
-                            </span>
-                          }
-                        </td>
-                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-300 max-w-[150px] sm:max-w-[200px] md:max-w-xs hidden md:table-cell">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className="truncate block cursor-help" title={lead.project_description}>
-                                    {lead.project_description ? lead.project_description.substring(0, 70) + (lead.project_description.length > 70 ? '...' : '') : '-'}
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-gray-950 border-brand-purple text-gray-300 max-w-xs p-2 text-xs">
-                                <p>{lead.project_description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                          {lead.project_type_guess && (
-                            <span 
-                              className={cn('block text-[0.6rem] sm:text-2xs italic font-semibold mt-0.5', getProjectTypeColor(lead.project_type_guess, pageTheme))}
-                              title={`Тип проекта (предположение): ${lead.project_type_guess}`}
-                            >
-                              ({lead.project_type_guess})
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400 hidden lg:table-cell">{lead.budget_range || '-'}</td>
-                        <td className="px-2 sm:px-3 py-1.5 sm:py-2">
-                          <select
-                            value={lead.status || 'new'}
-                            onChange={(e) => lead.id && onUpdateStatus(lead.id, e.target.value)}
-                            disabled={isLoading}
-                            className={cn(
-                              "bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none",
-                              lead.status === 'new' && 'ring-1 sm:ring-2 ring-yellow-400 font-bold',
-                              lead.status === 'in_progress' && 'ring-1 sm:ring-2 ring-blue-400',
-                              lead.status === 'interested' && 'ring-1 sm:ring-2 ring-pink-400 font-semibold',
-                              lead.status === 'closed_won' && 'bg-green-700/50 ring-1 sm:ring-2 ring-green-400 text-black font-bold',
-                              lead.status === 'closed_lost' && 'bg-red-700/50 ring-1 sm:ring-2 ring-red-400 text-gray-300',
-                              lead.status === 'analyzed_by_pipeline' && 'bg-purple-700/30 ring-1 ring-brand-purple text-brand-purple'
+                      <React.Fragment key={lead.id}>
+                        <tr className="bg-gray-900/50 border-b border-gray-800 hover:bg-gray-800/70 transition-colors">
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap">
+                            <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline text-brand-cyan flex items-center gap-1 font-semibold">
+                              {lead.client_name || 'N/A'} <VibeContentRenderer content="::FaSquareArrowUpRight className='text-[0.6rem] sm:text-2xs'::" />
+                            </a>
+                            {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-gray-500 italic' title={`Источник: ${lead.source}`}>({lead.source})</span>}
+                            {(lead.similarity_score !== null && lead.similarity_score !== undefined) &&
+                              <span className={cn('block text-[0.65rem] sm:text-xs font-bold',
+                                  lead.similarity_score >= 8 ? 'text-brand-lime' :
+                                  lead.similarity_score >= 5 ? 'text-brand-yellow' :
+                                  'text-brand-orange'
+                                )}
+                                title={`Релевантность: ${lead.similarity_score}/10`}
+                              >
+                                Р: {lead.similarity_score}/10
+                              </span>
+                            }
+                          </td>
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-300 max-w-[150px] sm:max-w-[200px] md:max-w-xs hidden md:table-cell">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                  <span className="truncate block cursor-help" title={lead.project_description}>
+                                      {lead.project_description ? lead.project_description.substring(0, 70) + (lead.project_description.length > 70 ? '...' : '') : '-'}
+                                  </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-gray-950 border-brand-purple text-gray-300 max-w-xs p-2 text-xs">
+                                  <p>{lead.project_description}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            {lead.project_type_guess && (
+                              <span
+                                className={cn('block text-[0.6rem] sm:text-2xs italic font-semibold mt-0.5', getProjectTypeColor(lead.project_type_guess, pageTheme))}
+                                title={`Тип проекта (предположение): ${lead.project_type_guess}`}
+                              >
+                                ({lead.project_type_guess})
+                              </span>
                             )}
-                          >
-                            <option value="new">Новый</option>
-                            <option value="raw_data">Сырые</option>
-                            <option value="analyzed">Анализ</option>
-                            <option value="analyzed_by_pipeline">Пайплайн AI</option>
-                            <option value="offer_generated">Оффер</option>
-                            <option value="contacted">Контакт</option>
-                            <option value="interested">Интерес</option>
-                            <option value="in_progress">В работе</option>
-                            <option value="closed_won">Успех!</option>
-                            <option value="closed_lost">Провал</option>
-                          </select>
-                        </td>
-                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400">
-                          <select
-                            value={lead.assigned_to_tank || lead.assigned_to_carry || lead.assigned_to_support || ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              const [role, id] = value.split(':');
-                              if (lead.id) {
-                                if (value === "unassign_tank") onAssignLead(lead.id, 'tank', null);
-                                else if (value === "unassign_carry") onAssignLead(lead.id, 'carry', null);
-                                else if (value === "unassign_support") onAssignLead(lead.id, 'support', null);
-                                else if (role && id) onAssignLead(lead.id, role as 'tank' | 'carry' | 'support', id);
-                              }
-                            }}
-                            disabled={isLoading}
-                            className="bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none"
-                          >
-                            <option value="">Никому</option>
-                            <optgroup label="Танки">
-                              {teamMembers.filter(m => m.role === 'tank').map(tm => <option key={tm.user_id} value={`tank:${tm.user_id}`}>{tm.username || tm.user_id.substring(0, 6)}</option>)}
-                              {lead.assigned_to_tank && <option value="unassign_tank" className="text-red-400">Снять Танка</option>}
-                            </optgroup>
-                            <optgroup label="Кэрри">
-                              {teamMembers.filter(m => m.role === 'carry').map(tm => <option key={tm.user_id} value={`carry:${tm.user_id}`}>{tm.username || tm.user_id.substring(0, 6)}</option>)}
-                              {lead.assigned_to_carry && <option value="unassign_carry" className="text-red-400">Снять Кэрри</option>}
-                            </optgroup>
-                            <optgroup label="Саппорт">
-                              {teamMembers.filter(m => m.role === 'support').map(tm => <option key={tm.user_id} value={`support:${tm.user_id}`}>{tm.username || tm.user_id.substring(0, 6)}</option>)}
-                              {lead.assigned_to_support && <option value="unassign_support" className="text-red-400">Снять Саппорта</option>}
-                            </optgroup>
-                          </select>
-                        </td>
-                        <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs space-x-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-brand-yellow hover:text-yellow-300 h-7 w-7 p-1" disabled={isLoading}>
-                                <VibeContentRenderer content="::FaCircleInfo::" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-gray-900 text-gray-200 border-brand-yellow/50 text-xs font-mono p-2 shadow-lg max-w-xs">
-                              <p>ID: {lead.id?.substring(0,8)}...</p>
-                              <p className="text-brand-pink">Твики (Танки): {tweaksCount}</p>
-                              <p className="text-brand-green">Новые фичи (Кэрри): {featuresCount}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400 hidden lg:table-cell">{lead.budget_range || '-'}</td>
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2">
+                            <select
+                              value={lead.status || 'new'}
+                              onChange={(e) => lead.id && onUpdateStatus(lead.id, e.target.value)}
+                              disabled={isLoading}
+                              className={cn(
+                                "bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none",
+                                lead.status === 'new' && 'ring-1 sm:ring-2 ring-yellow-400 font-bold',
+                                lead.status === 'in_progress' && 'ring-1 sm:ring-2 ring-blue-400',
+                                lead.status === 'interested' && 'ring-1 sm:ring-2 ring-pink-400 font-semibold',
+                                lead.status === 'closed_won' && 'bg-green-700/50 ring-1 sm:ring-2 ring-green-400 text-black font-bold',
+                                lead.status === 'closed_lost' && 'bg-red-700/50 ring-1 sm:ring-2 ring-red-400 text-gray-300',
+                                lead.status === 'analyzed_by_pipeline' && 'bg-purple-700/30 ring-1 ring-brand-purple text-brand-purple'
+                              )}
+                            >
+                              <option value="new">Новый</option>
+                              <option value="raw_data">Сырые</option>
+                              <option value="analyzed">Анализ</option>
+                              <option value="analyzed_by_pipeline">Пайплайн AI</option>
+                              <option value="offer_generated">Оффер</option>
+                              <option value="contacted">Контакт</option>
+                              <option value="interested">Интерес</option>
+                              <option value="in_progress">В работе</option>
+                              <option value="closed_won">Успех!</option>
+                              <option value="closed_lost">Провал</option>
+                            </select>
+                          </td>
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400">
+                            <select
+                              value={lead.assigned_to_tank || lead.assigned_to_carry || lead.assigned_to_support || ''}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                const [role, id] = value.split(':');
+                                if (lead.id) {
+                                  if (value === "unassign_tank") onAssignLead(lead.id, 'tank', null);
+                                  else if (value === "unassign_carry") onAssignLead(lead.id, 'carry', null);
+                                  else if (value === "unassign_support") onAssignLead(lead.id, 'support', null);
+                                  else if (role && id) onAssignLead(lead.id, role as 'tank' | 'carry' | 'support', id);
+                                }
+                              }}
+                              disabled={isLoading}
+                              className="bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none"
+                            >
+                              <option value="">Никому</option>
+                              <optgroup label="Танки">
+                                {teamMembers.filter(m => m.role === 'tank').map(tm => <option key={tm.user_id} value={`tank:${tm.user_id}`}>{tm.username || tm.user_id.substring(0, 6)}</option>)}
+                                {lead.assigned_to_tank && <option value="unassign_tank" className="text-red-400">Снять Танка</option>}
+                              </optgroup>
+                              <optgroup label="Кэрри">
+                                {teamMembers.filter(m => m.role === 'carry').map(tm => <option key={tm.user_id} value={`carry:${tm.user_id}`}>{tm.username || tm.user_id.substring(0, 6)}</option>)}
+                                {lead.assigned_to_carry && <option value="unassign_carry" className="text-red-400">Снять Кэрри</option>}
+                              </optgroup>
+                              <optgroup label="Саппорт">
+                                {teamMembers.filter(m => m.role === 'support').map(tm => <option key={tm.user_id} value={`support:${tm.user_id}`}>{tm.username || tm.user_id.substring(0, 6)}</option>)}
+                                {lead.assigned_to_support && <option value="unassign_support" className="text-red-400">Снять Саппорта</option>}
+                              </optgroup>
+                            </select>
+                          </td>
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs space-x-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-brand-yellow hover:text-yellow-300 h-7 w-7 p-1" disabled={isLoading}>
+                                  <VibeContentRenderer content="::FaCircleInfo::" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-gray-900 text-gray-200 border-brand-yellow/50 text-xs font-mono p-2 shadow-lg max-w-xs">
+                                <p>ID: {lead.id?.substring(0,8)}...</p>
+                                <p className="text-brand-pink">Твики (Танки): {tweaksCount}</p>
+                                <p className="text-brand-green">Новые фичи (Кэрри): {featuresCount}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </td>
+                          <td className="px-2 sm:px-3 py-1.5 sm:py-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => toggleExpand(lead.id)}
+                              className={cn("h-7 w-7 p-0", isExpanded ? "text-brand-blue" : "text-gray-500 hover:text-brand-cyan")}
+                              disabled={isLoading}
+                            >
+                              {isExpanded ? <VibeContentRenderer content="::FaChevronUp className='h-4 w-4'::" /> : <VibeContentRenderer content="::FaChevronDown className='h-4 w-4'::" />}
+                            </Button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-gray-950/70 border-b border-gray-700 transition-all duration-300 ease-in-out">
+                            <td colSpan={7} className="p-4 sm:p-6">
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-gray-300 text-xs sm:text-sm">
+                                {/* Project Description & Type */}
+                                <div className="space-y-3">
+                                  <h5 className={cn("font-orbitron font-bold text-sm sm:text-base", pageTheme.accentColor)}>
+                                    <VibeContentRenderer content="::FaFileAlt:: Полное описание проекта:" />
+                                  </h5>
+                                  <p className="leading-relaxed whitespace-pre-wrap">{lead.project_description || 'Нет описания.'}</p>
+                                  {lead.project_type_guess && (
+                                    <p className={cn('italic font-semibold', getProjectTypeColor(lead.project_type_guess, pageTheme))}>
+                                      <VibeContentRenderer content="::FaMagic:: Предполагаемый тип: " />{lead.project_type_guess}
+                                    </p>
+                                  )}
+                                  {lead.raw_html_description && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCopyToClipboard(lead.raw_html_description || '', "Raw HTML скопирован!")}
+                                      className="text-brand-yellow hover:underline text-xs"
+                                    >
+                                      <VibeContentRenderer content="::FaCode:: Копировать Raw HTML" />
+                                    </Button>
+                                  )}
+                                </div>
+
+                                {/* Financial and History Details */}
+                                <div className="space-y-3">
+                                  <h5 className={cn("font-orbitron font-bold text-sm sm:text-base", pageTheme.accentColor)}>
+                                    <VibeContentRenderer content="::FaChartLine:: Дополнительные данные:" />
+                                  </h5>
+                                  <p><VibeContentRenderer content="::FaMoneyBillWave:: Бюджет:" /> {lead.budget_range || '-'}</p>
+                                  <p><VibeContentRenderer content="::FaRegCalendarAlt:: Дедлайн:" /> {lead.posted_at ? new Date(lead.posted_at).toLocaleDateString() : (lead as any).deadline_info || '-'}</p>
+                                  <p><VibeContentRenderer content="::FaHistory:: История клиента:" /> {lead.client_kwork_history || '-'}</p>
+                                  <p><VibeContentRenderer content="::FaPercentage:: Предложений:" /> {lead.current_kwork_offers_count || '-'}</p>
+                                </div>
+
+                                {/* Generated Offer */}
+                                <div className="lg:col-span-2 space-y-3 pt-4 border-t border-gray-800">
+                                  <h5 className={cn("font-orbitron font-bold text-sm sm:text-base", pageTheme.accentColor)}>
+                                    <VibeContentRenderer content="::FaBullhorn:: Сгенерированное предложение (Оффер):" />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCopyToClipboard(lead.generated_offer || '', "Оффер скопирован!")}
+                                      className="ml-2 text-gray-400 hover:text-white"
+                                    >
+                                      <VibeContentRenderer content="::FaCopy::" />
+                                    </Button>
+                                  </h5>
+                                  <div className="bg-gray-800/50 p-3 rounded-md border border-brand-purple/30 max-h-60 overflow-y-auto simple-scrollbar whitespace-pre-wrap">
+                                    <VibeContentRenderer content={lead.generated_offer || 'Оффер не сгенерирован.'} />
+                                  </div>
+                                </div>
+
+                                {/* Identified Tweaks */}
+                                <div className="space-y-3 pt-4 border-t border-gray-800">
+                                  <h5 className={cn("font-orbitron font-bold text-sm sm:text-base", pageTheme.accentColor)}>
+                                    <VibeContentRenderer content="::FaTools:: Твики (для Танков):" />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCopyToClipboard(JSON.stringify(tweaksParsed, null, 2), "Твики скопированы!")}
+                                      className="ml-2 text-gray-400 hover:text-white"
+                                    >
+                                      <VibeContentRenderer content="::FaCopy::" />
+                                    </Button>
+                                  </h5>
+                                  {tweaksParsed.length > 0 ? (
+                                    <ul className="list-disc list-inside bg-gray-800/50 p-3 rounded-md border border-brand-pink/30 max-h-48 overflow-y-auto simple-scrollbar">
+                                      {tweaksParsed.map((tweak, idx) => (
+                                        <li key={idx} className="mb-1">
+                                          **{tweak.tweak_description}** ({tweak.estimated_complexity})
+                                          {tweak.relevant_supervibe_capability && <span className="block text-[0.6rem] text-gray-500">[{tweak.relevant_supervibe_capability}]</span>}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-gray-500">Твиков не найдено.</p>
+                                  )}
+                                </div>
+
+                                {/* Missing Features */}
+                                <div className="space-y-3 pt-4 border-t border-gray-800">
+                                  <h5 className={cn("font-orbitron font-bold text-sm sm:text-base", pageTheme.accentColor)}>
+                                    <VibeContentRenderer content="::FaFlask:: Новые фичи (для Кэрри):" />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCopyToClipboard(JSON.stringify(featuresParsed, null, 2), "Фичи скопированы!")}
+                                      className="ml-2 text-gray-400 hover:text-white"
+                                    >
+                                      <VibeContentRenderer content="::FaCopy::" />
+                                    </Button>
+                                  </h5>
+                                  {featuresParsed.length > 0 ? (
+                                    <ul className="list-disc list-inside bg-gray-800/50 p-3 rounded-md border border-brand-green/30 max-h-48 overflow-y-auto simple-scrollbar">
+                                      {featuresParsed.map((feature, idx) => (
+                                        <li key={idx} className="mb-1">
+                                          **{feature.feature_description}**
+                                          {feature.reason_for_carry && <span className="block text-[0.6rem] text-gray-500">Причина: {feature.reason_for_carry}</span>}
+                                          {feature.potential_impact_on_supervibe && <span className="block text-[0.6rem] text-brand-yellow">Impact: {feature.potential_impact_on_supervibe}</span>}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-gray-500">Новых фич не найдено.</p>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
