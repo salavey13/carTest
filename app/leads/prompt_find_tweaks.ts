@@ -37,30 +37,30 @@ export const PROMPT_FIND_TWEAKS = `
 \`\`\`json
 [
   {
-    "tweak_description": "Кастомизация UI и функционала каталога авто (отображение, фильтры, сортировка) под дизайн клиента на базе `TWA_CarRental` модуля.",
+    "tweak_description": "Кастомизация UI и функционала каталога авто (отображение, фильтры, сортировка) под дизайн клиента на базе \`TWA_CarRental\` модуля.",
     "estimated_complexity": "medium",
-    "relevant_supervibe_capability": "Адаптация компонента `TWA_CarRental` Catalog/Filters с помощью AI-инструментов SUPERVIBE Studio.",
+    "relevant_supervibe_capability": "Адаптация компонента \`TWA_CarRental\` Catalog/Filters с помощью AI-инструментов SUPERVIBE Studio.",
     "target_file_guess": "\`/app/rent-car/page.tsx\`, \`/components/car/CarCatalog.tsx\`",
     "generated_repo_xml_link_idea": "CustomizeCarCatalogUI"
   },
   {
-    "tweak_description": "Доработка системы бронирования и корзины для аренды авто, включая специфические поля и логику на базе `TWA_CarRental` модуля.",
+    "tweak_description": "Доработка системы бронирования и корзины для аренды авто, включая специфические поля и логику на базе \`TWA_CarRental\` модуля.",
     "estimated_complexity": "medium",
-    "relevant_supervibe_capability": "Расширение функционала `TWA_CarRental` Booking/Cart с помощью AI-инструментов SUPERVIBE Studio.",
+    "relevant_supervibe_capability": "Расширение функционала \`TWA_CarRental\` Booking/Cart с помощью AI-инструментов SUPERVIBE Studio.",
     "target_file_guess": "\`/components/car/BookingForm.tsx\`, \`/app/cart/page.tsx\`",
     "generated_repo_xml_link_idea": "EnhanceCarRentalBooking"
   },
   {
-    "tweak_description": "Адаптация существующих личных кабинетов для пользователей и владельцев авто в рамках `TWA_CarRental` модуля.",
+    "tweak_description": "Адаптация существующих личных кабинетов для пользователей и владельцев авто в рамках \`TWA_CarRental\` модуля.",
     "estimated_complexity": "low",
-    "relevant_supervibe_capability": "Кастомизация `Profile` и `Admin` страниц с помощью AI-инструментов SUPERVIBE Studio.",
+    "relevant_supervibe_capability": "Кастомизация \`Profile\` и \`Admin\` страниц с помощью AI-инструментов SUPERVIBE Studio.",
     "target_file_guess": "\`/app/profile/page.tsx\`, \`/app/admin/page.tsx\`",
     "generated_repo_xml_link_idea": "AdjustUserOwnerProfiles"
   },
   {
     "tweak_description": "Интеграция указанной платежной системы в TWA (если это простой API) и адаптация существующего админ-панели для управления платежами.",
     "estimated_complexity": "medium",
-    "relevant_supervibe_capability": "Интеграция платежной системы и адаптация `TWA_Admin_Basic`.",
+    "relevant_supervibe_capability": "Интеграция платежной системы и адаптация \`TWA_Admin_Basic\`.",
     "target_file_guess": "\`/lib/payment/paymentProcessor.ts\`, \`/app/admin/payments/page.tsx\`",
     "generated_repo_xml_link_idea": "IntegrateCustomPaymentGateway"
   }
