@@ -24,8 +24,8 @@ interface CsvLeadRow {
   missing_features?: string; 
   status?: string;
   source?: string;
-  initial_relevance_score?: string; // Добавлено, PapaParse читает все как строки сначала
-  project_type_guess?: string;   // Добавлено
+  initial_relevance_score?: string; // AI output
+  // project_type_guess will not be in the final CSV, so no need for it here.
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -80,12 +80,15 @@ export async function uploadLeadsFromCsv(
       transformHeader: header => {
         const trimmedHeader = header.trim().toLowerCase();
         if (trimmedHeader === 'kwork_url') return 'lead_url'; // Маппинг для upsert
+        if (trimmedHeader === 'initial_relevance_score') return 'similarity_score'; // Маппинг initial_relevance_score из CSV в similarity_score для БД
+        // project_type_guess будет отброшен, если не в заголовке
         return trimmedHeader; // Используем lowercase для сопоставления с CsvLeadRow
       },
       transform: (value, header) => {
         const trimmedValue = typeof value === 'string' ? value.trim() : value;
-        if (header === 'initial_relevance_score') {
-          const num = parseInt(trimmedValue as string, 10);
+        // header здесь будет уже 'similarity_score' благодаря transformHeader
+        if (header === 'similarity_score') { 
+          const num = parseFloat(trimmedValue as string); // Changed to parseFloat for NUMERIC(5,2)
           return isNaN(num) ? null : num;
         }
         return trimmedValue;
@@ -105,8 +108,8 @@ export async function uploadLeadsFromCsv(
 
     for (const row of parseResult.data) {
       // transformHeader уже привел все заголовки к lowerCase, поэтому обращаемся напрямую по lowerCase ключу
-      const getRowVal = (key: keyof CsvLeadRow) => (row as any)[key.toLowerCase()];
-      const leadUrlFromCsv = getRowVal('kwork_url'); // 'kwork_url' это уже 'lead_url' после transformHeader
+      const getRowVal = (key: keyof CsvLeadRow | 'lead_url' | 'similarity_score') => (row as any)[key.toLowerCase()]; // Type for key updated
+      const leadUrlFromCsv = getRowVal('lead_url'); // 'kwork_url' теперь 'lead_url' после transformHeader
 
       if (!getRowVal('project_description')) {
         localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
@@ -121,7 +124,6 @@ export async function uploadLeadsFromCsv(
       } else if (typeof identifiedTweaksCsv === 'object') { // Если PapaParse уже распарсил как объект (маловероятно для строки CSV, но на всякий случай)
         tweaksJson = identifiedTweaksCsv;
       }
-
 
       let featuresJson: any = null;
       const missingFeaturesCsv = getRowVal('missing_features');
@@ -143,8 +145,9 @@ export async function uploadLeadsFromCsv(
         missing_features: featuresJson,
         status: getRowVal('status') || 'raw_data', 
         source: getRowVal('source') || 'csv_upload',
-        initial_relevance_score: typeof getRowVal('initial_relevance_score') === 'number' ? getRowVal('initial_relevance_score') : null,
-        project_type_guess: getRowVal('project_type_guess') || null,
+        // Теперь используем similarity_score, так как так поле называется в БД
+        similarity_score: typeof getRowVal('similarity_score') === 'number' ? getRowVal('similarity_score') : null, 
+        // project_type_guess больше не добавляется в БД
       };
 
       if (leadEntry.lead_url === '') {
@@ -435,7 +438,7 @@ export async function scrapePageContent(
     logger.debug(`[Scraper] Извлечено ${extractedTexts.length} текстовых фрагментов. Пример: "${extractedTexts.slice(0,5).join(' | ')}"`);
     let textContent = extractedTexts.join(". "); 
     
-    logger.debug(`[Scraper] Текст после первичного соединения (до очистки, первые 500 симв.): ${textContent.substring(0,500)}`);
+    logger.debug(`[Scraper] Текст после первичного соединения (до очистки, первые 500 симv.): ${textContent.substring(0,500)}`);
     textContent = textContent
       .replace(/\s\s+/g, ' ')       
       .replace(/\s+\./g, '.')       
