@@ -12,7 +12,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import RockstarHeroSection from "../tutorials/RockstarHeroSection";
 import { Textarea } from "@/components/ui/textarea";
-import { FaCircleInfo, FaTelegramPlane, FaBookmark, FaCheck } from "react-icons/fa6"; // Import FaCircleInfo, FaTelegramPlane, FaBookmark, FaCheck
+import { FaCircleInfo, FaPaperPlane, FaBookmark, FaCheck } from "react-icons/fa6"; // Import FaCircleInfo, FaPaperPlane, FaBookmark, FaCheck
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Import Dialog components
 
 type Language = 'en' | 'ru';
@@ -898,7 +898,7 @@ export default function VeritasiumPage() {
                         onClick={handleSendNotesToTelegram}
                         className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-orbitron mt-4 flex items-center justify-center gap-2"
                     >
-                        <FaTelegramPlane className="h-5 w-5" />
+                        <FaPaperPlane className="h-5 w-5" />
                         {selectedLang === 'ru' ? "Отправить в Telegram" : "Send to Telegram"}
                     </Button>
                 </motion.section>
