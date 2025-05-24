@@ -1,3 +1,4 @@
+// /app/leads/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -55,7 +56,6 @@ interface PredefinedSearchButton {
   keywords: string;
   siteUrlFormat: string;
 }
-
 
 const LeadGenerationHQPage = () => {
   const { user: tgUserContext, dbUser } = useAppContext(); 
@@ -134,7 +134,7 @@ const LeadGenerationHQPage = () => {
   const t = { 
     pageTitle: "КОЦ 'Сетевой Дозор'",
     pageSubtitle: `Бойцы КиберОтряда! Это ваш командный пункт для захвата лидов и доминации в Supervibe-стиле. Роли распределены, цели определены, VIBE активирован. Трансмутируем инфу в профит!`,
-    rolesTitle: "::FaUsersShield:: КиберОтряд: Роли и Протоколы Действий",
+    rolesTitle: "::FaShieldCat:: КиберОтряд: Роли и Протоколы Действий",
     rolesSubtitle: `Экипаж машины боевой, заряженный на VIBE-победу и тотальное превосходство. Узнай больше о нашей философии в {linkToSelfDev} и {linkToPurposeProfit}.`,
     carryRoleTitle: "::FaBrain:: Кэрри (Ты, Павел)",
     carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создаешь и внедряешь прорывные фичи в {linkToRepoXml}. Решаешь нетривиальные задачи разработки, определяя вектор эволюции платформы. Твой код – закон. Смотри {linkToAbout} Кэрри.`,
@@ -197,7 +197,7 @@ const LeadGenerationHQPage = () => {
     ctaSubtitle: `Система в боевой готовности. КиберОтряд укомплектован. Саппорты, к оружию! Начинаем сбор кибер-трофеев в этом {linkToLeads}. Да пребудет с нами VIBE и AI!`,
     ctaButtonText: "::FaBolt:: НАЧАТЬ ШТУРM РЫНКА!", 
     navToTop: "::FaChevronUp:: К Началу",
-    navToRoles: "::FaUsersShield:: К Ролям",
+    navToRoles: "::FaShieldCat:: К Ролям",
     navToArsenal: "::FaToolbox:: К Арсеналу",
     navToOffer: "::FaBullhorn:: К Офферам", 
     navToWorkflow: "::FaDiagramProject:: К Процессу",
