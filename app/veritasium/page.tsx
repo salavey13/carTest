@@ -12,8 +12,8 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import RockstarHeroSection from "../tutorials/RockstarHeroSection";
 import { Textarea } from "@/components/ui/textarea";
-import { FaCircleInfo, FaPaperPlane, FaBookmark, FaCheck } from "react-icons/fa6"; // Import FaCircleInfo, FaPaperPlane, FaBookmark, FaCheck
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"; // Import Dialog components
+import { FaCircleInfo, FaBookmark } from "react-icons/fa6"; // Removed FaTelegramPlane, FaCheck
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Removed DialogDescription
 
 type Language = 'en' | 'ru';
 
@@ -39,7 +39,17 @@ interface SectionContent {
   id: string;
   icon: string;
   title: string;
-  points: string[];
+  points?: string[]; // Made optional for sections with subSections
+  subSections?: {
+    title: string;
+    icon: string;
+    points: string[];
+    borderColor: string;
+    textColor: string;
+    imageUrl?: string;
+    imageAlt?: string;
+    infoDetails?: InfoDetail;
+  }[];
   imageUrl?: string;
   imageAlt: string;
   question: SectionQuestion;
@@ -211,222 +221,6 @@ const pageTranslations = {
             title: "4. Продуктивная Сложность (Germane Load)",
             icon: "::FaPuzzlePiece::",
             points: ["Небольшие трудности могут заставить Систему 2 активироваться (например, трудный для чтения шрифт в тесте).", "Это заставляет мозг 'думать о мышлении' и формировать полезные паттерны."],
-            borderColor: "border-neon-lime", textColor: "text-neon-lime",
-            infoDetails: {
-              titleRu: "Эксперимент с трудным для чтения шрифтом",
-              titleEn: "Hard-to-Read Font Experiment",
-              contentRu: "Исследование показало, что студенты, которым давали тест с трудночитаемым шрифтом, отвечали правильнее. Почему? Потому что это 'незначительное' усложнение заставляло их Систему 2 активироваться и работать более усердно, вместо того чтобы автоматически выплевывать первый попавшийся ответ. Это пример использования 'продуктивной сложности' для улучшения обучения.",
-              contentEn: "A study showed that students given a test with a hard-to-read font answered more correctly. Why? Because this 'minor' difficulty forced their System 2 to activate and work harder, instead of automatically blurting out the first answer that came to mind. This is an example of using 'productive difficulty' to enhance learning."
-            }
-          },
-        ],
-        question: {
-          type: 'yes_no',
-          textRu: "Намеренное создание небольших трудностей в обучении может быть полезным для активации Системы 2.",
-          textEn: "Intentionally creating minor difficulties in learning can be beneficial for activating System 2.",
-          correctAnswer: 'yes',
-          tipRu: "Именно так! Это увеличивает продуктивную когнитивную нагрузку, заставляя мозг активнее работать.",
-          tipEn: "That's right! This increases germane cognitive load, prompting the brain to work more actively.",
-        },
-        notablePhrase: {
-          textRu: "Незначительное усложнение задачи может 'включить' Систему 2.",
-          textEn: "Slightly harder tasks can force System 2 activation.",
-        }
-      },
-      {
-        id: "ais-role",
-        icon: "::FaPeopleGroup::",
-        title: "Истинная Роль ИИ и Суть Образования",
-        points: [
-          "<strong class='text-brand-green'>Позитивная роль ИИ:</strong> Мгновенная обратная связь, что критически важно для обучения любому навыку.",
-          "<strong class='text-brand-red'>Главная опасность ИИ:</strong> Снижение необходимости в усилиях. Если ИИ делает работу за нас (написание эссе, рисование), мозг лишается необходимой 'болезненной, но полезной' практики.",
-          "Образование – это не проблема доступа к информации (книги всегда были доступны).",
-          "Образование – это <strong class='text-brand-purple'>социальная активность</strong>: Учитель, другие ученики, общение, ответственность.",
-          "Учителя – это 'персональные тренеры' для ума, которые мотивируют и удерживают в процессе, заставляя 'делать повторения'.",
-          "Поэтому никакая технология не произведет 'революции' в образовании; его суть остается человеческой и социальной.",
-        ],
-        imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/9D00FF/png?text=Социальное+Обучение`,
-        imageAlt: "Группа людей, взаимодействующих в процессе обучения",
-        question: {
-          type: 'multiple_choice',
-          textRu: "Согласно Veritasium, основная проблема образования заключается в:",
-          textEn: "According to Veritasium, the main problem in education is:",
-          optionsRu: ["Недостаточном доступе к информации", "Отсутствии ИИ-тьюторов", "Недостатке усилий и социального взаимодействия", "Перегрузке информацией"],
-          optionsEn: ["Lack of information access", "Absence of AI tutors", "Lack of effort and social interaction", "Information overload"],
-          correctAnswer: 'Недостатке усилий и социального взаимодействия',
-          tipRu: "Верно! Дерек Мюллер подчеркивает, что образование – это социальный процесс, требующий усилий и взаимодействия.",
-          tipEn: "Correct! Derek Muller emphasizes that education is a social process requiring effort and interaction.",
-        },
-        notablePhrase: {
-          textRu: "Самая большая опасность ИИ в образовании – это возможность избежать необходимой, но 'болезненной' практики.",
-          textEn: "The biggest concern with AI in education is its opportunity to reduce effortful practice.",
-        },
-        infoDetails: {
-          titleRu: "Концепция 'Un-рекламы'",
-          titleEn: "'Un-advertising' Concept",
-          contentRu: "Дерек Мюллер приводит пример 'Un-рекламы' (реклама страховой компании 'Un'), которая специально была сделана запутанной и неочевидной. Это заставляло Систему 2 зрителя активироваться, пытаясь понять, что это за реклама, вместо того чтобы Система 1 автоматически 'отфильтровывала' её как обычную рекламу. В результате, такая реклама становилась более запоминающейся и эффективной.",
-          contentEn: "Derek Muller uses the example of 'Un-advertising' (an ad for the insurance company 'Un'), which was intentionally made confusing and non-obvious. This forced the viewer's System 2 to activate, trying to understand what the ad was about, instead of System 1 automatically 'filtering it out' as a regular ad. As a result, such advertising became more memorable and effective."
-        }
-      },
-    ] as SectionContent[]
-  },
-  en: {
-    pageTitle: "What Everyone Gets Wrong About AI and Learning",
-    pageSubtitle: "Derek Muller (Veritasium) on why technology won't revolutionize education and how our brains learn.",
-    source: "Based on Veritasium's lecture: What Everyone Gets Wrong About AI and Learning",
-    sections: [
-      {
-        id: "intro-revolution",
-        icon: "::FaRocket::",
-        title: "The Promise of Revolution and Reality",
-        points: [
-          "AI tutors are impressive, but history is filled with promises of educational revolution (movies, radio, TV, computers, MOOCs).",
-          "Thomas Edison in 1922 predicted motion pictures would supplant textbooks. It didn't happen.",
-          "These technologies haven't revolutionized education. Why? Perhaps the problem isn't access to information.",
-        ],
-        imageUrl: `${STORAGE_BASE_URL_VT}/600x338/2e1a1a/FF0000/png?text=Education+Revolutions`,
-        imageAlt: "Old technologies promising revolution in education",
-        question: {
-          type: 'yes_no',
-          textRu: "Томас Эдисон в начале 20 века точно предсказал, что кино полностью заменит учебники в образовании.",
-          textEn: "Thomas Edison accurately predicted in the early 20th century that cinema would completely replace textbooks in education.",
-          correctAnswer: 'no',
-          tipRu: "На самом деле, его предсказание не сбылось. Технологии часто не революционизируют образование так, как ожидается.",
-          tipEn: "Actually, his prediction didn't come true. Technologies often don't revolutionize education as expected.",
-        },
-        notablePhrase: {
-          textRu: "Люди слишком возбуждены, слишком готовы поставить слово 'революционизировать' рядом с 'образованием'.",
-          textEn: "People are all too excited, all too ready to put the word 'revolutionize' next to 'education'.",
-        },
-        infoDetails: {
-          titleRu: "Почему 'революция' не произошла?",
-          titleEn: "Why the 'revolution' didn't happen?",
-          contentRu: "Дерек Мюллер указывает на историю, где каждая новая технология (кино, радио, ТВ, компьютеры, MOOCs) предсказывала 'революцию' в образовании, но по факту лишь становилась инструментом в руках учителей, не меняя фундаментальных принципов обучения.",
-          contentEn: "Derek Muller points to history where every new technology (movies, radio, TV, computers, MOOCs) predicted an 'education revolution' but in reality only became a tool in the hands of teachers, without changing the fundamental principles of learning."
-        }
-      },
-      {
-        id: "two-systems",
-        icon: "::FaBrain::",
-        title: "Our Two Minds: System 1 & System 2",
-        points: [
-          "Daniel Kahneman: <strong class='text-brand-yellow'>System 1</strong> (fast, intuitive, automatic) and <strong class='text-brand-blue'>System 2</strong> (slow, conscious, effortful).",
-          "Examples: The bat and ball problem, Earth around the Sun.",
-          "System 2 is lazy and tends to accept System 1's quick answers without checking.",
-          "The goal of education: to develop System 1 so that complex tasks become automatic.",
-        ],
-        imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/FFEE00/png?text=Systems+of+Thought`,
-        imageAlt: "Two figures symbolizing System 1 (fast) and System 2 (slow)",
-        question: {
-          type: 'multiple_choice',
-          textRu: "Какой тип мышления, по Даниэлю Канеману, отвечает за быстрые, интуитивные ответы?",
-          textEn: "Which type of thinking, according to Daniel Kahneman, is responsible for quick, intuitive answers?",
-          optionsRu: ["Система 1", "Система 2", "Когнитивная нагрузка", "Чанкинг"],
-          optionsEn: ["System 1", "System 2", "Cognitive Load", "Chunking"],
-          correctAnswer: 'System 1',
-          tipRu: "Верно! Система 1 – это ваш 'автопилот' мышления.",
-          tipEn: "Correct! System 1 is your thinking 'autopilot'."
-        },
-        notablePhrase: {
-          textRu: "Наши мозги запрограммированы помогать нам быть эффективными в этом мире, а не обязательно понимать сложные концепции.",
-          textEn: "Our brains are designed to help us be effective in this world, not necessarily to understand complex concepts.",
-        },
-        infoDetails: {
-          titleRu: "Задача с битой и мячом / Земля вокруг Солнца",
-          titleEn: "Bat and Ball / Earth and Sun Problems",
-          contentRu: "Эти задачи демонстрируют, как Система 1 (быстрое, интуитивное мышление) склонна давать неверные ответы (10 центов; один день), потому что они кажутся легкими и 'правильными'. Система 2 (медленное, усилие) требуется для перепроверки и нахождения верного решения, но она ленива и часто не активируется без принуждения.",
-          contentEn: "These problems demonstrate how System 1 (fast, intuitive thinking) tends to give incorrect answers (10 cents; one day) because they seem easy and 'right'. System 2 (slow, effortful) is required to re-check and find the correct solution, but it's lazy and often won't activate without prompting."
-        }
-      },
-      {
-        id: "cognitive-load",
-        icon: "::FaWeightHanging::",
-        title: "Limits of Working Memory: Cognitive Load",
-        points: [
-          "System 2's working memory is very limited (~4 items).",
-          "Cognitive load can be measured by pupil dilation during intense thinking.",
-          "Three types of load: <strong class='text-brand-red'>Intrinsic</strong> (inherent task difficulty), <strong class='text-brand-orange'>Extraneous</strong> (distractions), <strong class='text-brand-green'>Germane</strong> (thinking about thinking, processing for long-term storage).",
-        ],
-        imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/FF9900/png?text=Cognitive+Load`,
-        imageAlt: "Diagram of a brain with load indicators",
-        question: {
-          type: 'yes_no',
-          textRu: "Отвлекающие факторы во время обучения увеличивают полезную когнитивную нагрузку.",
-          textEn: "Distractions during learning increase germane cognitive load.",
-          correctAnswer: 'no',
-          tipRu: "Наоборот, отвлекающие факторы увеличивают *внешнюю* когнитивную нагрузку, которая является нежелательной.",
-          tipEn: "On the contrary, distractions increase *extraneous* cognitive load, which is undesirable.",
-        },
-        notablePhrase: {
-          textRu: "Когнитивная нагрузка – это мера умственных усилий, которые вы вкладываете во что-то.",
-          textEn: "Cognitive load is a measure of how much mental effort you are investing in something.",
-        },
-        infoDetails: {
-          titleRu: "Эксперимент с расширением зрачков (Cognitive Load)",
-          titleEn: "Pupil Dilation Experiment (Cognitive Load)",
-          contentRu: "Дерек Мюллер продемонстрировал, что во время интенсивного умственного усилия (активации Системы 2), зрачки расширяются. Это показывает, насколько сильно мозг 'работает', и подтверждает ограниченность рабочей памяти. Чем больше усилий требует задача, тем сильнее зрачки реагируют.",
-          contentEn: "Derek Muller demonstrated that during intense mental effort (System 2 activation), pupils dilate. This shows how hard the brain is 'working' and confirms the limited capacity of working memory. The more effort a task requires, the more the pupils react."
-        }
-      },
-      {
-        id: "mastery-chunking",
-        icon: "::FaDumbbell::",
-        title: "Mastery & Chunking: How Experts Think Faster",
-        points: [
-          "Experts (e.g., chess masters) see complex patterns ('chunks'), overcoming working memory limitations.",
-          "Chunking is grouping disparate information into a single entity, making it easier to remember.",
-          "E.g., 1945 is not four digits, but the year WWII ended. For a physicist, an equation is one 'chunk'.",
-          "There's no 'general thinking skill'; rather, deep, specialized long-term memory networks that System 1 uses automatically.",
-        ],
-        imageUrl: `${STORAGE_BASE_URL_VT}/600x338/1a1a2e/4682B4/png?text=Mastery+and+Chunking`,
-        imageAlt: "Chess board with pieces illustrating patterns",
-        question: {
-          type: 'yes_no',
-          textRu: "Эксперты лучше запоминают случайное расположение шахматных фигур, чем новички, благодаря чанкингу.",
-          textEn: "Experts remember random chess piece arrangements better than novices due to chunking.",
-          correctAnswer: 'no',
-          tipRu: "Чанкинг работает только с осмысленными паттернами. В случайных ситуациях эксперты не имеют преимущества.",
-          tipEn: "Chunking only works with meaningful patterns. In random situations, experts have no advantage.",
-        },
-        notablePhrase: {
-          textRu: "Мастерство – это когда навык становится доменом Системы 1, работая автоматически.",
-          textEn: "Mastery is when a skill becomes a System 1 domain, operating automatically.",
-        },
-        infoDetails: {
-          titleRu: "Исследование с шахматными мастерами (Чанкинг)",
-          titleEn: "Chess Master Study (Chunking)",
-          contentRu: "Исследование показало, что шахматные гроссмейстеры могли запомнить расположение 16 фигур на доске после 5 секунд просмотра, в то время как новички только 4. При случайном расположении фигур их способности выравнивались. Это демонстрирует, что эксперты 'чанкуют' информацию – объединяют её в осмысленные паттерны, хранящиеся в долгосрочной памяти, что позволяет Системе 1 обрабатывать её мгновенно.",
-          contentEn: "A study showed that chess grandmasters could remember 16 pieces on a board after 5 seconds of viewing, while novices remembered only 4. With random piece arrangements, their abilities equalized. This demonstrates that experts 'chunk' information – grouping it into meaningful patterns stored in long-term memory, allowing System 1 to process it instantly."
-        }
-      },
-      {
-        id: "implications",
-        icon: "::FaGraduationCap::",
-        title: "Implications for Education",
-        points: [], // Main points moved to subSections for this section
-        subSections: [
-          {
-            title: "1. Eliminate Extraneous Cognitive Load",
-            icon: "::FaEraser::",
-            points: ["Provide a comfortable seat, legible text, pristine sound.", "Remove distractions so System 2 can focus."],
-            borderColor: "border-brand-pink", textColor: "text-brand-pink",
-          },
-          {
-            title: "2. Limit Intrinsic Cognitive Load",
-            icon: "::FaDivide::",
-            points: ["Present material in 'bite-sized' chunks.", "Slow things down; allow students to play known songs to master an instrument."],
-            borderColor: "border-brand-blue", textColor: "text-brand-blue",
-          },
-          {
-            title: "3. Be Wary of 'Discovery Learning'",
-            icon: "::FaHandshakeSlash::",
-            points: ["Removing 'scaffolding' too early leads to frustration.", "Use 'worked examples' and gradually fade assistance to facilitate System 2 engagement."],
-            borderColor: "border-brand-yellow", textColor: "text-brand-yellow",
-          },
-          {
-            title: "4. Embrace Productive Difficulty (Germane Load)",
-            icon: "::FaPuzzlePiece::",
-            points: ["Slightly harder tasks can force System 2 activation (e.g., hard-to-read font in a test).", "This forces the brain to 'think about thinking' and form useful patterns."],
             borderColor: "border-neon-lime", textColor: "text-neon-lime",
             infoDetails: {
               titleRu: "Эксперимент с трудным для чтения шрифтом",
@@ -676,7 +470,7 @@ export default function VeritasiumPage() {
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
                   <h2 className={cn(`flex items-center text-2xl md:text-3xl font-semibold mb-4 font-orbitron`, textColorClass)}>
-                    <span className={cn('mr-3 text-current/80')}>
+                    <span className={cn(`mr-3 text-current/80`)}>
                       <VibeContentRenderer content={section.icon} />
                     </span>
                     <VibeContentRenderer content={section.title} />
@@ -731,7 +525,7 @@ export default function VeritasiumPage() {
                        </div>
                    ))}
 
-                  {!section.subSections && section.points.length > 0 && (
+                  {!section.subSections && section.points && section.points.length > 0 && (
                     <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed prose prose-sm md:prose-base prose-invert max-w-none prose-strong:font-orbitron prose-a:text-brand-blue hover:prose-a:text-brand-cyan prose-li:marker:text-current">
                       {section.points.map((point, i) => (
                         <li key={`${section.id}-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
@@ -769,10 +563,11 @@ export default function VeritasiumPage() {
                         )}
                         size="sm"
                       >
-                        {noteSavedFeedback[section.id] ? (selectedLang === 'ru' ? "Сохранено! " : "Saved! ")}
-                        <FaCheck className={cn("ml-1", noteSavedFeedback[section.id] ? "block" : "hidden")} />
-                        {!noteSavedFeedback[section.id] && (selectedLang === 'ru' ? "Сохранить заметку" : "Save Note")}
-                        {!noteSavedFeedback[section.id] && <FaBookmark className="ml-1" />}
+                        {noteSavedFeedback[section.id] ? (selectedLang === 'ru' ? "Сохранено! " : "Saved! ") : (selectedLang === 'ru' ? "Сохранить заметку" : "Save Note")}
+                        <VibeContentRenderer 
+                          content={noteSavedFeedback[section.id] ? "::FaCircleCheck::" : "::FaBookmark::"} 
+                          className="ml-1" 
+                        />
                       </Button>
                     </motion.div>
                   )}
@@ -866,7 +661,7 @@ export default function VeritasiumPage() {
                                   {selectedLang === 'ru' ? "Продолжить" : "Continue"}
                               </Button>
                           )}
-                           {!nextSection && (
+                          {!nextSection && (
                               <p className="mt-4 text-sm text-gray-400">
                                   {selectedLang === 'ru' ? "Вы успешно завершили интерактивный курс!" : "You have successfully completed the interactive course!"}
                               </p>
@@ -898,26 +693,26 @@ export default function VeritasiumPage() {
                         onClick={handleSendNotesToTelegram}
                         className="w-full bg-brand-purple hover:bg-brand-purple/80 text-white font-orbitron mt-4 flex items-center justify-center gap-2"
                     >
-                        <FaPaperPlane className="h-5 w-5" />
+                        <VibeContentRenderer content="::FaPaperPlane::" className="h-5 w-5" /> 
                         {selectedLang === 'ru' ? "Отправить в Telegram" : "Send to Telegram"}
                     </Button>
                 </motion.section>
             )}
 
-            <section className="text-center pt-10 border-t border-brand-cyan/20 mt-10">
+            <section className="text-center pt-10 border-t border-brand-yellow/20 mt-10">
                <VibeContentRenderer 
-                  content={selectedLang === 'ru' 
-                    ? "Уроки Дерека Мюллера напоминают нам: технологии – это инструменты, но сердце образования остается в человеческом взаимодействии, усилиях и социальной связи. <strong class='text-brand-cyan'>Прокачивай свой мозг, не ищи легких путей.</strong>"
-                    : "Derek Muller's insights remind us: technology is a tool, but the heart of education remains in human interaction, effort, and social connection. <strong class='text-brand-cyan'>Train your brain, don't seek shortcuts.</strong>"
-                  } 
-                  className="text-lg text-gray-300 italic prose prose-invert max-w-none prose-strong:text-brand-cyan"
+                  content="Джим Рон оставил наследие мудрости. Твоя задача – взять эти принципы, пропустить через фильтр своего КиберВайба и построить жизнь, достойную легенды. <strong class='text-brand-yellow'>Ты – архитектор своего будущего.</strong>" 
+                  className="text-lg text-gray-300 italic prose prose-invert max-w-none prose-strong:text-brand-yellow"
                 />
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                     <Button asChild variant="outline" className="border-brand-blue text-brand-blue hover:bg-brand-blue/10 font-orbitron">
-                        <Link href="/expmind">Мышление Экспериментатора</Link>
+                        <Link href="/selfdev">SelfDev Лаборатория</Link>
                     </Button>
-                     <Button asChild variant="outline" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 font-orbitron">
-                        <Link href="/cybervibe">КиберВайб Апгрейд</Link>
+                     <Button asChild variant="outline" className="border-brand-green text-brand-green hover:bg-brand-green/10 font-orbitron">
+                        <Link href="/purpose-profit">Цель и Прибыль</Link>
+                    </Button>
+                    <Button asChild variant="outline" className="border-brand-pink text-brand-pink hover:bg-brand-pink/10 font-orbitron">
+                        <Link href="/expmind">Мышление Экспериментатора</Link>
                     </Button>
                 </div>
             </section>
@@ -925,22 +720,6 @@ export default function VeritasiumPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
-        <DialogContent className="sm:max-w-[425px] md:max-w-xl bg-dark-card border-brand-cyan/50 text-white shadow-[0_0_20px_rgba(0,255,255,0.4)]">
-          <DialogHeader>
-            <DialogTitle className="text-brand-cyan font-orbitron text-2xl">
-              {currentInfoModalContent ? (selectedLang === 'ru' ? currentInfoModalContent.titleRu : currentInfoModalContent.titleEn) : ""}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-gray-300 text-base leading-relaxed">
-            {currentInfoModalContent ? (selectedLang === 'ru' ? currentInfoModalContent.contentRu : currentInfoModalContent.contentEn) : ""}
-          </div>
-          <Button onClick={closeInfoModal} className="mt-4 bg-brand-blue hover:bg-brand-blue/80 text-white font-orbitron">
-            {selectedLang === 'ru' ? "Закрыть" : "Close"}
-          </Button>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
