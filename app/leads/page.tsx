@@ -11,8 +11,8 @@ import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboar
 import { toast } from 'sonner';
 import LeadsPageRightNav from './LeadsPageRightNav';
 import SupportArsenal from './SupportArsenal';
-import LeadsDashboard from './LeadsDashboard';
 import GeneralPurposeScraper from './GeneralPurposeScraper';
+import LeadsDashboard from './LeadsDashboard';
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 
@@ -48,6 +48,15 @@ interface TeamUser {
   role?: string | null;
 }
 
+interface PredefinedSearchButton {
+  id: string;
+  label: string;
+  site: "kwork" | "habr" | string;
+  keywords: string;
+  siteUrlFormat: string;
+}
+
+
 const LeadGenerationHQPage = () => {
   const { user: tgUserContext, dbUser } = useAppContext(); 
   const currentUserId = dbUser?.user_id || tgUserContext?.id?.toString(); 
@@ -74,71 +83,38 @@ const LeadGenerationHQPage = () => {
   const ctaSectionRef = useRef<HTMLDivElement>(null);
 
   // Helper for rendering text with Next.js Link components
-  const renderTextWithLinks = (text: string, links: { [key: string]: { href: string; label: string; className?: string; target?: string; rel?: string } }) => {
-    let currentText = text;
-    const elements: (string | JSX.Element)[] = [];
+  const renderTextWithLinks = useCallback((text: string, links: { [key: string]: { href: string; label: string; className?: string; target?: string; rel?: string } }) => {
+    let result: (string | JSX.Element)[] = [text];
     let keyCounter = 0;
 
     Object.entries(links).forEach(([placeholder, linkProps]) => {
-      const regex = new RegExp(placeholder.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1"), "g");
-      let match;
-      let lastIndex = 0;
-      
-      // This temporary array will hold parts for the current placeholder iteration
-      const tempElements: (string | JSX.Element)[] = [];
-      
-      // Split currentText by the current placeholder
-      const parts = currentText.split(regex);
-
-      parts.forEach((part, index) => {
-        if (part) { // Add the text part
-          tempElements.push(part);
-        }
-        if (index < parts.length - 1) { // Add the link part
-          tempElements.push(
-            <Link key={`${placeholder}-${keyCounter++}`} href={linkProps.href} className={linkProps.className} target={linkProps.target} rel={linkProps.rel}>
-              {linkProps.label}
-            </Link>
-          );
-        }
-      });
-      
-      // Reconstruct currentText from tempElements for the next placeholder iteration
-      // This is a bit tricky because currentText needs to be a string for the next split
-      // A more robust solution would parse the whole string once and replace all placeholders.
-      // For now, we'll update `elements` directly if this is the final processing,
-      // or try to make `currentText` a string for the next iteration (which is flawed).
-      // Let's simplify: process placeholders one by one on the main `elements` array.
-    });
-
-    // A simpler iterative replacement approach (less efficient but easier to manage state):
-    let result: (string | JSX.Element)[] = [text];
-
-    Object.entries(links).forEach(([placeholder, linkProps]) => {
+        const regex = new RegExp(placeholder.replace(/([.?*+^$[\]\\(){}|-])/g, "\\$1"), "g");
         const newResult: (string | JSX.Element)[] = [];
+
         result.forEach(segment => {
             if (typeof segment === 'string') {
-                const parts = segment.split(placeholder);
+                const parts = segment.split(regex);
                 parts.forEach((part, index) => {
-                    if (part) newResult.push(part);
+                    if (part) {
+                        newResult.push(part);
+                    }
                     if (index < parts.length - 1) {
                         newResult.push(
-                            <Link key={`${placeholder}-${keyCounter++}`} href={linkProps.href} className={linkProps.className} target={linkProps.target} rel={linkProps.rel}>
+                            <Link key={`link-${linkProps.href}-${keyCounter++}`} href={linkProps.href} className={linkProps.className} target={linkProps.target} rel={linkProps.rel}>
                                 {linkProps.label}
                             </Link>
                         );
                     }
                 });
             } else {
-                newResult.push(segment); // Keep existing JSX elements
+                newResult.push(segment); // Keep already processed JSX elements
             }
         });
         result = newResult;
     });
-    
-    return result.map((el, idx) => <React.Fragment key={idx}>{el}</React.Fragment>);
-  };
 
+    return result.map((el, idx) => <React.Fragment key={idx}>{el}</React.Fragment>);
+  }, []);
 
   const t_links_config = { 
     "{linkToRepoXml}": { href: "/repo-xml", label: "SUPERVIBE Studio", className: "text-brand-purple hover:underline" },
@@ -158,49 +134,45 @@ const LeadGenerationHQPage = () => {
   const t = { 
     pageTitle: "КОЦ 'Сетевой Дозор'",
     pageSubtitle: `Бойцы КиберОтряда! Это ваш командный пункт для захвата лидов и доминации в Supervibe-стиле. Роли распределены, цели определены, VIBE активирован. Трансмутируем инфу в профит!`,
-    rolesTitle: "::fausershield:: КиберОтряд: Роли и Протоколы Действий",
+    rolesTitle: "::FaUsersShield:: КиберОтряд: Роли и Протоколы Действий",
     rolesSubtitle: `Экипаж машины боевой, заряженный на VIBE-победу и тотальное превосходство. Узнай больше о нашей философии в {linkToSelfDev} и {linkToPurposeProfit}.`,
-    carryRoleTitle: "::fabrain:: Кэрри (Ты, Павел)",
+    carryRoleTitle: "::FaBrain:: Кэрри (Ты, Павел)",
     carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создаешь и внедряешь прорывные фичи в {linkToRepoXml}. Решаешь нетривиальные задачи разработки, определяя вектор эволюции платформы. Твой код – закон. Смотри {linkToAbout} Кэрри.`,
-    tanksRoleTitle: "::fashieldhalved:: Танки (Штурмовики Кастомизации)",
+    tanksRoleTitle: "::FaShieldHalved:: Танки (Штурмовики Кастомизации)",
     tanksRoleDesc: "Броневой кулак кастомизации и адаптации. Принимают на себя 'урон' от сложных клиентских запросов, AI-артефактов. Трансмутируют базовые модули в уникальные клиентские решения, используя реактивную мощь Supervibe Studio. Их девиз: 'Прорвемся и Улучшим!'",
     tanksRoleLeverages: `Основное вооружение: {linkToTutorials} (включая Замену Изображений, Охоту на Иконки, Видео-Интеграцию, Inception Swap-Маневры).`,
-    supportRoleTitle: "::faheadset:: Саппорт (Дозорные Сети)",
+    supportRoleTitle: "::FaHeadset:: Саппорт (Дозорные Сети)",
     supportRoleDesc: `Информационно-логистический хаб и голос отряда. Идентифицируют, фильтруют и обрабатывают входящие сигналы (лиды). Готовят разведданные, CSV для AI-обработки и целеуказания для Танков и Кэрри. Ведут первичные переговоры, обеспечивая бесперебойную связь и снабжение отряда задачами.`,
-    supportArsenalTitle: "::fatoolbox:: Арсенал Саппорта: Протоколы Автоматизации 'Судный День'",
+    supportArsenalTitle: "::FaToolbox:: Арсенал Саппорта: Протоколы Автоматизации 'Судный День'",
     supportArsenalSubtitle: `Высокотехнологичное снаряжение для информационной войны и эффективной вербовки. Геймеры, это для вас – превращаем рутину в квест в нашем {linkToCyberDevOS}!`,
-    rawKworksInputTitle: "::fabinoculars:: Этап 1: 'Сбор трофеев' (Поток KWorks)",
+    rawKworksInputTitle: "::FaBinoculars:: Этап 1: 'Сбор трофеев' (Поток KWorks)",
     rawKworksInputDesc: "Саппорт! Копируй сюда ВСЮ страницу с проектами Kwork или другой биржи. Наш AI-парсер, как верный дрон, извлечет из этого хаоса структурированные данные о лидах. Чем больше данных, тем точнее прицел!",
     rawKworksInputPlaceholder: "Ctrl+A, Ctrl+C со страницы Kwork... и Ctrl+V сюда, оперативник!",
-    promptButtonsTitle: "::fabolt:: Этап 2: 'Нейро-алхимия' (AI-Обработка Лидов):",
+    promptButtonsTitle: "::FaBolt:: Этап 2: 'Нейро-алхимия' (AI-Обработка Лидов):",
     promptButtonKworksToCsv: "1. 'Трансмутация Хаоса': Текст KWorks -> CSV Таблицу Лидов",
     promptButtonCsvToOffer: "2. 'Заряд Убеждения': CSV + Промпт Оффера -> CSV с Колонкой 'Оффер'",
     promptButtonCsvToTweaks: "3. 'Чертежи для Танков': CSV + Промпт Твиков -> CSV с Колонкой 'Твики'",
     promptButtonCsvToFeatures: "4. 'R&D для Кэрри': CSV + Промпт Фич -> CSV с Колонкой 'Новые Фичи'",
     promptButtonInstruction: "Инструкция для Саппорта-Геймера: 1. Заполни поле 'Сбор трофеев'. 2. Жми кнопку 'Трансмутация Хаоса', скопируй промпт. 3. Скармливай AI (ChatGPT/Claude) этот промпт + текст из поля -> получишь CSV-код. 4. Копируй этот CSV-код. 5. Жми кнопки 2, 3, 4 последовательно. Каждый раз копируй промпт и отдавай AI ВМЕСТЕ с ПОСЛЕДНИМ полученным CSV-кодом. AI будет ДОБАВЛЯТЬ новые колонки. Финальный CSV – в поле ниже.",
-    finalCsvInputTitle: "::fafilearrowup:: Этап 3: 'Десант в ЦОД' (Загрузка Финального CSV)",
+    finalCsvInputTitle: "::FaFileArrowUp:: Этап 3: 'Десант в ЦОД' (Загрузка Финального CSV)",
     finalCsvInputDesc: "Саппорт, сюда вставляй ПОЛНОСТЬЮ обработанный AI CSV-файл (уже с колонками 'generated_offer', 'identified_tweaks', 'missing_features'). Одна кнопка – и лиды улетают в нашу базу Supabase, а команда получает уведомления!",
     finalCsvInputPlaceholder: "Вставь сюда финальный CSV-код от AI...",
-    uploadLeadsButton: "::facloudarrowup:: ДЕСАНТИРОВАТЬ ЛИДЫ В SUPABASE!",
-    leadsDashboardTitle: "::fatablelist:: Оперативный Дашборд 'Око Войны'",
+    uploadLeadsButton: "::FaCloudArrowUp:: ДЕСАНТИРОВАТЬ ЛИДЫ В SUPABASE!",
+    leadsDashboardTitle: "::FaTableList:: Оперативный Дашборд 'Око Войны'",
     leadsDashboardDesc: "КиберОтряд, здесь ваши цели! Обновляйте статусы, назначайте ответственных, координируйте атаку! Фильтруйте задачи по ролям – каждый видит свой фронт работ.",
-    kworkSearchLink1Text: "TWA (Kwork)", // Changed from icon format to plain text
-    kworkSearchLink2Text: "Mini Apps (Kwork)",
-    kworkSearchLink3Text: "Нейро-Боты (Kwork)",
-    kworkSearchLink4Text: "AI Разработка (Kwork)",
-    offerTitle: "::fabullhorn:: Протокол 'Сирена': Создание Убойного Предложения", 
+    offerTitle: "::FaBullhorn:: Протокол 'Сирена': Создание Убойного Предложения", 
     offerSubtitle: "AI-заряженное послание, превращающее цели в союзников.",
-    workflowTitle: "::fadiagramproject:: Боевой Порядок: От Сигнала до VIBE-Победы",
+    workflowTitle: "::FaDiagramProject:: Боевой Порядок: От Сигнала до VIBE-Победы",
     workflowSubtitle: "Скоординированная атака нашего КиберОтряда.",
-    workflowStep1: "1. ::fasearchdollar:: **Саппорт:** Обнаруживает сигнал (лид) на Kwork/др., собирает первичные данные, передает Оракулу для квалификации, готовит целеуказания.",
-    workflowStep2: "2. ::farobot:: **Саппорт/AI-Оракул:** Генерирует и отправляет персонализированное предложение (возможно, с AI-сгенерированным концептом/макетом).",
-    workflowStep3: `3. ::facomments:: **Клиент:** При положительном ответе – сеанс связи (созвон) или доразведка. {linkToGamePlan} – стратегическая карта для этих переговоров. Детали стратегии также в {linkToPPlan}.`,
+    workflowStep1: "1. ::FaSearchDollar:: **Саппорт:** Обнаруживает сигнал (лид) на Kwork/др., собирает первичные данные, передает Оракулу для квалификации, готовит целеуказания.",
+    workflowStep2: "2. ::FaRobot:: **Саппорт/AI-Оракул:** Генерирует и отправляет персонализированное предложение (возможно, с AI-сгенерированным концептом/макетом).",
+    workflowStep3: `3. ::FaComments:: **Клиент:** При положительном ответе – сеанс связи (созвон) или доразведка. {linkToGamePlan} – стратегическая карта для этих переговоров. Детали стратегии также в {linkToPPlan}.`,
     workflowStep4: "4. **Развертывание Сил:**",
-    workflowStep4Tank: `::fashieldhalved:: **Танки:** {linkToRepoXml} Берут на себя кастомизацию по целеуказаниям Саппорта. Применяют всю огневую мощь Студии для штурма клиентских задач.`,
-    workflowStep4Carry: `::fabrain:: **Кэрри (Павел):** {linkToRepoXml} Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра.`,
-    workflowStep5: "5. ::farocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
-    workflowStep6: `6. ::fabolt:: **Анализ Результатов и Адаптация:** {linkToCyberVibeLoop} обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
-    assetsTitle: "::facubes:: Использование Трофейных Активов CyberVibe",
+    workflowStep4Tank: `::FaShieldHalved:: **Танки:** {linkToRepoXml} Берут на себя кастомизацию по целеуказаниям Саппорта. Применяют всю огневую мощь Студии для штурма клиентских задач.`,
+    workflowStep4Carry: `::FaBrain:: **Кэрри (Павел):** {linkToRepoXml} Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра.`,
+    workflowStep5: "5. ::FaRocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
+    workflowStep6: `6. ::FaBolt:: **Анализ Результатов и Адаптация:** {linkToCyberVibeLoop} обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
+    assetsTitle: "::FaCubes:: Использование Трофейных Активов CyberVibe",
     assetsSubtitle: "Наш внутренний арсенал для внешнего доминирования.",
     assetJumpstartTitle: "Jumpstart Kit: 'Первый Удар'",
     assetJumpstartDesc: `Наш главный таран для прорыва обороны. Предложите AI-сгенерированный каркас TWA на основе идеи клиента. Мгновенная демонстрация мощи и скорости. Подробнее о {linkToJumpstart}.`,
@@ -214,7 +186,7 @@ const LeadGenerationHQPage = () => {
     assetTutorialsDesc: `Демонстрируют конкретные боевые возможности (замена медиа, деактивация мин). Можно показывать клиентам для иллюстрации простоты модификаций или использовать для подготовки новобранцев в отряд Танков. Доступны в {linkToTutorials}.`,
     assetCyberDevOSTitle: "CyberDev OS (Геймификация): 'Путь Воина'",
     assetCyberDevOSDesc: `Демонстрирует философию 'непрерывной прокачки'. Уникальное УБП – клиенты не просто заказывают приложение, они подключаются к саморазвивающейся экосистеме. Вперед, в {linkToCyberDevOS}!`,
-    zionTitle: "::facomments:: Цитадель 'Зион': Комьюнити-Реактор",
+    zionTitle: "::FaComments:: Цитадель 'Зион': Комьюнити-Реактор",
     zionSubtitle: "Ваш Telegram-канал/чат: узел связи КиберОтряда и вербовочный пункт для будущих VIBE-адептов.",
     zionP1: `**Зион ({linkToZion}):** Это не просто флудилка, это ваш оперативный штаб, центр поддержки и инкубатор гениальных идей.`,
     zionList1: "**Координация Танков:** Обсуждение сложных маневров кастомизации, обмен боевым опытом, разработка новых тактик.",
@@ -223,17 +195,18 @@ const LeadGenerationHQPage = () => {
     zionList4: "**Школа Молодого Бойца:** Перспективные члены комьюнити, проявившие талант, могут проходить подготовку для зачисления в отряд Танков.",
     ctaTitle: "АКТИВИРОВАТЬ ПРОТОКОЛ 'СЕТЕВОЙ ДОЗОР'!", 
     ctaSubtitle: `Система в боевой готовности. КиберОтряд укомплектован. Саппорты, к оружию! Начинаем сбор кибер-трофеев в этом {linkToLeads}. Да пребудет с нами VIBE и AI!`,
-    ctaButtonText: "::fabolt:: НАЧАТЬ ШТУРM РЫНКА!", 
-    navToTop: "::fachevronup:: К Началу",
-    navToRoles: "::fausershield:: К Ролям",
-    navToArsenal: "::fatoolbox:: К Арсеналу",
-    navToOffer: "::fabullhorn:: К Офферам", 
-    navToWorkflow: "::fadiagramproject:: К Процессу",
-    navToAssets: "::facubes:: К Активам",
-    navToZion: "::facomments:: К Зиону",
-    navToDashboard: "::fatablelist:: К Дашборду",
-    collapseAllSections: "::faanglesup:: Свернуть Инфо-Блоки", 
-    expandAllSections: "::faanglesdown:: Развернуть Инфо-Блоки", 
+    ctaButtonText: "::FaBolt:: НАЧАТЬ ШТУРM РЫНКА!", 
+    navToTop: "::FaChevronUp:: К Началу",
+    navToRoles: "::FaUsersShield:: К Ролям",
+    navToArsenal: "::FaToolbox:: К Арсеналу",
+    navToOffer: "::FaBullhorn:: К Офферам", 
+    navToWorkflow: "::FaDiagramProject:: К Процессу",
+    navToAssets: "::FaCubes:: К Активам",
+    navToZion: "::FaComments:: К Зиону",
+    navToDashboard: "::FaTableList:: К Дашборду",
+    navToScraper: "::FaSpider:: К Скрейперу", // Добавлено
+    collapseAllSections: "::FaAnglesUp:: Свернуть Инфо-Блоки", 
+    expandAllSections: "::FaAnglesDown:: Развернуть Инфо-Блоки", 
   };
 
   const pageTheme = {
@@ -245,17 +218,40 @@ const LeadGenerationHQPage = () => {
     buttonGradient: "bg-gradient-to-r from-brand-orange to-brand-yellow", 
   };
 
-   const kworkSearchLinks = [
-    { id: "kwork_twa", textKey: t.kworkSearchLink1Text, url: "https://kwork.ru/projects?c=all&q=telegram+web+app&keyword=telegram", icon: "::fasquarearrowupright::" },
-    { id: "kwork_miniapps", textKey: t.kworkSearchLink2Text, url: "https://kwork.ru/projects?c=all&q=telegram+mini+app&keyword=telegram", icon: "::fasquarearrowupright::" },
-    { id: "kwork_neurobots", textKey: t.kworkSearchLink3Text, url: "https://kwork.ru/projects?c=all&q=telegram+%D0%B1%D0%BE%D1%82+%D0%BD%D0%B5%D0%B9%D1%80%D0%BE%D1%81%D0%B5%D1%82%D1%8C&keyword=telegram", icon: "::fasquarearrowupright::" }, 
-    { id: "kwork_aidev", textKey: t.kworkSearchLink4Text, url: "https://kwork.ru/projects?c=all&q=AI+разработка&keyword=AI", icon: "::fasquarearrowupright::" },
-    { id: "kwork_twa_react", textKey: "TWA React (Kwork)", url: "https://kwork.ru/projects?c=all&q=TWA+React&keyword=TWA", icon: "::fasquarearrowupright::" },
-    { id: "kwork_tg_nextjs", textKey: "Telegram App Next.js (Kwork)", url: "https://kwork.ru/projects?c=all&q=Telegram+App+Next.js&keyword=Telegram", icon: "::fasquarearrowupright::" },
-    { id: "kwork_miniapp_tg", textKey: "Миниприложение Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Миниприложение+Telegram&keyword=Telegram", icon: "::fasquarearrowupright::" },
-    { id: "kwork_webapp_tg", textKey: "Разработка WebApp Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Разработка+WebApp+Telegram&keyword=Telegram", icon: "::fasquarearrowupright::" },
-    { id: "kwork_supabase_tg", textKey: "Supabase Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Supabase+Telegram&keyword=Supabase", icon: "::fasquarearrowupright::" },
-    { id: "kwork_ai_tg_bot", textKey: "AI Telegram Bot (Kwork)", url: "https://kwork.ru/projects?c=all&q=AI+Telegram+Bot&keyword=AI", icon: "::fasquarearrowupright::" },
+  // Перемещено сюда из GeneralPurposeScraper
+  const predefinedSearchButtons: PredefinedSearchButton[] = [
+    { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
+    { id: "kwork_mini_app", label: "Mini App (Kwork)", site: "kwork", keywords: "mini app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
+    { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
+    { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_webapp", label: "WebApp (Kwork)", site: "kwork", keywords: "webapp", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_react", label: "React (Kwork)", site: "kwork", keywords: "react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_twa_react", label: "TWA React (Kwork)", site: "kwork", keywords: "twa react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_tg_bot", label: "TG Бот (Kwork)", site: "kwork", keywords: "telegram бот", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_parser", label: "Парсер (Kwork)", site: "kwork", keywords: "парсер", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" }, // Habr использует 'q'
+    { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    // НОВЫЕ КНОПКИ ДЛЯ УЛУЧШЕНИЙ
+    { id: "kwork_car_rental_twa", label: "Аренда Авто (TWA Kwork)", site: "kwork", keywords: "telegram web app аренда авто", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_fitness_twa", label: "Фитнес (TWA Kwork)", site: "kwork", keywords: "telegram web app фитнес тренировки", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_crm_twa", label: "CRM (TWA Kwork)", site: "kwork", keywords: "telegram web app crm", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_admin_panel", label: "Админка (Kwork)", site: "kwork", keywords: "админ панель next.js react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "habr_nextjs_react", label: "Next.js React (Habr)", site: "habr", keywords: "next.js react", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    { id: "habr_supabase_db", label: "Supabase (Habr)", site: "habr", keywords: "supabase база данных", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+  ];
+
+   const kworkSearchLinks = [ // Это внешние ссылки для SupportArsenal, оставлены здесь
+    { name: "TWA (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+web+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
+    { name: "Mini Apps (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+mini+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
+    { name: "Нейро-Боты (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+%D0%B1%D0%BE%D1%82+%D0%BD%D0%B5%D0%B9%D1%80%D0%BE%D1%81%D0%B5%D1%82%D1%8C&keyword=telegram", icon: "::FaSquareArrowUpRight::" }, 
+    { name: "AI Разработка (Kwork)", url: "https://kwork.ru/projects?c=all&q=AI+разработка&keyword=AI", icon: "::FaSquareArrowUpRight::" },
+    { name: "TWA React (Kwork)", url: "https://kwork.ru/projects?c=all&q=TWA+React&keyword=TWA", icon: "::FaSquareArrowUpRight::" },
+    { name: "Telegram App Next.js (Kwork)", url: "https://kwork.ru/projects?c=all&q=Telegram+App+Next.js&keyword=Telegram", icon: "::FaSquareArrowUpRight::" },
+    { name: "Миниприложение Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Миниприложение+Telegram&keyword=Telegram", icon: "::FaSquareArrowUpRight::" },
+    { name: "Разработка WebApp Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Разработка+WebApp+Telegram&keyword=Telegram", icon: "::FaSquareArrowUpRight::" },
+    { name: "Supabase Telegram (Kwork)", url: "https://kwork.ru/projects?c=all&q=Supabase+Telegram&keyword=Supabase", icon: "::FaSquareArrowUpRight::" },
+    { name: "AI Telegram Bot (Kwork)", url: "https://kwork.ru/projects?c=all&q=AI+Telegram+Bot&keyword=AI", icon: "::FaSquareArrowUpRight::" },
   ];
 
   const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement>) => {
@@ -395,6 +391,7 @@ const LeadGenerationHQPage = () => {
     workflowRef: workflowSectionRef,
     assetsRef: assetsSectionRef,
     zionRef: zionSectionRef,
+    scraperRef: scraperSectionRef, // Добавляем скрейпер в рефы навигации
   };
   const rightNavLabels = {
     navToTop: t.navToTop,
@@ -404,6 +401,7 @@ const LeadGenerationHQPage = () => {
     navToWorkflow: t.navToWorkflow,
     navToAssets: t.navToAssets,
     navToZion: t.navToZion,
+    navToScraper: t.navToScraper, // Добавляем label для скрейпера
   };
 
   const handleSuccessfulScrape = useCallback(() => {
@@ -438,7 +436,7 @@ const LeadGenerationHQPage = () => {
         className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-orange/20 hover:text-brand-orange backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-brand-orange/30"
         title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
       >
-        <VibeContentRenderer content={sectionsCollapsed ? "::faanglesdown className='w-5 h-5'::" : "::faanglesup className='w-5 h-5'::"} />
+        <VibeContentRenderer content={sectionsCollapsed ? "::FaAnglesDown className='w-5 h-5'::" : "::FaAnglesUp className='w-5 h-5'::"} />
       </Button>
       
       <LeadsPageRightNav 
@@ -452,7 +450,7 @@ const LeadGenerationHQPage = () => {
         {!sectionsCollapsed && (
           <div ref={headerSectionRef}>
             <header className="text-center mb-10 md:mb-16">
-            <VibeContentRenderer content={`::facrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping"::`} />
+            <VibeContentRenderer content={`::FaCrosshairs className="mx-auto text-5xl sm:text-6xl md:text-7xl mb-4 sm:mb-5 ${pageTheme.primaryColor} animate-ping"::`} />
             <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
                 <VibeContentRenderer content={t.pageTitle} />
             </h1>
@@ -494,7 +492,7 @@ const LeadGenerationHQPage = () => {
            <div ref={scraperSectionRef} id="scraperSectionAnchor">
             <GeneralPurposeScraper
               pageTheme={pageTheme}
-              t_dynamic_links={t_links_config as any} // Cast for now, GeneralPurposeScraper might need update
+              predefinedSearchButtons={predefinedSearchButtons}
               onScrapedData={handleScrapedData}
               onSuccessfulScrape={handleSuccessfulScrape}
             />
@@ -552,8 +550,8 @@ const LeadGenerationHQPage = () => {
                     <div>
                         <VibeContentRenderer content={t.workflowStep4} />
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
-                           <li><VibeContentRenderer content={`::fashieldhalved:: **Танки:** ${t.tanksRoleDesc.split('.')[0] + '.'}`} /></li>
-                           <li><VibeContentRenderer content={`::fabrain:: **Кэрри (Павел):** ${t.carryRoleDesc.split('.')[0] + '.'}`} /></li>
+                           <li><VibeContentRenderer content={`::FaShieldHalved:: **Танки:** ${t.tanksRoleDesc.split('.')[0] + '.'}`} /></li>
+                           <li><VibeContentRenderer content={`::FaBrain:: **Кэрри (Павел):** ${t.carryRoleDesc.split('.')[0] + '.'}`} /></li>
                         </ul>
                     </div>
                     <p>{renderTextWithLinks(t.workflowStep5, t_links_config)}</p>
@@ -574,12 +572,12 @@ const LeadGenerationHQPage = () => {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 font-mono text-xs sm:text-sm">
                     {[
-                    { titleKey: 'assetJumpstartTitle', descKey: 'assetJumpstartDesc', icon: '::farocket::' },
-                    { titleKey: 'assetStudioTitle', descKey: 'assetStudioDesc', icon: '::fawandmagicsparkles::' },
-                    { titleKey: 'assetPhilosophyTitle', descKey: 'assetPhilosophyDesc', icon: '::fabookopen::' },
-                    { titleKey: 'assetPlansTitle', descKey: 'assetPlansDesc', icon: '::faclipboardlist::' },
-                    { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', icon: '::fagraduationcap::' },
-                    { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', icon: '::fagamepad::' },
+                    { titleKey: 'assetJumpstartTitle', descKey: 'assetJumpstartDesc', icon: '::FaRocket::' },
+                    { titleKey: 'assetStudioTitle', descKey: 'assetStudioDesc', icon: '::FaWandMagicSparkles::' },
+                    { titleKey: 'assetPhilosophyTitle', descKey: 'assetPhilosophyDesc', icon: '::FaBookOpen::' },
+                    { titleKey: 'assetPlansTitle', descKey: 'assetPlansDesc', icon: '::FaClipboardList::' },
+                    { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', icon: '::FaGraduationCap::' },
+                    { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', icon: '::FaGamepad::' },
                     ].map(asset => (
                     <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
                         <h5 className={cn("font-orbitron font-bold mb-1 sm:mb-1.5 flex items-center gap-1.5 sm:gap-2", pageTheme.accentColor)}>
@@ -618,7 +616,7 @@ const LeadGenerationHQPage = () => {
           
           {!sectionsCollapsed && (
             <section ref={ctaSectionRef} className="text-center mt-12 sm:mt-16 py-8 sm:py-10">
-                <VibeContentRenderer content={`::farocket className="mx-auto text-5xl sm:text-7xl mb-6 sm:mb-8 ${pageTheme.primaryColor} animate-bounce"::`} />
+                <VibeContentRenderer content={`::FaRocket className="mx-auto text-5xl sm:text-7xl mb-6 sm:mb-8 ${pageTheme.primaryColor} animate-bounce"::`} />
                 <h2 className={cn("text-3xl sm:text-4xl md:text-5xl font-orbitron font-bold mb-4 sm:mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
                 <VibeContentRenderer content={t.ctaTitle} />
                 </h2>
