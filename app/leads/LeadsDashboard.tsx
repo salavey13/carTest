@@ -165,11 +165,11 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
               <table className="w-full text-left">
                 <thead className="text-[0.7rem] sm:text-xs text-brand-orange uppercase bg-gray-950/70 font-orbitron">
                   <tr>
-                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 w-1/3">Клиент (Р)</th> {/* Client & Relevance */}
-                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden md:table-cell w-1/3">Проект</th> {/* Project, hidden on small */}
-                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 w-1/3">Статус</th>
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Клиент (Р)</th> {/* Client & Relevance */}
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden md:table-cell">Проект</th> {/* Project, hidden on small */}
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Статус</th>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden sm:table-cell">Назначен</th> {/* Hidden on smallest mobile */}
-                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2"></th> {/* Details/Info button */}
+                    <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Детали</th> {/* Details/Info button */}
                   </tr>
                 </thead>
                 <tbody>
@@ -198,34 +198,34 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                       return (
                         <React.Fragment key={lead.id}>
                           <tr className="bg-gray-900/50 border-b border-gray-800 hover:bg-gray-800/70 transition-colors">
-                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap flex items-center justify-between gap-1 w-full">
-                              <div className="flex flex-col flex-grow min-w-0"> {/* Use min-w-0 to prevent overflow */}
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => toggleExpand(lead.id)}
-                                    className={cn("h-7 w-7 p-0 mr-1 flex-shrink-0", isExpanded ? "text-brand-blue" : "text-gray-500 hover:text-brand-cyan")}
-                                    disabled={isLoading}
-                                  >
-                                    {isExpanded ? <VibeContentRenderer content="::FaChevronUp className='h-4 w-4'::" /> : <VibeContentRenderer content="::FaChevronDown className='h-4 w-4'::" />}
-                                  </Button>
+                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap overflow-hidden">
+                              <div className="flex items-center gap-1 w-full">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => toggleExpand(lead.id)}
+                                  className={cn("h-7 w-7 p-0 mr-1 flex-shrink-0", isExpanded ? "text-brand-blue" : "text-gray-500 hover:text-brand-cyan")}
+                                  disabled={isLoading}
+                                >
+                                  {isExpanded ? <VibeContentRenderer content="::FaChevronUp className='h-4 w-4'::" /> : <VibeContentRenderer content="::FaChevronDown className='h-4 w-4'::" />}
+                                </Button>
+                                <div className="flex flex-col flex-grow min-w-0"> {/* Use min-w-0 to prevent overflow */}
                                   <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline text-brand-cyan flex items-center gap-1 font-semibold truncate">
                                     {lead.client_name || 'N/A'} <VibeContentRenderer content="::FaSquareArrowUpRight className='text-[0.6rem] sm:text-2xs flex-shrink-0'::" />
                                   </a>
+                                  {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-gray-500 italic truncate' title={`Источник: ${lead.source}`}>({lead.source})</span>}
+                                  {(lead.similarity_score !== null && lead.similarity_score !== undefined) &&
+                                    <span className={cn('block text-[0.65rem] sm:text-xs font-bold',
+                                        lead.similarity_score >= 8 ? 'text-brand-lime' :
+                                        lead.similarity_score >= 5 ? 'text-brand-yellow' :
+                                        'text-brand-orange'
+                                      )}
+                                      title={`Релевантность: ${lead.similarity_score}/10`}
+                                    >
+                                      Р: {lead.similarity_score}/10
+                                    </span>
+                                  }
                                 </div>
-                                {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-gray-500 italic truncate' title={`Источник: ${lead.source}`}>({lead.source})</span>}
-                                {(lead.similarity_score !== null && lead.similarity_score !== undefined) &&
-                                  <span className={cn('block text-[0.65rem] sm:text-xs font-bold',
-                                      lead.similarity_score >= 8 ? 'text-brand-lime' :
-                                      lead.similarity_score >= 5 ? 'text-brand-yellow' :
-                                      'text-brand-orange'
-                                    )}
-                                    title={`Релевантность: ${lead.similarity_score}/10`}
-                                  >
-                                    Р: {lead.similarity_score}/10
-                                  </span>
-                                }
                               </div>
                             </td>
                             <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-300 max-w-[150px] sm:max-w-[200px] md:max-w-xs hidden md:table-cell">
@@ -336,7 +336,7 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                   {/* Project Description & Type */}
                                   <div className="space-y-2">
                                     <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
-                                      <VibeContentRenderer content="::FaFileAlt:: Полное описание проекта:" />
+                                      <VibeContentRenderer content="::FaFileLines:: Полное описание проекта:" />
                                     </h5>
                                     <p className="leading-relaxed whitespace-pre-wrap">{lead.project_description || 'Нет описания.'}</p>
                                     {lead.project_type_guess && (
