@@ -1,3 +1,4 @@
+// /app/leads/GeneralPurposeScraper.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -74,7 +75,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
         toast.success(<VibeContentRenderer content="::FaCheckCircle:: Разведданные собраны! Информация добавлена в 'Сбор трофеев'." />, { id: toastId, duration: 4000 });
         onSuccessfulScrape?.(); 
       } else {
-        toast.error(<VibeContentRenderer content={`::FaExclamationTriangle:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
+        toast.error(<VibeContentRenderer content={`::FaTriangleExclamation:: Ошибка скрейпинга: ${result.error || "Не удалось получить контент."}`} />, { id: toastId, duration: 6000 });
       }
     } catch (error: any) {
       toast.error(<VibeContentRenderer content={`::FaBomb:: Критическая ошибка зонда: ${error.message}`} />, { id: toastId, duration: 6000 });
@@ -157,7 +158,7 @@ const GeneralPurposeScraper: React.FC<GeneralPurposeScraperProps> = ({
           <VibeContentRenderer content={isScraping ? "::FaSpinner className='animate-spin text-lg':: Зонд в полёте..." : "::FaSpider className='text-lg':: Запустить Зонд-Охотник!"} />
         </Button>
         <p className="text-xs text-gray-400 font-mono">
-          <VibeContentRenderer content="::FaExclamationTriangle className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке. Не используйте для массового парсинга без прокси и задержек." />
+          <VibeContentRenderer content="::FaTriangleExclamation className='text-yellow-400 text-sm':: **Этика:** Используйте с уважением к ресурсам. Чрезмерный или агрессивный скрейпинг может нарушать правила площадок и привести к блокировке. Не используйте для массового парсинга без прокси и задержек." />
         </p>
       </CardContent>
     </Card>
