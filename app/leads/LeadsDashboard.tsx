@@ -359,16 +359,13 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                       <VibeContentRenderer content="::FaChartLine:: Дополнительные данные:" />
                                     </h5>
                                     <p><VibeContentRenderer content="::FaMoneyBillWave:: Бюджет:" /> {lead.budget_range || '-'}</p>
-                                    {/* Changed FaRegCalendarAlt to FaCalendarDay */}
                                     <p><VibeContentRenderer content="::FaCalendarDay:: Дедлайн:" /> {lead.posted_at ? new Date(lead.posted_at).toLocaleDateString() : (lead as any).deadline_info || '-'}</p>
-                                    {/* Changed FaHistory to FaClock */}
                                     <p><VibeContentRenderer content="::FaClock:: История клиента:" /> {lead.client_kwork_history || '-'}</p>
-                                    {/* Changed FaPercentage to FaPercent */}
                                     <p><VibeContentRenderer content="::FaPercent:: Предложений:" /> {lead.current_kwork_offers_count || '-'}</p>
                                     {/* Assignee details moved here for smaller screens */}
                                     <div className="sm:hidden mt-2 pt-2 border-t border-gray-700">
                                       <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
-                                        <VibeContentRenderer content="::FaUsers:: Назначены:" />
+                                        <VibeContentRenderer content="::FaShieldCat:: Назначены:" /> {/* Changed FaUsers to FaShieldCat */}
                                       </h5>
                                       {lead.assigned_to_tank && <p className="text-gray-400">Танк: {getAssigneeName(lead, 'tank')}</p>}
                                       {lead.assigned_to_carry && <p className="text-gray-400">Кэрри: {getAssigneeName(lead, 'carry')}</p>}
