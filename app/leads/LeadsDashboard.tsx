@@ -7,7 +7,6 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-
 interface Lead {
   id?: string;
   source?: string;
@@ -116,9 +115,9 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                     filter === 'support' ? 'Задачи Саппорта' :
                       filter === 'tank' ? 'Задачи Танков' :
                         filter === 'carry' ? 'Задачи Кэрри' :
-                          filter === 'new' ? <VibeContentRenderer content="::facircleexclamation:: Новые" /> :
-                            filter === 'in_progress' ? <VibeContentRenderer content="::fahourglasshalf:: В Работе" /> :
-                              filter === 'interested' ? <VibeContentRenderer content="::fafire:: Интерес" /> :
+                          filter === 'new' ? <VibeContentRenderer content="::FaCircleExclamation:: Новые" /> :
+                            filter === 'in_progress' ? <VibeContentRenderer content="::FaHourglassHalf:: В Работе" /> :
+                              filter === 'interested' ? <VibeContentRenderer content="::FaFire:: Интерес" /> :
                                 filter.charAt(0).toUpperCase() + filter.slice(1)
                 }
               </Button>
@@ -135,7 +134,7 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
             </p>
           ) : isLoading && leads.length === 0 ? (
             <div className="text-center py-4">
-              <VibeContentRenderer content="::faspinner className='animate-spin text-xl sm:text-2xl text-brand-orange':: Загрузка данных из ЦОД..." />
+              <VibeContentRenderer content="::FaSpinner className='animate-spin text-xl sm:text-2xl text-brand-orange':: Загрузка данных из ЦОД..." />
             </div>
           ) : (
             <div className="overflow-x-auto simple-scrollbar">
@@ -171,7 +170,7 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                       <tr key={lead.id} className="bg-gray-900/50 border-b border-gray-800 hover:bg-gray-800/70 transition-colors">
                         <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap">
                           <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline text-brand-cyan flex items-center gap-1 font-semibold">
-                            {lead.client_name || 'N/A'} <VibeContentRenderer content="::fasquarearrowupright className='text-[0.6rem] sm:text-2xs'::" />
+                            {lead.client_name || 'N/A'} <VibeContentRenderer content="::FaSquareArrowUpRight className='text-[0.6rem] sm:text-2xs'::" />
                           </a>
                           {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-gray-500 italic' title={`Источник: ${lead.source}`}>({lead.source})</span>}
                           {(lead.initial_relevance_score || lead.similarity_score) && 
@@ -269,7 +268,7 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button variant="ghost" size="icon" className="text-brand-yellow hover:text-yellow-300 h-7 w-7 p-1" disabled={isLoading}>
-                                <VibeContentRenderer content="::facircleinfo::" />
+                                <VibeContentRenderer content="::FaCircleInfo::" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent className="bg-gray-900 text-gray-200 border-brand-yellow/50 text-xs font-mono p-2 shadow-lg max-w-xs">
