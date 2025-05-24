@@ -1,3 +1,4 @@
+// /app/leads/LeadsPageRightNav.tsx
 "use client";
 
 import React from 'react';
@@ -38,7 +39,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
 }) => {
   const allNavItems = [
     { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "FaChevronUp", alwaysVisible: true }, 
-    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "FaUsersShield", alwaysVisible: false },
+    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "FaShieldCat", alwaysVisible: false },
     { ref: sectionRefs.scraperRef, labelKey: 'navToScraper', iconName: "FaSpider", alwaysVisible: true }, // Добавляем скрейпер
     { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "FaToolbox", alwaysVisible: true },
     { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "FaTableList", alwaysVisible: true },
