@@ -15,6 +15,7 @@ import { PROMPT_INTERGALACTIC_PIPELINE } from './prompt_intergalactic_pipeline';
 interface KworkSearchLink {
   name: string;
   url: string;
+  icon?: string; // Добавлено поле icon
 }
 
 interface SupportArsenalProps {
@@ -72,7 +73,10 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
           <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4 pl-2">
             {kworkSearchLinks.map(link => (
               <Button key={link.name} variant="outline" size="xs" asChild className={cn("text-[0.65rem] sm:text-xs py-1 px-1.5 sm:px-2 font-mono", pageTheme.borderColor, pageTheme.primaryColor, `hover:${pageTheme.primaryColor}/80 hover:bg-black/20 transform hover:scale-105`)}>
-                <a href={link.url} target="_blank" rel="noopener noreferrer"><VibeContentRenderer content={link.name} /></a>
+                <a href={link.url} target="_blank" rel="noopener noreferrer">
+                  {link.icon && <VibeContentRenderer content={link.icon} />} {/* Отображаем иконку, если есть */}
+                  <VibeContentRenderer content={link.name} />
+                </a>
               </Button>
             ))}
           </div>
@@ -99,7 +103,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
               disabled={!rawKworksInput.trim()}
               className="w-full bg-brand-blue/20 text-brand-blue border-brand-blue/50 hover:bg-brand-blue/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
-              <VibeContentRenderer content="::facopy::" />
+              <VibeContentRenderer content="::FaCopy::" />
               <span className="flex-grow whitespace-normal">
                 <VibeContentRenderer content={t.promptButtonKworksToCsv} />
               </span>
@@ -116,14 +120,14 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
               disabled={!rawKworksInput.trim()}
               className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-orbitron font-bold transform hover:scale-105 px-3"
             >
-              <VibeContentRenderer content="::fameteor:: ВСЁ СРАЗУ В AI!" />
+              <VibeContentRenderer content="::FaMeteor:: ВСЁ СРАЗУ В AI!" />
             </Button>
             <Button
               variant="secondary"
               onClick={() => onCopyToClipboard(PROMPT_OFFER_V2_CYBERVIBE_OUTREACH, "Промпт 'CSV + Оффер' скопирован! Передайте AI вместе с CSV.")}
               className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
-              <VibeContentRenderer content="::facopy::" />
+              <VibeContentRenderer content="::FaCopy::" />
               <span className="flex-grow whitespace-normal">
                 <VibeContentRenderer content={t.promptButtonCsvToOffer} />
               </span>
@@ -133,7 +137,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
               onClick={() => onCopyToClipboard(PROMPT_FIND_TWEAKS, "Промпт 'CSV + Твики' скопирован! Передайте AI вместе с CSV.")}
               className="w-full bg-brand-pink/20 text-brand-pink border-brand-pink/50 hover:bg-brand-pink/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
-              <VibeContentRenderer content="::facopy::" />
+              <VibeContentRenderer content="::FaCopy::" />
               <span className="flex-grow whitespace-normal">
                 <VibeContentRenderer content={t.promptButtonCsvToTweaks} />
               </span>
@@ -143,7 +147,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
               onClick={() => onCopyToClipboard(PROMPT_FIND_MISSING_FEATURES, "Промпт 'CSV + Фичи' скопирован! Передайте AI вместе с CSV.")}
               className="w-full bg-brand-green/20 text-brand-green border-brand-green/50 hover:bg-brand-green/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
-              <VibeContentRenderer content="::facopy::" />
+              <VibeContentRenderer content="::FaCopy::" />
               <span className="flex-grow whitespace-normal">
                 <VibeContentRenderer content={t.promptButtonCsvToFeatures} />
               </span>
@@ -173,7 +177,7 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
             disabled={isLoading || !processedCsvForUpload.trim()}
             className={cn("w-full sm:w-auto bg-brand-lime/80 text-black hover:bg-brand-lime flex items-center justify-center gap-2 py-2.5 sm:py-3 text-sm sm:text-base font-orbitron font-semibold transform hover:scale-105", (isLoading || !processedCsvForUpload.trim()) && "opacity-50 cursor-not-allowed")}
           >
-            <VibeContentRenderer content={isLoading ? "::faspinner className='animate-spin':: ДЕСАНТИРОВАНИЕ..." : t.uploadLeadsButton} />
+            <VibeContentRenderer content={isLoading ? "::FaSpinner className='animate-spin':: ДЕСАНТИРОВАНИЕ..." : t.uploadLeadsButton} />
           </Button>
         </div>
       </CardContent>

@@ -15,6 +15,7 @@ interface LeadsPageRightNavProps {
     workflowRef: React.RefObject<HTMLDivElement>;
     assetsRef: React.RefObject<HTMLDivElement>;
     zionRef: React.RefObject<HTMLDivElement>;
+    scraperRef: React.RefObject<HTMLDivElement>; // Добавляем реф для скрейпера
   };
   labels: {
     navToTop: string;
@@ -24,6 +25,7 @@ interface LeadsPageRightNavProps {
     navToWorkflow: string;
     navToAssets: string;
     navToZion: string;
+    navToScraper: string; // Добавляем label для скрейпера
   };
   sectionsCollapsed: boolean; 
 }
@@ -35,13 +37,14 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
   sectionsCollapsed,
 }) => {
   const allNavItems = [
-    { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "fachevronup", alwaysVisible: true }, 
-    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "fausershield", alwaysVisible: false },
-    { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "fatoolbox", alwaysVisible: true },
-    { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "fatablelist", alwaysVisible: true },
-    { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "fadiagramproject", alwaysVisible: false },
-    { ref: sectionRefs.assetsRef, labelKey: 'navToAssets', iconName: "facubes", alwaysVisible: false },
-    { ref: sectionRefs.zionRef, labelKey: 'navToZion', iconName: "facomments", alwaysVisible: false },
+    { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "FaChevronUp", alwaysVisible: true }, 
+    { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "FaUsersShield", alwaysVisible: false },
+    { ref: sectionRefs.scraperRef, labelKey: 'navToScraper', iconName: "FaSpider", alwaysVisible: true }, // Добавляем скрейпер
+    { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "FaToolbox", alwaysVisible: true },
+    { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "FaTableList", alwaysVisible: true },
+    { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "FaDiagramProject", alwaysVisible: false },
+    { ref: sectionRefs.assetsRef, labelKey: 'navToAssets', iconName: "FaCubes", alwaysVisible: false },
+    { ref: sectionRefs.zionRef, labelKey: 'navToZion', iconName: "FaComments", alwaysVisible: false },
   ];
 
   const visibleNavItems = allNavItems.filter(item => 

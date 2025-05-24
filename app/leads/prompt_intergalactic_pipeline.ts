@@ -54,7 +54,7 @@ ${PROMPT_FIND_MISSING_FEATURES}
     5.  **Минимальное количество СЛОЖНЫХ \`missing_features\` (задач для "Кэрри"):** Проекты, требующие в основном "твиков" для "Танков", быстрее в реализации.
 2.  **Выбор ТОП-Лидов:** Выбери **ТОП-3 НАИБОЛЕЕ ПЕРСПЕКТИВНЫХ ЛИДА** по результатам ранжирования (или менее, если всего найдено меньше).
 3.  **Генерация CSV:** Для каждого выбранного ТОП-лида сформируй строку CSV.
-    *   **Заголовок CSV (первая строка вывода):** \`"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","initial_relevance_score","project_type_guess"\`
+    *   **Заголовок CSV (первая строка вывода):** \`"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","similarity_score"\`
     *   **Строки данных CSV (для каждого ТОП-лида):**
         *   \`client_name\`: из данных Этапа 1.
         *   \`kwork_url\`: из данных Этапа 1 (будет \`lead_url\` при импорте).
@@ -64,10 +64,9 @@ ${PROMPT_FIND_MISSING_FEATURES}
         *   \`generated_offer\`: строка оффера из Этапа 2.
         *   \`identified_tweaks\`: **JSON-строка** от \`JSON.stringify(current_lead.identified_tweaks_json_array)\`. Если массив пуст, используй \`"[]"\`.
         *   \`missing_features\`: **JSON-строка** от \`JSON.stringify(current_lead.missing_features_json_array)\`. Если массив пуст, используй \`"[]"\`.
-        *   \`status\`: установи значение \`"analyzed_by_pipeline"\`
+        *   \`status\`: установи значение \`"analyzed"\`
         *   \`source\`: установи значение \`"kwork_pipeline_top3"\`
-        *   \`initial_relevance_score\`: из данных Этапа 1.
-        *   \`project_type_guess\`: из данных Этапа 1.
+        *   \`similarity_score\`: из данных Этапа 1 (\`current_lead.initial_relevance_score\`).
     *   **Форматирование CSV:**
         *   Разделитель: запятая (,).
         *   Все текстовые поля, включая JSON-строки, должны быть заключены в двойные кавычки (\`"\`).
@@ -76,8 +75,8 @@ ${PROMPT_FIND_MISSING_FEATURES}
 
 **Пример финального CSV-вывода (для одного лида):**
 \`\`\`csv
-"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","initial_relevance_score","project_type_guess"
-"urik99","https://kwork.ru/projects/2840722","Разработка telegram mini app...","до 10 000 ₽ / до 30 000 ₽","","Привет, urik99! ... ваш оффер ...","[{""tweak_description"":""Интеграция дизайна..."",""estimated_complexity"":""medium"",...}]","[{""feature_description"":""Новая фича Х..."",""reason_for_carry"":""Сложная логика..."",...}]","analyzed_by_pipeline","kwork_pipeline_top3",9,"TWA_Training"
+"client_name","kwork_url","project_description","budget_range","raw_html_description","generated_offer","identified_tweaks","missing_features","status","source","similarity_score"
+"urik99","https://kwork.ru/projects/2840722","Разработка telegram mini app...","до 10 000 ₽ / до 30 000 ₽","","Привет, urik99! ... ваш оффер ...","[{""tweak_description"":""Интеграция дизайна..."",""estimated_complexity"":""medium"",...}]","[{""feature_description"":""Новая фича Х..."",""reason_for_carry"":""Сложная логика..."",...}]","analyzed","kwork_pipeline_top3",9
 \`\`\`
 *(Если несколько ТОП-лидов, каждая новая строка данных будет под заголовком)*
 

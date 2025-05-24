@@ -9,13 +9,14 @@ export const PROMPT_FIND_MISSING_FEATURES = `
 *   Использование Supabase для: Базы данных, Аутентификации, Storage, простых Edge Functions (например, для cron-задач или простых вебхуков).
 *   **Известные готовые или легко адаптируемые решения (страницы/компоненты):**
     *   **TWA_Training / TWA_Fitness:** личные кабинеты, каталоги тренировок, отслеживание базового прогресса, UI-кит. (например, \`/app/start-training/page.tsx\`)
-    *   **TWA_CarRental:** каталоги авто, фильтры, система бронирования, личные кабинеты, UI-кит. (например, \`/app/rent-car/page.tsx\`)
+    *   **TWA_CarRental:** каталоги авто, фильтры, система бронирования, личные кабинеты, UI-кит. (например, \`/app/rent-car/page.tsx\`). **Если \`project_type_guess\` == "TWA_CarRental", то эти функции считаются уже покрытыми нашей базой.**
     *   **TWA_WheelOfFortune:** Компонент "Колесо Фортуны". (например, \`/app/wheel-of-fortune/page.tsx\`)
     *   **TWA_Captcha:** Компонент для верификации Captcha. (например, \`/components/CaptchaVerification.tsx\`)
     *   **TWA_ArticleFromYouTube:** Генерация статей из видео YouTube. (например, \`/app/yt/page.tsx\`)
     *   **TWA_VPRTests:** Система тестирования для школьников (ВПР). (например, \`/app/vpr-tests/page.tsx\`)
     *   **TWA_Broadcast:** Рассылка сообщений пользователям через бота (базовая).
-    *   **Прочее:** Страницы донатов, подписок, базовой админки.
+    *   **TWA_Admin_Basic:** Базовая админ-панель для управления контентом и пользователями. (например, \`/app/admin/page.tsx\`)
+    *   **Прочее:** Страницы донатов, подписок, базовой админки. Базовая интеграция платежных систем (Telegram Stars, простые API).
 *   Кастомизация UI/UX существующих компонентов, добавление простых полей, изменение логики отображения данных, простые интеграции с известными API (например, получение курса валют).
 
 **Входные данные (JSON-объект лида \`lead_data\` и JSON-массив \`identified_tweaks_json\`):**
@@ -45,6 +46,7 @@ export const PROMPT_FIND_MISSING_FEATURES = `
     *   Уже покрываются Jumpstart Kit или нашими известными компонентами/страницами (см. список выше).
     *   Являются простой кастомизацией (уже есть в \`identified_tweaks_json\`).
     *   Представляют собой стандартный CRUD, UI-изменения, или базовые Supabase функции.
+    *   **КЛЮЧЕВОЕ ПРАВИЛО:** Если \`project_type_guess\` совпадает с одним из наших "Известных готовых решений" (например, "TWA_CarRental", "TWA_Training"), то БОЛЬШИНСТВО запрошенных клиентом фич, характерных для этого типа проекта, должны быть классифицированы как "твики" для "Танков", а не как "новые фичи" для "Кэрри". То есть, наши AI-ассистенты уже имеют базу, и нужно лишь адаптировать её под клиента.
 *   **Ищи запросы на:**
     *   Уникальную, сложную бизнес-логику, не покрываемую стандартными паттернами (например, сложная система скоринга, кастомные воронки, многоэтапные процессы с нестандартной логикой).
     *   Продвинутые real-time взаимодействия (например, коллаборативное редактирование, синхронизация игровых состояний, сложные чаты - сложнее, чем базовый Supabase Realtime).
@@ -75,5 +77,5 @@ Project Description: {{project_description}}
 Key Features Requested: {{key_features_requested_list_json_string}}
 Project Type Guess: {{project_type_guess}}
 Identified Tweaks (for Tanks, to EXCLUDE from your list): {{identified_tweaks_list_or_json_string_optional}}
-List of existing SuperVibe features and components (consider these as easily customizable by 'Tanks', not new for 'Carry'): ["TWA_Training", "TWA_CarRental", "TWA_WheelOfFortune", "TWA_Captcha", "TWA_ArticleFromYouTube", "TWA_VPRTests", "TWA_Ecommerce_Basic", "TWA_SemanticSearch", "CRUD operations", "Telegram Auth", "Supabase Integration (DB, Storage, Basic Functions)", "Basic Bot Integration", "Telegram Payments (Stars)"]
+List of existing SuperVibe features and components (consider these as easily customizable by 'Tanks', not new for 'Carry'): ["TWA_Training", "TWA_CarRental", "TWA_WheelOfFortune", "TWA_Captcha", "TWA_ArticleFromYouTube", "TWA_VPRTests", "TWA_Ecommerce_Basic", "TWA_SemanticSearch", "TWA_Admin_Basic", "CRUD operations", "Telegram Auth", "Supabase Integration (DB, Storage, Basic Functions)", "Basic Bot Integration", "Telegram Payments (Stars)", "Simple API Integration"]
 `;
