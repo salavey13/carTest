@@ -21,8 +21,8 @@ const translations: Record<string, Record<string, string>> = {
     "noFileSelected": "No file selected",
     "fileSelected": "File: %%FILENAME%%",
     "promptGenerated": "Prompt for Gemini AI generated!",
-    "copyPromptAndData": "Copy Prompt & Data for Gemini",
-    "goToGemini": "Open Google AI Studio (Gemini)",
+    "copyPromptAndData": "Copy Prompt & Data",
+    "goToGemini": "Open Google AI Studio",
     "step2Title": "Step 2: Get Analysis from Gemini AI",
     "pasteMarkdown": "Paste the full Markdown response from Gemini AI here:",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
@@ -52,18 +52,18 @@ const translations: Record<string, Record<string, string>> = {
     "manualCopyPrompt": "Manual Copy Area (if auto-copy fails):",
   },
   ru: {
-    "pageTitle": "XLSX Аналитика через Gemini AI ✨",
+    "pageTitle": "XLSX Аналитика через Gemini AI ✨", // This will be styled with GTA effect
     "pageSubtitle": "Сгенерируйте AI-анализ вашего XLSX фин. отчета с помощью Google AI Studio (Gemini).",
     "step1Title": "Шаг 1: Загрузите и Подготовьте Данные для AI",
     "selectFile": "Выберите XLSX Отчет",
     "noFileSelected": "Файл не выбран",
     "fileSelected": "Файл: %%FILENAME%%",
     "promptGenerated": "Промпт для Gemini AI сгенерирован!",
-    "copyPromptAndData": "Скопировать Промпт и Данные для Gemini",
-    "goToGemini": "Открыть Google AI Studio (Gemini)",
+    "copyPromptAndData": "Копировать Промпт", // Shortened
+    "goToGemini": "Перейти в Gemini", // Shortened
     "step2Title": "Шаг 2: Получите Анализ от Gemini AI",
     "pasteMarkdown": "Вставьте полный Markdown-ответ от Gemini AI сюда:",
-    "generateAndSendPdf": "Создать PDF и Отправить в Telegram",
+    "generateAndSendPdf": "PDF в Telegram", // Shortened
     "processing": "Обработка...",
     "parsingXlsx": "Парсинг XLSX...",
     "generatingPrompt": "Генерация AI Промпта...",
@@ -156,33 +156,34 @@ export default function ToPdfPageWithGemini() {
             const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
 
             setStatusMessage(t('generatingPrompt'));
-            const promptForAI = `
-You are a highly skilled financial analyst AI. Your task is to analyze the provided financial data from an XLSX report and generate a comprehensive summary in Markdown format.
-The original filename of the report was: "${file.name}".
-The data is from sheet: "${firstSheetName}".
+            const promptForAI = `Ты — высококвалифицированный AI-финансовый аналитик. Твоя задача — проанализировать предоставленные финансовые данные из отчета XLSX и составить подробное резюме в формате Markdown.
+ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
 
-**Analysis Request:**
-Please perform a thorough analysis of the financial data below. Focus on:
-1.  **Executive Summary:** A concise (3-5 sentences) overview of the company's financial health and performance based on the data.
-2.  **Key Financial Metrics & Trends:** Identify and discuss important metrics (e.g., revenue, profit margins, expenses, growth rates). Highlight significant trends, positive or negative. Use bullet points for clarity.
-3.  **Potential Insights & Observations:** What interesting patterns, anomalies, or insights can be derived from the data? Are there areas of strength or concern?
-4.  **Recommendations (Optional but Preferred):** Based on your analysis, suggest 1-3 high-level recommendations or areas for further investigation.
-5.  **Data Period:** If discernible from the data, state the period the report likely covers.
+Исходное имя файла отчета: "${file.name}".
+Данные взяты с листа: "${firstSheetName}".
 
-**Output Format Requirements:**
-- Your entire response MUST be in **Markdown format**.
-- Use headings (e.g., \`# Executive Summary\`, \`## Key Findings\`) to structure your report.
-- Use bullet points (\`* \` or \`- \`) for lists (e.g., key findings, recommendations).
-- Use bold (\`**text**\`) for emphasis where appropriate.
-- If you include tables, ensure they are Markdown-formatted tables.
+**Запрос на Анализ:**
+Пожалуйста, проведи тщательный анализ финансовых данных ниже. Сконцентрируйся на следующем:
+1.  **Краткое резюме (Executive Summary):** Сжатый (3-5 предложений) обзор финансового состояния и результатов деятельности компании на основе данных.
+2.  **Ключевые финансовые показатели и тенденции:** Определи и обсуди важные показатели (например, выручка, рентабельность, расходы, темпы роста). Выдели значительные тенденции, как положительные, так и отрицательные. Используй маркированные списки для наглядности.
+3.  **Потенциальные инсайты и наблюдения:** Какие интересные закономерности, аномалии или выводы можно сделать из данных? Есть ли сильные стороны или проблемные области?
+4.  **Рекомендации (Необязательно, но желательно):** На основе твоего анализа предложи 1-3 общие рекомендации или направления для дальнейшего изучения.
+5.  **Отчетный период:** Если это можно определить из данных, укажи период, который, вероятно, охватывает отчет.
 
-**Here is the financial data (extracted from the XLSX sheet and converted to CSV format for your convenience):**
+**Требования к формату вывода:**
+- Весь твой ответ ДОЛЖЕН БЫТЬ в формате **Markdown на русском языке**.
+- Используй заголовки (например, \`# Краткое резюме\`, \`## Ключевые выводы\`) для структурирования отчета.
+- Используй маркированные списки (\`* \` или \`- \`) для перечислений (например, ключевые выводы, рекомендации).
+- Используй выделение жирным шрифтом (\`**текст**\`) для акцентирования там, где это уместно.
+- Если ты включаешь таблицы, убедись, что они отформатированы как Markdown-таблицы.
+
+**Вот финансовые данные (извлеченные из листа XLSX и преобразованные в формат CSV для твоего удобства):**
 \`\`\`csv
 ${csvDataString.substring(0, 25000)} 
 \`\`\`
-(Note: Data may be truncated if very large. Focus on the provided segment.)
+(Примечание: Данные могут быть усечены, если они очень большие. Сосредоточься на предоставленном фрагменте.)
 
-Please provide a detailed and insightful Markdown report.
+Пожалуйста, предоставь подробный и содержательный отчет в формате Markdown на русском языке.
 `;
             setGeneratedPrompt(promptForAI);
             setCurrentStage('gemini');
@@ -197,9 +198,9 @@ Please provide a detailed and insightful Markdown report.
         }
     };
 
-    const handleCopyToClipboard = (text: string, successMessage: string) => {
+    const handleCopyToClipboard = (text: string, successMessageKey: string) => {
         navigator.clipboard.writeText(text)
-            .then(() => toast.success(successMessage))
+            .then(() => toast.success(t(successMessageKey)))
             .catch(err => {
                 toast.error(t('promptCopyError'));
                 logger.error('Clipboard copy failed:', err);
@@ -244,13 +245,19 @@ Please provide a detailed and insightful Markdown report.
     }
 
     return (
-        <div className={cn("min-h-screen flex flex-col items-center pt-24 pb-10 font-mono", "bg-gradient-to-br from-slate-900 via-black to-indigo-900/50 text-gray-200 px-4")}>
+        <div className={cn("min-h-screen flex flex-col items-center pt-24 pb-10", "bg-gradient-to-br from-slate-900 via-black to-indigo-900/50 text-gray-200 px-4 font-mono")}>
             <Toaster position="bottom-center" richColors toastOptions={{ className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm' }} />
             <div className="absolute top-4 right-4 z-20"> <button onClick={toggleLang} className="p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1.5 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> <FontAwesomeIcon icon={faLanguage} /> {currentLang === 'en' ? 'RU' : 'EN'} </button> </div>
 
             <div className="w-full max-w-2xl p-6 md:p-8 border border-brand-orange/40 rounded-xl bg-black/80 backdrop-blur-xl shadow-2xl shadow-brand-orange/30">
                 <VibeContentRenderer content="::FaWandMagicSparkles::" className="text-6xl text-brand-orange mx-auto mb-5 animate-pulse" />
-                <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-orange cyber-text glitch mb-2" data-text={t("pageTitle")}>{t("pageTitle")}</h1>
+                <h1 
+                    className="font-sans text-4xl md:text-5xl font-extrabold text-center text-white uppercase cyber-text glitch mb-2" 
+                    data-text={t("pageTitle")}
+                    style={{ textShadow: '2px 2px 0px #000000, 4px 4px 0px #EF9A3F' }}
+                >
+                    {t("pageTitle")}
+                </h1>
                 <p className="text-sm text-center text-gray-400 mb-10">{t("pageSubtitle")}</p>
 
                 {/* Step 1: Upload and Prepare Prompt */}
@@ -272,7 +279,7 @@ Please provide a detailed and insightful Markdown report.
                              <label htmlFor="geminiPrompt" className="text-xs text-gray-400 block mb-1">{t("manualCopyPrompt")}</label>
                              <textarea id="geminiPrompt" readOnly value={generatedPrompt} rows={7} className="w-full p-2.5 text-xs bg-slate-900/70 border border-slate-700 rounded-md text-gray-300 simple-scrollbar shadow-sm"/>
                             <div className="flex flex-col sm:flex-row gap-3">
-                                <Button onClick={() => handleCopyToClipboard(generatedPrompt, t('promptCopySuccess'))} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-sm">
+                                <Button onClick={() => handleCopyToClipboard(generatedPrompt, 'promptCopySuccess')} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-sm">
                                     <FontAwesomeIcon icon={faCopy} className="mr-2"/>{t("copyPromptAndData")}
                                 </Button>
                                 <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-sm">
