@@ -108,44 +108,53 @@ export async function generatePdfFromMarkdownAndSend(
         const pdfDoc = await PDFDocument.create();
         
         const regularFontName = 'DejaVuSans.ttf';
-        const boldFontName = 'DejaVuSans-Bold.ttf';
+        const boldFontName = 'DejaVuSans-Bold.ttf'; // Corrected name
+        // In Next.js, process.cwd() usually points to the project root.
+        // public/ directory is served statically but files within can be accessed by server-side code using fs.
         const fontsDir = path.join(process.cwd(), 'public', 'fonts');
 
+        // --- Load Regular Font ---
         const regularFontPath = path.join(fontsDir, regularFontName);
-        debugLogger.log(`[PDF Gen] Attempting to load regular font from: ${regularFontPath}`);
-        let regularFontBytes;
+        debugLogger.log(`[PDF Gen] Attempting to load regular font from absolute path: ${regularFontPath}`);
+        
         if (!fs.existsSync(regularFontPath)) {
-            logger.error(`[PDF Gen] CRITICAL: Regular font file NOT FOUND at ${regularFontPath}.`);
-            return { success: false, error: `Core font file (${regularFontName}) for PDF generation is missing on the server. Path checked: ${regularFontPath}` };
+            logger.error(`[PDF Gen] CRITICAL: Regular font file NOT FOUND at specified path: ${regularFontPath}. process.cwd() is: ${process.cwd()}`);
+            return { success: false, error: `Core font file (${regularFontName}) for PDF generation is missing on the server. Please check server logs for the exact path.` };
         }
+        
+        let regularFontBytes;
         try {
-            regularFontBytes = fs.readFileSync(regularFontPath);
+            regularFontBytes = fs.readFileSync(regularFontPath); // Reads as Buffer by default
+            debugLogger.log(`[PDF Gen] Successfully read regular font file '${regularFontName}'. Size: ${regularFontBytes.byteLength} bytes.`);
         } catch (fontError: any) {
-            logger.error(`[PDF Gen] CRITICAL: Failed to READ regular font file '${regularFontName}' at ${regularFontPath}. Error: ${fontError.message}`);
-            return { success: false, error: `Failed to read core font file (${regularFontName}) for PDF generation. Please contact support.` };
+            logger.error(`[PDF Gen] CRITICAL: Failed to READ regular font file '${regularFontName}' from ${regularFontPath}. Error: ${fontError.message}`);
+            return { success: false, error: `Failed to read core font file (${regularFontName}). Ensure it's not corrupted and server has permissions.` };
         }
         
         const customFont = await pdfDoc.embedFont(regularFontBytes, { subset: true });
-        debugLogger.log(`[PDF Gen] Regular font '${regularFontName}' loaded and embedded successfully.`);
+        debugLogger.log(`[PDF Gen] Regular font '${regularFontName}' embedded successfully into PDF.`);
         
+        // --- Load Bold Font ---
         let customBoldFont: PDFFont;
-        const boldFontPath = path.join(fontsDir, boldFontName);
-        debugLogger.log(`[PDF Gen] Attempting to load bold font from: ${boldFontPath}`);
+        const boldFontPath = path.join(fontsDir, boldFontName); // Uses corrected boldFontName
+        debugLogger.log(`[PDF Gen] Attempting to load bold font from absolute path: ${boldFontPath}`);
+
         if (!fs.existsSync(boldFontPath)) {
-            logger.warn(`[PDF Gen] Warning: Bold font file NOT FOUND at ${boldFontPath}. Falling back to regular font for bold text.`);
+            logger.warn(`[PDF Gen] Warning: Bold font file '${boldFontName}' NOT FOUND at ${boldFontPath}. Falling back to regular font for bold text.`);
             customBoldFont = customFont; 
         } else {
             try {
                 const boldFontBytes = fs.readFileSync(boldFontPath);
+                debugLogger.log(`[PDF Gen] Successfully read bold font file '${boldFontName}'. Size: ${boldFontBytes.byteLength} bytes.`);
                 customBoldFont = await pdfDoc.embedFont(boldFontBytes, { subset: true });
-                debugLogger.log(`[PDF Gen] Bold font '${boldFontName}' loaded and embedded successfully.`);
+                debugLogger.log(`[PDF Gen] Bold font '${boldFontName}' embedded successfully into PDF.`);
             } catch (fontError: any) {
-                logger.warn(`[PDF Gen] Warning: Failed to READ bold font file '${boldFontName}' at ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
+                logger.warn(`[PDF Gen] Warning: Failed to READ bold font file '${boldFontName}' from ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
                 customBoldFont = customFont; // Fallback to regular font
             }
         }
 
-
+        // --- Create PDF Document ---
         let page = pdfDoc.addPage(PageSizes.A4);
         const { width, height } = page.getSize();
         
