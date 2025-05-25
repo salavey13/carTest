@@ -110,13 +110,14 @@ export async function generatePdfFromMarkdownAndSend(
         const regularFontName = 'DejaVuSans.ttf';
         const boldFontName = 'DejaVuSans-Bold.ttf';
         const currentWorkingDirectory = process.cwd();
-        const fontsDir = path.join(currentWorkingDirectory, 'public', 'fonts');
+        // Adjusted path to 'server-assets/fonts'
+        const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
 
         debugLogger.log(`[PDF Gen] Current working directory (process.cwd()): ${currentWorkingDirectory}`);
         debugLogger.log(`[PDF Gen] Attempting to access fonts directory at absolute path: ${fontsDir}`);
 
         if (!fs.existsSync(fontsDir)) {
-            logger.error(`[PDF Gen] CRITICAL: Fonts directory NOT FOUND at specified path: ${fontsDir}. This means the 'public/fonts' directory is not accessible or does not exist at this location in the server environment.`);
+            logger.error(`[PDF Gen] CRITICAL: Fonts directory NOT FOUND at specified path: ${fontsDir}. This means the 'server-assets/fonts' directory is not accessible or does not exist at this location in the server environment.`);
             return { success: false, error: `Core fonts directory missing on server. Expected at: ${fontsDir}. Please check server deployment and logs.` };
         } else {
             debugLogger.log(`[PDF Gen] Fonts directory found at: ${fontsDir}. Attempting to list contents...`);
