@@ -4,8 +4,8 @@ import { sendTelegramDocument } from '@/app/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import { PDFDocument, StandardFonts, rgb, PageSizes, PDFFont, PDFFontType } from 'pdf-lib';
-import fs from 'fs'; // Import fs for reading font file
-import path from 'path'; // Import path for constructing file path
+import fs from 'fs'; 
+import path from 'path'; 
 
 // Helper to draw wrapped text in PDF, considering basic Markdown
 async function drawMarkdownWrappedText(
@@ -72,8 +72,7 @@ async function drawMarkdownWrappedText(
                 }
             } catch (e: any) {
                 logger.warn(`[PDF Gen] Skipping character/word due to font error: "${word}" in segment "${testSegment}". Error: ${e.message}`);
-                // Attempt to replace problematic characters or skip word - basic example:
-                currentLineSegment = currentLineSegment.replace(/[^\x00-\x7F]/g, "?"); // Replace non-ASCII with ?
+                currentLineSegment = currentLineSegment.replace(/[^\x00-\x7F]/g, "?"); 
             }
         }
         if (currentLineSegment && currentY >= margin) {
@@ -108,27 +107,44 @@ export async function generatePdfFromMarkdownAndSend(
     try {
         const pdfDoc = await PDFDocument.create();
         
-        // --- Load custom font that supports Cyrillic (DejaVuSans) ---
-        const regularFontPath = path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf');
+        const regularFontName = 'DejaVuSans.ttf';
+        const boldFontName = 'DejaVuSans-Bold.ttf';
+        const fontsDir = path.join(process.cwd(), 'public', 'fonts');
+
+        const regularFontPath = path.join(fontsDir, regularFontName);
+        debugLogger.log(`[PDF Gen] Attempting to load regular font from: ${regularFontPath}`);
         let regularFontBytes;
+        if (!fs.existsSync(regularFontPath)) {
+            logger.error(`[PDF Gen] CRITICAL: Regular font file NOT FOUND at ${regularFontPath}.`);
+            return { success: false, error: `Core font file (${regularFontName}) for PDF generation is missing on the server. Path checked: ${regularFontPath}` };
+        }
         try {
             regularFontBytes = fs.readFileSync(regularFontPath);
         } catch (fontError: any) {
-            logger.error(`[PDF Gen] CRITICAL: Failed to load regular font file 'DejaVuSans.ttf' at ${regularFontPath}. Error: ${fontError.message}`);
-            return { success: false, error: "Core font file (DejaVuSans.ttf) for PDF generation is missing or unreadable on the server. Please contact support." };
+            logger.error(`[PDF Gen] CRITICAL: Failed to READ regular font file '${regularFontName}' at ${regularFontPath}. Error: ${fontError.message}`);
+            return { success: false, error: `Failed to read core font file (${regularFontName}) for PDF generation. Please contact support.` };
         }
         
         const customFont = await pdfDoc.embedFont(regularFontBytes, { subset: true });
+        debugLogger.log(`[PDF Gen] Regular font '${regularFontName}' loaded and embedded successfully.`);
         
         let customBoldFont: PDFFont;
-        const boldFontPath = path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans-Bold.ttf');
-        try {
-            const boldFontBytes = fs.readFileSync(boldFontPath);
-            customBoldFont = await pdfDoc.embedFont(boldFontBytes, { subset: true });
-        } catch (fontError: any) {
-            logger.warn(`[PDF Gen] Warning: Failed to load bold font file 'DejaVuSans-Bold.ttf' at ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
-            customBoldFont = customFont; // Fallback to regular font
+        const boldFontPath = path.join(fontsDir, boldFontName);
+        debugLogger.log(`[PDF Gen] Attempting to load bold font from: ${boldFontPath}`);
+        if (!fs.existsSync(boldFontPath)) {
+            logger.warn(`[PDF Gen] Warning: Bold font file NOT FOUND at ${boldFontPath}. Falling back to regular font for bold text.`);
+            customBoldFont = customFont; 
+        } else {
+            try {
+                const boldFontBytes = fs.readFileSync(boldFontPath);
+                customBoldFont = await pdfDoc.embedFont(boldFontBytes, { subset: true });
+                debugLogger.log(`[PDF Gen] Bold font '${boldFontName}' loaded and embedded successfully.`);
+            } catch (fontError: any) {
+                logger.warn(`[PDF Gen] Warning: Failed to READ bold font file '${boldFontName}' at ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
+                customBoldFont = customFont; // Fallback to regular font
+            }
         }
+
 
         let page = pdfDoc.addPage(PageSizes.A4);
         const { width, height } = page.getSize();
@@ -137,9 +153,7 @@ export async function generatePdfFromMarkdownAndSend(
         const lineHeight = 14;
         let currentY = height - margin;
 
-        // Sanitize filename for title - keep more characters than before, but still protect PDF metadata
         const sanitizedTitleFileName = originalFileName.replace(/[^\w\s\d.,!?"'%*()\-+=\[\]{};:@#~$&\/\\]/g, "_");
-
 
         page.drawText(`AI Analysis Report: ${sanitizedTitleFileName}`, {
             x: margin,
@@ -189,7 +203,7 @@ export async function generatePdfFromMarkdownAndSend(
         const pdfBytes = await pdfDoc.save();
         debugLogger.log(`[Markdown to PDF Action] PDF generated from Markdown. Size: ${pdfBytes.byteLength} bytes.`);
 
-        const pdfFileName = `AI_Report_${originalFileName.replace(/[^\w\d_.-]/g, "_").replace(/\.\w+$/, "")}.pdf`; // Sanitize filename further for filesystem/telegram
+        const pdfFileName = `AI_Report_${originalFileName.replace(/[^\w\d_.-]/g, "_").replace(/\.\w+$/, "")}.pdf`;
         
         const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName);
 
@@ -203,7 +217,7 @@ export async function generatePdfFromMarkdownAndSend(
 
     } catch (error) {
         logger.error('[Markdown to PDF Action] Critical error during PDF generation or sending:', error);
-        const errorMsg = error instanceof Error ? error.message : 'An unexpected server error occurred.';
+        const errorMsg = error instanceof Error ? error.message : 'An unexpected server error occurred during PDF processing.';
         return { success: false, error: errorMsg };
     }
 }
