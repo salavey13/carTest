@@ -63,7 +63,7 @@ const allPages: PageInfo[] = [
   { path: "/ai-work-future", name: "AI & Future of Work", icon: "FaNetworkWired", group: "Content & Tools", color: "cyan" },
   { path: "/advice", name: "Advice Archive", icon: "FaRegLightbulb", group: "Content & Tools", color: "orange" },
   { path: "/expmind", name: "Experimental Mindset", icon: "FaBrain", group: "Content & Tools", color: "pink" },
-  { path: "/veritasium", name: "Veritasium Insights", icon: "FaBookAtlas", group: "Content & Tools", color: "cyan", isImportant: true, isHot: true }, // Added Veritasium Page
+  { path: "/veritasium", name: "Veritasium Insights", icon: "FaBookAtlas", group: "Content & Tools", color: "cyan", isImportant: true, isHot: true },
   { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "gray" },
   { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "gray" },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green"},
@@ -102,6 +102,17 @@ const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
     "Admin Zone": "FaShieldHalved",
 };
 
+const groupIconColors: Record<string, string> = {
+  "Vibe HQ": "text-brand-yellow",
+  "Core Vibe": "text-brand-cyan",
+  "GTA Vibe Missions": "text-brand-pink",
+  "CyberFitness": "text-neon-lime",
+  "Content & Tools": "text-brand-orange",
+  "Misc": "text-muted-foreground",
+  "Admin Zone": "text-destructive",
+};
+
+
 const translations: Record<string, Record<string, string>> = {
   en: {
     "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "Leads HQ": "Leads HQ", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", "CyberVibe Upgrade": "CyberVibe Upgrade",
@@ -132,6 +143,7 @@ const colorVarMap: Record<string, string> = {
   lime: "var(--neon-lime-rgb)", green: "var(--brand-green-rgb)", pink: "var(--brand-pink-rgb)",
   cyan: "var(--brand-cyan-rgb)", red: "var(--red-500-rgb)", orange: "var(--brand-orange-rgb)",
   gray: "var(--gray-500-rgb)", 
+  default: "var(--gray-500-rgb)",
 };
 
 const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
@@ -147,6 +159,38 @@ const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> 
   gray: "border-muted/70 hover:border-muted text-muted-foreground", 
   default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" 
 };
+
+const gridContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const tileItemVariants = {
+  hidden: { y: 10, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 12,
+    },
+  },
+};
+
+const MotionLink = motion(Link);
+
+const RenderIconFromPage = React.memo(({ icon, className }: { icon?: string; className?: string }) => {
+  if (!icon) return null;
+  return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
+});
+RenderIconFromPage.displayName = "RenderIconFromPage";
+
 
 export default function Header() {
   const { isAdmin, user, dbUser, isLoading: appContextLoading } = useAppContext(); 
@@ -277,10 +321,6 @@ export default function Header() {
   useEffect(() => { if (isNavOpen) { setSearchTerm(""); } }, [pathname, isNavOpen]); 
   useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
-  const RenderIconFromPage = ({ icon, className }: { icon?: string; className?: string }) => {
-    if (!icon) return null;
-    return <VibeContentRenderer content={`::${icon}::`} className={className || ''} />;
-  };
 
   return (
     <>
@@ -333,9 +373,9 @@ export default function Header() {
           <motion.div
             key="nav-overlay"
             initial={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
-            animate={{ opacity: 1, clipPath: 'circle(150% at calc(100% - 3rem) 3rem)' }}
+            animate={{ opacity: 1, clipPath: 'circle(150vmax at calc(100% - 3rem) 3rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
-            transition={{ type: "tween", ease: "easeOut", duration: 0.3 }}
+            transition={{ type: "tween", ease: "easeOut", duration: 0.4 }} // slightly longer for clipPath
             className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-16 md:pt-20 pb-10 px-4 simple-scrollbar max-h-[85vh] sm:max-h-screen" 
           >
             <button
@@ -363,32 +403,34 @@ export default function Header() {
                   
                   const groupIconKey = groupIcons[groupName] as keyof typeof Fa6Icons | undefined;
                   const IconComponent = groupIconKey ? Fa6Icons[groupIconKey] : null;
-                  const isGtaVibeGroup = groupName === "GTA Vibe Missions";
-                  const isVibeHQGroup = groupName === "Vibe HQ";
 
                   return (
                     <div key={groupName}>
                        <h3 className={cn(
                         "text-lg sm:text-xl font-orbitron mb-2 sm:mb-3 flex items-center gap-x-2 sm:gap-x-2.5 justify-center py-1.5 sm:py-2",
-                        "gta-vibe-text-effect"
+                        "gta-vibe-text-effect",
+                        groupIconColors[groupName] || "text-brand-purple" // Default color for group title text if not specified
                         )}>
                         {IconComponent && (
-                          <IconComponent className={cn("w-5 h-5 sm:w-6 h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
+                          <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
                         )}
                         <span>{t(groupName)}</span>
-                        {IconComponent && (isGtaVibeGroup || isVibeHQGroup) && ( 
-                           <IconComponent className={cn("w-5 h-5 sm:w-6 h-6 gta-icon-fix", tileColorClasses[isGtaVibeGroup ? 'pink' : (isVibeHQGroup ? 'yellow' : 'purple')]?.text || 'text-brand-cyan')} />
+                        {IconComponent && (groupName === "GTA Vibe Missions" || groupName === "Vibe HQ") && ( 
+                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
                         )}
                       </h3>
-                      <div className={cn(
-                        "grid gap-1.5 sm:gap-2 md:gap-2.5",
-                        "grid-cols-2", // Base for smallest screens
-                        "sm:grid-cols-2", // Small screens
-                        "md:grid-cols-3", // Medium screens
-                        "lg:grid-cols-4", // Large screens
-                        "xl:grid-cols-5", // Extra large screens
-                        "2xl:grid-cols-6"  // 2XL screens
-                      )}>
+                      <motion.div
+                        className={cn(
+                          "grid gap-1.5 sm:gap-2 md:gap-2.5",
+                          "grid-cols-3",      // Base for smallest screens (3 tiles)
+                          "md:grid-cols-4",   // Medium screens (4 tiles)
+                          "lg:grid-cols-5",   // Large screens (5 tiles)
+                          "xl:grid-cols-6"    // Extra large screens (6 tiles)
+                        )}
+                        variants={gridContainerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
                         {pagesInGroup.map((page) => {
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
@@ -396,14 +438,15 @@ export default function Header() {
                           const tileShadow = rgbVar ? `hover:shadow-[0_0_12px_2px_rgba(${rgbVar},0.4)]` : 'hover:shadow-xl';
                           
                           return (
-                            <Link
+                            <MotionLink
                               key={page.path} href={page.path}
                               onClick={() => setIsNavOpen(false)}
+                              variants={tileItemVariants}
                               className={cn(
                                 "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.02] hover:-translate-y-0.5 shadow-md hover:shadow-lg",
                                 "p-1 sm:p-1.5", 
                                 page.isImportant 
-                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 sm:col-span-2 shadow-lg hover:shadow-xl" // Important takes more space on sm+
+                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 sm:col-span-2 shadow-lg hover:shadow-xl" 
                                   : "bg-dark-card/70 hover:bg-dark-card/90 col-span-1",
                                 tileBaseColorClass, 
                                 tileShadow, 
@@ -430,8 +473,8 @@ export default function Header() {
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-[0.75rem] sm:text-[0.85rem] md:text-base" 
-                                    : "text-light-text/90 group-hover:text-white text-[0.65rem] sm:text-xs md:text-sm" 
+                                    ? "text-white text-[0.7rem] sm:text-[0.8rem] md:text-[0.85rem]" // Adjusted sizes for denser grid
+                                    : "text-light-text/90 group-hover:text-white text-[0.6rem] sm:text-[0.7rem] md:text-xs" // Adjusted sizes
                               )}>
                                 {page.translatedName}
                               </span>
@@ -440,10 +483,10 @@ export default function Header() {
                                   ADMIN
                                 </span>
                               )}
-                            </Link>
+                            </MotionLink>
                           );
                         })}
-                      </div>
+                      </motion.div>
                       {groupOrder.indexOf(groupName) < groupOrder.length -1 && Object.values(groupedAndFilteredPages).filter(g => g && g.length > 0).indexOf(pagesInGroup) < Object.values(groupedAndFilteredPages).filter(g => g && g.length > 0).length -1 && (
                         <hr className="my-3 sm:my-4 border-gray-700/50"/>
                       )}
