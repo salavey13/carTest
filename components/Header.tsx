@@ -375,8 +375,8 @@ export default function Header() {
             initial={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
             animate={{ opacity: 1, clipPath: 'circle(150vmax at calc(100% - 3rem) 3rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
-            transition={{ type: "tween", ease: "easeOut", duration: 0.4 }} // slightly longer for clipPath
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-16 md:pt-20 pb-10 px-4 simple-scrollbar max-h-[85vh] sm:max-h-screen" 
+            transition={{ type: "tween", ease: "easeOut", duration: 0.4 }}
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-20 md:pt-24 pb-10 px-4 simple-scrollbar max-h-[85vh] sm:max-h-screen" 
           >
             <button
               onClick={() => setIsNavOpen(false)}
@@ -409,7 +409,7 @@ export default function Header() {
                        <h3 className={cn(
                         "text-lg sm:text-xl font-orbitron mb-2 sm:mb-3 flex items-center gap-x-2 sm:gap-x-2.5 justify-center py-1.5 sm:py-2",
                         "gta-vibe-text-effect",
-                        groupIconColors[groupName] || "text-brand-purple" // Default color for group title text if not specified
+                        groupIconColors[groupName] || "text-brand-purple" 
                         )}>
                         {IconComponent && (
                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
@@ -422,10 +422,10 @@ export default function Header() {
                       <motion.div
                         className={cn(
                           "grid gap-1.5 sm:gap-2 md:gap-2.5",
-                          "grid-cols-3",      // Base for smallest screens (3 tiles)
-                          "md:grid-cols-4",   // Medium screens (4 tiles)
-                          "lg:grid-cols-5",   // Large screens (5 tiles)
-                          "xl:grid-cols-6"    // Extra large screens (6 tiles)
+                          "grid-cols-3",      
+                          "md:grid-cols-4",   
+                          "lg:grid-cols-5",   
+                          "xl:grid-cols-6"    
                         )}
                         variants={gridContainerVariants}
                         initial="hidden"
@@ -473,8 +473,8 @@ export default function Header() {
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-[0.7rem] sm:text-[0.8rem] md:text-[0.85rem]" // Adjusted sizes for denser grid
-                                    : "text-light-text/90 group-hover:text-white text-[0.6rem] sm:text-[0.7rem] md:text-xs" // Adjusted sizes
+                                    ? "text-white text-[0.7rem] sm:text-[0.8rem] md:text-[0.85rem]" 
+                                    : "text-light-text/90 group-hover:text-white text-[0.6rem] sm:text-[0.7rem] md:text-xs" 
                               )}>
                                 {page.translatedName}
                               </span>
