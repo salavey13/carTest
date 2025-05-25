@@ -20,10 +20,21 @@ const nextConfig = {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
-    // Removed outputFileTracingIncludes for 'server-assets' as custom fonts (requiring those assets) are no longer used.
-    // outputFileTracingIncludes: {
-    //   '/': ['server-assets/**/*'], 
-    // },
+    // Ensure that 'server-assets' directory, containing fonts for PDF generation, is included in the serverless bundle.
+    outputFileTracingIncludes: {
+      '/': ['server-assets/**/*'], 
+    },
+  },
+  webpack: (config, { isServer }) => {
+    // Only apply this to server-side bundles
+    if (isServer) {
+      config.externals = config.externals || [];
+      // Mark pdf-lib and @pdf-lib/fontkit as external modules
+      // This prevents webpack from bundling them, forcing Node.js to resolve them from node_modules at runtime.
+      // This often solves issues with global state or native bindings in serverless environments.
+      config.externals.push('pdf-lib', '@pdf-lib/fontkit');
+    }
+    return config;
   },
 }
 

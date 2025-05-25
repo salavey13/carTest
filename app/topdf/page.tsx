@@ -89,10 +89,10 @@ const translations: Record<string, Record<string, string>> = {
     "promptCopyError": "Не удалось скопировать промпт. Скопируйте вручную.",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
-    "status": "Статус",
+    "status": "Status",
     "readyForUpload": "Готово к загрузке XLSX.",
     "readyForGemini": "Готово для Gemini AI. Промпт сгенерирован.",
-    "readyForPdf": "Готово к генерации PDF из Markdown.",
+    "readyForPdf": "Готово к генерации PDF.",
     "toggleLanguage": "Переключить язык",
     "manualCopyPrompt": "Область для ручного копирования (если авто-копирование не удалось):",
     "step3Title": "Шаг 3: Создать PDF",
@@ -305,7 +305,13 @@ ${csvDataString.substring(0, 25000)}
                                 <VibeContentRenderer content="::FaCheckCircle::" className="mr-2"/>{t("promptGenerated")}
                             </p>
                              <label htmlFor="geminiPrompt" className="text-xs text-gray-400 block mb-1">{t("manualCopyPrompt")}</label>
-                             <textarea id="geminiPrompt" readOnly value={generatedPrompt} rows={7} className="w-full p-2.5 text-xs bg-slate-900/70 border border-slate-700 rounded-md text-gray-300 simple-scrollbar shadow-sm"/>
+                             <textarea
+                                id="geminiPrompt"
+                                readOnly
+                                value={generatedPrompt}
+                                rows={7}
+                                className="w-full p-2.5 text-xs bg-slate-900/70 border border-slate-700 rounded-md text-gray-300 simple-scrollbar shadow-sm"
+                            />
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <Button onClick={() => handleCopyToClipboard(generatedPrompt, 'promptCopySuccess')} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-sm">
                                     {/* Using VibeContentRenderer */}

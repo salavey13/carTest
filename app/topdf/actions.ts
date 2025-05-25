@@ -3,33 +3,39 @@
 import { sendTelegramDocument } from '@/app/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
-// Use direct import for PDFDocument and related types/constants from pdf-lib
-// Removed fontkit import as we are now using standard fonts
+// Use standard ESM imports now that pdf-lib and fontkit are externalized in webpack config.
 import { PDFDocument, StandardFonts, rgb, PageSizes, PDFFont } from 'pdf-lib';
 import fs from 'fs'; 
 import path from 'path'; 
+import fontkit from '@pdf-lib/fontkit'; 
 
-// Helper to draw wrapped text in PDF, considering basic Markdown
+// Register fontkit globally when the module is loaded.
+// This is safe now that pdf-lib and fontkit are externalized in webpack config,
+// preventing bundling issues that caused `registerFontkit is not a function`.
+PDFDocument.registerFontkit(fontkit);
+debugLogger.log("[PDF Gen] fontkit registered with PDFDocument globally via externalization.");
+
+// Helper function definitions remain the same.
 async function drawMarkdownWrappedText(
-    page: /* import('pdf-lib').PDFPage */ any, 
+    page: any,
     text: string,
     x: number,
     y: number,
     maxWidth: number,
     lineHeight: number,
-    baseFont: PDFFont, // Use PDFFont type as it's compatible with embedded standard fonts
-    boldFont: PDFFont, // Use PDFFont type
+    baseFont: PDFFont, 
+    boldFont: PDFFont, 
     baseFontSize: number,
     color = rgb(0, 0, 0)
 ): Promise<number> {
     const lines = text.split('\n');
     let currentY = y;
-    // const margin = 50; // margin is already defined globally
+    const margin = 50; 
 
     for (const line of lines) {
-        if (currentY < margin) { 
-             debugLogger.warn("[PDF Gen] Content overflowing page, stopping text draw for this line.");
-             break; 
+        if (currentY < margin) {
+            debugLogger.warn("[PDF Gen] Content overflowing page, stopping text draw for this line.");
+            break;
         }
 
         let effectiveFont = baseFont;
@@ -51,11 +57,11 @@ async function drawMarkdownWrappedText(
             lineToDraw = line.substring(2);
         } else if (line.startsWith('* ') || line.startsWith('- ')) {
             lineToDraw = `• ${line.substring(2)}`;
-            currentX += 10; 
-        } else if (line.match(/^(\s*)\* /) || line.match(/^(\s*)- /)) { 
+            currentX += 10;
+        } else if (line.match(/^(\s*)\* /) || line.match(/^(\s*)- /)) {
             const indentMatch = line.match(/^(\s*)/);
             const indent = indentMatch ? indentMatch[0].length : 0;
-            currentX += 10 + (indent * 5); 
+            currentX += 10 + (indent * 5);
             lineToDraw = `• ${line.replace(/^(\s*)[\*-] /, '')}`;
         }
 
@@ -67,32 +73,31 @@ async function drawMarkdownWrappedText(
                 const textWidth = effectiveFont.widthOfTextAtSize(testSegment, effectiveSize);
                 if (currentX + textWidth > maxWidth && currentLineSegment) {
                     page.drawText(currentLineSegment, { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
-                    currentY -= lineHeight * (effectiveSize / baseFontSize); 
+                    currentY -= lineHeight * (effectiveSize / baseFontSize);
                     currentLineSegment = word;
-                    if (currentY < margin) break; 
+                    if (currentY < margin) break;
                 } else {
                     currentLineSegment = testSegment;
                 }
             } catch (e: any) {
-                // With standard fonts, this error should be very rare unless text contains non-ASCII characters not covered by the font subset.
-                logger.warn(`[PDF Gen] Skipping character/word due to font error (standard font): "${word}" in segment "${testSegment}". Error: ${e.message}`);
-                currentLineSegment = currentLineSegment.replace(/[^\x00-\x7F]/g, "?"); // Replace problematic chars
+                logger.warn(`[PDF Gen] Skipping character/word due to font error: "${word}" in segment "${testSegment}". Error: ${e.message}`);
+                currentLineSegment = currentLineSegment.replace(/[^\x00-\x7F]/g, "?"); 
             }
         }
         if (currentLineSegment && currentY >= margin) {
-             try {
+            try {
                 page.drawText(currentLineSegment, { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
-             } catch (e: any) {
-                 logger.warn(`[PDF Gen] Skipping final line segment due to font error (standard font): "${currentLineSegment}". Error: ${e.message}`);
-                 page.drawText(currentLineSegment.replace(/[^\x00-\x7F]/g, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
-             }
+            } catch (e: any) {
+                logger.warn(`[PDF Gen] Skipping final line segment due to font error: "${currentLineSegment}". Error: ${e.message}`);
+                page.drawText(currentLineSegment.replace(/[^\x00-\x7F]/g, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
+            }
             currentY -= lineHeight * (effectiveSize / baseFontSize);
         }
         if (currentY < margin) break;
     }
     return currentY;
 }
-const margin = 50; 
+const margin = 50;
 
 export async function generatePdfFromMarkdownAndSend(
     markdownContent: string,
@@ -110,20 +115,73 @@ export async function generatePdfFromMarkdownAndSend(
 
     try {
         const pdfDoc = await PDFDocument.create();
+
+        // Use DejaVuSans fonts for Cyrillic support
+        const regularFontName = 'DejaVuSans.ttf';
+        const boldFontName = 'DejaVuSans-Bold.ttf';
+        const currentWorkingDirectory = process.cwd();
+        // The 'server-assets/fonts' directory needs to be explicitly included in Next.js config for bundling
+        const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
+
+        debugLogger.log(`[PDF Gen] Current working directory (process.cwd()): ${currentWorkingDirectory}`);
+        debugLogger.log(`[PDF Gen] Attempting to access fonts directory at absolute path: ${fontsDir}`);
+
+        if (!fs.existsSync(fontsDir)) {
+            logger.error(`[PDF Gen] CRITICAL: Fonts directory NOT FOUND at specified path: ${fontsDir}. This means the 'server-assets/fonts' directory is not accessible or does not exist at this location in the server environment.`);
+            return { success: false, error: `Core fonts directory missing on server. Expected at: ${fontsDir}. Please check server deployment and logs.` };
+        } else {
+            debugLogger.log(`[PDF Gen] Fonts directory found at: ${fontsDir}. Attempting to list contents...`);
+            try {
+                const filesInFontsDir = fs.readdirSync(fontsDir);
+                debugLogger.log(`[PDF Gen] Files successfully listed in ${fontsDir}: [${filesInFontsDir.join(', ')}]`);
+                if (filesInFontsDir.length === 0) {
+                    logger.warn(`[PDF Gen] Warning: Fonts directory ${fontsDir} is empty.`);
+                }
+            } catch (readDirError: any) {
+                logger.warn(`[PDF Gen] Warning: Could not read contents of fonts directory ${fontsDir}, though the directory itself exists. Error: ${readDirError.message}`);
+            }
+        }
         
-        // Use Standard Fonts directly. No need for fontkit or reading font files.
-        const customFont = await pdfDoc.embedStandardFont(StandardFonts.TimesRoman);
-        debugLogger.log(`[PDF Gen] Standard font '${StandardFonts.TimesRoman}' embedded successfully into PDF.`);
+        // --- Load Regular Font ---
+        const regularFontPath = path.join(fontsDir, regularFontName);
+        debugLogger.log(`[PDF Gen] Attempting to load regular font from absolute path: ${regularFontPath}`);
         
-        const customBoldFont = await pdfDoc.embedStandardFont(StandardFonts.TimesRomanBold);
-        debugLogger.log(`[PDF Gen] Standard bold font '${StandardFonts.TimesRomanBold}' embedded successfully into PDF.`);
+        if (!fs.existsSync(regularFontPath)) {
+            logger.error(`[PDF Gen] CRITICAL: Regular font file '${regularFontName}' NOT FOUND at specified path: ${regularFontPath}.`);
+            return { success: false, error: `Core font file (${regularFontName}) for PDF generation is missing on the server. Path checked: ${regularFontPath}` };
+        }
         
-        // No longer need to check for fontsDir or font files as standard fonts are used.
-        // const currentWorkingDirectory = process.cwd();
-        // const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
-        // if (!fs.existsSync(fontsDir)) { ... } // Removed
-        // let regularFontBytes = fs.readFileSync(regularFontPath); // Removed
-        // const boldFontBytes = fs.readFileSync(boldFontPath); // Removed
+        let regularFontBytes;
+        try {
+            regularFontBytes = fs.readFileSync(regularFontPath);
+            debugLogger.log(`[PDF Gen] Successfully read regular font file '${regularFontName}'. Size: ${regularFontBytes.byteLength} bytes.`);
+        } catch (fontError: any) {
+            logger.error(`[PDF Gen] CRITICAL: Failed to READ regular font file '${regularFontName}' from ${regularFontPath}. Error: ${fontError.message}`);
+            return { success: false, error: `Failed to read core font file (${regularFontName}). Ensure it's not corrupted and server has permissions. Path: ${regularFontPath}` };
+        }
+        
+        const customFont = await pdfDoc.embedFont(regularFontBytes); 
+        debugLogger.log(`[PDF Gen] Custom font '${regularFontName}' embedded successfully into PDF.`);
+        
+        // --- Load Bold Font ---
+        let customBoldFont: PDFFont; 
+        const boldFontPath = path.join(fontsDir, boldFontName);
+        debugLogger.log(`[PDF Gen] Attempting to load bold font from absolute path: ${boldFontPath}`);
+
+        if (!fs.existsSync(boldFontPath)) {
+            logger.warn(`[PDF Gen] Warning: Bold font file '${boldFontName}' NOT FOUND at ${boldFontPath}. Falling back to regular font for bold text.`);
+            customBoldFont = customFont; 
+        } else {
+            try {
+                const boldFontBytes = fs.readFileSync(boldFontPath);
+                debugLogger.log(`[PDF Gen] Successfully read bold font file '${boldFontName}'. Size: ${boldFontBytes.byteLength} bytes.`);
+                customBoldFont = await pdfDoc.embedFont(boldFontBytes); 
+                debugLogger.log(`[PDF Gen] Custom bold font '${boldFontName}' embedded successfully into PDF.`);
+            } catch (fontError: any) {
+                logger.warn(`[PDF Gen] Warning: Failed to READ bold font file '${boldFontName}' from ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
+                customBoldFont = customFont; 
+            }
+        }
 
         // --- Create PDF Document ---
         let page = pdfDoc.addPage(PageSizes.A4);
