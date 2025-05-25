@@ -8,10 +8,9 @@ import fs from 'fs';
 import path from 'path'; 
 import fontkit from '@pdf-lib/fontkit'; 
 
-// Register fontkit globally when the module is loaded.
-// This ensures it's available before any PDFDocument instances attempt to embed custom fonts.
-PDFDocument.registerFontkit(fontkit);
-debugLogger.log("[PDF Gen] fontkit registered with PDFDocument at module level.");
+// Removed global fontkit registration as it was causing issues in certain Next.js/Vercel contexts.
+// PDFDocument.registerFontkit(fontkit);
+// debugLogger.log("[PDF Gen] fontkit registered with PDFDocument at module level.");
 
 // Helper to draw wrapped text in PDF, considering basic Markdown
 async function drawMarkdownWrappedText(
@@ -111,6 +110,11 @@ export async function generatePdfFromMarkdownAndSend(
     }
 
     try {
+        // Register fontkit right before creating the PDFDocument instance
+        // This is the most reliable way to ensure it's available in all Next.js/Vercel contexts.
+        PDFDocument.registerFontkit(fontkit);
+        debugLogger.log("[PDF Gen] fontkit registered with PDFDocument locally before creation.");
+
         const pdfDoc = await PDFDocument.create();
         
         const regularFontName = 'DejaVuSans.ttf';
