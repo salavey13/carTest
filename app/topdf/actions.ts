@@ -6,7 +6,12 @@ import { debugLogger } from '@/lib/debugLogger';
 import { PDFDocument, StandardFonts, rgb, PageSizes, PDFFont, PDFFontType } from 'pdf-lib';
 import fs from 'fs'; 
 import path from 'path'; 
-import fontkit from '@pdf-lib/fontkit'; // Import fontkit
+import fontkit from '@pdf-lib/fontkit'; 
+
+// Register fontkit globally when the module is loaded.
+// This ensures it's available before any PDFDocument instances attempt to embed custom fonts.
+PDFDocument.registerFontkit(fontkit);
+debugLogger.log("[PDF Gen] fontkit registered with PDFDocument at module level.");
 
 // Helper to draw wrapped text in PDF, considering basic Markdown
 async function drawMarkdownWrappedText(
@@ -107,9 +112,6 @@ export async function generatePdfFromMarkdownAndSend(
 
     try {
         const pdfDoc = await PDFDocument.create();
-        // Register fontkit before embedding any custom fonts
-        PDFDocument.registerFontkit(fontkit);
-        debugLogger.log("[PDF Gen] fontkit registered with PDFDocument.");
         
         const regularFontName = 'DejaVuSans.ttf';
         const boldFontName = 'DejaVuSans-Bold.ttf';
