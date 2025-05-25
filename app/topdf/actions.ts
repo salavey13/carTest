@@ -111,7 +111,7 @@ export async function generatePdfFromMarkdownAndSend(
         
         // --- Load custom font that supports Cyrillic ---
         // Ensure this path is correct and the font file is included in your deployment
-        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf');
+        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Comismsh.ttf');
         let customFontBytes;
         try {
             customFontBytes = fs.readFileSync(fontPath);
