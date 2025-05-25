@@ -3,24 +3,30 @@
 import { sendTelegramDocument } from '@/app/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
-// Changed to import the entire pdf-lib module as a namespace
-import * as PDFLib from 'pdf-lib'; 
 import fs from 'fs'; 
 import path from 'path'; 
 import fontkit from '@pdf-lib/fontkit'; 
 
+// Use CommonJS require for pdf-lib to ensure static methods like registerFontkit are available
+// This is a workaround for potential bundling issues with ESM imports in Next.js Server Components.
+const { PDFDocument, rgb, PageSizes, PDFFont, PDFFontType } = require('pdf-lib');
+
+// Register fontkit immediately after PDFDocument is acquired via require
+PDFDocument.registerFontkit(fontkit);
+debugLogger.log("[PDF Gen] fontkit registered with PDFDocument using CommonJS require.");
+
 // Helper to draw wrapped text in PDF, considering basic Markdown
 async function drawMarkdownWrappedText(
-    page: PDFLib.PDFPage,
+    page: /* import('pdf-lib').PDFPage */ any, // Type definition might need adjustment or direct import if this fails
     text: string,
     x: number,
     y: number,
     maxWidth: number,
     lineHeight: number,
-    baseFont: PDFLib.PDFFont,
-    boldFont: PDFLib.PDFFont,
+    baseFont: PDFFont,
+    boldFont: PDFFont,
     baseFontSize: number,
-    color = PDFLib.rgb(0, 0, 0)
+    color = rgb(0, 0, 0)
 ): Promise<number> {
     const lines = text.split('\n');
     let currentY = y;
@@ -107,12 +113,7 @@ export async function generatePdfFromMarkdownAndSend(
     }
 
     try {
-        // Register fontkit right before creating the PDFDocument instance
-        // Using PDFLib.PDFDocument to ensure static method is accessed correctly via namespace
-        PDFLib.PDFDocument.registerFontkit(fontkit);
-        debugLogger.log("[PDF Gen] fontkit registered with PDFDocument locally before creation.");
-
-        const pdfDoc = await PDFLib.PDFDocument.create(); // Use PDFLib.PDFDocument.create()
+        const pdfDoc = await PDFDocument.create();
         
         const regularFontName = 'DejaVuSans.ttf';
         const boldFontName = 'DejaVuSans-Bold.ttf';
@@ -162,7 +163,7 @@ export async function generatePdfFromMarkdownAndSend(
         debugLogger.log(`[PDF Gen] Regular font '${regularFontName}' embedded successfully into PDF.`);
         
         // --- Load Bold Font ---
-        let customBoldFont: PDFLib.PDFFont; // Use PDFLib.PDFFont
+        let customBoldFont: PDFFont;
         const boldFontPath = path.join(fontsDir, boldFontName);
         debugLogger.log(`[PDF Gen] Attempting to load bold font from absolute path: ${boldFontPath}`);
 
@@ -182,7 +183,7 @@ export async function generatePdfFromMarkdownAndSend(
         }
 
         // --- Create PDF Document ---
-        let page = pdfDoc.addPage(PDFLib.PageSizes.A4); // Use PDFLib.PageSizes
+        let page = pdfDoc.addPage(PageSizes.A4);
         const { width, height } = page.getSize();
         
         const baseFontSize = 10;
@@ -196,7 +197,7 @@ export async function generatePdfFromMarkdownAndSend(
             y: currentY,
             font: customBoldFont, 
             size: 16,
-            color: PDFLib.rgb(0.1, 0.1, 0.4) // Use PDFLib.rgb
+            color: rgb(0.1, 0.1, 0.4)
         });
         currentY -= 30;
 
@@ -204,10 +205,10 @@ export async function generatePdfFromMarkdownAndSend(
 
         for (const line of lines) {
             if (currentY < margin + lineHeight) { 
-                page = pdfDoc.addPage(PDFLib.PageSizes.A4);
+                page = pdfDoc.addPage(PageSizes.A4);
                 currentY = height - margin;
                  page.drawText(`AI Analysis Report: ${sanitizedTitleFileName} (cont.)`, {
-                    x: margin, y: currentY, font: customBoldFont, size: 12, color: PDFLib.rgb(0.2,0.2,0.2)
+                    x: margin, y: currentY, font: customBoldFont, size: 12, color: rgb(0.2,0.2,0.2)
                 });
                 currentY -= 20;
             }
@@ -217,7 +218,7 @@ export async function generatePdfFromMarkdownAndSend(
                     start: { x: margin, y: currentY - (lineHeight / 3) },
                     end: { x: width - margin, y: currentY - (lineHeight / 3) },
                     thickness: 1,
-                    color: PDFLib.rgb(0.7, 0.7, 0.7),
+                    color: rgb(0.7, 0.7, 0.7),
                 });
                 currentY -= lineHeight;
             } else {
@@ -231,7 +232,7 @@ export async function generatePdfFromMarkdownAndSend(
                     customFont, 
                     customBoldFont,
                     baseFontSize,
-                    PDFLib.rgb(0.1, 0.1, 0.1)
+                    rgb(0.1, 0.1, 0.1)
                 );
             }
         }
