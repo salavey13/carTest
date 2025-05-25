@@ -12,7 +12,8 @@ import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
-// import VibeContentRenderer from '@/components/VibeContentRenderer'; // VibeContentRenderer import removed from here as per rollback
+// Removed VibeContentRenderer import to comply with rollback request for this page
+// import VibeContentRenderer from '@/components/VibeContentRenderer'; 
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button"; 
 
@@ -284,7 +285,7 @@ ${csvDataString.substring(0, 25000)}
                 <div className={cn("p-5 border-2 border-dashed border-brand-cyan/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'gemini' && "opacity-60 blur-sm pointer-events-none")}>
                     <h2 className="text-xl font-semibold text-brand-cyan mb-4 flex items-center">
                         <FontAwesomeIcon icon={faBrain} className="mr-2 w-5 h-5"/>
-                        {t("step2Title")}
+                        {t("step22Title")}
                     </h2>
                     {generatedPrompt && (
                         <div className="space-y-4">
