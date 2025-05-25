@@ -376,7 +376,7 @@ export default function Header() {
             animate={{ opacity: 1, clipPath: 'circle(150vmax at calc(100% - 3rem) 3rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
             transition={{ type: "tween", ease: "easeOut", duration: 0.4 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-20 md:pt-24 pb-10 px-4 simple-scrollbar max-h-[85vh] sm:max-h-screen" 
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pb-10 px-4 simple-scrollbar" 
           >
             <button
               onClick={() => setIsNavOpen(false)}
@@ -384,7 +384,7 @@ export default function Header() {
               aria-label={t("Close navigation")}
             ><X className="h-5 w-5 sm:h-6 sm:w-6" /></button>
 
-            <div className="container mx-auto max-w-4xl xl:max-w-5xl mt-4 sm:mt-8"> 
+            <div className="container mx-auto max-w-4xl xl:max-w-5xl pt-16 md:pt-20"> 
               <div className="relative mb-4 sm:mb-6">
                 <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
