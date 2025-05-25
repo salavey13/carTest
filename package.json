@@ -60,7 +60,7 @@
     "input-otp": "1.4.1",
     "jsonwebtoken": "latest",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.454.0",
+    "lucide-react": "latest",
     "@fortawesome/react-fontawesome": "latest",
     "@fortawesome/free-solid-svg-icons": "latest",
     "@fortawesome/free-brands-svg-icons": "latest",
@@ -89,7 +89,8 @@
     "papaparse": "latest",
     "html-react-parser": "latest",
     "xlsx": "^0.18.5",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "@pdf-lib/fontkit": "^1.0.1"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
