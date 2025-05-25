@@ -6,7 +6,7 @@ import { useAppContext } from '@/contexts/AppContext';
 // import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; 
 // import { 
 //     faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, 
-//     faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, 
+//     faLanguage, faFileExcel, faBrain, faCopy, faPaste, FaGoogle, 
 //     faArrowUpFromBracket, faPaperPlane, faWandMagicSparkles 
 // } from '@fortawesome/free-solid-svg-icons'; 
 import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
@@ -314,7 +314,7 @@ ${csvDataString.substring(0, 25000)}
                                 <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-sm">
                                   <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" >
                                     {/* Using VibeContentRenderer */}
-                                    <VibeContentRenderer content="::FaExternalLinkAlt::" className="mr-2"/>{t("goToGemini")}
+                                    <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToGemini")}
                                   </a>
                                 </Button>
                             </div>
