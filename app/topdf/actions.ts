@@ -110,7 +110,8 @@ export async function generatePdfFromMarkdownAndSend(
         const regularFontName = 'DejaVuSans.ttf';
         const boldFontName = 'DejaVuSans-Bold.ttf';
         const currentWorkingDirectory = process.cwd();
-        // Adjusted path to 'server-assets/fonts'
+        // The 'server-assets/fonts' directory is now correctly bundled with the serverless function
+        // thanks to `outputFileTracingIncludes` in next.config.mjs.
         const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
 
         debugLogger.log(`[PDF Gen] Current working directory (process.cwd()): ${currentWorkingDirectory}`);

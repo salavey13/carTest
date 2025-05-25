@@ -1,194 +1,135 @@
-// /components/VibeContentRenderer.tsx
 "use client";
 
 import React from 'react';
-import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text, Comment } from 'html-react-parser';
+import parse, { HTMLReactParserOptions, Element, attributesToProps, domToReact } from 'html-react-parser';
 import Link from 'next/link';
 import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import { iconNameMap } from '@/lib/iconNameMap'; 
+import { cn } from '@/lib/utils'; // Assuming cn utility is available for class merging
 
-function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
-    return typeof iconName === 'string' && iconName.startsWith('Fa') && iconName in Fa6Icons;
-}
+// Full Icon Name Map (Lowercase or common names to PascalCase from react-icons/fa6)
+// This map helps resolve various text representations to actual Fa6 icon component names.
+const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
+  // General utility
+  faspinner: 'FaSpinner',
+  facheckcircle: 'FaCircleCheck', // faCheckCircle in FA5 is FaCircleCheck in FA6
+  fatriangleexclamation: 'FaTriangleExclamation',
+  falanguage: 'FaLanguage',
+  facopy: 'FaCopy',
+  fapaste: 'FaPaste',
+  faexternallinkalt: 'FaExternalLinkAlt', 
+  faarrowupfrombracket: 'FaArrowUpFromBracket',
+  fapaperplane: 'FaPaperPlane',
 
-function preprocessIconSyntaxInternal(content: string): string {
-    if (!content) return '';
-    // Regex to match ::faIconName attributes:: or ::FaIconName attributes::
-    // It captures the "fa" + "IconName" part, and any attributes.
-    // Uses 'i' flag for case-insensitivity on the icon name itself.
-    return content.replace(
-        /::(fa[a-zA-Z0-9_]+)((?:\s+\w+(?:=(?:(["'])(?:(?!\3).)*\3|\w+)))*)\s*::/gi,
-        (_match, rawIconName, attributesString) => {
-            const lowerIconName = rawIconName.toLowerCase(); // e.g., fausershield
-            
-            // Try to map to PascalCase using iconNameMap first
-            let pascalCaseIconName = iconNameMap[lowerIconName];
-            
-            // If not in map, try to convert rawIconName to PascalCase (e.g., if user typed ::FaUserShield::)
-            if (!pascalCaseIconName) {
-                if (rawIconName.startsWith('Fa')) {
-                    pascalCaseIconName = rawIconName as keyof typeof Fa6Icons;
-                } else if (rawIconName.startsWith('fa')) {
-                    pascalCaseIconName = ('F' + rawIconName.substring(1)) as keyof typeof Fa6Icons; // faUserShield -> FaUserShield
-                }
-            }
-            // Final check if it's a valid icon name
-            if (!isValidFa6Icon(pascalCaseIconName as string)) {
-                 // Fallback: if it's not a known Fa icon even after attempts,
-                 // we might pass the original rawIconName or a standardized PascalCase version.
-                 // For now, construct the tag with the best guess PascalCase.
-                 // The main parser will handle it if it's still not found.
-                 if (!pascalCaseIconName && rawIconName.length > 2) {
-                    pascalCaseIconName = rawIconName.charAt(0).toUpperCase() + rawIconName.slice(1) as keyof typeof Fa6Icons;
-                 } else if (!pascalCaseIconName) {
-                    pascalCaseIconName = rawIconName as keyof typeof Fa6Icons; // keep original if unsure
-                 }
-            }
-            
-            const attrs = attributesString ? attributesString.trim() : '';
-            // Create a tag like <FaUserShield attributes />
-            return `<${pascalCaseIconName}${attrs ? ' ' + attrs : ''}></${pascalCaseIconName}>`;
-        }
-    );
-}
+  // Specific to this page (XLSX, Brain, PDF, WandMagicSparkles)
+  fafileexcel: 'FaFileExcel', 
+  faupload: 'FaUpload',
+  fafilepdf: 'FaFilePdf',
+  fabrain: 'FaBrain',
+  fawandmagicsparkles: 'FaWandMagicSparkles', 
 
-// Function to apply simple markdown conversions
-function applySimpleMarkdown(content: string): string {
-    if (!content) return '';
-    let result = content;
-    result = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    result = result.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    // Note: Be cautious with more complex regex to avoid unclosed tags or invalid HTML
-    return result;
-}
-
-const simplifiedParserOptions: HTMLReactParserOptions = {
-    replace: (domNode) => {
-        if (domNode.type === 'text' || domNode instanceof Text) {
-            return undefined; 
-        }
-
-        if (domNode.type === 'comment' || domNode instanceof Comment) {
-            return <></>;
-        }
-
-        if (domNode instanceof Element && domNode.name) {
-            const nodeName = domNode.name;
-            const lowerCaseName = nodeName.toLowerCase();
-            
-            const mutableAttribs = attributesToProps(domNode.attribs || {});
-            const children = domNode.children && domNode.children.length > 0
-                           ? domToReact(domNode.children, simplifiedParserOptions) 
-                           : null;
-
-            // --- Icon Handling ---
-            let iconToRender: keyof typeof Fa6Icons | undefined = undefined;
-            
-            if (isValidFa6Icon(nodeName)) { 
-                iconToRender = nodeName as keyof typeof Fa6Icons;
-            } else if (iconNameMap[lowerCaseName]) { 
-                const mappedName = iconNameMap[lowerCaseName];
-                if (isValidFa6Icon(mappedName)) {
-                    iconToRender = mappedName;
-                }
-            }
-            
-            if (iconToRender) {
-                const IconComponent = Fa6Icons[iconToRender];
-                const { className, style, title, ...restProps } = mutableAttribs; 
-                const finalProps: Record<string, any> = {
-                    ...restProps, 
-                    className: `${className || ''} inline align-baseline mx-px`.trim(),
-                    style: style,
-                    title: title 
-                };
-                return React.createElement(IconComponent, finalProps); // Icons are self-closing
-            } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) {
-                logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
-                return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?] Неизвестная иконка <${nodeName}>`}</span>;
-            }
-
-            // --- Link Handling ---
-            if (lowerCaseName === 'a') {
-                const hrefVal = mutableAttribs.href;
-                const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
-                
-                let linkClassName = mutableAttribs.className || '';
-                mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); 
-
-                if (isInternal && !mutableAttribs.target && hrefVal) {
-                    return <Link {...mutableAttribs} href={hrefVal as string}>{children}</Link>;
-                }
-                return React.createElement('a', mutableAttribs, children);
-            }
-            
-            // --- Standard HTML Elements Styling & Passing Children ---
-            if (lowerCaseName === 'strong') {
-                mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim();
-            }
-            if (lowerCaseName === 'em') {
-                mutableAttribs.className = `${mutableAttribs.className || ''} italic text-brand-cyan`.trim();
-            }
-            if (lowerCaseName === 'code' && domNode.parent?.name !== 'pre') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted px-1 py-0.5 rounded text-sm font-mono text-accent-foreground`.trim();
-            }
-            if (lowerCaseName === 'pre') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar`.trim();
-            }
-            if (lowerCaseName === 'blockquote') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} border-l-4 border-brand-purple pl-4 italic text-muted-foreground my-4`.trim();
-            }
-            if (lowerCaseName === 'ul') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} list-disc list-inside space-y-1 my-2`.trim();
-            }
-            if (lowerCaseName === 'ol') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} list-decimal list-inside space-y-1 my-2`.trim();
-            }
-            if (lowerCaseName === 'li') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} my-0.5`.trim();
-            }
-            if (lowerCaseName === 'hr') {
-                 mutableAttribs.className = `${mutableAttribs.className || ''} border-border my-4`.trim();
-            }
-
-            return React.createElement(nodeName, mutableAttribs, children);
-        }
-        
-        return undefined; 
-    },
+  // Placeholder/Fallback
+  faquestion: 'FaQuestion',
+  fatools: 'FaToolbox', 
 };
+
+// Helper function to get the icon component by its name
+const getIconComponent = (name: string): React.ComponentType<any> | undefined => {
+  const normalizedName = name.toLowerCase(); 
+  // Try direct lookup in map first
+  if (iconNameMap[normalizedName]) {
+    return Fa6Icons[iconNameMap[normalizedName] as keyof typeof Fa6Icons];
+  }
+
+  // Try PascalCase conversion if not found in map
+  // E.g., 'FaUpload' -> 'FaUpload', 'FaFilePdf' -> 'FaFilePdf'
+  if (Fa6Icons[name as keyof typeof Fa6Icons]) {
+    return Fa6Icons[name as keyof typeof Fa6Icons];
+  }
+  
+  // As a last resort, try removing 'fa' prefix and then PascalCase
+  const trimmedName = name.startsWith('Fa') ? name.substring(2) : name;
+  const pascalCaseName = trimmedName.split(/(?=[A-Z])/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
+  if (Fa6Icons[`Fa${pascalCaseName}` as keyof typeof Fa6Icons]) {
+      return Fa6Icons[`Fa${pascalCaseName}` as keyof typeof Fa6Icons];
+  }
+
+
+  logger.warn(`[VibeContentRenderer] Icon component for "${name}" not found in Fa6Icons or map.`);
+  return undefined; // Icon not found
+};
+
 
 interface VibeContentRendererProps {
   content: string | null | undefined;
-  className?: string; 
+  className?: string;
+  spin?: boolean; // Added spin prop for animation
 }
 
-export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className }) => {
+export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
     if (typeof content !== 'string' || !content.trim()) {
-        return null;
+        return null; // Return null if content is not a valid string
     }
-    try {
-      let processedContent = String(content);
-      processedContent = applySimpleMarkdown(processedContent);
-      processedContent = preprocessIconSyntaxInternal(processedContent);
-      
-      const parsedContent = parse(processedContent, simplifiedParserOptions); 
-      
-      if (className) {
-        return <div className={className}>{parsedContent}</div>;
-      }
-      return <>{parsedContent}</>;
 
-    } catch (error) {
-      logger.error("[VCR Root] Parse Error:", error, "Input for parsing:", content, "Processed HTML:", preprocessIconSyntaxInternal(applySimpleMarkdown(String(content))));
-      const ErrorSpan = () => <span className="text-red-500">[Content Parse Error]</span>;
-      if (className) {
-        return <div className={className}><ErrorSpan /></div>;
-      }
-      return <ErrorSpan />;
-    }
+    const options: HTMLReactParserOptions = {
+        replace: (domNode) => {
+            // Intercept custom icon syntax like "::FaIconName::"
+            if (domNode.type === 'text') {
+                const text = domNode.data || '';
+                const iconRegex = /::(Fa[A-Za-z0-9]+)::/g; // Matches ::FaIconName::
+                const parts: (string | React.ReactNode)[] = [];
+                let lastIndex = 0;
+                let match;
+
+                while ((match = iconRegex.exec(text)) !== null) {
+                    const iconKey = match[1]; // e.g., "FaWandMagicSparkles"
+                    const IconComponent = getIconComponent(iconKey);
+
+                    // Add text before the icon
+                    if (match.index > lastIndex) {
+                        parts.push(text.substring(lastIndex, match.index));
+                    }
+
+                    if (IconComponent) {
+                        // Pass className and spin prop to the icon component
+                        // react-icons doesn't have a `spin` prop directly, so use `animate-spin` Tailwind class
+                        parts.push(
+                            <IconComponent
+                                key={iconKey + match.index} // Unique key for react list
+                                className={cn(className, spin && 'animate-spin')} // Apply animate-spin if `spin` is true
+                            />
+                        );
+                    } else {
+                        logger.warn(`[VibeContentRenderer] Icon component for "${iconKey}" not found. Rendering raw text.`);
+                        parts.push(match[0]); // Render original text if icon not found
+                    }
+                    lastIndex = iconRegex.lastIndex;
+                }
+
+                // Add any remaining text after the last icon
+                if (lastIndex < text.length) {
+                    parts.push(text.substring(lastIndex));
+                }
+                return <>{parts}</>; // Return a fragment with all parts
+            }
+
+            // Handle standard HTML elements like <a> tags for Next.js Link
+            if (domNode.type === 'tag' && domNode.name === 'a') {
+                const props = attributesToProps(domNode.attribs);
+                return (
+                    <Link href={props.href || ''} {...props}>
+                        {domToReact(domNode.children as Element[], options)}
+                    </Link>
+                );
+            }
+            // Standard parsing for other elements
+            return undefined;
+        },
+    };
+
+    return (
+        <div className={cn('vibe-content-renderer', className)}>
+            {parse(content, options)}
+        </div>
+    );
 });
-
-VibeContentRenderer.displayName = 'VibeContentRenderer';
-export default VibeContentRenderer;
