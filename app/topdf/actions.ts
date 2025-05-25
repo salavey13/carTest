@@ -4,21 +4,51 @@ import { sendTelegramDocument } from '@/app/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 
-// Use require for pdf-lib to ensure stable access to static methods
-const pdfLib = require('pdf-lib');
-const { PDFDocument, StandardFonts, rgb, PageSizes } = pdfLib;
-// PDFFont type can be tricky with require; using 'any' for broader compatibility in this context.
+// Use require for pdf-lib and fontkit
+const pdfLibModule = require('pdf-lib');
+const fontkitModule = require('@pdf-lib/fontkit');
+
+// --- PDF LIBRARY DIAGNOSTICS (runs once on cold start) ---
+console.log('--- PDF LIBRARY DIAGNOSTICS START ---');
+try {
+    const pdfLibKeys = Object.keys(pdfLibModule || {});
+    console.log(`[PDF DIAG] Keys of require("pdf-lib") (${pdfLibKeys.length}): ${pdfLibKeys.join(', ')}`);
+    console.log(`[PDF DIAG] typeof require("pdf-lib").registerFontkit (on module itself): typeof ${(pdfLibModule || {}).registerFontkit}`);
+
+    if (pdfLibModule && pdfLibModule.PDFDocument) {
+        const PDFD = pdfLibModule.PDFDocument;
+        console.log('[PDF DIAG] pdfLibModule.PDFDocument IS PRESENT.');
+        const pdfDKeys = Object.keys(PDFD || {});
+        console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument (${pdfDKeys.length}): ${pdfDKeys.join(', ')}`);
+        if (PDFD.prototype) {
+            const protoKeys = Object.keys(PDFD.prototype);
+            console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument.prototype (${protoKeys.length}): ${protoKeys.join(', ')}`);
+        } else {
+            console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype IS NOT PRESENT.');
+        }
+        console.log(`[PDF DIAG] typeof pdfLibModule.PDFDocument.registerFontkit: typeof ${(PDFD || {}).registerFontkit}`);
+    } else {
+        console.log('[PDF DIAG] require("pdf-lib").PDFDocument IS UNDEFINED or NULL.');
+    }
+
+    const fontkitKeys = Object.keys(fontkitModule || {});
+    console.log(`[PDF DIAG] Keys of require("@pdf-lib/fontkit") (${fontkitKeys.length}): ${fontkitKeys.join(', ')}`);
+    console.log(`[PDF DIAG] typeof require("@pdf-lib/fontkit").default: typeof ${(fontkitModule || {}).default}`);
+    console.log(`[PDF DIAG] typeof require("@pdf-lib/fontkit") (module itself): typeof ${fontkitModule}`);
+} catch (e: any) {
+    console.error('[PDF DIAG] Error during initial diagnostics logging:', e.message, e.stack);
+}
+console.log('--- PDF LIBRARY DIAGNOSTICS END ---');
+// --- END DIAGNOSTICS ---
+
+const { StandardFonts, rgb, PageSizes } = pdfLibModule;
+// Note: PDFDocument will be determined dynamically later.
 type PDFFont = any; 
 
-import fs from 'fs';
-import path from 'path';
-import fontkitInstance from '@pdf-lib/fontkit'; // Renamed to avoid potential naming conflicts
-
-// Module-level flag to ensure registration happens only once per server instance lifetime
 let fontkitRegistered = false;
 
 async function drawMarkdownWrappedText(
-    page: any, // Should be PDFPage from pdf-lib
+    page: any, 
     text: string,
     x: number,
     y: number,
@@ -114,171 +144,145 @@ export async function generatePdfFromMarkdownAndSend(
         return { success: false, error: "No Markdown content provided to generate PDF." };
     }
 
+    let PDFDocumentClass: any; // Will hold the actual PDFDocument class
+
     try {
-        // Attempt to register fontkit if not already done in this server instance's lifetime
         if (!fontkitRegistered) {
-            debugLogger.log("[PDF Gen] Attempting to register fontkit with PDFDocument...");
+            debugLogger.log("[PDF Gen] Attempting to register fontkit...");
+            
+            let determinedPDFDocumentClass: any;
+            if (pdfLibModule && pdfLibModule.PDFDocument && typeof pdfLibModule.PDFDocument.registerFontkit === 'function') {
+                determinedPDFDocumentClass = pdfLibModule.PDFDocument;
+                debugLogger.log("[PDF Gen] Using 'pdfLibModule.PDFDocument' as PDFDocument class.");
+            } else if (pdfLibModule && typeof pdfLibModule.registerFontkit === 'function') {
+                // Fallback: pdfLibModule itself might be the PDFDocument class
+                determinedPDFDocumentClass = pdfLibModule;
+                debugLogger.log("[PDF Gen] Using 'pdfLibModule' (direct require result) as PDFDocument class.");
+            } else {
+                logger.error("[PDF Gen] CRITICAL: Could not determine usable PDFDocument class from require('pdf-lib'). 'registerFontkit' method not found on expected objects.");
+                return { success: false, error: "Critical PDF library load error (PDFDocument class with registerFontkit not found)." };
+            }
+
+            const fontkitInstanceToUse = fontkitModule.default || fontkitModule;
+
             try {
-                // Explicitly use the PDFDocument class obtained from the 'pdfLib' require object
-                pdfLib.PDFDocument.registerFontkit(fontkitInstance);
-                fontkitRegistered = true; // Mark as registered for this server instance
-                debugLogger.log("[PDF Gen] fontkit registered with PDFDocument successfully.");
-            } catch (e: any) {
-                logger.error("[PDF Gen] CRITICAL: Failed to register fontkit with PDFDocument.", e);
-                return { 
-                    success: false, 
-                    error: `Critical PDF library setup error (fontkit registration failed: ${e.message}). Please verify server environment or contact support.` 
-                };
+                determinedPDFDocumentClass.registerFontkit(fontkitInstanceToUse);
+                fontkitRegistered = true;
+                PDFDocumentClass = determinedPDFDocumentClass; // Store the successfully used class
+                debugLogger.log("[PDF Gen] fontkit registered successfully.");
+            } catch (registrationError: any) {
+                logger.error("[PDF Gen] CRITICAL: Error during fontkit registration call:", registrationError);
+                return { success: false, error: `PDF library error during fontkit registration: ${registrationError.message}` };
             }
         } else {
-            debugLogger.log("[PDF Gen] fontkit already registered in this server instance.");
+             // If already registered, ensure PDFDocumentClass is set from the module
+            if (pdfLibModule && pdfLibModule.PDFDocument) {
+                PDFDocumentClass = pdfLibModule.PDFDocument;
+            } else if (pdfLibModule && typeof pdfLibModule.registerFontkit === 'function') {
+                 PDFDocumentClass = pdfLibModule;
+            } else {
+                 logger.error("[PDF Gen] CRITICAL: fontkit was marked registered, but PDFDocument class could not be re-determined.");
+                 return { success: false, error: "Critical PDF library inconsistency after fontkit registration." };
+            }
+            debugLogger.log("[PDF Gen] fontkit already registered. Using determined PDFDocumentClass.");
         }
 
-        const pdfDoc = await PDFDocument.create(); // Uses the destructured PDFDocument
+        if (!PDFDocumentClass) {
+             logger.error("[PDF Gen] CRITICAL: PDFDocumentClass is not defined before PDF creation. This should not happen.");
+             return { success: false, error: "Internal error: PDFDocument class not initialized." };
+        }
+
+        const pdfDoc = await PDFDocumentClass.create();
 
         const regularFontName = 'DejaVuSans.ttf';
         const boldFontName = 'DejaVuSans-Bold.ttf';
         const currentWorkingDirectory = process.cwd();
         const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
 
+        // ... (rest of the font loading and PDF generation logic remains the same)
         debugLogger.log(`[PDF Gen] Current working directory (process.cwd()): ${currentWorkingDirectory}`);
         debugLogger.log(`[PDF Gen] Attempting to access fonts directory at absolute path: ${fontsDir}`);
 
         if (!fs.existsSync(fontsDir)) {
             logger.error(`[PDF Gen] CRITICAL: Fonts directory NOT FOUND at specified path: ${fontsDir}.`);
             return { success: false, error: `Core fonts directory missing on server. Expected at: ${fontsDir}.` };
-        } else {
-            debugLogger.log(`[PDF Gen] Fonts directory found at: ${fontsDir}. Attempting to list contents...`);
-            try {
-                const filesInFontsDir = fs.readdirSync(fontsDir);
-                debugLogger.log(`[PDF Gen] Files successfully listed in ${fontsDir}: [${filesInFontsDir.join(', ')}]`);
-                if (filesInFontsDir.length === 0) {
-                    logger.warn(`[PDF Gen] Warning: Fonts directory ${fontsDir} is empty.`);
-                }
-            } catch (readDirError: any) {
-                logger.warn(`[PDF Gen] Warning: Could not read contents of fonts directory ${fontsDir}, though the directory itself exists. Error: ${readDirError.message}`);
-            }
         }
         
         const regularFontPath = path.join(fontsDir, regularFontName);
-        debugLogger.log(`[PDF Gen] Attempting to load regular font from absolute path: ${regularFontPath}`);
-        
         if (!fs.existsSync(regularFontPath)) {
-            logger.error(`[PDF Gen] CRITICAL: Regular font file '${regularFontName}' NOT FOUND at specified path: ${regularFontPath}.`);
-            return { success: false, error: `Core font file (${regularFontName}) for PDF generation is missing on the server. Path checked: ${regularFontPath}` };
+            logger.error(`[PDF Gen] CRITICAL: Regular font file '${regularFontName}' NOT FOUND at: ${regularFontPath}.`);
+            return { success: false, error: `Font file (${regularFontName}) missing. Path: ${regularFontPath}` };
         }
         
-        let regularFontBytes;
-        try {
-            regularFontBytes = fs.readFileSync(regularFontPath);
-            debugLogger.log(`[PDF Gen] Successfully read regular font file '${regularFontName}'. Size: ${regularFontBytes.byteLength} bytes.`);
-        } catch (fontError: any) {
-            logger.error(`[PDF Gen] CRITICAL: Failed to READ regular font file '${regularFontName}' from ${regularFontPath}. Error: ${fontError.message}`);
-            return { success: false, error: `Failed to read core font file (${regularFontName}). Ensure it's not corrupted and server has permissions. Path: ${regularFontPath}` };
-        }
-        
+        const regularFontBytes = fs.readFileSync(regularFontPath);
         const customFont = await pdfDoc.embedFont(regularFontBytes); 
-        debugLogger.log(`[PDF Gen] Custom font '${regularFontName}' embedded successfully into PDF.`);
         
         let customBoldFont: PDFFont; 
         const boldFontPath = path.join(fontsDir, boldFontName);
-        debugLogger.log(`[PDF Gen] Attempting to load bold font from absolute path: ${boldFontPath}`);
-
         if (!fs.existsSync(boldFontPath)) {
-            logger.warn(`[PDF Gen] Warning: Bold font file '${boldFontName}' NOT FOUND at ${boldFontPath}. Falling back to regular font for bold text.`);
             customBoldFont = customFont; 
         } else {
             try {
                 const boldFontBytes = fs.readFileSync(boldFontPath);
-                debugLogger.log(`[PDF Gen] Successfully read bold font file '${boldFontName}'. Size: ${boldFontBytes.byteLength} bytes.`);
                 customBoldFont = await pdfDoc.embedFont(boldFontBytes); 
-                debugLogger.log(`[PDF Gen] Custom bold font '${boldFontName}' embedded successfully into PDF.`);
             } catch (fontError: any) {
-                logger.warn(`[PDF Gen] Warning: Failed to READ bold font file '${boldFontName}' from ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
                 customBoldFont = customFont; 
             }
         }
 
         let page = pdfDoc.addPage(PageSizes.A4);
         const { width, height } = page.getSize();
-        
+        let currentY = height - pageMargins;
         const baseFontSize = 10;
         const lineHeight = 14;
-        let currentY = height - pageMargins;
-
         const sanitizedTitleFileName = originalFileName.replace(/[^\w\s\d.,!?"'%*()\-+=\[\]{};:@#~$&\/\\]/g, "_");
 
         page.drawText(`AI Analysis Report: ${sanitizedTitleFileName}`, {
-            x: pageMargins,
-            y: currentY,
-            font: customBoldFont, 
-            size: 16,
-            color: rgb(0.1, 0.1, 0.4)
+            x: pageMargins, y: currentY, font: customBoldFont, size: 16, color: rgb(0.1, 0.1, 0.4)
         });
         currentY -= 30;
 
         const lines = markdownContent.split('\n');
-
         for (const line of lines) {
             if (currentY < pageMargins + lineHeight) { 
                 page = pdfDoc.addPage(PageSizes.A4);
                 currentY = height - pageMargins;
-                 page.drawText(`AI Analysis Report: ${sanitizedTitleFileName} (cont.)`, {
+                page.drawText(`AI Analysis Report: ${sanitizedTitleFileName} (cont.)`, {
                     x: pageMargins, y: currentY, font: customBoldFont, size: 12, color: rgb(0.2,0.2,0.2)
                 });
                 currentY -= 20;
             }
-
             if (line.trim() === '---' || line.trim() === '***' || line.trim() === '___') {
                 page.drawLine({
                     start: { x: pageMargins, y: currentY - (lineHeight / 3) },
                     end: { x: width - pageMargins, y: currentY - (lineHeight / 3) },
-                    thickness: 1,
-                    color: rgb(0.7, 0.7, 0.7),
+                    thickness: 1, color: rgb(0.7, 0.7, 0.7),
                 });
                 currentY -= lineHeight;
             } else {
                  currentY = await drawMarkdownWrappedText(
-                    page,
-                    line,
-                    pageMargins,
-                    currentY,
-                    width - 2 * pageMargins,
-                    lineHeight,
-                    customFont, 
-                    customBoldFont,
-                    baseFontSize,
-                    rgb(0.1, 0.1, 0.1)
+                    page, line, pageMargins, currentY, width - 2 * pageMargins,
+                    lineHeight, customFont, customBoldFont, baseFontSize, rgb(0.1, 0.1, 0.1)
                 );
             }
         }
 
         const pdfBytes = await pdfDoc.save();
-        debugLogger.log(`[Markdown to PDF Action] PDF generated from Markdown. Size: ${pdfBytes.byteLength} bytes.`);
-
         const pdfFileName = `AI_Report_${originalFileName.replace(/[^\w\d_.-]/g, "_").replace(/\.\w+$/, "")}.pdf`;
-        
         const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName);
 
         if (sendResult.success) {
-            logger.info(`[Markdown to PDF Action] PDF "${pdfFileName}" sent successfully to chat ID ${chatId}.`);
-            return { success: true, message: `PDF report "${pdfFileName}" based on AI analysis has been sent to your Telegram chat.` };
+            return { success: true, message: `PDF report "${pdfFileName}" sent.` };
         } else {
-            logger.error(`[Markdown to PDF Action] Failed to send PDF to Telegram for chat ID ${chatId}: ${sendResult.error}`);
-            return { success: false, error: `Failed to send PDF to Telegram: ${sendResult.error}` };
+            return { success: false, error: `Failed to send PDF: ${sendResult.error}` };
         }
 
     } catch (error: any) {
-        logger.error('[Markdown to PDF Action] Critical error during PDF generation or sending:', error);
-        
+        logger.error('[Markdown to PDF Action] Critical error during PDF generation or sending:', error, error.stack);
         if (error.constructor && error.constructor.name === 'FontkitNotRegisteredError') {
-             return { 
-                 success: false, 
-                 error: `PDF library error: Font system (fontkit) not available when embedding font. Original message: ${error.message}`
-             };
+             return { success: false, error: `PDF library error: Font system (fontkit) not available. Original: ${error.message}` };
         }
-        
-        const errorMsg = error instanceof Error ? error.message : 'An unexpected server error occurred during PDF processing.';
+        const errorMsg = error instanceof Error ? error.message : 'Unexpected server error during PDF processing.';
         return { success: false, error: errorMsg };
     }
 }
