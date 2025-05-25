@@ -5,21 +5,21 @@ import parse, { HTMLReactParserOptions, Element, attributesToProps, domToReact }
 import Link from 'next/link';
 import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import { cn } from '@/lib/utils'; // Assuming cn utility is available for class merging
+import { cn } from '@/lib/utils'; 
 
 // Full Icon Name Map (Lowercase or common names to PascalCase from react-icons/fa6)
 // This map helps resolve various text representations to actual Fa6 icon component names.
 const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   // General utility
   faspinner: 'FaSpinner',
-  facheckcircle: 'FaCircleCheck', // faCheckCircle in FA5 is FaCircleCheck in FA6
+  facheckcircle: 'FaCircleCheck', 
   fatriangleexclamation: 'FaTriangleExclamation',
   falanguage: 'FaLanguage',
   facopy: 'FaCopy',
   fapaste: 'FaPaste',
   faexternallinkalt: 'FaExternalLinkAlt', 
-  faarrowupfrombracket: 'FaArrowUpFromBracket',
   fapaperplane: 'FaPaperPlane',
+  faarrowupfrombracket: 'FaArrowUpFromBracket',
 
   // Specific to this page (XLSX, Brain, PDF, WandMagicSparkles)
   fafileexcel: 'FaFileExcel', 
@@ -42,7 +42,6 @@ const getIconComponent = (name: string): React.ComponentType<any> | undefined =>
   }
 
   // Try PascalCase conversion if not found in map
-  // E.g., 'FaUpload' -> 'FaUpload', 'FaFilePdf' -> 'FaFilePdf'
   if (Fa6Icons[name as keyof typeof Fa6Icons]) {
     return Fa6Icons[name as keyof typeof Fa6Icons];
   }
@@ -56,19 +55,19 @@ const getIconComponent = (name: string): React.ComponentType<any> | undefined =>
 
 
   logger.warn(`[VibeContentRenderer] Icon component for "${name}" not found in Fa6Icons or map.`);
-  return undefined; // Icon not found
+  return undefined; 
 };
 
 
 interface VibeContentRendererProps {
   content: string | null | undefined;
   className?: string;
-  spin?: boolean; // Added spin prop for animation
+  spin?: boolean; 
 }
 
-export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
+const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
     if (typeof content !== 'string' || !content.trim()) {
-        return null; // Return null if content is not a valid string
+        return null; 
     }
 
     const options: HTMLReactParserOptions = {
@@ -76,13 +75,13 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
             // Intercept custom icon syntax like "::FaIconName::"
             if (domNode.type === 'text') {
                 const text = domNode.data || '';
-                const iconRegex = /::(Fa[A-Za-z0-9]+)::/g; // Matches ::FaIconName::
+                const iconRegex = /::(Fa[A-Za-z0-9]+)::/g; 
                 const parts: (string | React.ReactNode)[] = [];
                 let lastIndex = 0;
                 let match;
 
                 while ((match = iconRegex.exec(text)) !== null) {
-                    const iconKey = match[1]; // e.g., "FaWandMagicSparkles"
+                    const iconKey = match[1]; 
                     const IconComponent = getIconComponent(iconKey);
 
                     // Add text before the icon
@@ -91,17 +90,15 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
                     }
 
                     if (IconComponent) {
-                        // Pass className and spin prop to the icon component
-                        // react-icons doesn't have a `spin` prop directly, so use `animate-spin` Tailwind class
                         parts.push(
                             <IconComponent
-                                key={iconKey + match.index} // Unique key for react list
-                                className={cn(className, spin && 'animate-spin')} // Apply animate-spin if `spin` is true
+                                key={iconKey + match.index} 
+                                className={cn(className, spin && 'animate-spin')} 
                             />
                         );
                     } else {
                         logger.warn(`[VibeContentRenderer] Icon component for "${iconKey}" not found. Rendering raw text.`);
-                        parts.push(match[0]); // Render original text if icon not found
+                        parts.push(match[0]); 
                     }
                     lastIndex = iconRegex.lastIndex;
                 }
@@ -110,7 +107,7 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
                 if (lastIndex < text.length) {
                     parts.push(text.substring(lastIndex));
                 }
-                return <>{parts}</>; // Return a fragment with all parts
+                return <>{parts}</>; 
             }
 
             // Handle standard HTML elements like <a> tags for Next.js Link
@@ -133,3 +130,5 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
         </div>
     );
 });
+
+export default VibeContentRenderer; // Changed to default export
