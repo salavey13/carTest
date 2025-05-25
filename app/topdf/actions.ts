@@ -71,7 +71,6 @@ async function drawMarkdownWrappedText(
                     currentLineSegment = testSegment;
                 }
             } catch (e: any) {
-                // Log character causing issue if possible, fallback to word/segment
                 logger.warn(`[PDF Gen] Skipping character/word due to font error: "${word}" in segment "${testSegment}". Error: ${e.message}`);
                 // Attempt to replace problematic characters or skip word - basic example:
                 currentLineSegment = currentLineSegment.replace(/[^\x00-\x7F]/g, "?"); // Replace non-ASCII with ?
@@ -109,20 +108,27 @@ export async function generatePdfFromMarkdownAndSend(
     try {
         const pdfDoc = await PDFDocument.create();
         
-        // --- Load custom font that supports Cyrillic ---
-        // Ensure this path is correct and the font file is included in your deployment
-        const fontPath = path.join(process.cwd(), 'public', 'fonts', 'Comismsh.ttf');
-        let customFontBytes;
+        // --- Load custom font that supports Cyrillic (DejaVuSans) ---
+        const regularFontPath = path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf');
+        let regularFontBytes;
         try {
-            customFontBytes = fs.readFileSync(fontPath);
-        } catch (fontError) {
-            logger.error(`[PDF Gen] CRITICAL: Failed to load font file at ${fontPath}. Error: ${fontError}`);
-            return { success: false, error: "Font file for PDF generation is missing or unreadable on the server." };
+            regularFontBytes = fs.readFileSync(regularFontPath);
+        } catch (fontError: any) {
+            logger.error(`[PDF Gen] CRITICAL: Failed to load regular font file 'DejaVuSans.ttf' at ${regularFontPath}. Error: ${fontError.message}`);
+            return { success: false, error: "Core font file (DejaVuSans.ttf) for PDF generation is missing or unreadable on the server. Please contact support." };
         }
         
-        const customFont = await pdfDoc.embedFont(customFontBytes, { subset: true }); // Enable subsetting
-        // For bold, ideally, you'd load a DejaVuSans-Bold.ttf. If not available, use the same font.
-        const customBoldFont = customFont; // Or load a specific bold variant if you have it.
+        const customFont = await pdfDoc.embedFont(regularFontBytes, { subset: true });
+        
+        let customBoldFont: PDFFont;
+        const boldFontPath = path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans-Bold.ttf');
+        try {
+            const boldFontBytes = fs.readFileSync(boldFontPath);
+            customBoldFont = await pdfDoc.embedFont(boldFontBytes, { subset: true });
+        } catch (fontError: any) {
+            logger.warn(`[PDF Gen] Warning: Failed to load bold font file 'DejaVuSans-Bold.ttf' at ${boldFontPath}. Using regular font for bold text. Error: ${fontError.message}`);
+            customBoldFont = customFont; // Fallback to regular font
+        }
 
         let page = pdfDoc.addPage(PageSizes.A4);
         const { width, height } = page.getSize();
@@ -131,10 +137,14 @@ export async function generatePdfFromMarkdownAndSend(
         const lineHeight = 14;
         let currentY = height - margin;
 
-        page.drawText(`AI Analysis Report: ${originalFileName.replace(/[^\x00-\x7F]/g, "?")}`, { // Sanitize filename for title
+        // Sanitize filename for title - keep more characters than before, but still protect PDF metadata
+        const sanitizedTitleFileName = originalFileName.replace(/[^\w\s\d.,!?"'%*()\-+=\[\]{};:@#~$&\/\\]/g, "_");
+
+
+        page.drawText(`AI Analysis Report: ${sanitizedTitleFileName}`, {
             x: margin,
             y: currentY,
-            font: customBoldFont, // Use custom bold font
+            font: customBoldFont, 
             size: 16,
             color: rgb(0.1, 0.1, 0.4)
         });
@@ -146,7 +156,7 @@ export async function generatePdfFromMarkdownAndSend(
             if (currentY < margin + lineHeight) { 
                 page = pdfDoc.addPage(PageSizes.A4);
                 currentY = height - margin;
-                 page.drawText(`AI Analysis Report: ${originalFileName.replace(/[^\x00-\x7F]/g, "?")} (cont.)`, {
+                 page.drawText(`AI Analysis Report: ${sanitizedTitleFileName} (cont.)`, {
                     x: margin, y: currentY, font: customBoldFont, size: 12, color: rgb(0.2,0.2,0.2)
                 });
                 currentY -= 20;
@@ -168,8 +178,8 @@ export async function generatePdfFromMarkdownAndSend(
                     currentY,
                     width - 2 * margin,
                     lineHeight,
-                    customFont, // Use custom font
-                    customBoldFont, // Use custom bold font
+                    customFont, 
+                    customBoldFont,
                     baseFontSize,
                     rgb(0.1, 0.1, 0.1)
                 );
@@ -179,7 +189,7 @@ export async function generatePdfFromMarkdownAndSend(
         const pdfBytes = await pdfDoc.save();
         debugLogger.log(`[Markdown to PDF Action] PDF generated from Markdown. Size: ${pdfBytes.byteLength} bytes.`);
 
-        const pdfFileName = `AI_Report_${originalFileName.replace(/[^\x00-\x7F_.\-]/g, "_").replace(/\.\w+$/, "")}.pdf`; // Sanitize filename further
+        const pdfFileName = `AI_Report_${originalFileName.replace(/[^\w\d_.-]/g, "_").replace(/\.\w+$/, "")}.pdf`; // Sanitize filename further for filesystem/telegram
         
         const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName);
 

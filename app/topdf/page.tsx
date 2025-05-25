@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, FaWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
