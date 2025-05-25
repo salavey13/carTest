@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, faMagicWandSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, FaWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
@@ -249,7 +249,7 @@ Please provide a detailed and insightful Markdown report.
             <div className="absolute top-4 right-4 z-20"> <button onClick={toggleLang} className="p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1.5 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> <FontAwesomeIcon icon={faLanguage} /> {currentLang === 'en' ? 'RU' : 'EN'} </button> </div>
 
             <div className="w-full max-w-2xl p-6 md:p-8 border border-brand-orange/40 rounded-xl bg-black/80 backdrop-blur-xl shadow-2xl shadow-brand-orange/30">
-                <VibeContentRenderer content="::FaMagicWandSparkles::" className="text-6xl text-brand-orange mx-auto mb-5 animate-pulse" />
+                <VibeContentRenderer content="::FaWandMagicSparkles::" className="text-6xl text-brand-orange mx-auto mb-5 animate-pulse" />
                 <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-orange cyber-text glitch mb-2" data-text={t("pageTitle")}>{t("pageTitle")}</h1>
                 <p className="text-sm text-center text-gray-400 mb-10">{t("pageSubtitle")}</p>
 
