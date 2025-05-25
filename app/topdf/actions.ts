@@ -9,7 +9,8 @@ const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
 
 // --- PDF LIBRARY DIAGNOSTICS (runs once on cold start) ---
-console.log('--- PDF LIBRARY DIAGNOSTICS START ---');
+// This section is valuable for debugging and can be kept or removed once stable.
+console.log('--- PDF LIBRARY DIAGNOSTICS START (v2) ---');
 try {
     const pdfLibKeys = Object.keys(pdfLibModule || {});
     console.log(`[PDF DIAG] Keys of require("pdf-lib") (${pdfLibKeys.length}): ${pdfLibKeys.join(', ')}`);
@@ -19,14 +20,25 @@ try {
         const PDFD = pdfLibModule.PDFDocument;
         console.log('[PDF DIAG] pdfLibModule.PDFDocument IS PRESENT.');
         const pdfDKeys = Object.keys(PDFD || {});
-        console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument (${pdfDKeys.length}): ${pdfDKeys.join(', ')}`);
+        console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument (${pdfDKeys.length}): ${pdfDKeys.join(', ')}`); // Expected: load, create, registerFontkit (static)
+        
+        if (typeof (PDFD || {}).registerFontkit === 'function') {
+            console.log('[PDF DIAG] pdfLibModule.PDFDocument.registerFontkit IS A FUNCTION (STATIC). This is expected.');
+        } else {
+            console.log('[PDF DIAG] pdfLibModule.PDFDocument.registerFontkit IS NOT a function (STATIC). Current typeof: ' + typeof (PDFD || {}).registerFontkit);
+        }
+
         if (PDFD.prototype) {
             const protoKeys = Object.keys(PDFD.prototype);
             console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument.prototype (${protoKeys.length}): ${protoKeys.join(', ')}`);
+             if (typeof (PDFD.prototype || {}).registerFontkit === 'function') {
+                console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype.registerFontkit IS A FUNCTION (INSTANCE/PROTOTYPE). This is UNEXPECTED for static registration.');
+            } else {
+                 console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype.registerFontkit IS NOT a function (INSTANCE/PROTOTYPE).');
+            }
         } else {
             console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype IS NOT PRESENT.');
         }
-        console.log(`[PDF DIAG] typeof pdfLibModule.PDFDocument.registerFontkit: typeof ${(PDFD || {}).registerFontkit}`);
     } else {
         console.log('[PDF DIAG] require("pdf-lib").PDFDocument IS UNDEFINED or NULL.');
     }
@@ -34,18 +46,23 @@ try {
     const fontkitKeys = Object.keys(fontkitModule || {});
     console.log(`[PDF DIAG] Keys of require("@pdf-lib/fontkit") (${fontkitKeys.length}): ${fontkitKeys.join(', ')}`);
     console.log(`[PDF DIAG] typeof require("@pdf-lib/fontkit").default: typeof ${(fontkitModule || {}).default}`);
-    console.log(`[PDF DIAG] typeof require("@pdf-lib/fontkit") (module itself): typeof ${fontkitModule}`);
+    const fontkitInstanceForDiag = fontkitModule.default || fontkitModule;
+    console.log(`[PDF DIAG] Determined fontkit instance for registration (typeof): typeof ${fontkitInstanceForDiag}`);
+    if(typeof fontkitInstanceForDiag !== 'object' && typeof fontkitInstanceForDiag !== 'function'){
+        console.warn('[PDF DIAG] fontkitInstanceForDiag does not appear to be a valid fontkit instance object/function.');
+    }
+
 } catch (e: any) {
     console.error('[PDF DIAG] Error during initial diagnostics logging:', e.message, e.stack);
 }
-console.log('--- PDF LIBRARY DIAGNOSTICS END ---');
+console.log('--- PDF LIBRARY DIAGNOSTICS END (v2) ---');
 // --- END DIAGNOSTICS ---
 
-const { StandardFonts, rgb, PageSizes } = pdfLibModule;
-// Note: PDFDocument will be determined dynamically later.
+const { StandardFonts, rgb, PageSizes } = pdfLibModule; // These should be safe.
 type PDFFont = any; 
 
 let fontkitRegistered = false;
+let PDFDocumentClassToUse: any = null; // To store the class/object used for PDFDocument operations
 
 async function drawMarkdownWrappedText(
     page: any, 
@@ -143,63 +160,93 @@ export async function generatePdfFromMarkdownAndSend(
     if (!markdownContent || !markdownContent.trim()) {
         return { success: false, error: "No Markdown content provided to generate PDF." };
     }
-
-    let PDFDocumentClass: any; // Will hold the actual PDFDocument class
-
+    
     try {
         if (!fontkitRegistered) {
             debugLogger.log("[PDF Gen] Attempting to register fontkit...");
             
-            let determinedPDFDocumentClass: any;
-            if (pdfLibModule && pdfLibModule.PDFDocument && typeof pdfLibModule.PDFDocument.registerFontkit === 'function') {
-                determinedPDFDocumentClass = pdfLibModule.PDFDocument;
-                debugLogger.log("[PDF Gen] Using 'pdfLibModule.PDFDocument' as PDFDocument class.");
-            } else if (pdfLibModule && typeof pdfLibModule.registerFontkit === 'function') {
-                // Fallback: pdfLibModule itself might be the PDFDocument class
-                determinedPDFDocumentClass = pdfLibModule;
-                debugLogger.log("[PDF Gen] Using 'pdfLibModule' (direct require result) as PDFDocument class.");
-            } else {
-                logger.error("[PDF Gen] CRITICAL: Could not determine usable PDFDocument class from require('pdf-lib'). 'registerFontkit' method not found on expected objects.");
-                return { success: false, error: "Critical PDF library load error (PDFDocument class with registerFontkit not found)." };
+            const PDFD_Class = pdfLibModule.PDFDocument; // As per logs, PDFDocument is on pdfLibModule
+            const fontkitInstanceToUse = fontkitModule.default || fontkitModule; // As per logs, fontkitModule itself is the instance
+
+            if (!PDFD_Class) {
+                logger.error("[PDF Gen] CRITICAL: pdfLibModule.PDFDocument is undefined. Cannot proceed.");
+                return { success: false, error: "Critical PDF library load error (PDFDocument class not found on module)." };
+            }
+             if (!fontkitInstanceToUse || (typeof fontkitInstanceToUse !== 'object' && typeof fontkitInstanceToUse !== 'function')) {
+                logger.error("[PDF Gen] CRITICAL: fontkitInstanceToUse is not a valid object or function. Cannot proceed.", fontkitInstanceToUse);
+                return { success: false, error: "Critical PDF library load error (fontkit instance is invalid)." };
             }
 
-            const fontkitInstanceToUse = fontkitModule.default || fontkitModule;
 
-            try {
-                determinedPDFDocumentClass.registerFontkit(fontkitInstanceToUse);
+            let registrationSuccess = false;
+            // Attempt 1: Standard static call (if logs were misleading or version changed)
+            if (typeof PDFD_Class.registerFontkit === 'function') {
+                try {
+                    PDFD_Class.registerFontkit(fontkitInstanceToUse);
+                    registrationSuccess = true;
+                    debugLogger.log("[PDF Gen] Registered fontkit via PDFD_Class.registerFontkit (STATIC).");
+                } catch (e: any) {
+                    debugLogger.warn(`[PDF Gen] Failed PDFD_Class.registerFontkit (STATIC): ${e.message}`);
+                }
+            }
+
+            // Attempt 2: Based on logs, registerFontkit is on the prototype. Try calling it with the class as context.
+            if (!registrationSuccess && PDFD_Class.prototype && typeof PDFD_Class.prototype.registerFontkit === 'function') {
+                try {
+                    PDFD_Class.prototype.registerFontkit.call(PDFD_Class, fontkitInstanceToUse);
+                    registrationSuccess = true;
+                    debugLogger.log("[PDF Gen] Registered fontkit via PDFD_Class.prototype.registerFontkit.call(PDFD_Class).");
+                } catch (e: any) {
+                    debugLogger.warn(`[PDF Gen] Failed PDFD_Class.prototype.registerFontkit.call(PDFD_Class): ${e.message}`);
+                }
+            }
+            
+            // Attempt 3: If pdfLibModule itself has registerFontkit (less likely based on logs, but a fallback)
+             if (!registrationSuccess && typeof pdfLibModule.registerFontkit === 'function') {
+                try {
+                    pdfLibModule.registerFontkit(fontkitInstanceToUse);
+                    registrationSuccess = true;
+                    PDFDocumentClassToUse = pdfLibModule; // If this works, pdfLibModule itself acts as PDFDocument
+                    debugLogger.log("[PDF Gen] Registered fontkit via pdfLibModule.registerFontkit (on module itself).");
+                } catch (e:any) {
+                     debugLogger.warn(`[PDF Gen] Failed pdfLibModule.registerFontkit: ${e.message}`);
+                }
+            }
+
+
+            if (registrationSuccess) {
                 fontkitRegistered = true;
-                PDFDocumentClass = determinedPDFDocumentClass; // Store the successfully used class
-                debugLogger.log("[PDF Gen] fontkit registered successfully.");
-            } catch (registrationError: any) {
-                logger.error("[PDF Gen] CRITICAL: Error during fontkit registration call:", registrationError);
-                return { success: false, error: `PDF library error during fontkit registration: ${registrationError.message}` };
+                if (!PDFDocumentClassToUse) PDFDocumentClassToUse = PDFD_Class; // Default to PDFD_Class if not set by attempt 3
+                debugLogger.log("[PDF Gen] Fontkit registration marked as successful.");
+            } else {
+                logger.error("[PDF Gen] CRITICAL: All attempts to register fontkit failed. `registerFontkit` method not found or callable on expected objects.");
+                return { success: false, error: "Critical PDF library setup error (All fontkit registration attempts failed)." };
             }
         } else {
-             // If already registered, ensure PDFDocumentClass is set from the module
-            if (pdfLibModule && pdfLibModule.PDFDocument) {
-                PDFDocumentClass = pdfLibModule.PDFDocument;
-            } else if (pdfLibModule && typeof pdfLibModule.registerFontkit === 'function') {
-                 PDFDocumentClass = pdfLibModule;
-            } else {
-                 logger.error("[PDF Gen] CRITICAL: fontkit was marked registered, but PDFDocument class could not be re-determined.");
-                 return { success: false, error: "Critical PDF library inconsistency after fontkit registration." };
+            // If already registered, ensure PDFDocumentClassToUse is set
+            if (!PDFDocumentClassToUse) {
+                 // Re-determine based on initial successful registration logic (simplified)
+                PDFDocumentClassToUse = pdfLibModule.PDFDocument || pdfLibModule;
+                 if (!PDFDocumentClassToUse) {
+                     logger.error("[PDF Gen] CRITICAL: fontkit was marked registered, but PDFDocumentClassToUse could not be re-determined.");
+                     return { success: false, error: "Internal error: PDFDocument class re-determination failed." };
+                 }
             }
-            debugLogger.log("[PDF Gen] fontkit already registered. Using determined PDFDocumentClass.");
+            debugLogger.log("[PDF Gen] Fontkit already registered. Using stored PDFDocumentClassToUse.");
         }
 
-        if (!PDFDocumentClass) {
-             logger.error("[PDF Gen] CRITICAL: PDFDocumentClass is not defined before PDF creation. This should not happen.");
-             return { success: false, error: "Internal error: PDFDocument class not initialized." };
+        if (!PDFDocumentClassToUse || typeof PDFDocumentClassToUse.create !== 'function') {
+             logger.error("[PDF Gen] CRITICAL: PDFDocumentClassToUse is invalid or does not have a .create method. Current value:", PDFDocumentClassToUse);
+             return { success: false, error: "Internal error: PDFDocument class is not correctly initialized for PDF creation." };
         }
 
-        const pdfDoc = await PDFDocumentClass.create();
+        const pdfDoc = await PDFDocumentClassToUse.create();
 
         const regularFontName = 'DejaVuSans.ttf';
         const boldFontName = 'DejaVuSans-Bold.ttf';
         const currentWorkingDirectory = process.cwd();
         const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
 
-        // ... (rest of the font loading and PDF generation logic remains the same)
         debugLogger.log(`[PDF Gen] Current working directory (process.cwd()): ${currentWorkingDirectory}`);
         debugLogger.log(`[PDF Gen] Attempting to access fonts directory at absolute path: ${fontsDir}`);
 
