@@ -2,18 +2,19 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // Re-added FontAwesome import
-import { 
-    faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, 
-    faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, 
-    faArrowUpFromBracket, faPaperPlane, faWandMagicSparkles // Re-added faWandMagicSparkles
-} from '@fortawesome/free-solid-svg-icons'; 
+// Removed FontAwesome imports as VibeContentRenderer will be used
+// import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; 
+// import { 
+//     faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, 
+//     faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, 
+//     faArrowUpFromBracket, faPaperPlane, faWandMagicSparkles 
+// } from '@fortawesome/free-solid-svg-icons'; 
 import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
-// Removed VibeContentRenderer import to comply with rollback request for this page
-// import VibeContentRenderer from '@/components/VibeContentRenderer'; 
+// Changed to default import for VibeContentRenderer
+import VibeContentRenderer from '@/components/VibeContentRenderer'; 
 import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button"; 
 
@@ -245,7 +246,8 @@ ${csvDataString.substring(0, 25000)}
     if (isAuthLoading) {
         return (
             <div className="flex justify-center items-center min-h-screen pt-20 bg-black">
-                <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-brand-cyan" />
+                {/* Using VibeContentRenderer */}
+                <VibeContentRenderer content="::FaSpinner::" spin={true} className="text-brand-cyan text-2xl" />
                 <span className="ml-3 text-brand-cyan font-mono">{t('loadingUser')}</span>
             </div>
         );
@@ -254,11 +256,16 @@ ${csvDataString.substring(0, 25000)}
     return (
         <div className={cn("min-h-screen flex flex-col items-center pt-24 pb-10", "bg-gradient-to-br from-slate-900 via-black to-indigo-900/50 text-gray-200 px-4 font-mono")}>
             <Toaster position="bottom-center" richColors toastOptions={{ className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm' }} />
-            <div className="absolute top-4 right-4 z-20"> <button onClick={toggleLang} className="p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1.5 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> <FontAwesomeIcon icon={faLanguage} /> {currentLang === 'en' ? 'RU' : 'EN'} </button> </div>
+            <div className="absolute top-4 right-4 z-20"> 
+                <button onClick={toggleLang} className="p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1.5 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> 
+                    {/* Using VibeContentRenderer */}
+                    <VibeContentRenderer content="::FaLanguage::" /> {currentLang === 'en' ? 'RU' : 'EN'} 
+                </button> 
+            </div>
 
             <div className="w-full max-w-2xl p-6 md:p-8 border border-brand-orange/40 rounded-xl bg-black/80 backdrop-blur-xl shadow-2xl shadow-brand-orange/30">
-                {/* Reverted to FontAwesomeIcon for faWandMagicSparkles */}
-                <FontAwesomeIcon icon={faWandMagicSparkles} className="text-6xl text-brand-orange mx-auto mb-5 animate-pulse" />
+                {/* Using VibeContentRenderer */}
+                <VibeContentRenderer content="::FaWandMagicSparkles::" className="text-6xl text-brand-orange mx-auto mb-5 animate-pulse" />
                 <h1 
                     className="font-sans text-4xl md:text-5xl font-extrabold text-center text-white uppercase cyber-text glitch mb-2" 
                     data-text={t("pageTitle")}
@@ -271,11 +278,13 @@ ${csvDataString.substring(0, 25000)}
                 {/* Step 1: Upload and Prepare Prompt */}
                 <div className={cn("p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'upload' && "opacity-60 blur-sm pointer-events-none")}>
                     <h2 className="text-xl font-semibold text-brand-yellow mb-4 flex items-center">
-                        <FontAwesomeIcon icon={faArrowUpFromBracket} className="mr-2 w-5 h-5"/>
+                        {/* Using VibeContentRenderer */}
+                        <VibeContentRenderer content="::FaArrowUpFromBracket::" className="mr-2 w-5 h-5"/>
                         {t("step1Title")}
                     </h2>
                     <label htmlFor="xlsxFile" className={cn("w-full flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow hover:bg-brand-yellow/10 text-brand-yellow", isLoading && currentStage === 'upload' ? "opacity-70 cursor-not-allowed" : "hover:scale-105")}>
-                        <FontAwesomeIcon icon={faFileExcel} className="mr-3 text-3xl mb-2" />
+                        {/* Using VibeContentRenderer */}
+                        <VibeContentRenderer content="::FaFileExcel::" className="mr-3 text-3xl mb-2" />
                         <span className="font-semibold text-sm">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
                         <input id="xlsxFile" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChangeAndPreparePrompt} className="sr-only" disabled={isLoading && currentStage === 'upload'} />
                     </label>
@@ -284,21 +293,27 @@ ${csvDataString.substring(0, 25000)}
                 {/* Step 2: Gemini Interaction */}
                 <div className={cn("p-5 border-2 border-dashed border-brand-cyan/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'gemini' && "opacity-60 blur-sm pointer-events-none")}>
                     <h2 className="text-xl font-semibold text-brand-cyan mb-4 flex items-center">
-                        <FontAwesomeIcon icon={faBrain} className="mr-2 w-5 h-5"/>
-                        {t("step22Title")}
+                        {/* Using VibeContentRenderer */}
+                        <VibeContentRenderer content="::FaBrain::" className="mr-2 w-5 h-5"/>
+                        {t("step2Title")}
                     </h2>
                     {generatedPrompt && (
                         <div className="space-y-4">
-                            <p className="text-sm text-green-400"><FontAwesomeIcon icon={faCheckCircle} className="mr-2"/>{t("promptGenerated")}</p>
+                            <p className="text-sm text-green-400">
+                                {/* Using VibeContentRenderer */}
+                                <VibeContentRenderer content="::FaCheckCircle::" className="mr-2"/>{t("promptGenerated")}
+                            </p>
                              <label htmlFor="geminiPrompt" className="text-xs text-gray-400 block mb-1">{t("manualCopyPrompt")}</label>
                              <textarea id="geminiPrompt" readOnly value={generatedPrompt} rows={7} className="w-full p-2.5 text-xs bg-slate-900/70 border border-slate-700 rounded-md text-gray-300 simple-scrollbar shadow-sm"/>
                             <div className="flex flex-col sm:flex-row gap-3">
                                 <Button onClick={() => handleCopyToClipboard(generatedPrompt, 'promptCopySuccess')} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-sm">
-                                    <FontAwesomeIcon icon={faCopy} className="mr-2"/>{t("copyPromptAndData")}
+                                    {/* Using VibeContentRenderer */}
+                                    <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")}
                                 </Button>
                                 <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-sm">
                                   <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" >
-                                    <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2"/>{t("goToGemini")}
+                                    {/* Using VibeContentRenderer */}
+                                    <VibeContentRenderer content="::FaExternalLinkAlt::" className="mr-2"/>{t("goToGemini")}
                                   </a>
                                 </Button>
                             </div>
@@ -319,13 +334,17 @@ ${csvDataString.substring(0, 25000)}
                 {/* Step 3: Generate PDF */}
                 <div className={cn("p-5 border-2 border-dashed border-brand-pink/40 rounded-xl bg-slate-800/40 shadow-inner shadow-black/30", (currentStage !== 'gemini' && currentStage !== 'pdf') || (currentStage === 'gemini' && !markdownInput.trim()) ? "opacity-60 blur-sm pointer-events-none" : "")}>
                      <h2 className="text-xl font-semibold text-brand-pink mb-4 flex items-center">
-                        <FontAwesomeIcon icon={faFilePdf} className="mr-2 w-5 h-5"/>
+                        {/* Using VibeContentRenderer */}
+                        <VibeContentRenderer content="::FaFilePdf::" className="mr-2 w-5 h-5"/>
                         {t("step3Title")}
                      </h2>
                     <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id || currentStage !== 'gemini'} className={cn("w-full text-lg py-3.5 bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue text-white hover:shadow-brand-pink/50 hover:brightness-125 focus:ring-brand-pink shadow-lg", (isLoading || !markdownInput.trim() || currentStage !== 'gemini') && "opacity-50 cursor-not-allowed")}>
                         {isLoading && currentStage === 'pdf' 
-                            ? (<span className="flex items-center justify-center text-sm"><FontAwesomeIcon icon={faSpinner} spin className="mr-2.5"/> {statusMessage || t('processing')}</span>) 
-                            : <><FontAwesomeIcon icon={faPaperPlane} className="mr-2.5"/> {t('generateAndSendPdf')}</>
+                            ? (<span className="flex items-center justify-center text-sm">
+                                {/* Using VibeContentRenderer */}
+                                <VibeContentRenderer content="::FaSpinner::" spin={true} className="mr-2.5"/> {statusMessage || t('processing')}
+                              </span>) 
+                            : <><VibeContentRenderer content="::FaPaperPlane::" className="mr-2.5"/> {t('generateAndSendPdf')}</>
                         }
                     </Button>
                 </div>
