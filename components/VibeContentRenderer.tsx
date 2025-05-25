@@ -13,7 +13,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   // Common icons used across the app (minimal set as per initial prompt context)
   faspinner: 'FaSpinner',
   falanguage: 'FaLanguage',
-  // Specific icons for toppdf page
+  // Specific icons for toppdf page (re-added if they were removed by a strict rollback)
   fawandmagicsparkles: 'FaWandMagicSparkles',
   faarrowupfrombracket: 'FaArrowUpFromBracket',
   fafileexcel: 'FaFileExcel',
@@ -50,8 +50,8 @@ interface VibeContentRendererProps {
   spin?: boolean; 
 }
 
-// Changed to ONLY default export. This is the standard way to export a single component.
-const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
+// Component definition as a named export
+export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
     if (typeof content !== 'string' || !content.trim()) {
         return null; 
     }
@@ -112,4 +112,7 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ co
     );
 });
 
+// Explicitly export as default IN ADDITION to the named export above.
+// This allows both `import VibeContentRenderer from '...'` and `import { VibeContentRenderer } from '...'`
+// to work correctly.
 export default VibeContentRenderer;
