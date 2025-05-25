@@ -3,61 +3,66 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel } from '@fortawesome/free-solid-svg-icons';
+import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain } from '@fortawesome/free-solid-svg-icons';
 import { convertXlsxToPdfAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
-import VibeContentRenderer from '@/components/VibeContentRenderer'; // For icons in buttons
+import VibeContentRenderer from '@/components/VibeContentRenderer'; 
 
-// --- Translations ---
 const translations: Record<string, Record<string, string>> = {
   en: {
-    "pageTitle": "XLSX to PDF Converter",
-    "pageSubtitle": "Upload your XLSX file, and we'll convert it to a PDF and send it to your Telegram chat.",
-    "selectFile": "Select XLSX File",
+    "pageTitle": "AI Financial Report Analyzer (XLSX to PDF)",
+    "pageSubtitle": "Upload your XLSX financial report. Our AI will analyze it, generate a summary, and send a PDF report to your Telegram.",
+    "selectFile": "Select XLSX Report",
     "noFileSelected": "No file selected",
     "fileSelected": "File: %%FILENAME%%",
-    "convertToPdfAndSend": "Convert & Send to Telegram",
-    "uploading": "Uploading...",
-    "converting": "Converting...",
-    "sending": "Sending PDF...",
+    "analyzeAndSend": "Analyze & Send PDF Report",
+    "processing": "Processing...",
+    "parsingXlsx": "Parsing XLSX...",
+    "analyzingData": "AI Analyzing Data...",
+    "generatingPdf": "Generating PDF Report...",
+    "sendingPdf": "Sending PDF to Telegram...",
     "errorNoFile": "Please select an XLSX file first.",
     "errorNoUser": "User information not available. Please ensure you are logged in via Telegram.",
     "errorFileTooLarge": "File is too large. Maximum size: 5MB.",
     "errorInvalidFileType": "Invalid file type. Only .xlsx files are accepted.",
-    "successMessage": "Success! Your PDF has been sent to your Telegram chat.",
-    "uploadFailed": "Upload failed. Please try again.",
-    "conversionFailed": "Conversion failed: %%ERROR%%",
+    "successMessage": "Success! Your AI-generated PDF report has been sent to your Telegram chat.",
+    "processFailed": "Processing failed. Please try again.",
+    "aiAnalysisFailed": "AI Analysis Failed: %%ERROR%%",
+    "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
     "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
     "unexpectedError": "An unexpected error occurred: %%ERROR%%",
     "loadingUser": "Loading user data...",
     "status": "Status",
-    "ready": "Ready for conversion.",
+    "ready": "Ready for AI analysis.",
     "toggleLanguage": "Toggle Language",
   },
   ru: {
-    "pageTitle": "Конвертер XLSX в PDF",
-    "pageSubtitle": "Загрузите ваш XLSX файл, мы сконвертируем его в PDF и отправим в ваш Telegram чат.",
-    "selectFile": "Выберите XLSX Файл",
+    "pageTitle": "AI Анализатор Фин. Отчетов (XLSX в PDF)",
+    "pageSubtitle": "Загрузите ваш XLSX фин. отчет. Наш AI проанализирует его, создаст сводку и отправит PDF-отчет в ваш Telegram.",
+    "selectFile": "Выберите XLSX Отчет",
     "noFileSelected": "Файл не выбран",
     "fileSelected": "Файл: %%FILENAME%%",
-    "convertToPdfAndSend": "Конвертировать и Отправить в Telegram",
-    "uploading": "Загрузка...",
-    "converting": "Конвертация...",
-    "sending": "Отправка PDF...",
+    "analyzeAndSend": "Анализировать и Отправить PDF",
+    "processing": "Обработка...",
+    "parsingXlsx": "Парсинг XLSX...",
+    "analyzingData": "AI Анализирует Данные...",
+    "generatingPdf": "Генерация PDF Отчета...",
+    "sendingPdf": "Отправка PDF в Telegram...",
     "errorNoFile": "Пожалуйста, сначала выберите XLSX файл.",
     "errorNoUser": "Информация о пользователе недоступна. Убедитесь, что вы авторизованы через Telegram.",
     "errorFileTooLarge": "Файл слишком большой. Максимальный размер: 5МБ.",
     "errorInvalidFileType": "Неверный тип файла. Принимаются только .xlsx файлы.",
-    "successMessage": "Успешно! Ваш PDF файл отправлен в ваш Telegram чат.",
-    "uploadFailed": "Ошибка загрузки. Пожалуйста, попробуйте снова.",
-    "conversionFailed": "Ошибка конвертации: %%ERROR%%",
+    "successMessage": "Успешно! Ваш AI-сгенерированный PDF отчет отправлен в ваш Telegram чат.",
+    "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
+    "aiAnalysisFailed": "Ошибка AI Анализа: %%ERROR%%",
+    "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
     "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
     "status": "Статус",
-    "ready": "Готово к конвертации.",
+    "ready": "Готово к AI анализу.",
     "toggleLanguage": "Переключить язык",
   }
 };
@@ -103,7 +108,7 @@ export default function ToPdfPage() {
 
      useEffect(() => {
         setStatusMessage(t('ready'));
-    }, [t, currentLang]); // Update status message when language changes
+    }, [t, currentLang]); 
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -111,13 +116,13 @@ export default function ToPdfPage() {
             if (file.size > MAX_FILE_SIZE_BYTES) {
                 toast.error(t('errorFileTooLarge'));
                 setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+                if (fileInputRef.current) fileInputRef.current.value = ""; 
                 return;
             }
             if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) {
                 toast.error(t('errorInvalidFileType'));
                 setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+                if (fileInputRef.current) fileInputRef.current.value = ""; 
                 return;
             }
             setSelectedFile(file);
@@ -129,48 +134,64 @@ export default function ToPdfPage() {
     };
 
     const handleSubmit = async () => {
-        if (!selectedFile) {
-            toast.error(t('errorNoFile'));
-            return;
-        }
-        if (!user?.id) {
-            toast.error(t('errorNoUser'));
-            return;
-        }
+        if (!selectedFile) { toast.error(t('errorNoFile')); return; }
+        if (!user?.id) { toast.error(t('errorNoUser')); return; }
         if (!isInTelegramContext && process.env.NODE_ENV !== 'development') {
-            // Optional: Restrict usage outside Telegram if needed, except in dev
-            toast.error("This feature is intended for use within Telegram.");
-            return;
+            toast.error("This feature is intended for use within Telegram."); return;
         }
-
 
         setIsLoading(true);
-        setStatusMessage(t('uploading'));
+        setStatusMessage(t('parsingXlsx'));
 
         const formData = new FormData();
         formData.append('xlsxFile', selectedFile);
 
+        // Sequence of status updates
+        const statusUpdates = [
+            t('analyzingData'),
+            t('generatingPdf'),
+            t('sendingPdf')
+        ];
+        let currentStatusIdx = 0;
+        const intervalId = setInterval(() => {
+            if(isLoading && currentStatusIdx < statusUpdates.length -1){ // don't update past last message if still loading
+                 currentStatusIdx = (currentStatusIdx + 1);
+                 setStatusMessage(statusUpdates[currentStatusIdx]);
+            } else {
+                // setStatusMessage(statusUpdates[statusUpdates.length-1]); // Ensure last message is set
+            }
+
+        }, 3000); // Update status every 3 seconds
+
+
         try {
-            setStatusMessage(t('converting'));
-            const result = await convertXlsxToPdfAndSend(formData, String(user.id));
+            // The action now handles all steps including AI analysis
+            const result = await convertXlsxToPdfAndSend(formData, String(user.id), String(user.id) /* Pass user.id for Coze */);
+            clearInterval(intervalId);
 
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
                 setStatusMessage(result.message || t('successMessage'));
-                setSelectedFile(null); // Clear selection on success
-                if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+                setSelectedFile(null); 
+                if (fileInputRef.current) fileInputRef.current.value = ""; 
             } else {
-                const errorKey = result.error?.includes("Telegram") ? 'telegramSendFailed' : 'conversionFailed';
-                toast.error(t(errorKey, { ERROR: result.error || t('uploadFailed') }), { duration: 7000 });
-                setStatusMessage(t(errorKey, { ERROR: result.error || t('uploadFailed') }));
-                logger.error('XLSX to PDF conversion failed:', result.error);
+                let errorKey = 'processFailed';
+                if (result.error?.includes("AI analysis failed")) errorKey = 'aiAnalysisFailed';
+                else if (result.error?.includes("PDF Generation Failed")) errorKey = 'pdfGenerationFailed';
+                else if (result.error?.includes("Telegram")) errorKey = 'telegramSendFailed';
+                
+                toast.error(t(errorKey, { ERROR: result.error || t('processFailed') }), { duration: 7000 });
+                setStatusMessage(t(errorKey, { ERROR: result.error || t('processFailed') }));
+                logger.error('XLSX to AI PDF failed:', result.error);
             }
         } catch (error) {
+            clearInterval(intervalId);
             toast.error(t('unexpectedError', { ERROR: (error as Error).message || 'Unknown client error' }), { duration: 7000 });
             setStatusMessage(t('unexpectedError', { ERROR: (error as Error).message || 'Unknown client error' }));
-            logger.error('Client-side error during XLSX to PDF submission:', error);
+            logger.error('Client-side error during XLSX to AI PDF submission:', error);
         } finally {
             setIsLoading(false);
+             if (intervalId) clearInterval(intervalId);
         }
     };
 
@@ -186,7 +207,7 @@ export default function ToPdfPage() {
     return (
         <div className={cn(
             "min-h-screen flex flex-col items-center justify-center pt-24 pb-10 font-mono",
-            "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200 px-4"
+            "bg-gradient-to-br from-purple-900/30 via-black to-blue-900/30 text-gray-200 px-4"
         )}>
             <Toaster position="bottom-center" richColors toastOptions={{
                  className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm',
@@ -204,25 +225,25 @@ export default function ToPdfPage() {
                 </button>
             </div>
 
-            <div className="w-full max-w-lg p-6 md:p-8 border border-brand-cyan/30 rounded-lg bg-black/60 backdrop-blur-md shadow-2xl shadow-brand-cyan/20 text-center">
-                <FontAwesomeIcon icon={faFilePdf} className="text-5xl text-brand-cyan mb-4" />
-                <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-cyan cyber-text glitch mb-2" data-text={t("pageTitle")}>
+            <div className="w-full max-w-xl p-6 md:p-8 border border-brand-pink/30 rounded-lg bg-black/70 backdrop-blur-lg shadow-2xl shadow-brand-pink/20 text-center">
+                <VibeContentRenderer content="::FaBrain::" className="text-6xl text-brand-pink mb-5 animate-pulse" />
+                <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-pink cyber-text glitch mb-2" data-text={t("pageTitle")}>
                     {t("pageTitle")}
                 </h1>
-                <p className="text-sm text-gray-400 mb-6">
+                <p className="text-sm text-gray-400 mb-8">
                     {t("pageSubtitle")}
                 </p>
 
-                <div className="mb-6">
+                <div className="mb-8">
                     <label
                         htmlFor="xlsxFile"
                         className={cn(
-                            "w-full flex items-center justify-center px-4 py-3 border-2 border-dashed rounded-md cursor-pointer transition-colors",
-                            "border-brand-yellow/50 hover:border-brand-yellow hover:bg-brand-yellow/10 text-brand-yellow"
+                            "w-full flex items-center justify-center px-4 py-3.5 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
+                            "border-brand-lime/50 hover:border-brand-lime hover:bg-brand-lime/10 text-brand-lime"
                         )}
                     >
-                        <FontAwesomeIcon icon={faFileExcel} className="mr-3 text-xl" />
-                        <span className="font-semibold">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
+                        <FontAwesomeIcon icon={faFileExcel} className="mr-3 text-2xl" />
+                        <span className="font-semibold text-base">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
                         <input
                             id="xlsxFile"
                             ref={fileInputRef}
@@ -240,29 +261,32 @@ export default function ToPdfPage() {
                     onClick={handleSubmit}
                     disabled={isLoading || !selectedFile || !user?.id}
                     className={cn(
-                        "w-full px-6 py-3 rounded-md text-lg font-semibold transition duration-150 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black",
+                        "w-full px-6 py-4 rounded-md text-xl font-semibold transition duration-150 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black shadow-lg",
                         isLoading || !selectedFile || !user?.id
-                            ? "bg-gray-600 text-gray-400 cursor-not-allowed"
-                            : "bg-brand-green/80 hover:bg-brand-green text-black focus:ring-brand-green"
+                            ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                            : "bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue text-white hover:shadow-brand-pink/40 hover:brightness-110 focus:ring-brand-pink"
                     )}
                 >
                     {isLoading ? (
                         <>
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                            <span>{statusMessage || t('converting')}</span>
+                            <FontAwesomeIcon icon={faSpinner} spin className="text-xl"/>
+                            <span className="text-lg">{statusMessage || t('processing')}</span>
                         </>
                     ) : (
                         <>
-                             <VibeContentRenderer content="::FaPaperPlane::" />
-                            <span>{t('convertToPdfAndSend')}</span>
+                             <VibeContentRenderer content="::FaRocket::" className="text-xl"/>
+                            <span className="text-lg">{t('analyzeAndSend')}</span>
                         </>
                     )}
                 </button>
 
-                <div className="mt-6 text-xs text-gray-500 min-h-[20px]">
-                    {t('status')}: {isLoading ? statusMessage : (selectedFile ? t('ready') : t('noFileSelected'))}
+                <div className="mt-8 text-xs text-gray-500 min-h-[20px] font-orbitron">
+                   <span className="uppercase">{t('status')}:</span> {isLoading ? statusMessage : (selectedFile ? t('ready') : t('noFileSelected'))}
                 </div>
             </div>
+             <p className="text-center text-xs text-gray-600 mt-8">
+                {language === 'ru' ? 'Эта фича использует AI для анализа. Качество отчета зависит от предоставленных данных и возможностей AI.' : 'This feature uses AI for analysis. Report quality depends on the provided data and AI capabilities.'}
+            </p>
         </div>
     );
 }
