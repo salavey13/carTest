@@ -10,50 +10,35 @@ import { cn } from '@/lib/utils';
 // Full Icon Name Map (Lowercase or common names to PascalCase from react-icons/fa6)
 // This map helps resolve various text representations to actual Fa6 icon component names.
 const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
-  // General utility
+  // Common icons used across the app (minimal set as per initial prompt context)
   faspinner: 'FaSpinner',
+  falanguage: 'FaLanguage',
+  // Specific icons for toppdf page (re-added if they were removed by a strict rollback)
+  fawandmagicsparkles: 'FaWandMagicSparkles',
+  faarrowupfrombracket: 'FaArrowUpFromBracket',
+  fafileexcel: 'FaFileExcel',
+  fabrain: 'FaBrain',
+  facopy: 'FaCopy',
+  faexternallinkalt: 'FaExternalLinkAlt',
+  fafilepdf: 'FaFilePdf',
+  fapaperplane: 'FaPaperPlane',
   facheckcircle: 'FaCircleCheck', 
   fatriangleexclamation: 'FaTriangleExclamation',
-  falanguage: 'FaLanguage',
-  facopy: 'FaCopy',
-  fapaste: 'FaPaste',
-  faexternallinkalt: 'FaExternalLinkAlt', 
-  fapaperplane: 'FaPaperPlane',
-  faarrowupfrombracket: 'FaArrowUpFromBracket',
-
-  // Specific to this page (XLSX, Brain, PDF, WandMagicSparkles)
-  fafileexcel: 'FaFileExcel', 
-  faupload: 'FaUpload',
-  fafilepdf: 'FaFilePdf',
-  fabrain: 'FaBrain',
-  fawandmagicsparkles: 'FaWandMagicSparkles', 
-
-  // Placeholder/Fallback
-  faquestion: 'FaQuestion',
+  
+  // As per original provided code context, adding placeholders or assuming usage
   fatools: 'FaToolbox', 
 };
 
 // Helper function to get the icon component by its name
 const getIconComponent = (name: string): React.ComponentType<any> | undefined => {
   const normalizedName = name.toLowerCase(); 
-  // Try direct lookup in map first
   if (iconNameMap[normalizedName]) {
     return Fa6Icons[iconNameMap[normalizedName] as keyof typeof Fa6Icons];
   }
-
-  // Try PascalCase conversion if not found in map
+  // Fallback to direct PascalCase check if not in map
   if (Fa6Icons[name as keyof typeof Fa6Icons]) {
-    return Fa6Icons[name as keyof typeof Fa6Icons];
+      return Fa6Icons[name as keyof typeof Fa6Icons];
   }
-  
-  // As a last resort, try removing 'fa' prefix and then PascalCase
-  const trimmedName = name.startsWith('Fa') ? name.substring(2) : name;
-  const pascalCaseName = trimmedName.split(/(?=[A-Z])/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('');
-  if (Fa6Icons[`Fa${pascalCaseName}` as keyof typeof Fa6Icons]) {
-      return Fa6Icons[`Fa${pascalCaseName}` as keyof typeof Fa6Icons];
-  }
-
-
   logger.warn(`[VibeContentRenderer] Icon component for "${name}" not found in Fa6Icons or map.`);
   return undefined; 
 };
@@ -65,14 +50,14 @@ interface VibeContentRendererProps {
   spin?: boolean; 
 }
 
-const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
+// Component definition as a named export
+export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className, spin }) => {
     if (typeof content !== 'string' || !content.trim()) {
         return null; 
     }
 
     const options: HTMLReactParserOptions = {
         replace: (domNode) => {
-            // Intercept custom icon syntax like "::FaIconName::"
             if (domNode.type === 'text') {
                 const text = domNode.data || '';
                 const iconRegex = /::(Fa[A-Za-z0-9]+)::/g; 
@@ -84,7 +69,6 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ co
                     const iconKey = match[1]; 
                     const IconComponent = getIconComponent(iconKey);
 
-                    // Add text before the icon
                     if (match.index > lastIndex) {
                         parts.push(text.substring(lastIndex, match.index));
                     }
@@ -103,14 +87,12 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ co
                     lastIndex = iconRegex.lastIndex;
                 }
 
-                // Add any remaining text after the last icon
                 if (lastIndex < text.length) {
                     parts.push(text.substring(lastIndex));
                 }
                 return <>{parts}</>; 
             }
 
-            // Handle standard HTML elements like <a> tags for Next.js Link
             if (domNode.type === 'tag' && domNode.name === 'a') {
                 const props = attributesToProps(domNode.attribs);
                 return (
@@ -119,7 +101,6 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ co
                     </Link>
                 );
             }
-            // Standard parsing for other elements
             return undefined;
         },
     };
@@ -131,4 +112,7 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ co
     );
 });
 
-export default VibeContentRenderer; // Changed to default export
+// Explicitly export as default IN ADDITION to the named export above.
+// This allows both `import VibeContentRenderer from '...'` and `import { VibeContentRenderer } from '...'`
+// to work correctly.
+export default VibeContentRenderer;
