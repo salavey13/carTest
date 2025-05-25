@@ -3,6 +3,8 @@
 import { sendTelegramDocument } from '@/app/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
+import path from 'path'; // Added import
+import fs from 'fs';   // Added import
 
 // Use require for pdf-lib and fontkit
 const pdfLibModule = require('pdf-lib');
@@ -177,7 +179,6 @@ export async function generatePdfFromMarkdownAndSend(
                 return { success: false, error: "Critical PDF library load error (fontkit instance is invalid)." };
             }
 
-
             let registrationSuccess = false;
             // Attempt 1: Standard static call (if logs were misleading or version changed)
             if (typeof PDFD_Class.registerFontkit === 'function') {
@@ -212,7 +213,6 @@ export async function generatePdfFromMarkdownAndSend(
                      debugLogger.warn(`[PDF Gen] Failed pdfLibModule.registerFontkit: ${e.message}`);
                 }
             }
-
 
             if (registrationSuccess) {
                 fontkitRegistered = true;
