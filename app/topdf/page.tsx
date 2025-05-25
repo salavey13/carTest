@@ -3,13 +3,14 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, faMagic } from '@fortawesome/free-solid-svg-icons';
+import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, faMagicWandSparkles } from '@fortawesome/free-solid-svg-icons'; // Changed faMagic to faMagicWandSparkles for Fa6
 import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import VibeContentRenderer from '@/components/VibeContentRenderer'; 
 import * as XLSX from 'xlsx';
+import { Button } from "@/components/ui/button"; // Corrected import
 
 const translations: Record<string, Record<string, string>> = {
   en: {
@@ -45,7 +46,7 @@ const translations: Record<string, Record<string, string>> = {
     "loadingUser": "Loading user data...",
     "status": "Status",
     "readyForUpload": "Ready to upload XLSX.",
-    "readyForGemini": "Ready for Gemini AI. Prompt copied.",
+    "readyForGemini": "Ready for Gemini AI. Prompt generated.",
     "readyForPdf": "Ready to generate PDF from Markdown.",
     "toggleLanguage": "Toggle Language",
     "manualCopyPrompt": "Manual Copy Area (if auto-copy fails):",
@@ -83,7 +84,7 @@ const translations: Record<string, Record<string, string>> = {
     "loadingUser": "Загрузка данных пользователя...",
     "status": "Статус",
     "readyForUpload": "Готово к загрузке XLSX.",
-    "readyForGemini": "Готово для Gemini AI. Промпт скопирован.",
+    "readyForGemini": "Готово для Gemini AI. Промпт сгенерирован.",
     "readyForPdf": "Готово к генерации PDF из Markdown.",
     "toggleLanguage": "Переключить язык",
     "manualCopyPrompt": "Область для ручного копирования (если авто-копирование не удалось):",
@@ -125,36 +126,27 @@ export default function ToPdfPageWithGemini() {
 
     useEffect(() => {
         if (currentStage === 'upload') setStatusMessage(t('readyForUpload'));
-        else if (currentStage === 'gemini') setStatusMessage(t('readyForGemini'));
+        else if (currentStage === 'gemini' && generatedPrompt) setStatusMessage(t('readyForGemini'));
         else if (currentStage === 'pdf') setStatusMessage(t('readyForPdf'));
-    }, [t, currentStage, currentLang]);
+    }, [t, currentStage, currentLang, generatedPrompt]);
 
     const handleFileChangeAndPreparePrompt = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) {
-            setSelectedFile(null);
-            setGeneratedPrompt('');
-            setCurrentStage('upload');
-            setStatusMessage(t('noFileSelected'));
+            setSelectedFile(null); setGeneratedPrompt(''); setCurrentStage('upload'); setStatusMessage(t('noFileSelected'));
             return;
         }
 
         if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast.error(t('errorFileTooLarge'));
-            setSelectedFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
+            toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
         if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) {
-            toast.error(t('errorInvalidFileType'));
-            setSelectedFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
+            toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
         
-        setSelectedFile(file);
-        setIsLoading(true);
-        setStatusMessage(t('parsingXlsx'));
+        setSelectedFile(file); setIsLoading(true); setStatusMessage(t('parsingXlsx'));
 
         try {
             const arrayBuffer = await file.arrayBuffer();
@@ -194,9 +186,8 @@ Please provide a detailed and insightful Markdown report.
 `;
             setGeneratedPrompt(promptForAI);
             setCurrentStage('gemini');
-            setStatusMessage(t('promptGenerated'));
+            setStatusMessage(t('promptGenerated')); // This will be updated by useEffect for 'gemini' stage
             toast.success(t('promptGenerated'));
-            handleCopyToClipboard(promptForAI, t('promptCopySuccess'));
         } catch (error) {
             logger.error("Error parsing XLSX for AI prompt:", error);
             toast.error(t('unexpectedError', { ERROR: (error as Error).message }));
@@ -216,102 +207,104 @@ Please provide a detailed and insightful Markdown report.
     };
 
     const handleGeneratePdf = async () => {
-        if (!markdownInput.trim()) {
-            toast.error(t('errorNoMarkdown'));
-            return;
-        }
-        if (!user?.id) {
-            toast.error(t('errorNoUser'));
-            return;
-        }
-         if (!selectedFile?.name) { // Ensure we have the original filename
-            toast.error("Original file context lost. Please re-upload.");
-            setCurrentStage('upload');
-            return;
-        }
+        if (!markdownInput.trim()) { toast.error(t('errorNoMarkdown')); return; }
+        if (!user?.id) { toast.error(t('errorNoUser')); return; }
+        if (!selectedFile?.name) { toast.error("Original file context lost. Please re-upload."); setCurrentStage('upload'); return; }
 
-
-        setIsLoading(true);
-        setStatusMessage(t('generatingPdf'));
+        setIsLoading(true); setStatusMessage(t('generatingPdf')); setCurrentStage('pdf');
 
         try {
             const result = await generatePdfFromMarkdownAndSend(markdownInput, String(user.id), selectedFile.name);
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
                 setStatusMessage(result.message || t('successMessage'));
-                setMarkdownInput('');
-                setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-                setGeneratedPrompt('');
-                setCurrentStage('upload');
+                setMarkdownInput(''); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = "";
+                setGeneratedPrompt(''); setCurrentStage('upload');
             } else {
                 toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
                 setStatusMessage(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
+                setCurrentStage('gemini'); // Revert to allow re-paste or re-copy
             }
         } catch (error) {
             toast.error(t('unexpectedError', { ERROR: (error as Error).message }));
             setStatusMessage(t('unexpectedError', { ERROR: (error as Error).message }));
+            setCurrentStage('gemini');
         } finally {
             setIsLoading(false);
         }
     };
     
-    if (isAuthLoading) { /* ... loading spinner ... */ }
+    if (isAuthLoading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen pt-20 bg-black">
+                <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-brand-cyan" />
+                <span className="ml-3 text-brand-cyan font-mono">{t('loadingUser')}</span>
+            </div>
+        );
+    }
 
     return (
         <div className={cn("min-h-screen flex flex-col items-center pt-24 pb-10 font-mono", "bg-gradient-to-br from-slate-900 via-black to-indigo-900/50 text-gray-200 px-4")}>
             <Toaster position="bottom-center" richColors toastOptions={{ className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm' }} />
-            <div className="absolute top-4 right-4"> <button onClick={toggleLang} className="p-2 bg-gray-700/50 rounded-md hover:bg-gray-600/70 transition-colors flex items-center gap-1.5 text-xs text-cyan-300" title={t("toggleLanguage")}> <FontAwesomeIcon icon={faLanguage} /> {currentLang === 'en' ? 'RU' : 'EN'} </button> </div>
+            <div className="absolute top-4 right-4 z-20"> <button onClick={toggleLang} className="p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1.5 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> <FontAwesomeIcon icon={faLanguage} /> {currentLang === 'en' ? 'RU' : 'EN'} </button> </div>
 
-            <div className="w-full max-w-2xl p-6 md:p-8 border border-brand-orange/40 rounded-xl bg-black/70 backdrop-blur-xl shadow-2xl shadow-brand-orange/25">
-                <VibeContentRenderer content="::FaMagic::" className="text-6xl text-brand-orange mx-auto mb-5" />
+            <div className="w-full max-w-2xl p-6 md:p-8 border border-brand-orange/40 rounded-xl bg-black/80 backdrop-blur-xl shadow-2xl shadow-brand-orange/30">
+                <VibeContentRenderer content="::FaMagicWandSparkles::" className="text-6xl text-brand-orange mx-auto mb-5 animate-pulse" />
                 <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-orange cyber-text glitch mb-2" data-text={t("pageTitle")}>{t("pageTitle")}</h1>
-                <p className="text-sm text-center text-gray-400 mb-8">{t("pageSubtitle")}</p>
+                <p className="text-sm text-center text-gray-400 mb-10">{t("pageSubtitle")}</p>
 
                 {/* Step 1: Upload and Prepare Prompt */}
-                <div className={cn("p-5 border border-dashed border-brand-yellow/30 rounded-lg mb-8 bg-slate-800/30", currentStage !== 'upload' && "opacity-50")}>
-                    <h2 className="text-xl font-semibold text-brand-yellow mb-3 flex items-center"><VibeContentRenderer content="::FaFileUpload::" className="mr-2"/>{t("step1Title")}</h2>
-                    <label htmlFor="xlsxFile" className={cn("w-full flex items-center justify-center px-4 py-3 border-2 border-dashed rounded-md cursor-pointer transition-colors mb-4", "border-brand-yellow/50 hover:border-brand-yellow hover:bg-brand-yellow/10 text-brand-yellow", isLoading && currentStage === 'upload' && "opacity-70 cursor-not-allowed")}>
-                        <FontAwesomeIcon icon={faFileExcel} className="mr-3 text-xl" />
-                        <span className="font-semibold">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
-                        <input id="xlsxFile" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChangeAndPreparePrompt} className="sr-only" disabled={isLoading && currentStage === 'upload'} />
+                <div className={cn("p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'upload' && "opacity-60")}>
+                    <h2 className="text-xl font-semibold text-brand-yellow mb-4 flex items-center"><VibeContentRenderer content="::FaFileUpload::" className="mr-2 w-5 h-5"/>{t("step1Title")}</h2>
+                    <label htmlFor="xlsxFile" className={cn("w-full flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow hover:bg-brand-yellow/10 text-brand-yellow", (isLoading && currentStage === 'upload') || currentStage !== 'upload' ? "opacity-70 cursor-not-allowed" : "hover:scale-105")}>
+                        <FontAwesomeIcon icon={faFileExcel} className="mr-3 text-3xl mb-2" />
+                        <span className="font-semibold text-sm">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
+                        <input id="xlsxFile" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChangeAndPreparePrompt} className="sr-only" disabled={(isLoading && currentStage === 'upload') || currentStage !== 'upload'} />
                     </label>
-                    {generatedPrompt && currentStage === 'gemini' && (
-                        <div className="space-y-3">
+                </div>
+
+                {/* Step 2: Gemini Interaction */}
+                <div className={cn("p-5 border-2 border-dashed border-brand-cyan/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'gemini' && "opacity-60 pointer-events-none")}>
+                    <h2 className="text-xl font-semibold text-brand-cyan mb-4 flex items-center"><VibeContentRenderer content="::FaBrain::" className="mr-2 w-5 h-5"/>{t("step2Title")}</h2>
+                    {generatedPrompt && (
+                        <div className="space-y-4">
                             <p className="text-sm text-green-400"><FontAwesomeIcon icon={faCheckCircle} className="mr-2"/>{t("promptGenerated")}</p>
-                             <textarea readOnly value={generatedPrompt} rows={5} className="w-full p-2 text-xs bg-slate-700/50 border border-slate-600 rounded-md text-gray-300 simple-scrollbar" title={t("manualCopyPrompt")}/>
+                             <label htmlFor="geminiPrompt" className="text-xs text-gray-400 block mb-1">{t("manualCopyPrompt")}</label>
+                             <textarea id="geminiPrompt" readOnly value={generatedPrompt} rows={7} className="w-full p-2.5 text-xs bg-slate-900/70 border border-slate-700 rounded-md text-gray-300 simple-scrollbar shadow-sm"/>
                             <div className="flex flex-col sm:flex-row gap-3">
-                                <Button onClick={() => handleCopyToClipboard(generatedPrompt, t('promptCopySuccess'))} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 hover:text-brand-cyan flex-1">
+                                <Button onClick={() => handleCopyToClipboard(generatedPrompt, t('promptCopySuccess'))} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-sm">
                                     <FontAwesomeIcon icon={faCopy} className="mr-2"/>{t("copyPromptAndData")}
                                 </Button>
-                                <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className={cn(Button.styles.variants.outline, "border-brand-blue text-brand-blue hover:bg-brand-blue/10 hover:text-brand-blue flex-1 flex items-center justify-center")}>
+                                <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className={cn(Button.defaultStyles, "bg-brand-blue/80 hover:bg-brand-blue text-white flex-1 flex items-center justify-center py-2.5 text-sm")}> {/* Use Button.defaultStyles or specific variant */}
                                     <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2"/>{t("goToGemini")}
                                 </a>
                             </div>
+                             <label htmlFor="markdownInput" className="text-sm text-gray-300 block mt-6 mb-1.5">{t("pasteMarkdown")}</label>
+                             <textarea
+                                id="markdownInput"
+                                value={markdownInput}
+                                onChange={(e) => setMarkdownInput(e.target.value)}
+                                placeholder="..."
+                                rows={10}
+                                className="w-full p-3 border rounded-md bg-slate-900/70 border-slate-700 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-sm simple-scrollbar shadow-sm"
+                                disabled={isLoading || currentStage !== 'gemini'}
+                            />
                         </div>
                     )}
                 </div>
-
-                {/* Step 2: Paste Markdown and Generate PDF */}
-                <div className={cn("p-5 border border-dashed border-brand-pink/30 rounded-lg bg-slate-800/30", currentStage !== 'gemini' && currentStage !== 'pdf' && "opacity-50 pointer-events-none")}>
-                    <h2 className="text-xl font-semibold text-brand-pink mb-3 flex items-center"><VibeContentRenderer content="::FaPaste::" className="mr-2"/>{t("step2Title")}</h2>
-                    <textarea
-                        value={markdownInput}
-                        onChange={(e) => setMarkdownInput(e.target.value)}
-                        placeholder={t("pasteMarkdown")}
-                        rows={8}
-                        className="w-full p-3 border rounded-md bg-slate-700/50 border-slate-600 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-sm simple-scrollbar mb-4"
-                        disabled={isLoading || currentStage !== 'gemini'}
-                    />
-                    <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id || currentStage !== 'gemini'} className={cn("w-full text-lg py-3 bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue text-white hover:shadow-brand-pink/40 hover:brightness-110 focus:ring-brand-pink", (isLoading || !markdownInput.trim() || currentStage !== 'gemini') && "opacity-60 cursor-not-allowed")}>
-                        {isLoading && currentStage === 'pdf' ? (<><FontAwesomeIcon icon={faSpinner} spin className="mr-2"/> {statusMessage || t('processing')}</>) : <><VibeContentRenderer content="::FaFilePdf::" className="mr-2"/> {t('generateAndSendPdf')}</>}
+                
+                {/* Step 3: Generate PDF */}
+                <div className={cn("p-5 border-2 border-dashed border-brand-pink/40 rounded-xl bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'pdf' && currentStage !== 'gemini' && "opacity-60 pointer-events-none", currentStage === 'gemini' && !markdownInput.trim() && "opacity-60 pointer-events-none" )}>
+                     <h2 className="text-xl font-semibold text-brand-pink mb-4 flex items-center"><VibeContentRenderer content="::FaFilePdf::" className="mr-2 w-5 h-5"/>{currentLang === "ru" ? "Шаг 3: Создать PDF" : "Step 3: Generate PDF"}</h2>
+                    <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id || currentStage !== 'gemini'} className={cn("w-full text-lg py-3.5 bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue text-white hover:shadow-brand-pink/50 hover:brightness-125 focus:ring-brand-pink shadow-lg", (isLoading || !markdownInput.trim() || currentStage !== 'gemini') && "opacity-50 cursor-not-allowed")}>
+                        {isLoading && currentStage === 'pdf' ? (<><FontAwesomeIcon icon={faSpinner} spin className="mr-2"/> {statusMessage || t('processing')}</>) : <><VibeContentRenderer content="::FaPaperPlane::" className="mr-2"/> {t('generateAndSendPdf')}</>}
                     </Button>
                 </div>
                 
-                <div className="mt-6 text-xs text-center text-gray-500 min-h-[20px] font-orbitron uppercase">
-                   {t('status')}: {isLoading ? statusMessage : (currentStage === 'upload' ? (selectedFile ? t('fileSelected', {FILENAME: selectedFile.name}) : t('readyForUpload')) : (currentStage === 'gemini' ? t('readyForGemini') : t('readyForPdf'))) }
+                <div className="mt-8 text-xs text-center text-gray-400 min-h-[20px] font-orbitron uppercase tracking-wider">
+                   {t('status')}: {isLoading ? statusMessage : ( (currentStage === 'upload' && !selectedFile) ? t('readyForUpload') : (currentStage==='upload' && selectedFile ? t('fileSelected', {FILENAME: selectedFile.name}) : (currentStage === 'gemini' ? t('readyForGemini') : t('readyForPdf'))) ) }
                 </div>
-                 <p className="text-center text-xs text-gray-600 mt-6">
+                 <p className="text-center text-xs text-gray-500 mt-6">
                     {currentLang === 'ru' ? 'Эта фича использует Google Gemini AI. Качество отчета зависит от качества данных и возможностей AI.' : 'This feature uses Google Gemini AI. Report quality depends on data quality and AI capabilities.'}
                 </p>
             </div>
