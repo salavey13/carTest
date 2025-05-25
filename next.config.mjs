@@ -20,6 +20,11 @@ const nextConfig = {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
+    // Ensure that 'server-assets' directory, containing fonts for PDF generation, is included in the serverless bundle.
+    // This is crucial for fs.readFileSync to find the fonts in the Vercel environment.
+    outputFileTracingIncludes: {
+      '/': ['server-assets/**/*'], 
+    },
   },
 }
 
