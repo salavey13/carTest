@@ -3,14 +3,14 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, faMagicWandSparkles } from '@fortawesome/free-solid-svg-icons'; // Changed faMagic to faMagicWandSparkles for Fa6
+import { faUpload, faFilePdf, faSpinner, faCheckCircle, faTriangleExclamation, faLanguage, faFileExcel, faBrain, faCopy, faPaste, faExternalLinkAlt, faMagicWandSparkles } from '@fortawesome/free-solid-svg-icons';
 import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import VibeContentRenderer from '@/components/VibeContentRenderer'; 
 import * as XLSX from 'xlsx';
-import { Button } from "@/components/ui/button"; // Corrected import
+import { Button } from "@/components/ui/button"; 
 
 const translations: Record<string, Record<string, string>> = {
   en: {
@@ -186,7 +186,7 @@ Please provide a detailed and insightful Markdown report.
 `;
             setGeneratedPrompt(promptForAI);
             setCurrentStage('gemini');
-            setStatusMessage(t('promptGenerated')); // This will be updated by useEffect for 'gemini' stage
+            setStatusMessage(t('promptGenerated')); 
             toast.success(t('promptGenerated'));
         } catch (error) {
             logger.error("Error parsing XLSX for AI prompt:", error);
@@ -221,12 +221,12 @@ Please provide a detailed and insightful Markdown report.
                 setMarkdownInput(''); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = "";
                 setGeneratedPrompt(''); setCurrentStage('upload');
             } else {
-                toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
+                toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }), { duration: 7000 });
                 setStatusMessage(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
-                setCurrentStage('gemini'); // Revert to allow re-paste or re-copy
+                setCurrentStage('gemini'); 
             }
         } catch (error) {
-            toast.error(t('unexpectedError', { ERROR: (error as Error).message }));
+            toast.error(t('unexpectedError', { ERROR: (error as Error).message }), { duration: 7000 });
             setStatusMessage(t('unexpectedError', { ERROR: (error as Error).message }));
             setCurrentStage('gemini');
         } finally {
@@ -254,17 +254,17 @@ Please provide a detailed and insightful Markdown report.
                 <p className="text-sm text-center text-gray-400 mb-10">{t("pageSubtitle")}</p>
 
                 {/* Step 1: Upload and Prepare Prompt */}
-                <div className={cn("p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'upload' && "opacity-60")}>
-                    <h2 className="text-xl font-semibold text-brand-yellow mb-4 flex items-center"><VibeContentRenderer content="::FaFileUpload::" className="mr-2 w-5 h-5"/>{t("step1Title")}</h2>
-                    <label htmlFor="xlsxFile" className={cn("w-full flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow hover:bg-brand-yellow/10 text-brand-yellow", (isLoading && currentStage === 'upload') || currentStage !== 'upload' ? "opacity-70 cursor-not-allowed" : "hover:scale-105")}>
+                <div className={cn("p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'upload' && "opacity-60 blur-sm pointer-events-none")}>
+                    <h2 className="text-xl font-semibold text-brand-yellow mb-4 flex items-center"><VibeContentRenderer content="::FaArrowUpFromBracket::" className="mr-2 w-5 h-5"/>{t("step1Title")}</h2>
+                    <label htmlFor="xlsxFile" className={cn("w-full flex flex-col items-center justify-center px-4 py-6 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow hover:bg-brand-yellow/10 text-brand-yellow", isLoading && currentStage === 'upload' ? "opacity-70 cursor-not-allowed" : "hover:scale-105")}>
                         <FontAwesomeIcon icon={faFileExcel} className="mr-3 text-3xl mb-2" />
                         <span className="font-semibold text-sm">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
-                        <input id="xlsxFile" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChangeAndPreparePrompt} className="sr-only" disabled={(isLoading && currentStage === 'upload') || currentStage !== 'upload'} />
+                        <input id="xlsxFile" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChangeAndPreparePrompt} className="sr-only" disabled={isLoading && currentStage === 'upload'} />
                     </label>
                 </div>
 
                 {/* Step 2: Gemini Interaction */}
-                <div className={cn("p-5 border-2 border-dashed border-brand-cyan/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'gemini' && "opacity-60 pointer-events-none")}>
+                <div className={cn("p-5 border-2 border-dashed border-brand-cyan/40 rounded-xl mb-8 bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'gemini' && "opacity-60 blur-sm pointer-events-none")}>
                     <h2 className="text-xl font-semibold text-brand-cyan mb-4 flex items-center"><VibeContentRenderer content="::FaBrain::" className="mr-2 w-5 h-5"/>{t("step2Title")}</h2>
                     {generatedPrompt && (
                         <div className="space-y-4">
@@ -275,9 +275,11 @@ Please provide a detailed and insightful Markdown report.
                                 <Button onClick={() => handleCopyToClipboard(generatedPrompt, t('promptCopySuccess'))} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-sm">
                                     <FontAwesomeIcon icon={faCopy} className="mr-2"/>{t("copyPromptAndData")}
                                 </Button>
-                                <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className={cn(Button.defaultStyles, "bg-brand-blue/80 hover:bg-brand-blue text-white flex-1 flex items-center justify-center py-2.5 text-sm")}> {/* Use Button.defaultStyles or specific variant */}
+                                <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-sm">
+                                  <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" >
                                     <FontAwesomeIcon icon={faExternalLinkAlt} className="mr-2"/>{t("goToGemini")}
-                                </a>
+                                  </a>
+                                </Button>
                             </div>
                              <label htmlFor="markdownInput" className="text-sm text-gray-300 block mt-6 mb-1.5">{t("pasteMarkdown")}</label>
                              <textarea
@@ -294,7 +296,7 @@ Please provide a detailed and insightful Markdown report.
                 </div>
                 
                 {/* Step 3: Generate PDF */}
-                <div className={cn("p-5 border-2 border-dashed border-brand-pink/40 rounded-xl bg-slate-800/40 shadow-inner shadow-black/30", currentStage !== 'pdf' && currentStage !== 'gemini' && "opacity-60 pointer-events-none", currentStage === 'gemini' && !markdownInput.trim() && "opacity-60 pointer-events-none" )}>
+                <div className={cn("p-5 border-2 border-dashed border-brand-pink/40 rounded-xl bg-slate-800/40 shadow-inner shadow-black/30", (currentStage !== 'gemini' && currentStage !== 'pdf') || (currentStage === 'gemini' && !markdownInput.trim()) ? "opacity-60 blur-sm pointer-events-none" : "")}>
                      <h2 className="text-xl font-semibold text-brand-pink mb-4 flex items-center"><VibeContentRenderer content="::FaFilePdf::" className="mr-2 w-5 h-5"/>{currentLang === "ru" ? "Шаг 3: Создать PDF" : "Step 3: Generate PDF"}</h2>
                     <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id || currentStage !== 'gemini'} className={cn("w-full text-lg py-3.5 bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue text-white hover:shadow-brand-pink/50 hover:brightness-125 focus:ring-brand-pink shadow-lg", (isLoading || !markdownInput.trim() || currentStage !== 'gemini') && "opacity-50 cursor-not-allowed")}>
                         {isLoading && currentStage === 'pdf' ? (<><FontAwesomeIcon icon={faSpinner} spin className="mr-2"/> {statusMessage || t('processing')}</>) : <><VibeContentRenderer content="::FaPaperPlane::" className="mr-2"/> {t('generateAndSendPdf')}</>}
