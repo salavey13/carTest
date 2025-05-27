@@ -16,7 +16,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { FaTimes } from "react-icons/fa";
+import { FaXmark } from "react-icons/fa";
 
 export interface HotLeadData {
   id: string;
@@ -131,7 +131,7 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
                 </div>
                 <DialogClose asChild>
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground -mt-1 -mr-1">
-                        <FaTimes className="w-5 h-5" />
+                        <FaXmark className="w-5 h-5" />
                         <span className="sr-only">{modalText.close}</span>
                     </Button>
                 </DialogClose>
