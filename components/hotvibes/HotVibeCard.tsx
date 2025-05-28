@@ -1,3 +1,4 @@
+// /components/hotvibes/HotVibeCard.tsx
 "use client";
 
 import React, { useState } from 'react';
@@ -16,7 +17,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { FaXmark } from "react-icons/fa";
+import { FaXmark } from "react-icons/fa6";
 
 export interface HotLeadData {
   id: string;
