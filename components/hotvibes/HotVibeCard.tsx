@@ -42,7 +42,7 @@ interface HotVibeCardProps {
   currentLang?: 'ru' | 'en';
 }
 
-const PLACEHOLDER_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/webanybot_hotvibe_placeholder.png";
+const PLACEHOLDER_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png";
 
 export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, currentLang = 'ru' }: HotVibeCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
