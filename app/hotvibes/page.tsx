@@ -1,3 +1,4 @@
+// /app/hotvibes/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense, useCallback, useId } from 'react';
@@ -26,7 +27,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 
 const pageTranslations = {
     ru: {
-        pageTitle: "::FaFireAlt:: ГОРЯЧИЕ ВАЙБЫ ::FaFireAlt::",
+        pageTitle: "::FaFire:: ГОРЯЧИЕ ВАЙБЫ ::FaFireAlt::",
         pageSubtitle: "Агент! Это твой доступ к самым перспективным возможностям. Клиенты УЖЕ ЖДУТ или скоро откликнутся. Выбирай миссию, применяй навыки, зарабатывай KiloVibes и реальный кэш!",
         lobbyTitle: "::FaConciergeBell:: Лобби Горячих Возможностей",
         noHotVibes: "Пока нет подходящих вайбов. Прокачивайся в Тренировках, запускай свой Скрейпер в /leads или загляни позже!",
@@ -37,7 +38,7 @@ const pageTranslations = {
         lockedMissionRedirect: "Навык для этой миссии еще не открыт. Начинаем экспресс-тренировку...", // Generic message
     },
     en: {
-        pageTitle: "::FaFireAlt:: HOT VIBES ::FaFireAlt::",
+        pageTitle: "::FaFire:: HOT VIBES ::FaFire::",
         pageSubtitle: "Agent! This is your access to the most promising opportunities. Clients ARE WAITING or will respond soon. Choose your mission, apply your skills, earn KiloVibes and real cash!",
         lobbyTitle: "::FaConciergeBell:: Hot Opportunity Lobby",
         noHotVibes: "No suitable vibes yet. Level up in Training, run your Scraper in /leads, or check back later!",
@@ -205,8 +206,8 @@ function HotVibesContent() {
         title={t.pageTitle}
         subtitle={t.pageSubtitle}
         triggerElementSelector={`#${heroTriggerId}`}
-        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/webanybot_logo_stacked_transparent_glowing.png"
-        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/abstract_bg_002-246689a1-5d5d-474d-871b-435431844157.jpg"
+        backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"
+        mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//aPAQbwg_700b-62cff769-b043-4043-923d-76a1e9e4b71f.jpg"
       />
       <div id={heroTriggerId} style={{ height: '130vh' }} aria-hidden="true" />
 
