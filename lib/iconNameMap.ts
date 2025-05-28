@@ -10,6 +10,8 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faimageslash: "FaImage",
   fa42group: "Fa42Group",
   fa500px: "Fa500Px",
+'fafirealt': 'FaFire', // Using FaFire as a likely free alternative
+'faconciergebell': 'FaBellConcierge', // Using FaBellConcierge as a likely free alternative
   faaccessibleicon: "FaAccessibleIcon",
   faaccusoft: "FaAccusoft",
   faadn: "FaAdn",
