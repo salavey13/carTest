@@ -1,29 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe } from "lucide-react"; // Base Lucide icons
+import { LayoutGrid, X, Search, Globe } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import UserInfo from "@/components/user-info";
+import UserInfo from "@/components/user-info"; // Assuming this component exists and is styled
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { QUEST_ORDER, fetchUserCyberFitnessProfile, isQuestUnlocked as checkQuestUnlockedFromHook, CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
-import * as Fa6Icons from "react-icons/fa6";
-import { iconNameMap } from "@/lib/iconNameMap";
+import { 
+    QUEST_ORDER, 
+    fetchUserCyberFitnessProfile, 
+    isQuestUnlocked as checkQuestUnlockedFromHook, // Renamed for clarity
+    CyberFitnessProfile 
+} from '@/hooks/cyberFitnessSupabase';
+import * as Fa6Icons from "react-icons/fa6"; // Import all Fa6Icons
+// iconNameMap is NOT needed here if VibeContentRenderer handles ::FaName:: syntax
 
 interface PageInfo {
   path: string;
-  name: string;
-  icon?: keyof typeof Fa6Icons | string;
+  name: string; // Key for translation
+  icon?: string; // String like "FaFire" or "::FaFire::" for VibeContentRenderer
   isImportant?: boolean;
   isAdminOnly?: boolean;
   isHot?: boolean;
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray';
-  group?: string;
-  translatedName?: string;
+  group?: string; // Key for translation
+  translatedName?: string; // Populated by t() function
   questId?: string;
   minLevel?: number;
   supportOnly?: boolean;
@@ -94,7 +99,7 @@ const allPages: PageInfo[] = [
 
 const groupOrder = ["Vibe HQ", "Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 
-const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
+const groupIcons: Record<string, string> = { // Using string for icon names
     "Vibe HQ": "FaCrosshairs",
     "Core Vibe": "FaBolt",
     "GTA Vibe Missions": "FaGamepad",
@@ -183,10 +188,11 @@ const tileItemVariants = {
 
 const MotionLink = motion(Link);
 
-const RenderIconFromPage = React.memo(({ icon, className }: { icon?: keyof typeof Fa6Icons | string; className?: string }) => {
+// Simplified RenderIconFromPage trusting VibeContentRenderer
+const RenderIconFromPage = React.memo(({ icon, className }: { icon?: string; className?: string }) => {
   if (!icon) return null;
-  const formattedIcon = typeof icon === 'string' && icon.startsWith("::") && icon.endsWith("::") ? icon : `::${icon}::`;
-  return <VibeContentRenderer content={formattedIcon} className={className || ''} />;
+  const iconString = icon.startsWith("::") && icon.endsWith("::") ? icon : `::${icon}::`;
+  return <VibeContentRenderer content={iconString} className={className || ''} />;
 });
 RenderIconFromPage.displayName = "RenderIconFromPage";
 
@@ -257,7 +263,7 @@ export default function Header() {
 
   const currentLogoText = useMemo(() => {
     const page = allPages.find(p => p.path === pathname);
-    let logoText = "CYBERVIBE"; // Default
+    let logoText = "CYBERVIBE"; 
 
     if (pathname?.startsWith('/vpr')) {
       logoText = "VPR";
@@ -285,12 +291,11 @@ export default function Header() {
     const userLevel = cyberProfile?.level ?? 0;
 
     logger.debug(`[Header Filtering] Search: "${lowerSearchTerm}", Admin: ${isAdmin}, Level: ${userLevel}, Profile Loading: ${profileLoading}, AppCtx Loading: ${appContextLoading}`);
-
+    
     const filtered = allPages
       .filter(page => {
         if (page.isAdminOnly && !isAdmin) return false;
         if (!isAdmin && page.minLevel !== undefined && userLevel < page.minLevel) return false;
-        // Correctly check supportOnly against user's role, allowing admin to bypass
         if (!isAdmin && page.supportOnly && !(dbUser?.role === 'support')) return false;
 
         if (page.group === "GTA Vibe Missions" && page.questId && cyberProfile && !profileLoading) {
@@ -303,46 +308,46 @@ export default function Header() {
       .filter(page =>
         (page.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
         (page.path || '').toLowerCase().includes(lowerSearchTerm) ||
-        (t(page.group || '') || '').toLowerCase().includes(lowerSearchTerm)
+        (t(page.group || 'Misc') || '').toLowerCase().includes(lowerSearchTerm) // Added fallback for page.group
       );
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
       if (groupName === "Admin Zone" && !isAdmin && !appContextLoading) return;
-      if (groupName === "GTA Vibe Missions" || (groups[groupName] !== undefined) || filtered.some(p => p.group === groupName) ) {
-         groups[groupName] = [];
-      }
+      // Always initialize groups mentioned in groupOrder to maintain order
+      groups[groupName] = [];
     });
-
-    const startTrainingPage = allPages.find(p => p.path === "/start-training");
-    if (startTrainingPage && !filtered.some(p => p.path === "/start-training")) {
-        const userCanSeeStartTraining = (!startTrainingPage.isAdminOnly || isAdmin) &&
-                                        (isAdmin || startTrainingPage.minLevel === undefined || userLevel >= startTrainingPage.minLevel) &&
-                                        (isAdmin || !startTrainingPage.supportOnly || dbUser?.role === 'support');
-
-        if (userCanSeeStartTraining) {
-            const translatedStartTraining = {...startTrainingPage, translatedName: t(startTrainingPage.name) };
-            if ( (translatedStartTraining.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
-                 (translatedStartTraining.path || '').toLowerCase().includes(lowerSearchTerm) ||
-                 (t(translatedStartTraining.group || '') || '').toLowerCase().includes(lowerSearchTerm)
-            ) {
-                 if (!groups["GTA Vibe Missions"]) groups["GTA Vibe Missions"] = [];
-                 // Check if it's already added by questId logic if quests are loaded
-                 if (!groups["GTA Vibe Missions"].some(p => p.path === translatedStartTraining.path)) {
-                    groups["GTA Vibe Missions"].push(translatedStartTraining);
-                 }
-            }
-        }
+     // If "Misc" is not in groupOrder but pages might fall into it
+    if (!groups["Misc"]) {
+        groups["Misc"] = [];
     }
+
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (!groups[groupName]) groups[groupName] = [];
-      if (!groups[groupName].some(p => p.path === page.path)) {
-        groups[groupName].push(page);
-      }
+      if (!groups[groupName]) groups[groupName] = []; // Should be covered by above, but as a safeguard
+      groups[groupName].push(page);
     });
-    // Ensure "GTA Vibe Missions" group is sorted if "Start Training" was added out of natural order
+    
+    // Ensure "Start Training" is correctly placed if visible
+    const startTrainingPageInfo = allPages.find(p => p.path === "/start-training");
+    if (startTrainingPageInfo) {
+        const userCanSeeStartTraining = (!startTrainingPageInfo.isAdminOnly || isAdmin) &&
+                                        (isAdmin || startTrainingPageInfo.minLevel === undefined || userLevel >= startTrainingPageInfo.minLevel) &&
+                                        (isAdmin || !startTrainingPageInfo.supportOnly || dbUser?.role === 'support');
+        if (userCanSeeStartTraining) {
+            const translatedStartTraining = {...startTrainingPageInfo, translatedName: t(startTrainingPageInfo.name) };
+            const stMatchesSearch = (translatedStartTraining.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
+                                   (translatedStartTraining.path || '').toLowerCase().includes(lowerSearchTerm) ||
+                                   (t(translatedStartTraining.group || 'GTA Vibe Missions') || '').toLowerCase().includes(lowerSearchTerm);
+            
+            if (stMatchesSearch && groups["GTA Vibe Missions"] && !groups["GTA Vibe Missions"].some(p => p.path === translatedStartTraining.path)) {
+                 groups["GTA Vibe Missions"].push(translatedStartTraining);
+            }
+        }
+    }
+    
+    // Sort groups like "GTA Vibe Missions" by their original order in allPages
     if (groups["GTA Vibe Missions"]) {
         groups["GTA Vibe Missions"].sort((a, b) => {
             const aIndex = allPages.findIndex(p => p.path === a.path);
@@ -446,11 +451,8 @@ export default function Header() {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null;
 
-                  const groupIconKey = groupIcons[groupName] as keyof typeof Fa6Icons | undefined;
-                  // @ts-ignore iconNameMap can be indexed by string
-                  const ResolvedIconComponent = groupIconKey ? Fa6Icons[iconNameMap[groupIconKey.toLowerCase()] || groupIconKey] : null;
-
-
+                  const groupIconString = groupIcons[groupName]; // This is now a string like "FaCrosshairs"
+                  
                   return (
                     <div key={groupName}>
                        <h3 className={cn(
@@ -458,12 +460,12 @@ export default function Header() {
                         "gta-vibe-text-effect",
                         groupIconColors[groupName] || "text-brand-purple"
                         )}>
-                        {ResolvedIconComponent && (
-                          <ResolvedIconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
+                        {groupIconString && (
+                          <RenderIconFromPage icon={groupIconString} className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
                         )}
                         <span>{t(groupName)}</span>
-                        {ResolvedIconComponent && (groupName === "GTA Vibe Missions" || groupName === "Vibe HQ") && (
-                           <ResolvedIconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
+                        {groupIconString && (groupName === "GTA Vibe Missions" || groupName === "Vibe HQ") && (
+                           <RenderIconFromPage icon={groupIconString} className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
                         )}
                       </h3>
                       <motion.div
@@ -509,7 +511,7 @@ export default function Header() {
                               )}
                               {page.icon && (
                                 <RenderIconFromPage
-                                    icon={page.icon} // Pass as string, RenderIconFromPage will format
+                                    icon={page.icon}
                                     className={cn(
                                         "transition-transform duration-200 group-hover:scale-110 mb-1 sm:mb-1.5",
                                         page.isImportant
