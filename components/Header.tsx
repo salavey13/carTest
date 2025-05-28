@@ -26,7 +26,7 @@ interface PageInfo {
   translatedName?: string;
   questId?: string;
   minLevel?: number;
-  supportOnly?: boolean; // Added for Leads HQ
+  supportOnly?: boolean;
 }
 
 const allPages: PageInfo[] = [
@@ -44,7 +44,7 @@ const allPages: PageInfo[] = [
   { path: "/cybervibe", name: "CyberVibe Upgrade", icon: "FaBolt", group: "Core Vibe", isImportant: true, color: "yellow", isHot: true, minLevel: 2 },
 
   // GTA Vibe Missions
-  { path: "/start-training", name: "Start Training", icon: "FaDumbbell", group: "GTA Vibe Missions", color: "green", isImportant: true, minLevel: 0}, // MOVED HERE
+  { path: "/start-training", name: "Start Training", icon: "FaDumbbell", group: "GTA Vibe Missions", color: "green", isImportant: true, minLevel: 0},
   { path: "/tutorials/image-swap", name: "Image Swap Mission", icon: "FaArrowRightArrowLeft", group: "GTA Vibe Missions", isImportant: true, color: "green", isHot: true, questId: "image-swap-mission" },
   { path: "/tutorials/icon-swap", name: "Icon Demining Mission", icon: "FaBomb", group: "GTA Vibe Missions", isImportant: true, color: "red", isHot: true, questId: "icon-swap-mission" },
   { path: "/tutorials/video-swap", name: "Video Render Mission", icon: "FaVideo", group: "GTA Vibe Missions", isImportant: true, color: "cyan", isHot: true, questId: "video-swap-mission" },
@@ -56,7 +56,6 @@ const allPages: PageInfo[] = [
   { path: "/buy-subscription", name: "OS Upgrades", icon: "FaCreditCard", group: "CyberFitness", color: "green", minLevel: 1 },
   { path: "/premium", name: "Premium Modules", icon: "FaStar", group: "CyberFitness", color: "yellow", minLevel: 3 },
   { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange", minLevel: 1},
-  // "/start-training" MOVED to GTA Vibe Missions
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue", minLevel: 1 },
   { path: "/partner", name: "Alliance Perks", icon: "FaUsers", group: "CyberFitness", color: "purple", minLevel: 2},
 
@@ -98,7 +97,7 @@ const groupOrder = ["Vibe HQ", "Core Vibe", "GTA Vibe Missions", "CyberFitness",
 const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
     "Vibe HQ": "FaCrosshairs",
     "Core Vibe": "FaBolt",
-    "GTA Vibe Missions": "FaGamepad", // Kept Gamepad as it's iconic for missions
+    "GTA Vibe Missions": "FaGamepad",
     "CyberFitness": "FaDumbbell",
     "Content & Tools": "FaPuzzlePiece",
     "Misc": "FaLayerGroup",
@@ -108,14 +107,13 @@ const groupIcons: Record<string, keyof typeof Fa6Icons | undefined> = {
 const groupIconColors: Record<string, string> = {
   "Vibe HQ": "text-brand-red",
   "Core Vibe": "text-brand-cyan",
-  "GTA Vibe Missions": "text-brand-green", // Changed to green as Start Training is green
+  "GTA Vibe Missions": "text-brand-green",
   "CyberFitness": "text-neon-lime",
   "Content & Tools": "text-brand-orange",
   "Misc": "text-muted-foreground",
   "Admin Zone": "text-destructive",
 };
 
-// Ensure all names from allPages are in BOTH en and ru translations
 const translations: Record<string, Record<string, string>> = {
   en: {
     "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "Leads HQ": "Leads HQ", "Hot Vibes": "Hot Vibes",
@@ -126,7 +124,7 @@ const translations: Record<string, Record<string, string>> = {
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Veritasium Insights": "Veritasium Insights", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo", "XLSX-2-PDF Converter": "XLSX-2-PDF Converter",
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
     "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
-    "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot", "Missions": "Missions", // Added Missions for tutorial path
+    "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot", "Missions": "Missions",
     "Vibe HQ": "Vibe HQ", "Core Vibe": "Core Vibe", "GTA Vibe Missions": "GTA Vibe Missions", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
   ru: {
@@ -143,21 +141,55 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-// ... (rest of the Header component from previous response, including colorVarMap, tileColorClasses, gridContainerVariants, tileItemVariants, MotionLink, RenderIconFromPage, and the main Header function with its hooks and logic)
-// The filtering logic for groupedAndFilteredPages already uses minLevel and isAdmin, which is correct.
-// The questId check for GTA Vibe Missions also remains correct.
-// No further changes needed in the main Header function body beyond the allPages and translations update above.
-// Make sure the dynamic logo logic correctly uses the new t("Missions") for the tutorial path.
-// Inside useMemo for currentLogoText:
-// ...
-    if (pathname?.startsWith('/tutorials')) {
-        const tutorialName = t(page?.name || "Missions"); // Ensure "Missions" has translation
-        // Adjusted to use the generic "Missions" if specific tutorial name is too long
-        return tutorialName.length > 10 ? t("Missions").toUpperCase() : tutorialName.toUpperCase();
-    }
-// ...
+const colorVarMap: Record<string, string> = {
+  purple: "var(--brand-purple-rgb)", blue: "var(--brand-blue-rgb)", yellow: "var(--brand-yellow-rgb)",
+  lime: "var(--neon-lime-rgb)", green: "var(--brand-green-rgb)", pink: "var(--brand-pink-rgb)",
+  cyan: "var(--brand-cyan-rgb)", red: "var(--destructive-rgb)", orange: "var(--brand-orange-rgb)",
+  gray: "var(--gray-500-rgb)",
+  default: "var(--gray-500-rgb)",
+};
 
-// Main Header function structure (repeated for completeness, ensure it merges with your existing logic)
+const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
+  purple: "border-brand-purple/70 hover:border-brand-purple text-brand-purple",
+  blue: "border-brand-blue/70 hover:border-brand-blue text-brand-blue",
+  yellow: "border-brand-yellow/70 hover:border-brand-yellow text-brand-yellow",
+  lime: "border-neon-lime/70 hover:border-neon-lime text-neon-lime",
+  green: "border-brand-green/70 hover:border-brand-green text-brand-green",
+  pink: "border-brand-pink/70 hover:border-brand-pink text-brand-pink",
+  cyan: "border-brand-cyan/70 hover:border-brand-cyan text-brand-cyan",
+  red: "border-destructive/70 hover:border-destructive text-destructive",
+  orange: "border-brand-orange/70 hover:border-brand-orange text-brand-orange",
+  gray: "border-muted/70 hover:border-muted text-muted-foreground",
+  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary"
+};
+
+const gridContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.035, delayChildren: 0.1 },
+  },
+};
+
+const tileItemVariants = {
+  hidden: { y: 8, opacity: 0, scale: 0.98 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring", stiffness: 120, damping: 10 },
+  },
+};
+
+const MotionLink = motion(Link);
+
+const RenderIconFromPage = React.memo(({ icon, className }: { icon?: keyof typeof Fa6Icons | string; className?: string }) => {
+  if (!icon) return null;
+  const formattedIcon = typeof icon === 'string' && icon.startsWith("::") && icon.endsWith("::") ? icon : `::${icon}::`;
+  return <VibeContentRenderer content={formattedIcon} className={className || ''} />;
+});
+RenderIconFromPage.displayName = "RenderIconFromPage";
+
 export default function Header() {
   const appContext = useAppContext();
   const { isAdmin: isAdminFunc, user, dbUser, isLoading: appContextLoading } = appContext;
@@ -225,19 +257,24 @@ export default function Header() {
 
   const currentLogoText = useMemo(() => {
     const page = allPages.find(p => p.path === pathname);
-    if (pathname?.startsWith('/vpr')) return "VPR";
-    if (pathname?.startsWith('/tutorials') || pathname === '/start-training') { // Added /start-training
-        const pageNameOrDefault = page?.name || "Missions"; // Default to "Missions" if page not found (e.g. /start-training)
+    let logoText = "CYBERVIBE"; // Default
+
+    if (pathname?.startsWith('/vpr')) {
+      logoText = "VPR";
+    } else if (pathname?.startsWith('/tutorials') || pathname === '/start-training') {
+        const pageNameOrDefault = page?.name || "Missions";
         const tutorialName = t(pageNameOrDefault);
-        return tutorialName.length > 10 ? t("Missions").toUpperCase() : tutorialName.toUpperCase();
-    }
-    if (page?.name) {
+        logoText = tutorialName.length > 10 ? t("Missions").toUpperCase() : tutorialName.toUpperCase();
+    } else if (page?.name) {
         const translatedPageName = t(page.name);
         const firstWord = translatedPageName.split(' ')[0];
-        if (firstWord.length <= 6 && firstWord.length > 0) return firstWord.toUpperCase();
-        if (page.name.length <= 6 && page.name.length > 0) return page.name.toUpperCase();
+        if (firstWord.length <= 6 && firstWord.length > 0) {
+          logoText = firstWord.toUpperCase();
+        } else if (page.name.length <= 6 && page.name.length > 0) {
+          logoText = page.name.toUpperCase();
+        }
     }
-    return "CYBERVIBE";
+    return logoText;
   }, [pathname, t]);
 
   const logoCyberPart = currentLogoText === "CYBERVIBE" ? "CYBER" : currentLogoText;
@@ -248,16 +285,16 @@ export default function Header() {
     const userLevel = cyberProfile?.level ?? 0;
 
     logger.debug(`[Header Filtering] Search: "${lowerSearchTerm}", Admin: ${isAdmin}, Level: ${userLevel}, Profile Loading: ${profileLoading}, AppCtx Loading: ${appContextLoading}`);
-    
+
     const filtered = allPages
       .filter(page => {
         if (page.isAdminOnly && !isAdmin) return false;
         if (!isAdmin && page.minLevel !== undefined && userLevel < page.minLevel) return false;
+        // Correctly check supportOnly against user's role, allowing admin to bypass
         if (!isAdmin && page.supportOnly && !(dbUser?.role === 'support')) return false;
 
-
         if (page.group === "GTA Vibe Missions" && page.questId && cyberProfile && !profileLoading) {
-          const unlocked = checkQuestUnlockedFromHook(page.questId, cyberProfile.completedQuests, QUEST_ORDER);
+          const unlocked = checkQuestUnlockedFromHook(page.questId, cyberProfile.completedQuests || [], QUEST_ORDER);
           return unlocked;
         }
         return true;
@@ -272,32 +309,47 @@ export default function Header() {
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
       if (groupName === "Admin Zone" && !isAdmin && !appContextLoading) return;
-      // Ensure "GTA Vibe Missions" group is always created if it might contain "Start Training"
       if (groupName === "GTA Vibe Missions" || (groups[groupName] !== undefined) || filtered.some(p => p.group === groupName) ) {
          groups[groupName] = [];
       }
     });
-    // Special handling for Start Training if it's not naturally in a visible group due to questId filtering
+
     const startTrainingPage = allPages.find(p => p.path === "/start-training");
     if (startTrainingPage && !filtered.some(p => p.path === "/start-training")) {
-        const translatedStartTraining = {...startTrainingPage, translatedName: t(startTrainingPage.name) };
-        if ( (translatedStartTraining.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
-             (translatedStartTraining.path || '').toLowerCase().includes(lowerSearchTerm) ||
-             (t(translatedStartTraining.group || '') || '').toLowerCase().includes(lowerSearchTerm)
-        ) {
-             if (!groups["GTA Vibe Missions"]) groups["GTA Vibe Missions"] = [];
-             groups["GTA Vibe Missions"].push(translatedStartTraining);
+        const userCanSeeStartTraining = (!startTrainingPage.isAdminOnly || isAdmin) &&
+                                        (isAdmin || startTrainingPage.minLevel === undefined || userLevel >= startTrainingPage.minLevel) &&
+                                        (isAdmin || !startTrainingPage.supportOnly || dbUser?.role === 'support');
+
+        if (userCanSeeStartTraining) {
+            const translatedStartTraining = {...startTrainingPage, translatedName: t(startTrainingPage.name) };
+            if ( (translatedStartTraining.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
+                 (translatedStartTraining.path || '').toLowerCase().includes(lowerSearchTerm) ||
+                 (t(translatedStartTraining.group || '') || '').toLowerCase().includes(lowerSearchTerm)
+            ) {
+                 if (!groups["GTA Vibe Missions"]) groups["GTA Vibe Missions"] = [];
+                 // Check if it's already added by questId logic if quests are loaded
+                 if (!groups["GTA Vibe Missions"].some(p => p.path === translatedStartTraining.path)) {
+                    groups["GTA Vibe Missions"].push(translatedStartTraining);
+                 }
+            }
         }
     }
-
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
       if (!groups[groupName]) groups[groupName] = [];
-      if (!groups[groupName].some(p => p.path === page.path)) { // Avoid duplicates if start-training was manually added
+      if (!groups[groupName].some(p => p.path === page.path)) {
         groups[groupName].push(page);
       }
     });
+    // Ensure "GTA Vibe Missions" group is sorted if "Start Training" was added out of natural order
+    if (groups["GTA Vibe Missions"]) {
+        groups["GTA Vibe Missions"].sort((a, b) => {
+            const aIndex = allPages.findIndex(p => p.path === a.path);
+            const bIndex = allPages.findIndex(p => p.path === b.path);
+            return aIndex - bIndex;
+        });
+    }
     return groups;
   }, [searchTerm, isAdmin, t, appContextLoading, cyberProfile, profileLoading, dbUser?.role]);
 
@@ -315,34 +367,70 @@ export default function Header() {
 
   return (
     <>
-      <motion.header /* ... same as before ... */ >
-         {/* ... content of header ... */}
+      <motion.header
+        className={cn("fixed top-0 left-0 right-0 z-40 bg-black/80 border-b border-brand-purple/40 shadow-md backdrop-blur-md", "transition-transform duration-300 ease-in-out")}
+        initial={{ y: 0 }} animate={{ y: isHeaderVisible ? 0 : "-100%" }} transition={{ type: "tween", duration: 0.3 }}
+        style={{'--header-height': '60px'} as React.CSSProperties}
+      >
+        <div className="container mx-auto px-4 py-2.5 sm:py-3">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              className={cn(
+                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider",
+                "transition-all duration-300 hover:brightness-125 flex items-baseline"
+              )}
+              onClick={() => isNavOpen && setIsNavOpen(false)}
+            >
+              <span
+                className="text-neon-lime glitch"
+                data-text={logoCyberPart}
+              >
+                {logoCyberPart}
+              </span>
+              {logoVibePart && (
+                <span className="gta-vibe-text-effect">
+                  {logoVibePart}
+                </span>
+              )}
+            </Link>
+            <div className="flex items-center gap-2 md:gap-3">
+              <button
+                onClick={toggleLang}
+                className="p-1.5 sm:p-2 text-xs font-semibold text-brand-cyan hover:text-brand-cyan/70 focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-cyan/10 flex items-center gap-1"
+                aria-label={t("Toggle Language")} title={t("Toggle Language")}
+              ><Globe className="h-4 w-4 sm:h-3.5 sm:w-3.5" /> <span className="hidden sm:inline">{currentLang === 'en' ? 'RU' : 'EN'}</span></button>
+              {!isNavOpen && (
+                <button
+                  onClick={() => setIsNavOpen(true)}
+                  className="p-2 text-brand-green hover:text-brand-green/70 focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-green/10"
+                  aria-label={t("Open navigation")} aria-expanded={isNavOpen}
+                ><LayoutGrid className="h-5 w-5 sm:h-6 sm:w-6" /></button>
+              )}
+              <UserInfo />
+            </div>
+          </div>
+        </div>
       </motion.header>
 
       <AnimatePresence>
         {isNavOpen && (
-          <motion.div /* ... same as before ... */ >
-            {/* ... content of nav overlay ... */}
-            {/* The mapping logic for pagesInGroup within groupOrder.map will use the updated groupedAndFilteredPages */}
-            {/* Ensure RenderIconFromPage correctly handles icon names from Fa6Icons */}
-            {/* Inside groupOrder.map, when rendering tiles: */}
-            {/* ...
-            {pagesInGroup.map((page) => {
-                // ...
-                {page.icon && (
-                    <RenderIconFromPage
-                        icon={page.icon as keyof typeof Fa6Icons} // Critical: Ensure page.icon is a valid key
-                        className={cn(
-                            // ...
-                        )}
-                    />
-                )}
-                // ...
-            })}
-            ... */}
-             <div className="container mx-auto max-w-4xl xl:max-w-5xl pt-16 md:pt-20">
+          <motion.div
+            key="nav-overlay"
+            initial={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
+            animate={{ opacity: 1, clipPath: 'circle(150vmax at calc(100% - 3rem) 3rem)' }}
+            exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
+            transition={{ type: "tween", ease: "easeOut", duration: 0.4 }}
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pb-10 px-4 simple-scrollbar"
+          >
+            <button
+              onClick={() => setIsNavOpen(false)}
+              className="fixed top-3 left-1/2 -translate-x-1/2 z-[51] p-1.5 sm:p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10"
+              aria-label={t("Close navigation")}
+            ><X className="h-5 w-5 sm:h-6 sm:w-6" /></button>
+
+            <div className="container mx-auto max-w-4xl xl:max-w-5xl pt-16 md:pt-20">
               <div className="relative mb-4 sm:mb-6">
-                {/* Search input same as before */}
                  <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -359,7 +447,9 @@ export default function Header() {
                   if (!pagesInGroup || pagesInGroup.length === 0) return null;
 
                   const groupIconKey = groupIcons[groupName] as keyof typeof Fa6Icons | undefined;
-                  const IconComponent = groupIconKey ? Fa6Icons[groupIconKey] : undefined;
+                  // @ts-ignore iconNameMap can be indexed by string
+                  const ResolvedIconComponent = groupIconKey ? Fa6Icons[iconNameMap[groupIconKey.toLowerCase()] || groupIconKey] : null;
+
 
                   return (
                     <div key={groupName}>
@@ -368,12 +458,12 @@ export default function Header() {
                         "gta-vibe-text-effect",
                         groupIconColors[groupName] || "text-brand-purple"
                         )}>
-                        {IconComponent && (
-                          <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
+                        {ResolvedIconComponent && (
+                          <ResolvedIconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
                         )}
                         <span>{t(groupName)}</span>
-                        {IconComponent && (groupName === "GTA Vibe Missions" || groupName === "Vibe HQ") && (
-                           <IconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
+                        {ResolvedIconComponent && (groupName === "GTA Vibe Missions" || groupName === "Vibe HQ") && (
+                           <ResolvedIconComponent className={cn("w-5 h-5 sm:w-6 sm:h-6 gta-icon-fix", groupIconColors[groupName] || "text-brand-purple")} />
                         )}
                       </h3>
                       <motion.div
@@ -392,11 +482,8 @@ export default function Header() {
                         {pagesInGroup.map((page) => {
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
-                          // @ts-ignore
-                          const rgbVarName = page.color ? `--${page.color}-rgb` : '--default-glow-rgb';
-                          const rgbVar = colorVarMap[page.color || 'default']; // Use the map
+                          const rgbVar = colorVarMap[page.color || 'default'];
                           const tileShadow = rgbVar ? `hover:shadow-[0_0_12px_2px_rgba(${rgbVar},0.4)]` : 'hover:shadow-xl';
-
 
                           return (
                             <MotionLink
@@ -422,7 +509,7 @@ export default function Header() {
                               )}
                               {page.icon && (
                                 <RenderIconFromPage
-                                    icon={page.icon as keyof typeof Fa6Icons}
+                                    icon={page.icon} // Pass as string, RenderIconFromPage will format
                                     className={cn(
                                         "transition-transform duration-200 group-hover:scale-110 mb-1 sm:mb-1.5",
                                         page.isImportant
