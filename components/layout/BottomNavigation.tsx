@@ -1,3 +1,4 @@
+// /components/layout/BottomNavigation.tsx
 "use client";
 
 import Link from "next/link";
@@ -10,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppContext } from '@/contexts/AppContext';
 import type { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
-import React, { useMemo } from 'react';
+import React, { useMemo,useCallback  } from 'react';
 
 const bottomNavVariants = {
   hidden: { y: 100, opacity: 0 },
@@ -37,7 +38,7 @@ interface NavItemConfig {
 // Define all possible items that COULD be in the bottom nav
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink", minLevelShow: 0, isFallback: true },
-  { href: "/hotvibes", icon: FaFire, label: "HotVibes", isCentral: true, centralColor: "from-brand-red to-brand-orange", minLevelShow: 0, isFallback: true },
+  { href: "/hotvibes", icon: FaFire, label: "HotVibes", isCentral: true, centralColor: "from-brand-purple to-brand-orange", minLevelShow: 0, isFallback: true },
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
   { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentral: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 1 },
@@ -164,12 +165,10 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     // Ensure the total doesn't exceed maxItems, unless fewer were available
     finalLayout = finalLayout.slice(0, desiredTotal);
 
-
     logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}:`, finalLayout.map(i => i.label));
     return finalLayout;
 
   }, [dbUser, appCtxLoading, isAuthenticating, isAdmin]);
-
 
   if (appCtxLoading || isAuthenticating || navItemsToDisplay.length === 0) {
     logger.debug("[BottomNav] Either loading or no items to display. Returning null.");
