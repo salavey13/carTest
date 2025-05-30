@@ -24,7 +24,7 @@ ${PROMPT_KWORKS_TO_CSV.replace("{{RAW_KWORKS_TEXT_BLOCK}}", rawKworksTextBlock)}
 *   **Промежуточный Результат Этапа 2 (для твоего внутреннего использования):** Для каждого лида – \`generated_offer_string\`. Добавь это как новое поле к каждому объекту лида в твоем рабочем массиве.
 
 ---
-${PROMPT_OFFER_V2_CYBERVIBE_OUTREACH} 
+${PROMPT_OFFER_V4_CYBERVIBE_OUTREACH} 
 ---
 
 **ЭТАП 3: ОПРЕДЕЛЕНИЕ ТВИНКОВ ДЛЯ ТАНКОВ (Промпт: PROMPT_FIND_TWEAKS)**
