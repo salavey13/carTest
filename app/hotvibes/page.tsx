@@ -1,4 +1,3 @@
-// /app/hotvibes/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense, useCallback, useId } from 'react';
@@ -6,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // Уже импортируется через useAppToast
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import TutorialLoader from '../tutorials/TutorialLoader';
@@ -20,10 +19,13 @@ import {
   markTutorialAsCompleted,
 } from '@/hooks/cyberFitnessSupabase';
 import { fetchLeadsForDashboard } from '../leads/actions';
-import type { LeadRow as LeadDataFromActions } from '../leads/actions'; // Use LeadRow from actions
-import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard'; // Ensure HotLeadData is well-defined
+import type { LeadRow as LeadDataFromActions } from '../leads/actions';
+// Убедимся, что импортируем и тип темы
+import { HotVibeCard, HotLeadData, HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard'; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
+
+// Тип HotVibeCardTheme теперь импортируется, определение здесь больше не нужно
 
 const pageTranslations = {
     ru: {
@@ -35,7 +37,7 @@ const pageTranslations = {
         missionActivated: "Миссия активирована! Перенаправление...",
         errorLoadingLeads: "Ошибка загрузки вайбов.",
         errorLoadingProfile: "Не удалось загрузить профиль CyberFitness.",
-        lockedMissionRedirect: "Навык для этой миссии еще не открыт. Начинаем экспресс-тренировку...", // Generic message
+        lockedMissionRedirect: "Навык для этой миссии еще не открыт. Начинаем экспресс-тренировку...",
     },
     en: {
         pageTitle: "::FaFire:: HOT VIBES ::FaFire::",
@@ -50,27 +52,23 @@ const pageTranslations = {
     }
 };
 
-// Ensure your leads table has a column like 'required_quest_id_for_hotvibe' TEXT NULLABLE
-// or derive it based on project_type_guess or other logic in fetchLeadsForDashboard
-// For HotLeadData, make sure all fields are optional or have fallbacks
 function mapLeadToHotLeadData(lead: LeadDataFromActions): HotLeadData {
+  const demoImageUrl = (lead.supervibe_studio_links as any)?.demo_image_url || 
+                       (lead.supervibe_studio_links as any)?.client_avatar_url;
+
   return {
     id: lead.id || `fallback_id_${Math.random()}`,
     kwork_gig_title: lead.client_name || lead.project_description?.substring(0, 50) || "Untitled Gig",
     ai_summary: lead.project_description?.substring(0, 100) || "No summary available.",
-    // Assuming you'll add a specific field for demo images in your 'leads' table
-    // For now, using a placeholder or a field if it exists
-    demo_image_url: (lead.supervibe_studio_links as any)?.demo_image_url || undefined,
+    demo_image_url: demoImageUrl,
     potential_earning: lead.budget_range || undefined,
-    // required_kilovibes: lead.required_kilovibes_for_hotvibe || undefined, // Example field
-    // required_quest_id: lead.required_quest_id_for_hotvibe || undefined, // Example field
-    // For testing, let's assign a default quest if none is specified for the lead
-    required_quest_id: (lead as any).required_quest_id_for_hotvibe || "image-swap-mission", // TEMP: Default for display
-    client_response_snippet: lead.status === 'interested' ? "Client showed interest!" : undefined, // Example
+    required_quest_id: (lead as any).required_quest_id_for_hotvibe || "image-swap-mission",
+    client_response_snippet: lead.status === 'interested' || lead.status === 'client_responded_positive' ? "Клиент проявил интерес!" : undefined,
     kwork_url: lead.lead_url,
     project_description: lead.project_description,
     ai_generated_proposal_draft: lead.generated_offer,
     status: lead.status,
+    project_type_guess: lead.project_type_guess,
   };
 }
 
@@ -88,13 +86,13 @@ function HotVibesContent() {
   const t = pageTranslations[currentLang];
 
   useEffect(() => {
-    setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en'); // Default to RU for mobile TG
+    setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en');
   }, [tgUser?.language_code, platform]);
 
   const loadPageData = useCallback(async () => {
     if (appCtxLoading || isAuthenticating) {
         logger.debug("[HotVibes] AppContext still loading/authenticating. Waiting.");
-        setPageLoading(true); // Ensure loading state is true
+        setPageLoading(true);
         return;
     }
     setPageLoading(true);
@@ -104,34 +102,24 @@ function HotVibesContent() {
       const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
       if (profileResult.success && profileResult.data) {
         setCyberProfile(profileResult.data);
-        logger.info(`[HotVibes] Profile loaded for ${dbUser.user_id}. Level: ${profileResult.data.level}, Completed Quests: ${profileResult.data.completedQuests.join(', ')}`);
+        logger.info(`[HotVibes] Profile loaded for ${dbUser.user_id}. Level: ${profileResult.data.level}`);
 
-        // UNHARDENED FILTER: Fetch 'new', 'analyzed', 'offer_generated', or 'interested' leads
-        // This will likely fetch many. Consider pagination in fetchLeadsForDashboard if it becomes an issue.
-        // For now, fetching all that could potentially be "hot" or become "hot".
-        // The "filter" param in fetchLeadsForDashboard needs to support an array of statuses or a special keyword.
-        // Let's assume for now 'all' fetches everything an admin/support can see, and we filter client-side.
-        // Or, if 'all' is too much, start with 'new' or 'analyzed'.
-        const leadsResult = await fetchLeadsForDashboard(dbUser.user_id, 'all'); // Fetching more broadly
+        const leadsResult = await fetchLeadsForDashboard(dbUser.user_id, 'all');
 
         if (leadsResult.success && leadsResult.data) {
           const allFetchedLeads = leadsResult.data as LeadDataFromActions[];
-          logger.info(`[HotVibes] Fetched ${allFetchedLeads.length} total leads for potential display.`);
+          logger.info(`[HotVibes] Fetched ${allFetchedLeads.length} total leads.`);
 
-          // Filter for statuses that could be "hot" or "pre-hot"
           const potentiallyHotLeads = allFetchedLeads.filter(lead =>
             ['new', 'analyzed', 'offer_generated', 'interested', 'demo_generated', 'client_responded_positive'].includes(lead.status || '')
           );
           logger.info(`[HotVibes] Found ${potentiallyHotLeads.length} potentially hot leads after status filter.`);
-
+          
           const typedAndFilteredLeads: HotLeadData[] = potentiallyHotLeads
-            .map(mapLeadToHotLeadData) // Map to HotLeadData structure
-            .filter(mappedLead => { // Now filter by quest unlock on the mapped data
+            .map(mapLeadToHotLeadData)
+            .filter(mappedLead => {
               const requiredQuest = mappedLead.required_quest_id;
-              // For now, if profile is loading, assume quests are locked to avoid premature display flicker.
-              // Or, always show but disable button if profile not loaded yet.
-              // Here, assuming we wait for profile.
-              if (!profileResult.data) return false; // Don't show if profile isn't loaded
+              if (!profileResult.data) return false; 
               const isUnlocked = requiredQuest
                 ? checkQuestUnlocked(requiredQuest, profileResult.data.completedQuests || [], QUEST_ORDER)
                 : true;
@@ -153,7 +141,7 @@ function HotVibesContent() {
         setHotLeads([]);
       }
     } else {
-      logger.info(`[HotVibes] User not authenticated or no dbUser. Clearing profile and leads.`);
+      logger.info(`[HotVibes] User not authenticated or no dbUser.`);
       setCyberProfile(null);
       setHotLeads([]);
     }
@@ -170,35 +158,41 @@ function HotVibesContent() {
       return;
     }
 
-    const targetQuestId = questIdFromLead || "icon-swap-mission"; // Default prerequisite
+    const targetQuestId = questIdFromLead || "image-swap-mission";
     const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests, QUEST_ORDER);
 
     if (!isActuallyUnlocked) {
       addToast(t.lockedMissionRedirect.replace("...", `'${targetQuestId}'`), "info", 7000);
-      // Attempt to auto-complete the 'icon-swap-mission' as the universal basic skill.
-      // This simulates the "tinted lock" auto-training for the very first barrier.
-      // For other quests, you might just redirect to their specific tutorial.
-      if (targetQuestId === "icon-swap-mission" && !cyberProfile.completedQuests.includes("icon-swap-mission")) {
-        await markTutorialAsCompleted(dbUser.user_id, "icon-swap-mission");
-        const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id); // Re-fetch
+      
+      if (targetQuestId === "image-swap-mission" && !cyberProfile.completedQuests.includes("image-swap-mission")) {
+        logger.info(`[HotVibes] Auto-completing '${targetQuestId}' for courage boost for user ${dbUser.user_id}`);
+        await markTutorialAsCompleted(dbUser.user_id, "image-swap-mission");
+        const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (updatedProfileResult.success && updatedProfileResult.data) {
           setCyberProfile(updatedProfileResult.data);
-          // Now it *should* be unlocked, try to proceed to repo-xml
-          // Or, better, redirect to the tutorial to reinforce, then they come back
-           router.push(`/tutorials/icon-swap?nextLead=${leadId}&nextQuest=${targetQuestId}`);
-           return;
+          addToast(`Навык '${targetQuestId}' экспресс-активирован! Попробуйте снова.`, "success", 3000);
+          return;
         }
-      } else {
-         router.push(`/tutorials/${targetQuestId}?nextLead=${leadId}&nextQuest=${targetQuestId}`); // Redirect to the specific tutorial
-         return;
       }
+      router.push(`/tutorials/${targetQuestId}?nextLead=${leadId}&nextQuest=${targetQuestId}`);
+      return;
     }
 
-    // If skill is already unlocked, proceed to execution
     addToast(`${t.missionActivated} (Lead: ${leadId.substring(0,6)}..., Quest: ${targetQuestId})`, "success");
     router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission`);
 
   }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast]);
+
+  // Define the theme for HotVibeCard
+  const cardTheme: HotVibeCardTheme = {
+    borderColor: "border-brand-red/70", 
+    accentGradient: "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500", 
+    modalOverlayGradient: "from-black/70 via-purple-900/50 to-black/80", // Adjusted for more subtlety
+    modalAccentColor: "text-brand-cyan", 
+    modalCardBg: "bg-black/70",          // Slightly more opaque for better contrast
+    modalCardBorder: "border-white/20",  // Slightly more visible border
+    modalImageOverlayGradient: "bg-gradient-to-t from-black/90 via-black/50 to-transparent", // Added this new theme property
+  };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground overflow-x-hidden">
@@ -218,7 +212,12 @@ function HotVibesContent() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="w-full max-w-5xl mx-auto"
         >
-          <Card className={cn("bg-dark-card/90 backdrop-blur-xl border-2 shadow-2xl border-brand-red/70 shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]")}>
+          <Card className={cn(
+              "bg-dark-card/95 backdrop-blur-xl border-2 shadow-2xl",
+              "border-brand-red/70 shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]",
+              "relative z-20" 
+            )}
+          >
             <CardHeader className="pb-4 pt-6">
               <CardTitle className={cn("text-2xl sm:text-3xl md:text-4xl font-orbitron flex items-center justify-center gap-2 text-brand-red")}>
                 <VibeContentRenderer content={t.lobbyTitle} />
@@ -253,6 +252,7 @@ function HotVibesContent() {
                       isMissionUnlocked={cyberProfile ? (lead.required_quest_id ? checkQuestUnlocked(lead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
                       onExecuteMission={handleExecuteMission}
                       currentLang={currentLang}
+                      theme={cardTheme}
                     />
                   ))}
                 </div>
