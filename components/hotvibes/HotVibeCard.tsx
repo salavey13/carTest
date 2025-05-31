@@ -9,6 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle as ShadCardTitle, 
 import {
   Dialog,
   DialogContent,
+DialogHeader,
   DialogTrigger,
   DialogClose, // Used for the single close button
 } from '@/components/ui/dialog';
