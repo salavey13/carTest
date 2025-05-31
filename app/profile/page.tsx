@@ -15,12 +15,10 @@ import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
-  // No longer need DailyActivityRecord here if chart is removed or uses profile.dailyActivityLog directly
   getAchievementDetails,
   Achievement,
   ALL_ACHIEVEMENTS, 
   checkAndUnlockFeatureAchievement, 
-  // logCyberFitnessAction // Only if still used directly on this page
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
@@ -32,7 +30,6 @@ import { cn } from "@/lib/utils";
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 
-// Local DailyActivityRecord for the chart tooltip
 interface DailyActivityRecordForChart {
   date: string;
   filesExtracted: number;
@@ -41,9 +38,9 @@ interface DailyActivityRecordForChart {
   prsCreated: number;
   branchesUpdated: number;
   focusTimeMinutes?: number;
-  value: number; // For chart bar height (Vibe Points)
-  name: string; // For XAxis (day name)
-  label: string; // For default label if needed
+  value: number; 
+  name: string; 
+  label: string; 
 }
 
 const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE: Array<DailyActivityRecordForChart> = Array.from({ length: 7 }).map((_, i) => {
@@ -95,10 +92,20 @@ const CustomTooltipContent = ({ active, payload, label }: any) => {
     return null;
   };
 
+const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({ 
+    level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
+    activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: [],
+    cognitiveOSVersion: "v0.1 Error/Guest", lastActivityTimestamp: new Date(0).toISOString(), 
+    dailyActivityLog: [], achievements: [],
+    totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
+    totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
+});
+
+
 export default function ProfilePage() {
   const appContext = useAppContext();
   const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError } = appContext; 
-  const { addToast } = useAppContext(); 
+  // const { addToast } useAppToast(); // Removed, useAppContext now provides addToast
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
@@ -111,7 +118,7 @@ export default function ProfilePage() {
     github: false,
     vercel: false,
     supabase: false,
-    aistudio: false, // Changed key to lowercase 's'
+    aistudio: false, 
   });
 
   const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
@@ -127,7 +134,7 @@ export default function ProfilePage() {
     try {
         if (appContextError) {
           logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Defaulting.`);
-           setCyberProfile(getDefaultCyberFitnessProfile()); // Use helper
+           setCyberProfile(getDefaultCyberFitnessProfile()); 
            setIntegrations({ github: false, vercel: false, supabase: false, aistudio: false });
         } else if (dbUser?.user_id) {
           const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
@@ -137,7 +144,7 @@ export default function ProfilePage() {
               github: result.data.featuresUsed?.integration_github_connected === true,
               vercel: result.data.featuresUsed?.integration_vercel_connected === true,
               supabase: result.data.featuresUsed?.integration_supabase_connected === true,
-              aistudio: result.data.featuresUsed?.integration_aistudio_connected === true, // Reads 'integration_aistudio_connected'
+              aistudio: result.data.featuresUsed?.integration_aistudio_connected === true, 
             });
           } else {
             logger.warn(`[ProfilePage] Failed to load profile for ${dbUser.user_id}. Error: ${result.error}. Defaulting.`);
@@ -156,7 +163,7 @@ export default function ProfilePage() {
     } finally {
       setProfileLoading(false); 
     }
-  }, [dbUser?.user_id, appLoading, isAuthenticating, appContextError]); // dbUser.user_id to re-fetch if it changes
+  }, [dbUser?.user_id, appLoading, isAuthenticating, appContextError]); 
 
   useEffect(() => {
     fetchProfileData();
@@ -168,14 +175,14 @@ export default function ProfilePage() {
         return;
     }
 
-    // Construct the feature name EXACTLY as it's stored in the backend (e.g., integration_aistudio_connected)
     const featureName = `integration_${integrationKey}_connected`; 
     logger.debug(`[ProfilePage] handleIntegrationChange: key='${integrationKey}', featureName='${featureName}', checked=${isChecked}`);
-
 
     setIntegrations(prev => ({ ...prev, [integrationKey]: isChecked }));
     const operationToastId = toast.loading(`${isChecked ? "Отметка" : "Снятие отметки"} интеграции с ${integrationKey}...`);
 
+    // Assuming checkAndUnlockFeatureAchievement is correctly typed and handles its own toasts on success/error.
+    // If it doesn't handle toasts for new achievements, you might need addToast here.
     const result = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, isChecked);
     
     if (result.error) {
@@ -185,12 +192,13 @@ export default function ProfilePage() {
         toast.success(`Интеграция с ${integrationKey} ${isChecked ? "отмечена" : "снята"}!`, { id: operationToastId });
         if (isChecked && result.newAchievements?.length) {
              result.newAchievements.forEach(ach => {
-                if (addToast) addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+                 // Using addToast from useAppContext (if available and needed, or relying on checkAndUnlock... itself)
+                 toast.info(`🏆 Ачивка: ${ach.name}!`, { description: ach.description, duration: 5000 });
             });
         }
         await fetchProfileData();
     }
-  }, [dbUser?.user_id, addToast, fetchProfileData]);
+  }, [dbUser?.user_id, fetchProfileData]); // Removed addToast from deps as it's stable
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
@@ -204,15 +212,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({ 
-    level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
-    activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: [],
-    cognitiveOSVersion: "v0.1 Error/Guest", lastActivityTimestamp: new Date(0).toISOString(), 
-    dailyActivityLog: [], achievements: [],
-    totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
-    totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
-  });
 
   const safeCyberProfile = cyberProfile ?? getDefaultCyberFitnessProfile();
 
@@ -284,9 +283,8 @@ export default function ProfilePage() {
     {id: "github" as keyof typeof integrations, label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
     {id: "vercel" as keyof typeof integrations, label: "Vercel (Деплой проектов)", icon: "FaBolt"},
     {id: "supabase" as keyof typeof integrations, label: "Supabase (База данных & Auth)", icon: "FaDatabase"},
-    {id: "aistudio" as keyof typeof integrations, label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"}, // Changed id to lowercase 's'
+    {id: "aistudio" as keyof typeof integrations, label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"}, 
   ];
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
@@ -318,6 +316,11 @@ export default function ProfilePage() {
             <div className="mt-3 text-sm font-mono text-brand-yellow">
               Level: {currentLevel} | Cognitive OS: {cognitiveOS}
             </div>
+             {dbUser?.subscription_id && dbUser.subscription_id !== "cyber_initiate_free_demo" && (
+                <div className="mt-2 text-xs font-mono text-brand-green">
+                    Активный план: <span className="font-semibold">{dbUser.subscription_id}</span>
+                </div>
+            )}
           </CardHeader>
 
           <CardContent className="space-y-8 p-6 md:p-8">
