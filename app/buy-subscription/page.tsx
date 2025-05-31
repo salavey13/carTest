@@ -98,7 +98,7 @@ CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
       "<FaDiagramProject className='text-brand-cyan mr-2 align-middle text-xl group-hover:text-brand-blue transition-colors duration-300'/ /> **ТЫ – АРХИТЕКТОР, AI – ТВОЙ ЛИЧНЫЙ ЛЕГИОН:** Полный безлимит и все админ-права в SUPERVIBE Studio. Проектируй, генерируй, кастомизируй самые сложные многофайловые приложения и AI-ботов.",
       "<FaDatabase className='text-brand-green mr-2 align-middle text-xl group-hover:text-neon-lime transition-colors duration-300'/> **АЛХИМИЯ SUPABASE (УРОВЕНЬ: ПРОФИ):** От проектирования масштабируемых схем до Realtime-магии, сложных Edge Functions и управления данными из бота – ты освоишь всё.",
       "<FaToolbox className='text-brand-blue mr-2 align-middle text-xl group-hover:text-brand-cyan transition-colors duration-300'/ /> **АВТОПИЛОТЫ ДЛЯ ТВОЕГО VIBE'А (Продвинутые Supabase Функции):** Автоматизируй всё, что движется (и не движется) – парсинг, отчеты, сложные интеграции, AI-агенты, работающие 24/7.",
-      "<FaDonate className='text-neon-lime mr-2 align-middle text-xl group-hover:text-brand-yellow transition-colors duration-300'/> **XTR МОНЕТИЗАЦИЯ ИЛИ БЕСПЛАТНО – ТАКОВ VIBE!** Мастер-класс по подключению Telegram Stars. **Никаких е*учих внешних платежек – только чистый XTR-VIBE!**",
+      "<fadove className='text-neon-lime mr-2 align-middle text-xl group-hover:text-brand-yellow transition-colors duration-300'/> **XTR МОНЕТИЗАЦИЯ ИЛИ БЕСПЛАТНО – ТАКОВ VIBE!** Мастер-класс по подключению Telegram Stars. **Никаких е*учих внешних платежек – только чистый XTR-VIBE!**",
       "<FaHatWizard className='text-brand-purple mr-2 align-middle text-xl group-hover:text-brand-pink transition-colors duration-300'/> **ИСКУССТВО AI-ПРОМПТИНГА (УРОВЕНЬ: ДЖЕДАЙ):** Создавай свои 'магические заклинания' (сложные 'чейны' промптов) и кастомные AI-Оракулы для любых задач, о которых сибиряки даже не слышали.",
       "<FaEmpire className='text-brand-pink mr-2 align-middle text-xl group-hover:text-brand-purple transition-colors duration-300'/> **ФРАНШИЗА ТВОЕГО VIBE'А (Полный Пакет):** Инструменты, знания и моя поддержка для создания и управления твоей собственной командой 'Полевых Агентов' и масштабирования твоего успеха.",
       "<FaCrown className='text-brand-yellow mr-2 align-middle text-xl group-hover:text-orange-400 transition-colors duration-300'/> **VIP-ДОСТУП К ИСХОДНОМУ КОДУ VIBE'А:** Эксклюзивные Vibe Perks, альфа-тесты новейших AI-модулей, прямая связь с Кэрри (Павлом) для мозговых штурмов и совместного R&D.",
@@ -339,7 +339,7 @@ export default function BuySubscriptionPage() {
                     : sub.id === "cyber_initiate_free_demo" ? "bg-gray-500 text-gray-300 cursor-not-allowed"
                     : "bg-dark-bg/80 text-light-text hover:bg-brand-green hover:text-black hover:shadow-brand-green/60 focus:bg-brand-green focus:text-black"}`}
                 >
-                  {sub.id === activeSubscriptionId ? "ЭТО ТЫ, АГЕНТ!" : selectedSubscription?.id === sub.id ? "::FaCheckDouble:: ВЫБРАН ДЛЯ АПГРЕЙДА!" : sub.cta}
+                  {sub.id === activeSubscriptionId ? "ЭТО ТЫ, АГЕНТ!" : selectedSubscription?.id === sub.id ? "::FaCheckToSlot:: ВЫБРАН ДЛЯ АПГРЕЙДА!" : sub.cta}
                 </Button>
               </motion.div>
             ))}
