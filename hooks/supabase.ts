@@ -289,7 +289,6 @@ export async function generateCarEmbedding(
             if (rent_link !== undefined) fieldsToUpdate.rent_link = rent_link;
             if (status !== undefined) fieldsToUpdate.status = status;
 
-
             if (Object.keys(fieldsToUpdate).length > 0) {
                 logger.info(`Updating additional fields for new car ${createdCarId}...`, fieldsToUpdate);
                 const { error: updateError } = await supabaseAdmin
@@ -506,59 +505,63 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
 
 export const updateUserSubscription = async (
   userId: string,
-  subscriptionId: number | string | null // subscription_id in invoices is number | null. users table doesn't have this.
+  subscriptionId: string | null // Changed from number | string | null to string | null
 ): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Attempting to update subscription-related info for user ${userId} (Note: users table has no subscription_id field)`);
+    debugLogger.log(`Attempting to update subscription-related info for user ${userId}. New subscription_id (from users table): ${subscriptionId}`);
     try {
-        // The 'users' table does not have 'subscription_id' in its definition in database.types.ts.
-        logger.warn(`User table schema does not have 'subscription_id'. Only 'updated_at' will be modified for user ${userId}.`);
-        const updatePayload: Partial<DbUser> = { updated_at: new Date().toISOString() };
-        // If you intended to store subscription_id in user's metadata:
-        // const { data: currentData, error: fetchErr } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
-        // if (fetchErr) throw fetchErr;
-        // const newMeta = { ...currentData?.metadata, subscription_id: subscriptionId };
-        // updatePayload.metadata = newMeta;
-
+        // The 'users' table in database.types.ts has 'subscription_id TEXT'.
+        const updatePayload: Partial<DbUser> = { 
+            updated_at: new Date().toISOString(),
+            subscription_id: subscriptionId, // Directly assign the string or null
+        };
+        
         const { data, error } = await supabaseAdmin
             .from("users") 
             .update(updatePayload)
             .eq("user_id", userId) 
-            .select("*, metadata") 
+            .select("*, metadata") // Select all fields including the updated subscription_id
             .single();
 
         if (error) {
-            logger.error(`Error updating user ${userId} info:`, error);
+            logger.error(`Error updating user ${userId} subscription info:`, error);
             if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
             throw error;
         }
          if (!data) return { success: false, error: `User ${userId} not found after update attempt.` };
 
-        debugLogger.log(`Successfully updated user ${userId} (updated_at, potentially metadata if implemented).`);
+        debugLogger.log(`Successfully updated user ${userId} subscription_id to ${data.subscription_id}.`);
         return { success: true, data };
     } catch (error) {
-        logger.error(`Exception in updateUserSubscription for ${userId}:`, error);
+        logger.error(`Exception in updateUserSubscription for user ${userId}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Failed to update subscription-related info" };
     }
 };
 
 export const getUserSubscription = async (
   userId: string
-): Promise<{ success: boolean; data?: number | string | null; error?: string }> => {
+): Promise<{ success: boolean; data?: string | null; error?: string }> => { // Return type changed to string | null
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Attempting to fetch subscription-related info for user ${userId} (Note: users table has no subscription_id field)`);
+    debugLogger.log(`Fetching subscription_id for user ${userId} from users table.`);
     try {
-        logger.warn(`User table schema does not have 'subscription_id'. Cannot fetch subscription_id directly. Returning null.`);
-        // If subscription_id were stored in metadata:
-        // const { data: userData, error: userError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
-        // if (userError) throw userError;
-        // const subIdFromMeta = userData?.metadata?.subscription_id;
-        // return { success: true, data: subIdFromMeta ?? null };
-        return { success: true, data: null }; 
+        const { data: userData, error: userError } = await supabaseAdmin
+            .from("users")
+            .select("subscription_id")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+        if (userError) {
+            logger.error(`Error fetching user ${userId} for subscription_id:`, userError);
+            throw userError;
+        }
+        
+        const subIdFromDb = userData?.subscription_id; // This will be string | null
+        debugLogger.log(`User ${userId} current subscription_id from DB: ${subIdFromDb}`);
+        return { success: true, data: subIdFromDb ?? null };
 
     } catch (error) {
         logger.error(`Exception in getUserSubscription for ${userId}:`, error);
@@ -571,27 +574,14 @@ export const createInvoice = async (
     id: string, 
     userId: string,
     amount: number,
-    subscriptionId?: number | string | null, 
+    subscriptionId?: string | null, // Changed to string | null to match DB TEXT type
     metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
     if (!id || !userId || amount == null || !type) return { success: false, error: "Missing required parameters for invoice creation." };
 
     try {
-        let finalSubscriptionIdForDb: number | null = null;
-        if (typeof subscriptionId === 'number') {
-            finalSubscriptionIdForDb = subscriptionId;
-        } else if (typeof subscriptionId === 'string') {
-            const parsedInt = parseInt(subscriptionId, 10);
-            if (!isNaN(parsedInt)) {
-                finalSubscriptionIdForDb = parsedInt;
-            } else {
-                logger.warn(`Could not parse subscriptionId string '${subscriptionId}' to int for invoice. Storing null.`);
-            }
-        } else {
-             finalSubscriptionIdForDb = null; // Explicitly null if undefined or already null
-        }
-
+        // subscriptionId is now string | null, directly usable if DB column is TEXT
         const { data, error } = await supabaseAdmin
             .from("invoices")
             .insert({
@@ -600,7 +590,7 @@ export const createInvoice = async (
                 type: type,
                 amount: amount, 
                 status: 'pending', 
-                subscription_id: finalSubscriptionIdForDb, 
+                subscription_id: subscriptionId, // Pass string or null directly
                 metadata: metadata,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -615,6 +605,12 @@ export const createInvoice = async (
                  if (existing.success && existing.data) return { success: true, data: existing.data };
                  return { success: false, error: `Invoice ID ${id} already exists, but failed to retrieve it.` };
             }
+            logger.error(`Error inserting invoice ${id}:`, {
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+              code: error.code,
+            });
             throw error; 
         }
         if (!data) return { success: false, error: "Invoice creation returned no data." };
@@ -622,8 +618,16 @@ export const createInvoice = async (
         debugLogger.log(`Invoice ${id} created successfully for user ${userId}.`);
         return { success: true, data };
     } catch (error) {
-        logger.error(`Error creating invoice ${id} for user ${userId}:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Failed to create invoice" };
+        // Catch block error logging is already comprehensive
+        const castError = error as any;
+        logger.error(`Exception creating invoice ${id} for user ${userId}:`, {
+            message: castError.message,
+            details: castError.details,
+            hint: castError.hint,
+            code: castError.code,
+            fullError: castError,
+          });
+        return { success: false, error: castError instanceof Error ? castError.message : "Failed to create invoice" };
     }
 };
 

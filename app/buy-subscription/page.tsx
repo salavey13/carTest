@@ -1,4 +1,3 @@
-// /app/buy-subscription/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -11,19 +10,15 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
 const parseFeatureString = (feature: string): { iconVibeContent: string | null, textContent: string } => {
-    const featureMatch = feature.match(/^(<Fa\w+(?:\s+[^>]*?)?\s*\/?>)(.*)$/);
+    // Updated regex to match ::FaIconName attributes:: format
+    const featureMatch = feature.match(/^(::Fa\w+(?:\s+[^:]*?)?::)(.*)$/);
     if (featureMatch) {
-        const iconHtmlTag = featureMatch[1];
+        const iconVibeSyntax = featureMatch[1];
         const text = featureMatch[2].trim();
-        const iconTagParts = iconHtmlTag.match(/^<(Fa\w+)((?:\s+[^>]*?)?)\s*\/>$/);
-        if (iconTagParts) {
-            const iconName = iconTagParts[1];
-            const attributes = iconTagParts[2] ? iconTagParts[2].trim() : '';
-            return {
-                iconVibeContent: `::${iconName}${attributes ? ' ' + attributes : ''}::`,
-                textContent: text
-            };
-        }
+        return {
+            iconVibeContent: iconVibeSyntax,
+            textContent: text
+        };
     }
     return { iconVibeContent: null, textContent: feature };
 };
@@ -38,14 +33,14 @@ const UPDATED_SUBSCRIPTION_PLANS = [
     color: "from-gray-700/70 via-gray-800/60 to-gray-900/70 border-gray-500 hover:border-brand-lime/70",
     cta: "Это Твой VIBE!",
     main_description: "**Никаких 'демо-версий' с урезанным функционалом, Агент! Получи ПОЛНЫЙ, мать его, доступ ко всей экосистеме CyberVibe СРАЗУ. Это не 'посмотреть' – это НАЧАТЬ ДЕЛАТЬ.** Забудь про унылую Сибирь – почувствуй реальную мощь AI здесь и сейчас!",
-    features: [/* existing features */
-      "<FaPlayCircle className='text-brand-cyan mr-2 align-middle text-xl group-hover:text-brand-pink transition-colors duration-300'/> **'ИСКРА ВАЙБА' – Твой Первый Успех (и Кэш!):** Принеси идею или KWork-заказ. Я, как твой личный 'Призрачный Пилот', создам для тебя AI-прототип и убойный оффер. Ты увидишь магию, почувствуешь VIBE и, скорее всего, заработаешь первый кэш через 'Лобби Горячих Вайбов'!",
-      "<FaToolbox className='text-brand-yellow mr-2 align-middle text-xl group-hover:text-brand-orange transition-colors duration-300'/> **ВСЕ ИНСТРУМЕНТЫ ОТКРЫТЫ:** SUPERVIBE Studio, CyberDev OS, все 'GTA Vibe Миссии' (по мере твоей прокачки!), 'Схемы Вайба', `GeneralPurposeScraper` – ныряй, исследуй, экспериментируй, ломай!",
-      "<FaScroll className='text-brand-green mr-2 align-middle text-xl group-hover:text-neon-lime transition-colors duration-300'/> **ПОЛНАЯ БАЗА ЗНАНИЙ (АНТИ-НУДНО):** От 'Цели и Прибыли' до 'Экспериментального Мышления' – весь сок для твоего кибер-апгрейда. Никакой воды, только VIBE!",
-      "<FaUsers className='text-brand-pink mr-2 align-middle text-xl group-hover:text-brand-purple transition-colors duration-300'/> **VIBE TRIBE (Твоё Комьюнити):** Поддержка 24/7, обмен опытом, совместные мозговые штурмы и рейды на KWork (когда комьюнити полностью активно). Ты не один, Агент!",
+    features: [
+      "::FaPlayCircle className='text-brand-cyan mr-2 align-middle w-4 h-4 group-hover:text-brand-pink transition-colors duration-300':: **'ИСКРА ВАЙБА' – Твой Первый Успех (и Кэш!):** Принеси идею или KWork-заказ. Я, как твой личный 'Призрачный Пилот', создам для тебя AI-прототип и убойный оффер. Ты увидишь магию, почувствуешь VIBE и, скорее всего, заработаешь первый кэш через 'Лобби Горячих Вайбов'!",
+      "::FaToolbox className='text-brand-yellow mr-2 align-middle w-4 h-4 group-hover:text-brand-orange transition-colors duration-300':: **ВСЕ ИНСТРУМЕНТЫ ОТКРЫТЫ:** SUPERVIBE Studio, CyberDev OS, все 'GTA Vibe Миссии' (по мере твоей прокачки!), 'Схемы Вайба', `GeneralPurposeScraper` – ныряй, исследуй, экспериментируй, ломай!",
+      "::FaScroll className='text-brand-green mr-2 align-middle w-4 h-4 group-hover:text-neon-lime transition-colors duration-300':: **ПОЛНАЯ БАЗА ЗНАНИЙ (АНТИ-НУДНО):** От 'Цели и Прибыли' до 'Экспериментального Мышления' – весь сок для твоего кибер-апгрейда. Никакой воды, только VIBE!",
+      "::FaUsers className='text-brand-pink mr-2 align-middle w-4 h-4 group-hover:text-brand-purple transition-colors duration-300':: **VIBE TRIBE (Твоё Комьюнити):** Поддержка 24/7, обмен опытом, совместные мозговые штурмы и рейды на KWork (когда комьюнити полностью активно). Ты не один, Агент!",
     ],
     who_is_this_for: "Для КАЖДОГО, кто зае*ался топтаться на месте и хочет без риска ощутить настоящий CyberVibe, увидеть AI в деле, выполнить свою первую 'Миссию Огня' и прокричать – **ДА, Я ТОЖЕ, БЛ*ТЬ, МОГУ!** Это твой реальный шанс убедиться, что CyberVibe – это не очередная сибирская телега, а ракета в будущее. **Твой ход, Агент!**",
-    hormozi_easter_egg_title: "::FaTriangleexclamation className='text-brand-yellow':: БЕСПЛАТНО? В ЧЕМ ПОДВОХ, VIBERIDER?",
+    hormozi_easter_egg_title: "::FaTriangleExclamation className='text-brand-yellow':: БЕСПЛАТНО? В ЧЕМ ПОДВОХ, VIBERIDER?",
     hormozi_easter_egg_content: `
 Конкуренция на фрилансе – АД? Все дерутся за подачки? **ХВАТИТ ЭТО ТЕРПЕТЬ!**
 CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
@@ -64,12 +59,12 @@ CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
     color: "from-brand-orange/90 via-yellow-500/30 to-brand-yellow/90 border-brand-orange shadow-yellow-glow hover:border-brand-yellow/70",
     cta: "АКТИВИРОВАТЬ VIBE-ЗАПУСК",
     main_description: "**Хватит смотреть – ПОРА ДЕЛАТЬ ВМЕСТЕ! Это твой персональный AI-воркшоп на максималках. Ты даешь KWork-заказ (из 'ez-entry-tier'), я – твой VIBE-штурман 24/7, заряженный на результат. ВМЕСТЕ мы проносимся по всему циклу: от идеи до рабочего демо и оффера, который порвет конкурентов. Ты – за рулем CyberVibe Studio, я – 'похлопываю по плечу' и подливаю VIBE-топлива.**",
-    features: [/* existing features */
-      "<FaHandHoldingDollar className='text-brand-green mr-2 align-middle text-xl group-hover:text-neon-lime transition-colors duration-300'/> **ТВОЙ ПЕРВЫЙ КЛИЕНТ (Почти Гарантированно!):** Мы вместе создадим настолько убойное демо и оффер, что клиент просто не сможет отказаться. Ты отправишь, ты получишь кэш (моя доля – эти 4200₽/42XTR, ВСЁ остальное – твоё!). **Это не грёбаная теория, это практика с хрустящими купюрами и KiloVibes!**",
-      "<FaLaptopCode className='text-brand-cyan mr-2 align-middle text-xl group-hover:text-brand-blue transition-colors duration-300'/> **ТЫ КОМАНДУЕШЬ AI, А НЕ НАОБОРОТ:** Заходим в CyberVibe Studio. **ЗАБУДЬ про Node.js, ES6, npm – просто кликай по кнопкам (реально, как в игре!) и смотри, как AI пишет код за тебя!** Я покажу, как делать 'свопы' медиа, менять дизайн 'на лету', генерировать текст, от которого клиенты текут.",
-      "<FaBrain className='text-neon-lime mr-2 align-middle text-xl group-hover:text-brand-yellow transition-colors duration-300'/> **МЕНТОРСТВО 'НА ЛЕТУ' (Без Духоты):** Никаких скучных лекций. Все вопросы – по ходу РЕАЛЬНОГО, мать его, проекта. Ты поймешь, как это работает, потому что **СДЕЛАЕШЬ ЭТО САМ, СВОИМИ РУКАМИ (и кликами).**",
-      "<FaPersonThroughWindow className='text-brand-pink mr-2 align-middle text-xl group-hover:text-brand-purple transition-colors duration-300'/> **ИЗ 'ОФИСНОГО ПЛАНКТОНА' В 'AI-МАГА':** Этот один опыт покажет тебе, что ты можешь создавать веб-приложения и ботов. Серьезно. Прямо сейчас. **Прощай, унылая стабильность – здравствуй, VIBE!**",
-      "<FaTools className='text-brand-purple mr-2 align-middle text-xl group-hover:text-brand-pink transition-colors duration-300'/> **ТВОЙ СТАРТОВЫЙ AI-АРСЕНАЛ НА БУДУЩЕЕ:** После 'VIBE-Запуска' ты сможешь сам фигачить простые задачи в WebAnyBot/oneSitePlsBot.",
+    features: [
+      "::FaHandHoldingDollar className='text-brand-green mr-2 align-middle w-4 h-4 group-hover:text-neon-lime transition-colors duration-300':: **ТВОЙ ПЕРВЫЙ КЛИЕНТ (Почти Гарантированно!):** Мы вместе создадим настолько убойное demo и оффер, что клиент просто не сможет отказаться. Ты отправишь, ты получишь кэш (моя доля – эти 4200₽/42XTR, ВСЁ остальное – твоё!). **Это не грёбаная теория, это практика с хрустящими купюрами и KiloVibes!**",
+      "::FaLaptopCode className='text-brand-cyan mr-2 align-middle w-4 h-4 group-hover:text-brand-blue transition-colors duration-300':: **ТЫ КОМАНДУЕШЬ AI, А НЕ НАОБОРОТ:** Заходим в CyberVibe Studio. **ЗАБУДЬ про Node.js, ES6, npm – просто кликай по кнопкам (реально, как в игре!) и смотри, как AI пишет код за тебя!** Я покажу, как делать 'свопы' медиа, менять дизайн 'на лету', генерировать текст, от которого клиенты текут.",
+      "::FaBrain className='text-neon-lime mr-2 align-middle w-4 h-4 group-hover:text-brand-yellow transition-colors duration-300':: **МЕНТОРСТВО 'НА ЛЕТУ' (Без Духоты):** Никаких скучных лекций. Все вопросы – по ходу РЕАЛЬНОГО, мать его, проекта. Ты поймешь, как это работает, потому что **СДЕЛАЕШЬ ЭТО САМ, СВОИМИ РУКАМИ (и кликами).**",
+      "::FaPersonThroughWindow className='text-brand-pink mr-2 align-middle w-4 h-4 group-hover:text-brand-purple transition-colors duration-300':: **ИЗ 'ОФИСНОГО ПЛАНКТОНА' В 'AI-МАГА':** Этот один опыт покажет тебе, что ты можешь создавать веб-приложения и ботов. Серьезно. Прямо сейчас. **Прощай, унылая стабильность – здравствуй, VIBE!**",
+      "::FaTools className='text-brand-purple mr-2 align-middle w-4 h-4 group-hover:text-brand-pink transition-colors duration-300':: **ТВОЙ СТАРТОВЫЙ AI-АРСЕНАЛ НА БУДУЩЕЕ:** После 'VIBE-Запуска' ты сможешь сам фигачить простые задачи в WebAnyBot/oneSitePlsBot.",
     ],
     who_is_this_for: "Для тех, кто готов **инвестировать в опыт, который меняет правила игры и разъе*ывает шаблоны.** Если 'Кибер-Демо' зажгло в тебе искру, этот 'VIBE-Запуск' – твой первый реальный шаг к деньгам, свободе и навыкам AI-разраба нового поколения. **Платишь за результат и мое персональное время – получаешь Vibegasm от первого успеха и пожизненный апгрейд мышления! Это ТВОЙ шанс.**",
     hormozi_easter_egg_title: "::FaFireAlt className='text-brand-orange':: ЗА 4200₽ СТАТЬ AI-ФРИЛАНСЕРОМ? РАЗВОД?",
@@ -94,14 +89,14 @@ CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
     color: "from-brand-purple/90 via-pink-500/40 to-brand-pink/90 border-brand-purple shadow-pink-glow hover:border-brand-pink/70 animate-neon-border-glow",
     cta: "АКТИВИРОВАТЬ QBI-МАСТЕРСТВО",
     main_description: "**Это WOW-ТРАНСФОРМАЦИЯ, Агент! Хватит быть зрителем – СТАНЬ АРХИТЕКТОРОМ своей AI-реальности. Мы ВМЕСТЕ с тобой создаем TWA и ботов ЛЮБОЙ сложности, 'доим' существующих клиентов на кастомные фичи, строим твою личную цифровую империю. Я делюсь ВСЕЙ магией CyberVibe, ты – командуешь парадом и гребешь кэш.**",
-    features: [/* existing features */
-      "<FaDiagramProject className='text-brand-cyan mr-2 align-middle text-xl group-hover:text-brand-blue transition-colors duration-300'/ /> **ТЫ – АРХИТЕКТОР, AI – ТВОЙ ЛИЧНЫЙ ЛЕГИОН:** Полный безлимит и все админ-права в SUPERVIBE Studio. Проектируй, генерируй, кастомизируй самые сложные многофайловые приложения и AI-ботов.",
-      "<FaDatabase className='text-brand-green mr-2 align-middle text-xl group-hover:text-neon-lime transition-colors duration-300'/> **АЛХИМИЯ SUPABASE (УРОВЕНЬ: ПРОФИ):** От проектирования масштабируемых схем до Realtime-магии, сложных Edge Functions и управления данными из бота – ты освоишь всё.",
-      "<FaToolbox className='text-brand-blue mr-2 align-middle text-xl group-hover:text-brand-cyan transition-colors duration-300'/ /> **АВТОПИЛОТЫ ДЛЯ ТВОЕГО VIBE'А (Продвинутые Supabase Функции):** Автоматизируй всё, что движется (и не движется) – парсинг, отчеты, сложные интеграции, AI-агенты, работающие 24/7.",
-      "<fadove className='text-neon-lime mr-2 align-middle text-xl group-hover:text-brand-yellow transition-colors duration-300'/> **XTR МОНЕТИЗАЦИЯ ИЛИ БЕСПЛАТНО – ТАКОВ VIBE!** Мастер-класс по подключению Telegram Stars. **Никаких е*учих внешних платежек – только чистый XTR-VIBE!**",
-      "<FaHatWizard className='text-brand-purple mr-2 align-middle text-xl group-hover:text-brand-pink transition-colors duration-300'/> **ИСКУССТВО AI-ПРОМПТИНГА (УРОВЕНЬ: ДЖЕДАЙ):** Создавай свои 'магические заклинания' (сложные 'чейны' промптов) и кастомные AI-Оракулы для любых задач, о которых сибиряки даже не слышали.",
-      "<FaEmpire className='text-brand-pink mr-2 align-middle text-xl group-hover:text-brand-purple transition-colors duration-300'/> **ФРАНШИЗА ТВОЕГО VIBE'А (Полный Пакет):** Инструменты, знания и моя поддержка для создания и управления твоей собственной командой 'Полевых Агентов' и масштабирования твоего успеха.",
-      "<FaCrown className='text-brand-yellow mr-2 align-middle text-xl group-hover:text-orange-400 transition-colors duration-300'/> **VIP-ДОСТУП К ИСХОДНОМУ КОДУ VIBE'А:** Эксклюзивные Vibe Perks, альфа-тесты новейших AI-модулей, прямая связь с Кэрри (Павлом) для мозговых штурмов и совместного R&D.",
+    features: [
+      "::FaDiagramProject className='text-brand-cyan mr-2 align-middle w-4 h-4 group-hover:text-brand-blue transition-colors duration-300':: **ТЫ – АРХИТЕКТОР, AI – ТВОЙ ЛИЧНЫЙ ЛЕГИОН:** Полный безлимит и все админ-права в SUPERVIBE Studio. Проектируй, генерируй, кастомизируй самые сложные многофайловые приложения и AI-ботов.",
+      "::FaDatabase className='text-brand-green mr-2 align-middle w-4 h-4 group-hover:text-neon-lime transition-colors duration-300':: **АЛХИМИЯ SUPABASE (УРОВЕНЬ: ПРОФИ):** От проектирования масштабируемых схем до Realtime-магии, сложных Edge Functions и управления данными из бота – ты освоишь всё.",
+      "::FaToolbox className='text-brand-blue mr-2 align-middle w-4 h-4 group-hover:text-brand-cyan transition-colors duration-300':: **АВТОПИЛОТЫ ДЛЯ ТВОЕГО VIBE'А (Продвинутые Supabase Функции):** Автоматизируй всё, что движется (и не движется) – парсинг, отчеты, сложные интеграции, AI-агенты, работающие 24/7.",
+      "::FaDove className='text-neon-lime mr-2 align-middle w-4 h-4 group-hover:text-brand-yellow transition-colors duration-300':: **XTR МОНЕТИЗАЦИЯ ИЛИ БЕСПЛАТНО – ТАКОВ VIBE!** Мастер-класс по подключению Telegram Stars. **Никаких е*учих внешних платежек – только чистый XTR-VIBE!**",
+      "::FaHatWizard className='text-brand-purple mr-2 align-middle w-4 h-4 group-hover:text-brand-pink transition-colors duration-300':: **ИСКУССТВО AI-ПРОМПТИНГА (УРОВЕНЬ: ДЖЕДАЙ):** Создавай свои 'магические заклинания' (сложные 'чейны' промптов) и кастомные AI-Оракулы для любых задач, о которых сибиряки даже не слышали.",
+      "::FaEmpire className='text-brand-pink mr-2 align-middle w-4 h-4 group-hover:text-brand-purple transition-colors duration-300':: **ФРАНШИЗА ТВОЕГО VIBE'А (Полный Пакет):** Инструменты, знания и моя поддержка для создания и управления твоей собственной командой 'Полевых Агентов' и масштабирования твоего успеха.",
+      "::FaCrown className='text-brand-yellow mr-2 align-middle w-4 h-4 group-hover:text-orange-400 transition-colors duration-300':: **VIP-ДОСТУП К ИСХОДНОМУ КОДУ VIBE'А:** Эксклюзивные Vibe Perks, альфа-тесты новейших AI-модулей, прямая связь с Кэрри (Павлом) для мозговых штурмов и совместного R&D.",
     ],
     who_is_this_for: "Для Агентов, готовых к **ПОЛНОЙ VIBE-ТРАНСФОРМАЦИИ и захвату цифрового мира.** Если ты хочешь не просто использовать AI, а ИЗОБРЕТАТЬ с его помощью, создавать системы, которые меняют правила, монетизировать свои уникальные 'AI-соусы' и, возможно, построить свою личную 'сосисочную империю' – это твой апгрейд. **Vibegasm от безграничных возможностей, влияния и кэша гарантирован! Ты готов стать легендой CyberVibe?**",
     hormozi_easter_egg_title: "::FaRocket className='text-brand-pink':: QBI ЗА 6900₽ – ЭТО ЧТО, ВХОД В МАТРИЦУ?",
@@ -117,10 +112,6 @@ CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
     `
   }
 ];
-
-// HarmoziTease (13 XTR Offer) - not part of the main plans array, but can be linked to from elsewhere if needed,
-// or dynamically inserted based on user context. For now, let's assume the "VIBE-ЗАПУСК" at 42 XTR is the main intro offer.
-// If you want the 13 XTR as a distinct, always-visible plan, we'd add it to the array above.
 
 export default function BuySubscriptionPage() {
   const { user, isInTelegramContext, dbUser } = useAppContext();
@@ -163,45 +154,56 @@ export default function BuySubscriptionPage() {
       toast.success(`ДЕМО-РЕЖИМ: Счет для "${selectedSubscription.name}" типа создан! VIBE почти активирован!`);
       setLoading(false);
       setSuccess(true);
-      setActiveSubscriptionId(selectedSubscription.id);
+      setActiveSubscriptionId(selectedSubscription.id); 
+      // Simulate user update for dev environment
+      if (user?.id && typeof window !== 'undefined') {
+        // This is a mock update, real update happens via webhook
+        // In a real scenario, you might optimistically update UI or wait for webhook.
+        // For now, just setting active ID is enough for UI change.
+        console.log(`[DEV_MODE_PURCHASE] Mock user subscription update to ${selectedSubscription.id}`);
+      }
       return;
     }
 
     try {
       const metadata = {
-        type: "subscription_cyberfitness",
-        subscription_id: selectedSubscription.id,
+        type: "subscription_cyberfitness", // Match this in subscriptionHandler
+        subscription_id: selectedSubscription.id, // String plan ID
         subscription_name: selectedSubscription.name,
-        subscription_price_stars: selectedSubscription.price,
+        subscription_price_stars: selectedSubscription.price, // XTR amount
         userId: user.id.toString(),
         username: user.username || "unknown_tg_user",
       };
       const payload = `sub_cf_${user.id}_${selectedSubscription.id}_${Date.now()}`;
 
+      // Create invoice in DB first
       const invoiceCreateResult = await createInvoice(
-        "subscription_cyberfitness",
-        payload,
-        user.id.toString(),
-        selectedSubscription.price,
-        selectedSubscription.id,
-        metadata
+        "subscription_cyberfitness", // type for DB invoice
+        payload,                     // unique invoice id
+        user.id.toString(),          // user_id
+        selectedSubscription.price,  // amount in XTR
+        selectedSubscription.id,     // plan_id (string) for subscription_id in DB
+        metadata                     // additional metadata
       );
 
       if (!invoiceCreateResult.success || !invoiceCreateResult.data) {
         throw new Error(invoiceCreateResult.error || "Не удалось создать запись о счете в CyberVibe БД. Попробуйте позже.");
       }
-
+      
+      // Prepare a cleaner description for Telegram invoice
       const cleanFeaturesForInvoice = selectedSubscription.features
         .map((feature: string) => parseFeatureString(feature).textContent)
-        .slice(0, 2)
+        .slice(0, 2) // Take first 2 features for brevity
         .join(', ') + "... полный доступ к AI-магии!";
 
+      // Send invoice to Telegram
       const response = await sendTelegramInvoice(
         user.id.toString(),
         `Апгрейд CyberVibe OS: ${selectedSubscription.name}`,
         `Разблокируй ${selectedSubscription.name} для: ${cleanFeaturesForInvoice}.`,
-        payload,
-        selectedSubscription.price
+        payload, // This payload MUST match the invoice ID in DB
+        selectedSubscription.price // Amount in XTR (smallest unit, e.g. 100 for 1 XTR if XTR had cents)
+                                   // For Telegram Stars, this is the direct amount in stars.
       );
 
       if (!response.success) {
@@ -260,7 +262,7 @@ export default function BuySubscriptionPage() {
                         <li key={i} className="text-gray-100/95 font-mono flex items-start py-1">
                           {iconVibeContent && <VibeContentRenderer content={`${iconVibeContent} `} />}
                           <span>
-                            {textContent}
+                            <VibeContentRenderer content={textContent} />
                           </span>
                         </li>
                       );
@@ -309,7 +311,7 @@ export default function BuySubscriptionPage() {
                         <li key={i} className="text-gray-100/90 font-mono flex items-start py-0.5">
                            {iconVibeContent && <VibeContentRenderer content={`${iconVibeContent} `} />}
                            <span>
-                             {textContent}
+                             <VibeContentRenderer content={textContent} />
                            </span>
                         </li>
                       );
@@ -339,7 +341,11 @@ export default function BuySubscriptionPage() {
                     : sub.id === "cyber_initiate_free_demo" ? "bg-gray-500 text-gray-300 cursor-not-allowed"
                     : "bg-dark-bg/80 text-light-text hover:bg-brand-green hover:text-black hover:shadow-brand-green/60 focus:bg-brand-green focus:text-black"}`}
                 >
-                  {sub.id === activeSubscriptionId ? "ЭТО ТЫ, АГЕНТ!" : selectedSubscription?.id === sub.id ? "::FaCheckToSlot:: ВЫБРАН ДЛЯ АПГРЕЙДА!" : sub.cta}
+                  <VibeContentRenderer content={
+                    sub.id === activeSubscriptionId ? "ЭТО ТЫ, АГЕНТ!"
+                    : selectedSubscription?.id === sub.id ? "::FaCheckToSlot:: ВЫБРАН ДЛЯ АПГРЕЙДА!"
+                    : sub.cta
+                  } />
                 </Button>
               </motion.div>
             ))}
@@ -359,7 +365,9 @@ export default function BuySubscriptionPage() {
                   ${loading || success || !selectedSubscription || selectedSubscription.id === "cyber_initiate_free_demo" ? "bg-muted text-muted-foreground cursor-not-allowed animate-pulse-slow"
                   : "bg-gradient-to-r from-brand-green via-neon-lime to-brand-cyan text-black hover:shadow-[0_0_25px_theme(colors.brand-green)] text-glow"}`}
               >
-                {loading ? "::FaSpinner className='animate-spin mr-2':: ОБРАБОТКА ЗАПРОСА..." : success ? "::FaPaperPlane:: СЧЕТ ОТПРАВЛЕН В TELEGRAM!" : "ЗАПУСТИТЬ VIBE-АПГРЕЙД!"}
+                {loading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: ОБРАБОТКА ЗАПРОСА..." />
+                : success ? <VibeContentRenderer content="::FaPaperPlane:: СЧЕТ ОТПРАВЛЕН В TELEGRAM!" />
+                : <VibeContentRenderer content="ЗАПУСТИТЬ VIBE-АПГРЕЙД!" />}
               </Button>
               {error && (
                 <motion.p
