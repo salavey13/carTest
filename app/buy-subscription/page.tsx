@@ -16,7 +16,7 @@ const parseFeatureString = (feature: string): { iconVibeContent: string | null, 
     // Matches <FaIconName ...attributes... /> at the beginning of the string
     const featureMatch = feature.match(/^(<Fa\w+(?:\s+[^>]*?)?\s*\/?>)(.*)$/);
     if (featureMatch) {
- 방향      const iconHtmlTag = featureMatch[1]; // e.g., <FaBookReader className='text-brand-green mr-2 align-middle text-xl'/>
+        const iconHtmlTag = featureMatch[1]; // e.g., <FaBookReader className='text-brand-green mr-2 align-middle text-xl'/>
         const text = featureMatch[2].trim();
 
         // Extracts icon name and attributes for VibeContentRenderer format ::FaIconName attributes::
