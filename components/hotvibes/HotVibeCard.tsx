@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent as ShadCardContent, CardFooter, CardHeader as ShadCardHeader, CardTitle as ShadCardTitle, CardDescription as ShadCardDescription } from '@/components/ui/card'; // Renamed to avoid conflict
+import { Card, CardContent, CardFooter, CardHeader as ShadCardHeader, CardTitle as ShadCardTitle, CardDescription as ShadCardDescription } from '@/components/ui/card'; // Renamed to avoid conflict
 import {
   Dialog,
   DialogContent,
@@ -233,12 +233,12 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
                         <VibeContentRenderer content={modalText.missionBriefing}/>
                         </ShadCardTitle>
                     </ShadCardHeader>
-                    <ShadCardContent className="p-0 text-xs space-y-1 text-gray-300">
+                    <CardContent className="p-0 text-xs space-y-1 text-gray-300">
                         {lead.potential_earning && <p><VibeContentRenderer content="::FaMoneyBillWave className='text-brand-green':: "/>{modalText.budget} <span className="font-semibold">{lead.potential_earning}</span></p>}
                         {lead.project_type_guess && <p><VibeContentRenderer content="::FaLightbulb className='text-brand-yellow':: "/>{modalText.taskType} <span className="font-semibold">{lead.project_type_guess}</span></p>}
                         {lead.required_quest_id && <p><VibeContentRenderer content="::FaBoltLightning className='text-brand-orange':: "/>{modalText.requiredSkill} <span className="font-semibold">{lead.required_quest_id}</span></p>}
                         {lead.client_response_snippet && <p className="text-brand-lime"><VibeContentRenderer content="::FaCommentDots className='text-brand-lime':: "/>{modalText.clientStatus} <span className="font-semibold italic">"{lead.client_response_snippet}"</span></p>}
-                    </ShadCardContent>
+                    </CardContent>
                 </Card>
 
                 {lead.project_description && (
@@ -248,9 +248,9 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
                             <VibeContentRenderer content="::FaFileLines className='mr-2'::"/>{modalText.fullDescription}
                         </ShadCardTitle>
                         </ShadCardHeader>
-                        <ShadCardContent className="p-3 sm:p-4 text-xs text-gray-300 whitespace-pre-wrap break-words max-h-40 sm:max-h-48 overflow-y-auto simple-scrollbar">
+                        <CardContent className="p-3 sm:p-4 text-xs text-gray-300 whitespace-pre-wrap break-words max-h-40 sm:max-h-48 overflow-y-auto simple-scrollbar">
                         <VibeContentRenderer content={lead.project_description} />
-                        </ShadCardContent>
+                        </CardContent>
                     </Card>
                 )}
             
@@ -265,9 +265,9 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
                                 <VibeContentRenderer content="::FaCopy::"/>
                             </Button>
                         </ShadCardHeader>
-                        <ShadCardContent className="p-3 sm:p-4 text-xs text-gray-300 whitespace-pre-wrap break-words max-h-40 sm:max-h-48 overflow-y-auto simple-scrollbar">
+                        <CardContent className="p-3 sm:p-4 text-xs text-gray-300 whitespace-pre-wrap break-words max-h-40 sm:max-h-48 overflow-y-auto simple-scrollbar">
                             {lead.ai_generated_proposal_draft}
-                        </ShadCardContent>
+                        </CardContent>
                     </Card>
                 )}
             </div>
