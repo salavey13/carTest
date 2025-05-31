@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react"; 
-import { Suspense, useEffect, useRef, useCallback } from 'react'; // Added useCallback
+import { Suspense, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -54,18 +54,16 @@ function AppInitializers() {
         logger.error("[ClientLayout ScrollAch] Error unlocking achievement:", error);
         scrollAchievementUnlockedRef.current = false; // Allow retry if error
       }
-      // Listener is removed in the useEffect cleanup or if dependencies change causing re-run
     }
-  }, [isAuthenticated, dbUser, addToast]); // addToast is stable, dbUser and isAuthenticated are key
+  }, [isAuthenticated, dbUser, addToast]);
 
   useEffect(() => {
-    const currentScrollHandler = handleScrollForAchievement; // Capture current handler
+    const currentScrollHandler = handleScrollForAchievement;
 
     if (isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
       window.addEventListener('scroll', currentScrollHandler, { passive: true });
       logger.debug(`[ClientLayout ScrollAch] Added scroll listener for user ${dbUser.user_id}.`);
     } else {
-      // Ensure listener is removed if conditions are not met (e.g., logout) or achievement unlocked
       window.removeEventListener('scroll', currentScrollHandler);
       logger.debug(`[ClientLayout ScrollAch] Conditions not met or achievement unlocked. Ensured scroll listener is removed for user ${dbUser?.user_id}.`);
     }
@@ -74,7 +72,7 @@ function AppInitializers() {
       window.removeEventListener('scroll', currentScrollHandler);
       logger.debug(`[ClientLayout ScrollAch] Cleaned up scroll listener for user ${dbUser?.user_id}.`);
     };
-  }, [isAuthenticated, dbUser, handleScrollForAchievement]); // handleScrollForAchievement will change if its deps change
+  }, [isAuthenticated, dbUser, handleScrollForAchievement]);
   
   return null; 
 }
@@ -83,7 +81,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
-  const pathsToShowBottomNavForStartsWith = ["/selfdev/gamified", "/p-plan", "/profile"]; 
+  const pathsToShowBottomNavForStartsWith = [
+    "/selfdev/gamified", 
+    "/p-plan", 
+    "/profile",
+    "/hotvibes" // <--- ДОБАВЛЕНО ЗДЕСЬ
+  ]; 
 
   const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname);
   const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p));
