@@ -19,7 +19,7 @@ CREATE TABLE public.users (
     avatar_url TEXT,
     website TEXT,
     language_code TEXT,
-    subscription_id INT,
+    subscription_id TEXT,
     status TEXT DEFAULT 'free',
     role TEXT DEFAULT 'attendee',
     created_at TIMESTAMPTZ DEFAULT now(),
