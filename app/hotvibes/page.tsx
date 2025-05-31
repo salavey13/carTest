@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // Уже импортируется через useAppToast
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import TutorialLoader from '../tutorials/TutorialLoader';
@@ -20,24 +20,12 @@ import {
 } from '@/hooks/cyberFitnessSupabase';
 import { fetchLeadsForDashboard } from '../leads/actions';
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
-import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard'; // Убедитесь, что импорт HotVibeCardTheme также есть, если он экспортируется
+// Убедимся, что импортируем и тип темы
+import { HotVibeCard, HotLeadData, HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard'; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
 
-// Импортируем тип темы из HotVibeCard, если он там определен и экспортирован
-// Если нет, можно определить его здесь или в общем файле типов.
-// import type { HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard'; // Пример импорта
-
-// Определяем тип темы здесь, если он не импортируется
-interface HotVibeCardTheme {
-  borderColor: string;
-  accentGradient: string;
-  modalOverlayGradient?: string;
-  modalAccentColor?: string;
-  modalCardBg?: string;
-  modalCardBorder?: string;
-}
-
+// Тип HotVibeCardTheme теперь импортируется, определение здесь больше не нужно
 
 const pageTranslations = {
     ru: {
@@ -199,11 +187,11 @@ function HotVibesContent() {
   const cardTheme: HotVibeCardTheme = {
     borderColor: "border-brand-red/70", 
     accentGradient: "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500", 
-    // Theme for the modal (as discussed)
-    modalOverlayGradient: "from-black/80 via-purple-900/60 to-black/90", // Darker purple, more black
-    modalAccentColor: "text-brand-cyan", // Keep cyan for modal titles
-    modalCardBg: "bg-black/60",          // Darker, more translucent cards inside modal
-    modalCardBorder: "border-white/15",  // Subtle border for cards inside modal
+    modalOverlayGradient: "from-black/70 via-purple-900/50 to-black/80", // Adjusted for more subtlety
+    modalAccentColor: "text-brand-cyan", 
+    modalCardBg: "bg-black/70",          // Slightly more opaque for better contrast
+    modalCardBorder: "border-white/20",  // Slightly more visible border
+    modalImageOverlayGradient: "bg-gradient-to-t from-black/90 via-black/50 to-transparent", // Added this new theme property
   };
 
   return (
@@ -214,11 +202,9 @@ function HotVibesContent() {
         triggerElementSelector={`#${heroTriggerId}`}
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//aPAQbwg_700b-62cff769-b043-4043-923d-76a1e9e4b71f.jpg"
-        // No onScrollProgressChange needed here, hero manages its own text fade
       />
       <div id={heroTriggerId} style={{ height: '130vh' }} aria-hidden="true" />
 
-      {/* Main content container with appropriate z-index and background */}
       <div className="container mx-auto px-2 sm:px-4 py-10 md:py-12 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -227,9 +213,9 @@ function HotVibesContent() {
           className="w-full max-w-5xl mx-auto"
         >
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl border-2 shadow-2xl", // Nearly opaque background
+              "bg-dark-card/95 backdrop-blur-xl border-2 shadow-2xl",
               "border-brand-red/70 shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]",
-              "relative z-20" // Ensure this card is above hero's text elements
+              "relative z-20" 
             )}
           >
             <CardHeader className="pb-4 pt-6">
@@ -266,7 +252,7 @@ function HotVibesContent() {
                       isMissionUnlocked={cyberProfile ? (lead.required_quest_id ? checkQuestUnlocked(lead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
                       onExecuteMission={handleExecuteMission}
                       currentLang={currentLang}
-                      theme={cardTheme} // Pass the theme object to each card
+                      theme={cardTheme}
                     />
                   ))}
                 </div>
