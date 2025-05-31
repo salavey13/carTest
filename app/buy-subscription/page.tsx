@@ -10,17 +10,18 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
 const parseFeatureString = (feature: string): { iconVibeContent: string | null, textContent: string } => {
-    // Updated regex to match ::FaIconName attributes:: format
-    const featureMatch = feature.match(/^(::Fa\w+(?:\s+[^:]*?)?::)(.*)$/);
+    // Regex to match ::FaIconName attributes:: format
+    // Using /s flag to make . match newline characters as well, crucial for multi-line attributes if any.
+    const featureMatch = feature.match(/^(::Fa\w+\b(?:.*?)?::)(.*)$/s); 
     if (featureMatch) {
-        const iconVibeSyntax = featureMatch[1];
-        const text = featureMatch[2].trim();
+        const iconVibeSyntax = featureMatch[1]; // Full icon tag e.g. ::FaIcon attributes::
+        const text = featureMatch[2].trim();    // Text content
         return {
             iconVibeContent: iconVibeSyntax,
             textContent: text
         };
     }
-    return { iconVibeContent: null, textContent: feature };
+    return { iconVibeContent: null, textContent: feature }; // Fallback if no match
 };
 
 const UPDATED_SUBSCRIPTION_PLANS = [
@@ -155,11 +156,7 @@ export default function BuySubscriptionPage() {
       setLoading(false);
       setSuccess(true);
       setActiveSubscriptionId(selectedSubscription.id); 
-      // Simulate user update for dev environment
       if (user?.id && typeof window !== 'undefined') {
-        // This is a mock update, real update happens via webhook
-        // In a real scenario, you might optimistically update UI or wait for webhook.
-        // For now, just setting active ID is enough for UI change.
         console.log(`[DEV_MODE_PURCHASE] Mock user subscription update to ${selectedSubscription.id}`);
       }
       return;
@@ -167,43 +164,46 @@ export default function BuySubscriptionPage() {
 
     try {
       const metadata = {
-        type: "subscription_cyberfitness", // Match this in subscriptionHandler
-        subscription_id: selectedSubscription.id, // String plan ID
+        type: "subscription_cyberfitness", 
+        subscription_id: selectedSubscription.id, 
         subscription_name: selectedSubscription.name,
-        subscription_price_stars: selectedSubscription.price, // XTR amount
+        subscription_price_stars: selectedSubscription.price, 
         userId: user.id.toString(),
         username: user.username || "unknown_tg_user",
       };
       const payload = `sub_cf_${user.id}_${selectedSubscription.id}_${Date.now()}`;
 
-      // Create invoice in DB first
       const invoiceCreateResult = await createInvoice(
-        "subscription_cyberfitness", // type for DB invoice
-        payload,                     // unique invoice id
-        user.id.toString(),          // user_id
-        selectedSubscription.price,  // amount in XTR
-        selectedSubscription.id,     // plan_id (string) for subscription_id in DB
-        metadata                     // additional metadata
+        "subscription_cyberfitness", 
+        payload,                    
+        user.id.toString(),         
+        selectedSubscription.price, 
+        selectedSubscription.id,    
+        metadata                    
       );
 
       if (!invoiceCreateResult.success || !invoiceCreateResult.data) {
         throw new Error(invoiceCreateResult.error || "Не удалось создать запись о счете в CyberVibe БД. Попробуйте позже.");
       }
       
-      // Prepare a cleaner description for Telegram invoice
-      const cleanFeaturesForInvoice = selectedSubscription.features
+      const featuresTextForInvoice = selectedSubscription.features
         .map((feature: string) => parseFeatureString(feature).textContent)
-        .slice(0, 2) // Take first 2 features for brevity
-        .join(', ') + "... полный доступ к AI-магии!";
+        .slice(0, 2) 
+        .join(', ');
+      
+      let descriptionForTelegram = `Разблокируй ${selectedSubscription.name} для: ${featuresTextForInvoice}... полный доступ к AI-магии!`;
+      // Clean up VibeRenderer syntax just in case it slipped through parseFeatureString or for other parts of description
+      descriptionForTelegram = descriptionForTelegram
+        .replace(/::Fa\w+\b(?:.*?)?::/g, '') // Remove ::FaIcon...::
+        .replace(/\s{2,}/g, ' ') // Replace multiple spaces with a single space
+        .trim();
 
-      // Send invoice to Telegram
       const response = await sendTelegramInvoice(
         user.id.toString(),
         `Апгрейд CyberVibe OS: ${selectedSubscription.name}`,
-        `Разблокируй ${selectedSubscription.name} для: ${cleanFeaturesForInvoice}.`,
-        payload, // This payload MUST match the invoice ID in DB
-        selectedSubscription.price // Amount in XTR (smallest unit, e.g. 100 for 1 XTR if XTR had cents)
-                                   // For Telegram Stars, this is the direct amount in stars.
+        descriptionForTelegram,
+        payload, 
+        selectedSubscription.price 
       );
 
       if (!response.success) {
