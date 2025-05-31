@@ -5,14 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { 
-    Card, 
-    CardContent, 
-    CardFooter, 
-    CardHeader as ShadCardHeader, // Используем ShadCardHeader для вложенных карточек
-    CardTitle as ShadCardTitle, 
-    CardDescription as ShadCardDescription 
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader as ShadCardHeader, CardTitle as ShadCardTitle, CardDescription as ShadCardDescription } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +18,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { FaXmark, FaChevronDown, FaChevronUp, FaCopy } from "react-icons/fa6";
+import { FaXmark, FaChevronDown, FaChevronUp, FaCopy, FaLink } from "react-icons/fa6"; // Добавили FaLink
 import { toast } from 'sonner';
 
 export interface HotLeadData {
@@ -49,7 +42,7 @@ export interface HotVibeCardTheme {
   accentGradient: string;
   modalOverlayGradient?: string;
   modalAccentColor?: string;
-  modalCardBg?: string;
+  modalCardBg?: string; // Фон для карточек ВНУТРИ модала (Брифинг, Описание, Оффер)
   modalCardBorder?: string;
   modalImageOverlayGradient?: string;
 }
@@ -63,7 +56,7 @@ interface HotVibeCardProps {
 }
 
 const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png";
-// Более нейтральный или абстрактный фон для модала, если нет demo_image_url
+// ТВОЙ ПЛЕЙСХОЛДЕР ДЛЯ ФОНА МОДАЛА (как просил)
 const MODAL_BACKGROUND_FALLBACK = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//IMG_20250516_051010-f7be2229-1a7f-4bc2-950a-5c122b74fce6.jpg";
 
 
@@ -73,7 +66,7 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
   const [isOfferOpen, setIsOfferOpen] = useState(false);
   
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
-  const imageForModalHeroArea = lead.demo_image_url || MODAL_BACKGROUND_FALLBACK; // Это изображение для верхней части модала
+  const imageForModalHeroArea = lead.demo_image_url || MODAL_BACKGROUND_FALLBACK;
 
   const handleExecuteClickInModal = () => {
     if (!isMissionUnlocked) {
@@ -96,7 +89,7 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
 
   const tModal = {
     ru: { 
-        viewOriginal: "Смотреть Оригинал на KWork", 
+        viewOriginal: "Оригинал Заказа", // Изменено для краткости рядом с кнопкой
         clientSays: "Клиент говорит:", 
         draftOffer: "Черновик Оффера:", 
         fullDescription: "Полное Описание:", 
@@ -111,7 +104,7 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
         copyOffer: "Копировать Оффер",
      },
     en: { 
-        viewOriginal: "View Original on KWork", clientSays: "Client says:", draftOffer: "Draft Offer:", 
+        viewOriginal: "Original Order", clientSays: "Client says:", draftOffer: "Draft Offer:", 
         fullDescription: "Full Description:", executeMission: "::FaFireAlt className='mr-2':: Execute Live Fire Mission!", 
         skillLocked: "::FaLock className='mr-2':: Skill Locked", close: "Close",
         missionBriefing: "::FaListCheck className='mr-2':: Mission Briefing", budget: "Budget:",
@@ -119,8 +112,7 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
     }
   };
   const modalText = tModal[currentLang];
-  // modalEffectiveOverlayGradient больше не нужен, т.к. контентная часть имеет свой фон
-  const modalImageEffectiveOverlayGradient = theme.modalImageOverlayGradient || "bg-gradient-to-t from-black/95 via-black/60 to-transparent"; // Более сильное затемнение снизу
+  const modalImageEffectiveOverlayGradient = theme.modalImageOverlayGradient || "bg-gradient-to-t from-black/80 via-black/40 to-transparent"; // Сделал темнее снизу для текста брифинга
 
   return (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -177,7 +169,7 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
 
         <CardFooter className="p-2 sm:p-2.5 pt-0">
           <Button
-            onClick={() => setIsModalOpen(true)} // Эта кнопка открывает модал
+            onClick={() => setIsModalOpen(true)}
             variant="default"
             size="sm"
             className={cn(
@@ -192,139 +184,136 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
 
       <DialogContent 
           className={cn(
-          "hotvibe-modal max-w-3xl w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[500px] max-h-[95vh] sm:max-h-[85vh]",
-          "bg-transparent text-light-text p-0 overflow-hidden flex flex-col border-0 shadow-none", // Убрали фон и бордер отсюда
-          "data-[state=open]:animate-content-show data-[state=closed]:animate-content-hide" // Анимации shadcn
+          "hotvibe-modal max-w-3xl w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[550px] xl:w-[600px] max-h-[95vh] sm:max-h-[90vh]", // Ширина чуть больше для баланса
+          "bg-dark-card text-light-text p-0 overflow-hidden flex flex-col", 
+          "border-2", theme.borderColor, `shadow-[0_0_50px_-10px_rgba(var(--brand-cyan-rgb),0.6)]` // Циан глоу
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
       >
-          {/* Внешний контейнер для управления общим фоном и бордером, если нужно */}
-          <div className={cn(
-            "w-full h-full flex flex-col overflow-hidden rounded-xl border-2", 
-            theme.borderColor, `shadow-[0_0_60px_-15px_rgba(var(--brand-cyan-rgb),0.7)]` // Циановое свечение для всего модала
-          )}>
-            {/* Верхняя половина - Изображение с градиентом */}
-            <div className="relative w-full h-[40vh] sm:h-[45vh] flex-shrink-0 overflow-hidden group bg-black"> {/* Фон черный на случай отсутствия картинки */}
-                {imageForModalHeroArea && (
-                    <Image
-                        src={imageForModalHeroArea}
-                        alt="Mission Epic Background"
-                        fill
-                        className="object-cover scale-105 group-hover:scale-110 transition-transform duration-500 ease-out opacity-70 group-hover:opacity-80" // Чуть прозрачнее для VIBE'а
-                        priority
-                        onError={(e) => { (e.target as HTMLImageElement).src = MODAL_BACKGROUND_FALLBACK; }} // Запасная картинка для фона
-                    />
-                )}
-                {/* Градиент поверх изображения */}
-                <div className={cn("absolute inset-0", modalImageEffectiveOverlayGradient, "mix-blend-multiply group-hover:mix-blend-normal transition-all")} />
-                
-                {/* Заголовок и кнопка закрытия поверх изображения */}
-                <div className="absolute top-0 left-0 right-0 p-3 pt-4 sm:p-4 flex justify-between items-start z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent pb-10">
-                    <div className="flex-grow pr-2">
-                        <ShadCardTitle className={cn("font-orbitron text-lg sm:text-xl md:text-2xl line-clamp-3 leading-tight", theme.modalAccentColor || "text-brand-cyan", "text-shadow-cyber")}>
-                            {lead.client_name ? `${lead.client_name}: ${lead.kwork_gig_title}` : lead.kwork_gig_title || (currentLang === 'ru' ? "Детали Горячего Вайба" : "Hot Vibe Details")}
-                        </ShadCardTitle>
-                        {lead.kwork_url && (
-                        <ShadCardDescription className="pt-1">
-                            <Link href={lead.kwork_url} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm text-brand-blue hover:underline flex items-center gap-1.5 opacity-90 hover:opacity-100">
-                                {modalText.viewOriginal} <VibeContentRenderer content="::FaArrowUpRightFromSquare className='w-3 h-3'::" />
-                            </Link>
-                        </ShadCardDescription>
-                        )}
-                    </div>
-                    <DialogClose asChild>
-                        <Button variant="ghost" size="icon" className="text-gray-300 hover:text-white w-8 h-8 sm:w-9 sm:h-9 p-1.5 sm:p-2 flex-shrink-0 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm shadow-md">
-                            <FaXmark className="w-4 h-4 sm:w-5 sm:h-5" />
-                            <span className="sr-only">{modalText.close}</span>
-                        </Button>
-                    </DialogClose>
-                </div>
-            </div>
-            
-            {/* Нижняя половина - Контент (скроллабл) */}
-            <div className={cn(
-                "relative z-10 flex-grow overflow-y-auto p-3 sm:p-4 space-y-3 font-mono simple-scrollbar",
-                "bg-dark-bg" // Фон для контентной части, чтобы перекрыть нижележащий градиент, если он есть
+          {/* Верхняя Часть Модала: Изображение + Брифинг поверх него */}
+          <div className="relative w-full h-[45vh] sm:h-[50vh] flex-shrink-0 overflow-hidden group bg-black">
+              {imageForModalHeroArea && (
+                  <Image
+                      src={imageForModalHeroArea}
+                      alt="Mission Epic Background"
+                      fill
+                      className="object-cover scale-105 group-hover:scale-110 transition-transform duration-500 ease-out opacity-60 group-hover:opacity-75" // Менее прозрачно
+                      priority
+                      onError={(e) => { (e.target as HTMLImageElement).src = MODAL_BACKGROUND_FALLBACK; }}
+                  />
               )}
-            >
-                <Card className={cn("border p-3 shadow-md backdrop-blur-sm", theme.modalCardBg || "bg-black/60", theme.modalCardBorder || "border-white/15")}>
-                    <ShadCardHeader className="p-0 mb-1.5 sm:mb-2">
-                        <ShadCardTitle className={cn("text-sm sm:text-base font-orbitron flex items-center", theme.modalAccentColor || "text-brand-cyan")}>
-                        <VibeContentRenderer content={modalText.missionBriefing}/>
-                        </ShadCardTitle>
-                    </ShadCardHeader>
-                    <CardContent className="p-0 text-2xs sm:text-xs space-y-1 text-gray-300">
-                        {lead.potential_earning && <p><VibeContentRenderer content="::FaMoneyBillWave className='text-brand-green mr-1.5':: "/>{modalText.budget} <span className="font-semibold text-white">{lead.potential_earning}</span></p>}
-                        {lead.project_type_guess && <p><VibeContentRenderer content="::FaLightbulb className='text-brand-yellow mr-1.5':: "/>{modalText.taskType} <span className="font-semibold text-white">{lead.project_type_guess}</span></p>}
-                        {lead.required_quest_id && <p><VibeContentRenderer content="::FaBoltLightning className='text-brand-orange mr-1.5':: "/>{modalText.requiredSkill} <span className="font-semibold text-white">{lead.required_quest_id}</span></p>}
-                        {lead.client_response_snippet && <p className="text-brand-lime"><VibeContentRenderer content="::FaCommentDots className='text-brand-lime mr-1.5':: "/>{modalText.clientStatus} <span className="font-semibold text-white italic">"{lead.client_response_snippet}"</span></p>}
-                    </CardContent>
-                </Card>
+              {/* Градиент для затемнения низа изображения, чтобы текст брифинга был читаем */}
+              <div className={cn("absolute inset-x-0 bottom-0 h-2/3", modalImageEffectiveOverlayGradient)} />
+              
+              {/* Кнопка Закрытия - теперь точно одна и в углу картинки */}
+              <DialogClose asChild>
+                  <Button variant="ghost" size="icon" className="absolute top-3 right-3 text-gray-300 hover:text-white w-9 h-9 p-2 flex-shrink-0 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-sm shadow-md z-30">
+                      <FaXmark className="w-5 h-5" />
+                      <span className="sr-only">{modalText.close}</span>
+                  </Button>
+              </DialogClose>
 
-                {lead.project_description && (
-                  <Collapsible open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen} className="rounded-lg overflow-hidden">
-                    <Card className={cn("border-0 shadow-none", theme.modalCardBg || "bg-black/60")}>
-                      <CollapsibleTrigger asChild>
-                        <ShadCardHeader className={cn("pt-2.5 pb-1.5 px-3 sm:px-4 cursor-pointer flex justify-between items-center transition-colors rounded-t-md", isDescriptionOpen ? `${theme.modalCardBorder || "border-white/15"} bg-white/10` : `${theme.modalCardBorder || "border-white/15"} hover:bg-white/5`)}>
-                          <ShadCardTitle className={cn("text-xs sm:text-sm font-orbitron flex items-center", theme.modalAccentColor || "text-brand-purple")}>
-                              <VibeContentRenderer content="::FaFileLines className='mr-2'::"/>{modalText.fullDescription}
-                          </ShadCardTitle>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-gray-400">
-                            {isDescriptionOpen ? <FaChevronUp /> : <FaChevronDown />}
-                          </Button>
-                        </ShadCardHeader>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className={cn("border-x border-b rounded-b-md", theme.modalCardBorder || "border-white/15")}>
-                        <CardContent className="p-2.5 sm:p-3 text-2xs sm:text-xs text-gray-300 whitespace-pre-wrap break-words max-h-28 sm:max-h-32 overflow-y-auto simple-scrollbar">
-                          <VibeContentRenderer content={lead.project_description} />
-                        </CardContent>
-                      </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                )}
-            
-                {lead.ai_generated_proposal_draft && (
-                  <Collapsible open={isOfferOpen} onOpenChange={setIsOfferOpen} className="rounded-lg overflow-hidden">
-                     <Card className={cn("border-0 shadow-none", theme.modalCardBg || "bg-black/60")}>
-                        <CollapsibleTrigger asChild>
-                            <ShadCardHeader className={cn("pt-2.5 pb-1.5 px-3 sm:px-4 cursor-pointer flex justify-between items-center transition-colors rounded-t-md", isOfferOpen ? `${theme.modalCardBorder || "border-white/10"} bg-white/10` : `${theme.modalCardBorder || "border-white/10"} hover:bg-white/5`)}>
-                                <ShadCardTitle className={cn("text-xs sm:text-sm font-orbitron flex items-center", theme.modalAccentColor || "text-brand-pink")}>
-                                    <VibeContentRenderer content="::FaPaperPlane className='mr-2'::"/>{modalText.draftOffer}
-                                </ShadCardTitle>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-gray-400">
-                                    {isOfferOpen ? <FaChevronUp /> : <FaChevronDown />}
-                                </Button>
-                            </ShadCardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className={cn("border-x border-b rounded-b-md", theme.modalCardBorder || "border-white/10")}>
-                            <CardContent className="p-2.5 sm:p-3 text-2xs sm:text-xs text-gray-300">
-                                <pre className="whitespace-pre-wrap break-words max-h-28 sm:max-h-32 overflow-y-auto simple-scrollbar">{lead.ai_generated_proposal_draft}</pre>
-                                <Button variant="outline" size="sm" className={cn("mt-2 text-2xs sm:text-xs h-auto py-1 px-2", theme.borderColor, theme.modalAccentColor || "text-brand-pink", `hover:bg-opacity-20 focus:ring-1 focus:ring-offset-0 ${(theme.modalAccentColor || "text-brand-pink").replace('text-','ring-')}`)}
-                                        onClick={() => handleCopyToClipboard(lead.ai_generated_proposal_draft, "Черновик оффера скопирован!")}>
-                                    <VibeContentRenderer content="::FaCopy className='mr-1.5'::"/>{modalText.copyOffer}
-                                </Button>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Card>
-                  </Collapsible>
-                )}
-            </div>
-
-            <div className="relative z-10 p-3 sm:p-4 border-t border-white/20 flex-shrink-0 mt-auto bg-black/50 backdrop-blur-sm rounded-b-xl">
-                <Button
-                onClick={handleExecuteClickInModal}
-                disabled={!isMissionUnlocked}
-                variant="default"
-                size="lg" 
-                className={cn(
-                    "w-full font-orbitron text-sm sm:text-base py-2.5 shadow-lg",
-                    isMissionUnlocked ? `${theme.accentGradient} text-black hover:brightness-110 active:scale-95 shadow-md` : "bg-muted text-muted-foreground cursor-not-allowed"
-                )}
-                >
-                <VibeContentRenderer content={isMissionUnlocked ? modalText.executeMission : modalText.skillLocked} />
-                </Button>
-            </div>
+              {/* Брифинг Миссии - поверх изображения внизу */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 sm:p-4 sm:pb-5 z-20 text-white">
+                <ShadCardHeader className="p-0 mb-1.5 sm:mb-2">
+                    <ShadCardTitle className={cn("text-base sm:text-lg font-orbitron flex items-center", theme.modalAccentColor || "text-brand-cyan", "text-shadow-cyber")}>
+                      <VibeContentRenderer content={modalText.missionBriefing}/>
+                    </ShadCardTitle>
+                </ShadCardHeader>
+                <CardContent className="p-0 text-xs sm:text-sm space-y-1"> {/* Уменьшил space-y */}
+                    {lead.client_name && <p className="font-semibold text-base line-clamp-1">{lead.client_name}</p>}
+                    {lead.potential_earning && <p><VibeContentRenderer content="::FaMoneyBillWave className='text-brand-green mr-1.5':: "/>{modalText.budget} <span className="font-semibold">{lead.potential_earning}</span></p>}
+                    {lead.project_type_guess && <p><VibeContentRenderer content="::FaLightbulb className='text-brand-yellow mr-1.5':: "/>{modalText.taskType} <span className="font-semibold">{lead.project_type_guess}</span></p>}
+                    {lead.required_quest_id && <p><VibeContentRenderer content="::FaBoltLightning className='text-brand-orange mr-1.5':: "/>{modalText.requiredSkill} <span className="font-semibold">{lead.required_quest_id}</span></p>}
+                    {lead.client_response_snippet && <p className="text-brand-lime italic"><VibeContentRenderer content="::FaCommentDots className='text-brand-lime mr-1.5':: "/>{modalText.clientStatus} "{lead.client_response_snippet}"</p>}
+                </CardContent>
+              </div>
           </div>
+          
+          {/* Нижняя Часть Модала - Контент (скроллабл) */}
+          <div className={cn(
+              "relative z-10 flex-grow overflow-y-auto p-3 sm:p-4 space-y-3 font-mono simple-scrollbar",
+              "bg-dark-bg" 
+            )}
+          >
+              {/* Full Description (Collapsible) */}
+              {lead.project_description && (
+                <Collapsible open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen} className="rounded-lg overflow-hidden">
+                  <Card className={cn("border-0 shadow-none", theme.modalCardBg || "bg-black/60")}>
+                    <CollapsibleTrigger asChild>
+                      <ShadCardHeader className={cn("pt-2.5 pb-1.5 px-3 sm:px-4 cursor-pointer flex justify-between items-center transition-colors rounded-t-md", isDescriptionOpen ? `${theme.modalCardBorder || "border-white/15"} bg-white/10` : `${theme.modalCardBorder || "border-white/15"} hover:bg-white/5`)}>
+                        <ShadCardTitle className={cn("text-xs sm:text-sm font-orbitron flex items-center", theme.modalAccentColor || "text-brand-purple")}>
+                            <VibeContentRenderer content="::FaFileLines className='mr-2'::"/>{modalText.fullDescription}
+                        </ShadCardTitle>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 p-1 text-gray-400">
+                          {isDescriptionOpen ? <FaChevronUp /> : <FaChevronDown />}
+                        </Button>
+                      </ShadCardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className={cn("border-x border-b rounded-b-md", theme.modalCardBorder || "border-white/15")}>
+                      <CardContent className="p-2.5 sm:p-3 text-2xs sm:text-xs text-gray-300 whitespace-pre-wrap break-words max-h-28 sm:max-h-32 overflow-y-auto simple-scrollbar">
+                        <VibeContentRenderer content={lead.project_description} />
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+          
+              {/* Offer Draft (Collapsible, но с видимыми кнопками Копировать и Ссылка) */}
+              {lead.ai_generated_proposal_draft && (
+                <Collapsible open={isOfferOpen} onOpenChange={setIsOfferOpen} className="rounded-lg overflow-hidden">
+                   <Card className={cn("border-0 shadow-none", theme.modalCardBg || "bg-black/60")}>
+                      <ShadCardHeader className={cn("pt-2.5 pb-1.5 px-3 sm:px-4 flex justify-between items-center rounded-t-md", theme.modalCardBorder || "border-white/15", isOfferOpen && "bg-white/10")}>
+                          <CollapsibleTrigger asChild>
+                              <button className={cn("flex-grow text-left flex items-center focus:outline-none", theme.modalAccentColor || "text-brand-pink")}>
+                                  <ShadCardTitle className="text-xs sm:text-sm font-orbitron flex items-center">
+                                      <VibeContentRenderer content="::FaPaperPlane className='mr-2'::"/>{modalText.draftOffer}
+                                  </ShadCardTitle>
+                                  <span className="ml-auto text-gray-400">
+                                    {isOfferOpen ? <FaChevronUp className="h-4 w-4"/> : <FaChevronDown className="h-4 w-4"/>}
+                                  </span>
+                              </button>
+                          </CollapsibleTrigger>
+                          <div className="flex items-center ml-2 flex-shrink-0">
+                            {lead.kwork_url && (
+                                <Link href={lead.kwork_url} target="_blank" rel="noopener noreferrer" passHref legacyBehavior>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 p-1 text-brand-blue hover:text-blue-300" title={modalText.viewOriginal}>
+                                    <FaLink/>
+                                </Button>
+                                </Link>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-7 w-7 p-1 text-gray-400 hover:text-brand-pink" 
+                                    title={modalText.copyOffer}
+                                    onClick={(e) => { e.stopPropagation(); handleCopyToClipboard(lead.ai_generated_proposal_draft, "Черновик оффера скопирован!")}}>
+                                <VibeContentRenderer content="::FaCopy::"/>
+                            </Button>
+                          </div>
+                      </ShadCardHeader>
+                      <CollapsibleContent className={cn("border-x border-b rounded-b-md", theme.modalCardBorder || "border-white/10")}>
+                          <CardContent className="p-2.5 sm:p-3 text-2xs sm:text-xs text-gray-300">
+                              <pre className="whitespace-pre-wrap break-words max-h-28 sm:max-h-32 overflow-y-auto simple-scrollbar">{lead.ai_generated_proposal_draft}</pre>
+                          </CardContent>
+                      </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+          </div>
+
+          <div className="relative z-10 p-3 sm:p-4 border-t border-white/20 flex-shrink-0 mt-auto bg-black/50 backdrop-blur-sm rounded-b-xl">
+              <Button
+              onClick={handleExecuteClickInModal}
+              disabled={!isMissionUnlocked}
+              variant="default"
+              size="lg" 
+              className={cn(
+                  "w-full font-orbitron text-sm sm:text-base py-2.5 shadow-lg",
+                  isMissionUnlocked ? `${theme.accentGradient} text-black hover:brightness-110 active:scale-95 shadow-md` : "bg-muted text-muted-foreground cursor-not-allowed"
+              )}
+              >
+              <VibeContentRenderer content={isMissionUnlocked ? modalText.executeMission : modalText.skillLocked} />
+              </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
