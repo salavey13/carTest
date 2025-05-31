@@ -87,6 +87,23 @@ const UPDATED_SUBSCRIPTION_PLANS = [
     who_is_this_for: "Для Агентов, готовых к **полной VIBE-трансформации.** Если ты хочешь не просто использовать AI, а ИЗОБРЕТАТЬ с его помощью, создавать сложные системы, монетизировать свои уникальные 'AI-соусы' и, возможно, построить свою 'сосисочную империю' – это твой апгрейд. **Vibegasm от безграничных возможностей гарантирован!**"
   }
 ];
+const parseFeatureString = (feature: string): { iconVibeContent: string | null, textContent: string } => {
+    const featureMatch = feature.match(/^(<Fa\w+(?:\s+[^>]*?)?\s*\/?>)(.*)$/);
+    if (featureMatch) {
+        const iconHtmlTag = featureMatch[1];
+        const text = featureMatch[2].trim();
+        const iconTagParts = iconHtmlTag.match(/^<(Fa\w+)((?:\s+[^>]*?)?)\s*\/>$/);
+        if (iconTagParts) {
+            const iconName = iconTagParts[1];
+            const attributes = iconTagParts[2] ? iconTagParts[2].trim() : '';
+            return {
+                iconVibeContent: `::${iconName}${attributes ? ' ' + attributes : ''}::`,
+                textContent: text
+            };
+        }
+    }
+    return { iconVibeContent: null, textContent: feature };
+};
 
 export default function BuySubscriptionPage() {
   const { user, isInTelegramContext, dbUser } = useAppContext();
