@@ -1,3 +1,4 @@
+// /app/buy-subscription/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
@@ -44,7 +45,7 @@ const UPDATED_SUBSCRIPTION_PLANS = [
       "<FaUsers className='text-brand-pink mr-2 align-middle text-xl group-hover:text-brand-purple transition-colors duration-300'/> **VIBE TRIBE (Твоё Комьюнити):** Поддержка 24/7, обмен опытом, совместные мозговые штурмы и рейды на KWork (когда комьюнити полностью активно). Ты не один, Агент!",
     ],
     who_is_this_for: "Для КАЖДОГО, кто зае*ался топтаться на месте и хочет без риска ощутить настоящий CyberVibe, увидеть AI в деле, выполнить свою первую 'Миссию Огня' и прокричать – **ДА, Я ТОЖЕ, БЛ*ТЬ, МОГУ!** Это твой реальный шанс убедиться, что CyberVibe – это не очередная сибирская телега, а ракета в будущее. **Твой ход, Агент!**",
-    hormozi_easter_egg_title: "::FaExclamationTriangle className='text-brand-yellow':: БЕСПЛАТНО? В ЧЕМ ПОДВОХ, VIBERIDER?",
+    hormozi_easter_egg_title: "::FaTriangleexclamation className='text-brand-yellow':: БЕСПЛАТНО? В ЧЕМ ПОДВОХ, VIBERIDER?",
     hormozi_easter_egg_content: `
 Конкуренция на фрилансе – АД? Все дерутся за подачки? **ХВАТИТ ЭТО ТЕРПЕТЬ!**
 CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
