@@ -13,7 +13,10 @@ import { cn } from "@/lib/utils";
 
 export default function PremiumPage() {
   const { dbUser } = useAppContext();
-  const hasActivePremium = dbUser?.subscription_id && dbUser.subscription_id !== "basic_neural_net";
+  // Assuming "cyber_initiate_free_demo" is the ID for the free/basic plan
+  const isFreePlan = dbUser?.subscription_id === "cyber_initiate_free_demo" || !dbUser?.subscription_id;
+  const hasActivePremium = !isFreePlan;
+
 
   const premiumFeatures = [
     { icon: <FaBrain className="text-brand-cyan" />, title: "Advanced Neural Pathways", description: "Глубокое погружение в продвинутые концепции CyberDev и Vibe-инженерии. Открой новые горизонты мышления." },
@@ -38,7 +41,6 @@ export default function PremiumPage() {
             <FaStar 
               className={cn(
                 "text-6xl text-brand-yellow mx-auto mb-4 animate-pulse",
-                // Using arbitrary value with CSS variable for drop-shadow
                 "[filter:drop-shadow(0_0_15px_hsl(var(--brand-yellow)))]" 
               )} 
             />
@@ -54,7 +56,7 @@ export default function PremiumPage() {
             {hasActivePremium ? (
                 <div className="text-center p-6 bg-brand-green/20 border-2 border-dashed border-brand-green/70 rounded-lg shadow-md">
                     <h2 className="text-2xl font-orbitron font-semibold text-brand-green mb-2 text-shadow-cyber">ПРЕМИУМ ПРОТОКОЛЫ АКТИВИРОВАНЫ!</h2>
-                    <p className="text-muted-foreground font-mono">Ты уже используешь все мощности CyberVibe OS. Твой путь к сингулярности открыт, Агент!</p>
+                    <p className="text-muted-foreground font-mono">Ты уже используешь все мощности CyberVibe OS. Твой текущий план: <strong className="text-brand-green">{dbUser?.subscription_id || "Неизвестный Премиум"}</strong>. Путь к сингулярности открыт, Агент!</p>
                 </div>
             ) : (
                 <p className="text-center text-lg text-light-text/90 font-mono">
