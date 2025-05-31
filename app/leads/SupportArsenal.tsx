@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { PROMPT_KWORKS_TO_CSV } from './prompt_kworks_to_csv';
-import { PROMPT_OFFER_V2_CYBERVIBE_OUTREACH } from './prompt_offer';
+import { PROMPT_OFFER_V4_CYBERVIBE_OUTREACH } from './prompt_offer';
 import { PROMPT_FIND_TWEAKS } from './prompt_find_tweaks';
 import { PROMPT_FIND_MISSING_FEATURES } from './prompt_find_missing_features';
 import { PROMPT_INTERGALACTIC_PIPELINE } from './prompt_intergalactic_pipeline';
@@ -120,11 +120,11 @@ const SupportArsenal: React.FC<SupportArsenalProps> = ({
               disabled={!rawKworksInput.trim()}
               className="w-full bg-gradient-to-r from-red-500 via-pink-500 to-purple-600 text-white border-pink-500/50 hover:opacity-90 flex items-center justify-center gap-2 py-2.5 sm:py-3 text-xs sm:text-sm font-orbitron font-bold transform hover:scale-105 px-3"
             >
-              <VibeContentRenderer content="::FaMeteor:: ВСЁ СРАЗУ В AI!" />
+              <VibeContentRenderer content="::FaRocket:: ВСЁ СРАЗУ В AI!" />
             </Button>
             <Button
               variant="secondary"
-              onClick={() => onCopyToClipboard(PROMPT_OFFER_V2_CYBERVIBE_OUTREACH, "Промпт 'CSV + Оффер' скопирован! Передайте AI вместе с CSV.")}
+              onClick={() => onCopyToClipboard(PROMPT_OFFER_V4_CYBERVIBE_OUTREACH, "Промпт 'CSV + Оффер' скопирован! Передайте AI вместе с CSV.")}
               className="w-full bg-brand-purple/20 text-brand-purple border-brand-purple/50 hover:bg-brand-purple/30 flex items-center justify-start text-left gap-2 py-2.5 sm:py-3 text-xs sm:text-sm transform hover:scale-105 px-3 font-mono"
             >
               <VibeContentRenderer content="::FaCopy::" />
