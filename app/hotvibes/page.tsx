@@ -20,9 +20,24 @@ import {
 } from '@/hooks/cyberFitnessSupabase';
 import { fetchLeadsForDashboard } from '../leads/actions';
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
-import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard';
+import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard'; // Убедитесь, что импорт HotVibeCardTheme также есть, если он экспортируется
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
+
+// Импортируем тип темы из HotVibeCard, если он там определен и экспортирован
+// Если нет, можно определить его здесь или в общем файле типов.
+// import type { HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard'; // Пример импорта
+
+// Определяем тип темы здесь, если он не импортируется
+interface HotVibeCardTheme {
+  borderColor: string;
+  accentGradient: string;
+  modalOverlayGradient?: string;
+  modalAccentColor?: string;
+  modalCardBg?: string;
+  modalCardBorder?: string;
+}
+
 
 const pageTranslations = {
     ru: {
@@ -50,16 +65,14 @@ const pageTranslations = {
 };
 
 function mapLeadToHotLeadData(lead: LeadDataFromActions): HotLeadData {
-  // Attempt to get a specific demo image; fallback to a generic placeholder or client avatar if available.
-  // For a "portrait crop" on the card, the HotVibeCard component will handle styling.
   const demoImageUrl = (lead.supervibe_studio_links as any)?.demo_image_url || 
-                       (lead.supervibe_studio_links as any)?.client_avatar_url; // Example fallback
+                       (lead.supervibe_studio_links as any)?.client_avatar_url;
 
   return {
     id: lead.id || `fallback_id_${Math.random()}`,
     kwork_gig_title: lead.client_name || lead.project_description?.substring(0, 50) || "Untitled Gig",
     ai_summary: lead.project_description?.substring(0, 100) || "No summary available.",
-    demo_image_url: demoImageUrl, // Use the determined image URL
+    demo_image_url: demoImageUrl,
     potential_earning: lead.budget_range || undefined,
     required_quest_id: (lead as any).required_quest_id_for_hotvibe || "image-swap-mission",
     client_response_snippet: lead.status === 'interested' || lead.status === 'client_responded_positive' ? "Клиент проявил интерес!" : undefined,
@@ -67,7 +80,6 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions): HotLeadData {
     project_description: lead.project_description,
     ai_generated_proposal_draft: lead.generated_offer,
     status: lead.status,
-    // Pass additional fields needed for the "Mission Briefing"
     project_type_guess: lead.project_type_guess,
   };
 }
@@ -122,7 +134,7 @@ function HotVibesContent() {
               if (!profileResult.data) return false; 
               const isUnlocked = requiredQuest
                 ? checkQuestUnlocked(requiredQuest, profileResult.data.completedQuests || [], QUEST_ORDER)
-                : true; // If no quest ID specified, assume it's accessible
+                : true;
               if(!isUnlocked) logger.debug(`[HotVibes] Lead ${mappedLead.id} for quest ${requiredQuest} is LOCKED for user.`);
               return isUnlocked;
             });
@@ -164,7 +176,6 @@ function HotVibesContent() {
     if (!isActuallyUnlocked) {
       addToast(t.lockedMissionRedirect.replace("...", `'${targetQuestId}'`), "info", 7000);
       
-      // Auto-complete "image-swap-mission" if it's the blocker for the first "courage boost"
       if (targetQuestId === "image-swap-mission" && !cyberProfile.completedQuests.includes("image-swap-mission")) {
         logger.info(`[HotVibes] Auto-completing '${targetQuestId}' for courage boost for user ${dbUser.user_id}`);
         await markTutorialAsCompleted(dbUser.user_id, "image-swap-mission");
@@ -172,11 +183,9 @@ function HotVibesContent() {
         if (updatedProfileResult.success && updatedProfileResult.data) {
           setCyberProfile(updatedProfileResult.data);
           addToast(`Навык '${targetQuestId}' экспресс-активирован! Попробуйте снова.`, "success", 3000);
-          // Don't redirect yet, let them click again with the unlocked skill.
           return;
         }
       }
-      // For other locked quests, redirect to their specific tutorial page
       router.push(`/tutorials/${targetQuestId}?nextLead=${leadId}&nextQuest=${targetQuestId}`);
       return;
     }
@@ -186,45 +195,41 @@ function HotVibesContent() {
 
   }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast]);
 
-  // Define a base theme for the HotVibeCard
-  const cardTheme = {
-    borderColor: "border-brand-red/70", // Example: use red for hot vibes
-    accentGradient: "bg-gradient-to-br from-brand-red via-brand-orange to-yellow-500", // For CTA buttons
-    // Add other theme properties if HotVibeCard expects more
+  // Define the theme for HotVibeCard
+  const cardTheme: HotVibeCardTheme = {
+    borderColor: "border-brand-red/70", 
+    accentGradient: "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500", 
+    // Theme for the modal (as discussed)
+    modalOverlayGradient: "from-black/80 via-purple-900/60 to-black/90", // Darker purple, more black
+    modalAccentColor: "text-brand-cyan", // Keep cyan for modal titles
+    modalCardBg: "bg-black/60",          // Darker, more translucent cards inside modal
+    modalCardBorder: "border-white/15",  // Subtle border for cards inside modal
   };
-
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground overflow-x-hidden">
-      {/* Fix for hero subtitle overlap: Ensure main content area has a background and z-index */}
       <RockstarHeroSection
         title={t.pageTitle}
         subtitle={t.pageSubtitle}
         triggerElementSelector={`#${heroTriggerId}`}
         backgroundImageObjectUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"
         mainBackgroundImageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//aPAQbwg_700b-62cff769-b043-4043-923d-76a1e9e4b71f.jpg"
-        // Pass a callback to hide subtitle on scroll
-        onScrollProgressChange={(progress) => {
-            const subtitleEl = document.querySelector(`#${heroTriggerId} + .rockstar-hero-content .font-orbitron.text-lg`) as HTMLElement; // Adjust selector
-            if (subtitleEl) {
-                subtitleEl.style.opacity = `${1 - Math.min(progress * 2, 1)}`; // Fade out faster
-            }
-        }}
+        // No onScrollProgressChange needed here, hero manages its own text fade
       />
       <div id={heroTriggerId} style={{ height: '130vh' }} aria-hidden="true" />
 
-      <div className="container mx-auto px-2 sm:px-4 py-10 md:py-12 relative z-10"> {/* Ensure this content is above hero's text when scrolled */}
+      {/* Main content container with appropriate z-index and background */}
+      <div className="container mx-auto px-2 sm:px-4 py-10 md:py-12 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
           className="w-full max-w-5xl mx-auto"
         >
-          {/* Main content card that should obscure hero text */}
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl border-2 shadow-2xl", // Added /95 for more opacity
+              "bg-dark-card/95 backdrop-blur-xl border-2 shadow-2xl", // Nearly opaque background
               "border-brand-red/70 shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]",
-              "relative z-20" // Higher z-index than hero's text elements
+              "relative z-20" // Ensure this card is above hero's text elements
             )}
           >
             <CardHeader className="pb-4 pt-6">
@@ -261,7 +266,7 @@ function HotVibesContent() {
                       isMissionUnlocked={cyberProfile ? (lead.required_quest_id ? checkQuestUnlocked(lead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
                       onExecuteMission={handleExecuteMission}
                       currentLang={currentLang}
-                      theme={cardTheme} // Pass the theme to the card
+                      theme={cardTheme} // Pass the theme object to each card
                     />
                   ))}
                 </div>
