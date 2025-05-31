@@ -134,7 +134,7 @@ create table public.invoices (
   id text not null,
   type text,
   user_id text not null,
-  subscription_id integer not null,
+  subscription_id text not null,
   status text null default 'pending'::text,
   amount integer not null,
   currency text null default 'XTR'::text,
@@ -170,6 +170,12 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 -- Allow authenticated users to view their own invoices
 CREATE POLICY "Users can view own invoices" ON public.invoices
   FOR SELECT
+-- Enable RLS on the invoices table
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to view their own invoices
+CREATE POLICY "Users can view own invoices" ON public.invoices
+  FOR SELECT
   TO authenticated
   USING (auth.jwt() ->> 'chat_id' = user_id); -- Assumes chat_id is passed as uid in JWT
 
@@ -195,7 +201,75 @@ CREATE OR REPLACE FUNCTION create_invoice(
     p_id TEXT,
     p_user_id TEXT,
     p_amount NUMERIC,
-    p_subscription_id  NUMERIC,
+    p_subscription_id TEXT,
+    p_metadata JSONB DEFAULT '{}'::jsonb
+) RETURNS public.invoices AS $$
+DECLARE
+    v_invoice public.invoices;
+BEGIN
+    INSERT INTO public.invoices (type, id, user_id, amount, metadata, subscription_id)
+    VALUES (p_type, p_id, p_user_id, p_amount, p_metadata, p_subscription_id)
+    RETURNING * INTO v_invoice;
+    
+    RETURN v_invoice;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function to update invoice status
+CREATE OR REPLACE FUNCTION update_invoice_status(
+    p_invoice_id TEXT,
+    p_status TEXT
+) RETURNS public.invoices AS $$
+DECLARE
+    v_invoice public.invoices;
+BEGIN
+    UPDATE public.invoices
+    SET status = p_status,
+        updated_at = now()
+    WHERE id = p_invoice_id
+    RETURNING * INTO v_invoice;
+    
+    RETURN v_invoice;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function to get user invoices
+CREATE OR REPLACE FUNCTION get_user_invoices(
+    p_user_id TEXT
+) RETURNS SETOF public.invoices AS $$
+BEGIN
+    RETURN QUERY
+    SELECT *
+    FROM public.invoices
+    WHERE user_id = p_user_id
+    ORDER BY created_at DESC;
+END;
+$$ LANGUAGE plpgsql;  TO authenticated
+  USING (auth.jwt() ->> 'chat_id' = user_id); -- Assumes chat_id is passed as uid in JWT
+
+-- Allow authenticated users to insert their own invoices
+CREATE POLICY "Users can create own invoices" ON public.invoices
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
+
+-- Allow authenticated users to update their own invoices (if needed)
+CREATE POLICY "Users can update own invoices" ON public.invoices
+  FOR UPDATE
+  TO authenticated
+  USING (auth.jwt() ->> 'chat_id' = user_id);
+
+-- Admins can bypass RLS (handled via supabaseAdmin in code)
+
+
+
+-- Create function to create invoice
+CREATE OR REPLACE FUNCTION create_invoice(
+    p_type TEXT,
+    p_id TEXT,
+    p_user_id TEXT,
+    p_amount NUMERIC,
+    p_subscription_id TEXT,
     p_metadata JSONB DEFAULT '{}'::jsonb
 ) RETURNS public.invoices AS $$
 DECLARE
