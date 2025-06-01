@@ -6,10 +6,10 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
 import { toast } from "sonner";
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation'; // Добавил useNextSearchParams
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
-  startParamPayload: string | null; // Будет содержать client_nickname или ID лида
+  startParamPayload: string | null;
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
@@ -19,12 +19,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useNextSearchParams(); // Используем хук для доступа к searchParams на клиенте
 
   useEffect(() => {
     if (telegramData.tg && telegramData.tg.initDataUnsafe?.start_param) {
       const rawStartParam = telegramData.tg.initDataUnsafe.start_param;
       debugLogger.info(`[AppContext] Received start_param (raw): ${rawStartParam}. This will be used as lead_identifier.`);
-      setStartParamPayload(rawStartParam); // Сохраняем как есть (например, nickname клиента)
+      setStartParamPayload(rawStartParam);
     }
   }, [telegramData.tg]);
 
@@ -32,15 +33,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (startParamPayload && !telegramData.isLoading && !telegramData.isAuthenticating) {
       debugLogger.info(`[AppContext] Processing startParamPayload (lead_identifier): ${startParamPayload}`);
       
-      // Целевой путь - страница HotVibes с идентификатором лида
-      const targetPath = `/hotvibes?lead_identifier=${startParamPayload}`;
+      const targetPathBase = `/hotvibes`;
+      const targetQuery = `lead_identifier=${startParamPayload}`;
+      const fullTargetPath = `${targetPathBase}?${targetQuery}`;
 
-      if (pathname.split('?')[0] !== '/hotvibes' || new URLSearchParams(window.location.search).get('lead_identifier') !== startParamPayload) {
+      // Проверяем текущий путь и параметры
+      const currentLeadIdentifier = searchParams.get('lead_identifier');
+
+      if (pathname !== targetPathBase || currentLeadIdentifier !== startParamPayload) {
         if (typeof startParamPayload === 'string' && startParamPayload.trim().length > 0) {
           globalLogger.info(`[AppContext] Routing to HotVibes for lead_identifier: ${startParamPayload}`);
-          router.push(targetPath);
-          // Очищаем startParamPayload после использования, чтобы избежать повторных редиректов при HMR
-          // setStartParamPayload(null); // Раскомментировать, если нужен строго одноразовый редирект
+          router.push(fullTargetPath); 
+          // НЕ ОЧИЩАЕМ startParamPayload здесь, чтобы /hotvibes мог его прочитать
         } else {
           debugLogger.warn(`[AppContext] Invalid or empty startParamPayload for routing: ${startParamPayload}`);
         }
@@ -48,7 +52,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         debugLogger.info(`[AppContext] Already on target HotVibes page for lead_identifier: ${startParamPayload}, no redirect needed.`);
       }
     }
-  }, [startParamPayload, router, pathname, telegramData.isLoading, telegramData.isAuthenticating]);
+  }, [startParamPayload, router, pathname, searchParams, telegramData.isLoading, telegramData.isAuthenticating]);
 
   const contextValue = useMemo(() => {
     return {
