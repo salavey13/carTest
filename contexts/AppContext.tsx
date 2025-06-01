@@ -6,43 +6,42 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
 import { toast } from "sonner";
-// УБИРАЕМ ИМПОРТЫ ХУКОВ НАВИГАЦИИ ОТСЮДА
-// import { useRouter as useNextRouter, usePathname as useNextPathname, useSearchParams as useNextSearchParams } from 'next/navigation';
+// УБРАНЫ ВСЕ ИМПОРТЫ, СВЯЗАННЫЕ С next/navigation ОТСЮДА
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   startParamPayload: string | null;
-  // УБИРАЕМ ПОЛЯ ДЛЯ РОУТЕРА ИЗ ИНТЕРФЕЙСА КОНТЕКСТА
-  // router: ReturnType<typeof useNextRouter> | null;
-  // pathname: ReturnType<typeof useNextPathname> | null;
-  // searchParams: ReturnType<typeof useNextSearchParams> | null;
+  // УБРАНЫ router, pathname, searchParams ИЗ ИНТЕРФЕЙСА
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const telegramData = useTelegram();
+  const telegramData = useTelegram(); // Это наш основной источник данных от Telegram
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
-  // УБИРАЕМ ВСЕ СОСТОЯНИЯ И ЛОГИКУ, СВЯЗАННУЮ С HУКАМИ НАВИГАЦИИ ОТСЮДА
 
+  // Этот useEffect отвечает ТОЛЬКО за извлечение start_param
   useEffect(() => {
     if (telegramData.tg && telegramData.tg.initDataUnsafe?.start_param) {
       const rawStartParam = telegramData.tg.initDataUnsafe.start_param;
-      debugLogger.info(`[AppContext] Received start_param (raw): ${rawStartParam}. This will be used as lead_identifier.`);
+      debugLogger.info(`[AppContext] Received start_param (raw): ${rawStartParam}.`);
       setStartParamPayload(rawStartParam);
+    } else {
+      // Если start_param нет, убедимся, что startParamPayload сброшен
+      if (startParamPayload !== null) { // Сбрасываем только если он был установлен
+        debugLogger.info(`[AppContext] No start_param found or tg not ready, ensuring startParamPayload is null.`);
+        setStartParamPayload(null);
+      }
     }
-  }, [telegramData.tg]);
-
-  // Эффект для маршрутизации на основе startParamPayload УДАЛЕН ОТСЮДА.
-  // Маршрутизация будет обрабатываться на уровне страницы /hotvibes/page.tsx
+  }, [telegramData.tg, telegramData.tg?.initDataUnsafe?.start_param, startParamPayload]); // Добавил startParamPayload в зависимости для корректного сброса
 
   const contextValue = useMemo(() => {
     return {
         ...telegramData,
         startParamPayload,
-        // НЕ ПЕРЕДАЕМ router, pathname, searchParams В КОНТЕКСТ ОТСЮДА
     };
   }, [telegramData, startParamPayload]);
 
+  // Этот useEffect для логгирования статуса остается
   useEffect(() => {
     debugLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value changed. Current state from context:", {
       isAuthenticated: contextValue.isAuthenticated,
@@ -56,16 +55,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       inTelegram: contextValue.isInTelegramContext,
       mockUserEnv: process.env.NEXT_PUBLIC_USE_MOCK_USER,
       platform: contextValue.platform,
-      startParamPayload: contextValue.startParamPayload,
+      startParamPayload: contextValue.startParamPayload, // Это значение будет использоваться на страницах
     });
   }, [contextValue]);
 
+  // Этот useEffect для тостов остается
   useEffect(() => {
-    // ... логика для тостов остается без изменений ...
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 350;
-
-    const isClient = typeof document !== 'undefined'; // Проверка на клиент
+    const isClient = typeof document !== 'undefined';
 
     debugLogger.log(`[APP_CONTEXT EFFECT_TOAST_LOGIC] Evaluating toasts. isLoading: ${contextValue.isLoading}, isAuthenticating: ${contextValue.isAuthenticating}, isAuthenticated: ${contextValue.isAuthenticated}, error: ${contextValue.error?.message}, isInTG: ${contextValue.isInTelegramContext}, MOCK_ENV: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, Visible: ${isClient ? document.visibilityState : 'unknown'}`);
 
@@ -81,7 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const stillLoadingInTimeout = contextValue.isLoading || contextValue.isAuthenticating;
           if (stillLoadingInTimeout && (!isClient || document.visibilityState === 'visible')) {
              debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Showing 'Авторизация...' loading toast (ID: auth-loading-toast).");
-             toast.loading("Авторизация...", { id: "auth-loading-toast" });
+             toast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 }); // Увеличил длительность на всякий случай
           } else {
              debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Loading toast condition NO LONGER MET inside timeout or tab not visible. Dismissing auth-loading-toast pre-emptively.");
              toast.dismiss("auth-loading-toast");
@@ -165,9 +163,6 @@ export const useAppContext = (): AppContextData => {
         colorScheme: 'dark',
         startParam: null,
         startParamPayload: null,
-        // router: null, // УБРАНО
-        // pathname: null, // УБРАНО
-        // searchParams: null, // УБРАНО
      } as AppContextData;
   }
 
