@@ -6,10 +6,15 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
 import { toast } from "sonner";
-import { useRouter, usePathname, useSearchParams as useNextSearchParams } from 'next/navigation'; // Добавил useNextSearchParams
+// Импортируем хуки навигации здесь
+import { useRouter as useNextRouter, usePathname as useNextPathname, useSearchParams as useNextSearchParams } from 'next/navigation';
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   startParamPayload: string | null;
+  // Добавляем поля для router, pathname, searchParams, которые будут null на сервере
+  router: ReturnType<typeof useNextRouter> | null;
+  pathname: ReturnType<typeof useNextPathname> | null;
+  searchParams: ReturnType<typeof useNextSearchParams> | null;
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
@@ -17,9 +22,25 @@ const AppContext = createContext<Partial<AppContextData>>({});
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const telegramData = useTelegram();
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useNextSearchParams(); // Используем хук для доступа к searchParams на клиенте
+
+  // Состояния для хуков навигации, инициализируем null
+  const [router, setRouter] = useState<ReturnType<typeof useNextRouter> | null>(null);
+  const [pathname, setPathname] = useState<ReturnType<typeof useNextPathname> | null>(null);
+  const [searchParams, setSearchParams] = useState<ReturnType<typeof useNextSearchParams> | null>(null);
+  
+  const [isMounted, setIsMounted] = useState(false);
+  
+  const nextRouterInternal = useNextRouter();
+  const nextPathnameInternal = useNextPathname();
+  const nextSearchParamsInternal = useNextSearchParams();
+
+  useEffect(() => {
+    setIsMounted(true);
+    setRouter(nextRouterInternal);
+    setPathname(nextPathnameInternal);
+    setSearchParams(nextSearchParamsInternal);
+  }, [nextRouterInternal, nextPathnameInternal, nextSearchParamsInternal]);
+
 
   useEffect(() => {
     if (telegramData.tg && telegramData.tg.initDataUnsafe?.start_param) {
@@ -30,21 +51,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [telegramData.tg]);
 
   useEffect(() => {
-    if (startParamPayload && !telegramData.isLoading && !telegramData.isAuthenticating) {
+    if (isMounted && router && pathname && searchParams && startParamPayload && !telegramData.isLoading && !telegramData.isAuthenticating) {
       debugLogger.info(`[AppContext] Processing startParamPayload (lead_identifier): ${startParamPayload}`);
       
       const targetPathBase = `/hotvibes`;
       const targetQuery = `lead_identifier=${startParamPayload}`;
       const fullTargetPath = `${targetPathBase}?${targetQuery}`;
 
-      // Проверяем текущий путь и параметры
       const currentLeadIdentifier = searchParams.get('lead_identifier');
 
       if (pathname !== targetPathBase || currentLeadIdentifier !== startParamPayload) {
         if (typeof startParamPayload === 'string' && startParamPayload.trim().length > 0) {
           globalLogger.info(`[AppContext] Routing to HotVibes for lead_identifier: ${startParamPayload}`);
-          router.push(fullTargetPath); 
-          // НЕ ОЧИЩАЕМ startParamPayload здесь, чтобы /hotvibes мог его прочитать
+          router.push(fullTargetPath);
         } else {
           debugLogger.warn(`[AppContext] Invalid or empty startParamPayload for routing: ${startParamPayload}`);
         }
@@ -52,14 +71,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         debugLogger.info(`[AppContext] Already on target HotVibes page for lead_identifier: ${startParamPayload}, no redirect needed.`);
       }
     }
-  }, [startParamPayload, router, pathname, searchParams, telegramData.isLoading, telegramData.isAuthenticating]);
+  }, [isMounted, router, pathname, searchParams, startParamPayload, telegramData.isLoading, telegramData.isAuthenticating]);
+
 
   const contextValue = useMemo(() => {
     return {
         ...telegramData,
         startParamPayload,
+        router: isMounted ? router : null,
+        pathname: isMounted ? pathname : null,
+        searchParams: isMounted ? searchParams : null,
     };
-  }, [telegramData, startParamPayload]);
+  }, [telegramData, startParamPayload, isMounted, router, pathname, searchParams]);
 
   useEffect(() => {
     debugLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value changed. Current state from context:", {
@@ -75,14 +98,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       mockUserEnv: process.env.NEXT_PUBLIC_USE_MOCK_USER,
       platform: contextValue.platform,
       startParamPayload: contextValue.startParamPayload,
+      isMountedForNav: isMounted,
     });
-  }, [contextValue]);
+  }, [contextValue, isMounted]);
 
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 350;
 
-    debugLogger.log(`[APP_CONTEXT EFFECT_TOAST_LOGIC] Evaluating toasts. isLoading: ${contextValue.isLoading}, isAuthenticating: ${contextValue.isAuthenticating}, isAuthenticated: ${contextValue.isAuthenticated}, error: ${contextValue.error?.message}, isInTG: ${contextValue.isInTelegramContext}, MOCK_ENV: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, Visible: ${document.visibilityState}`);
+    debugLogger.log(`[APP_CONTEXT EFFECT_TOAST_LOGIC] Evaluating toasts. isLoading: ${contextValue.isLoading}, isAuthenticating: ${contextValue.isAuthenticating}, isAuthenticated: ${contextValue.isAuthenticated}, error: ${contextValue.error?.message}, isInTG: ${contextValue.isInTelegramContext}, MOCK_ENV: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, Visible: ${typeof document !== 'undefined' ? document.visibilityState : 'unknown'}`);
 
     const فعلاًЗагружается = contextValue.isLoading || contextValue.isAuthenticating;
 
@@ -94,7 +118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
        loadingTimer = setTimeout(() => {
           const stillLoadingInTimeout = contextValue.isLoading || contextValue.isAuthenticating;
-          if (stillLoadingInTimeout && document.visibilityState === 'visible') {
+          if (stillLoadingInTimeout && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
              debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Showing 'Авторизация...' loading toast (ID: auth-loading-toast).");
              toast.loading("Авторизация...", { id: "auth-loading-toast" });
           } else {
@@ -108,8 +132,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Exited loading/authenticating state. Dismissed auth-loading-toast.");
 
         if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !contextValue.isInTelegramContext) {
-             const existingMockToast = document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]');
-             if (!existingMockToast && document.visibilityState === 'visible') {
+             const existingMockToast = typeof document !== 'undefined' ? document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]') : null;
+             if (!existingMockToast && (typeof document === 'undefined' || document.visibilityState === 'visible')) {
                 debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Using MOCK_USER outside of Telegram. Displaying info toast (ID: mock-user-info-toast).");
                 toast.info("Внимание: используется тестовый пользователь!", {
                     description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.",
@@ -126,13 +150,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (contextValue.isAuthenticated && !contextValue.error) {
             toast.dismiss("auth-error-toast");
-             if (document.visibilityState === 'visible') {
+             if (typeof document === 'undefined' || document.visibilityState === 'visible') {
                  debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] User authenticated successfully. Showing success toast (ID: auth-success-toast).");
                  toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
              }
         } else if (contextValue.error) {
             toast.dismiss("auth-success-toast");
-            if (document.visibilityState === 'visible') {
+            if (typeof document === 'undefined' || document.visibilityState === 'visible') {
                  globalLogger.error("[APP_CONTEXT EFFECT_TOAST_LOGIC] Auth error. Showing error toast (ID: auth-error-toast). Error:", contextValue.error.message);
                  toast.error(`Ошибка авторизации: ${contextValue.error.message}`, {
                     id: "auth-error-toast",
@@ -153,14 +177,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error, contextValue.isInTelegramContext]);
 
+
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  if (!context || context.isLoading === undefined || context.isAuthenticating === undefined ) {
-     debugLogger.info("HOOK_APP_CONTEXT: Context is empty or key state flags (`isLoading`/`isAuthenticating`) are undefined. Returning SKELETON/LOADING defaults.");
+  // Этот блок срабатывает, если контекст используется до того, как AppProvider смонтировался
+  // или если useTelegram еще не вернул начальные значения.
+  if (!context || context.isLoading === undefined || context.isAuthenticating === undefined || context.router === undefined) { // Добавил context.router === undefined
+     debugLogger.info("HOOK_APP_CONTEXT: Context is empty or key state flags are undefined. Returning SKELETON/LOADING defaults.");
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false,
         isLoading: true, isAuthenticating: true, error: null,
@@ -180,12 +207,16 @@ export const useAppContext = (): AppContextData => {
         colorScheme: 'dark',
         startParam: null,
         startParamPayload: null,
+        router: null,
+        pathname: null,
+        searchParams: null,
      } as AppContextData;
   }
 
+  // ВОССТАНОВЛЕННЫЙ БЛОК "FALLBACK ДЛЯ ISADMIN"
   if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
     globalLogger.error(
-        "HOOK_APP_CONTEXT: CRITICAL - Context fully loaded (isLoading: false, isAuthenticating: false) but context.isAdmin is NOT a function. Providing a fallback isAdmin.",
+        "HOOK_APP_CONTEXT: CRITICAL - Context fully loaded (isLoading: false, isAuthenticating: false) but context.isAdmin is NOT a function. This indicates a problem with how useTelegram returns its memoized value or how AppContext consumes it. Providing a fallback isAdmin.",
         {
             contextDbUserExists: !!context.dbUser,
             contextDbUserStatus: context.dbUser?.status,
@@ -209,5 +240,7 @@ export const useAppContext = (): AppContextData => {
         isAdmin: fallbackIsAdmin,
     };
   }
+  // КОНЕЦ ВОССТАНОВЛЕННОГО БЛОКА
+
   return context as AppContextData;
 };
