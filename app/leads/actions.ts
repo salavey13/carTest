@@ -1,3 +1,4 @@
+// /app/leads/actions.ts
 "use server";
 
 import { supabaseAdmin } from '@/hooks/supabase'; // Используем admin клиент для серверных операций
@@ -488,5 +489,51 @@ export async function scrapePageContent(
         return { success: false, error: 'Ошибка парсинга HTML: невалидный символ. Возможно, проблема с кодировкой страницы.'};
     }
     return { success: false, error: `Ошибка скрейпинга: ${error.message}` };
+  }
+}
+
+export async function fetchLeadByIdentifierOrNickname(
+  identifier: string,
+  currentUserId?: string // Для потенциальной проверки прав доступа в будущем, если нужно
+): Promise<{ success: boolean; data?: LeadRow; error?: string }> {
+  if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
+  if (!identifier) return { success: false, error: "Идентификатор лида не указан." };
+
+  logger.info(`[LeadsActions] Поиск лида по идентификатору/никнейму: ${identifier}`);
+  try {
+    // Сначала пытаемся найти по UUID, если идентификатор похож на UUID
+    let query = supabaseAdmin.from('leads').select('*');
+    
+    // Простая проверка на UUID-подобный формат (можно улучшить)
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(identifier);
+
+    if (isUUID) {
+      query = query.eq('id', identifier);
+    } else {
+      // Иначе ищем по client_name (предполагаем, что никнейм там) или в kwork_title
+      // Это может вернуть несколько, если никнеймы не уникальны, берем первый.
+      // Для большей точности, если startapp=client_nickname, то client_name должен быть уникальным или нужна другая логика.
+      query = query.or(`client_name.ilike.%${identifier}%,kwork_title.ilike.%${identifier}%`) 
+                   .order('created_at', { ascending: false }); // Берем самый свежий, если несколько совпадений
+    }
+
+    const { data, error } = await query.maybeSingle(); // Берем один или null
+
+    if (error) {
+      logger.error(`[LeadsActions] Ошибка поиска лида "${identifier}":`, error);
+      return { success: false, error: `Ошибка БД: ${error.message}` };
+    }
+
+    if (!data) {
+      logger.warn(`[LeadsActions] Лид с идентификатором/никнеймом "${identifier}" не найден.`);
+      return { success: false, error: "Лид не найден" };
+    }
+
+    logger.info(`[LeadsActions] Лид "${identifier}" найден: ID ${data.id}`);
+    return { success: true, data };
+
+  } catch (e) {
+    logger.error('[LeadsActions] Критическая ошибка при поиске лида:', e);
+    return { success: false, error: e instanceof Error ? e.message : 'Неожиданная серверная ошибка.' };
   }
 }
