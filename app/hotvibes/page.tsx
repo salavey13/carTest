@@ -17,11 +17,10 @@ import {
   isQuestUnlocked as checkQuestUnlocked,
   markTutorialAsCompleted,
 } from '@/hooks/cyberFitnessSupabase';
-// Предположим, ты создашь или адаптируешь одну из этих функций для поиска по идентификатору
 import { fetchLeadsForDashboard, fetchLeadByIdentifierOrNickname } from '../leads/actions'; 
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
-import { HotVibeCard, HotLeadData, HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard';
-import { VipLeadDisplay } from '@/components/hotvibes/VipLeadDisplay';
+import { HotVibeCard, HotLeadData, HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard'; 
+import { VipLeadDisplay } from '@/components/hotvibes/VipLeadDisplay'; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
 
@@ -39,7 +38,7 @@ const pageTranslations = {
         lockedMissionRedirect: "Навык для этой миссии еще не открыт. Начинаем экспресс-тренировку...",
     },
     en: {
-        pageTitle: "::FaFire:: HOT VIBES ::FaFireAlt::",
+        pageTitle: "::FaFire:: HOT VIBES ::FaFire::",
         pageSubtitle: "Agent! This is your access to the most promising opportunities. Clients ARE WAITING or will respond soon. Choose your mission, apply your skills, earn KiloVibes and real cash!",
         lobbyTitle: "::FaConciergeBell:: Hot Opportunity Lobby",
         noHotVibes: "No suitable vibes for your level yet. Level up in Training, run your Scraper in /leads, or check back later!",
@@ -59,12 +58,12 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions): HotLeadData {
 
   return {
     id: lead.id || `fallback_id_${Math.random()}`,
-    kwork_gig_title: lead.kwork_title || lead.project_description?.substring(0, 70) || "Untitled Gig", // Используем kwork_title если есть
-    client_name: lead.client_name, // Убедись, что это поле есть в LeadDataFromActions
-    ai_summary: lead.ai_summary || lead.project_description?.substring(0, 150) || "Краткое описание задачи от AI...",
+    kwork_gig_title: lead.kwork_title || lead.project_description?.substring(0, 70) || "Untitled Gig",
+    client_name: lead.client_name,
+    ai_summary: (lead as any).ai_summary || lead.project_description?.substring(0, 150) || "Краткое описание задачи от AI...",
     demo_image_url: demoImageUrl,
     potential_earning: lead.budget_range || undefined,
-    required_quest_id: (lead as any).required_quest_id_for_hotvibe || "image-swap-mission", // Убедись, что это поле есть
+    required_quest_id: (lead as any).required_quest_id_for_hotvibe || "image-swap-mission",
     client_response_snippet: lead.status === 'interested' || lead.status === 'client_responded_positive' ? "Клиент проявил интерес!" : 
                              lead.status === 'new_ai_generated' || lead.status === 'demo_generated' ? "AI сгенерировал прототип!" : undefined,
     kwork_url: lead.lead_url,
@@ -75,9 +74,10 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions): HotLeadData {
   };
 }
 
+// Выносим основной контент в отдельный компонент для Suspense
 function HotVibesContentInternal() {
   const router = useRouter();
-  const searchParamsHook = useNextSearchParamsHook();
+  const searchParams = useNextSearchParamsHook(); // ВАЖНО: useSearchParams используется здесь
   const { dbUser, isAuthenticated, user: tgUser, isLoading: appCtxLoading, isAuthenticating, platform, startParamPayload } = useAppContext();
   const { addToast } = useAppToast();
   const heroTriggerId = useId().replace(/:/g, "-") + "-hotvibes-hero-trigger";
@@ -87,33 +87,19 @@ function HotVibesContentInternal() {
   const [vipLeadToShow, setVipLeadToShow] = useState<HotLeadData | null>(null);
   const [lobbyLeads, setLobbyLeads] = useState<HotLeadData[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
-  const [currentLeadIdentifier, setCurrentLeadIdentifier] = useState<string | null>(null);
+  // Отслеживаем, какой идентификатор был обработан, чтобы избежать повторной загрузки
+  const [processedLeadIdentifier, setProcessedLeadIdentifier] = useState<string | null | "initial_lobby_loaded">(null);
+
 
   const t = pageTranslations[currentLang];
 
   useEffect(() => {
     setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en');
   }, [tgUser?.language_code, platform]);
-
-  useEffect(() => {
-    // Получаем идентификатор лида из URL search params ПРИ МОНТИРОВАНИИ или ИЗМЕНЕНИИ searchParamsHook
-    const leadIdFromQuery = searchParamsHook.get('lead_identifier');
-    logger.debug(`[HotVibes Effect SearchParams] leadIdFromQuery: ${leadIdFromQuery}, currentLeadIdentifier: ${currentLeadIdentifier}`);
-    if (leadIdFromQuery && leadIdFromQuery !== currentLeadIdentifier) {
-      setCurrentLeadIdentifier(leadIdFromQuery);
-    } else if (!leadIdFromQuery && currentLeadIdentifier && startParamPayload !== currentLeadIdentifier) {
-      // Если параметр ушел из URL, но он не был startParamPayload, возможно, нужно сбросить VIP вид
-      //setCurrentLeadIdentifier(null); // Это может вызвать двойную загрузку, если AppContext еще не обновил URL
-    }
-  }, [searchParamsHook, currentLeadIdentifier, startParamPayload]);
-
-
-  const loadPageData = useCallback(async () => {
-    const leadIdentifierToLoad = currentLeadIdentifier || startParamPayload; // Приоритет URL, потом из AppContext (на случай редиректа)
-    
-    logger.info(`[HotVibes loadPageData] Called. LeadIdentifierToLoad: ${leadIdentifierToLoad}`);
+  
+  const loadPageData = useCallback(async (identifierToLoad: string | null) => {
+    logger.info(`[HotVibes loadPageData] Called with identifier: ${identifierToLoad}. AppContext Loading: ${appCtxLoading}, Authenticating: ${isAuthenticating}`);
     if (appCtxLoading || isAuthenticating) {
-      logger.debug("[HotVibes loadPageData] AppContext still loading. Waiting.");
       setPageLoading(true); return;
     }
     setPageLoading(true);
@@ -124,74 +110,61 @@ function HotVibesContentInternal() {
       if (profileResult.success && profileResult.data) {
         loadedProfile = profileResult.data;
         setCyberProfile(loadedProfile);
-        logger.info(`[HotVibes loadPageData] Profile loaded for ${dbUser.user_id}. Level: ${loadedProfile.level}`);
-      } else {
-        addToast(t.errorLoadingProfile, "error");
-        logger.error(`[HotVibes loadPageData] Error fetching profile: ${profileResult.error}`);
-      }
+      } else { addToast(t.errorLoadingProfile, "error"); }
     }
 
-    if (leadIdentifierToLoad) {
-      logger.info(`[HotVibes loadPageData] Attempting to fetch VIP lead for identifier: ${leadIdentifierToLoad}`);
-      // ВАЖНО: Нужна функция fetchLeadByIdentifierOrNickname в actions.ts
-      const vipResult = await fetchLeadByIdentifierOrNickname(leadIdentifierToLoad, dbUser?.user_id || "guest");
+    if (identifierToLoad) {
+      logger.info(`[HotVibes] Attempting to fetch VIP lead: ${identifierToLoad}`);
+      const vipResult = await fetchLeadByIdentifierOrNickname(identifierToLoad, dbUser?.user_id || "guest");
       if (vipResult.success && vipResult.data) {
-        setVipLeadToShow(mapLeadToHotLeadData(vipResult.data as LeadDataFromActions));
-        setLobbyLeads([]); // Очищаем лобби, так как показываем VIP
-        logger.info(`[HotVibes loadPageData] VIP Lead "${leadIdentifierToLoad}" found and set.`);
-        if (pathname.includes('lead_identifier')) { // Очищаем query параметр только если он был в URL
-             router.replace('/hotvibes', undefined); // Очищаем query-параметр из URL
+        const mappedVipLead = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions);
+        setVipLeadToShow(mappedVipLead);
+        setLobbyLeads([]);
+        addToast(`Демонстрация VIP VIBE для: ${mappedVipLead.kwork_gig_title || mappedVipLead.client_name}`, "success");
+        // Очищаем URL, если VIP-лид загружен по параметру из AppContext, а не напрямую из URL
+        // Это предотвратит зацикливание, если AppContext редиректит на URL с параметром, а мы его тут же чистим
+        const currentQueryLeadId = searchParams.get('lead_identifier');
+        if(currentQueryLeadId === identifierToLoad) {
+            router.replace('/hotvibes', undefined);
         }
       } else {
-        addToast(t.vipLeadNotFound, "warning", { description: `Идентификатор: ${leadIdentifierToLoad}` });
-        logger.warn(`[HotVibes loadPageData] VIP Lead "${leadIdentifierToLoad}" not found or error: ${vipResult.error}. Fallback to lobby.`);
-        setVipLeadToShow(null);
-        // Загружаем лобби, если VIP не найден
-        const leadsResult = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
-        if (leadsResult.success && leadsResult.data) {
-          const mappedLobbyLeads = (leadsResult.data as LeadDataFromActions[]).map(mapLeadToHotLeadData);
-          setLobbyLeads(mappedLobbyLeads.filter(mLead => loadedProfile ? (mLead.required_quest_id ? checkQuestUnlocked(mLead.required_quest_id, loadedProfile.completedQuests || [], QUEST_ORDER) : true) : (isAuthenticated ? false : true) ));
+        addToast(t.vipLeadNotFound, "warning", { description: `Идентификатор: ${identifierToLoad}` });
+        setVipLeadToShow(null); // Сбрасываем VIP, если не найден
+        // Загружаем лобби как fallback
+        const leadsRes = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
+        if (leadsRes.success && leadsRes.data) {
+            const mappedLobby = (leadsRes.data as LeadDataFromActions[]).map(mapLeadToHotLeadData);
+            setLobbyLeads(mappedLobby.filter(mLead => loadedProfile ? (mLead.required_quest_id ? checkQuestUnlocked(mLead.required_quest_id, loadedProfile.completedQuests || [], QUEST_ORDER) : true) : (isAuthenticated ? false : true)));
         }
       }
-    } else {
-      logger.info("[HotVibes loadPageData] No specific lead identifier. Loading lobby.");
+    } else { // Загрузка обычного лобби
+      logger.info("[HotVibes] No VIP identifier. Loading lobby.");
       setVipLeadToShow(null);
-      const leadsResult = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
-      if (leadsResult.success && leadsResult.data) {
-        const mappedLobbyLeads = (leadsResult.data as LeadDataFromActions[]).map(mapLeadToHotLeadData);
-        setLobbyLeads(mappedLobbyLeads.filter(mLead => loadedProfile ? (mLead.required_quest_id ? checkQuestUnlocked(mLead.required_quest_id, loadedProfile.completedQuests || [], QUEST_ORDER) : true) : (isAuthenticated ? false : true) ));
-        logger.info(`[HotVibes loadPageData] Lobby leads loaded: ${lobbyLeads.length}`);
-      } else {
-        addToast(t.errorLoadingLeads, "error");
-        logger.error(`[HotVibes loadPageData] Error fetching lobby leads: ${leadsResult.error}`);
-      }
+      const leadsRes = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
+      if (leadsRes.success && leadsRes.data) {
+        const mappedLobby = (leadsRes.data as LeadDataFromActions[]).map(mapLeadToHotLeadData);
+        setLobbyLeads(mappedLobby.filter(mLead => loadedProfile ? (mLead.required_quest_id ? checkQuestUnlocked(mLead.required_quest_id, loadedProfile.completedQuests || [], QUEST_ORDER) : true) : (isAuthenticated ? false : true)));
+      } else { addToast(t.errorLoadingLeads, "error"); }
     }
     setPageLoading(false);
-  }, [isAuthenticated, dbUser?.user_id, appCtxLoading, isAuthenticating, addToast, t.errorLoadingLeads, t.errorLoadingProfile, router, currentLeadIdentifier, startParamPayload, pathname]); // Добавил pathname
+  }, [isAuthenticated, dbUser?.user_id, appCtxLoading, isAuthenticating, addToast, t, router, searchParams]); // searchParams добавлен в зависимости
 
   useEffect(() => {
-    // Этот эффект будет управлять вызовом loadPageData на основе currentLeadIdentifier
-    // currentLeadIdentifier устанавливается из searchParams или startParamPayload
-    // Мы хотим вызвать loadPageData, когда currentLeadIdentifier стабилизируется
-    const leadIdFromQuery = searchParamsHook.get('lead_identifier');
-    const finalLeadIdentifier = leadIdFromQuery || startParamPayload;
+    // Этот эффект решает, какой идентификатор использовать для загрузки
+    const leadIdFromQuery = searchParams.get('lead_identifier');
+    const identifierToProcess = leadIdFromQuery || startParamPayload;
 
-    if(finalLeadIdentifier && finalLeadIdentifier !== currentLeadIdentifier) {
-        setCurrentLeadIdentifier(finalLeadIdentifier);
+    if (identifierToProcess && identifierToProcess !== processedLeadIdentifier) {
+      logger.debug(`[HotVibes] New identifier to process: ${identifierToProcess}. Prev processed: ${processedLeadIdentifier}`);
+      setProcessedLeadIdentifier(identifierToProcess); // Отмечаем, что этот ID сейчас будет обработан
+      loadPageData(identifierToProcess);
+    } else if (!identifierToProcess && processedLeadIdentifier !== "initial_lobby_loaded") {
+      // Случай первого захода без параметров или после очистки URL
+      logger.debug(`[HotVibes] No identifier, loading initial lobby. Prev processed: ${processedLeadIdentifier}`);
+      setProcessedLeadIdentifier("initial_lobby_loaded");
+      loadPageData(null);
     }
-    
-    // Вызываем loadPageData, если currentLeadIdentifier определен или если это первый заход (null)
-    // и если мы еще не в процессе загрузки
-    if (!pageLoading) { // Избегаем повторного вызова, если уже грузим
-        if (currentLeadIdentifier !== null || (currentLeadIdentifier === null && !leadIdFromQuery && !startParamPayload)) {
-             loadPageData(currentLeadIdentifier);
-        }
-    } else if (currentLeadIdentifier === null && !leadIdFromQuery && !startParamPayload) {
-        // Самый первый рендер без параметров
-        loadPageData(null);
-    }
-
-  }, [searchParamsHook, startParamPayload, loadPageData, currentLeadIdentifier, pageLoading]);
+  }, [searchParams, startParamPayload, loadPageData, processedLeadIdentifier]);
 
 
   const handleExecuteMission = useCallback(async (leadId: string, questIdFromLead: string | undefined) => {
@@ -230,9 +203,9 @@ function HotVibesContentInternal() {
     modalImageOverlayGradient: "bg-gradient-to-t from-black/90 via-black/50 to-transparent",
   };
 
-  if (pageLoading) return <TutorialLoader message="Загрузка VIBE-пространства..."/>;
+  if (pageLoading) return <TutorialLoader message="Загрузка VIBE-пространства..."/>; // Показываем лоадер всегда, пока pageLoading true
 
-  if (vipLeadToShow) {
+  if (vipLeadToShow) { // Если vipLeadToShow загружен, показываем его
     return (
       <div className="relative min-h-screen bg-gradient-to-br from-black via-slate-900 to-purple-900/50 text-foreground overflow-x-hidden py-10 sm:py-12 md:py-16">
         <div className="container mx-auto px-2 sm:px-4 relative z-10">
@@ -284,14 +257,13 @@ function HotVibesContentInternal() {
               <CardTitle className={cn("text-2xl sm:text-3xl md:text-4xl font-orbitron flex items-center justify-center gap-2 text-brand-red")}>
                 <VibeContentRenderer content={t.lobbyTitle} />
               </CardTitle>
-              {cyberProfile && ( // Убрал !pageLoading, т.к. pageLoading уже false здесь
+              {cyberProfile && (
                 <CardDescription className="text-muted-foreground font-mono text-center text-xs">
                   Загружено для Агента Уровня {cyberProfile.level} | Доступно вайбов: {lobbyLeads.length}
                 </CardDescription>
               )}
             </CardHeader>
             <CardContent className="p-2 sm:p-4 md:p-6 min-h-[200px]">
-              {/* pageLoading уже false здесь, TutorialLoader не нужен */}
               {!isAuthenticated && (
                 <p className="text-center text-muted-foreground py-8 font-mono text-sm sm:text-base">{t.noHotVibesForGuest}</p>
               )}
@@ -329,8 +301,8 @@ function HotVibesContentInternal() {
 
 export default function HotVibesPage() {
   return (
-    <Suspense fallback={<TutorialLoader message="Загрузка Кибер-Пространства..."/>}> {/* Suspense для всей страницы */}
+    <Suspense fallback={<TutorialLoader message="Загрузка Кибер-Пространства..."/>}>
       <HotVibesContentInternal />
     </Suspense>
-  )
+  );
 }
