@@ -74,7 +74,7 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions): HotLeadData {
   };
 }
 
-function HotVibesClientContent() { // Переименовано в HotVibesClientContent для ясности
+function HotVibesClientContent() {
   const router = useRouter();
   const searchParams = useNextSearchParamsHook(); 
   const { dbUser, isAuthenticated, user: tgUser, isLoading: appCtxLoading, isAuthenticating, platform, startParamPayload } = useAppContext();
@@ -86,9 +86,8 @@ function HotVibesClientContent() { // Переименовано в HotVibesClie
   const [vipLeadToShow, setVipLeadToShow] = useState<HotLeadData | null>(null);
   const [lobbyLeads, setLobbyLeads] = useState<HotLeadData[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
-  const [currentLeadIdentifierForPage, setCurrentLeadIdentifierForPage] = useState<string | null>(null); // Renamed to avoid conflict with other variables
+  const [currentLeadIdentifierForPage, setCurrentLeadIdentifierForPage] = useState<string | null>(null);
   const [hasRoutedForStartParam, setHasRoutedForStartParam] = useState(false);
-
 
   const t = pageTranslations[currentLang];
 
@@ -103,7 +102,6 @@ function HotVibesClientContent() { // Переименовано в HotVibesClie
         setHasRoutedForStartParam(true); 
     }
   }, [startParamPayload, appCtxLoading, isAuthenticating, searchParams, router, hasRoutedForStartParam]);
-
 
   const loadPageData = useCallback(async (identifierToLoad: string | null) => {
     logger.info(`[HotVibes loadPageData] Called with identifier: ${identifierToLoad}. AppContext Loading: ${appCtxLoading}, Authenticating: ${isAuthenticating}`);
@@ -132,7 +130,6 @@ function HotVibesClientContent() { // Переименовано в HotVibesClie
         
         const currentQueryLeadId = searchParams.get('lead_identifier');
         if(currentQueryLeadId === identifierToLoad) {
-            // router.replace('/hotvibes', { shallow: true }); // Using undefined to remove query params
             router.replace('/hotvibes', undefined);
         }
       } else {
@@ -145,7 +142,7 @@ function HotVibesClientContent() { // Переименовано в HotVibesClie
         }
       }
     } else { 
-      logger.info("[HotVibes] No VIP identifier. Loading lobby.");
+      logger.info("[HotVibes] No VIP identifier in URL. Loading lobby.");
       setVipLeadToShow(null);
       const leadsRes = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
       if (leadsRes.success && leadsRes.data) {
@@ -272,10 +269,10 @@ function HotVibesClientContent() { // Переименовано в HotVibesClie
               )}
             </CardHeader>
             <CardContent className="p-2 sm:p-4 md:p-6 min-h-[200px]">
-              {!isAuthenticated && ( // Показываем если не аутентифицирован, независимо от pageLoading (который уже false)
+              {!isAuthenticated && (
                 <p className="text-center text-muted-foreground py-8 font-mono text-sm sm:text-base">{t.noHotVibesForGuest}</p>
               )}
-              {isAuthenticated && lobbyLeads.length === 0 && ( // Показываем если аутентифицирован, но нет лидов для лобби
+              {isAuthenticated && lobbyLeads.length === 0 && (
                  <div className="text-center text-muted-foreground py-8 font-mono text-sm sm:text-base">
                     <VibeContentRenderer content={t.noHotVibes} />
                     <div className="mt-4">
