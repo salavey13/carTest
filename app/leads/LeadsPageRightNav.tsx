@@ -1,4 +1,3 @@
-// /app/leads/LeadsPageRightNav.tsx
 "use client";
 
 import React from 'react';
@@ -16,7 +15,7 @@ interface LeadsPageRightNavProps {
     workflowRef: React.RefObject<HTMLDivElement>;
     assetsRef: React.RefObject<HTMLDivElement>;
     zionRef: React.RefObject<HTMLDivElement>;
-    scraperRef: React.RefObject<HTMLDivElement>; // Добавляем реф для скрейпера
+    scraperRef: React.RefObject<HTMLDivElement>; 
   };
   labels: {
     navToTop: string;
@@ -26,7 +25,7 @@ interface LeadsPageRightNavProps {
     navToWorkflow: string;
     navToAssets: string;
     navToZion: string;
-    navToScraper: string; // Добавляем label для скрейпера
+    navToScraper: string; 
   };
   sectionsCollapsed: boolean; 
 }
@@ -40,7 +39,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
   const allNavItems = [
     { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "FaChevronUp", alwaysVisible: true }, 
     { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "FaShieldCat", alwaysVisible: false },
-    { ref: sectionRefs.scraperRef, labelKey: 'navToScraper', iconName: "FaSpider", alwaysVisible: true }, // Добавляем скрейпер
+    { ref: sectionRefs.scraperRef, labelKey: 'navToScraper', iconName: "FaSpider", alwaysVisible: true }, 
     { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "FaToolbox", alwaysVisible: true },
     { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "FaTableList", alwaysVisible: true },
     { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "FaDiagramProject", alwaysVisible: false },

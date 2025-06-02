@@ -1,4 +1,3 @@
-// /components/layout/BottomNavigation.tsx
 "use client";
 
 import Link from "next/link";
@@ -25,7 +24,7 @@ const bottomNavVariants = {
 interface NavItemConfig {
   href: string;
   icon: React.ElementType;
-  label: string; // This will be the key for translation
+  label: string; 
   color?: string;
   isCentral?: boolean;
   centralColor?: string;
@@ -35,18 +34,16 @@ interface NavItemConfig {
   isFallback?: boolean;
 }
 
-// Define all possible items that COULD be in the bottom nav
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink", minLevelShow: 0, isFallback: true },
-  { href: "/hotvibes", icon: FaFire, label: "HotVibes", isCentral: true, centralColor: "from-brand-purple to-brand-orange", minLevelShow: 0, isFallback: true },
+  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true }, // Not central by default
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
-  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentral: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 1 },
+  { href: "/repo-xml", icon: FaGithub, label: "Studio", color: "text-brand-purple", minLevelShow: 1 }, // Not central by default
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan", minLevelShow: 1 },
-  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentral: false, color: "text-brand-purple", minLevelShow: 2, supportOnly: true },
+  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentral: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 2, supportOnly: true },
 ];
 
-// Translations for bottom nav labels specifically
 const navTranslations: Record<string, Record<string, string>> = {
   en: {
     "OS Home": "OS Home", "HotVibes": "HotVibes", "AgentOS": "AgentOS",
@@ -79,105 +76,79 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
   }, [isAdminFunc]);
 
   const navItemsToDisplay = useMemo(() => {
-    if (appCtxLoading || isAuthenticating) {
-      logger.debug("[BottomNav] Context loading/authenticating, returning no items yet.");
+    if (appCtxLoading || isAuthenticating || !appContext.dbUser) { // Ensure dbUser is loaded
+      logger.debug("[BottomNav] Context/dbUser loading or not available, returning no items yet.");
       return [];
     }
 
-    const cyberProfile = dbUser?.metadata?.cyberFitness as CyberFitnessProfile | undefined;
+    const cyberProfile = appContext.dbUser?.metadata?.cyberFitness as CyberFitnessProfile | undefined;
     const userLevel = cyberProfile?.level ?? 0;
-    const userRole = dbUser?.role;
+    const userRole = appContext.dbUser?.role;
 
     logger.debug(`[BottomNav] Filtering items. UserLevel: ${userLevel}, IsAdmin: ${isAdmin}, Role: ${userRole}`);
 
-    let items: NavItemConfig[];
-
-    if (!dbUser && !isAdmin) { // Guest user (not authenticated and not overridden as admin for dev)
-      items = ALL_POSSIBLE_NAV_ITEMS.filter(item => item.isFallback);
-      logger.debug("[BottomNav] Guest user, showing fallback items:", items.map(i => i.label));
-    } else if (userLevel === 0 && !isAdmin && !dbUser?.role?.includes('support')) { // True Level 0 non-admin, non-support
-      items = ALL_POSSIBLE_NAV_ITEMS.filter(item => item.isFallback);
-       logger.debug(`[BottomNav] Level 0 user (not admin/support), showing fallback items:`, items.map(i => i.label));
-    }
-     else { // Authenticated users with level > 0, or admin, or support
-      items = ALL_POSSIBLE_NAV_ITEMS.filter(item => {
+    let items = ALL_POSSIBLE_NAV_ITEMS.filter(item => {
         if (item.adminOnly && !isAdmin) return false;
         if (item.supportOnly && !(isAdmin || userRole === 'support')) return false;
         return userLevel >= item.minLevelShow || isAdmin;
-      });
-      logger.debug("[BottomNav] Authenticated/Admin/Support user, showing filtered items:", items.map(i => i.label));
+    });
+    
+    if (items.length === 0 && !isAdmin) { // Fallback for non-admin if filters leave nothing
+        items = ALL_POSSIBLE_NAV_ITEMS.filter(item => item.isFallback);
+        logger.debug("[BottomNav] No specific items after filtering, showing fallback items for non-admin:", items.map(i => i.label));
     }
 
-    // Attempt to balance and prioritize central items
+
+    // Determine central item: Leads if available, otherwise HotVibes
     let finalLayout: NavItemConfig[] = [];
-    const maxItems = 5; // Target max items
+    const maxItems = 5;
 
-    const centralItemsFromFiltered = items.filter(i => i.isCentral);
-    const nonCentralItemsFromFiltered = items.filter(i => !i.isCentral);
+    const leadsItem = items.find(i => i.label === "Leads");
+    const hotVibesItem = items.find(i => i.label === "HotVibes");
 
-    // Priority for central display: HotVibes, then Studio
-    const hotVibesCentral = centralItemsFromFiltered.find(i => i.label === "HotVibes");
-    const studioCentral = centralItemsFromFiltered.find(i => i.label === "Studio");
-    
-    const chosenCentralItems: NavItemConfig[] = [];
-    if (hotVibesCentral) chosenCentralItems.push(hotVibesCentral);
-    if (studioCentral && chosenCentralItems.length < 2 && studioCentral.label !== hotVibesCentral?.label) {
-         chosenCentralItems.push(studioCentral);
+    let centralItem: NavItemConfig | undefined = undefined;
+
+    if (leadsItem) {
+        centralItem = { ...leadsItem, isCentral: true }; // Make it central
+    } else if (hotVibesItem) {
+        centralItem = { ...hotVibesItem, isCentral: true, centralColor: "from-brand-purple to-brand-orange" }; // HotVibes as central
     }
-
-    // Start building the layout
-    const otherItems = nonCentralItemsFromFiltered.filter(
-        ni => !chosenCentralItems.some(ci => ci.label === ni.label)
-    );
-
-    // Distribute non-central items around central ones
-    // This is a simplified distribution logic aiming for 5 items with 1 or 2 central.
-    // If 1 central item, it's [NC, NC, C, NC, NC]
-    // If 2 central items, it's [NC, C, NC, C, NC] or [NC, C, C, NC, NC] depending on count
     
-    const desiredTotal = Math.min(items.length, maxItems);
-    const numNonCentral = desiredTotal - chosenCentralItems.length;
+    // Remove chosen central item (if any) from the main list to avoid duplication
+    const otherItems = items.filter(i => i.label !== centralItem?.label);
 
-    if (chosenCentralItems.length === 1) {
-        const centralItem = chosenCentralItems[0];
+    const desiredTotal = Math.min(items.length, maxItems);
+    let numNonCentral = centralItem ? desiredTotal - 1 : desiredTotal;
+    
+    // Ensure numNonCentral is not negative
+    numNonCentral = Math.max(0, numNonCentral);
+
+
+    if (centralItem) {
         const leftCount = Math.ceil(numNonCentral / 2);
         const rightCount = numNonCentral - leftCount;
         finalLayout.push(...otherItems.slice(0, leftCount));
         finalLayout.push(centralItem);
         finalLayout.push(...otherItems.slice(leftCount, leftCount + rightCount));
-    } else if (chosenCentralItems.length >= 2) {
-        // Take first two central for this example layout
-        const c1 = chosenCentralItems[0];
-        const c2 = chosenCentralItems[1];
-        const leftCount = Math.floor(numNonCentral / 2) > 0 ? 1 : 0; // Max 1 on left of first central
-        const middleCount = Math.max(0, numNonCentral - leftCount - (numNonCentral > leftCount ? 1: 0) ); // Max 1 in middle
-        const rightCount = Math.max(0, numNonCentral - leftCount - middleCount);
-
-        finalLayout.push(...otherItems.slice(0, leftCount));
-        finalLayout.push(c1);
-        finalLayout.push(...otherItems.slice(leftCount, leftCount + middleCount));
-        finalLayout.push(c2);
-        finalLayout.push(...otherItems.slice(leftCount + middleCount, leftCount + middleCount + rightCount));
-    } else { // No central items (should not happen with HotVibes as fallback)
+    } else {
         finalLayout.push(...otherItems.slice(0, desiredTotal));
     }
     
-    // Ensure the total doesn't exceed maxItems, unless fewer were available
     finalLayout = finalLayout.slice(0, desiredTotal);
 
-    logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}:`, finalLayout.map(i => i.label));
+    logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}, role ${userRole}:`, finalLayout.map(i => i.label));
     return finalLayout;
 
-  }, [dbUser, appCtxLoading, isAuthenticating, isAdmin]);
+  }, [appContext.dbUser, appCtxLoading, isAuthenticating, isAdmin, appContext.user?.language_code]); // Added appContext.user for language
 
-  if (appCtxLoading || isAuthenticating || navItemsToDisplay.length === 0) {
-    logger.debug("[BottomNav] Either loading or no items to display. Returning null.");
+  if (appCtxLoading || isAuthenticating || !dbUser || navItemsToDisplay.length === 0) {
+    logger.debug("[BottomNav] Either loading, no dbUser, or no items to display. Returning null.");
     return null;
   }
 
   return (
     <motion.div
-      key={navItemsToDisplay.map(item => item.href).join('-')} // Add key to force re-render on item change
+      key={navItemsToDisplay.map(item => item.href).join('-')} 
       variants={bottomNavVariants}
       initial="hidden"
       animate="visible"
@@ -185,7 +156,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     >
       <div className={cn(
           "container mx-auto flex justify-around items-center px-1",
-          navItemsToDisplay.length <= 3 ? "max-w-[280px]" : // Tighter for 3 items
+          navItemsToDisplay.length <= 3 ? "max-w-[280px]" : 
           navItemsToDisplay.length === 4 ? "max-w-xs" : 
           navItemsToDisplay.length === 5 ? "max-w-sm" : 
           "max-w-md sm:max-w-lg"
@@ -199,7 +170,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               asChild
               size="icon"
               className={cn(
-                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor} mx-0.5 sm:mx-1`,
+                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor || 'from-gray-700 to-gray-900'} mx-0.5 sm:mx-1`, // Fallback centralColor
                 isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-black shadow-lg shadow-brand-cyan/60"
               )}
               key={item.label}
@@ -216,7 +187,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               asChild
               variant="ghost"
               className={cn(
-                "bottom-nav-item flex-1 px-0.5 py-1 sm:px-1", // Adjusted padding
+                "bottom-nav-item flex-1 px-0.5 py-1 sm:px-1", 
                 isActive && "active-bottom-link"
               )}
               key={item.label}
@@ -228,8 +199,8 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
                  item.color,
                  isActive ? "opacity-100 current-nav-glow" : "opacity-70 hover:opacity-100"
               )}>
-                <IconComponent className="w-5 h-5 sm:w-[22px] sm:h-[22px] mb-0.5" /> {/* Slightly smaller icon for non-central */}
-                <span className="text-[0.55rem] sm:text-[0.6rem] font-orbitron tracking-tight leading-none text-center line-clamp-1"> {/* even smaller text */}
+                <IconComponent className="w-5 h-5 sm:w-[22px] sm:h-[22px] mb-0.5" /> 
+                <span className="text-[0.55rem] sm:text-[0.6rem] font-orbitron tracking-tight leading-none text-center line-clamp-1"> 
                   {tNav(item.label)}
                 </span>
               </Link>

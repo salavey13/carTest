@@ -50,8 +50,6 @@ class DebugLogger {
     } catch (stringifyError) {
       let errorMsg = '[SafelyStringify Error]';
       if (stringifyError instanceof Error) { errorMsg += `: ${stringifyError.message}`; }
-      // Avoid logging the error back through the logger itself if it's a stringify issue.
-      // Direct console.warn is safer here.
       if (this.isBrowser) { console.warn(errorMsg, stringifyError, "Original Arg:", arg); } 
       else { process.stderr.write(`${errorMsg} ${stringifyError} Original Arg: ${String(arg)}\n`); }
       return errorMsg;
@@ -70,7 +68,7 @@ class DebugLogger {
     let message = '';
     try {
       const argsArray = Array.isArray(args) ? args : [args];
-      message = argsArray.map(this.safelyStringify).join(" "); // Use the bound safelyStringify
+      message = argsArray.map(this.safelyStringify).join(" "); 
 
       const logEntry: LogRecord = {
           id: this.logIdCounter++,

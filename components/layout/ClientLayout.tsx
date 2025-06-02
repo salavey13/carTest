@@ -85,7 +85,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     "/selfdev/gamified", 
     "/p-plan", 
     "/profile",
-    "/hotvibes" // <--- ДОБАВЛЕНО ЗДЕСЬ
+    "/hotvibes",
+    "/leads", // Added /leads here for bottom nav visibility
   ]; 
 
   const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname);
