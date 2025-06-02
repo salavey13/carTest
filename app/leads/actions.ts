@@ -1,18 +1,19 @@
 "use server";
 
-import { supabaseAdmin } from '@/hooks/supabase'; // Используем admin клиент для серверных операций
+import { supabaseAdmin } from '@/hooks/supabase'; 
 import type { Database } from "@/types/database.types";
-import { logger } from '@/lib/logger';
+// import { logger } from '@/lib/logger'; // Replaced with console for Vercel server-side
 import Papa from 'papaparse';
 import * as cheerio from 'cheerio';
 
 type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
 type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
+type UserRole = Database["public"]["Tables"]["users"]["Row"]["role"];
 
 interface CsvLeadRow {
   client_name?: string;
-  kwork_url?: string; // Это будет lead_url в transformHeader
-  project_description: string; // Обязательное поле
+  kwork_url?: string; 
+  project_description: string; 
   budget_range?: string;
   deadline_info?: string; 
   client_kwork_history?: string; 
@@ -23,14 +24,14 @@ interface CsvLeadRow {
   missing_features?: string; 
   status?: string;
   source?: string;
-  initial_relevance_score?: string; // AI output
+  initial_relevance_score?: string; 
   project_type_guess?: string; 
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
   if (!userId) return false;
   if (!supabaseAdmin) {
-    logger.error("Supabase admin client is not available for permission check.");
+    console.error("[LeadsActions verifyUserPermissions] Supabase admin client is not available.");
     return false;
   }
   try {
@@ -41,16 +42,16 @@ async function verifyUserPermissions(userId: string, allowedRoles: string[], all
       .single();
 
     if (error) {
-      logger.error(`Error fetching user ${userId} for permission check: ${error.message}`);
+      console.error(`[LeadsActions verifyUserPermissions] Error fetching user ${userId}: ${error.message}`);
       return false;
     }
     if (!user) {
-      logger.warn(`User ${userId} not found for permission check.`);
+      console.warn(`[LeadsActions verifyUserPermissions] User ${userId} not found.`);
       return false;
     }
     return allowedStatuses.includes(user.status || '') || allowedRoles.includes(user.role || '');
-  } catch (e) {
-    logger.error(`Exception during permission check for ${userId}:`, e);
+  } catch (e: any) {
+    console.error(`[LeadsActions verifyUserPermissions] Exception for ${userId}:`, e.message);
     return false;
   }
 }
@@ -69,6 +70,7 @@ export async function uploadLeadsFromCsv(
     return { success: false, message: "Ошибка: CSV данные отсутствуют." };
   }
   if (!supabaseAdmin) {
+    console.error("[LeadsActions uploadLeadsFromCsv] Supabase admin client is not available.");
     return { success: false, message: "Ошибка: Клиент базы данных недоступен." };
   }
 
@@ -165,7 +167,7 @@ export async function uploadLeadsFromCsv(
       .select();
 
     if (error) {
-      logger.error("Ошибка загрузки/обновления лидов в Supabase:", error);
+      console.error("[LeadsActions uploadLeadsFromCsv] Ошибка загрузки/обновления лидов в Supabase:", error);
       return { success: false, message: `Ошибка базы данных: ${error.message}`, errors: localErrors };
     }
 
@@ -179,7 +181,7 @@ export async function uploadLeadsFromCsv(
         message += ` Обнаружено ${localErrors.length} ошибок в CSV.`;
     }
     
-    logger.info(message);
+    console.log(`[LeadsActions uploadLeadsFromCsv] ${message}`);
     return { 
         success: true, 
         message, 
@@ -187,9 +189,9 @@ export async function uploadLeadsFromCsv(
         errors: localErrors.length > 0 ? localErrors : undefined 
     };
 
-  } catch (error) {
-    logger.error('Критическая ошибка во время загрузки CSV лидов:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'Неожиданная серверная ошибка.' };
+  } catch (error: any) {
+    console.error('[LeadsActions uploadLeadsFromCsv] Критическая ошибка:', error.message);
+    return { success: false, message: error.message || 'Неожиданная серверная ошибка.' };
   }
 }
 
@@ -202,7 +204,7 @@ export async function updateLeadStatus(
   const { data: leadData, error: leadError } = await supabaseAdmin.from('leads').select('assigned_to_tank, assigned_to_carry, assigned_to_support').eq('id', leadId).single();
   let canUpdate = false;
   if (leadError) {
-      logger.error(`Lead ${leadId} not found for status update: ${leadError.message}`);
+      console.error(`[LeadsActions updateLeadStatus] Lead ${leadId} not found: ${leadError.message}`);
       canUpdate = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
       if (!canUpdate) return { success: false, message: "Ошибка: Лид не найден и нет прав на создание." };
   } else if (leadData) {
@@ -221,7 +223,10 @@ export async function updateLeadStatus(
   if (!canUpdate) {
     return { success: false, message: "Ошибка: Недостаточно прав для обновления статуса этого лида." };
   }
-  if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
+  if (!supabaseAdmin) {
+    console.error("[LeadsActions updateLeadStatus] Клиент БД не инициализирован");
+    return { success: false, error: "Клиент БД не инициализирован" };
+  }
 
   try {
     const { error } = await supabaseAdmin
@@ -230,15 +235,15 @@ export async function updateLeadStatus(
       .eq('id', leadId);
 
     if (error) {
-      logger.error(`Ошибка обновления статуса лида ${leadId}:`, error);
+      console.error(`[LeadsActions updateLeadStatus] Ошибка обновления статуса лида ${leadId}:`, error);
       return { success: false, message: `Ошибка БД: ${error.message}` };
     }
     const successMsg = `Статус лида ${leadId.substring(0,8)}... обновлен на '${newStatus}'.`;
-    logger.info(successMsg);
+    console.log(`[LeadsActions updateLeadStatus] ${successMsg}`);
     return { success: true, message: successMsg };
-  } catch (error) {
-    logger.error('Критическая ошибка при обновлении статуса лида:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'Неожиданная серверная ошибка.' };
+  } catch (error: any) {
+    console.error('[LeadsActions updateLeadStatus] Критическая ошибка:', error.message);
+    return { success: false, message: error.message || 'Неожиданная серверная ошибка.' };
   }
 }
 
@@ -252,7 +257,10 @@ export async function assignLead(
   if (!canAssign) {
     return { success: false, message: "Ошибка: Только Саппорт или Админ могут назначать ответственных." };
   }
-   if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
+   if (!supabaseAdmin) {
+    console.error("[LeadsActions assignLead] Клиент БД не инициализирован");
+    return { success: false, error: "Клиент БД не инициализирован" };
+  }
 
   try {
     const updatePayload: Partial<LeadInsert> = { updated_at: new Date().toISOString() };
@@ -267,15 +275,15 @@ export async function assignLead(
       .eq('id', leadId);
 
     if (error) {
-      logger.error(`Ошибка назначения лида ${leadId} на ${assigneeType} ${assigneeId}:`, error);
+      console.error(`[LeadsActions assignLead] Ошибка назначения лида ${leadId} на ${assigneeType} ${assigneeId}:`, error);
       return { success: false, message: `Ошибка БД: ${error.message}` };
     }
     const successMsg = `Лид ${leadId.substring(0,8)}... ${assigneeId ? `назначен на ${assigneeType} ${(assigneeId).substring(0,8)}...` : `снят с назначения ${assigneeType}`}.`;
-    logger.info(successMsg);
+    console.log(`[LeadsActions assignLead] ${successMsg}`);
     return { success: true, message: successMsg };
-  } catch (error) {
-    logger.error('Критическая ошибка при назначении лида:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'Неожиданная серверная ошибка.' };
+  } catch (error: any) {
+    console.error('[LeadsActions assignLead] Критическая ошибка:', error.message);
+    return { success: false, message: error.message || 'Неожиданная серверная ошибка.' };
   }
 }
 
@@ -283,7 +291,10 @@ export async function fetchLeadsForDashboard(
   currentUserId: string,
   filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' 
 ): Promise<{ success: boolean; data?: LeadRow[]; error?: string }> {
-  if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
+  if (!supabaseAdmin) {
+    console.error("[LeadsActions fetchLeadsForDashboard] Клиент БД не инициализирован");
+    return { success: false, error: "Клиент БД не инициализирован" };
+  }
 
   try {
     const { data: currentUserData, error: userError } = await supabaseAdmin
@@ -293,7 +304,7 @@ export async function fetchLeadsForDashboard(
       .single();
 
     if (userError || !currentUserData) {
-      logger.error(`Ошибка получения данных пользователя ${currentUserId} для дашборда: ${userError?.message || 'Пользователь не найден'}`);
+      console.error(`[LeadsActions fetchLeadsForDashboard] Ошибка получения данных пользователя ${currentUserId}: ${userError?.message || 'Пользователь не найден'}`);
       return { success: false, error: "Не удалось получить данные пользователя." };
     }
 
@@ -323,15 +334,15 @@ export async function fetchLeadsForDashboard(
     const { data, error } = await query;
 
     if (error) {
-      logger.error("Ошибка загрузки лидов для дашборда:", error);
+      console.error("[LeadsActions fetchLeadsForDashboard] Ошибка загрузки лидов:", error);
       return { success: false, error: `Ошибка БД: ${error.message}` };
     }
     
     return { success: true, data: data || [] };
 
-  } catch (error) {
-    logger.error('Критическая ошибка при загрузке лидов для дашборда:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Неожиданная серверная ошибка.' };
+  } catch (error: any) {
+    console.error('[LeadsActions fetchLeadsForDashboard] Критическая ошибка:', error.message);
+    return { success: false, error: error.message || 'Неожиданная серверная ошибка.' };
   }
 }
 
@@ -339,12 +350,12 @@ export async function scrapePageContent(
   targetUrl: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   if (!targetUrl || typeof targetUrl !== 'string' || !targetUrl.trim()) {
-    logger.warn(`[Scraper] Попытка скрейпинга с невалидным URL: ${targetUrl}`);
+    console.warn(`[Scraper Action] Попытка скрейпинга с невалидным URL: ${targetUrl}`);
     return { success: false, error: "URL не указан или имеет неверный формат." };
   }
   
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
-  logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl} с User-Agent: ${userAgent}`);
+  console.log(`[Scraper Action] Запрос на скрейпинг URL: ${targetUrl} с User-Agent: ${userAgent}`);
 
   try {
     const response = await fetch(targetUrl, {
@@ -355,22 +366,22 @@ export async function scrapePageContent(
       },
       signal: AbortSignal.timeout(20000), 
     });
-    logger.info(`[Scraper] Получен ответ от ${targetUrl}. Статус: ${response.status} ${response.statusText}`);
+    console.log(`[Scraper Action] Получен ответ от ${targetUrl}. Статус: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "Не удалось прочитать тело ошибки");
-      logger.error(`[Scraper] Ошибка HTTP: ${response.status} ${response.statusText} для URL: ${targetUrl}. Тело ответа (если есть): ${errorText.substring(0,500)}`);
+      console.error(`[Scraper Action] Ошибка HTTP: ${response.status} ${response.statusText} для URL: ${targetUrl}. Тело ответа (если есть): ${errorText.substring(0,500)}`);
       return { success: false, error: `Ошибка HTTP: ${response.status} ${response.statusText}` };
     }
 
     const html = await response.text();
-    logger.debug(`[Scraper] HTML получен, длина: ${html.length}. Начинаю парсинг Cheerio.`);
+    console.log(`[Scraper Action] HTML получен, длина: ${html.length}. Начинаю парсинг Cheerio.`);
     const $ = cheerio.load(html);
     
-    logger.debug(`[Scraper] HTML перед удалением элементов (первые 500 симв.): ${$('body').html()?.substring(0,500)}`);
+    console.log(`[Scraper Action] HTML перед удалением элементов (первые 500 симв.): ${$('body').html()?.substring(0,500)}`);
     $('script, style, noscript, nav, footer, header, aside, form, button, input, textarea, select, iframe, link[rel="stylesheet"], meta, svg, path, img, figure, dialog, [role="dialog"], [aria-hidden="true"]').remove();
     $('[class*="cookie"], [id*="cookie"], [class*="banner"], [id*="banner"], [class*="popup"], [id*="popup"], [class*="modal"], [id*="modal"]').remove();
-    logger.debug(`[Scraper] Ненужные элементы удалены.`);
+    console.log(`[Scraper Action] Ненужные элементы удалены.`);
 
     const contentSelectors = [
       'article', '.article-content', '.entry-content', '.post-body', '.post-content', 
@@ -382,7 +393,7 @@ export async function scrapePageContent(
       '.page-content', '.content', '#content', '.main-content', '#main-content', 
       'section', 
     ];
-    logger.debug(`[Scraper] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
+    console.log(`[Scraper Action] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
 
     let $targetElement: cheerio.Cheerio<cheerio.Element> | null = null;
     let maxTextLength = 0;
@@ -391,7 +402,7 @@ export async function scrapePageContent(
     for (const selector of contentSelectors) {
         const $candidates = $(selector);
         if ($candidates.length > 0) {
-            logger.debug(`[Scraper] Найдены кандидаты по селектору '${selector}': ${$candidates.length} шт.`);
+            console.log(`[Scraper Action] Найдены кандидаты по селектору '${selector}': ${$candidates.length} шт.`);
             $candidates.each((_i, el) => {
                 const $currentCandidate = $(el);
                 const $clone = $currentCandidate.clone();
@@ -402,7 +413,7 @@ export async function scrapePageContent(
                     maxTextLength = textSample.length;
                     $targetElement = $currentCandidate; 
                     mainContentSelectorUsed = selector;
-                    logger.info(`[Scraper] Новый лучший кандидат по селектору '${selector}', длина текста: ${maxTextLength}`);
+                    console.log(`[Scraper Action] Новый лучший кандидат по селектору '${selector}', длина текста: ${maxTextLength}`);
                 }
             });
         }
@@ -411,12 +422,12 @@ export async function scrapePageContent(
     if (!$targetElement || maxTextLength < 100) { 
       $targetElement = $('body');
       mainContentSelectorUsed = 'body (fallback)';
-      logger.warn(`[Scraper] Специфичный контент не найден или слишком мал (maxTextLength: ${maxTextLength}). Используется весь body.`);
+      console.warn(`[Scraper Action] Специфичный контент не найден или слишком мал (maxTextLength: ${maxTextLength}). Используется весь body.`);
     } else {
-      logger.info(`[Scraper] Финально выбран контент по селектору: ${mainContentSelectorUsed}.`);
+      console.log(`[Scraper Action] Финально выбран контент по селектору: ${mainContentSelectorUsed}.`);
     }
     
-    logger.debug(`[Scraper] HTML выбранного элемента ('${mainContentSelectorUsed}') перед извлечением текста (первые 500 симв.): ${$targetElement.html()?.substring(0,500)}`);
+    console.log(`[Scraper Action] HTML выбранного элемента ('${mainContentSelectorUsed}') перед извлечением текста (первые 500 симв.): ${$targetElement.html()?.substring(0,500)}`);
     
     const targetHtmlForText = $targetElement.html() || "";
     const $tempForText = cheerio.load(`<body>${targetHtmlForText}</body>`); 
@@ -431,10 +442,10 @@ export async function scrapePageContent(
             }
         });
     
-    logger.debug(`[Scraper] Извлечено ${extractedTexts.length} текстовых фрагментов. Пример: "${extractedTexts.slice(0,5).join(' | ')}"`);
+    console.log(`[Scraper Action] Извлечено ${extractedTexts.length} текстовых фрагментов. Пример: "${extractedTexts.slice(0,5).join(' | ')}"`);
     let textContent = extractedTexts.join(". "); 
     
-    logger.debug(`[Scraper] Текст после первичного соединения (до очистки, первые 500 симv.): ${textContent.substring(0,500)}`);
+    console.log(`[Scraper Action] Текст после первичного соединения (до очистки, первые 500 симv.): ${textContent.substring(0,500)}`);
     textContent = textContent
       .replace(/\s\s+/g, ' ')       
       .replace(/\s+\./g, '.')       
@@ -443,7 +454,7 @@ export async function scrapePageContent(
       .replace(/(\r\n|\n|\r)+/gm, " ") 
       .replace(/\s\s+/g, ' ')       
       .trim();
-    logger.debug(`[Scraper] Текст после основной очистки (первые 500 симв.): ${textContent.substring(0,500)}`);
+    console.log(`[Scraper Action] Текст после основной очистки (первые 500 симв.): ${textContent.substring(0,500)}`);
     
     const MIN_LINE_LENGTH_FOR_MEANING = 10; 
     const MIN_SIGNIFICANT_CONTENT_LENGTH = 50; 
@@ -458,31 +469,86 @@ export async function scrapePageContent(
         .join(' ') 
         .trim();
     
-    logger.debug(`[Scraper] Текст после фильтрации осмысленных строк (длина: ${meaningfulLines.length}, первые 500 симв.): ${meaningfulLines.substring(0,500)}`);
+    console.log(`[Scraper Action] Текст после фильтрации осмысленных строк (длина: ${meaningfulLines.length}, первые 500 симв.): ${meaningfulLines.substring(0,500)}`);
     textContent = meaningfulLines;
 
     if (!textContent || textContent.length < MIN_SIGNIFICANT_CONTENT_LENGTH) {
-      logger.warn(`[Scraper] Не удалось извлечь значимый контент (длина ${textContent?.length || 0}) из URL: ${targetUrl}. Возможно, это honeypot, страница-заглушка, капча, или требует JS-рендеринга / имеет нестандартную структуру.`);
+      console.warn(`[Scraper Action] Не удалось извлечь значимый контент (длина ${textContent?.length || 0}) из URL: ${targetUrl}. Возможно, это honeypot, страница-заглушка, капча, или требует JS-рендеринга / имеет нестандартную структуру.`);
       return { success: false, error: `Не удалось извлечь контент (длина ${textContent?.length || 0}). Страница может быть пустой, требовать JS или быть honeypot.` };
     }
     
     const MAX_LENGTH = 25000; 
     if (textContent.length > MAX_LENGTH) {
         textContent = textContent.substring(0, MAX_LENGTH) + "\n\n--- СОДЕРЖИМОЕ ОБРЕЗАНО ИЗ-ЗА ПРЕВЫШЕНИЯ ЛИМИТА ---";
-        logger.warn(`[Scraper] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
+        console.warn(`[Scraper Action] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
     }
 
-    logger.info(`[Scraper] Успешно собран контент с URL: ${targetUrl}. Финальная длина: ${textContent.length}`);
+    console.log(`[Scraper Action] Успешно собран контент с URL: ${targetUrl}. Финальная длина: ${textContent.length}`);
     return { success: true, content: textContent };
 
   } catch (error: any) {
-    logger.error(`[Scraper] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error.stack);
+    console.error(`[Scraper Action] Критическая ошибка при скрейпинге ${targetUrl}: ${error.message}`, error.stack);
     if (error.name === 'AbortError' || error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
         return { success: false, error: 'Тайм-аут запроса к целевому URL. Сервер не ответил вовремя.' };
     }
-    if (error.message.toLowerCase().includes('invalidcharactererror')) { // DOMException
+    if (error.message.toLowerCase().includes('invalidcharactererror')) { 
         return { success: false, error: 'Ошибка парсинга HTML: невалидный символ. Возможно, проблема с кодировкой страницы.'};
     }
     return { success: false, error: `Ошибка скрейпинга: ${error.message}` };
+  }
+}
+
+export async function updateUserRole(
+  targetUserId: string,
+  newRole: 'tank' | 'support' | 'carry' | 'guest' | 'admin' | 'vprAdmin', // Уточнили возможные роли
+  currentUserId: string // ID пользователя, выполняющего действие
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  console.log(`[LeadsActions updateUserRole] Attempting to update role for ${targetUserId} to ${newRole} by ${currentUserId}`);
+
+  if (!supabaseAdmin) {
+    console.error("[LeadsActions updateUserRole] Supabase admin client is not available.");
+    return { success: false, error: "Клиент БД не инициализирован." };
+  }
+
+  // Проверка прав: только админ может менять роль (пока что)
+  // В будущем можно добавить логику, чтобы пользователь мог сам себе менять роль на 'tank' или 'support'
+  const isAdmin = await verifyUserPermissions(currentUserId, ['vprAdmin', 'admin'], ['admin']);
+  if (!isAdmin && targetUserId !== currentUserId) { // Не админ и пытается изменить роль не себе
+      console.warn(`[LeadsActions updateUserRole] User ${currentUserId} (not admin) attempted to change role for ${targetUserId}. Denied.`);
+      return { success: false, error: "Недостаточно прав для изменения роли другого пользователя." };
+  }
+  // TODO: Если targetUserId === currentUserId, разрешить смену на 'tank' или 'support' без админских прав.
+
+  const validRoles: UserRole[] = ['tank', 'support', 'carry', 'guest', 'admin', 'vprAdmin', null]; // null тоже валидная роль
+  if (!validRoles.includes(newRole as any)) { // (newRole as any) для UserRole | null
+      console.error(`[LeadsActions updateUserRole] Invalid role specified: ${newRole}`);
+      return { success: false, error: `Недопустимая роль: ${newRole}.` };
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({ role: newRole, updated_at: new Date().toISOString() })
+      .eq('user_id', targetUserId)
+      .select() 
+      .single(); // Ожидаем одну обновленную запись
+
+    if (error) {
+      console.error(`[LeadsActions updateUserRole] Error updating role for user ${targetUserId} to ${newRole}:`, error);
+      return { success: false, error: `Ошибка базы данных при обновлении роли: ${error.message}` };
+    }
+
+    if (!data) {
+      console.warn(`[LeadsActions updateUserRole] User ${targetUserId} not found for role update, or no change made.`);
+      return { success: false, error: `Пользователь ${targetUserId} не найден или роль не была изменена.` };
+    }
+
+    const successMsg = `Роль пользователя ${targetUserId} успешно обновлена на '${newRole}'.`;
+    console.log(`[LeadsActions updateUserRole] ${successMsg}`);
+    return { success: true, message: successMsg };
+
+  } catch (e: any) {
+    console.error(`[LeadsActions updateUserRole] Critical error updating role for ${targetUserId}:`, e.message);
+    return { success: false, error: `Критическая ошибка сервера: ${e.message}` };
   }
 }
