@@ -34,12 +34,13 @@ interface NavItemConfig {
   isFallback?: boolean;
 }
 
+// Define all possible items that COULD be in the bottom nav
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink", minLevelShow: 0, isFallback: true },
-  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true }, // Not central by default
+  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentral: true, centralColor: "from-brand-purple to-brand-orange" }, // Fallback central
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
-  { href: "/repo-xml", icon: FaGithub, label: "Studio", color: "text-brand-purple", minLevelShow: 1 }, // Not central by default
+  { href: "/repo-xml", icon: FaGithub, label: "Studio", color: "text-brand-purple", minLevelShow: 1 }, 
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan", minLevelShow: 1 },
   { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentral: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 2, supportOnly: true },
 ];
@@ -76,7 +77,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
   }, [isAdminFunc]);
 
   const navItemsToDisplay = useMemo(() => {
-    if (appCtxLoading || isAuthenticating || !appContext.dbUser) { // Ensure dbUser is loaded
+    if (appCtxLoading || isAuthenticating || !appContext.dbUser) { 
       logger.debug("[BottomNav] Context/dbUser loading or not available, returning no items yet.");
       return [];
     }
@@ -93,53 +94,50 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
         return userLevel >= item.minLevelShow || isAdmin;
     });
     
-    if (items.length === 0 && !isAdmin) { // Fallback for non-admin if filters leave nothing
+    if (items.length === 0 && !isAdmin) { 
         items = ALL_POSSIBLE_NAV_ITEMS.filter(item => item.isFallback);
         logger.debug("[BottomNav] No specific items after filtering, showing fallback items for non-admin:", items.map(i => i.label));
     }
 
-
-    // Determine central item: Leads if available, otherwise HotVibes
     let finalLayout: NavItemConfig[] = [];
     const maxItems = 5;
 
-    const leadsItem = items.find(i => i.label === "Leads");
-    const hotVibesItem = items.find(i => i.label === "HotVibes");
+    const leadsItemConfig = ALL_POSSIBLE_NAV_ITEMS.find(i => i.label === "Leads");
+    const hotVibesItemConfig = ALL_POSSIBLE_NAV_ITEMS.find(i => i.label === "HotVibes");
 
-    let centralItem: NavItemConfig | undefined = undefined;
+    let centralItemCandidate: NavItemConfig | undefined = undefined;
 
-    if (leadsItem) {
-        centralItem = { ...leadsItem, isCentral: true }; // Make it central
-    } else if (hotVibesItem) {
-        centralItem = { ...hotVibesItem, isCentral: true, centralColor: "from-brand-purple to-brand-orange" }; // HotVibes as central
+    // Priority for Leads if available and conditions met
+    if (leadsItemConfig && (userLevel >= leadsItemConfig.minLevelShow || isAdmin) && (!leadsItemConfig.supportOnly || isAdmin || userRole === 'support')) {
+        centralItemCandidate = { ...leadsItemConfig, isCentral: true };
+    } else if (hotVibesItemConfig && (userLevel >= hotVibesItemConfig.minLevelShow || isAdmin)) { // Fallback to HotVibes
+        centralItemCandidate = { ...hotVibesItemConfig, isCentral: true };
     }
     
-    // Remove chosen central item (if any) from the main list to avoid duplication
-    const otherItems = items.filter(i => i.label !== centralItem?.label);
-
-    const desiredTotal = Math.min(items.length, maxItems);
-    let numNonCentral = centralItem ? desiredTotal - 1 : desiredTotal;
+    // Filter `items` to remove the chosen central item to avoid duplication if it was already there
+    // And ensure all items in `items` are actually available based on current filters
+    let availableOtherItems = items.filter(i => i.label !== centralItemCandidate?.label);
     
-    // Ensure numNonCentral is not negative
+    const desiredTotal = Math.min(items.length, maxItems); // Use total items from initial filtering
+    let numNonCentral = centralItemCandidate ? desiredTotal - 1 : desiredTotal;
     numNonCentral = Math.max(0, numNonCentral);
 
-
-    if (centralItem) {
+    if (centralItemCandidate) {
         const leftCount = Math.ceil(numNonCentral / 2);
         const rightCount = numNonCentral - leftCount;
-        finalLayout.push(...otherItems.slice(0, leftCount));
-        finalLayout.push(centralItem);
-        finalLayout.push(...otherItems.slice(leftCount, leftCount + rightCount));
+        finalLayout.push(...availableOtherItems.slice(0, leftCount));
+        finalLayout.push(centralItemCandidate);
+        finalLayout.push(...availableOtherItems.slice(leftCount, leftCount + rightCount));
     } else {
-        finalLayout.push(...otherItems.slice(0, desiredTotal));
+        finalLayout.push(...availableOtherItems.slice(0, desiredTotal));
     }
     
-    finalLayout = finalLayout.slice(0, desiredTotal);
+    finalLayout = finalLayout.slice(0, Math.min(finalLayout.length, maxItems)); // Ensure maxItems constraint
 
     logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}, role ${userRole}:`, finalLayout.map(i => i.label));
     return finalLayout;
 
-  }, [appContext.dbUser, appCtxLoading, isAuthenticating, isAdmin, appContext.user?.language_code]); // Added appContext.user for language
+  }, [appContext.dbUser, appCtxLoading, isAuthenticating, isAdmin, appContext.user?.language_code]);
 
   if (appCtxLoading || isAuthenticating || !dbUser || navItemsToDisplay.length === 0) {
     logger.debug("[BottomNav] Either loading, no dbUser, or no items to display. Returning null.");
@@ -170,7 +168,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               asChild
               size="icon"
               className={cn(
-                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor || 'from-gray-700 to-gray-900'} mx-0.5 sm:mx-1`, // Fallback centralColor
+                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor || 'from-gray-700 to-gray-900'} mx-0.5 sm:mx-1`, 
                 isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-black shadow-lg shadow-brand-cyan/60"
               )}
               key={item.label}
