@@ -42,6 +42,7 @@ export interface HotLeadData {
   ai_generated_proposal_draft?: string | null;
   status?: string;
   project_type_guess?: string | null;
+  client_name?: string | null; // Добавлено для VipLeadDisplay
 }
 
 export interface HotVibeCardTheme {
@@ -160,9 +161,9 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
             
             <CardFooter className="p-2 sm:p-2.5 pt-0 mt-auto">
               <div 
-                aria-hidden="true"
+                aria-hidden="true" 
                 className={cn(
-                  "w-full font-orbitron text-[0.7rem] sm:text-xs py-1.5 sm:py-2 rounded-md flex items-center justify-center",
+                  "w-full font-orbitron text-[0.7rem] sm:text-xs py-1.5 sm:py-2 rounded-md flex items-center justify-center pointer-events-none",
                   isMissionUnlocked ? `${theme.accentGradient} text-black shadow-md` : "bg-gray-600 text-gray-400"
                 )}
               >
