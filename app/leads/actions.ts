@@ -2,7 +2,6 @@
 
 import { supabaseAdmin } from '@/hooks/supabase'; 
 import type { Database } from "@/types/database.types";
-// import { logger } from '@/lib/logger'; // Replaced with console for Vercel server-side
 import Papa from 'papaparse';
 import * as cheerio from 'cheerio';
 
@@ -28,7 +27,7 @@ interface CsvLeadRow {
   project_type_guess?: string; 
 }
 
-async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
+async function verifyUserPermissions(userId: string, allowedRoles: UserRole[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
   if (!userId) return false;
   if (!supabaseAdmin) {
     console.error("[LeadsActions verifyUserPermissions] Supabase admin client is not available.");
@@ -49,7 +48,11 @@ async function verifyUserPermissions(userId: string, allowedRoles: string[], all
       console.warn(`[LeadsActions verifyUserPermissions] User ${userId} not found.`);
       return false;
     }
-    return allowedStatuses.includes(user.status || '') || allowedRoles.includes(user.role || '');
+    // Check if user status is one of the allowed statuses OR user role is one of the allowed roles
+    const statusMatch = allowedStatuses.includes(user.status || '');
+    const roleMatch = user.role ? allowedRoles.includes(user.role) : false;
+    
+    return statusMatch || roleMatch;
   } catch (e: any) {
     console.error(`[LeadsActions verifyUserPermissions] Exception for ${userId}:`, e.message);
     return false;
@@ -61,7 +64,7 @@ export async function uploadLeadsFromCsv(
   currentUserId: string 
 ): Promise<{ success: boolean; message: string; insertedCount?: number; updatedCount?: number; errors?: string[] }> {
   
-  const canUpload = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
+  const canUpload = await verifyUserPermissions(currentUserId, ['support' as UserRole], ['admin']);
   if (!canUpload) {
     return { success: false, message: "Ошибка: У вас нет прав для выполнения этой операции (только Саппорт или Админ)." };
   }
@@ -205,19 +208,19 @@ export async function updateLeadStatus(
   let canUpdate = false;
   if (leadError) {
       console.error(`[LeadsActions updateLeadStatus] Lead ${leadId} not found: ${leadError.message}`);
-      canUpdate = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
+      canUpdate = await verifyUserPermissions(currentUserId, ['support' as UserRole], ['admin']);
       if (!canUpdate) return { success: false, message: "Ошибка: Лид не найден и нет прав на создание." };
   } else if (leadData) {
     const assignedTank = leadData.assigned_to_tank === currentUserId;
     const assignedCarry = leadData.assigned_to_carry === currentUserId;
     const assignedSupport = leadData.assigned_to_support === currentUserId;
     
-    const assignedRoles: string[] = [];
+    const assignedRoles: UserRole[] = [];
     if (assignedTank) assignedRoles.push('tank');
     if (assignedCarry) assignedRoles.push('carry');
     if (assignedSupport) assignedRoles.push('support');
 
-    canUpdate = await verifyUserPermissions(currentUserId, ['support', ...assignedRoles], ['admin']);
+    canUpdate = await verifyUserPermissions(currentUserId, ['support' as UserRole, ...assignedRoles], ['admin']);
   }
   
   if (!canUpdate) {
@@ -253,7 +256,7 @@ export async function assignLead(
   assigneeId: string | null, 
   currentUserId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const canAssign = await verifyUserPermissions(currentUserId, ['support'], ['admin']);
+  const canAssign = await verifyUserPermissions(currentUserId, ['support' as UserRole], ['admin']);
   if (!canAssign) {
     return { success: false, message: "Ошибка: Только Саппорт или Админ могут назначать ответственных." };
   }
@@ -389,7 +392,7 @@ export async function scrapePageContent(
       '.project-description', '.task__description', '.job-description', '.vacancy-description', 
       '.product-description', '[itemprop="description"]', 
       '.text-content', '.content-text', '.article-text', 
-      '.job_show_description', '.b-description__text', 
+      '.job_show_description', '.b-description__text', // Kwork specific: .b-description__text
       '.page-content', '.content', '#content', '.main-content', '#main-content', 
       'section', 
     ];
@@ -433,7 +436,7 @@ export async function scrapePageContent(
     const $tempForText = cheerio.load(`<body>${targetHtmlForText}</body>`); 
     
     let extractedTexts: string[] = [];
-    $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a')
+    $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a, .break-words') // Added .break-words
         .each(function() {
             const $this = $(this);
             const elementText = $this.clone().children().remove().end().text().replace(/\s\s+/g, ' ').trim();
@@ -473,17 +476,17 @@ export async function scrapePageContent(
     textContent = meaningfulLines;
 
     if (!textContent || textContent.length < MIN_SIGNIFICANT_CONTENT_LENGTH) {
-      console.warn(`[Scraper Action] Не удалось извлечь значимый контент (длина ${textContent?.length || 0}) из URL: ${targetUrl}. Возможно, это honeypot, страница-заглушка, капча, или требует JS-рендеринга / имеет нестандартную структуру.`);
+      console.warn(`[Scraper Action] Не удалось извлечь значимый контент (длина ${textContent?.length || 0}) из URL: ${targetUrl}. HTML выбранного элемента: ${$targetElement.html()?.substring(0, 2000)}`);
       return { success: false, error: `Не удалось извлечь контент (длина ${textContent?.length || 0}). Страница может быть пустой, требовать JS или быть honeypot.` };
     }
     
-    const MAX_LENGTH = 25000; 
+    const MAX_LENGTH = 35000; // Increased max length
     if (textContent.length > MAX_LENGTH) {
         textContent = textContent.substring(0, MAX_LENGTH) + "\n\n--- СОДЕРЖИМОЕ ОБРЕЗАНО ИЗ-ЗА ПРЕВЫШЕНИЯ ЛИМИТА ---";
         console.warn(`[Scraper Action] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
     }
 
-    console.log(`[Scraper Action] Успешно собран контент с URL: ${targetUrl}. Финальная длина: ${textContent.length}`);
+    console.log(`[Scraper Action] Успешно собран контент с URL: ${targetUrl}. Финальная длина: ${textContent.length}. Фрагмент: ${textContent.substring(0, 200)}...`);
     return { success: true, content: textContent };
 
   } catch (error: any) {
@@ -500,8 +503,8 @@ export async function scrapePageContent(
 
 export async function updateUserRole(
   targetUserId: string,
-  newRole: 'tank' | 'support' | 'carry' | 'guest' | 'admin' | 'vprAdmin', // Уточнили возможные роли
-  currentUserId: string // ID пользователя, выполняющего действие
+  newRole: UserRole,
+  currentUserId: string 
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   console.log(`[LeadsActions updateUserRole] Attempting to update role for ${targetUserId} to ${newRole} by ${currentUserId}`);
 
@@ -510,17 +513,18 @@ export async function updateUserRole(
     return { success: false, error: "Клиент БД не инициализирован." };
   }
 
-  // Проверка прав: только админ может менять роль (пока что)
-  // В будущем можно добавить логику, чтобы пользователь мог сам себе менять роль на 'tank' или 'support'
-  const isAdmin = await verifyUserPermissions(currentUserId, ['vprAdmin', 'admin'], ['admin']);
-  if (!isAdmin && targetUserId !== currentUserId) { // Не админ и пытается изменить роль не себе
-      console.warn(`[LeadsActions updateUserRole] User ${currentUserId} (not admin) attempted to change role for ${targetUserId}. Denied.`);
-      return { success: false, error: "Недостаточно прав для изменения роли другого пользователя." };
+  const isAdmin = await verifyUserPermissions(currentUserId, ['vprAdmin' as UserRole, 'admin' as UserRole], ['admin']);
+  
+  // Разрешить пользователю менять свою роль на 'tank' или 'support'
+  if (targetUserId === currentUserId && (newRole === 'tank' || newRole === 'support')) {
+    // Разрешено
+  } else if (!isAdmin) { // Если не админ и пытается изменить роль не себе ИЛИ на запрещенную роль
+      console.warn(`[LeadsActions updateUserRole] User ${currentUserId} (not admin or invalid self-assign) attempted to change role for ${targetUserId} to ${newRole}. Denied.`);
+      return { success: false, error: "Недостаточно прав для этой операции." };
   }
-  // TODO: Если targetUserId === currentUserId, разрешить смену на 'tank' или 'support' без админских прав.
 
-  const validRoles: UserRole[] = ['tank', 'support', 'carry', 'guest', 'admin', 'vprAdmin', null]; // null тоже валидная роль
-  if (!validRoles.includes(newRole as any)) { // (newRole as any) для UserRole | null
+  const validRoles: UserRole[] = ['tank', 'support', 'carry', 'guest', 'admin', 'vprAdmin', null];
+  if (!validRoles.includes(newRole)) { 
       console.error(`[LeadsActions updateUserRole] Invalid role specified: ${newRole}`);
       return { success: false, error: `Недопустимая роль: ${newRole}.` };
   }
@@ -531,7 +535,7 @@ export async function updateUserRole(
       .update({ role: newRole, updated_at: new Date().toISOString() })
       .eq('user_id', targetUserId)
       .select() 
-      .single(); // Ожидаем одну обновленную запись
+      .single();
 
     if (error) {
       console.error(`[LeadsActions updateUserRole] Error updating role for user ${targetUserId} to ${newRole}:`, error);
@@ -543,7 +547,7 @@ export async function updateUserRole(
       return { success: false, error: `Пользователь ${targetUserId} не найден или роль не была изменена.` };
     }
 
-    const successMsg = `Роль пользователя ${targetUserId} успешно обновлена на '${newRole}'.`;
+    const successMsg = `Роль пользователя ${targetUserId} (${data.username || 'ID'}) успешно обновлена на '${newRole}'.`;
     console.log(`[LeadsActions updateUserRole] ${successMsg}`);
     return { success: true, message: successMsg };
 
