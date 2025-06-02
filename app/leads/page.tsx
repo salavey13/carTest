@@ -51,7 +51,7 @@ interface TeamUser {
 interface PredefinedSearchButton {
   id: string;
   label: string;
-  site: "kwork" | "habr" | string;
+  site: "kwork" | "habr" | "upwork" | "freelancer" | "contra" | string; // Added contra
   keywords: string;
   siteUrlFormat: string;
 }
@@ -81,7 +81,6 @@ const LeadGenerationHQPage = () => {
   const scraperSectionRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
 
-  // Helper for rendering text with Next.js Link components
   const renderTextWithLinks = useCallback((text: string, links: { [key: string]: { href: string; label: string; className?: string; target?: string; rel?: string } }) => {
     let result: (string | JSX.Element)[] = [text];
     let keyCounter = 0;
@@ -106,7 +105,7 @@ const LeadGenerationHQPage = () => {
                     }
                 });
             } else {
-                newResult.push(segment); // Keep already processed JSX elements
+                newResult.push(segment);
             }
         });
         result = newResult;
@@ -124,7 +123,7 @@ const LeadGenerationHQPage = () => {
     "{linkToPPlan}": { href: "/p-plan", label: "VIBE План", className: "text-brand-yellow hover:underline" },
     "{linkToTutorials}": { href: "/start-training", label: "Арсенал Приемов и Тактик", className: "text-brand-cyan hover:underline" },
     "{linkToCyberDevOS}": { href: "/selfdev/gamified", label: "CyberDev OS", className: "text-brand-orange hover:underline" },
-    "{linkToAboutCarry}": { href: "/about#carry-section", label: "личное дело Кэрри", className: "text-brand-purple hover:underline" }, // Example specific link
+    "{linkToAboutCarry}": { href: "/about#carry-section", label: "личное дело Кэрри", className: "text-brand-purple hover:underline" }, 
     "{linkToLeads}": { href: "/leads", label: "КОЦ 'Сетевой Дозор'", className: "text-brand-orange hover:underline" },
     "{linkToZion}": { href: "https://t.me/salavey_channel", label: "Цитадель 'Зион' (@salavey_channel)", className: "text-brand-cyan hover:underline", target: "_blank", rel: "noopener noreferrer" },
     "{linkToCyberVibeLoop}": { href: "/repo-xml#cybervibe-section", label: "Петля CyberVibe", className: "text-brand-cyan hover:underline" },
@@ -137,10 +136,10 @@ const LeadGenerationHQPage = () => {
     rolesSubtitle: `Экипаж машины боевой, заряженный на VIBE-победу и тотальное превосходство. Узнай больше о нашей философии в {linkToSelfDev} и {linkToPurposeProfit}.`,
     carryRoleTitle: "::FaBrain:: Кэрри (Павел)",
     carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создает и внедряет прорывные фичи в {linkToRepoXml}. Решает нетривиальные задачи разработки, определяя вектор эволюции платформы. Его код – закон. Смотри {linkToAboutCarry}.`,
-    tanksRoleTitle: "::FaShieldHalved:: Танки (Штурмовики Кастомизации)",
+    tanksRoleTitle: `::FaShieldHalved:: Танки (${dbUser?.username || 'Воин Кастомизации'}?)`,
     tanksRoleDesc: "Броневой кулак кастомизации и адаптации. Принимают на себя 'урон' от сложных клиентских запросов, AI-артефактов. Трансмутируют базовые модули в уникальные клиентские решения, используя реактивную мощь Supervibe Studio. Их девиз: 'Прорвемся и Улучшим!'",
     tanksRoleLeverages: `Основное вооружение: {linkToTutorials} (включая Замену Изображений, Охоту на Иконки, Видео-Интеграцию, Inception Swap-Маневры).`,
-    supportRoleTitle: "::FaHeadset:: Саппорт (Дозорные Сети)",
+    supportRoleTitle: `::FaHeadset:: Саппорт (${dbUser?.username || 'Дозорный Сети'}?)`,
     supportRoleDesc: `Информационно-логистический хаб и голос отряда. Идентифицируют, фильтруют и обрабатывают входящие сигналы (лиды). Готовят разведданные, CSV для AI-обработки и целеуказания для Танков и Кэрри. Ведут первичные переговоры, обеспечивая бесперебойную связь и снабжение отряда задачами.`,
     supportArsenalTitle: "::FaToolbox:: Арсенал Саппорта: Протоколы Автоматизации 'Судный День'",
     supportArsenalSubtitle: `Высокотехнологичное снаряжение для информационной войны и эффективной вербовки. Геймеры, это для вас – превращаем рутину в квест в нашем {linkToCyberDevOS}!`,
@@ -231,6 +230,10 @@ const LeadGenerationHQPage = () => {
     { id: "habr_twa_react_next", label: "TWA React/Next (Habr)", site: "habr", keywords: "telegram web app react next.js", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
     { id: "habr_ai_bot_integration", label: "AI Бот Интеграция (Habr)", site: "habr", keywords: "telegram бот ai интеграция", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
     { id: "habr_supabase_backend", label: "Supabase Backend (Habr)", site: "habr", keywords: "supabase backend next.js", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    { id: "contra_twa_developer", label: "TWA Developer (Contra)", site: "contra", keywords: "telegram web app developer", siteUrlFormat: "https://contra.com/search/creators?query={keywords}" },
+    { id: "contra_react_next_developer", label: "React/Next.js Dev (Contra)", site: "contra", keywords: "react next.js developer", siteUrlFormat: "https://contra.com/search/creators?query={keywords}" },
+    { id: "upwork_telegram_mini_app", label: "Telegram Mini App (Upwork)", site: "upwork", keywords: "telegram mini app", siteUrlFormat: "https://www.upwork.com/nx/jobs/search/?q={keywords}" },
+    { id: "freelancer_twa_development", label: "TWA Development (Freelancer.com)", site: "freelancer", keywords: "telegram web app development", siteUrlFormat: "https://www.freelancer.com/jobs/telegram-web-app-development/?keyword={keywords}" },
 ];
 
 
@@ -378,22 +381,22 @@ const LeadGenerationHQPage = () => {
   const rightNavSectionRefs = {
     topRef: pageTopRef,
     rolesRef: rolesSectionRef,
+    scraperRef: scraperSectionRef, 
     arsenalRef: arsenalSectionRef,
     dashboardRef: dashboardSectionRef,
     workflowRef: workflowSectionRef,
     assetsRef: assetsSectionRef,
     zionRef: zionSectionRef,
-    scraperRef: scraperSectionRef, 
   };
   const rightNavLabels = {
     navToTop: t.navToTop,
     navToRoles: t.navToRoles,
+    navToScraper: t.navToScraper,
     navToArsenal: t.navToArsenal,
     navToDashboard: t.navToDashboard,
     navToWorkflow: t.navToWorkflow,
     navToAssets: t.navToAssets,
     navToZion: t.navToZion,
-    navToScraper: t.navToScraper, 
   };
 
   const handleSuccessfulScrape = useCallback(() => {
