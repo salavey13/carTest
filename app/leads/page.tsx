@@ -1,4 +1,3 @@
-// /app/leads/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -68,7 +67,7 @@ const LeadGenerationHQPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentFilter, setCurrentFilter] = useState('all'); 
   const [teamMembers, setTeamMembers] = useState<TeamUser[]>([]); 
-  const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(true); // Default to collapsed
 
   const pageTopRef = useRef<HTMLDivElement>(null);
   const headerSectionRef = useRef<HTMLDivElement>(null);
@@ -125,7 +124,7 @@ const LeadGenerationHQPage = () => {
     "{linkToPPlan}": { href: "/p-plan", label: "VIBE План", className: "text-brand-yellow hover:underline" },
     "{linkToTutorials}": { href: "/start-training", label: "Арсенал Приемов и Тактик", className: "text-brand-cyan hover:underline" },
     "{linkToCyberDevOS}": { href: "/selfdev/gamified", label: "CyberDev OS", className: "text-brand-orange hover:underline" },
-    "{linkToAbout}": { href: "/about", label: "личное дело", className: "text-brand-purple hover:underline" },
+    "{linkToAboutCarry}": { href: "/about#carry-section", label: "личное дело Кэрри", className: "text-brand-purple hover:underline" }, // Example specific link
     "{linkToLeads}": { href: "/leads", label: "КОЦ 'Сетевой Дозор'", className: "text-brand-orange hover:underline" },
     "{linkToZion}": { href: "https://t.me/salavey_channel", label: "Цитадель 'Зион' (@salavey_channel)", className: "text-brand-cyan hover:underline", target: "_blank", rel: "noopener noreferrer" },
     "{linkToCyberVibeLoop}": { href: "/repo-xml#cybervibe-section", label: "Петля CyberVibe", className: "text-brand-cyan hover:underline" },
@@ -136,8 +135,8 @@ const LeadGenerationHQPage = () => {
     pageSubtitle: `Бойцы КиберОтряда! Это ваш командный пункт для захвата лидов и доминации в Supervibe-стиле. Роли распределены, цели определены, VIBE активирован. Трансмутируем инфу в профит!`,
     rolesTitle: "::FaShieldCat:: КиберОтряд: Роли и Протоколы Действий",
     rolesSubtitle: `Экипаж машины боевой, заряженный на VIBE-победу и тотальное превосходство. Узнай больше о нашей философии в {linkToSelfDev} и {linkToPurposeProfit}.`,
-    carryRoleTitle: "::FaBrain:: Кэрри (Ты, Павел)",
-    carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создаешь и внедряешь прорывные фичи в {linkToRepoXml}. Решаешь нетривиальные задачи разработки, определяя вектор эволюции платформы. Твой код – закон. Смотри {linkToAbout} Кэрри.`,
+    carryRoleTitle: "::FaBrain:: Кэрри (Павел)",
+    carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создает и внедряет прорывные фичи в {linkToRepoXml}. Решает нетривиальные задачи разработки, определяя вектор эволюции платформы. Его код – закон. Смотри {linkToAboutCarry}.`,
     tanksRoleTitle: "::FaShieldHalved:: Танки (Штурмовики Кастомизации)",
     tanksRoleDesc: "Броневой кулак кастомизации и адаптации. Принимают на себя 'урон' от сложных клиентских запросов, AI-артефактов. Трансмутируют базовые модули в уникальные клиентские решения, используя реактивную мощь Supervibe Studio. Их девиз: 'Прорвемся и Улучшим!'",
     tanksRoleLeverages: `Основное вооружение: {linkToTutorials} (включая Замену Изображений, Охоту на Иконки, Видео-Интеграцию, Inception Swap-Маневры).`,
@@ -204,7 +203,7 @@ const LeadGenerationHQPage = () => {
     navToAssets: "::FaCubes:: К Активам",
     navToZion: "::FaComments:: К Зиону",
     navToDashboard: "::FaTableList:: К Дашборду",
-    navToScraper: "::FaSpider:: К Скрейперу", // Добавлено
+    navToScraper: "::FaSpider:: К Скрейперу",
     collapseAllSections: "::FaAnglesUp:: Свернуть Инфо-Блоки", 
     expandAllSections: "::FaAnglesDown:: Развернуть Инфо-Блоки", 
   };
@@ -214,34 +213,28 @@ const LeadGenerationHQPage = () => {
     secondaryColor: "text-brand-yellow", 
     accentColor: "text-brand-cyan",     
     borderColor: "border-brand-orange/50", 
-    shadowColor: "shadow-[0_0_25px_rgba(var(--orange-rgb),0.5)]", // Используем RGB для тени
+    shadowColor: "shadow-[0_0_25px_rgba(var(--orange-rgb),0.5)]", 
     buttonGradient: "bg-gradient-to-r from-brand-orange to-brand-yellow", 
   };
 
-  // Перемещено сюда из GeneralPurposeScraper
   const predefinedSearchButtons: PredefinedSearchButton[] = [
-    { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
-    { id: "kwork_mini_app", label: "Mini App (Kwork)", site: "kwork", keywords: "mini app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
-    { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
-    { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_webapp", label: "WebApp (Kwork)", site: "kwork", keywords: "webapp", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_react", label: "React (Kwork)", site: "kwork", keywords: "react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_twa_react", label: "TWA React (Kwork)", site: "kwork", keywords: "twa react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_tg_bot", label: "TG Бот (Kwork)", site: "kwork", keywords: "telegram бот", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_parser", label: "Парсер (Kwork)", site: "kwork", keywords: "парсер", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" }, // Habr использует 'q'
-    { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-    // НОВЫЕ КНОПКИ ДЛЯ УЛУЧШЕНИЙ
-    { id: "kwork_car_rental_twa", label: "Аренда Авто (TWA Kwork)", site: "kwork", keywords: "telegram web app аренда авто", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_fitness_twa", label: "Фитнес (TWA Kwork)", site: "kwork", keywords: "telegram web app фитнес тренировки", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_crm_twa", label: "CRM (TWA Kwork)", site: "kwork", keywords: "telegram web app crm", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_admin_panel", label: "Админка (Kwork)", site: "kwork", keywords: "админ панель next.js react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "habr_nextjs_react", label: "Next.js React (Habr)", site: "habr", keywords: "next.js react", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-    { id: "habr_supabase_db", label: "Supabase (Habr)", site: "habr", keywords: "supabase база данных", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-  ];
+    { id: "kwork_twa_next_supabase", label: "TWA Next.js Supabase (Kwork)", site: "kwork", keywords: "telegram web app next.js supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_mini_app_react_supabase", label: "Mini App React Supabase (Kwork)", site: "kwork", keywords: "telegram mini app react supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_ai_bot_python_fastapi", label: "AI Бот Python FastAPI (Kwork)", site: "kwork", keywords: "телеграм бот нейросеть python fastapi", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_admin_panel_nextjs_tailwind", label: "Админка Next.js Tailwind (Kwork)", site: "kwork", keywords: "админ панель next.js tailwindcss", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_car_rental_twa", label: "Аренда Авто TWA (Kwork)", site: "kwork", keywords: "telegram web app аренда авто", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_fitness_club_twa", label: "Фитнес-клуб TWA (Kwork)", site: "kwork", keywords: "telegram web app фитнес клуб", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_crm_twa_supabase", label: "CRM TWA Supabase (Kwork)", site: "kwork", keywords: "telegram web app crm supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_marketplace_twa", label: "Маркетплейс TWA (Kwork)", site: "kwork", keywords: "telegram web app маркетплейс", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_booking_service_twa", label: "Сервис бронирования TWA (Kwork)", site: "kwork", keywords: "telegram web app сервис бронирования", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_parser_nextjs_supabase", label: "Парсер Next.js Supabase (Kwork)", site: "kwork", keywords: "парсер next.js supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "habr_twa_react_next", label: "TWA React/Next (Habr)", site: "habr", keywords: "telegram web app react next.js", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    { id: "habr_ai_bot_integration", label: "AI Бот Интеграция (Habr)", site: "habr", keywords: "telegram бот ai интеграция", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+    { id: "habr_supabase_backend", label: "Supabase Backend (Habr)", site: "habr", keywords: "supabase backend next.js", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
+];
 
-   const kworkSearchLinks = [ // Это внешние ссылки для SupportArsenal, оставлены здесь
+
+   const kworkSearchLinks = [ 
     { name: "TWA (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+web+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
     { name: "Mini Apps (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+mini+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
     { name: "Нейро-Боты (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+%D0%B1%D0%BE%D1%82+%D0%BD%D0%B5%D0%B9%D1%80%D0%BE%D1%81%D0%B5%D1%82%D1%8C&keyword=telegram", icon: "::FaSquareArrowUpRight::" }, 
@@ -368,7 +361,6 @@ const LeadGenerationHQPage = () => {
 
   useEffect(() => {
     const fetchTeam = async () => {
-      // В реальном приложении здесь будет запрос к API/Supabase
       setTeamMembers([
         { user_id: 'ID_Танка_1', username: 'Танк_Альфа', role: 'tank' },
         { user_id: 'ID_Танка_2', username: 'Танк_Бета', role: 'tank' },
@@ -391,7 +383,7 @@ const LeadGenerationHQPage = () => {
     workflowRef: workflowSectionRef,
     assetsRef: assetsSectionRef,
     zionRef: zionSectionRef,
-    scraperRef: scraperSectionRef, // Добавляем скрейпер в рефы навигации
+    scraperRef: scraperSectionRef, 
   };
   const rightNavLabels = {
     navToTop: t.navToTop,
@@ -401,7 +393,7 @@ const LeadGenerationHQPage = () => {
     navToWorkflow: t.navToWorkflow,
     navToAssets: t.navToAssets,
     navToZion: t.navToZion,
-    navToScraper: t.navToScraper, // Добавляем label для скрейпера
+    navToScraper: t.navToScraper, 
   };
 
   const handleSuccessfulScrape = useCallback(() => {
@@ -509,7 +501,7 @@ const LeadGenerationHQPage = () => {
               onUploadCsvToSupabase={handleUploadCsvToSupabase}
               onScrollToSection={scrollToSection}
               kworkSearchLinks={kworkSearchLinks}
-              t={t} // t object for other texts
+              t={t} 
               pageTheme={pageTheme}
               offerSectionRef={offerSectionRef}
             />
@@ -550,8 +542,20 @@ const LeadGenerationHQPage = () => {
                     <div>
                         <VibeContentRenderer content={t.workflowStep4} />
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
-                           <li><VibeContentRenderer content={`::FaShieldHalved:: **Танки:** ${t.tanksRoleDesc.split('.')[0] + '.'}`} /></li>
-                           <li><VibeContentRenderer content={`::FaBrain:: **Кэрри (Павел):** ${t.carryRoleDesc.split('.')[0] + '.'}`} /></li>
+                           <li>
+                                {renderTextWithLinks(t.workflowStep4Tank, t_links_config).map((segment, index) => (
+                                    <React.Fragment key={`tank-seg-${index}`}>
+                                        {typeof segment === 'string' ? <VibeContentRenderer content={segment} /> : segment}
+                                    </React.Fragment>
+                                ))}
+                            </li>
+                           <li>
+                               {renderTextWithLinks(t.workflowStep4Carry, t_links_config).map((segment, index) => (
+                                    <React.Fragment key={`carry-seg-${index}`}>
+                                        {typeof segment === 'string' ? <VibeContentRenderer content={segment} /> : segment}
+                                    </React.Fragment>
+                                ))}
+                           </li>
                         </ul>
                     </div>
                     <p>{renderTextWithLinks(t.workflowStep5, t_links_config)}</p>

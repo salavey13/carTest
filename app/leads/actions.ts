@@ -1,4 +1,3 @@
-// /app/leads/actions.ts
 "use server";
 
 import { supabaseAdmin } from '@/hooks/supabase'; // Используем admin клиент для серверных операций
@@ -15,7 +14,6 @@ interface CsvLeadRow {
   kwork_url?: string; // Это будет lead_url в transformHeader
   project_description: string; // Обязательное поле
   budget_range?: string;
-  // Поля ниже присутствуют в CSV от AI, но не все есть в таблице `leads`
   deadline_info?: string; 
   client_kwork_history?: string; 
   current_kwork_offers_count?: string; 
@@ -26,7 +24,7 @@ interface CsvLeadRow {
   status?: string;
   source?: string;
   initial_relevance_score?: string; // AI output
-  // project_type_guess will not be in the final CSV, so no need for it here.
+  project_type_guess?: string; 
 }
 
 async function verifyUserPermissions(userId: string, allowedRoles: string[], allowedStatuses: string[] = ['admin']): Promise<boolean> {
@@ -80,16 +78,14 @@ export async function uploadLeadsFromCsv(
       skipEmptyLines: 'greedy',
       transformHeader: header => {
         const trimmedHeader = header.trim().toLowerCase();
-        if (trimmedHeader === 'kwork_url') return 'lead_url'; // Маппинг для upsert
-        if (trimmedHeader === 'initial_relevance_score') return 'similarity_score'; // Маппинг initial_relevance_score из CSV в similarity_score для БД
-        // project_type_guess будет отброшен, если не в заголовке
-        return trimmedHeader; // Используем lowercase для сопоставления с CsvLeadRow
+        if (trimmedHeader === 'kwork_url') return 'lead_url'; 
+        if (trimmedHeader === 'initial_relevance_score') return 'similarity_score';
+        return trimmedHeader; 
       },
       transform: (value, header) => {
         const trimmedValue = typeof value === 'string' ? value.trim() : value;
-        // header здесь будет уже 'similarity_score' благодаря transformHeader
         if (header === 'similarity_score') { 
-          const num = parseFloat(trimmedValue as string); // Changed to parseFloat for NUMERIC(5,2)
+          const num = parseFloat(trimmedValue as string); 
           return isNaN(num) ? null : num;
         }
         return trimmedValue;
@@ -108,9 +104,8 @@ export async function uploadLeadsFromCsv(
     const localErrors: string[] = [];
 
     for (const row of parseResult.data) {
-      // transformHeader уже привел все заголовки к lowerCase, поэтому обращаемся напрямую по lowerCase ключу
-      const getRowVal = (key: keyof CsvLeadRow | 'lead_url' | 'similarity_score') => (row as any)[key.toLowerCase()]; // Type for key updated
-      const leadUrlFromCsv = getRowVal('lead_url'); // 'kwork_url' теперь 'lead_url' после transformHeader
+      const getRowVal = (key: keyof CsvLeadRow | 'lead_url' | 'similarity_score') => (row as any)[key.toLowerCase()]; 
+      const leadUrlFromCsv = getRowVal('lead_url');
 
       if (!getRowVal('project_description')) {
         localErrors.push(`Пропущена строка: отсутствует 'project_description'. URL: ${leadUrlFromCsv || 'N/A'}`);
@@ -122,7 +117,7 @@ export async function uploadLeadsFromCsv(
       if (identifiedTweaksCsv && typeof identifiedTweaksCsv === 'string') {
         try { tweaksJson = JSON.parse(identifiedTweaksCsv); }
         catch (e) { localErrors.push(`Ошибка парсинга JSON для 'identified_tweaks' в лиде с URL ${leadUrlFromCsv}: ${(e as Error).message}`); }
-      } else if (typeof identifiedTweaksCsv === 'object') { // Если PapaParse уже распарсил как объект (маловероятно для строки CSV, но на всякий случай)
+      } else if (typeof identifiedTweaksCsv === 'object') { 
         tweaksJson = identifiedTweaksCsv;
       }
 
@@ -146,9 +141,8 @@ export async function uploadLeadsFromCsv(
         missing_features: featuresJson,
         status: getRowVal('status') || 'raw_data', 
         source: getRowVal('source') || 'csv_upload',
-        // Теперь используем similarity_score, так как так поле называется в БД
         similarity_score: typeof getRowVal('similarity_score') === 'number' ? getRowVal('similarity_score') : null, 
-        // project_type_guess больше не добавляется в БД
+        project_type_guess: getRowVal('project_type_guess') || null, 
       };
 
       if (leadEntry.lead_url === '') {
@@ -313,7 +307,7 @@ export async function fetchLeadsForDashboard(
       else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); 
       else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
       else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
-      else if (filter === 'my' && currentUserStatus === 'admin') { // Админ в "мои" видит все где он либо танк либо кэрри либо саппорт
+      else if (filter === 'my' && currentUserStatus === 'admin') { 
         query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
       }
     } else if (currentUserRole === 'tank') {
@@ -344,9 +338,11 @@ export async function fetchLeadsForDashboard(
 export async function scrapePageContent(
   targetUrl: string
 ): Promise<{ success: boolean; content?: string; error?: string }> {
-  if (!targetUrl) {
-    return { success: false, error: "URL не указан." };
+  if (!targetUrl || typeof targetUrl !== 'string' || !targetUrl.trim()) {
+    logger.warn(`[Scraper] Попытка скрейпинга с невалидным URL: ${targetUrl}`);
+    return { success: false, error: "URL не указан или имеет неверный формат." };
   }
+  
   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
   logger.info(`[Scraper] Запрос на скрейпинг URL: ${targetUrl} с User-Agent: ${userAgent}`);
 
@@ -377,14 +373,14 @@ export async function scrapePageContent(
     logger.debug(`[Scraper] Ненужные элементы удалены.`);
 
     const contentSelectors = [
-      'article', '.article-content', '.entry-content', '.post-body', '.post-content', // Блоги и статьи
-      'main[role="main"]', 'main', // Основной контент
-      '.project-description', '.task__description', '.job-description', '.vacancy-description', // Описания проектов/вакансий
-      '.product-description', '[itemprop="description"]', // Описания продуктов
-      '.text-content', '.content-text', '.article-text', // Общие текстовые блоки
-      '.job_show_description', '.b-description__text', // Специфичные для некоторых сайтов
-      '.page-content', '.content', '#content', '.main-content', '#main-content', // Общие контейнеры
-      'section', // В крайнем случае секции
+      'article', '.article-content', '.entry-content', '.post-body', '.post-content', 
+      'main[role="main"]', 'main', 
+      '.project-description', '.task__description', '.job-description', '.vacancy-description', 
+      '.product-description', '[itemprop="description"]', 
+      '.text-content', '.content-text', '.article-text', 
+      '.job_show_description', '.b-description__text', 
+      '.page-content', '.content', '#content', '.main-content', '#main-content', 
+      'section', 
     ];
     logger.debug(`[Scraper] Поиск основного контента по селекторам: ${contentSelectors.join(', ')}`);
 
@@ -398,14 +394,13 @@ export async function scrapePageContent(
             logger.debug(`[Scraper] Найдены кандидаты по селектору '${selector}': ${$candidates.length} шт.`);
             $candidates.each((_i, el) => {
                 const $currentCandidate = $(el);
-                // Клонируем, чтобы не изменять оригинал, удаляем скрипты и стили на всякий случай еще раз из кандидата
                 const $clone = $currentCandidate.clone();
                 $clone.find('script, style, nav, footer, header, aside, form, button, input, textarea, select, iframe, link, meta, svg, img, figure').remove();
                 const textSample = $clone.text().replace(/\s\s+/g, ' ').trim();
                 
                 if (textSample.length > maxTextLength) {
                     maxTextLength = textSample.length;
-                    $targetElement = $currentCandidate; // Берем оригинальный элемент, а не клон
+                    $targetElement = $currentCandidate; 
                     mainContentSelectorUsed = selector;
                     logger.info(`[Scraper] Новый лучший кандидат по селектору '${selector}', длина текста: ${maxTextLength}`);
                 }
@@ -413,7 +408,7 @@ export async function scrapePageContent(
         }
     }
 
-    if (!$targetElement || maxTextLength < 100) { // Если лучший кандидат все равно слишком мал или не найден
+    if (!$targetElement || maxTextLength < 100) { 
       $targetElement = $('body');
       mainContentSelectorUsed = 'body (fallback)';
       logger.warn(`[Scraper] Специфичный контент не найден или слишком мал (maxTextLength: ${maxTextLength}). Используется весь body.`);
@@ -485,55 +480,9 @@ export async function scrapePageContent(
     if (error.name === 'AbortError' || error.code === 'UND_ERR_CONNECT_TIMEOUT' || error.message.toLowerCase().includes('timeout')) {
         return { success: false, error: 'Тайм-аут запроса к целевому URL. Сервер не ответил вовремя.' };
     }
-    if (error.message.toLowerCase().includes('invalidcharactererror')) {
+    if (error.message.toLowerCase().includes('invalidcharactererror')) { // DOMException
         return { success: false, error: 'Ошибка парсинга HTML: невалидный символ. Возможно, проблема с кодировкой страницы.'};
     }
     return { success: false, error: `Ошибка скрейпинга: ${error.message}` };
-  }
-}
-
-export async function fetchLeadByIdentifierOrNickname(
-  identifier: string,
-  currentUserId?: string // Для потенциальной проверки прав доступа в будущем, если нужно
-): Promise<{ success: boolean; data?: LeadRow; error?: string }> {
-  if (!supabaseAdmin) return { success: false, error: "Клиент БД не инициализирован" };
-  if (!identifier) return { success: false, error: "Идентификатор лида не указан." };
-
-  logger.info(`[LeadsActions] Поиск лида по идентификатору/никнейму: ${identifier}`);
-  try {
-    // Сначала пытаемся найти по UUID, если идентификатор похож на UUID
-    let query = supabaseAdmin.from('leads').select('*');
-    
-    // Простая проверка на UUID-подобный формат (можно улучшить)
-    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(identifier);
-
-    if (isUUID) {
-      query = query.eq('id', identifier);
-    } else {
-      // Иначе ищем по client_name (предполагаем, что никнейм там) или в kwork_title
-      // Это может вернуть несколько, если никнеймы не уникальны, берем первый.
-      // Для большей точности, если startapp=client_nickname, то client_name должен быть уникальным или нужна другая логика.
-      query = query.or(`client_name.ilike.%${identifier}%,kwork_title.ilike.%${identifier}%`) 
-                   .order('created_at', { ascending: false }); // Берем самый свежий, если несколько совпадений
-    }
-
-    const { data, error } = await query.maybeSingle(); // Берем один или null
-
-    if (error) {
-      logger.error(`[LeadsActions] Ошибка поиска лида "${identifier}":`, error);
-      return { success: false, error: `Ошибка БД: ${error.message}` };
-    }
-
-    if (!data) {
-      logger.warn(`[LeadsActions] Лид с идентификатором/никнеймом "${identifier}" не найден.`);
-      return { success: false, error: "Лид не найден" };
-    }
-
-    logger.info(`[LeadsActions] Лид "${identifier}" найден: ID ${data.id}`);
-    return { success: true, data };
-
-  } catch (e) {
-    logger.error('[LeadsActions] Критическая ошибка при поиске лида:', e);
-    return { success: false, error: e instanceof Error ? e.message : 'Неожиданная серверная ошибка.' };
   }
 }
