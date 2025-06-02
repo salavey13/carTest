@@ -54,6 +54,7 @@ interface PredefinedSearchButton {
   site: "kwork" | "habr" | "upwork" | "freelancer" | "contra" | string; 
   keywords: string;
   siteUrlFormat: string;
+  isLikelyWorking?: boolean; // Флаг для выделения
 }
 
 const LeadGenerationHQPage = () => {
@@ -217,7 +218,8 @@ const LeadGenerationHQPage = () => {
   };
 
   const predefinedSearchButtons: PredefinedSearchButton[] = [
-    { id: "kwork_twa_app", label: "TWA (Kwork, 1 ключ)", site: "kwork", keywords: "app", siteUrlFormat: "https://kwork.ru/projects?a=1&keyword={keywords}" },
+    { id: "freelancer_twa_dev_highlight", label: "TWA Dev (Freelancer)", site: "freelancer", keywords: "telegram web app development", siteUrlFormat: "https://www.freelancer.com/jobs/?keyword={keywords}", isLikelyWorking: true },
+    { id: "kwork_twa_app_highlight", label: "TWA App (Kwork)", site: "kwork", keywords: "app", siteUrlFormat: "https://kwork.ru/projects?a=1&keyword={keywords}", isLikelyWorking: true },
     { id: "kwork_twa_next_supabase", label: "TWA Next Supabase (Kwork)", site: "kwork", keywords: "telegram web app next.js supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
     { id: "kwork_mini_app_react", label: "Mini App React (Kwork)", site: "kwork", keywords: "telegram mini app react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
     { id: "kwork_ai_bot_python", label: "AI Бот Python (Kwork)", site: "kwork", keywords: "телеграм бот нейросеть python", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
@@ -232,7 +234,6 @@ const LeadGenerationHQPage = () => {
     { id: "habr_ai_bot", label: "AI Бот (Habr)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
     { id: "habr_supabase_next", label: "Supabase Next.js (Habr)", site: "habr", keywords: "supabase next.js", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
     { id: "upwork_telegram_mini_app", label: "TWA (Upwork)", site: "upwork", keywords: "telegram mini app", siteUrlFormat: "https://www.upwork.com/nx/jobs/search/?q={keywords}" },
-    { id: "freelancer_twa_dev", label: "TWA (Freelancer.com)", site: "freelancer", keywords: "telegram web app development", siteUrlFormat: "https://www.freelancer.com/jobs/telegram-web-app-development/?keyword={keywords}" },
     { id: "contra_twa_dev", label: "TWA (Contra)", site: "contra", keywords: "telegram web app developer", siteUrlFormat: "https://contra.com/search/creators?query={keywords}" },
 ];
 
@@ -367,7 +368,7 @@ const LeadGenerationHQPage = () => {
       setTeamMembers([
         { user_id: 'ID_Танка_1', username: 'Танк_Альфа', role: 'tank' },
         { user_id: 'ID_Танка_2', username: 'Танк_Бета', role: 'tank' },
-        { user_id: 'ID_Кэрри_1', username: 'SALAVEY13', role: 'carry' }, // Обновлено имя
+        { user_id: 'ID_Кэрри_1', username: 'SALAVEY13', role: 'carry' }, 
         { user_id: 'ID_Саппорта_1', username: 'Саппорт_Гамма', role: 'support' },
       ]);
     };
@@ -410,7 +411,7 @@ const LeadGenerationHQPage = () => {
 
   const handleScrapedData = (data: string) => {
     const newDataBlock = `\n\n--- Собрано Скрейпером (${new Date().toLocaleTimeString()}) ---\n${data}`.trim();
-    if (!rawKworksInput.includes(data)) { // Проверка на дубликаты
+    if (!rawKworksInput.includes(data)) { 
         setRawKworksInput(prev => `${prev}${newDataBlock}`);
         toast.info("Собранные данные добавлены в 'Сбор трофеев'.");
     } else {
@@ -549,7 +550,7 @@ const LeadGenerationHQPage = () => {
                     <p>{renderTextWithLinks(t.workflowStep2, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep3, t_links_config)}</p> 
                     <div>
-                       <VibeContentRenderer content={t.workflowStep4} />
+                       <VibeContentRenderer content="4. **Развертывание Сил:**" /> {/* Removed direct t.workflowStep4 */}
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
                             <li>
                                 {renderTextWithLinks(t.workflowStep4Tank, t_links_config).map((segment, index) => (
