@@ -1,4 +1,3 @@
-// /app/leads/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -8,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { useAppContext } from '@/contexts/AppContext'; 
-import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard } from './actions'; 
+import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard, updateUserRole } from './actions'; 
 import { toast } from 'sonner';
 import LeadsPageRightNav from './LeadsPageRightNav';
 import SupportArsenal from './SupportArsenal';
@@ -52,13 +51,15 @@ interface TeamUser {
 interface PredefinedSearchButton {
   id: string;
   label: string;
-  site: "kwork" | "habr" | string;
+  site: "kwork" | "upwork" | "freelancer" | string; 
   keywords: string;
   siteUrlFormat: string;
+  isLikelyWorking?: boolean; 
 }
 
 const LeadGenerationHQPage = () => {
-  const { user: tgUserContext, dbUser } = useAppContext(); 
+  const appContext = useAppContext();
+  const { user: tgUserContext, dbUser, refreshDbUser } = appContext;
   const currentUserId = dbUser?.user_id || tgUserContext?.id?.toString(); 
   const { addToast } = useAppToast();
 
@@ -68,7 +69,7 @@ const LeadGenerationHQPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentFilter, setCurrentFilter] = useState('all'); 
   const [teamMembers, setTeamMembers] = useState<TeamUser[]>([]); 
-  const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
+  const [sectionsCollapsed, setSectionsCollapsed] = useState(true);
 
   const pageTopRef = useRef<HTMLDivElement>(null);
   const headerSectionRef = useRef<HTMLDivElement>(null);
@@ -82,7 +83,6 @@ const LeadGenerationHQPage = () => {
   const scraperSectionRef = useRef<HTMLDivElement>(null);
   const ctaSectionRef = useRef<HTMLDivElement>(null);
 
-  // Helper for rendering text with Next.js Link components
   const renderTextWithLinks = useCallback((text: string, links: { [key: string]: { href: string; label: string; className?: string; target?: string; rel?: string } }) => {
     let result: (string | JSX.Element)[] = [text];
     let keyCounter = 0;
@@ -107,7 +107,7 @@ const LeadGenerationHQPage = () => {
                     }
                 });
             } else {
-                newResult.push(segment); // Keep already processed JSX elements
+                newResult.push(segment);
             }
         });
         result = newResult;
@@ -125,7 +125,7 @@ const LeadGenerationHQPage = () => {
     "{linkToPPlan}": { href: "/p-plan", label: "VIBE План", className: "text-brand-yellow hover:underline" },
     "{linkToTutorials}": { href: "/start-training", label: "Арсенал Приемов и Тактик", className: "text-brand-cyan hover:underline" },
     "{linkToCyberDevOS}": { href: "/selfdev/gamified", label: "CyberDev OS", className: "text-brand-orange hover:underline" },
-    "{linkToAbout}": { href: "/about", label: "личное дело", className: "text-brand-purple hover:underline" },
+    "{linkToAboutCarry}": { href: "/about#carry-section", label: "личное дело Кэрри", className: "text-brand-purple hover:underline" }, 
     "{linkToLeads}": { href: "/leads", label: "КОЦ 'Сетевой Дозор'", className: "text-brand-orange hover:underline" },
     "{linkToZion}": { href: "https://t.me/salavey_channel", label: "Цитадель 'Зион' (@salavey_channel)", className: "text-brand-cyan hover:underline", target: "_blank", rel: "noopener noreferrer" },
     "{linkToCyberVibeLoop}": { href: "/repo-xml#cybervibe-section", label: "Петля CyberVibe", className: "text-brand-cyan hover:underline" },
@@ -136,12 +136,12 @@ const LeadGenerationHQPage = () => {
     pageSubtitle: `Бойцы КиберОтряда! Это ваш командный пункт для захвата лидов и доминации в Supervibe-стиле. Роли распределены, цели определены, VIBE активирован. Трансмутируем инфу в профит!`,
     rolesTitle: "::FaShieldCat:: КиберОтряд: Роли и Протоколы Действий",
     rolesSubtitle: `Экипаж машины боевой, заряженный на VIBE-победу и тотальное превосходство. Узнай больше о нашей философии в {linkToSelfDev} и {linkToPurposeProfit}.`,
-    carryRoleTitle: "::FaBrain:: Кэрри (Ты, Павел)",
-    carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создаешь и внедряешь прорывные фичи в {linkToRepoXml}. Решаешь нетривиальные задачи разработки, определяя вектор эволюции платформы. Твой код – закон. Смотри {linkToAbout} Кэрри.`,
-    tanksRoleTitle: "::FaShieldHalved:: Танки (Штурмовики Кастомизации)",
+    carryRoleTitle: "::FaBrain:: Кэрри (SALAVEY13)",
+    carryRoleDesc: `Верховный Архитектор, Движитель Инноваций. Создает и внедряет прорывные фичи в {linkToRepoXml}. Решает нетривиальные задачи разработки, определяя вектор эволюции платформы. Его код – закон. Смотри {linkToAboutCarry}.`,
+    tanksRoleTitle: `::FaShieldHalved:: Танки (${dbUser?.username || 'Воин Кастомизации'}?)`,
     tanksRoleDesc: "Броневой кулак кастомизации и адаптации. Принимают на себя 'урон' от сложных клиентских запросов, AI-артефактов. Трансмутируют базовые модули в уникальные клиентские решения, используя реактивную мощь Supervibe Studio. Их девиз: 'Прорвемся и Улучшим!'",
     tanksRoleLeverages: `Основное вооружение: {linkToTutorials} (включая Замену Изображений, Охоту на Иконки, Видео-Интеграцию, Inception Swap-Маневры).`,
-    supportRoleTitle: "::FaHeadset:: Саппорт (Дозорные Сети)",
+    supportRoleTitle: `::FaHeadset:: Саппорт (${dbUser?.username || 'Дозорный Сети'}?)`,
     supportRoleDesc: `Информационно-логистический хаб и голос отряда. Идентифицируют, фильтруют и обрабатывают входящие сигналы (лиды). Готовят разведданные, CSV для AI-обработки и целеуказания для Танков и Кэрри. Ведут первичные переговоры, обеспечивая бесперебойную связь и снабжение отряда задачами.`,
     supportArsenalTitle: "::FaToolbox:: Арсенал Саппорта: Протоколы Автоматизации 'Судный День'",
     supportArsenalSubtitle: `Высокотехнологичное снаряжение для информационной войны и эффективной вербовки. Геймеры, это для вас – превращаем рутину в квест в нашем {linkToCyberDevOS}!`,
@@ -169,7 +169,7 @@ const LeadGenerationHQPage = () => {
     workflowStep3: `3. ::FaComments:: **Клиент:** При положительном ответе – сеанс связи (созвон) или доразведка. {linkToGamePlan} – стратегическая карта для этих переговоров. Детали стратегии также в {linkToPPlan}.`,
     workflowStep4: "4. **Развертывание Сил:**",
     workflowStep4Tank: `::FaShieldHalved:: **Танки:** {linkToRepoXml} Берут на себя кастомизацию по целеуказаниям Саппорта. Применяют всю огневую мощь Студии для штурма клиентских задач.`,
-    workflowStep4Carry: `::FaBrain:: **Кэрри (Павел):** {linkToRepoXml} Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра.`,
+    workflowStep4Carry: `::FaBrain:: **Кэрри (SALAVEY13):** {linkToRepoXml} Работает по ТЗ от Саппорта (GitHub Issues) над созданием новых вооружений и улучшением ядра.`,
     workflowStep5: "5. ::FaRocket:: **VIBE-Доставка:** Клиент получает свой AI-форсированный Telegram Web App, собранный с кибернетической скоростью и точностью.",
     workflowStep6: `6. ::FaBolt:: **Анализ Результатов и Адаптация:** {linkToCyberVibeLoop} обеспечивает непрерывную оптимизацию и адаптацию на основе боевого опыта и эволюции ваших технологий.`,
     assetsTitle: "::FaCubes:: Использование Трофейных Активов CyberVibe",
@@ -204,44 +204,37 @@ const LeadGenerationHQPage = () => {
     navToAssets: "::FaCubes:: К Активам",
     navToZion: "::FaComments:: К Зиону",
     navToDashboard: "::FaTableList:: К Дашборду",
-    navToScraper: "::FaSpider:: К Скрейперу", // Добавлено
+    navToScraper: "::FaSpider:: К Скрейперу",
     collapseAllSections: "::FaAnglesUp:: Свернуть Инфо-Блоки", 
     expandAllSections: "::FaAnglesDown:: Развернуть Инфо-Блоки", 
   };
 
   const pageTheme = {
-    primaryColor: "text-brand-orange", 
-    secondaryColor: "text-brand-yellow", 
-    accentColor: "text-brand-cyan",     
-    borderColor: "border-brand-orange/50", 
-    shadowColor: "shadow-[0_0_25px_rgba(var(--orange-rgb),0.5)]", // Используем RGB для тени
-    buttonGradient: "bg-gradient-to-r from-brand-orange to-brand-yellow", 
+    primaryColor: "text-brand-cyan", 
+    secondaryColor: "text-brand-purple", 
+    accentColor: "text-brand-lime",     
+    borderColor: "border-brand-cyan/60", 
+    shadowColor: "shadow-[0_0_15px_hsla(var(--cyan-rgb),0.2),_0_0_8px_hsla(var(--purple-rgb),0.15),_0_0_5px_hsla(var(--lime-rgb),0.1)]", 
+    buttonGradient: "bg-gradient-to-r from-brand-cyan to-brand-purple", 
   };
 
-  // Перемещено сюда из GeneralPurposeScraper
   const predefinedSearchButtons: PredefinedSearchButton[] = [
-    { id: "kwork_twa", label: "TWA (Kwork)", site: "kwork", keywords: "telegram web app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
-    { id: "kwork_mini_app", label: "Mini App (Kwork)", site: "kwork", keywords: "mini app", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
-    { id: "kwork_ai_bots", label: "AI Боты (Kwork)", site: "kwork", keywords: "telegram бот нейросеть", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_nextjs", label: "Next.js (Kwork)", site: "kwork", keywords: "next.js", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" }, 
-    { id: "kwork_supabase", label: "Supabase (Kwork)", site: "kwork", keywords: "supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_webapp", label: "WebApp (Kwork)", site: "kwork", keywords: "webapp", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_react", label: "React (Kwork)", site: "kwork", keywords: "react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_twa_react", label: "TWA React (Kwork)", site: "kwork", keywords: "twa react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_tg_bot", label: "TG Бот (Kwork)", site: "kwork", keywords: "telegram бот", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_parser", label: "Парсер (Kwork)", site: "kwork", keywords: "парсер", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "habr_twa", label: "TWA (Habr Freelance)", site: "habr", keywords: "telegram web app", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" }, // Habr использует 'q'
-    { id: "habr_ai_bots", label: "AI Боты (Habr Freelance)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-    // НОВЫЕ КНОПКИ ДЛЯ УЛУЧШЕНИЙ
-    { id: "kwork_car_rental_twa", label: "Аренда Авто (TWA Kwork)", site: "kwork", keywords: "telegram web app аренда авто", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_fitness_twa", label: "Фитнес (TWA Kwork)", site: "kwork", keywords: "telegram web app фитнес тренировки", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_crm_twa", label: "CRM (TWA Kwork)", site: "kwork", keywords: "telegram web app crm", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "kwork_admin_panel", label: "Админка (Kwork)", site: "kwork", keywords: "админ панель next.js react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "habr_nextjs_react", label: "Next.js React (Habr)", site: "habr", keywords: "next.js react", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-    { id: "habr_supabase_db", label: "Supabase (Habr)", site: "habr", keywords: "supabase база данных", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-  ];
+    { id: "freelancer_twa_dev_highlight", label: "TWA (Freelancer)", site: "freelancer", keywords: "telegram web app", siteUrlFormat: "https://www.freelancer.com/jobs/?keyword={keywords}", isLikelyWorking: true },
+    { id: "kwork_twa_app_highlight", label: "TWA App (Kwork)", site: "kwork", keywords: "app", siteUrlFormat: "https://kwork.ru/projects?a=1&keyword={keywords}", isLikelyWorking: true },
+    { id: "kwork_twa_next_supabase", label: "TWA Next Supabase (Kwork)", site: "kwork", keywords: "telegram web app next.js supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_mini_app_react", label: "Mini App React (Kwork)", site: "kwork", keywords: "telegram mini app react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_ai_bot_python", label: "AI Бот Python (Kwork)", site: "kwork", keywords: "телеграм бот нейросеть python", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_admin_panel_next", label: "Админка Next.js (Kwork)", site: "kwork", keywords: "админ панель next.js", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_car_rental_twa", label: "Аренда Авто TWA (Kwork)", site: "kwork", keywords: "twa аренда авто", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_fitness_club_twa", label: "Фитнес TWA (Kwork)", site: "kwork", keywords: "twa фитнес", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_crm_twa", label: "CRM TWA (Kwork)", site: "kwork", keywords: "twa crm", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_marketplace_twa", label: "Маркетплейс TWA (Kwork)", site: "kwork", keywords: "twa маркетплейс", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_booking_twa", label: "Бронирование TWA (Kwork)", site: "kwork", keywords: "twa бронирование", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "kwork_parser_supabase", label: "Парсер Supabase (Kwork)", site: "kwork", keywords: "парсер supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
+    { id: "upwork_telegram_mini_app", label: "TWA (Upwork)", site: "upwork", keywords: "telegram mini app", siteUrlFormat: "https://www.upwork.com/nx/jobs/search/?q={keywords}" },
+];
 
-   const kworkSearchLinks = [ // Это внешние ссылки для SupportArsenal, оставлены здесь
+   const kworkSearchLinks = [ 
     { name: "TWA (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+web+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
     { name: "Mini Apps (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+mini+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
     { name: "Нейро-Боты (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+%D0%B1%D0%BE%D1%82+%D0%BD%D0%B5%D0%B9%D1%80%D0%BE%D1%81%D0%B5%D1%82%D1%8C&keyword=telegram", icon: "::FaSquareArrowUpRight::" }, 
@@ -257,9 +250,9 @@ const LeadGenerationHQPage = () => {
   const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
     if (ref.current) {
-      ref.current.classList.add('ring-2', 'ring-brand-orange', 'transition-all', 'duration-1000', 'ease-out');
+      ref.current.classList.add('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out'); 
       setTimeout(() => {
-        ref.current?.classList.remove('ring-2', 'ring-brand-orange', 'transition-all', 'duration-1000', 'ease-out');
+        ref.current?.classList.remove('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out');
       }, 1500);
     }
   }, []);
@@ -360,19 +353,25 @@ const LeadGenerationHQPage = () => {
     if (result.success) {
         toast.success(result.message || "Лид назначен/снят с назначения. Вперед, к победе!");
         fetchLeadsFromSupabaseCallback(currentFilter); 
+        if (assigneeId && dbUser?.user_id) { 
+            checkAndUnlockFeatureAchievement(dbUser.user_id, `lead_assigned_to_${assigneeType}_ever`)
+            .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_role_commander')) 
+            .then(({ newAchievements }) => {
+                newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+            });
+        }
     } else {
         toast.error(result.message || "Ошибка операции: не удалось назначить/снять лид.");
     }
     setIsLoading(false);
-  }, [currentUserId, fetchLeadsFromSupabaseCallback, currentFilter]);
+  }, [currentUserId, dbUser, fetchLeadsFromSupabaseCallback, currentFilter, addToast]);
 
   useEffect(() => {
     const fetchTeam = async () => {
-      // В реальном приложении здесь будет запрос к API/Supabase
       setTeamMembers([
         { user_id: 'ID_Танка_1', username: 'Танк_Альфа', role: 'tank' },
         { user_id: 'ID_Танка_2', username: 'Танк_Бета', role: 'tank' },
-        { user_id: 'ID_Кэрри_1', username: 'Кэрри_Омега (Павел)', role: 'carry' },
+        { user_id: 'ID_Кэрри_1', username: 'SALAVEY13', role: 'carry' }, 
         { user_id: 'ID_Саппорта_1', username: 'Саппорт_Гамма', role: 'support' },
       ]);
     };
@@ -386,22 +385,22 @@ const LeadGenerationHQPage = () => {
   const rightNavSectionRefs = {
     topRef: pageTopRef,
     rolesRef: rolesSectionRef,
+    scraperRef: scraperSectionRef, 
     arsenalRef: arsenalSectionRef,
     dashboardRef: dashboardSectionRef,
     workflowRef: workflowSectionRef,
     assetsRef: assetsSectionRef,
     zionRef: zionSectionRef,
-    scraperRef: scraperSectionRef, // Добавляем скрейпер в рефы навигации
   };
   const rightNavLabels = {
     navToTop: t.navToTop,
     navToRoles: t.navToRoles,
+    navToScraper: t.navToScraper,
     navToArsenal: t.navToArsenal,
     navToDashboard: t.navToDashboard,
     navToWorkflow: t.navToWorkflow,
     navToAssets: t.navToAssets,
     navToZion: t.navToZion,
-    navToScraper: t.navToScraper, // Добавляем label для скрейпера
   };
 
   const handleSuccessfulScrape = useCallback(() => {
@@ -414,18 +413,41 @@ const LeadGenerationHQPage = () => {
   }, [dbUser, addToast]);
 
   const handleScrapedData = (data: string) => {
-    setRawKworksInput(prev => `${prev}\n\n--- Собрано Скрейпером (${new Date().toLocaleTimeString()}) ---\n${data}`.trim());
+    const newDataBlock = `\n\n--- Собрано Скрейпером (${new Date().toLocaleTimeString()}) ---\n${data}`.trim();
+    if (!rawKworksInput.includes(data)) { 
+        setRawKworksInput(prev => `${prev}${newDataBlock}`);
+        toast.info("Собранные данные добавлены в 'Сбор трофеев'.");
+    } else {
+        toast.info("Эти данные уже были собраны ранее.");
+    }
     scrollToSection(arsenalSectionRef); 
   };
 
+  const handleSelfAssignRole = async (newRole: 'tank' | 'support') => {
+    if (!currentUserId || !dbUser) {
+        toast.error("Ошибка: Пользователь не аутентифицирован.");
+        return;
+    }
+    setIsLoading(true);
+    const result = await updateUserRole(currentUserId, newRole, currentUserId); 
+    setIsLoading(false);
+
+    if (result.success) {
+        toast.success(`Вы успешно стали ${newRole === 'tank' ? 'Танком' : 'Саппортом'}! Ваши новые задачи ждут на Дашборде.`);
+        if (refreshDbUser) await refreshDbUser(); 
+    } else {
+        toast.error(result.error || `Не удалось сменить роль на ${newRole}.`);
+    }
+};
+
   return (
-    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-20 sm:pt-24 pb-20 overflow-x-hidden">
+    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground pt-20 sm:pt-24 pb-20 overflow-x-hidden"> 
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
-          backgroundImage: `linear-gradient(to right, hsla(var(--orange-rgb), 0.1) 0.5px, transparent 0.5px),
-                            linear-gradient(to bottom, hsla(var(--orange-rgb), 0.1) 0.5px, transparent 0.5px)`, 
-          backgroundSize: '30px 30px sm:40px sm:40px', 
+          backgroundImage: `linear-gradient(to right, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px),
+                            linear-gradient(to bottom, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px)`, 
+          backgroundSize: '40px 40px', 
         }}
       ></div>
 
@@ -433,7 +455,7 @@ const LeadGenerationHQPage = () => {
         onClick={toggleAllSections}
         variant="outline"
         size="icon"
-        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-orange/20 hover:text-brand-orange backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-brand-orange/30"
+        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-cyan/20 hover:text-brand-cyan backdrop-blur-sm text-gray-300 border-border w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-cyan-glow/30"
         title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
       >
         <VibeContentRenderer content={sectionsCollapsed ? "::FaAnglesDown className='w-5 h-5'::" : "::FaAnglesUp className='w-5 h-5'::"} />
@@ -454,7 +476,7 @@ const LeadGenerationHQPage = () => {
             <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
                 <VibeContentRenderer content={t.pageTitle} />
             </h1>
-            <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-300 font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
+            <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
                 {renderTextWithLinks(t.pageSubtitle, t_links_config)}
             </CardDescription>
             </header>
@@ -464,26 +486,32 @@ const LeadGenerationHQPage = () => {
         <div className="space-y-10 md:space-y-16">
           {!sectionsCollapsed && (
             <div ref={rolesSectionRef} id="rolesSectionAnchor">
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.rolesTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.rolesSubtitle, t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.rolesSubtitle, t_links_config)}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
-                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                    <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{renderTextWithLinks(t.carryRoleDesc, t_links_config)}</p>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                      <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
+                      <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.carryRoleDesc, t_links_config)}</p>
                     </div>
-                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                    <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{renderTextWithLinks(t.tanksRoleDesc, t_links_config)}</p>
-                    <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}>{renderTextWithLinks(t.tanksRoleLeverages, t_links_config)}</p>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                      <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
+                      <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.tanksRoleDesc, t_links_config)}</p>
+                      <p className={cn("text-xs text-muted-foreground mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}>{renderTextWithLinks(t.tanksRoleLeverages, t_links_config)}</p>
+                      {dbUser && dbUser.role !== 'tank' && (
+                        <Button onClick={() => handleSelfAssignRole('tank')} size="sm" className={cn("mt-3 w-full", pageTheme.buttonGradient, "text-black hover:opacity-90")}>Стать Танком!</Button>
+                      )}
                     </div>
-                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                    <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{renderTextWithLinks(t.supportRoleDesc, t_links_config)}</p>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                      <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
+                      <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.supportRoleDesc, t_links_config)}</p>
+                       {dbUser && dbUser.role !== 'support' && (
+                        <Button onClick={() => handleSelfAssignRole('support')} size="sm" className={cn("mt-3 w-full", pageTheme.buttonGradient, "text-black hover:opacity-90")}>Стать Саппортом!</Button>
+                      )}
                     </div>
                 </CardContent>
                 </Card>
@@ -509,7 +537,7 @@ const LeadGenerationHQPage = () => {
               onUploadCsvToSupabase={handleUploadCsvToSupabase}
               onScrollToSection={scrollToSection}
               kworkSearchLinks={kworkSearchLinks}
-              t={t} // t object for other texts
+              t={t} 
               pageTheme={pageTheme}
               offerSectionRef={offerSectionRef}
             />
@@ -526,6 +554,13 @@ const LeadGenerationHQPage = () => {
               onFilterChange={(filter) => {
                 setCurrentFilter(filter);
                 fetchLeadsFromSupabaseCallback(filter);
+                if (dbUser?.user_id) { 
+                    checkAndUnlockFeatureAchievement(dbUser.user_id, `leads_filter_${filter}_used`)
+                        .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_filter_master'))
+                        .then(({ newAchievements }) => {
+                            newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                        });
+                }
               }}
               onUpdateStatus={handleUpdateLeadStatus}
               onAssignLead={handleAssignLeadCallback}
@@ -536,22 +571,34 @@ const LeadGenerationHQPage = () => {
 
           {!sectionsCollapsed && (
             <div ref={workflowSectionRef}>
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.workflowTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.workflowSubtitle,t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.workflowSubtitle,t_links_config)}</CardDescription>
                 </CardHeader>
-                <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-3 sm:space-y-4">
+                <CardContent className="font-mono text-xs sm:text-sm text-foreground space-y-3 sm:space-y-4">
                     <p>{renderTextWithLinks(t.workflowStep1, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep2, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep3, t_links_config)}</p> 
                     <div>
-                        <VibeContentRenderer content={t.workflowStep4} />
+                       <VibeContentRenderer content={t.workflowStep4} /> 
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
-                           <li><VibeContentRenderer content={`::FaShieldHalved:: **Танки:** ${t.tanksRoleDesc.split('.')[0] + '.'}`} /></li>
-                           <li><VibeContentRenderer content={`::FaBrain:: **Кэрри (Павел):** ${t.carryRoleDesc.split('.')[0] + '.'}`} /></li>
+                            <li>
+                                {renderTextWithLinks(t.workflowStep4Tank, t_links_config).map((segment, index) => (
+                                    <React.Fragment key={`tank-seg-${index}`}>
+                                        {typeof segment === 'string' ? <VibeContentRenderer content={segment} /> : segment}
+                                    </React.Fragment>
+                                ))}
+                            </li>
+                           <li>
+                               {renderTextWithLinks(t.workflowStep4Carry, t_links_config).map((segment, index) => (
+                                    <React.Fragment key={`carry-seg-${index}`}>
+                                        {typeof segment === 'string' ? <VibeContentRenderer content={segment} /> : segment}
+                                    </React.Fragment>
+                                ))}
+                           </li>
                         </ul>
                     </div>
                     <p>{renderTextWithLinks(t.workflowStep5, t_links_config)}</p>
@@ -563,12 +610,12 @@ const LeadGenerationHQPage = () => {
 
           {!sectionsCollapsed && (
             <div ref={assetsSectionRef}>
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.assetsTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.assetsSubtitle, t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.assetsSubtitle, t_links_config)}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 font-mono text-xs sm:text-sm">
                     {[
@@ -579,12 +626,12 @@ const LeadGenerationHQPage = () => {
                     { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', icon: '::FaGraduationCap::' },
                     { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', icon: '::FaGamepad::' },
                     ].map(asset => (
-                    <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
+                    <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
                         <h5 className={cn("font-orbitron font-bold mb-1 sm:mb-1.5 flex items-center gap-1.5 sm:gap-2", pageTheme.accentColor)}>
                         <VibeContentRenderer content={asset.icon} />
                         <VibeContentRenderer content={t[asset.titleKey as keyof typeof t]} />
                         </h5>
-                        <div className="text-gray-300 text-[0.7rem] sm:text-xs leading-snug">{renderTextWithLinks(t[asset.descKey as keyof typeof t], t_links_config)}</div>
+                        <div className="text-foreground text-[0.7rem] sm:text-xs leading-snug">{renderTextWithLinks(t[asset.descKey as keyof typeof t], t_links_config)}</div>
                     </div>
                     ))}
                 </CardContent>
@@ -594,14 +641,14 @@ const LeadGenerationHQPage = () => {
 
           {!sectionsCollapsed && (
             <div ref={zionSectionRef}>
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.zionTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.zionSubtitle, t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.zionSubtitle, t_links_config)}</CardDescription>
                 </CardHeader>
-                <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-2 sm:space-y-3">
+                <CardContent className="font-mono text-xs sm:text-sm text-foreground space-y-2 sm:space-y-3">
                 <p>{renderTextWithLinks(t.zionP1, t_links_config)}</p>
                 <ul className="list-disc list-inside pl-3 sm:pl-4 space-y-1.5 sm:space-y-2">
                     <li>{renderTextWithLinks(t.zionList1, t_links_config)}</li>
@@ -620,13 +667,13 @@ const LeadGenerationHQPage = () => {
                 <h2 className={cn("text-3xl sm:text-4xl md:text-5xl font-orbitron font-bold mb-4 sm:mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
                 <VibeContentRenderer content={t.ctaTitle} />
                 </h2>
-                <p className="text-lg sm:text-xl text-gray-300 font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
+                <p className="text-lg sm:text-xl text-muted-foreground font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
                 {renderTextWithLinks(t.ctaSubtitle, t_links_config)}
                 </p>
                 <Button 
                     size="lg" 
                     onClick={() => scrollToSection(arsenalSectionRef)} 
-                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(var(--orange-rgb),0.8)]`)}
+                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(var(--cyan-rgb),0.5),_0_0_15px_rgba(var(--purple-rgb),0.4)]`)} 
                 >
                 <VibeContentRenderer content={t.ctaButtonText} />
                 </Button>
