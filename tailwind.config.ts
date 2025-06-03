@@ -57,12 +57,12 @@ const config: Config = {
         "brand-yellow": "hsl(var(--brand-yellow))",
         "brand-green": "hsl(var(--brand-green))",
         "brand-orange": "hsl(var(--brand-orange))",
-        "brand-lime": "hsl(var(--brand-lime))", // Renamed from neon-lime for consistency
-        "neon-lime": "hsl(var(--brand-lime))", // Alias for backward compatibility if used elsewhere
+        "brand-lime": "hsl(var(--brand-lime))", 
+        "neon-lime": "hsl(var(--brand-lime))", 
 
         // Text specific colors referencing CSS variables
-        "light-text": "hsl(var(--light-text))", // Or directly hsl(var(--foreground))
-        "accent-text": "hsl(var(--accent-text))", // Or directly hsl(var(--brand-yellow))
+        "light-text": "hsl(var(--light-text))", 
+        "accent-text": "hsl(var(--accent-text))", 
         
         // Chart colors referencing CSS variables
         chart: {
@@ -100,6 +100,7 @@ const config: Config = {
         "blue-glow": "0 0 15px hsla(var(--blue-rgb), 0.4), 0 0 30px hsla(var(--blue-rgb), 0.2)",
         "cyan-glow": "0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2)",
         "orange-glow": "0 0 15px hsla(var(--orange-rgb), 0.4), 0 0 30px hsla(var(--orange-rgb), 0.2)",
+        "lime-glow": "0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2)", // Added lime glow
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
