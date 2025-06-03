@@ -8,9 +8,9 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppContext } from '@/contexts/AppContext'; // For dbUser
-import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase'; // For achievements
-import { useAppToast } from "@/hooks/useAppToast"; // For custom toasts
+import { useAppContext } from '@/contexts/AppContext'; 
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase'; 
+import { useAppToast } from "@/hooks/useAppToast"; 
 
 interface Lead {
   id?: string;
@@ -57,9 +57,9 @@ interface LeadsDashboardProps {
     accentColor: string;
   };
   t: Record<string, any>;
-  onFilterChange: (filter: string) => void; // This will be wrapped to include achievement logic
+  onFilterChange: (filter: string) => void; 
   onUpdateStatus: (leadId: string, newStatus: string) => void;
-  onAssignLead: (leadId: string, assigneeType: 'tank' | 'carry' | 'support', assigneeId: string | null) => void; // This will be wrapped
+  onAssignLead: (leadId: string, assigneeType: 'tank' | 'carry' | 'support', assigneeId: string | null) => void; 
   onScrollToSection: (ref: React.RefObject<HTMLDivElement>) => void;
   arsenalSectionRef: React.RefObject<HTMLDivElement>;
 }
@@ -70,11 +70,11 @@ const getProjectTypeColor = (type: string | null | undefined, theme: LeadsDashbo
   if (lowerType.includes('training') || lowerType.includes('fitness')) return 'text-brand-green';
   if (lowerType.includes('carrental') || lowerType.includes('rent')) return 'text-brand-blue';
   if (lowerType.includes('ecommerce')) return 'text-brand-pink';
-  if (lowerType.includes('twa')) return theme.accentColor; // Use pageTheme accent for generic TWA
+  if (lowerType.includes('twa')) return theme.accentColor; 
   if (lowerType.includes('bot')) return 'text-brand-purple';
   if (lowerType.includes('nextjs_app')) return 'text-brand-yellow';
   if (lowerType.includes('wheeloffortune')) return 'text-brand-lime';
-  if (lowerType.includes('vprtests')) return 'text-brand-cyan'; // Keep cyan for VPR tests
+  if (lowerType.includes('vprtests')) return 'text-brand-cyan'; 
   return 'text-gray-400';
 };
 
@@ -127,7 +127,7 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
 
   const handleAssignLeadWithAchievement = (leadId: string, assigneeType: 'tank' | 'carry' | 'support', assigneeId: string | null) => {
     originalOnAssignLead(leadId, assigneeType, assigneeId);
-    if (assigneeId && dbUser?.user_id) { // Log achievement only if lead is assigned (not unassigned)
+    if (assigneeId && dbUser?.user_id) { 
         checkAndUnlockFeatureAchievement(dbUser.user_id, `lead_assigned_to_${assigneeType}_ever`)
         .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_role_commander'))
         .then(({ newAchievements }) => {
@@ -157,8 +157,8 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                 className={cn(
                   "text-[0.65rem] sm:text-xs px-2 sm:px-3 py-1 transform hover:scale-105 font-mono",
                   currentFilter === filter
-                    ? `${pageTheme.buttonGradient} text-black shadow-md hover:opacity-95` // Added hover opacity
-                    : `${pageTheme.borderColor} ${pageTheme.primaryColor} hover:bg-brand-purple/20 hover:text-white` // Adjusted hover
+                    ? `${pageTheme.buttonGradient} text-black shadow-md hover:opacity-95` 
+                    : `${pageTheme.borderColor} ${pageTheme.primaryColor} hover:bg-brand-purple/20 hover:text-white` 
                 )}
               >
                 {filter === 'all' ? 'Все Лиды' :

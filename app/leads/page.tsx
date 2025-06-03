@@ -234,7 +234,6 @@ const LeadGenerationHQPage = () => {
     { id: "upwork_telegram_mini_app", label: "TWA (Upwork)", site: "upwork", keywords: "telegram mini app", siteUrlFormat: "https://www.upwork.com/nx/jobs/search/?q={keywords}" },
 ];
 
-
    const kworkSearchLinks = [ 
     { name: "TWA (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+web+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
     { name: "Mini Apps (Kwork)", url: "https://kwork.ru/projects?c=all&q=telegram+mini+app&keyword=telegram", icon: "::FaSquareArrowUpRight::" },
@@ -354,9 +353,9 @@ const LeadGenerationHQPage = () => {
     if (result.success) {
         toast.success(result.message || "Лид назначен/снят с назначения. Вперед, к победе!");
         fetchLeadsFromSupabaseCallback(currentFilter); 
-        if (assigneeId && dbUser?.user_id) { // Log achievement if lead is assigned (not unassigned)
+        if (assigneeId && dbUser?.user_id) { 
             checkAndUnlockFeatureAchievement(dbUser.user_id, `lead_assigned_to_${assigneeType}_ever`)
-            .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_role_commander')) // Check composite achievement
+            .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_role_commander')) 
             .then(({ newAchievements }) => {
                 newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             });
@@ -430,26 +429,25 @@ const LeadGenerationHQPage = () => {
         return;
     }
     setIsLoading(true);
-    const result = await updateUserRole(currentUserId, newRole, currentUserId);
+    const result = await updateUserRole(currentUserId, newRole, currentUserId); // Передаем currentUserId как 'actor'
     setIsLoading(false);
 
     if (result.success) {
         toast.success(`Вы успешно стали ${newRole === 'tank' ? 'Танком' : 'Саппортом'}! Ваши новые задачи ждут на Дашборде.`);
-        if (refreshDbUser) await refreshDbUser(); // Обновляем данные пользователя в контексте
+        if (refreshDbUser) await refreshDbUser(); 
     } else {
         toast.error(result.error || `Не удалось сменить роль на ${newRole}.`);
     }
 };
 
-
   return (
-    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground pt-20 sm:pt-24 pb-20 overflow-x-hidden"> {/* Updated background gradient */}
+    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground pt-20 sm:pt-24 pb-20 overflow-x-hidden"> 
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
           backgroundImage: `linear-gradient(to right, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px),
                             linear-gradient(to bottom, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px)`, 
-          backgroundSize: '40px 40px', // Slightly larger grid
+          backgroundSize: '40px 40px', 
         }}
       ></div>
 
@@ -556,7 +554,7 @@ const LeadGenerationHQPage = () => {
               onFilterChange={(filter) => {
                 setCurrentFilter(filter);
                 fetchLeadsFromSupabaseCallback(filter);
-                if (dbUser?.user_id) { // Log filter usage for achievement
+                if (dbUser?.user_id) { 
                     checkAndUnlockFeatureAchievement(dbUser.user_id, `leads_filter_${filter}_used`)
                         .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_filter_master'))
                         .then(({ newAchievements }) => {
