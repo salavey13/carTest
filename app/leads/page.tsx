@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { cn } from '@/lib/utils';
 import { useAppContext } from '@/contexts/AppContext'; 
-import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard } from './actions'; 
+import { uploadLeadsFromCsv, updateLeadStatus, assignLead, fetchLeadsForDashboard, updateUserRole } from './actions'; 
 import { toast } from 'sonner';
 import LeadsPageRightNav from './LeadsPageRightNav';
 import SupportArsenal from './SupportArsenal';
@@ -58,7 +58,8 @@ interface PredefinedSearchButton {
 }
 
 const LeadGenerationHQPage = () => {
-  const { user: tgUserContext, dbUser } = useAppContext(); 
+  const appContext = useAppContext();
+  const { user: tgUserContext, dbUser, refreshDbUser } = appContext;
   const currentUserId = dbUser?.user_id || tgUserContext?.id?.toString(); 
   const { addToast } = useAppToast();
 
@@ -250,7 +251,7 @@ const LeadGenerationHQPage = () => {
   const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
     if (ref.current) {
-      ref.current.classList.add('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out'); // Updated color
+      ref.current.classList.add('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out'); 
       setTimeout(() => {
         ref.current?.classList.remove('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out');
       }, 1500);
@@ -353,11 +354,18 @@ const LeadGenerationHQPage = () => {
     if (result.success) {
         toast.success(result.message || "Лид назначен/снят с назначения. Вперед, к победе!");
         fetchLeadsFromSupabaseCallback(currentFilter); 
+        if (assigneeId && dbUser?.user_id) { // Log achievement if lead is assigned (not unassigned)
+            checkAndUnlockFeatureAchievement(dbUser.user_id, `lead_assigned_to_${assigneeType}_ever`)
+            .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_role_commander')) // Check composite achievement
+            .then(({ newAchievements }) => {
+                newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+            });
+        }
     } else {
         toast.error(result.message || "Ошибка операции: не удалось назначить/снять лид.");
     }
     setIsLoading(false);
-  }, [currentUserId, fetchLeadsFromSupabaseCallback, currentFilter]);
+  }, [currentUserId, dbUser, fetchLeadsFromSupabaseCallback, currentFilter, addToast]);
 
   useEffect(() => {
     const fetchTeam = async () => {
@@ -416,14 +424,32 @@ const LeadGenerationHQPage = () => {
     scrollToSection(arsenalSectionRef); 
   };
 
+  const handleSelfAssignRole = async (newRole: 'tank' | 'support') => {
+    if (!currentUserId || !dbUser) {
+        toast.error("Ошибка: Пользователь не аутентифицирован.");
+        return;
+    }
+    setIsLoading(true);
+    const result = await updateUserRole(currentUserId, newRole, currentUserId);
+    setIsLoading(false);
+
+    if (result.success) {
+        toast.success(`Вы успешно стали ${newRole === 'tank' ? 'Танком' : 'Саппортом'}! Ваши новые задачи ждут на Дашборде.`);
+        if (refreshDbUser) await refreshDbUser(); // Обновляем данные пользователя в контексте
+    } else {
+        toast.error(result.error || `Не удалось сменить роль на ${newRole}.`);
+    }
+};
+
+
   return (
-    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200 pt-20 sm:pt-24 pb-20 overflow-x-hidden">
+    <div ref={pageTopRef} className="relative min-h-screen bg-gradient-to-br from-background via-black to-card text-foreground pt-20 sm:pt-24 pb-20 overflow-x-hidden"> {/* Updated background gradient */}
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
           backgroundImage: `linear-gradient(to right, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px),
                             linear-gradient(to bottom, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px)`, 
-          backgroundSize: '30px 30px sm:40px sm:40px', 
+          backgroundSize: '40px 40px', // Slightly larger grid
         }}
       ></div>
 
@@ -431,7 +457,7 @@ const LeadGenerationHQPage = () => {
         onClick={toggleAllSections}
         variant="outline"
         size="icon"
-        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-cyan/20 hover:text-brand-cyan backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-cyan-glow/30"
+        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-cyan/20 hover:text-brand-cyan backdrop-blur-sm text-gray-300 border-border w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-cyan-glow/30"
         title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
       >
         <VibeContentRenderer content={sectionsCollapsed ? "::FaAnglesDown className='w-5 h-5'::" : "::FaAnglesUp className='w-5 h-5'::"} />
@@ -471,17 +497,23 @@ const LeadGenerationHQPage = () => {
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
                     <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                    <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.carryRoleDesc, t_links_config)}</p>
+                      <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
+                      <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.carryRoleDesc, t_links_config)}</p>
                     </div>
                     <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                    <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.tanksRoleDesc, t_links_config)}</p>
-                    <p className={cn("text-xs text-muted-foreground mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}>{renderTextWithLinks(t.tanksRoleLeverages, t_links_config)}</p>
+                      <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
+                      <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.tanksRoleDesc, t_links_config)}</p>
+                      <p className={cn("text-xs text-muted-foreground mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}>{renderTextWithLinks(t.tanksRoleLeverages, t_links_config)}</p>
+                      {dbUser && dbUser.role !== 'tank' && (
+                        <Button onClick={() => handleSelfAssignRole('tank')} size="sm" className={cn("mt-3 w-full", pageTheme.buttonGradient, "text-black hover:opacity-90")}>Стать Танком!</Button>
+                      )}
                     </div>
                     <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
-                    <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.supportRoleDesc, t_links_config)}</p>
+                      <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
+                      <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.supportRoleDesc, t_links_config)}</p>
+                       {dbUser && dbUser.role !== 'support' && (
+                        <Button onClick={() => handleSelfAssignRole('support')} size="sm" className={cn("mt-3 w-full", pageTheme.buttonGradient, "text-black hover:opacity-90")}>Стать Саппортом!</Button>
+                      )}
                     </div>
                 </CardContent>
                 </Card>
@@ -524,6 +556,13 @@ const LeadGenerationHQPage = () => {
               onFilterChange={(filter) => {
                 setCurrentFilter(filter);
                 fetchLeadsFromSupabaseCallback(filter);
+                if (dbUser?.user_id) { // Log filter usage for achievement
+                    checkAndUnlockFeatureAchievement(dbUser.user_id, `leads_filter_${filter}_used`)
+                        .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_filter_master'))
+                        .then(({ newAchievements }) => {
+                            newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                        });
+                }
               }}
               onUpdateStatus={handleUpdateLeadStatus}
               onAssignLead={handleAssignLeadCallback}
@@ -636,7 +675,7 @@ const LeadGenerationHQPage = () => {
                 <Button 
                     size="lg" 
                     onClick={() => scrollToSection(arsenalSectionRef)} 
-                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(var(--cyan-rgb),0.5),_0_0_15px_rgba(var(--purple-rgb),0.4)]`)} // Updated hover shadow
+                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(var(--cyan-rgb),0.5),_0_0_15px_rgba(var(--purple-rgb),0.4)]`)} 
                 >
                 <VibeContentRenderer content={t.ctaButtonText} />
                 </Button>

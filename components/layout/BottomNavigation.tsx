@@ -32,7 +32,6 @@ interface NavItemConfig {
   adminOnly?: boolean;
   supportOnly?: boolean;
   isFallback?: boolean;
-  // Dynamic property to be set based on logic
   isActuallyCentral?: boolean;
 }
 
@@ -103,7 +102,6 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     let finalLayout: NavItemConfig[] = [];
     const maxItems = 5;
 
-    // Determine central item with priority: Studio > Leads > HotVibes
     let centralItem: NavItemConfig | undefined = undefined;
     const studioItem = availableItems.find(i => i.label === "Studio");
     const leadsItem = availableItems.find(i => i.label === "Leads");
