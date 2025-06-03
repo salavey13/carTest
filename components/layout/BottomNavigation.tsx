@@ -34,13 +34,12 @@ interface NavItemConfig {
   isFallback?: boolean;
 }
 
-// Define all possible items that COULD be in the bottom nav
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink", minLevelShow: 0, isFallback: true },
-  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentral: true, centralColor: "from-brand-purple to-brand-orange" }, // Fallback central
+  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentral: true, centralColor: "from-brand-purple to-brand-orange" }, 
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
-  { href: "/repo-xml", icon: FaGithub, label: "Studio", color: "text-brand-purple", minLevelShow: 1 }, 
+  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentral: true, centralColor: "from-brand-blue to-brand-cyan", minLevelShow: 1 }, 
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan", minLevelShow: 1 },
   { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentral: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 2, supportOnly: true },
 ];
@@ -102,37 +101,33 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     let finalLayout: NavItemConfig[] = [];
     const maxItems = 5;
 
-    const leadsItemConfig = ALL_POSSIBLE_NAV_ITEMS.find(i => i.label === "Leads");
-    const hotVibesItemConfig = ALL_POSSIBLE_NAV_ITEMS.find(i => i.label === "HotVibes");
+    // Define central item candidates with priority
+    const centralCandidatesPriority = [
+        items.find(i => i.label === "Studio"),      // Highest priority
+        items.find(i => i.label === "Leads"),       // Next priority
+        items.find(i => i.label === "HotVibes")     // Fallback
+    ].filter(Boolean) as NavItemConfig[]; // Filter out undefined
 
-    let centralItemCandidate: NavItemConfig | undefined = undefined;
-
-    // Priority for Leads if available and conditions met
-    if (leadsItemConfig && (userLevel >= leadsItemConfig.minLevelShow || isAdmin) && (!leadsItemConfig.supportOnly || isAdmin || userRole === 'support')) {
-        centralItemCandidate = { ...leadsItemConfig, isCentral: true };
-    } else if (hotVibesItemConfig && (userLevel >= hotVibesItemConfig.minLevelShow || isAdmin)) { // Fallback to HotVibes
-        centralItemCandidate = { ...hotVibesItemConfig, isCentral: true };
-    }
+    let centralItem: NavItemConfig | undefined = centralCandidatesPriority.length > 0 ? 
+        {...centralCandidatesPriority[0], isCentral: true} : undefined;
     
-    // Filter `items` to remove the chosen central item to avoid duplication if it was already there
-    // And ensure all items in `items` are actually available based on current filters
-    let availableOtherItems = items.filter(i => i.label !== centralItemCandidate?.label);
+    let availableOtherItems = items.filter(i => i.label !== centralItem?.label);
     
-    const desiredTotal = Math.min(items.length, maxItems); // Use total items from initial filtering
-    let numNonCentral = centralItemCandidate ? desiredTotal - 1 : desiredTotal;
+    const desiredTotal = Math.min(items.length, maxItems);
+    let numNonCentral = centralItem ? desiredTotal - 1 : desiredTotal;
     numNonCentral = Math.max(0, numNonCentral);
 
-    if (centralItemCandidate) {
+    if (centralItem) {
         const leftCount = Math.ceil(numNonCentral / 2);
         const rightCount = numNonCentral - leftCount;
         finalLayout.push(...availableOtherItems.slice(0, leftCount));
-        finalLayout.push(centralItemCandidate);
+        finalLayout.push(centralItem);
         finalLayout.push(...availableOtherItems.slice(leftCount, leftCount + rightCount));
     } else {
         finalLayout.push(...availableOtherItems.slice(0, desiredTotal));
     }
     
-    finalLayout = finalLayout.slice(0, Math.min(finalLayout.length, maxItems)); // Ensure maxItems constraint
+    finalLayout = finalLayout.slice(0, Math.min(finalLayout.length, maxItems));
 
     logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}, role ${userRole}:`, finalLayout.map(i => i.label));
     return finalLayout;

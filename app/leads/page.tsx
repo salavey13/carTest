@@ -54,7 +54,7 @@ interface PredefinedSearchButton {
   site: "kwork" | "habr" | "upwork" | "freelancer" | "contra" | string; 
   keywords: string;
   siteUrlFormat: string;
-  isLikelyWorking?: boolean; // Флаг для выделения
+  isLikelyWorking?: boolean; 
 }
 
 const LeadGenerationHQPage = () => {
@@ -218,7 +218,7 @@ const LeadGenerationHQPage = () => {
   };
 
   const predefinedSearchButtons: PredefinedSearchButton[] = [
-    { id: "freelancer_twa_dev_highlight", label: "TWA Dev (Freelancer)", site: "freelancer", keywords: "telegram web app development", siteUrlFormat: "https://www.freelancer.com/jobs/?keyword={keywords}", isLikelyWorking: true },
+    { id: "freelancer_twa_dev_highlight", label: "TWA (Freelancer)", site: "freelancer", keywords: "telegram web app", siteUrlFormat: "https://www.freelancer.com/jobs/?keyword={keywords}", isLikelyWorking: true },
     { id: "kwork_twa_app_highlight", label: "TWA App (Kwork)", site: "kwork", keywords: "app", siteUrlFormat: "https://kwork.ru/projects?a=1&keyword={keywords}", isLikelyWorking: true },
     { id: "kwork_twa_next_supabase", label: "TWA Next Supabase (Kwork)", site: "kwork", keywords: "telegram web app next.js supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
     { id: "kwork_mini_app_react", label: "Mini App React (Kwork)", site: "kwork", keywords: "telegram mini app react", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
@@ -230,11 +230,7 @@ const LeadGenerationHQPage = () => {
     { id: "kwork_marketplace_twa", label: "Маркетплейс TWA (Kwork)", site: "kwork", keywords: "twa маркетплейс", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
     { id: "kwork_booking_twa", label: "Бронирование TWA (Kwork)", site: "kwork", keywords: "twa бронирование", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
     { id: "kwork_parser_supabase", label: "Парсер Supabase (Kwork)", site: "kwork", keywords: "парсер supabase", siteUrlFormat: "https://kwork.ru/projects?c=11&keyword={keywords}&a=1" },
-    { id: "habr_twa_react", label: "TWA React (Habr)", site: "habr", keywords: "telegram web app react", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-    { id: "habr_ai_bot", label: "AI Бот (Habr)", site: "habr", keywords: "telegram бот ai", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
-    { id: "habr_supabase_next", label: "Supabase Next.js (Habr)", site: "habr", keywords: "supabase next.js", siteUrlFormat: "https://freelance.habr.com/tasks?q={keywords}" },
     { id: "upwork_telegram_mini_app", label: "TWA (Upwork)", site: "upwork", keywords: "telegram mini app", siteUrlFormat: "https://www.upwork.com/nx/jobs/search/?q={keywords}" },
-    { id: "contra_twa_dev", label: "TWA (Contra)", site: "contra", keywords: "telegram web app developer", siteUrlFormat: "https://contra.com/search/creators?query={keywords}" },
 ];
 
 
@@ -550,7 +546,7 @@ const LeadGenerationHQPage = () => {
                     <p>{renderTextWithLinks(t.workflowStep2, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep3, t_links_config)}</p> 
                     <div>
-                       <VibeContentRenderer content="4. **Развертывание Сил:**" /> {/* Removed direct t.workflowStep4 */}
+                       <VibeContentRenderer content="4. **Развертывание Сил:**" />
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
                             <li>
                                 {renderTextWithLinks(t.workflowStep4Tank, t_links_config).map((segment, index) => (
