@@ -1,4 +1,3 @@
-// /app/leads/LeadsPageRightNav.tsx
 "use client";
 
 import React from 'react';
@@ -16,7 +15,7 @@ interface LeadsPageRightNavProps {
     workflowRef: React.RefObject<HTMLDivElement>;
     assetsRef: React.RefObject<HTMLDivElement>;
     zionRef: React.RefObject<HTMLDivElement>;
-    scraperRef: React.RefObject<HTMLDivElement>; // Добавляем реф для скрейпера
+    scraperRef: React.RefObject<HTMLDivElement>; 
   };
   labels: {
     navToTop: string;
@@ -26,7 +25,7 @@ interface LeadsPageRightNavProps {
     navToWorkflow: string;
     navToAssets: string;
     navToZion: string;
-    navToScraper: string; // Добавляем label для скрейпера
+    navToScraper: string; 
   };
   sectionsCollapsed: boolean; 
 }
@@ -40,7 +39,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
   const allNavItems = [
     { ref: sectionRefs.topRef, labelKey: 'navToTop', iconName: "FaChevronUp", alwaysVisible: true }, 
     { ref: sectionRefs.rolesRef, labelKey: 'navToRoles', iconName: "FaShieldCat", alwaysVisible: false },
-    { ref: sectionRefs.scraperRef, labelKey: 'navToScraper', iconName: "FaSpider", alwaysVisible: true }, // Добавляем скрейпер
+    { ref: sectionRefs.scraperRef, labelKey: 'navToScraper', iconName: "FaSpider", alwaysVisible: true }, 
     { ref: sectionRefs.arsenalRef, labelKey: 'navToArsenal', iconName: "FaToolbox", alwaysVisible: true },
     { ref: sectionRefs.dashboardRef, labelKey: 'navToDashboard', iconName: "FaTableList", alwaysVisible: true },
     { ref: sectionRefs.workflowRef, labelKey: 'navToWorkflow', iconName: "FaDiagramProject", alwaysVisible: false },
@@ -54,7 +53,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
 
   return (
     <motion.nav
-      className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-2 z-40 p-1.5 bg-black/50 backdrop-blur-md rounded-lg border border-gray-700/70 shadow-xl"
+      className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-[calc(50%+6rem)] sm:-translate-y-[calc(50%+6.5rem)] flex flex-col space-y-2 z-40 p-1.5 bg-black/50 backdrop-blur-md rounded-lg border border-brand-cyan/30 shadow-xl shadow-brand-cyan/20"
       initial={{ x: 100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
@@ -65,7 +64,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
           variant="ghost"
           size="icon"
           onClick={() => scrollToSection(item.ref)}
-          className="text-gray-300 hover:bg-brand-orange/20 hover:text-brand-orange w-9 h-9 sm:w-10 sm:h-10 p-0"
+          className="text-gray-300 hover:bg-brand-cyan/20 hover:text-brand-cyan w-9 h-9 sm:w-10 sm:h-10 p-0"
           title={labels[item.labelKey as keyof typeof labels]}
           aria-label={labels[item.labelKey as keyof typeof labels]}
         >

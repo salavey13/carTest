@@ -23,29 +23,24 @@ class DebugLogger {
         return `Error: ${arg.message}${arg.name ? ` (${arg.name})` : ''}${arg.stack ? `\nStack: ${arg.stack}` : ''}`;
       }
       if (typeof arg === 'object' && arg !== null) {
-        // Basic circular reference check
-        try {
-          // --- Pass a *bound* function or use a standalone helper ---
-          const replacer = (key: string, value: any) => {
-            // Handle common non-serializable types gracefully within stringify
-            if (typeof value === 'bigint') { return value.toString() + 'n'; }
-            if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
-            if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
-            // Use 'this.isBrowser' safely here because safelyStringify is an arrow function
-            if (this.isBrowser && value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
-            if (this.isBrowser && value instanceof Event) { return `[Event: ${value.type}]`; }
-            if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
-            if (value instanceof Error) { return `Error: ${value.message}`; } // Stringify nested errors simply
-            return value;
-          };
-          return JSON.stringify(arg, replacer, 2); // Indent for readability
-        } catch (e) {
-           if (e instanceof TypeError && e.message.includes('circular structure')) {
-               return '[Circular Object]';
-           }
-           console.warn("[Logger SafelyStringify] JSON.stringify failed:", e, "Arg:", arg);
-           return '[Unserializable Object]';
-        }
+        const seen = new WeakSet(); // Use WeakSet for circular reference checking
+        const replacer = (key: string, value: any) => {
+          if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+              return '[Circular Object]';
+            }
+            seen.add(value);
+          }
+          if (typeof value === 'bigint') { return value.toString() + 'n'; }
+          if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
+          if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
+          if (this.isBrowser && value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
+          if (this.isBrowser && value instanceof Event) { return `[Event: ${value.type}]`; }
+          if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
+          if (value instanceof Error) { return `Error: ${value.message}${value.name ? ` (${value.name})` : ''}`; } // More detail for nested errors
+          return value;
+        };
+        return JSON.stringify(arg, replacer, 2); // Indent for readability
       }
       if (typeof arg === 'symbol') { return arg.toString(); }
       if (arg === undefined) { return 'undefined'; }
@@ -55,12 +50,12 @@ class DebugLogger {
     } catch (stringifyError) {
       let errorMsg = '[SafelyStringify Error]';
       if (stringifyError instanceof Error) { errorMsg += `: ${stringifyError.message}`; }
-      if (this.isBrowser) { console.warn(errorMsg, stringifyError, "Original Arg:", arg); }
+      if (this.isBrowser) { console.warn(errorMsg, stringifyError, "Original Arg:", arg); } 
+      else { process.stderr.write(`${errorMsg} ${stringifyError} Original Arg: ${String(arg)}\n`); }
       return errorMsg;
     }
   }
   // --- End Safely Stringify ---
-
 
   private logInternal(level: LogLevel, ...args: any[]) {
     if (this.isLoggingInternally) {
@@ -73,9 +68,8 @@ class DebugLogger {
     let message = '';
     try {
       const argsArray = Array.isArray(args) ? args : [args];
-      message = argsArray.map(this.safelyStringify).join(" "); // Use the bound safelyStringify
+      message = argsArray.map(this.safelyStringify).join(" "); 
 
-      // Add to internal structured logs
       const logEntry: LogRecord = {
           id: this.logIdCounter++,
           level,
@@ -87,7 +81,6 @@ class DebugLogger {
         this.internalLogs = this.internalLogs.slice(this.internalLogs.length - this.maxInternalLogs);
       }
 
-      // Log to browser console
       if (this.isBrowser && typeof console !== 'undefined') {
         const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
         const prefix = `%c[${level.toUpperCase()}] %c${timestampStr}:`;
@@ -106,6 +99,7 @@ class DebugLogger {
     } catch (e) {
       const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
       if (this.isBrowser) { console.error(errorMsg); }
+      else { process.stderr.write(`${errorMsg}\n`); }
       this.internalLogs.push({ id: this.logIdCounter++, level: 'fatal', message: errorMsg, timestamp: Date.now() });
       if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
     } finally {
@@ -113,7 +107,6 @@ class DebugLogger {
     }
   }
 
-  // Public methods (use arrow functions for auto-binding)
   log = (...args: any[]) => this.logInternal('log', ...args);
   error = (...args: any[]) => this.logInternal('error', ...args);
   warn = (...args: any[]) => this.logInternal('warn', ...args);
@@ -121,12 +114,10 @@ class DebugLogger {
   debug = (...args: any[]) => this.logInternal('debug', ...args);
   fatal = (...args: any[]) => this.logInternal('fatal', ...args);
 
-  // Method to get internal logs as structured records
   getInternalLogRecords = (): ReadonlyArray<LogRecord> => {
       return [...this.internalLogs];
   };
 
-  // Method to get logs as a formatted string (kept for potential compatibility)
   getInternalLogs = (): string => {
       return this.internalLogs
           .map(log => `${log.level.toUpperCase()} ${new Date(log.timestamp).toISOString()}: ${log.message}`)
@@ -135,12 +126,9 @@ class DebugLogger {
 
   clearInternalLogs = () => {
       this.internalLogs = [];
-      this.log('info', '[Logger] Internal logs cleared.'); // Log the clearing action itself
+      this.log('info', '[Logger] Internal logs cleared.'); 
   };
 }
 
-// Export a single instance
 export const debugLogger = new DebugLogger();
-
-// Export types needed by consumers
 export type { LogLevel, LogRecord };
