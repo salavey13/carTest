@@ -26,7 +26,7 @@ interface NavItemConfig {
   icon: React.ElementType;
   label: string; 
   color?: string;
-  isCentral?: boolean;
+  isCentralCandidate?: boolean; // Mark as a candidate for central position
   centralColor?: string;
   minLevelShow: number;
   adminOnly?: boolean;
@@ -34,14 +34,15 @@ interface NavItemConfig {
   isFallback?: boolean;
 }
 
+// Define all possible items that COULD be in the bottom nav
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink", minLevelShow: 0, isFallback: true },
-  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentral: true, centralColor: "from-brand-purple to-brand-orange" }, 
+  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentralCandidate: true, centralColor: "from-brand-purple to-brand-orange" }, 
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
-  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentral: true, centralColor: "from-brand-blue to-brand-cyan", minLevelShow: 1 }, 
+  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentralCandidate: true, centralColor: "from-brand-blue to-brand-cyan", minLevelShow: 1 }, 
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan", minLevelShow: 1 },
-  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentral: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 2, supportOnly: true },
+  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentralCandidate: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 2, supportOnly: true },
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {
@@ -87,44 +88,48 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
 
     logger.debug(`[BottomNav] Filtering items. UserLevel: ${userLevel}, IsAdmin: ${isAdmin}, Role: ${userRole}`);
 
-    let items = ALL_POSSIBLE_NAV_ITEMS.filter(item => {
+    let availableItems = ALL_POSSIBLE_NAV_ITEMS.filter(item => {
         if (item.adminOnly && !isAdmin) return false;
         if (item.supportOnly && !(isAdmin || userRole === 'support')) return false;
         return userLevel >= item.minLevelShow || isAdmin;
     });
     
-    if (items.length === 0 && !isAdmin) { 
-        items = ALL_POSSIBLE_NAV_ITEMS.filter(item => item.isFallback);
-        logger.debug("[BottomNav] No specific items after filtering, showing fallback items for non-admin:", items.map(i => i.label));
+    if (availableItems.length === 0 && !isAdmin) { 
+        availableItems = ALL_POSSIBLE_NAV_ITEMS.filter(item => item.isFallback);
+        logger.debug("[BottomNav] No specific items after filtering, showing fallback items for non-admin:", availableItems.map(i => i.label));
     }
 
     let finalLayout: NavItemConfig[] = [];
     const maxItems = 5;
 
-    // Define central item candidates with priority
-    const centralCandidatesPriority = [
-        items.find(i => i.label === "Studio"),      // Highest priority
-        items.find(i => i.label === "Leads"),       // Next priority
-        items.find(i => i.label === "HotVibes")     // Fallback
-    ].filter(Boolean) as NavItemConfig[]; // Filter out undefined
+    // Determine central item with priority: Studio > Leads > HotVibes
+    let centralItem: NavItemConfig | undefined = undefined;
+    const studioItem = availableItems.find(i => i.label === "Studio");
+    const leadsItem = availableItems.find(i => i.label === "Leads");
+    const hotVibesItem = availableItems.find(i => i.label === "HotVibes");
 
-    let centralItem: NavItemConfig | undefined = centralCandidatesPriority.length > 0 ? 
-        {...centralCandidatesPriority[0], isCentral: true} : undefined;
+    if (studioItem) {
+        centralItem = { ...studioItem, isCentral: true };
+    } else if (leadsItem) {
+        centralItem = { ...leadsItem, isCentral: true };
+    } else if (hotVibesItem) {
+        centralItem = { ...hotVibesItem, isCentral: true };
+    }
     
-    let availableOtherItems = items.filter(i => i.label !== centralItem?.label);
+    let otherItems = availableItems.filter(i => i.label !== centralItem?.label);
     
-    const desiredTotal = Math.min(items.length, maxItems);
+    const desiredTotal = Math.min(availableItems.length, maxItems);
     let numNonCentral = centralItem ? desiredTotal - 1 : desiredTotal;
     numNonCentral = Math.max(0, numNonCentral);
 
     if (centralItem) {
         const leftCount = Math.ceil(numNonCentral / 2);
         const rightCount = numNonCentral - leftCount;
-        finalLayout.push(...availableOtherItems.slice(0, leftCount));
-        finalLayout.push(centralItem);
-        finalLayout.push(...availableOtherItems.slice(leftCount, leftCount + rightCount));
+        finalLayout.push(...otherItems.slice(0, leftCount));
+        finalLayout.push(centralItem); // Actual central item config
+        finalLayout.push(...otherItems.slice(leftCount, leftCount + rightCount));
     } else {
-        finalLayout.push(...availableOtherItems.slice(0, desiredTotal));
+        finalLayout.push(...otherItems.slice(0, desiredTotal));
     }
     
     finalLayout = finalLayout.slice(0, Math.min(finalLayout.length, maxItems));
@@ -158,7 +163,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
           const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
           const IconComponent = item.icon;
 
-          return item.isCentral ? (
+          return item.isCentral ? ( // Check the derived isCentral property for rendering
             <Button
               asChild
               size="icon"

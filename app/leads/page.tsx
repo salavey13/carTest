@@ -51,7 +51,7 @@ interface TeamUser {
 interface PredefinedSearchButton {
   id: string;
   label: string;
-  site: "kwork" | "habr" | "upwork" | "freelancer" | "contra" | string; 
+  site: "kwork" | "upwork" | "freelancer" | string; 
   keywords: string;
   siteUrlFormat: string;
   isLikelyWorking?: boolean; 
@@ -546,7 +546,7 @@ const LeadGenerationHQPage = () => {
                     <p>{renderTextWithLinks(t.workflowStep2, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep3, t_links_config)}</p> 
                     <div>
-                       <VibeContentRenderer content="4. **Развертывание Сил:**" />
+                       <VibeContentRenderer content={t.workflowStep4} /> {/* Render the "4. Развертывание Сил:" text part */}
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
                             <li>
                                 {renderTextWithLinks(t.workflowStep4Tank, t_links_config).map((segment, index) => (

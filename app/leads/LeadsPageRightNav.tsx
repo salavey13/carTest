@@ -53,7 +53,7 @@ const LeadsPageRightNav: React.FC<LeadsPageRightNavProps> = ({
 
   return (
     <motion.nav
-      className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-[calc(50%+2rem)] sm:-translate-y-[calc(50%+2.5rem)] flex flex-col space-y-2 z-40 p-1.5 bg-black/50 backdrop-blur-md rounded-lg border border-gray-700/70 shadow-xl"
+      className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-[calc(50%+3.5rem)] sm:-translate-y-[calc(50%+4rem)] flex flex-col space-y-2 z-40 p-1.5 bg-black/50 backdrop-blur-md rounded-lg border border-gray-700/70 shadow-xl"
       initial={{ x: 100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
