@@ -144,24 +144,24 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "inception-swap-mission", name: "Миссия: Inception Swap", description: "Осознал 4-шаговый паттерн! Ты почти Нео.", icon: "FaInfinity", kiloVibesAward: 15, checkCondition: (p) => p.completedQuests.includes("inception-swap-mission") },
     { id: "the-fifth-door-mission", name: "Миссия: Пятая Дверь", description: "Вышел из Матрицы! Полный контроль!", icon: "FaKey", kiloVibesAward: 50, checkCondition: (p) => p.completedQuests.includes("the-fifth-door-mission") },
 
-    // New Leads Page Achievements
+    // Leads Page Achievements
     { id: "leads_first_csv_upload", name: "Десантник Данных", description: "Первый успешный импорт CSV с лидами. База пополнена!", icon: "FaFileCsv", kiloVibesAward: 30, checkCondition: (p) => p.featuresUsed?.leads_first_csv_upload === true },
     { id: "leads_first_scrape_success", name: "Кибер-Паук", description: "Первый успешный сбор данных с помощью скрейпера.", icon: "FaSpider", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.leads_first_scrape_success === true },
     { id: "leads_ai_pipeline_used", name: "Конвейерный Магнат", description: "Использован Межгалактический Пайплайн для обработки лидов.", icon: "FaRobot", kiloVibesAward: 40, checkCondition: (p) => p.featuresUsed?.leads_ai_pipeline_used === true },
     { 
       id: "leads_filter_master", 
       name: "Магистр Фильтров", 
-      description: "Продемонстрировано мастерство фильтрации: использованы все основные фильтры ('my', 'support', 'tank', 'carry', 'new', 'in_progress', 'interested') на дашборде лидов.", 
+      description: "Продемонстрировано мастерство фильтрации: использованы все основные фильтры на дашборде лидов.", 
       icon: "FaFilterCircleDollar", 
       kiloVibesAward: 50, 
       checkCondition: (p) => 
-        p.featuresUsed?.leads_filter_my === true &&
-        p.featuresUsed?.leads_filter_support === true &&
-        p.featuresUsed?.leads_filter_tank === true &&
-        p.featuresUsed?.leads_filter_carry === true &&
-        p.featuresUsed?.leads_filter_new === true &&
-        p.featuresUsed?.leads_filter_in_progress === true &&
-        p.featuresUsed?.leads_filter_interested === true
+        p.featuresUsed?.leads_filter_my_used === true &&
+        p.featuresUsed?.leads_filter_support_used === true &&
+        p.featuresUsed?.leads_filter_tank_used === true &&
+        p.featuresUsed?.leads_filter_carry_used === true &&
+        p.featuresUsed?.leads_filter_new_used === true &&
+        p.featuresUsed?.leads_filter_in_progress_used === true &&
+        p.featuresUsed?.leads_filter_interested_used === true
     },
     { 
       id: "leads_role_commander", 
@@ -170,13 +170,12 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
       icon: "FaUsersGear", 
       kiloVibesAward: 60, 
       checkCondition: (p) => 
-        p.featuresUsed?.lead_assigned_to_tank === true &&
-        p.featuresUsed?.lead_assigned_to_carry === true &&
-        p.featuresUsed?.lead_assigned_to_support === true
+        p.featuresUsed?.lead_assigned_to_tank_ever === true &&
+        p.featuresUsed?.lead_assigned_to_carry_ever === true &&
+        p.featuresUsed?.lead_assigned_to_support_ever === true
     },
 ];
 
-// ... rest of the file remains the same
 const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: [QUEST_ORDER[0]], 
