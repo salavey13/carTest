@@ -26,23 +26,24 @@ interface NavItemConfig {
   icon: React.ElementType;
   label: string; 
   color?: string;
-  isCentralCandidate?: boolean; // Mark as a candidate for central position
+  isCentralCandidate?: boolean; 
   centralColor?: string;
   minLevelShow: number;
   adminOnly?: boolean;
   supportOnly?: boolean;
   isFallback?: boolean;
+  // Dynamic property to be set based on logic
+  isActuallyCentral?: boolean;
 }
 
-// Define all possible items that COULD be in the bottom nav
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink", minLevelShow: 0, isFallback: true },
-  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentralCandidate: true, centralColor: "from-brand-purple to-brand-orange" }, 
+  { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentralCandidate: true, centralColor: "from-brand-orange to-brand-pink" }, 
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
-  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentralCandidate: true, centralColor: "from-brand-blue to-brand-cyan", minLevelShow: 1 }, 
+  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentralCandidate: true, centralColor: "from-brand-cyan to-brand-blue", minLevelShow: 1 }, 
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan", minLevelShow: 1 },
-  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentralCandidate: true, centralColor: "from-brand-orange to-brand-yellow", minLevelShow: 2, supportOnly: true },
+  { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentralCandidate: true, centralColor: "from-brand-lime to-brand-green", minLevelShow: 2, supportOnly: true },
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {
@@ -109,11 +110,11 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     const hotVibesItem = availableItems.find(i => i.label === "HotVibes");
 
     if (studioItem) {
-        centralItem = { ...studioItem, isCentral: true };
+        centralItem = { ...studioItem, isActuallyCentral: true };
     } else if (leadsItem) {
-        centralItem = { ...leadsItem, isCentral: true };
+        centralItem = { ...leadsItem, isActuallyCentral: true };
     } else if (hotVibesItem) {
-        centralItem = { ...hotVibesItem, isCentral: true };
+        centralItem = { ...hotVibesItem, isActuallyCentral: true };
     }
     
     let otherItems = availableItems.filter(i => i.label !== centralItem?.label);
@@ -126,7 +127,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
         const leftCount = Math.ceil(numNonCentral / 2);
         const rightCount = numNonCentral - leftCount;
         finalLayout.push(...otherItems.slice(0, leftCount));
-        finalLayout.push(centralItem); // Actual central item config
+        finalLayout.push(centralItem); 
         finalLayout.push(...otherItems.slice(leftCount, leftCount + rightCount));
     } else {
         finalLayout.push(...otherItems.slice(0, desiredTotal));
@@ -134,7 +135,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     
     finalLayout = finalLayout.slice(0, Math.min(finalLayout.length, maxItems));
 
-    logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}, role ${userRole}:`, finalLayout.map(i => i.label));
+    logger.debug(`[BottomNav] Final layout for level ${userLevel}, admin ${isAdmin}, role ${userRole}:`, finalLayout.map(i => `${i.label}${i.isActuallyCentral ? " (C)" : ""}`));
     return finalLayout;
 
   }, [appContext.dbUser, appCtxLoading, isAuthenticating, isAdmin, appContext.user?.language_code]);
@@ -163,7 +164,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
           const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
           const IconComponent = item.icon;
 
-          return item.isCentral ? ( // Check the derived isCentral property for rendering
+          return item.isActuallyCentral ? ( 
             <Button
               asChild
               size="icon"

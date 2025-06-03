@@ -209,12 +209,12 @@ const LeadGenerationHQPage = () => {
   };
 
   const pageTheme = {
-    primaryColor: "text-brand-orange", 
-    secondaryColor: "text-brand-yellow", 
-    accentColor: "text-brand-cyan",     
-    borderColor: "border-brand-orange/50", 
-    shadowColor: "shadow-[0_0_25px_rgba(var(--orange-rgb),0.5)]", 
-    buttonGradient: "bg-gradient-to-r from-brand-orange to-brand-yellow", 
+    primaryColor: "text-brand-cyan", 
+    secondaryColor: "text-brand-purple", 
+    accentColor: "text-brand-lime",     
+    borderColor: "border-brand-cyan/60", 
+    shadowColor: "shadow-[0_0_15px_hsla(var(--cyan-rgb),0.2),_0_0_8px_hsla(var(--purple-rgb),0.15),_0_0_5px_hsla(var(--lime-rgb),0.1)]", 
+    buttonGradient: "bg-gradient-to-r from-brand-cyan to-brand-purple", 
   };
 
   const predefinedSearchButtons: PredefinedSearchButton[] = [
@@ -250,9 +250,9 @@ const LeadGenerationHQPage = () => {
   const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
     if (ref.current) {
-      ref.current.classList.add('ring-2', 'ring-brand-orange', 'transition-all', 'duration-1000', 'ease-out');
+      ref.current.classList.add('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out'); // Updated color
       setTimeout(() => {
-        ref.current?.classList.remove('ring-2', 'ring-brand-orange', 'transition-all', 'duration-1000', 'ease-out');
+        ref.current?.classList.remove('ring-2', 'ring-brand-lime', 'transition-all', 'duration-1000', 'ease-out');
       }, 1500);
     }
   }, []);
@@ -421,8 +421,8 @@ const LeadGenerationHQPage = () => {
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0" 
         style={{
-          backgroundImage: `linear-gradient(to right, hsla(var(--orange-rgb), 0.1) 0.5px, transparent 0.5px),
-                            linear-gradient(to bottom, hsla(var(--orange-rgb), 0.1) 0.5px, transparent 0.5px)`, 
+          backgroundImage: `linear-gradient(to right, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px),
+                            linear-gradient(to bottom, hsla(var(--cyan-rgb), 0.05) 0.5px, transparent 0.5px)`, 
           backgroundSize: '30px 30px sm:40px sm:40px', 
         }}
       ></div>
@@ -431,7 +431,7 @@ const LeadGenerationHQPage = () => {
         onClick={toggleAllSections}
         variant="outline"
         size="icon"
-        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-orange/20 hover:text-brand-orange backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-brand-orange/30"
+        className="fixed top-[calc(var(--header-height,60px)+8px)] sm:top-[calc(var(--header-height,70px)+12px)] left-3 z-50 bg-black/60 hover:bg-brand-cyan/20 hover:text-brand-cyan backdrop-blur-sm text-gray-300 border-gray-700/50 w-9 h-9 sm:w-10 sm:h-10 shadow-lg hover:shadow-cyan-glow/30"
         title={sectionsCollapsed ? t.expandAllSections : t.collapseAllSections}
       >
         <VibeContentRenderer content={sectionsCollapsed ? "::FaAnglesDown className='w-5 h-5'::" : "::FaAnglesUp className='w-5 h-5'::"} />
@@ -452,7 +452,7 @@ const LeadGenerationHQPage = () => {
             <h1 className={cn("text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-orbitron font-bold cyber-text glitch mb-3 sm:mb-4", pageTheme.primaryColor)} data-text={t.pageTitle}>
                 <VibeContentRenderer content={t.pageTitle} />
             </h1>
-            <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-300 font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
+            <CardDescription className="text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground font-mono max-w-xl sm:max-w-2xl md:max-w-3xl mx-auto">
                 {renderTextWithLinks(t.pageSubtitle, t_links_config)}
             </CardDescription>
             </header>
@@ -462,26 +462,26 @@ const LeadGenerationHQPage = () => {
         <div className="space-y-10 md:space-y-16">
           {!sectionsCollapsed && (
             <div ref={rolesSectionRef} id="rolesSectionAnchor">
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.rolesTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.rolesSubtitle, t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.rolesSubtitle, t_links_config)}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 font-mono">
-                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
                     <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.carryRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{renderTextWithLinks(t.carryRoleDesc, t_links_config)}</p>
+                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.carryRoleDesc, t_links_config)}</p>
                     </div>
-                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
                     <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.tanksRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{renderTextWithLinks(t.tanksRoleDesc, t_links_config)}</p>
-                    <p className={cn("text-xs text-gray-400 mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}>{renderTextWithLinks(t.tanksRoleLeverages, t_links_config)}</p>
+                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.tanksRoleDesc, t_links_config)}</p>
+                    <p className={cn("text-xs text-muted-foreground mt-2 pt-2 border-t", `${pageTheme.borderColor}/30`)}>{renderTextWithLinks(t.tanksRoleLeverages, t_links_config)}</p>
                     </div>
-                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
+                    <div className={cn("p-4 sm:p-5 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-1`)}>
                     <h3 className={cn("text-xl sm:text-2xl font-orbitron font-bold mb-2 flex items-center gap-2", pageTheme.secondaryColor)}><VibeContentRenderer content={t.supportRoleTitle} /></h3>
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">{renderTextWithLinks(t.supportRoleDesc, t_links_config)}</p>
+                    <p className="text-xs sm:text-sm text-foreground leading-relaxed">{renderTextWithLinks(t.supportRoleDesc, t_links_config)}</p>
                     </div>
                 </CardContent>
                 </Card>
@@ -534,19 +534,19 @@ const LeadGenerationHQPage = () => {
 
           {!sectionsCollapsed && (
             <div ref={workflowSectionRef}>
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.workflowTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.workflowSubtitle,t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.workflowSubtitle,t_links_config)}</CardDescription>
                 </CardHeader>
-                <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-3 sm:space-y-4">
+                <CardContent className="font-mono text-xs sm:text-sm text-foreground space-y-3 sm:space-y-4">
                     <p>{renderTextWithLinks(t.workflowStep1, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep2, t_links_config)}</p>
                     <p>{renderTextWithLinks(t.workflowStep3, t_links_config)}</p> 
                     <div>
-                       <VibeContentRenderer content={t.workflowStep4} /> {/* Render the "4. Развертывание Сил:" text part */}
+                       <VibeContentRenderer content={t.workflowStep4} /> 
                         <ul className="list-none pl-4 sm:pl-6 mt-1 space-y-1"> 
                             <li>
                                 {renderTextWithLinks(t.workflowStep4Tank, t_links_config).map((segment, index) => (
@@ -573,12 +573,12 @@ const LeadGenerationHQPage = () => {
 
           {!sectionsCollapsed && (
             <div ref={assetsSectionRef}>
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.assetsTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.assetsSubtitle, t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.assetsSubtitle, t_links_config)}</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 font-mono text-xs sm:text-sm">
                     {[
@@ -589,12 +589,12 @@ const LeadGenerationHQPage = () => {
                     { titleKey: 'assetTutorialsTitle', descKey: 'assetTutorialsDesc', icon: '::FaGraduationCap::' },
                     { titleKey: 'assetCyberDevOSTitle', descKey: 'assetCyberDevOSDesc', icon: '::FaGamepad::' },
                     ].map(asset => (
-                    <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-gray-950/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
+                    <div key={asset.titleKey} className={cn("p-3 sm:p-4 border-2 rounded-xl bg-background/50", pageTheme.borderColor, `hover:${pageTheme.shadowColor} transition-shadow duration-300 transform hover:-translate-y-0.5`)}>
                         <h5 className={cn("font-orbitron font-bold mb-1 sm:mb-1.5 flex items-center gap-1.5 sm:gap-2", pageTheme.accentColor)}>
                         <VibeContentRenderer content={asset.icon} />
                         <VibeContentRenderer content={t[asset.titleKey as keyof typeof t]} />
                         </h5>
-                        <div className="text-gray-300 text-[0.7rem] sm:text-xs leading-snug">{renderTextWithLinks(t[asset.descKey as keyof typeof t], t_links_config)}</div>
+                        <div className="text-foreground text-[0.7rem] sm:text-xs leading-snug">{renderTextWithLinks(t[asset.descKey as keyof typeof t], t_links_config)}</div>
                     </div>
                     ))}
                 </CardContent>
@@ -604,14 +604,14 @@ const LeadGenerationHQPage = () => {
 
           {!sectionsCollapsed && (
             <div ref={zionSectionRef}>
-                <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+                <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
                 <CardHeader>
                     <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
                     <VibeContentRenderer content={t.zionTitle} />
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">{renderTextWithLinks(t.zionSubtitle, t_links_config)}</CardDescription>
+                    <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">{renderTextWithLinks(t.zionSubtitle, t_links_config)}</CardDescription>
                 </CardHeader>
-                <CardContent className="font-mono text-xs sm:text-sm text-gray-300 space-y-2 sm:space-y-3">
+                <CardContent className="font-mono text-xs sm:text-sm text-foreground space-y-2 sm:space-y-3">
                 <p>{renderTextWithLinks(t.zionP1, t_links_config)}</p>
                 <ul className="list-disc list-inside pl-3 sm:pl-4 space-y-1.5 sm:space-y-2">
                     <li>{renderTextWithLinks(t.zionList1, t_links_config)}</li>
@@ -630,13 +630,13 @@ const LeadGenerationHQPage = () => {
                 <h2 className={cn("text-3xl sm:text-4xl md:text-5xl font-orbitron font-bold mb-4 sm:mb-6 cyber-text glitch", pageTheme.primaryColor)} data-text={t.ctaTitle}>
                 <VibeContentRenderer content={t.ctaTitle} />
                 </h2>
-                <p className="text-lg sm:text-xl text-gray-300 font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
+                <p className="text-lg sm:text-xl text-muted-foreground font-mono max-w-md sm:max-w-2xl mx-auto mb-8 sm:mb-10">
                 {renderTextWithLinks(t.ctaSubtitle, t_links_config)}
                 </p>
                 <Button 
                     size="lg" 
                     onClick={() => scrollToSection(arsenalSectionRef)} 
-                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(var(--orange-rgb),0.8)]`)}
+                    className={cn("font-orbitron text-lg sm:text-xl py-3.5 sm:py-5 px-8 sm:px-12 rounded-full text-black font-extrabold shadow-glow-lg hover:scale-105 transform transition duration-300 active:scale-95", pageTheme.buttonGradient, `hover:shadow-[0_0_30px_rgba(var(--cyan-rgb),0.5),_0_0_15px_rgba(var(--purple-rgb),0.4)]`)} // Updated hover shadow
                 >
                 <VibeContentRenderer content={t.ctaButtonText} />
                 </Button>
