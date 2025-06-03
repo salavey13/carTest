@@ -110,7 +110,7 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "archive_master", name: "Магистр Архивов", description: "Суммарно добавлено в контекст более 2000 файлов.", icon: "FaBoxArchive", kiloVibesAward: 400, checkCondition: (p) => p.totalFilesExtracted >= 2000 },
     { id: "token_economist_1", name: "Экономист Токенов I", description: "Обработано 100,000 токенов AI.", icon: "FaCoins", kiloVibesAward: 30, checkCondition: (p) => p.totalTokensProcessed >= 100000 },
     { id: "token_economist_2", name: "Экономист Токенов II", description: "Обработано 1,000,000 токенов AI.", icon: "FaCoins", kiloVibesAward: 100, checkCondition: (p) => p.totalTokensProcessed >= 1000000 },
-    { id: "context_leviathan", name: "Контекстный Левиафан", description: "Суммарно обработано более 5,000,000 токенов ИИ.", icon: "FaKraken", kiloVibesAward: 500, checkCondition: (p) => p.totalTokensProcessed >= 5000000 },
+    { id: "context_leviathan", name: "Контекстный Левиафан", description: "Суммарно обработано более 5,000,000 токенов ИИ.", icon: "FaAngryCreative", kiloVibesAward: 500, checkCondition: (p) => p.totalTokensProcessed >= 5000000 },
     { id: "request_maestro_1", name: "Маэстро Запросов I", description: "Отправлено 25 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 30, checkCondition: (p) => p.totalKworkRequestsSent >= 25 },
     { id: "request_maestro_2", name: "Маэстро Запросов II", description: "Отправлено 100 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 100, checkCondition: (p) => p.totalKworkRequestsSent >= 100 },
     { id: "commit_crafter_1", name: "Ремесленник Коммитов I", description: "Создано/обновлено 10 веток/PR.", icon: "FaCodeCommit", kiloVibesAward: 50, checkCondition: (p) => (p.totalPrsCreated + p.totalBranchesUpdated) >= 10 },
