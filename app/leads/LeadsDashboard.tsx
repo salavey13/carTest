@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppContext } from '@/contexts/AppContext'; // For dbUser
+import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase'; // For achievements
+import { useAppToast } from "@/hooks/useAppToast"; // For custom toasts
 
 interface Lead {
   id?: string;
@@ -54,9 +57,9 @@ interface LeadsDashboardProps {
     accentColor: string;
   };
   t: Record<string, any>;
-  onFilterChange: (filter: string) => void;
+  onFilterChange: (filter: string) => void; // This will be wrapped to include achievement logic
   onUpdateStatus: (leadId: string, newStatus: string) => void;
-  onAssignLead: (leadId: string, assigneeType: 'tank' | 'carry' | 'support', assigneeId: string | null) => void;
+  onAssignLead: (leadId: string, assigneeType: 'tank' | 'carry' | 'support', assigneeId: string | null) => void; // This will be wrapped
   onScrollToSection: (ref: React.RefObject<HTMLDivElement>) => void;
   arsenalSectionRef: React.RefObject<HTMLDivElement>;
 }
@@ -67,11 +70,11 @@ const getProjectTypeColor = (type: string | null | undefined, theme: LeadsDashbo
   if (lowerType.includes('training') || lowerType.includes('fitness')) return 'text-brand-green';
   if (lowerType.includes('carrental') || lowerType.includes('rent')) return 'text-brand-blue';
   if (lowerType.includes('ecommerce')) return 'text-brand-pink';
-  if (lowerType.includes('twa')) return theme.accentColor;
+  if (lowerType.includes('twa')) return theme.accentColor; // Use pageTheme accent for generic TWA
   if (lowerType.includes('bot')) return 'text-brand-purple';
   if (lowerType.includes('nextjs_app')) return 'text-brand-yellow';
   if (lowerType.includes('wheeloffortune')) return 'text-brand-lime';
-  if (lowerType.includes('vprtests')) return 'text-brand-cyan';
+  if (lowerType.includes('vprtests')) return 'text-brand-cyan'; // Keep cyan for VPR tests
   return 'text-gray-400';
 };
 
@@ -82,13 +85,15 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
   teamMembers,
   pageTheme,
   t,
-  onFilterChange,
+  onFilterChange: originalOnFilterChange,
   onUpdateStatus,
-  onAssignLead,
+  onAssignLead: originalOnAssignLead,
   onScrollToSection,
   arsenalSectionRef,
 }) => {
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
+  const { dbUser } = useAppContext();
+  const { addToast } = useAppToast();
 
   const toggleExpand = (leadId: string | undefined) => {
     if (leadId) {
@@ -109,14 +114,37 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
     return member?.username || userId.substring(0, 6);
   };
 
+  const handleFilterChangeWithAchievement = (filter: string) => {
+    originalOnFilterChange(filter);
+    if (dbUser?.user_id && ['my', 'support', 'tank', 'carry', 'new', 'in_progress', 'interested'].includes(filter)) {
+      checkAndUnlockFeatureAchievement(dbUser.user_id, `leads_filter_${filter}_used`)
+        .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_filter_master'))
+        .then(({ newAchievements }) => {
+          newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+        });
+    }
+  };
+
+  const handleAssignLeadWithAchievement = (leadId: string, assigneeType: 'tank' | 'carry' | 'support', assigneeId: string | null) => {
+    originalOnAssignLead(leadId, assigneeType, assigneeId);
+    if (assigneeId && dbUser?.user_id) { // Log achievement only if lead is assigned (not unassigned)
+        checkAndUnlockFeatureAchievement(dbUser.user_id, `lead_assigned_to_${assigneeType}_ever`)
+        .then(() => checkAndUnlockFeatureAchievement(dbUser.user_id, 'leads_role_commander'))
+        .then(({ newAchievements }) => {
+            newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+        });
+    }
+  };
+
+
   return (
     <TooltipProvider delayDuration={100}>
-      <Card className={cn("bg-black/70 backdrop-blur-md border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
+      <Card className={cn("bg-card/80 backdrop-blur-lg border-2", pageTheme.borderColor, pageTheme.shadowColor)}>
         <CardHeader>
           <CardTitle className={cn("text-2xl sm:text-3xl font-orbitron flex items-center gap-2 sm:gap-3", pageTheme.primaryColor)}>
             <VibeContentRenderer content={t.leadsDashboardTitle} />
           </CardTitle>
-          <CardDescription className="font-mono text-xs sm:text-sm text-gray-400">
+          <CardDescription className="font-mono text-xs sm:text-sm text-muted-foreground">
             <VibeContentRenderer content={t.leadsDashboardDesc} />
           </CardDescription>
           <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2">
@@ -125,12 +153,12 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                 key={filter}
                 variant={currentFilter === filter ? "default" : "outline"}
                 size="xs"
-                onClick={() => onFilterChange(filter)}
+                onClick={() => handleFilterChangeWithAchievement(filter)}
                 className={cn(
                   "text-[0.65rem] sm:text-xs px-2 sm:px-3 py-1 transform hover:scale-105 font-mono",
                   currentFilter === filter
-                    ? `${pageTheme.buttonGradient} text-black shadow-md`
-                    : `${pageTheme.borderColor} ${pageTheme.primaryColor} hover:bg-opacity-20 hover:text-white`
+                    ? `${pageTheme.buttonGradient} text-black shadow-md hover:opacity-95` // Added hover opacity
+                    : `${pageTheme.borderColor} ${pageTheme.primaryColor} hover:bg-brand-purple/20 hover:text-white` // Adjusted hover
                 )}
               >
                 {filter === 'all' ? 'Все Лиды' :
@@ -149,20 +177,20 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
         </CardHeader>
         <CardContent className="font-mono text-xs sm:text-sm">
           {leads.length === 0 && !isLoading ? (
-            <p className="text-gray-400 text-center py-4">
+            <p className="text-muted-foreground text-center py-4">
               По фильтру '{currentFilter}' кибер-целей не обнаружено. Время для{' '}
-              <Button variant="link" onClick={() => onScrollToSection(arsenalSectionRef)} className={cn("p-0 h-auto text-sm sm:text-base font-orbitron", pageTheme.primaryColor)}>
+              <Button variant="link" onClick={() => onScrollToSection(arsenalSectionRef)} className={cn("p-0 h-auto text-sm sm:text-base font-orbitron", pageTheme.accentColor)}>
                 'Сбора трофеев'
               </Button>!
             </p>
           ) : isLoading && leads.length === 0 ? (
             <div className="text-center py-4">
-              <VibeContentRenderer content="::FaSpinner className='animate-spin text-xl sm:text-2xl text-brand-orange':: Загрузка данных из ЦОД..." />
+              <VibeContentRenderer content={`::FaSpinner className='animate-spin text-xl sm:text-2xl ${pageTheme.primaryColor}':: Загрузка данных из ЦОД...`} />
             </div>
           ) : (
             <div className="overflow-x-auto simple-scrollbar">
               <table className="w-full text-left">
-                <thead className="text-[0.7rem] sm:text-xs text-brand-orange uppercase bg-gray-950/70 font-orbitron">
+                <thead className={cn("text-[0.7rem] sm:text-xs uppercase bg-background/70 font-orbitron", pageTheme.primaryColor)}>
                   <tr>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2">Клиент (Р)</th>
                     <th scope="col" className="px-2 sm:px-3 py-1.5 sm:py-2 hidden md:table-cell">Проект</th>
@@ -195,8 +223,8 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
 
                       return (
                         <React.Fragment key={lead.id}>
-                          <tr className="bg-gray-900/50 border-b border-gray-800 hover:bg-gray-800/70 transition-colors">
-                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-gray-200 whitespace-nowrap overflow-hidden">
+                          <tr className="bg-card/50 border-b border-border/50 hover:bg-card/70 transition-colors">
+                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 font-medium text-foreground whitespace-nowrap overflow-hidden">
                               <div className="flex items-center gap-1 w-full">
                                 <Button
                                   variant="ghost"
@@ -208,10 +236,10 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                   {isExpanded ? <VibeContentRenderer content="::FaChevronUp className='h-4 w-4'::" /> : <VibeContentRenderer content="::FaChevronDown className='h-4 w-4'::" />}
                                 </Button>
                                 <div className="flex flex-col flex-grow min-w-0">
-                                  <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline text-brand-cyan flex items-center gap-1 font-semibold truncate">
+                                  <a href={lead.lead_url || '#'} target="_blank" rel="noopener noreferrer" className={cn("hover:underline flex items-center gap-1 font-semibold truncate", pageTheme.accentColor)}>
                                     {lead.client_name || 'N/A'} <VibeContentRenderer content="::FaSquareArrowUpRight className='text-[0.6rem] sm:text-2xs flex-shrink-0'::" />
                                   </a>
-                                  {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-gray-500 italic truncate' title={`Источник: ${lead.source}`}>({lead.source})</span>}
+                                  {lead.source && <span className='block text-[0.6rem] sm:text-2xs text-muted-foreground italic truncate' title={`Источник: ${lead.source}`}>({lead.source})</span>}
                                   {(lead.similarity_score !== null && lead.similarity_score !== undefined) &&
                                     <span className={cn('block text-[0.65rem] sm:text-xs font-bold',
                                         lead.similarity_score >= 8 ? 'text-brand-lime' :
@@ -226,14 +254,14 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                 </div>
                               </div>
                             </td>
-                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-300 max-w-[150px] sm:max-w-[200px] md:max-w-xs hidden md:table-cell">
+                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-foreground max-w-[150px] sm:max-w-[200px] md:max-w-xs hidden md:table-cell">
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                     <span className="truncate block cursor-help" title={lead.project_description}>
                                         {lead.project_description ? lead.project_description.substring(0, 70) + (lead.project_description.length > 70 ? '...' : '') : '-'}
                                     </span>
                                 </TooltipTrigger>
-                                <TooltipContent className="bg-gray-950 border-brand-purple text-gray-300 max-w-xs p-2 text-xs">
+                                <TooltipContent className="bg-popover border-border text-popover-foreground max-w-xs p-2 text-xs">
                                     <p>{lead.project_description}</p>
                                 </TooltipContent>
                               </Tooltip>
@@ -252,13 +280,13 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                 onChange={(e) => lead.id && onUpdateStatus(lead.id, e.target.value)}
                                 disabled={isLoading}
                                 className={cn(
-                                  "bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none w-full",
-                                  lead.status === 'new' && 'ring-1 sm:ring-2 ring-yellow-400 font-bold',
-                                  lead.status === 'in_progress' && 'ring-1 sm:ring-2 ring-blue-400',
-                                  lead.status === 'interested' && 'ring-1 sm:ring-2 ring-pink-400 font-semibold',
-                                  lead.status === 'closed_won' && 'bg-green-700/50 ring-1 sm:ring-2 ring-green-400 text-black font-bold',
-                                  lead.status === 'closed_lost' && 'bg-red-700/50 ring-1 sm:ring-2 ring-red-400 text-gray-300',
-                                  lead.status === 'analyzed_by_pipeline' && 'bg-purple-700/30 ring-1 ring-brand-purple text-brand-purple'
+                                  "bg-muted border border-border/70 text-foreground text-[0.7rem] sm:text-xs rounded-md focus:ring-ring focus:border-ring p-1 sm:p-1.5 appearance-none w-full",
+                                  lead.status === 'new' && 'ring-2 ring-yellow-400 font-bold',
+                                  lead.status === 'in_progress' && 'ring-2 ring-blue-400',
+                                  lead.status === 'interested' && 'ring-2 ring-pink-400 font-semibold',
+                                  lead.status === 'closed_won' && 'bg-green-700/60 ring-2 ring-green-400 text-white font-bold',
+                                  lead.status === 'closed_lost' && 'bg-red-700/60 ring-2 ring-red-400 text-gray-300',
+                                  lead.status === 'analyzed_by_pipeline' && 'bg-purple-700/40 ring-1 ring-brand-purple text-brand-purple'
                                 )}
                               >
                                 <option value="new">Новый</option>
@@ -273,21 +301,21 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                 <option value="closed_lost">Провал</option>
                               </select>
                             </td>
-                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-gray-400 hidden sm:table-cell">
+                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-muted-foreground hidden sm:table-cell">
                               <select
                                 value={getAssigneeName(lead, 'tank') || getAssigneeName(lead, 'carry') || getAssigneeName(lead, 'support') || ''}
                                 onChange={(e) => {
                                   const value = e.target.value;
                                   const [role, id] = value.split(':');
                                   if (lead.id) {
-                                    if (value === "unassign_tank") onAssignLead(lead.id, 'tank', null);
-                                    else if (value === "unassign_carry") onAssignLead(lead.id, 'carry', null);
-                                    else if (value === "unassign_support") onAssignLead(lead.id, 'support', null);
-                                    else if (role && id) onAssignLead(lead.id, role as 'tank' | 'carry' | 'support', id);
+                                    if (value === "unassign_tank") handleAssignLeadWithAchievement(lead.id, 'tank', null);
+                                    else if (value === "unassign_carry") handleAssignLeadWithAchievement(lead.id, 'carry', null);
+                                    else if (value === "unassign_support") handleAssignLeadWithAchievement(lead.id, 'support', null);
+                                    else if (role && id) handleAssignLeadWithAchievement(lead.id, role as 'tank' | 'carry' | 'support', id);
                                   }
                                 }}
                                 disabled={isLoading}
-                                className="bg-gray-700 border border-gray-600 text-gray-200 text-[0.7rem] sm:text-xs rounded-md focus:ring-brand-orange focus:border-brand-orange p-1 sm:p-1.5 appearance-none w-full"
+                                className="bg-muted border border-border/70 text-foreground text-[0.7rem] sm:text-xs rounded-md focus:ring-ring focus:border-ring p-1 sm:p-1.5 appearance-none w-full"
                               >
                                 <option value="">Никому</option>
                                 <optgroup label="Танки">
@@ -307,11 +335,11 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                             <td className="px-2 sm:px-3 py-1.5 sm:py-2">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="text-brand-yellow hover:text-yellow-300 h-7 w-7 p-1" disabled={isLoading}>
+                                  <Button variant="ghost" size="icon" className={cn("h-7 w-7 p-1", pageTheme.accentColor, `hover:text-${pageTheme.accentColor}-300`)} disabled={isLoading}>
                                     <VibeContentRenderer content="::FaCircleInfo::" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent className="bg-gray-900 text-gray-200 border-brand-yellow/50 text-xs font-mono p-2 shadow-lg max-w-xs">
+                                <TooltipContent className="bg-popover text-popover-foreground border-border text-xs font-mono p-2 shadow-lg max-w-xs">
                                   <p>ID: {lead.id?.substring(0,8)}...</p>
                                   <p className="text-brand-pink">Твики (Танки): {tweaksCount}</p>
                                   <p className="text-brand-green">Новые фичи (Кэрри): {featuresCount}</p>
@@ -325,14 +353,13 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                               animate={{ opacity: 1, height: "auto", scaleY: 1 }}
                               exit={{ opacity: 0, height: 0, scaleY: 0.95 }}
                               transition={{ duration: 0.3, ease: "easeInOut" }}
-                              className="bg-gray-950/70 border-b border-gray-700"
+                              className="bg-card/30 border-b border-border/30"
                               style={{ transformOrigin: "top" }}
                             >
                               <td colSpan={5} className="p-4 sm:p-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-300 text-xs sm:text-sm">
-                                  {/* Project Description & Type */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-foreground text-xs sm:text-sm">
                                   <div className="space-y-2">
-                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
+                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.secondaryColor)}>
                                       <VibeContentRenderer content="::FaFileLines:: Полное описание проекта:" />
                                     </h5>
                                     <p className="leading-relaxed whitespace-pre-wrap">{lead.project_description || 'Нет описания.'}</p>
@@ -346,71 +373,67 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleCopyToClipboard(lead.raw_html_description || '', "Raw HTML скопирован!")}
-                                        className="text-brand-yellow hover:underline text-xs h-auto py-1 px-2"
+                                        className={cn("h-auto py-1 px-2 text-xs", pageTheme.accentColor, `hover:text-${pageTheme.accentColor}-300`)}
                                       >
                                         <VibeContentRenderer content="::FaCode:: Копировать Raw HTML" />
                                       </Button>
                                     )}
                                   </div>
 
-                                  {/* Financial and History Details - now always visible in expanded view */}
                                   <div className="space-y-2">
-                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
+                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.secondaryColor)}>
                                       <VibeContentRenderer content="::FaChartLine:: Дополнительные данные:" />
                                     </h5>
                                     <p><VibeContentRenderer content="::FaMoneyBillWave:: Бюджет:" /> {lead.budget_range || '-'}</p>
                                     <p><VibeContentRenderer content="::FaCalendarDay:: Дедлайн:" /> {lead.posted_at ? new Date(lead.posted_at).toLocaleDateString() : (lead as any).deadline_info || '-'}</p>
                                     <p><VibeContentRenderer content="::FaClock:: История клиента:" /> {lead.client_kwork_history || '-'}</p>
                                     <p><VibeContentRenderer content="::FaPercent:: Предложений:" /> {lead.current_kwork_offers_count || '-'}</p>
-                                    {/* Assignee details moved here for smaller screens */}
-                                    <div className="sm:hidden mt-2 pt-2 border-t border-gray-700">
-                                      <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
-                                        <VibeContentRenderer content="::FaShieldCat:: Назначены:" /> {/* Changed FaUsers to FaShieldCat */}
+                                    <div className="sm:hidden mt-2 pt-2 border-t border-border/30">
+                                      <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.secondaryColor)}>
+                                        <VibeContentRenderer content="::FaShieldCat:: Назначены:" />
                                       </h5>
-                                      {lead.assigned_to_tank && <p className="text-gray-400">Танк: {getAssigneeName(lead, 'tank')}</p>}
-                                      {lead.assigned_to_carry && <p className="text-gray-400">Кэрри: {getAssigneeName(lead, 'carry')}</p>}
-                                      {lead.assigned_to_support && <p className="text-gray-400">Саппорт: {getAssigneeName(lead, 'support')}</p>}
-                                      {!lead.assigned_to_tank && !lead.assigned_to_carry && !lead.assigned_to_support && <p className="text-gray-500">Никому не назначен.</p>}
+                                      {lead.assigned_to_tank && <p className="text-muted-foreground">Танк: {getAssigneeName(lead, 'tank')}</p>}
+                                      {lead.assigned_to_carry && <p className="text-muted-foreground">Кэрри: {getAssigneeName(lead, 'carry')}</p>}
+                                      {lead.assigned_to_support && <p className="text-muted-foreground">Саппорт: {getAssigneeName(lead, 'support')}</p>}
+                                      {!lead.assigned_to_tank && !lead.assigned_to_carry && !lead.assigned_to_support && <p className="text-gray-600">Никому не назначен.</p>}
                                     </div>
                                   </div>
 
-                                  {/* Generated Offer */}
-                                  <div className="md:col-span-2 space-y-2 pt-4 border-t border-gray-800">
-                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
+                                  <div className="md:col-span-2 space-y-2 pt-4 border-t border-border/30">
+                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.secondaryColor)}>
                                       <VibeContentRenderer content="::FaBullhorn:: Сгенерированное предложение (Оффер):" />
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleCopyToClipboard(lead.generated_offer || '', "Оффер скопирован!")}
-                                        className="ml-2 text-gray-400 hover:text-white h-auto py-1 px-2"
+                                        className="ml-2 text-muted-foreground hover:text-foreground h-auto py-1 px-2"
                                       >
                                         <VibeContentRenderer content="::FaCopy::" />
                                       </Button>
                                     </h5>
-                                    <div className="bg-gray-800/50 p-3 rounded-md border border-brand-purple/30 max-h-48 overflow-y-auto simple-scrollbar whitespace-pre-wrap">
+                                    <div className="bg-background/50 p-3 rounded-md border border-brand-purple/30 max-h-48 overflow-y-auto simple-scrollbar whitespace-pre-wrap">
                                       <VibeContentRenderer content={lead.generated_offer || 'Оффер не сгенерирован.'} />
                                     </div>
                                   </div>
 
-                                  {/* Identified Tweaks */}
-                                  <div className="space-y-2 pt-4 border-t border-gray-800">
-                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
+                                  <div className="space-y-2 pt-4 border-t border-border/30">
+                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.secondaryColor)}>
                                       <VibeContentRenderer content="::FaTools:: Твики (для Танков):" />
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleCopyToClipboard(JSON.stringify(tweaksParsed, null, 2), "Твики скопированы!")}
-                                        className="ml-2 text-gray-400 hover:text-white h-auto py-1 px-2"
+                                        className="ml-2 text-muted-foreground hover:text-foreground h-auto py-1 px-2"
                                       >
                                         <VibeContentRenderer content="::FaCopy::" />
                                       </Button>
                                     </h5>
                                     {tweaksParsed.length > 0 ? (
-                                      <ul className="list-disc list-inside bg-gray-800/50 p-3 rounded-md border border-brand-pink/30 max-h-48 overflow-y-auto simple-scrollbar">
+                                      <ul className="list-disc list-inside bg-background/50 p-3 rounded-md border border-brand-pink/30 max-h-48 overflow-y-auto simple-scrollbar">
                                         {tweaksParsed.map((tweak, idx) => (
                                           <li key={idx} className="mb-1">
                                             **{tweak.tweak_description}** ({tweak.estimated_complexity})
-                                            {tweak.relevant_supervibe_capability && <span className="block text-[0.6rem] text-gray-500">[{tweak.relevant_supervibe_capability}]</span>}
+                                            {tweak.relevant_supervibe_capability && <span className="block text-[0.6rem] text-muted-foreground">[{tweak.relevant_supervibe_capability}]</span>}
                                           </li>
                                         ))}
                                       </ul>
@@ -419,25 +442,24 @@ const LeadsDashboard: React.FC<LeadsDashboardProps> = ({
                                     )}
                                   </div>
 
-                                  {/* Missing Features */}
-                                  <div className="space-y-2 pt-4 border-t border-gray-800">
-                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.accentColor)}>
+                                  <div className="space-y-2 pt-4 border-t border-border/30">
+                                    <h5 className={cn("font-orbitron font-bold text-xs sm:text-sm", pageTheme.secondaryColor)}>
                                       <VibeContentRenderer content="::FaFlask:: Новые фичи (для Кэрри):" />
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleCopyToClipboard(JSON.stringify(featuresParsed, null, 2), "Фичи скопированы!")}
-                                        className="ml-2 text-gray-400 hover:text-white h-auto py-1 px-2"
+                                        className="ml-2 text-muted-foreground hover:text-foreground h-auto py-1 px-2"
                                       >
                                         <VibeContentRenderer content="::FaCopy::" />
                                       </Button>
                                     </h5>
                                     {featuresParsed.length > 0 ? (
-                                      <ul className="list-disc list-inside bg-gray-800/50 p-3 rounded-md border border-brand-green/30 max-h-48 overflow-y-auto simple-scrollbar">
+                                      <ul className="list-disc list-inside bg-background/50 p-3 rounded-md border border-brand-green/30 max-h-48 overflow-y-auto simple-scrollbar">
                                         {featuresParsed.map((feature, idx) => (
                                           <li key={idx} className="mb-1">
                                             **{feature.feature_description}**
-                                            {feature.reason_for_carry && <span className="block text-[0.6rem] text-gray-500">Причина: {feature.reason_for_carry}</span>}
+                                            {feature.reason_for_carry && <span className="block text-[0.6rem] text-muted-foreground">Причина: {feature.reason_for_carry}</span>}
                                             {feature.potential_impact_on_supervibe && <span className="block text-[0.6rem] text-brand-yellow">Impact: {feature.potential_impact_on_supervibe}</span>}
                                           </li>
                                         ))}
