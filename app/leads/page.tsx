@@ -429,7 +429,7 @@ const LeadGenerationHQPage = () => {
         return;
     }
     setIsLoading(true);
-    const result = await updateUserRole(currentUserId, newRole, currentUserId); // Передаем currentUserId как 'actor'
+    const result = await updateUserRole(currentUserId, newRole, currentUserId); 
     setIsLoading(false);
 
     if (result.success) {
