@@ -9,7 +9,7 @@ import {
     FaCopy, FaListCheck, FaBug, FaArrowRotateRight, FaPlus, FaPaperPlane, FaBroom, FaCheck,
     FaRobot, FaArrowsRotate, FaAngrycreative, FaPoo,
     FaList, FaCodeBranch, FaExclamation, FaImages, FaSpinner, FaUpLong,
-    FaAnglesDown, FaAnglesUp // Added for the new suggestion
+    FaAnglesDown, FaAnglesUp 
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -24,12 +24,13 @@ import {
 } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { useAppToast } from "@/hooks/useAppToast";
-import useInactivityTimer from "@/hooks/useInactivityTimer"; // Import the new hook
+import useInactivityTimer from "@/hooks/useInactivityTimer"; 
 
 // --- Constants & Types ---
 const INACTIVITY_TIMEOUT_MS = 60000; // 1 minute
 const BUDDY_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const BUDDY_ALT_TEXT = "Automation Buddy";
+const INITIAL_AUTO_ACTION_DELAY_MS = 2000; // 2 seconds
 
 interface Suggestion {
     id: string;
@@ -77,6 +78,7 @@ const AutomationBuddy: React.FC = () => {
 
     const animatedBuddyControls = useAnimationControls();
     const [animatedBuddyData, setAnimatedBuddyData] = useState<AnimatedBuddyVisualProps | null>(null);
+    const hasPerformedInitialAutoActionRef = useRef(false);
 
 
     // --- Hooks ---
@@ -97,10 +99,10 @@ const AutomationBuddy: React.FC = () => {
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed,
         triggerCreateOrUpdatePR, triggerToggleSettingsModal, scrollToSection,
         triggerClearKworkInput, getXuinityMessage,
-        triggerToggleAllSectionsGlobally, // New context function
-        sectionsCollapsed, // New context state
+        triggerToggleAllSectionsGlobally, 
+        sectionsCollapsed, 
     } = context;
-    logger.debug(`[AutomationBuddy] Context State Read: currentStep=${currentStep}, fetchStatus=${fetchStatus}, imageTask=${!!imageReplaceTask}, showComponents=${showComponents}, sectionsCollapsed=${sectionsCollapsed}`);
+    logger.debug(`[AutomationBuddy] Context State Read: currentStep=${currentStep}, sectionsCollapsed=${sectionsCollapsed}`);
 
     // --- Effects ---
     useEffect(() => { setIsMounted(true); logger.debug("[AutomationBuddy Effect] Mounted"); }, []);
@@ -109,7 +111,7 @@ const AutomationBuddy: React.FC = () => {
     useInactivityTimer(
         INACTIVITY_TIMEOUT_MS,
         () => { 
-            if (isMounted && !isOpen && !hasOpenedDueToInactivityRef.current && !animatedBuddyData) { // Don't auto-open if visual action is happening
+            if (isMounted && !isOpen && !hasOpenedDueToInactivityRef.current && !animatedBuddyData) { 
                 logger.log("[AutomationBuddy] Inactivity detected, auto-opening.");
                 setIsOpen(true);
                 hasOpenedDueToInactivityRef.current = true;
@@ -123,7 +125,7 @@ const AutomationBuddy: React.FC = () => {
     const activeMessage = useMemo(() => {
         logger.debug(`[AutomationBuddy Memo] Calculating activeMessage.`);
         if (!isMounted) return "Загрузка Бадди...";
-        if (animatedBuddyData) return animatedBuddyData.message; // Show action message if performing visual action
+        if (animatedBuddyData) return animatedBuddyData.message; 
         if (typeof getXuinityMessage === 'function') {
             const message = getXuinityMessage();
             logger.debug(`[AutomationBuddy Memo] getXuinityMessage returned: "${message}"`);
@@ -133,12 +135,11 @@ const AutomationBuddy: React.FC = () => {
         return "Ошибка получения статуса...";
     }, [isMounted, getXuinityMessage, animatedBuddyData]);
 
-    // --- Quick Action Handler ---
-    const handleQuickCollapseAll = async () => {
-        logger.info("[AutomationBuddy] handleQuickCollapseAll triggered.");
-        if (isOpen) setIsOpen(false); 
+    const performVisualCollapseAction = useCallback(async (isInitialAutoAction: boolean = false) => {
+        logger.info(`[AutomationBuddy] performVisualCollapseAction triggered. InitialAuto: ${isInitialAutoAction}`);
+        if (isOpen && !isInitialAutoAction) setIsOpen(false);
     
-        await new Promise(resolve => setTimeout(resolve, isOpen ? 300 : 50)); // Ensure dialog is gone / allow UI to settle
+        await new Promise(resolve => setTimeout(resolve, (isOpen && !isInitialAutoAction) ? 300 : 50)); 
     
         const fabContainer = document.getElementById("automation-buddy-fab-container");
         let initialX = window.innerWidth - 80; 
@@ -158,9 +159,15 @@ const AutomationBuddy: React.FC = () => {
             targetY = btnRect.top + btnRect.height / 2 - 32; 
         }
         
-        logger.debug(`QuickCollapse: Initial: (${initialX},${initialY}), Target: (${targetX},${targetY})`);
+        logger.debug(`VisualCollapseAction: Initial: (${initialX},${initialY}), Target: (${targetX},${targetY})`);
     
-        const message = sectionsCollapsed ? "Раскрываю секции для тебя!" : "Сворачиваю секции для тебя!";
+        let message = "";
+        if (isInitialAutoAction) {
+            message = "Сворачиваю инфо для начала!";
+        } else {
+            message = sectionsCollapsed ? "Раскрываю секции для тебя!" : "Сворачиваю секции для тебя!";
+        }
+
         setAnimatedBuddyData({
             message: message,
             initialPos: { x: initialX, y: initialY },
@@ -168,13 +175,11 @@ const AutomationBuddy: React.FC = () => {
         });
     
         try {
-            // Appear at initial position
             await animatedBuddyControls.start({
                 x: initialX, y: initialY,
                 opacity: 1, scale: 1,
                 transition: { duration: 0.2, ease: "easeOut" }
             });
-            // Move to target
             await animatedBuddyControls.start({
                 x: targetX, y: targetY,
                 transition: { type: "spring", stiffness: 110, damping: 18, duration: 0.7 }
@@ -187,17 +192,37 @@ const AutomationBuddy: React.FC = () => {
                 logger.error("[AutomationBuddy] triggerToggleAllSectionsGlobally is not a function!");
             }
             
-            // Hide
             await animatedBuddyControls.start({
                 opacity: 0, scale: 0,
                 transition: { delay: 0.4, duration: 0.3, ease: "easeIn" }
             });
         } catch (error) {
-            logger.error("[AutomationBuddy] QuickCollapse animation sequence error:", error);
+            logger.error("[AutomationBuddy] VisualCollapseAction animation sequence error:", error);
         } finally {
-            setAnimatedBuddyData(null); // Cleanup visual effect state
+            setAnimatedBuddyData(null); 
         }
-    };
+    }, [isOpen, sectionsCollapsed, animatedBuddyControls, triggerToggleAllSectionsGlobally, setIsOpen, setAnimatedBuddyData, logger]);
+
+
+    // Effect for initial auto-collapse action
+    useEffect(() => {
+        if (isMounted && showComponents && !hasPerformedInitialAutoActionRef.current && !sectionsCollapsed && !isOpen && !animatedBuddyData) {
+            logger.info("[AutomationBuddy Effect] Scheduling initial auto-collapse action.");
+            const timer = setTimeout(async () => {
+                // Re-check critical conditions before executing
+                if (isMounted && showComponents && !hasPerformedInitialAutoActionRef.current && !context.sectionsCollapsed && !isOpen && !animatedBuddyData) {
+                    logger.info("[AutomationBuddy] Executing initial auto-collapse action.");
+                    hasPerformedInitialAutoActionRef.current = true; 
+                    await performVisualCollapseAction(true); // Pass true for initial auto action
+                } else {
+                    logger.info("[AutomationBuddy] Conditions for initial auto-collapse changed or action already performed. Aborting auto-action.");
+                }
+            }, INITIAL_AUTO_ACTION_DELAY_MS);
+
+            return () => clearTimeout(timer);
+        }
+    }, [isMounted, showComponents, sectionsCollapsed, isOpen, animatedBuddyData, performVisualCollapseAction, context.sectionsCollapsed, logger]);
+
 
     useEffect(() => {
         logger.debug("[AutomationBuddy Effect] Calculating suggestions START");
@@ -223,7 +248,7 @@ const AutomationBuddy: React.FC = () => {
                 const safeAction = typeof action === 'function' ? action : () => logger.warn(`No action defined for suggestion ID: ${id}`);
                 if (requiresComponents && !canShowComponentActions) { condition = false; }
                 if (condition) {
-                    let isDisabled = disabled || isAnyLoading || !!animatedBuddyData; // Disable if visual action is happening
+                    let isDisabled = disabled || isAnyLoading || !!animatedBuddyData; 
                     if (['fetch', 'retry-fetch', 'retry-fetch-img'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || loadingPrs;
                     if (['add-selected', 'copy-kwork', 'clear-all'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || loadingPrs;
                     if (id.includes('ask-ai')) isDisabled = disabled || isAiGenerating;
@@ -234,7 +259,7 @@ const AutomationBuddy: React.FC = () => {
                     if (id === 'add-selected') isDisabled = disabled || selectedFetcherFiles.size === 0;
                     if (id === 'copy-kwork') isDisabled = disabled || !kworkInputHasContent; 
                     if (id === 'clear-all') isDisabled = disabled || (!selectedFetcherFiles.size && !kworkInputHasContent && !aiResponseHasContent && !filesParsed); 
-                    if (id === 'quick-collapse-all') isDisabled = disabled || !showComponents; // Only if components are shown
+                    if (id === 'quick-collapse-all') isDisabled = disabled || !showComponents; 
 
                     suggestionsList.push({ id, text, action: safeAction, icon, disabled: isDisabled, tooltip });
                 }
@@ -256,11 +281,10 @@ const AutomationBuddy: React.FC = () => {
              logger.debug("[Suggestion Calc] Standard Workflow");
              addSuggestion( 'toggle-settings', isSettingsModalOpen ? "Закрыть Настройки" : `Настройки (Цель: ${effectiveBranch})`, triggerToggleSettingsModal, <FaCodeBranch />, true, false, '', true );
             
-             // Add the new collapse/expand suggestion
-             if (showComponents) { // Only show if components area is visible
+             if (showComponents) { 
                 const collapseSuggestionText = sectionsCollapsed ? "Развернуть инфо-секции?" : "Свернуть инфо-секции?";
                 const collapseSuggestionIcon = sectionsCollapsed ? <FaAnglesUp /> : <FaAnglesDown />;
-                addSuggestion("quick-collapse-all", collapseSuggestionText, handleQuickCollapseAll, collapseSuggestionIcon, true, false, "Позволь мне быстро свернуть/раскрыть инфо-секции");
+                addSuggestion("quick-collapse-all", collapseSuggestionText, () => performVisualCollapseAction(false), collapseSuggestionIcon, true, false, "Позволь мне быстро свернуть/раскрыть инфо-секции");
              }
 
 
@@ -343,11 +367,11 @@ const AutomationBuddy: React.FC = () => {
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
         triggerToggleSettingsModal, scrollToSection, triggerClearKworkInput,
-        logger, sectionsCollapsed, animatedBuddyData // Added dependencies for new suggestion
+        logger, sectionsCollapsed, animatedBuddyData, performVisualCollapseAction 
     ]);
 
     useEffect(() => {
-        if (!isMounted || isOpen || animatedBuddyData) { // Also don't show notification if visual action is happening
+        if (!isMounted || isOpen || animatedBuddyData) { 
             if (isOpen || animatedBuddyData) logger.debug("[AutomationBuddy Effect] Suggestion Change - Resetting notification (buddy open or visual action)"); 
             setHasNewSuggestions(false); 
             return; 
@@ -362,11 +386,10 @@ const AutomationBuddy: React.FC = () => {
     }, [isMounted, suggestions, isOpen, logger, animatedBuddyData]);
 
     const handleEscKey = useCallback((e:KeyboardEvent) => { 
-        if(e.key==='Escape' && isOpen) { 
+        if(e.key==='Escape'&&isOpen) { 
             logger.debug("[AutomationBuddy CB] Escape key pressed, closing dialog."); 
             setIsOpen(false);
         }
-        // Note: Visual action buddy doesn't have an escape handler, it's too quick.
     }, [isOpen, logger]);
     useEffect(() => { document.addEventListener('keydown',handleEscKey); return()=>{document.removeEventListener('keydown',handleEscKey);}; }, [handleEscKey]);
 
@@ -375,7 +398,6 @@ const AutomationBuddy: React.FC = () => {
         logger.info(`[Buddy Click] Suggestion clicked: ${suggestion.id}`);
         if(suggestion.action){
              const r=suggestion.action();
-             // For quick-collapse-all, the dialog is already handled by the action itself (setIsOpen(false))
              if (!suggestion.id.startsWith('goto-') && !suggestion.id.includes('toggle-settings') && !suggestion.id.includes('retry-fetch') && suggestion.id !== 'img-replace-status' && suggestion.id !== 'quick-collapse-all') { 
                  logger.debug(`[Buddy Click] Closing buddy after action: ${suggestion.id}`); 
                  setIsOpen(false); 
@@ -391,7 +413,7 @@ const AutomationBuddy: React.FC = () => {
     const handleOverlayClick = () => { if (!animatedBuddyData) { logger.debug("[Buddy Click] Overlay clicked, closing."); setIsOpen(false); requestAnimationFrame(() => document.body.focus()); }};
     const handleDialogClick = (e:React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => {
-        if (animatedBuddyData) return; // Don't allow FAB click if visual action is in progress
+        if (animatedBuddyData) return; 
         logger.info(`[Buddy Click] FAB clicked. Current state: ${isOpen ? 'Open' : 'Closed'}`);
         const newIsOpenState = !isOpen;
         setIsOpen(newIsOpenState);
@@ -410,7 +432,7 @@ const AutomationBuddy: React.FC = () => {
         return (
             <>
                 <AnimatePresence>
-                    {isOpen && !animatedBuddyData && ( // Only show dialog if not doing visual action
+                    {isOpen && !animatedBuddyData && ( 
                         <motion.div key="buddy-dialog-overlay" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-4 bg-black bg-opacity-60 backdrop-blur-sm" onClick={handleOverlayClick} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} aria-modal="true" role="dialog" aria-labelledby="buddy-suggestions-title" >
                             <motion.div variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="relative p-4 w-full max-w-xs sm:max-w-sm md:max-w-md flex flex-col items-center sm:items-end bg-transparent" onClick={handleDialogClick} >
                                 <h2 id="buddy-suggestions-title" className="sr-only">Automation Buddy Suggestions</h2>
@@ -424,7 +446,7 @@ const AutomationBuddy: React.FC = () => {
                     )}
                 </AnimatePresence>
 
-                {!isOpen && !animatedBuddyData && ( // Only show FAB if dialog is closed and no visual action
+                {!isOpen && !animatedBuddyData && ( 
                     <div className="fixed bottom-12 right-4 z-50">
                         <motion.div 
                             id="automation-buddy-fab-container"
@@ -455,7 +477,7 @@ const AutomationBuddy: React.FC = () => {
                             <img src={BUDDY_IMAGE_URL} alt="Action Buddy" className="w-16 h-16 rounded-full shadow-lg" />
                             <SpeechBubble 
                                 message={animatedBuddyData.message} 
-                                className="mt-1 text-xs p-1 px-2 shadow-md bg-card text-card-foreground rounded-md" // Ensure proper styling
+                                className="mt-1 text-xs p-1 px-2 shadow-md bg-card text-card-foreground rounded-md" 
                                 bubblePosition="top" 
                             />
                         </motion.div>
