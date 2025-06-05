@@ -292,7 +292,7 @@ export async function assignLead(
 
 export async function fetchLeadsForDashboard(
   currentUserId: string,
-  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' 
+  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' | string // Allow string for client_name
 ): Promise<{ success: boolean; data?: LeadRow[]; error?: string }> {
   if (!supabaseAdmin) {
     console.error("[LeadsActions fetchLeadsForDashboard] Клиент БД не инициализирован");
@@ -314,24 +314,43 @@ export async function fetchLeadsForDashboard(
     const { role: currentUserRole, status: currentUserStatus } = currentUserData;
     let query = supabaseAdmin.from('leads').select('*').order('created_at', { ascending: false });
 
-    if (currentUserStatus === 'admin' || currentUserRole === 'support') {
-      if (filter === 'tank') query = query.neq('assigned_to_tank', null);
-      else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
-      else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); 
-      else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); 
-      else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
-      else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
-      else if (filter === 'my' && currentUserStatus === 'admin') { 
-        query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
+    const predefinedFilters = ['all', 'my', 'support', 'tank', 'carry', 'new', 'in_progress', 'interested'];
+
+    if (predefinedFilters.includes(filter)) {
+      // Existing filter logic for predefined keywords
+      if (currentUserStatus === 'admin' || currentUserRole === 'support') {
+        if (filter === 'tank') query = query.neq('assigned_to_tank', null);
+        else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
+        else if (filter === 'support' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId); 
+        else if (filter === 'support' && currentUserStatus === 'admin') query = query.neq('assigned_to_support', null); 
+        else if (['new', 'in_progress', 'interested'].includes(filter)) query = query.eq('status', filter);
+        else if (filter === 'my' && currentUserRole === 'support') query = query.eq('assigned_to_support', currentUserId);
+        else if (filter === 'my' && currentUserStatus === 'admin') { 
+          query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
+        }
+        // 'all' filter doesn't add specific role/status based WHERE clauses here for admin/support, shows all.
+      } else if (currentUserRole === 'tank') {
+        query = query.eq('assigned_to_tank', currentUserId);
+        if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
+      } else if (currentUserRole === 'carry') {
+        query = query.eq('assigned_to_carry', currentUserId);
+        if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
+      } else { // Guest or other roles with no specific assignments viewable might see nothing or a restricted set
+        // If non-admin/non-support/non-assigned role tries 'all', what should they see?
+        // For now, let's assume they see nothing unless explicitly assigned or it's a client_name search.
+        // If filter is 'all' or 'my' for these roles, and they are not assigned, they'd see 0.
+        // This path will be hit if filter is 'all' or 'my' for tank/carry but they have no assignments.
+        // Or if it's a guest-like role.
+        // If the goal is to prevent any data unless it's a client_name search below, we might return empty.
+        // However, the client_name search below will apply if filter isn't a predefined one.
       }
-    } else if (currentUserRole === 'tank') {
-      query = query.eq('assigned_to_tank', currentUserId);
-      if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
-    } else if (currentUserRole === 'carry') {
-      query = query.eq('assigned_to_carry', currentUserId);
-      if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
     } else {
-      return { success: true, data: [] };
+      // If filter is not one of the predefined, assume it's a client_name for searching.
+      // This allows HotVibes to pass "pavele0903" directly as the filter.
+      console.log(`[LeadsActions fetchLeadsForDashboard] Custom filter detected (treating as client_name): '${filter}'. Using ILIKE for case-insensitive exact match.`);
+      // Using ilike without '%' for case-insensitive exact match.
+      // If partial match is desired, use `'%${filter.trim()}%'`
+      query = query.ilike('client_name', filter.trim()); 
     }
     
     const { data, error } = await query;
@@ -341,6 +360,7 @@ export async function fetchLeadsForDashboard(
       return { success: false, error: `Ошибка БД: ${error.message}` };
     }
     
+    console.log(`[LeadsActions fetchLeadsForDashboard] Fetched ${data?.length || 0} leads with filter: ${filter}`);
     return { success: true, data: data || [] };
 
   } catch (error: any) {
@@ -348,6 +368,7 @@ export async function fetchLeadsForDashboard(
     return { success: false, error: error.message || 'Неожиданная серверная ошибка.' };
   }
 }
+
 
 export async function scrapePageContent(
   targetUrl: string
