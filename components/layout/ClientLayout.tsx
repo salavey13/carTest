@@ -2,7 +2,7 @@
 
 import type React from "react"; 
 import { Suspense, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
@@ -77,8 +77,25 @@ function AppInitializers() {
   return null; 
 }
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
+// This is the component that will consume context and handle routing
+function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { startParamPayload, isLoading: isAppLoading, isAuthenticating } = useAppContext();
+
+  useEffect(() => {
+    // Wait for app context to be fully loaded and not authenticating
+    if (!isAppLoading && !isAuthenticating) {
+      if (startParamPayload && pathname === '/') {
+        // If there's a startParam (nickname) and we are on the exact root path,
+        // redirect to /<nickname_lowercase>
+        // This assumes you have a dynamic route like app/[nickname]/page.tsx
+        const targetPath = `/${startParamPayload.toLowerCase()}`;
+        logger.info(`[ClientLayout Logic] Root path ('/') detected with startParamPayload '${startParamPayload}'. Redirecting to '${targetPath}'.`);
+        router.replace(targetPath); // Use replace to avoid adding "/" to history
+      }
+    }
+  }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating]);
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
   const pathsToShowBottomNavForStartsWith = [
@@ -86,32 +103,51 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     "/p-plan", 
     "/profile",
     "/hotvibes",
-    "/leads", // Added /leads here for bottom nav visibility
-  ]; 
+    "/leads",
+    // Add dynamic paths like /[nickname] if they should also have bottom nav
+    // This regex checks if the path is a single segment (likely a nickname)
+    // or if it's a nickname followed by / (e.g. /pavel/)
+    // Note: This simple regex might need adjustment if your nickname patterns are more complex
+    // or if you have other top-level routes that could be confused with nicknames.
+  ];
+  if (pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
+    pathsToShowBottomNavForStartsWith.push(pathname); // Dynamically add nickname paths
+  }
+
 
   const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname);
   const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p));
   
   const showBottomNav = isExactMatch || isStartsWithMatch;
-  logger.debug(`[ClientLayout] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
+  logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
 
+  return (
+    <>
+      <Header />
+      <main className={`flex-1 ${showBottomNav ? 'pb-20 sm:pb-0' : ''}`}> 
+        {children}
+      </main>
+      {showBottomNav && <BottomNavigation pathname={pathname} />}
+      <Suspense fallback={<LoadingChatButtonFallback />}>
+        <StickyChatButton />
+      </Suspense>
+      <Footer />
+    </>
+  );
+}
+
+
+export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
+  // The AppProvider should wrap any component that needs its context,
+  // including the LayoutLogicController which uses useAppContext.
   return (
     <ErrorOverlayProvider>
       <AppProvider> 
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-            <Header />
-            <main className={`flex-1 ${showBottomNav ? 'pb-20 sm:pb-0' : ''}`}> 
-              {children}
-            </main>
-            {showBottomNav && <BottomNavigation pathname={pathname} />}
-            <Suspense fallback={<LoadingChatButtonFallback />}>
-              <StickyChatButton />
-            </Suspense>
-            <Footer />
+            <LayoutLogicController>{children}</LayoutLogicController>
           </ErrorBoundaryForOverlay>
-
           <SonnerToaster
             position="bottom-right"
             richColors
