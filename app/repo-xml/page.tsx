@@ -1,4 +1,3 @@
-// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -176,30 +175,31 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     log("[ActualPageContent] START Render - Top Level");
 
     const { user } = useAppContext();
-    const pageContext = useRepoXmlPageContext();
-    const { info: toastInfo, error: toastError } = useAppToast();
+    const pageContext = useRepoXmlPageContext(); // pageContext will be fully initialized here
+    const { info: toastInfo, error: toastErrorHook } = useAppToast(); // Renamed to avoid conflict
 
     const [lang, setLang] = useState<keyof typeof translations>('en');
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     
-    // State for sections visibility
     const [isIntroVisible, setIsIntroVisible] = useState(true);
     const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
     const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
     const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
     const [isCtaVisible, setIsCtaVisible] = useState(true); 
-    const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
          return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
     }
-
+    
+    // Destructure AFTER checking pageContext
     const {
         fetcherRef, assistantRef, kworkInputRef,
         showComponents, setShowComponents,
+        sectionsCollapsed, triggerToggleAllSectionsGlobally // Use from context
     } = pageContext;
+
 
     useEffect(() => {
       debug("[Effect Lang] START");
@@ -218,23 +218,20 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
 
-    const toggleAllSections = useCallback(() => {
-        setSectionsCollapsed(prev => !prev);
-    }, []);
-
+    // Effect to control individual section visibility based on context's sectionsCollapsed
     useEffect(() => {
-        if (!t) return; // Don't run if translations are not loaded
+        if (!t) return; 
         const newVisibility = !sectionsCollapsed;
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        
-        
-            setIsCtaVisible(newVisibility);
-        
-        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
-    }, [sectionsCollapsed, t, showComponents, isCtaVisible]); 
+        // CTA visibility might have its own logic or also follow sectionsCollapsed
+        // For now, let's assume it follows if components are shown.
+        // setIsCtaVisible(newVisibility); // If CTA should also collapse/expand
+        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility} based on context.sectionsCollapsed: ${sectionsCollapsed}`);
+    }, [sectionsCollapsed, t]); 
+
 
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
@@ -257,7 +254,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             log(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            setIsCtaVisible(true); // Ensure CTA is visible when components are shown for the first time
+            setIsCtaVisible(true); 
             requestAnimationFrame(() => {
                 const el = document.getElementById(id);
                 if (el) {
@@ -276,12 +273,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const handleShowComponents = useCallback(() => {
         log("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
-        if (sectionsCollapsed) { // If user had previously collapsed all, expand them when showing components
-            setSectionsCollapsed(false);
+        if (sectionsCollapsed) { 
+            if (typeof triggerToggleAllSectionsGlobally === 'function') {
+                triggerToggleAllSectionsGlobally(); // Expand sections if they were collapsed
+            }
         }
         toastInfo("Компоненты загружены!", { duration: 1500 });
         setTimeout(() => scrollToSectionNav('extractor'), 100);
-    }, [setShowComponents, toastInfo, log, scrollToSectionNav, sectionsCollapsed]);
+    }, [setShowComponents, toastInfo, log, scrollToSectionNav, sectionsCollapsed, triggerToggleAllSectionsGlobally]);
 
      if (isPageLoading) {
          log(`[Render] ActualPageContent: Rendering Loading State (Waiting for translations)`);
@@ -299,7 +298,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
+    // Use context's sectionsCollapsed for the master toggle button's title
     const masterToggleTitle = sectionsCollapsed ? t.expandAll : t.collapseAll;
+
 
     const CloseButton = ({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) => (
         <button
@@ -320,7 +321,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                 <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto">
                     
                     <button
-                        onClick={toggleAllSections}
+                        id="master-toggle-sections-button" // Added ID
+                        onClick={triggerToggleAllSectionsGlobally} // Use context function
                         className="fixed top-20 left-4 sm:left-6 text-slate-300 hover:text-white z-50 p-2 rounded-full bg-dark-card/70 hover:bg-dark-card/90 backdrop-blur-sm shadow-lg border border-slate-700 hover:border-slate-500 transition-all"
                         title={masterToggleTitle}
                         aria-label={masterToggleTitle}
@@ -452,7 +454,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         </section>
                     )}
 
-                    {showComponents && ( // Core components are always shown if showComponents is true
+                    {showComponents && ( 
                          <>
                             <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse"><VibeContentRenderer content={t.componentsTitle} /></h2>
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
@@ -479,11 +481,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isCtaVisible && ( 
                         <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                            {/* Outer Border Div */}
                             <div className="relative p-1.5 rounded-xl bg-gradient-to-b from-blue-800 to-purple-700 shadow-2xl">
-                                {/* Middle Border Div */}
                                 <div className="p-1 rounded-lg bg-gradient-to-b from-orange-400 via-pink-400 to-purple-700">
-                                    {/* Content Div */}
                                     <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
                                         <button 
                                             onClick={() => setIsCtaVisible(false)} 
@@ -509,8 +508,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                         </div>
-
-                                        
                                         <div className="text-slate-300 text-base prose-invert"> <VibeContentRenderer content={t.ctaDude} /> </div>
                                     </div>
                                 </div>
@@ -521,7 +518,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
                          <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
-                         {showComponents && ( /* Navigation for components is always available if showComponents is true, regardless of sectionsCollapsed */
+                         {showComponents && ( 
                             <>
                                 <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
                                 <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-brand-cyan/80 backdrop-blur-sm rounded-full hover:bg-brand-cyan/70 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
