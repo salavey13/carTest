@@ -1,16 +1,16 @@
 import { WebhookHandler } from "./types";
 import { subscriptionHandler } from "./subscription";
-import { carRentalHandler } from "./car-rental"; // Restored car rental handler
+import { carRentalHandler } from "./car-rental"; 
 import { supportHandler } from "./support";
 import { donationHandler } from "./donation";
 import { scriptAccessHandler } from "./script-access";
 import { inventoryScriptAccessHandler } from "./inventory-script-access";
 import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
-import { protocardPurchaseHandler } from "./protocard-purchase-handler"; // Новый обработчик
+import { protocardPurchaseHandler } from "./protocard-purchase-handler"; 
 // Import the specific supabaseAdmin instance from your hook
 import { supabaseAdmin } from "@/hooks/supabase";
-import { sendTelegramMessage } from "../actions"; // Import from main actions
+import { sendTelegramMessage } from "../actions"; 
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 
@@ -27,7 +27,7 @@ const handlers: WebhookHandler[] = [
   inventoryScriptAccessHandler,
   selfDevBoostHandler,
   disableDummyModeHandler,
-  protocardPurchaseHandler, // Добавлен новый обработчик
+  protocardPurchaseHandler, 
 ];
 
 export async function handleWebhookProxy(update: any) {
@@ -51,13 +51,15 @@ export async function handleWebhookProxy(update: any) {
   if (update.message?.successful_payment) {
     const payment = update.message.successful_payment;
     const userId = update.message.chat.id.toString(); 
-    const { invoice_payload, total_amount } = payment;
-    logger.log(`Webhook Proxy: Handling successful_payment. Payload: ${invoice_payload}, Amount: ${total_amount}, UserID: ${userId}`);
+    // total_amount приходит в минимальных единицах валюты (например, копейки для RUB, центы для USD, или сами XTR для XTR)
+    // Для XTR, total_amount УЖЕ является количеством звезд. Делить на 100 не нужно.
+    const { invoice_payload, total_amount: totalAmountInStars } = payment; 
+    logger.log(`Webhook Proxy: Handling successful_payment. Payload: ${invoice_payload}, Amount: ${totalAmountInStars} XTR, UserID: ${userId}`);
 
     try {
       const { data: invoice, error: invoiceError } = await supabaseAdmin
         .from("invoices")
-        .select("*") // Select all fields including subscription_id and metadata
+        .select("*") 
         .eq("id", invoice_payload)
         .maybeSingle(); 
 
@@ -67,9 +69,9 @@ export async function handleWebhookProxy(update: any) {
       }
 
       if (!invoice) {
-        logger.error(`Webhook Proxy: Invoice not found in DB for payload: ${invoice_payload}. Payment amount: ${total_amount}, User: ${userId}`);
+        logger.error(`Webhook Proxy: Invoice not found in DB for payload: ${invoice_payload}. Payment amount: ${totalAmountInStars} XTR, User: ${userId}`);
         await sendTelegramMessage(
-          `🚨 ВНИМАНИЕ: Получен платеж (${total_amount / 100} XTR) с неизвестным payload: ${invoice_payload} от пользователя ${userId}. Инвойс не найден в базе!`,
+          `🚨 ВНИМАНИЕ: Получен платеж (${totalAmountInStars} XTR) с неизвестным payload: ${invoice_payload} от пользователя ${userId}. Инвойс не найден в базе!`,
           [],
           undefined,
           ADMIN_CHAT_ID 
@@ -81,31 +83,7 @@ export async function handleWebhookProxy(update: any) {
         logger.warn(`Webhook Proxy: Invoice ${invoice_payload} already marked as paid. Skipping processing.`);
         return; 
       }
-
-      // Обновление статуса инвойса на 'paid' теперь будет происходить внутри каждого хендлера,
-      // чтобы избежать двойного обновления или обновления перед тем, как хендлер подтвердит успешность.
-      // Однако, если хендлер упадет до обновления статуса, это может быть проблемой.
-      // Возможно, лучше оставить обновление статуса здесь, а хендлеры будут заниматься специфической логикой.
-      // Для MVP оставим обновление статуса здесь, если хендлер не предполагает иного.
-      // НО! protocardPurchaseHandler САМ обновляет статус. Поэтому для него это делать не нужно.
-      // Для других хендлеров, если они не делают этого явно, оставим.
-      // Для большей чистоты, каждый хендлер должен сам отвечать за обновление статуса инвойса.
-      // Пока что, если это не protocard, обновим здесь.
-      if (!invoice.type?.startsWith('protocard_')) {
-          const { error: updateInvoiceError } = await supabaseAdmin
-            .from("invoices")
-            .update({ status: "paid", updated_at: new Date().toISOString() })
-            .eq("id", invoice_payload);
-
-          if (updateInvoiceError) {
-            logger.error(`Webhook Proxy: Error marking non-protocard invoice ${invoice_payload} as paid:`, updateInvoiceError);
-            // Не прерываем, если это не критично для самого хендлера
-          } else {
-            logger.log(`Webhook Proxy: Non-protocard invoice ${invoice_payload} marked as paid.`);
-          }
-      }
-
-
+      
       const { data: userData, error: userError } = await supabaseAdmin
         .from("users")
         .select("*") 
@@ -129,8 +107,8 @@ export async function handleWebhookProxy(update: any) {
         await handler.handle(
           invoice,
           userId,
-          userData || { user_id: userId, metadata: {}, username: `tg_user_${userId}` }, // Provide default if userData is null
-          total_amount, // Передаем сумму в минимальных единицах XTR (как пришло от Telegram)
+          userData || { user_id: userId, metadata: {}, username: `tg_user_${userId}` }, 
+          totalAmountInStars, // Передаем сумму как есть, в XTR
           supabaseAdmin,
           TELEGRAM_BOT_TOKEN, 
           ADMIN_CHAT_ID,
@@ -140,7 +118,7 @@ export async function handleWebhookProxy(update: any) {
       } else {
         logger.warn(`Webhook Proxy: No handler found for invoice. Payload: ${invoice_payload}, DB Type: ${invoice.type}.`);
         await sendTelegramMessage( 
-          `⚠️ Необработанный платеж! Payload: ${invoice_payload}, Тип в БД: ${invoice.type || 'N/A'}, Сумма: ${total_amount} XTR (min. units), Пользователь: ${userId}`,
+          `⚠️ Необработанный платеж! Payload: ${invoice_payload}, Тип в БД: ${invoice.type || 'N/A'}, Сумма: ${totalAmountInStars} XTR, Пользователь: ${userId}`,
           [],
           undefined,
           ADMIN_CHAT_ID
