@@ -78,6 +78,12 @@ export const SimpleImageUploadTool: React.FC<SimpleImageUploadToolProps> = ({ on
         try {
             logger.info(`[SimpleImageUploadTool] Starting upload for ${file.name} to bucket ${bucketName}`);
             const result = await uploadBatchImages(formData);
+            logger.debug("[SimpleImageUploadTool] uploadBatchImages result:", result);
+
+
+            if (!result) { // Check if result itself is undefined
+                throw new Error("Результат загрузки не определен.");
+            }
 
             if (result.success && result.data && result.data.length > 0 && result.data[0].url) {
                 const url = result.data[0].url;
@@ -86,11 +92,11 @@ export const SimpleImageUploadTool: React.FC<SimpleImageUploadToolProps> = ({ on
                 toast.success(`${file.type.startsWith("video/") ? 'Видео' : 'Файл'} загружен!`, { id: uploadToastId });
                 onUploadComplete(url); // Notify parent
             } else {
-                const errorMsg = result.error || result.failed?.[0]?.error || `Не удалось загрузить ${file.type.startsWith("video/") ? 'файл' : 'файл'}.`;
+                const errorMsg = result.error || result.failed?.[0]?.error || `Не удалось загрузить ${file.type.startsWith("video/") ? 'файл' : 'файл'}. Подробности: ${JSON.stringify(result)}`;
                 throw new Error(errorMsg);
             }
         } catch (error: any) {
-            logger.error("[SimpleImageUploadTool] Upload failed:", error);
+            logger.error("[SimpleImageUploadTool] Upload failed:", error, { errorMessage: error.message, stack: error.stack });
             toast.error(error.message || "Ошибка загрузки.", { id: uploadToastId });
             setUploadedFile(null);
         } finally {
@@ -140,7 +146,7 @@ export const SimpleImageUploadTool: React.FC<SimpleImageUploadToolProps> = ({ on
                             ) : uploadedFile ? (
                                 <VibeContentRenderer content={`::FaCircleCheck className='text-green-400 mr-2':: Файл: ${uploadedFile.name.substring(0,20)}...`} />
                             ) : (
-                                <VibeContentRenderer content="::FaPaperclip className='mr-2':: Выбрать файл (до {MAX_VIDEO_SIZE_MB}MB видео)" />
+                                <VibeContentRenderer content={`::FaPaperclip className='mr-2':: Выбрать файл (до ${MAX_VIDEO_SIZE_MB}MB видео)`} />
                             )}
                         </label>
                     </Button>
