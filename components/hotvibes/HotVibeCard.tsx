@@ -163,11 +163,11 @@ export function HotVibeCard({ lead, isMissionUnlocked, onExecuteMission, current
               <div 
                 aria-hidden="true" 
                 className={cn(
-                  "w-full font-orbitron text-[0.7rem] sm:text-xs py-1.5 sm:py-2 rounded-md flex items-center justify-center pointer-events-none",
+                  "w-full font-orbitron text-[0.65rem] sm:text-xs py-1 sm:py-1.5 rounded-md flex items-center justify-center pointer-events-none text-center leading-tight", // Adjusted padding and leading
                   isMissionUnlocked ? `${theme.accentGradient} text-black shadow-md` : "bg-gray-600 text-gray-400"
                 )}
               >
-                <VibeContentRenderer content={isMissionUnlocked ? (currentLang === 'ru' ? "::FaBolt:: Взять Миссию!" : "::FaBolt:: Take Mission!") : (currentLang === 'ru' ? "::FaLock:: Навык Закрыт (Инфо)" : "::FaLock:: Skill Locked (Info)")} />
+                <VibeContentRenderer content={isMissionUnlocked ? (currentLang === 'ru' ? "::FaBolt:: Взять Миссию!" : "::FaBolt:: Take Mission!") : (currentLang === 'ru' ? "::FaLock:: Навык Закрыт" : "::FaLock:: Skill Locked")} />
               </div>
             </CardFooter>
         </Card>
