@@ -39,7 +39,7 @@ const ADD_NEW_ID = "add-new";
 const HIRE_ME_ID = "hire-me";
 const COPY_LOGS_ID = "copy-logs"; 
 const UPLOAD_IMAGE_GET_URL_ID = "upload-image-get-url"; // New ID
-const REPO_XML_PAGE_PATH = '/repo-xml';
+const REPO_XML_PAGE_PATH = '/repo-xml'; // Constant for repo-xml path
 
 interface Suggestion { id: string; text: string | React.ReactNode; link?: string; action?: () => void; icon?: React.ReactNode; isHireMe?: boolean; isFixAction?: boolean; isImageReplaceAction?: boolean; disabled?: boolean; tooltip?: string; }
 interface GitHubProfile { login: string; avatar_url: string; html_url: string; name?: string | null; }
@@ -439,9 +439,9 @@ const StickyChatButton: React.FC = () => {
                                                 <ToolsMenu
                                                     customLinks={[]}
                                                     onAddCustomLink={() => {
-                                                        toast.info("Управление ссылками в AI Ассистенте.", {
+                                                        toast.info("Управление ссылками в СуперВайб Студии.", {
                                                             description: "Хотите перейти?",
-                                                            action: { label: "Вперед!", onClick: () => { router.push('/ai-assistant'); setIsOpen(false); } }
+                                                            action: { label: "Вперед!", onClick: () => { router.push(REPO_XML_PAGE_PATH); setIsOpen(false); } }
                                                         });
                                                     }}
                                                 />
