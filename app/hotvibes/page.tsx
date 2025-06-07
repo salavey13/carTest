@@ -162,13 +162,10 @@ function HotVibesClientContent() {
       if (effectiveId) {
         logger.info(`[HotVibes InitialIdEffect] Setting initialVipIdentifier to: ${effectiveId}`);
         setInitialVipIdentifier(effectiveId);
-        if (startParamPayload && leadIdFromUrl === startParamPayload && router) {
-           // ClientLayout теперь обрабатывает редирект для startParamPayload, так что здесь не нужно
-        }
       }
       setIsInitialVipCheckDone(true); 
     }
-  }, [startParamPayload, searchParamsHook, appCtxLoading, isAuthenticating, router, isInitialVipCheckDone]);
+  }, [startParamPayload, searchParamsHook, appCtxLoading, isAuthenticating, isInitialVipCheckDone]);
   
   const loadPageData = useCallback(async () => {
     logger.info(`[HotVibes loadPageData] Triggered. AppCtxLoading: ${appCtxLoading}, isInitialVipCheckDone: ${isInitialVipCheckDone}, InitialVIP_ID: ${initialVipIdentifier}`);
@@ -238,13 +235,13 @@ function HotVibesClientContent() {
     }
     setPageLoading(false);
     logger.debug("[HotVibes loadPageData] Finished.");
-  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone]); // Removed refreshDbUser, vipLeadToShow, lobbyLeads from deps
+  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone]);
 
   useEffect(() => {
-    if (isInitialVipCheckDone) { // Only load if initial VIP check is done
+    if (isInitialVipCheckDone) { 
         loadPageData();
     }
-  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); // Added dbUser?.metadata?.xtr_protocards as dependency for re-check
+  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); 
 
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
@@ -298,7 +295,7 @@ function HotVibesClientContent() {
             setTimeout(async () => {
                 logger.info("[HotVibes handlePurchaseProtoCard] Executing scheduled dbUser refresh.");
                 await refreshDbUser(); 
-            }, 5000); // Increased delay slightly for webhook processing
+            }, 5000); 
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -352,7 +349,7 @@ function HotVibesClientContent() {
   
   const elonCardIsSupportedActually = useMemo(() => {
     const isSupported = !!dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active';
-    logger.debug(`[HotVibes elonCardIsSupportedActually] Memo re-calc. dbUser metadata exists: ${!!dbUser?.metadata}, xtr_protocards exists: ${!!dbUser?.metadata?.xtr_protocards}, Elon card: ${dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]}, Status: ${dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status}. Result: ${isSupported}`);
+    logger.debug(`[HotVibes elonCardIsSupportedActually] Memo re-calc. dbUser metadata exists: ${!!dbUser?.metadata}, xtr_protocards exists: ${!!dbUser?.metadata?.xtr_protocards}, Elon card: ${JSON.stringify(dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID])}, Status: ${dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status}. Result: ${isSupported}`);
     return isSupported;
   }, [dbUser?.metadata?.xtr_protocards]);
 
@@ -434,9 +431,9 @@ function HotVibesClientContent() {
           className="w-full max-w-5xl mx-auto"
         >
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl border-2 shadow-2xl",
-              "border-brand-red/70 shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]",
-              "relative z-20" 
+              "bg-dark-card/95 backdrop-blur-xl border shadow-2xl", // Убрал border-2, цвет рамки теперь из theme
+              theme.borderColor, 
+              theme.shadowColor
             )}
           >
             <CardHeader className="pb-4 pt-6">
@@ -456,7 +453,7 @@ function HotVibesClientContent() {
                     className={cn(
                         "text-[0.65rem] sm:text-xs px-2 sm:px-3 py-1 transform hover:scale-105 font-mono", 
                         activeFilter === 'all' 
-                            ? `bg-gradient-to-r from-brand-orange to-brand-red text-black shadow-md hover:opacity-95` 
+                            ? `bg-gradient-to-r from-brand-orange to-red-600 text-white shadow-md hover:opacity-95` // Ярче для активного "Все Вайбы"
                             : `border-brand-red text-brand-red hover:bg-brand-red/10`
                     )}
                   >
