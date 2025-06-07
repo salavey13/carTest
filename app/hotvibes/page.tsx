@@ -19,7 +19,7 @@ import {
 } from '@/hooks/cyberFitnessSupabase';
 import { fetchLeadsForDashboard, fetchLeadByIdentifierOrNickname } from '../leads/actions'; 
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
-import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard';  // HotVibeCardTheme больше не импортируется
+import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard';
 import { VipLeadDisplay } from '@/components/hotvibes/VipLeadDisplay'; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
@@ -178,14 +178,12 @@ function HotVibesClientContent() {
     setPageLoading(true);
     logger.debug("[HotVibes loadPageData] Proceeding with data fetch.");
 
-    let tempCyberProfile: CyberFitnessProfile | null = null;
-    if (isAuthenticated && dbUser?.user_id) {
+    if (isAuthenticated && dbUser?.user_id && (!cyberProfile || dbUser?.updated_at !== cyberProfile?.lastActivityTimestamp)) { // Запрашиваем профиль только если он изменился или не загружен
         logger.debug(`[HotVibes loadPageData] Fetching CyberFitness profile for user: ${dbUser.user_id}`);
         const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (profileResult.success && profileResult.data) {
-          tempCyberProfile = profileResult.data;
-          setCyberProfile(tempCyberProfile);
-          logger.debug("[HotVibes loadPageData] CyberFitness profile fetched:", tempCyberProfile);
+          setCyberProfile(profileResult.data);
+          logger.debug("[HotVibes loadPageData] CyberFitness profile fetched:", profileResult.data);
         } else { 
           addToast(t.errorLoadingProfile, "error"); 
           logger.warn("[HotVibes loadPageData] Failed to fetch CyberFitness profile:", profileResult.error);
@@ -235,13 +233,13 @@ function HotVibesClientContent() {
     }
     setPageLoading(false);
     logger.debug("[HotVibes loadPageData] Finished.");
-  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone]);
+  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone, cyberProfile]); // Добавил cyberProfile
 
   useEffect(() => {
     if (isInitialVipCheckDone) { 
         loadPageData();
     }
-  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); 
+  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); // dbUser.metadata.xtr_protocards как зависимость
 
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
@@ -339,8 +337,14 @@ function HotVibesClientContent() {
   }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast]);
   
   const elonCardIsSupportedActually = useMemo(() => {
-    const isSupported = !!dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active';
-    logger.debug(`[HotVibes elonCardIsSupportedActually] Memo re-calc. dbUser metadata exists: ${!!dbUser?.metadata}, xtr_protocards exists: ${!!dbUser?.metadata?.xtr_protocards}, Elon card: ${JSON.stringify(dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID])}, Status: ${dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status}. Result: ${isSupported}`);
+    const cards = dbUser?.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
+    if (!cards) {
+      logger.debug(`[HotVibes elonCardIsSupportedActually] xtr_protocards is missing or not an object. Result: false`);
+      return false;
+    }
+    const elonCard = cards[ELON_SIMULATOR_CARD_ID];
+    const isSupported = elonCard?.status?.toLowerCase() === 'active';
+    logger.debug(`[HotVibes elonCardIsSupportedActually] ID: ${ELON_SIMULATOR_CARD_ID}, CardData: ${JSON.stringify(elonCard)}, Status from DB: ${elonCard?.status}, Comparison result: ${isSupported}`);
     return isSupported;
   }, [dbUser?.metadata?.xtr_protocards]);
 
@@ -392,7 +396,6 @@ function HotVibesClientContent() {
           >
             <VipLeadDisplay 
               lead={vipLeadToShow} 
-              // theme={cardTheme} // theme больше не передается в VipLeadDisplay
               currentLang={currentLang}
               isMissionUnlocked={cyberProfile ? (vipLeadToShow.required_quest_id && vipLeadToShow.required_quest_id !== "none" ? checkQuestUnlocked(vipLeadToShow.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
               onExecuteMission={() => handleExecuteMission(vipLeadToShow.id, vipLeadToShow.required_quest_id)}
@@ -422,8 +425,8 @@ function HotVibesClientContent() {
           className="w-full max-w-5xl mx-auto"
         >
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl shadow-2xl border-brand-red/70", // Убрали theme.borderColor, используем конкретный класс
-              "shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]" // Убрали theme.shadowColor
+              "bg-dark-card/95 backdrop-blur-xl shadow-2xl border-brand-red/70", 
+              "shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]" 
             )}
           >
             <CardHeader className="pb-4 pt-6">
@@ -481,15 +484,6 @@ function HotVibesClientContent() {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
                   {displayedLeads.map((leadWithStatus) => {
                       const { isSpecial, isSupported, ...lead } = leadWithStatus;
-                      // cardTheme больше не используется для HotVibeCard
-                      const currentCardTheme = { // Оставляем для HotVibeCard, если он всё ещё её использует, но лучше убрать и оттуда
-                        borderColor: isSpecial ? "border-brand-yellow/70" : "border-brand-red/70",
-                        accentGradient: isSpecial ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500" : "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500",
-                        shadowColor: isSpecial ? "shadow-yellow-glow" : "shadow-brand-red/40",
-                        hoverBorderColor: isSpecial ? "hover:border-brand-yellow" : "hover:border-brand-red",
-                        hoverShadowColor: isSpecial ? "hover:shadow-yellow-glow/60" : "hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]",
-                        textColor: isSpecial ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red",
-                      };
                       return (
                         <HotVibeCard
                           key={lead.id}
@@ -501,7 +495,7 @@ function HotVibesClientContent() {
                           isSpecial={!!isSpecial}   
                           onViewVip={handleSelectLeadForVip} 
                           currentLang={currentLang}
-                          theme={currentCardTheme} // Передаем вычисленную тему
+                          // theme prop удален из HotVibeCard
                           translations={t}
                           isPurchasePending={isPurchasePending}
                           isAuthenticated={isAuthenticated}
