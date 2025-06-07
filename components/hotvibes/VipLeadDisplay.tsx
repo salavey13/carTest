@@ -85,8 +85,8 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
 
   return (
     <Card className={cn(
-        "overflow-hidden rounded-xl sm:rounded-2xl border backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", 
-        theme.borderColor, 
+        "overflow-hidden rounded-xl sm:rounded-2xl backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", 
+        // theme.borderColor, // Убрали рамку из темы для внешней карточки
         `shadow-[0_0_30px_-10px_rgba(var(--brand-cyan-rgb),0.5)] sm:shadow-[0_0_70px_-20px_rgba(var(--brand-cyan-rgb),0.7)]`, 
         "bg-gradient-to-br from-black/80 via-slate-900/70 to-black/80" 
     )}>
@@ -117,7 +117,7 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
       <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 font-mono">
         
         {!isElonCard && (
-            <Card className={cn("border p-3 sm:p-3.5 shadow-md backdrop-blur-sm rounded-lg", theme.modalCardBg || "bg-black/50", theme.modalCardBorder || "border-white/10")}>
+            <Card className={cn("p-3 sm:p-3.5 shadow-md backdrop-blur-sm rounded-lg", theme.modalCardBg || "bg-black/50", theme.modalCardBorder || "border-transparent")}> {/* Убрали рамку для внутренней карточки */}
                 <ShadCardHeader className="p-0 mb-1.5 sm:mb-2">
                     <ShadCardTitle className={cn("text-sm sm:text-md font-orbitron flex items-center", theme.modalAccentColor || "text-brand-cyan")}>
                         <VibeContentRenderer content={t.missionBriefing}/>
@@ -138,7 +138,7 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
                     <VibeContentRenderer content={t.fullDescription}/>
                 </ShadCardTitle>
             </ShadCardHeader>
-            <CardContent className={cn("p-3 sm:p-3.5 rounded-lg text-xs sm:text-sm text-gray-300/90 whitespace-pre-wrap break-words max-h-60 sm:max-h-72 overflow-y-auto simple-scrollbar border", theme.modalCardBg || "bg-black/40", theme.modalCardBorder || "border-white/10")}>
+            <CardContent className={cn("p-3 sm:p-3.5 rounded-lg text-xs sm:text-sm text-gray-300/90 whitespace-pre-wrap break-words max-h-60 sm:max-h-72 overflow-y-auto simple-scrollbar", theme.modalCardBg || "bg-black/40", theme.modalCardBorder ? `border ${theme.modalCardBorder}` : "border-transparent" )}> {/* Убрали рамку для внутренней карточки */}
                 <VibeContentRenderer content={lead.project_description || t.noDescription} />
             </CardContent>
         </div>
@@ -164,7 +164,7 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
                         </Button>
                     </div>
                 </ShadCardHeader>
-                <CardContent className={cn("p-3 sm:p-3.5 rounded-lg text-xs sm:text-sm text-gray-300/90 whitespace-pre-wrap break-words max-h-80 sm:max-h-96 overflow-y-auto simple-scrollbar border", theme.modalCardBg || "bg-black/40", theme.modalCardBorder || "border-white/10")}>
+                <CardContent className={cn("p-3 sm:p-3.5 rounded-lg text-xs sm:text-sm text-gray-300/90 whitespace-pre-wrap break-words max-h-80 sm:max-h-96 overflow-y-auto simple-scrollbar", theme.modalCardBg || "bg-black/40", theme.modalCardBorder ? `border ${theme.modalCardBorder}` : "border-transparent" )}> {/* Убрали рамку для внутренней карточки */}
                      <VibeContentRenderer content={lead.ai_generated_proposal_draft || t.noOffer} />
                 </CardContent>
             </div>
@@ -177,7 +177,7 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
                         <VibeContentRenderer content="::FaImage className='mr-1.5 sm:mr-2':: Демонстрация Прототипа"/>
                     </ShadCardTitle>
                 </ShadCardHeader>
-                <div className="aspect-video relative w-full rounded-md sm:rounded-lg overflow-hidden border border-white/15 shadow-lg">
+                <div className="aspect-video relative w-full rounded-md sm:rounded-lg overflow-hidden shadow-lg"> {/* Убрали рамку */}
                     <Image
                         src={actualDemoImage}
                         alt={`Actual demo for ${lead.kwork_gig_title || 'VIP Lead'}`}
