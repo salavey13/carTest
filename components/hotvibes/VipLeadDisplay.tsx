@@ -1,3 +1,4 @@
+// /components/hotvibes/VipLeadDisplay.tsx
 "use client";
 
 import React from 'react';
@@ -8,14 +9,15 @@ import { Button } from '@/components/ui/button';
 import { 
     Card, 
     CardContent, 
-    CardHeader as ShadCardHeader, // Using Shad prefixes for clarity if CardHeader etc. are used locally
+    CardHeader as ShadCardHeader, 
     CardTitle as ShadCardTitle, 
     CardDescription as ShadCardDescription 
 } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import type { HotLeadData, HotVibeCardTheme } from './HotVibeCard'; // Import types
-import { FaCopy, FaLink, FaClipboardList, FaLightbulb, FaCommentsDollar } from "react-icons/fa6"; // Changed FaFileLines, added FaCommentsDollar
+import type { HotLeadData, HotVibeCardTheme } from './HotVibeCard'; 
+import { FaCopy, FaLink, FaClipboardList, FaLightbulb, FaCommentsDollar, FaGamepad } from "react-icons/fa6"; 
 import { toast } from 'sonner';
+import { ELON_SIMULATOR_CARD_ID } from '@/app/hotvibes/page'; 
 
 interface VipLeadDisplayProps {
   lead: HotLeadData;
@@ -26,46 +28,51 @@ interface VipLeadDisplayProps {
 }
 
 const MODAL_BACKGROUND_FALLBACK_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/cyberpunk-cityscape-artistic-4k-ax-1920x1080.jpg";
-const PLACEHOLDER_DEMO_IMAGE_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vibe_city_neon_future-2d7a8b9e-a9f9-4b1f-8e4d-9f6a123b4c5d.jpg"; // More generic for actual demo
+const PLACEHOLDER_DEMO_IMAGE_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vibe_city_neon_future-2d7a8b9e-a9f9-4b1f-8e4d-9f6a123b4c5d.jpg"; 
 
 const vipPageTranslations = {
   ru: {
     pageTitleBase: "VIP Прототип для",
-    missionBriefing: "::FaListCheck className='mr-2 text-lg':: Брифинг Ультра-Миссии",
+    elonPageTitle: "Симулятор 'Рынка Маска'",
+    missionBriefing: "::FaListCheck className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Брифинг Ультра-Миссии",
     budget: "Бюджет:", 
     taskType: "Тип Задачи:", 
     requiredSkill: "Ключевой Навык:", 
     clientStatus: "Статус Клиента:",
-    fullDescription: "::FaClipboardList className='mr-2 text-lg':: Полное Техзадание", // Changed Icon
-    draftOffer: "::FaCommentsDollar className='mr-2 text-lg':: Наше Готовое Предложение", // Changed Icon
-    viewOriginalKwork: "Оригинал Заказа на KWork",
-    copyOffer: "Копировать Предложение",
-    executeMission: "::FaRocket className='mr-2':: Активировать VIBE & Запустить Миссию!",
-    skillLocked: "::FaLock className='mr-2':: Требуется Апгрейд Навыка",
+    fullDescription: "::FaClipboardList className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Полное Техзадание", 
+    draftOffer: "::FaCommentsDollar className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Наше Готовое Предложение", 
+    viewOriginalKwork: "Оригинал", // Shorter for mobile
+    copyOffer: "Копи", // Shorter for mobile
+    executeMission: "::FaRocket className='mr-1.5 sm:mr-2':: Активировать VIBE!", // Slightly shorter
+    skillLocked: "::FaLock className='mr-1.5 sm:mr-2':: Навык Заблокирован",
     noDescription: "Детальное описание проекта не предоставлено.",
     noOffer: "Предложение для этого проекта пока не сформировано.",
+    goToSimulator: "::FaGamepad className='mr-1.5 sm:mr-2':: К Симулятору Маска"
   },
   en: {
     pageTitleBase: "VIP Prototype for",
-    missionBriefing: "::FaListCheck className='mr-2 text-lg':: Ultra-Mission Briefing",
+    elonPageTitle: "Musk Market Simulator",
+    missionBriefing: "::FaListCheck className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Ultra-Mission Briefing",
     budget: "Budget:", 
     taskType: "Task Type:", 
     requiredSkill: "Key Skill:", 
     clientStatus: "Client Status:",
-    fullDescription: "::FaClipboardList className='mr-2 text-lg':: Full Task Description", // Changed Icon
-    draftOffer: "::FaCommentsDollar className='mr-2 text-lg':: Our Ready-Made Proposal", // Changed Icon
-    viewOriginalKwork: "Original Order on KWork",
-    copyOffer: "Copy Proposal",
-    executeMission: "::FaRocket className='mr-2':: Activate VIBE & Launch Mission!",
-    skillLocked: "::FaLock className='mr-2':: Skill Upgrade Required",
+    fullDescription: "::FaClipboardList className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Full Task Description", 
+    draftOffer: "::FaCommentsDollar className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Our Ready-Made Proposal", 
+    viewOriginalKwork: "Order", // Shorter for mobile
+    copyOffer: "Copy", // Shorter for mobile
+    executeMission: "::FaRocket className='mr-1.5 sm:mr-2':: Activate VIBE!", // Slightly shorter
+    skillLocked: "::FaLock className='mr-1.5 sm:mr-2':: Skill Locked",
     noDescription: "Detailed project description not provided.",
     noOffer: "A proposal for this project has not been drafted yet.",
+    goToSimulator: "::FaGamepad className='mr-1.5 sm:mr-2':: Go to Musk Simulator"
   }
 };
 
 export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnlocked, onExecuteMission }: VipLeadDisplayProps) {
+  const isElonCard = lead.id === ELON_SIMULATOR_CARD_ID;
   const imageForHeroArea = lead.demo_image_url || MODAL_BACKGROUND_FALLBACK_VIP;
-  const actualDemoImage = lead.demo_image_url || PLACEHOLDER_DEMO_IMAGE_VIP; // Image for the content block
+  const actualDemoImage = lead.demo_image_url || PLACEHOLDER_DEMO_IMAGE_VIP; 
 
   const handleCopyToClipboard = (text: string | null | undefined, message: string) => {
     if (!text) { toast.error("Нет текста для копирования."); return; }
@@ -75,108 +82,103 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
   };
 
   const t = vipPageTranslations[currentLang];
-  const pageTitle = `${t.pageTitleBase} ${lead.client_name || lead.kwork_gig_title || (currentLang === 'ru' ? 'Агента' : 'Agent')}`;
+  const pageTitle = isElonCard ? t.elonPageTitle : `${t.pageTitleBase} ${lead.client_name || lead.kwork_gig_title || (currentLang === 'ru' ? 'Агента' : 'Agent')}`;
 
   return (
     <Card className={cn(
-        "overflow-hidden rounded-2xl border-2 backdrop-blur-2xl shadow-2xl w-full", 
+        "overflow-hidden rounded-xl sm:rounded-2xl border-2 backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", 
         theme.borderColor, 
-        `shadow-[0_0_70px_-20px_rgba(var(--brand-cyan-rgb),0.7)]`, 
-        "bg-gradient-to-br from-dark-card/90 via-black/85 to-dark-card/90" 
+        `shadow-[0_0_30px_-10px_rgba(var(--brand-cyan-rgb),0.5)] sm:shadow-[0_0_70px_-20px_rgba(var(--brand-cyan-rgb),0.7)]`, 
+        "bg-gradient-to-br from-black/80 via-slate-900/70 to-black/80" 
     )}>
-      {/* Hero Image Section - Full Width */}
-      <div className="relative w-full h-[40vh] sm:h-[50vh] md:h-[55vh] group overflow-hidden">
+      <div className="relative w-full h-[35vh] sm:h-[45vh] md:h-[50vh] group overflow-hidden">
         <Image
             src={imageForHeroArea}
             alt={`${lead.kwork_gig_title || 'VIP Lead'} - Hero Background`}
             fill
             priority
-            className="object-cover opacity-40 group-hover:opacity-50 transition-opacity duration-500 ease-out scale-105 group-hover:scale-110"
+            className="object-cover opacity-30 sm:opacity-40 group-hover:opacity-40 sm:group-hover:opacity-50 transition-opacity duration-500 ease-out scale-105 group-hover:scale-110"
         />
-        <div className={cn("absolute inset-0", theme.modalImageOverlayGradient || "bg-gradient-to-t from-black/90 via-black/40 to-transparent")} />
-        <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-4 sm:p-6 md:p-8 z-10">
-            <VibeContentRenderer content={`::FaEye className="text-6xl sm:text-7xl mb-4 ${theme.modalAccentColor || 'text-brand-cyan'} opacity-80 text-glow-cyan"::`} />
+        <div className={cn("absolute inset-0", theme.modalImageOverlayGradient || "bg-gradient-to-t from-black/80 via-black/30 to-transparent")} />
+        <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-3 sm:p-4 md:p-6 z-10">
+            <VibeContentRenderer content={`::${isElonCard ? 'FaGamepad' : 'FaEye'} className="text-5xl sm:text-6xl mb-3 ${theme.modalAccentColor || 'text-brand-cyan'} opacity-80 text-glow-cyan"::`} />
             <h1 className={cn(
-                "font-orbitron text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold line-clamp-3 leading-tight", 
+                "font-orbitron text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold line-clamp-3 leading-tight", 
                 theme.modalAccentColor || "text-brand-cyan", 
-                "text-glow-cyan drop-shadow-2xl"
+                "text-glow-cyan drop-shadow-lg sm:drop-shadow-2xl"
                 )}
-                data-text={pageTitle} // For glitch effect if you add it
+                data-text={pageTitle}
             >
                 {pageTitle}
             </h1>
-            {lead.ai_summary && <p className="text-sm sm:text-base text-gray-300/90 mt-3 line-clamp-3 font-mono max-w-xl">{lead.ai_summary}</p>}
+            {lead.ai_summary && <p className="text-xs sm:text-sm text-gray-300/80 mt-2 sm:mt-3 line-clamp-2 sm:line-clamp-3 font-mono max-w-md sm:max-w-xl px-2">{lead.ai_summary}</p>}
         </div>
       </div>
 
-      {/* Content Section */}
-      <div className="p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6 font-mono">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 font-mono">
         
-        {/* Mission Briefing */}
-        <Card className={cn("border p-3.5 sm:p-4 shadow-lg backdrop-blur-sm", theme.modalCardBg || "bg-black/60", theme.modalCardBorder || "border-white/15")}>
-            <ShadCardHeader className="p-0 mb-2 sm:mb-2.5">
-                <ShadCardTitle className={cn("text-md sm:text-lg font-orbitron flex items-center", theme.modalAccentColor || "text-brand-cyan")}>
-                    <VibeContentRenderer content={t.missionBriefing}/>
-                </ShadCardTitle>
-            </ShadCardHeader>
-            <CardContent className="p-0 text-xs sm:text-sm space-y-1.5 text-gray-200">
-                {lead.potential_earning && <p><VibeContentRenderer content="::FaMoneyBillWave className='text-brand-green mr-2':: "/>{t.budget} <span className="font-semibold text-white">{lead.potential_earning}</span></p>}
-                {lead.project_type_guess && <p><VibeContentRenderer content="::FaLightbulb className='text-brand-yellow mr-2':: "/>{t.taskType} <span className="font-semibold text-white">{lead.project_type_guess}</span></p>}
-                {lead.required_quest_id && <p><VibeContentRenderer content="::FaBoltLightning className='text-brand-orange mr-2':: "/>{t.requiredSkill} <span className="font-semibold text-white">{lead.required_quest_id}</span></p>}
-                {lead.client_response_snippet && <p className="text-brand-lime"><VibeContentRenderer content="::FaCommentDots className='text-brand-lime mr-2':: "/>{t.clientStatus} <span className="font-semibold text-white italic">"{lead.client_response_snippet}"</span></p>}
-            </CardContent>
-        </Card>
+        {!isElonCard && (
+            <Card className={cn("border p-3 sm:p-3.5 shadow-md backdrop-blur-sm rounded-lg", theme.modalCardBg || "bg-black/50", theme.modalCardBorder || "border-white/10")}>
+                <ShadCardHeader className="p-0 mb-1.5 sm:mb-2">
+                    <ShadCardTitle className={cn("text-sm sm:text-md font-orbitron flex items-center", theme.modalAccentColor || "text-brand-cyan")}>
+                        <VibeContentRenderer content={t.missionBriefing}/>
+                    </ShadCardTitle>
+                </ShadCardHeader>
+                <CardContent className="p-0 text-xs space-y-1 text-gray-200/90">
+                    {lead.potential_earning && <p><VibeContentRenderer content="::FaMoneyBillWave className='text-brand-green mr-1.5 sm:mr-2':: "/>{t.budget} <span className="font-semibold text-white">{lead.potential_earning}</span></p>}
+                    {lead.project_type_guess && <p><VibeContentRenderer content="::FaLightbulb className='text-brand-yellow mr-1.5 sm:mr-2':: "/>{t.taskType} <span className="font-semibold text-white">{lead.project_type_guess}</span></p>}
+                    {lead.required_quest_id && lead.required_quest_id !== "none" && <p><VibeContentRenderer content="::FaBoltLightning className='text-brand-orange mr-1.5 sm:mr-2':: "/>{t.requiredSkill} <span className="font-semibold text-white">{lead.required_quest_id}</span></p>}
+                    {lead.client_response_snippet && <p className="text-brand-lime"><VibeContentRenderer content="::FaCommentDots className='text-brand-lime mr-1.5 sm:mr-2':: "/>{t.clientStatus} <span className="font-semibold text-white italic">"{lead.client_response_snippet}"</span></p>}
+                </CardContent>
+            </Card>
+        )}
 
-        {/* Full Description */}
-        <div className="pt-1">
-            <ShadCardHeader className="p-0 mb-1.5 sm:mb-2">
-                <ShadCardTitle className={cn("text-md sm:text-lg font-orbitron flex items-center", theme.modalAccentColor || "text-brand-purple")}>
+        <div className="pt-0.5">
+            <ShadCardHeader className="p-0 mb-1 sm:mb-1.5">
+                <ShadCardTitle className={cn("text-sm sm:text-md font-orbitron flex items-center", theme.modalAccentColor || "text-brand-purple")}>
                     <VibeContentRenderer content={t.fullDescription}/>
                 </ShadCardTitle>
             </ShadCardHeader>
-            <CardContent className={cn("p-3.5 sm:p-4 rounded-lg text-sm sm:text-base text-gray-300/95 whitespace-pre-wrap break-words max-h-72 overflow-y-auto simple-scrollbar border", theme.modalCardBg, theme.modalCardBorder)}>
+            <CardContent className={cn("p-3 sm:p-3.5 rounded-lg text-xs sm:text-sm text-gray-300/90 whitespace-pre-wrap break-words max-h-60 sm:max-h-72 overflow-y-auto simple-scrollbar border", theme.modalCardBg || "bg-black/40", theme.modalCardBorder || "border-white/10")}>
                 <VibeContentRenderer content={lead.project_description || t.noDescription} />
             </CardContent>
         </div>
         
-        {/* Offer Draft */}
-        {lead.ai_generated_proposal_draft && (
-            <div className="pt-1">
-                 <ShadCardHeader className="p-0 flex flex-row justify-between items-center mb-1.5 sm:mb-2">
-                    <ShadCardTitle className={cn("text-md sm:text-lg font-orbitron flex items-center", theme.modalAccentColor || "text-brand-pink")}>
+        {lead.ai_generated_proposal_draft && !isElonCard && (
+            <div className="pt-0.5">
+                 <ShadCardHeader className="p-0 flex flex-row justify-between items-center mb-1 sm:mb-1.5">
+                    <ShadCardTitle className={cn("text-sm sm:text-md font-orbitron flex items-center", theme.modalAccentColor || "text-brand-pink")}>
                         <VibeContentRenderer content={t.draftOffer}/>
                     </ShadCardTitle>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
                         {lead.kwork_url && (
                             <Link href={lead.kwork_url} target="_blank" rel="noopener noreferrer" passHref legacyBehavior>
-                            <Button variant="outline" size="sm" className={cn("h-8 px-2.5 py-1 text-xs border-brand-blue/60 text-brand-blue hover:bg-brand-blue/10 hover:text-blue-300", `focus:ring-brand-blue`)} title={t.viewOriginalKwork}>
-                                <FaLink className="mr-1.5 h-3.5 w-3.5"/> {currentLang === 'ru' ? 'KWork' : 'Order'}
+                            <Button variant="outline" size="xs" className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-blue/50 text-brand-blue hover:bg-brand-blue/10 hover:text-blue-300", `focus:ring-brand-blue`)} title={t.viewOriginalKwork}>
+                                <FaLink className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5"/> {t.viewOriginalKwork}
                             </Button>
                             </Link>
                         )}
-                        <Button variant="outline" size="sm" className={cn("h-8 px-2.5 py-1 text-xs border-brand-pink/60 text-brand-pink hover:bg-brand-pink/10 hover:text-pink-300", `focus:ring-brand-pink`)}
+                        <Button variant="outline" size="xs" className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 hover:text-pink-300", `focus:ring-brand-pink`)}
                                 title={t.copyOffer}
                                 onClick={() => handleCopyToClipboard(lead.ai_generated_proposal_draft, currentLang === 'ru' ? "Предложение скопировано!" : "Proposal copied!")}>
-                            <FaCopy className="mr-1.5 h-3.5 w-3.5"/> {currentLang === 'ru' ? 'Копи' : 'Copy'}
+                            <FaCopy className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5"/> {t.copyOffer}
                         </Button>
                     </div>
                 </ShadCardHeader>
-                <CardContent className={cn("p-3.5 sm:p-4 rounded-lg text-sm sm:text-base text-gray-300/95 whitespace-pre-wrap break-words max-h-96 overflow-y-auto simple-scrollbar border", theme.modalCardBg, theme.modalCardBorder)}>
-                     {/* Используем VibeContentRenderer для оффера, чтобы переносы строк \n работали */}
+                <CardContent className={cn("p-3 sm:p-3.5 rounded-lg text-xs sm:text-sm text-gray-300/90 whitespace-pre-wrap break-words max-h-80 sm:max-h-96 overflow-y-auto simple-scrollbar border", theme.modalCardBg || "bg-black/40", theme.modalCardBorder || "border-white/10")}>
                      <VibeContentRenderer content={lead.ai_generated_proposal_draft || t.noOffer} />
                 </CardContent>
             </div>
         )}
 
-        {/* Actual Demo Image if different from hero */}
-        {lead.demo_image_url && lead.demo_image_url !== imageForHeroArea && (
-             <div className="pt-3">
-                <ShadCardHeader className="p-0 mb-1.5 sm:mb-2">
-                    <ShadCardTitle className={cn("text-md sm:text-lg font-orbitron flex items-center", theme.modalAccentColor || "text-brand-green")}>
-                        <VibeContentRenderer content="::FaImage:: Демонстрация Прототипа"/>
+        {lead.demo_image_url && lead.demo_image_url !== imageForHeroArea && !isElonCard && (
+             <div className="pt-2 sm:pt-3">
+                <ShadCardHeader className="p-0 mb-1 sm:mb-1.5">
+                    <ShadCardTitle className={cn("text-sm sm:text-md font-orbitron flex items-center", theme.modalAccentColor || "text-brand-green")}>
+                        <VibeContentRenderer content="::FaImage className='mr-1.5 sm:mr-2':: Демонстрация Прототипа"/>
                     </ShadCardTitle>
                 </ShadCardHeader>
-                <div className="aspect-video relative w-full rounded-lg overflow-hidden border-2 border-white/20 shadow-xl">
+                <div className="aspect-video relative w-full rounded-md sm:rounded-lg overflow-hidden border border-white/15 shadow-lg">
                     <Image
                         src={actualDemoImage}
                         alt={`Actual demo for ${lead.kwork_gig_title || 'VIP Lead'}`}
@@ -188,19 +190,18 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
             </div>
         )}
 
-        {/* CTA Button */}
-        <div className="pt-5 sm:pt-8">
+        <div className="pt-4 sm:pt-6">
             <Button
-            onClick={onExecuteMission}
-            disabled={!isMissionUnlocked}
+            onClick={onExecuteMission} 
+            disabled={!isMissionUnlocked && !isElonCard}
             variant="default"
             size="lg" 
             className={cn(
-                "w-full font-orbitron text-base sm:text-lg py-3.5 shadow-xl hover:shadow-2xl",
-                isMissionUnlocked ? `${theme.accentGradient} text-black hover:brightness-125 active:scale-95` : "bg-muted text-muted-foreground cursor-not-allowed"
+                "w-full font-orbitron text-sm sm:text-base py-3 sm:py-3.5 shadow-lg hover:shadow-xl",
+                (isMissionUnlocked || isElonCard) ? `${theme.accentGradient} text-black hover:brightness-110 active:scale-95` : "bg-muted text-muted-foreground cursor-not-allowed"
             )}
             >
-            <VibeContentRenderer content={isMissionUnlocked ? t.executeMission : t.skillLocked} />
+            <VibeContentRenderer content={isElonCard ? t.goToSimulator : (isMissionUnlocked ? t.executeMission : t.skillLocked)} />
             </Button>
         </div>
       </div>

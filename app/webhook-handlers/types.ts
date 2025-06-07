@@ -1,3 +1,4 @@
+// /app/webhook-handlers/types.ts
 import { SupabaseClient } from "@supabase/supabase-js";
 
 // Define a more specific type for the invoice object if possible
