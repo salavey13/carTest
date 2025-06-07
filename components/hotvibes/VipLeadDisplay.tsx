@@ -40,9 +40,9 @@ const vipPageTranslations = {
     clientStatus: "Статус Клиента:",
     fullDescription: "::FaClipboardList className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Полное Техзадание", 
     draftOffer: "::FaCommentsDollar className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Наше Готовое Предложение", 
-    viewOriginalKwork: "Оригинал", // Shorter for mobile
-    copyOffer: "Копи", // Shorter for mobile
-    executeMission: "::FaRocket className='mr-1.5 sm:mr-2':: Активировать VIBE!", // Slightly shorter
+    viewOriginalKwork: "Оригинал", 
+    copyOffer: "Копи", 
+    executeMission: "::FaRocket className='mr-1.5 sm:mr-2':: Активировать VIBE!", 
     skillLocked: "::FaLock className='mr-1.5 sm:mr-2':: Навык Заблокирован",
     noDescription: "Детальное описание проекта не предоставлено.",
     noOffer: "Предложение для этого проекта пока не сформировано.",
@@ -58,9 +58,9 @@ const vipPageTranslations = {
     clientStatus: "Client Status:",
     fullDescription: "::FaClipboardList className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Full Task Description", 
     draftOffer: "::FaCommentsDollar className='mr-1.5 sm:mr-2 text-base sm:text-lg':: Our Ready-Made Proposal", 
-    viewOriginalKwork: "Order", // Shorter for mobile
-    copyOffer: "Copy", // Shorter for mobile
-    executeMission: "::FaRocket className='mr-1.5 sm:mr-2':: Activate VIBE!", // Slightly shorter
+    viewOriginalKwork: "Order", 
+    copyOffer: "Copy", 
+    executeMission: "::FaRocket className='mr-1.5 sm:mr-2':: Activate VIBE!", 
     skillLocked: "::FaLock className='mr-1.5 sm:mr-2':: Skill Locked",
     noDescription: "Detailed project description not provided.",
     noOffer: "A proposal for this project has not been drafted yet.",
@@ -85,7 +85,7 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
 
   return (
     <Card className={cn(
-        "overflow-hidden rounded-xl sm:rounded-2xl border backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", // Убрал border-2, цвет будет из theme
+        "overflow-hidden rounded-xl sm:rounded-2xl border backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", 
         theme.borderColor, 
         `shadow-[0_0_30px_-10px_rgba(var(--brand-cyan-rgb),0.5)] sm:shadow-[0_0_70px_-20px_rgba(var(--brand-cyan-rgb),0.7)]`, 
         "bg-gradient-to-br from-black/80 via-slate-900/70 to-black/80" 
