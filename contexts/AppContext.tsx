@@ -7,7 +7,7 @@ import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
 import { toast } from "sonner";
 import { fetchUserData as dbFetchUserData } from "@/hooks/supabase"; 
-import type { Database } from "@/types/database.types"; // Явный импорт типа
+import type { Database } from "@/types/database.types"; 
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   startParamPayload: string | null;
@@ -20,48 +20,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const telegramHookData = useTelegram(); 
   const { user, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
-  const [dbUser, setDbUser] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(telegramHookData.dbUser); 
+  // Локальный стейт для dbUser, инициализируется из хука, но может обновляться функцией refreshDbUser
+  const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(telegramHookData.dbUser); 
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
-  const [isContextLoading, setIsContextLoading] = useState(isTelegramLoading);
-  const [isContextAuthenticating, setIsContextAuthenticating] = useState(isTelegramAuthenticating);
-  const [contextError, setContextError] = useState<Error | null>(telegramError);
+  
+  // Состояния загрузки и аутентификации берем из хука useTelegram, т.к. он управляет основным потоком
+  const isLoading = isTelegramLoading;
+  const isAuthenticating = isTelegramAuthenticating;
+  const error = telegramError;
 
+  // Синхронизируем dbUser из useTelegram, если он там изменился (например, при первом получении)
   useEffect(() => {
-    setDbUser(telegramHookData.dbUser);
-    // logger.debug("[AppContext] dbUser from telegramHookData updated:", telegramHookData.dbUser);
+    // debugLogger.log("[AppContext] telegramHookData.dbUser changed, updating local dbUser state:", telegramHookData.dbUser);
+    setDbUserInternal(telegramHookData.dbUser);
   }, [telegramHookData.dbUser]);
-
-  useEffect(() => {
-    setIsContextLoading(isTelegramLoading);
-  }, [isTelegramLoading]);
-
-  useEffect(() => {
-    setIsContextAuthenticating(isTelegramAuthenticating);
-  }, [isTelegramAuthenticating]);
-
-  useEffect(() => {
-    setContextError(telegramError);
-  }, [telegramError]);
 
 
   const refreshDbUser = useCallback(async () => {
     if (user?.id) {
       debugLogger.info(`[AppContext refreshDbUser] Refreshing dbUser for user ID: ${user.id}`);
-      setIsContextLoading(true); 
+      // Показываем загрузку во время обновления, если это необходимо UI (можно убрать, если не нужно)
+      // setIsContextLoading(true); 
       try {
         const freshDbUser = await dbFetchUserData(String(user.id));
-        setDbUser(freshDbUser); // Обновляем локальный стейт dbUser
-        debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully. New metadata:`, freshDbUser?.metadata);
+        setDbUserInternal(freshDbUser); // Обновляем локальный стейт dbUser
+        debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully. New metadata:`, freshDbUser?.metadata?.xtr_protocards);
       } catch (e) {
         globalLogger.error("[AppContext refreshDbUser] Error refreshing dbUser:", e);
-        setContextError(e instanceof Error ? e : new Error("Failed to refresh user data"));
+        // setContextError(e instanceof Error ? e : new Error("Failed to refresh user data"));
       } finally {
-        setIsContextLoading(false);
+        // setIsContextLoading(false);
       }
     } else {
       debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user.id is not available.");
     }
-  }, [user?.id]); // Зависимость от user.id
+  }, [user?.id]);
 
 
   useEffect(() => {
@@ -78,28 +71,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [telegramHookData.tg, telegramHookData.tg?.initDataUnsafe?.start_param, startParamPayload]);
 
   const contextValue = useMemo(() => {
-    // debugLogger.debug("[AppContext] Re-memoizing contextValue. dbUser changed:", dbUser);
+    // debugLogger.debug("[AppContext] Re-memoizing contextValue. Key dependencies changed. isLoading:", isLoading, "isAuthenticating:", isAuthenticating, "dbUser reference changed:", dbUser !== telegramHookData.dbUser);
     return {
         ...restTelegramData,
         user, 
-        dbUser, 
-        isLoading: isContextLoading, 
-        isAuthenticating: isContextAuthenticating, 
-        error: contextError, 
+        dbUser, // Теперь это наш локальный стейт, который обновляется
+        isLoading, 
+        isAuthenticating, 
+        error, 
         startParamPayload,
         refreshDbUser, 
     };
-  }, [restTelegramData, user, dbUser, isContextLoading, isContextAuthenticating, contextError, startParamPayload, refreshDbUser]);
+  }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser]);
 
   useEffect(() => {
-    debugLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value changed. Current state from context:", {
+    debugLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value or dbUser changed. Current state from context:", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
       isAuthenticating: contextValue.isAuthenticating,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
-      dbUserExists: !!contextValue.dbUser, // Добавлено для отладки
-      dbUserMetadataExists: !!contextValue.dbUser?.metadata, // Добавлено
-      xtrProtocardsExist: !!contextValue.dbUser?.metadata?.xtr_protocards, // Добавлено
+      dbUserExists: !!contextValue.dbUser, 
+      dbUserMetadataExists: !!contextValue.dbUser?.metadata, 
+      xtrProtocardsExist: !!contextValue.dbUser?.metadata?.xtr_protocards, 
+      xtrProtocardsContent: contextValue.dbUser?.metadata?.xtr_protocards, // Логируем содержимое для отладки
       dbUserStatus: contextValue.dbUser?.status,
       dbUserRole: contextValue.dbUser?.role,
       isAdminFuncType: typeof contextValue.isAdmin,
@@ -109,66 +103,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       platform: contextValue.platform,
       startParamPayload: contextValue.startParamPayload,
     });
-  }, [contextValue]);
+  }, [contextValue, dbUser]); // Добавил dbUser как зависимость
 
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 350;
     const isClient = typeof document !== 'undefined';
-
-    // debugLogger.log(`[APP_CONTEXT EFFECT_TOAST_LOGIC] Evaluating toasts. isLoading: ${contextValue.isLoading}, isAuthenticating: ${contextValue.isAuthenticating}, isAuthenticated: ${contextValue.isAuthenticated}, error: ${contextValue.error?.message}, isInTG: ${contextValue.isInTelegramContext}, MOCK_ENV: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, Visible: ${isClient ? document.visibilityState : 'unknown'}`);
-
-    const فعلاًЗагружается = contextValue.isLoading || contextValue.isAuthenticating;
+    const فعلاًЗагружается = isLoading || isAuthenticating;
 
     if (فعلاًЗагружается) {
        toast.dismiss("auth-success-toast"); toast.dismiss("auth-error-toast"); toast.dismiss("mock-user-info-toast");
-       // debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] In loading/authenticating state. Dismissed other toasts.");
        loadingTimer = setTimeout(() => {
-          const stillLoadingInTimeout = contextValue.isLoading || contextValue.isAuthenticating;
+          const stillLoadingInTimeout = isLoading || isAuthenticating;
           if (stillLoadingInTimeout && (!isClient || document.visibilityState === 'visible')) {
-             // debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Showing 'Авторизация...' loading toast (ID: auth-loading-toast).");
              toast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 });
           } else {
-             // debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Loading toast condition NO LONGER MET inside timeout or tab not visible. Dismissing auth-loading-toast pre-emptively.");
              toast.dismiss("auth-loading-toast");
           }
        }, LOADING_TOAST_DELAY);
     } else {
         if (loadingTimer) clearTimeout(loadingTimer);
         toast.dismiss("auth-loading-toast");
-        // debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Exited loading/authenticating state. Dismissed auth-loading-toast.");
-
-        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !contextValue.isInTelegramContext) {
+        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !telegramHookData.isInTelegramContext) {
              const existingMockToast = isClient ? document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]') : null;
              if (!existingMockToast && (!isClient || document.visibilityState === 'visible')) {
-                // debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] Using MOCK_USER outside of Telegram. Displaying info toast (ID: mock-user-info-toast).");
                 toast.info("Внимание: используется тестовый пользователь!", { description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.", duration: 7000, id: "mock-user-info-toast" });
-             } else if (existingMockToast) {
-                // debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Mock user info toast already exists or tab not visible. Not showing new one.");
              }
-        } else if (contextValue.isInTelegramContext) {
-             // debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] In real Telegram context. Dismissing any mock user info toast (ID: mock-user-info-toast).");
+        } else if (telegramHookData.isInTelegramContext) {
              toast.dismiss("mock-user-info-toast");
         }
 
-        if (contextValue.isAuthenticated && !contextValue.error) {
+        if (telegramHookData.isAuthenticated && !error) { // Используем isAuthenticated из хука
             toast.dismiss("auth-error-toast");
              if (!isClient || document.visibilityState === 'visible') {
-                 // debugLogger.info("[APP_CONTEXT EFFECT_TOAST_LOGIC] User authenticated successfully. Showing success toast (ID: auth-success-toast).");
                  toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
              }
-        } else if (contextValue.error) {
+        } else if (error) {
             toast.dismiss("auth-success-toast");
             if (!isClient || document.visibilityState === 'visible') {
-                 globalLogger.error("[APP_CONTEXT EFFECT_TOAST_LOGIC] Auth error. Showing error toast (ID: auth-error-toast). Error:", contextValue.error.message);
-                 toast.error(`Ошибка авторизации: ${contextValue.error.message}`, { id: "auth-error-toast", description: "Не удалось войти. Попробуйте перезапустить приложение или обратитесь в поддержку.", duration: 10000 });
+                 globalLogger.error("[APP_CONTEXT EFFECT_TOAST_LOGIC] Auth error. Showing error toast (ID: auth-error-toast). Error:", error.message);
+                 toast.error(`Ошибка авторизации: ${error.message}`, { id: "auth-error-toast", description: "Не удалось войти. Попробуйте перезапустить приложение или обратитесь в поддержку.", duration: 10000 });
             }
-        } else {
-            // debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC] Not loading, not authed, no error. No specific auth status toast needed.");
         }
     }
-    return () => { if (loadingTimer) { clearTimeout(loadingTimer); /* debugLogger.log("[APP_CONTEXT EFFECT_TOAST_LOGIC_CLEANUP] Cleared loadingTimer."); */ }};
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error, contextValue.isInTelegramContext]);
+    return () => { if (loadingTimer) { clearTimeout(loadingTimer); }};
+  }, [telegramHookData.isAuthenticated, isLoading, isAuthenticating, error, telegramHookData.isInTelegramContext]);
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };

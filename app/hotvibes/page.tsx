@@ -431,7 +431,7 @@ function HotVibesClientContent() {
           className="w-full max-w-5xl mx-auto"
         >
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl border shadow-2xl", // Убрал border-2, цвет рамки теперь из theme
+              "bg-dark-card/95 backdrop-blur-xl border shadow-2xl", 
               theme.borderColor, 
               theme.shadowColor
             )}
@@ -453,7 +453,7 @@ function HotVibesClientContent() {
                     className={cn(
                         "text-[0.65rem] sm:text-xs px-2 sm:px-3 py-1 transform hover:scale-105 font-mono", 
                         activeFilter === 'all' 
-                            ? `bg-gradient-to-r from-brand-orange to-red-600 text-white shadow-md hover:opacity-95` // Ярче для активного "Все Вайбы"
+                            ? `bg-gradient-to-r from-brand-orange to-red-600 text-white shadow-md hover:opacity-95` 
                             : `border-brand-red text-brand-red hover:bg-brand-red/10`
                     )}
                   >
