@@ -31,13 +31,12 @@ export interface HotLeadData {
 }
 
 export interface HotVibeCardTheme {
-  borderColor: string; // e.g. "border-brand-red/70"
-  accentGradient: string; // e.g. "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500"
-  // For shadows, we might infer from borderColor or add a specific shadowColor prop
-  shadowColor?: string; // e.g. "shadow-brand-red/40" or "shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]"
-  hoverBorderColor?: string; // e.g. "hover:border-brand-red"
-  hoverShadowColor?: string; // e.g. "hover:shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.7)]"
-  textColor?: string; // e.g. "text-brand-red" for title hover
+  borderColor: string; 
+  accentGradient: string; 
+  shadowColor?: string; 
+  hoverBorderColor?: string; 
+  hoverShadowColor?: string; 
+  textColor?: string; 
 }
 
 interface HotVibeCardProps {
@@ -55,8 +54,7 @@ interface HotVibeCardProps {
   isAuthenticated: boolean;
 }
 
-const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png";
-const MODAL_BACKGROUND_FALLBACK = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//IMG_20250516_051010-f7be2229-1a7f-4bc2-950a-5c122b74fce6.jpg";
+const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"; // Placeholder общий
 
 export function HotVibeCard({ 
     lead, 
@@ -78,10 +76,9 @@ export function HotVibeCard({
 
   const effectiveBorderColor = theme.borderColor || "border-brand-red/70";
   const effectiveHoverBorderColor = theme.hoverBorderColor || theme.borderColor?.replace("/70", "") || "hover:border-brand-red";
-  const effectiveShadowColor = theme.shadowColor || "shadow-brand-red/30"; // Softer default shadow
-  const effectiveHoverShadowColor = theme.hoverShadowColor || `hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.5)]`; // Example, assuming var(--brand-red-rgb) is defined
+  const effectiveShadowColor = theme.shadowColor || "shadow-brand-red/30"; 
+  const effectiveHoverShadowColor = theme.hoverShadowColor || `hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.5)]`; 
   const effectiveTextColor = theme.textColor || "group-hover:text-brand-red";
-
 
   const renderFooterButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 sm:py-2.5 rounded-lg flex items-center justify-center text-center leading-tight shadow-md transition-all duration-200 ease-in-out transform group-hover:scale-105";
@@ -112,7 +109,7 @@ export function HotVibeCard({
       if (isSupported) {
         return (
           <Button 
-            onClick={() => onViewVip(lead)} // Click now directly shows VIP
+            onClick={() => onViewVip(lead)} 
             className={cn(buttonBaseClasses, "bg-brand-green hover:bg-green-400 text-black", disabledClasses)}
           >
             <VibeContentRenderer content={`::FaEye className='mr-1.5':: ${translations.supportedText} (${translations.viewDemoText})`} />
@@ -137,7 +134,7 @@ export function HotVibeCard({
       onClick={isSupported && !isElonSimulatorCard ? () => onViewVip(lead) : undefined}
       className={cn(
         "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl bg-black/70 backdrop-blur-md transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        "border-2",
+        "border", // Используем просто border, цвет будет из theme
         effectiveBorderColor,
         effectiveShadowColor,
         (isMissionUnlocked || isElonSimulatorCard || isSupported) 
@@ -146,7 +143,7 @@ export function HotVibeCard({
         (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
       )}
     >
-        <div className="relative aspect-[1/1] w-full overflow-hidden"> {/* Changed to 1/1 for more square-like image */}
+        <div className="relative aspect-[1/1] w-full overflow-hidden"> 
           <Image
             src={imageToDisplayOnCard}
             alt={lead.kwork_gig_title || 'Hot Vibe Lead'}
@@ -173,7 +170,7 @@ export function HotVibeCard({
         </div>
 
         <CardContent className="flex flex-1 flex-col justify-between p-2.5 sm:p-3 text-center space-y-1.5">
-          <div className="min-h-[3.5em] sm:min-h-[4em]"> {/* Fixed height for title + summary area */}
+          <div className="min-h-[3.5em] sm:min-h-[4em]"> 
             <h3 
               className={cn(
                 "font-orbitron text-sm sm:text-base font-bold leading-tight transition-colors line-clamp-2", 

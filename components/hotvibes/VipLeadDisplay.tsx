@@ -85,7 +85,7 @@ export function VipLeadDisplay({ lead, theme, currentLang = 'ru', isMissionUnloc
 
   return (
     <Card className={cn(
-        "overflow-hidden rounded-xl sm:rounded-2xl border-2 backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", 
+        "overflow-hidden rounded-xl sm:rounded-2xl border backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", // Убрал border-2, цвет будет из theme
         theme.borderColor, 
         `shadow-[0_0_30px_-10px_rgba(var(--brand-cyan-rgb),0.5)] sm:shadow-[0_0_70px_-20px_rgba(var(--brand-cyan-rgb),0.7)]`, 
         "bg-gradient-to-br from-black/80 via-slate-900/70 to-black/80" 
