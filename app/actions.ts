@@ -6,7 +6,7 @@ import {
   fetchUserData as dbFetchUserData,
   createOrUpdateUser as dbCreateOrUpdateUser,
   updateUserMetadata as dbUpdateUserMetadata,
-  uploadImage, // Assuming this one is also async or handled correctly by supabase.ts
+  uploadImage, 
 } from "@/hooks/supabase"; 
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
@@ -22,6 +22,7 @@ import { v4 as uuidv4 } from 'uuid';
 type User = Database["public"]["Tables"]["users"]["Row"];
 type UserSettings = User['metadata'];
 
+// Эти константы используются только внутри этого серверного модуля, их не нужно экспортировать
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; 
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID;
@@ -29,22 +30,12 @@ const COZE_API_KEY = process.env.COZE_API_KEY;
 const COZE_BOT_ID = process.env.COZE_BOT_ID;
 const COZE_USER_ID = process.env.COZE_USER_ID;
 
-function checkEnvVars() {
-  if (!TELEGRAM_BOT_TOKEN) {
-    logger.error("Missing critical environment variable: TELEGRAM_BOT_TOKEN");
-  }
-  if (!COZE_API_KEY) {
-    logger.warn("Missing environment variable: COZE_API_KEY. Coze features may be disabled.");
-  }
-   if (!COZE_BOT_ID) {
-    logger.warn("Missing environment variable: COZE_BOT_ID. analyzeMessage may fail.");
-  }
-   if (!COZE_USER_ID) {
-    logger.warn("Missing environment variable: COZE_USER_ID. analyzeMessage may fail.");
-  }
-}
-checkEnvVars();
+// УБИРАЕМ ВЫЗОВ checkEnvVars() НА УРОВНЕ МОДУЛЯ
+// checkEnvVars(); 
+// Если проверка все еще нужна, ее можно добавить в начало критичных функций, 
+// но для Vercel сборки это обычно не требуется, т.к. отсутствующие process.env вызовут ошибку.
 
+// Вспомогательные типы и интерфейсы (не экспортируются)
 interface InlineButton {
   text: string;
   url: string;
@@ -65,7 +56,7 @@ type SendTextPayload = SendPayloadBase & { text: string; parse_mode?: 'Markdown'
 type SendPhotoPayload = SendPayloadBase & { photo: string; caption: string; parse_mode?: 'Markdown' | 'MarkdownV2' | 'HTML' };
 type SendPayload = SendTextPayload | SendPhotoPayload;
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms)); // Локальная, не экспортируемая
 
 async function pollCozeChat(conversationId: string, chatId: string, apiKey: string | undefined, maxAttempts = 15, pollInterval = 2000) {
     if (!apiKey) throw new Error("Coze API Key not configured");
@@ -109,13 +100,17 @@ function adjustColor(hex: string, amount: number): string {
   }
 }
 
+
+// --- ЭКСПОРТИРУЕМЫЕ ФУНКЦИИ (ВСЕ ДОЛЖНЫ БЫТЬ ASYNC) ---
+
 export async function handleWebhookUpdate(update: any) {
   if (!update) {
     logger.warn("Received empty webhook update.");
     return;
   }
   try {
-    await handleWebhookProxy(update);
+    // Убедимся, что handleWebhookProxy также async или вызывается через await, если он делает async операции
+    await handleWebhookProxy(update); 
   } catch (error) {
     logger.error("Error processing webhook update in handleWebhookProxy:", error);
   }
@@ -129,6 +124,7 @@ export async function sendTelegramMessage(
   carId?: string 
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   if (!TELEGRAM_BOT_TOKEN) {
+    logger.error("sendTelegramMessage: TELEGRAM_BOT_TOKEN not configured"); // Добавлено логгирование
     return { success: false, error: "Telegram bot token not configured" };
   }
   const finalChatId = chatId || ADMIN_CHAT_ID;
@@ -153,7 +149,7 @@ export async function sendTelegramMessage(
 }
 
 export async function sendTelegramDocument(chatId: string, fileContent: string, fileName: string): Promise<{ success: boolean; data?: any; error?: string }> {
-   if (!TELEGRAM_BOT_TOKEN) return { success: false, error: "Telegram bot token not configured" };
+   if (!TELEGRAM_BOT_TOKEN) { logger.error("sendTelegramDocument: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" };}
   try {
     const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
     const formData = new FormData();
@@ -170,15 +166,22 @@ export async function sendTelegramDocument(chatId: string, fileContent: string, 
 }
 
 export async function sendTelegramInvoice(chatId: string, title: string, description: string, payload: string, amount: number, subscription_id: number = 0, photo_url?: string): Promise<{ success: boolean; data?: any; error?: string }> {
-  if (!TELEGRAM_BOT_TOKEN) { return { success: false, error: "Telegram bot token not configured" }; }
-  const PROVIDER_TOKEN = ""; const currency = "XTR"; const prices = [{ label: title, amount: amount }]; 
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("sendTelegramInvoice: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
+  const PROVIDER_TOKEN = process.env.TELEGRAM_PROVIDER_TOKEN || ""; // Убедитесь, что токен провайдера есть
+  if (!PROVIDER_TOKEN && amount > 0) { // Если сумма больше 0, а токена нет - это проблема для реальных платежей. Для XTR может быть не так критично, если это внутренняя валюта.
+      logger.warn("sendTelegramInvoice: TELEGRAM_PROVIDER_TOKEN is not set. Real payments might fail.");
+      // Для XTR (если это внутренняя валюта и не требует реального платежного провайдера), можно проигнорировать.
+      // Если XTR это реальная крипта через @CryptoBot и т.п., токен провайдера нужен.
+  }
+  const currency = "XTR"; 
+  const prices = [{ label: title, amount: amount }]; 
   const requestBody: Record<string, any> = { chat_id: chatId, title, description, payload, provider_token: PROVIDER_TOKEN, currency, prices, start_parameter: "pay" };
   if (photo_url) Object.assign(requestBody, { photo_url, photo_size: 600, photo_width: 600, photo_height: 400 });
   try {
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendInvoice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
     const data: TelegramApiResponse = await response.json();
     if (!data.ok) { logger.error(`Telegram API error (sendInvoice): ${data.description || "Unknown error"}`, { chatId, payload, errorCode: data.error_code }); throw new Error(`Telegram API error: ${data.description || "Failed to send invoice"}`);}
-    try { await supabaseAdmin.from("invoices").insert({ id: payload, user_id: chatId, amount: amount, type: payload.split("_")[0], status: "pending", metadata: { description, title }, subscription_id: subscription_id || null }); } catch (dbError: any) { logger.error(`Failed to save invoice ${payload} to DB after sending: ${dbError.message}`); }
+    try { await supabaseAdmin.from("invoices").insert({ id: payload, user_id: chatId, amount: amount, type: payload.split("_")[0], status: "pending", metadata: { description, title }, subscription_id: String(subscription_id) || null }); } catch (dbError: any) { logger.error(`Failed to save invoice ${payload} to DB after sending: ${dbError.message}`); }
     return { success: true, data: data.result };
   } catch (error) {
     logger.error("Error in sendTelegramInvoice:", error);
@@ -187,7 +190,7 @@ export async function sendTelegramInvoice(chatId: string, title: string, descrip
 }
 
 export async function confirmPayment(preCheckoutQueryId: string): Promise<{ success: boolean; error?: string }> {
-  if (!TELEGRAM_BOT_TOKEN) { return { success: false, error: "Telegram bot token not configured" }; }
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("confirmPayment: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   try {
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pre_checkout_query_id: preCheckoutQueryId, ok: true }) });
     const result: TelegramApiResponse = await response.json();
@@ -201,21 +204,20 @@ export async function confirmPayment(preCheckoutQueryId: string): Promise<{ succ
 }
 
 export async function notifyAdmin(message: string): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("notifyAdmin: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   const result = await sendTelegramMessage(message, [], undefined, ADMIN_CHAT_ID);
   if (!result.success) { logger.error(`Failed to notify primary admin (${ADMIN_CHAT_ID}): ${result.error}`); }
   return { success: result.success, error: result.error };
 }
 
 export async function notifyAdmins(message: string): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("notifyAdmins: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   try {
     const { data: admins, error } = await supabaseAdmin.from("users").select("user_id").eq("status", "admin"); 
     if (error) { logger.error("Failed to fetch admins for notification:", error); throw error; }
     if (!admins || admins.length === 0) { logger.warn("No admins found to notify."); return { success: true }; }
     let allSuccessful = true;
-    for (const admin of admins) {
-      const result = await sendTelegramMessage(message, [], undefined, admin.user_id);
-      if (!result.success) { allSuccessful = false; logger.error(`Failed to notify admin ${admin.user_id}: ${result.error}`); }
-    }
+    for (const admin of admins) { if(!admin.user_id) continue; const result = await sendTelegramMessage(message, [], undefined, admin.user_id); if (!result.success) { allSuccessful = false; logger.error(`Failed to notify admin ${admin.user_id}: ${result.error}`); } }
     return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to notify one or more admins" };
   } catch (error) {
      logger.error("Error notifying admins:", error);
@@ -224,6 +226,7 @@ export async function notifyAdmins(message: string): Promise<{ success: boolean;
 }
 
 export async function notifyCarAdmin(carId: string, message: string): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("notifyCarAdmin: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   try {
     const { data: car, error } = await supabaseAdmin.from("cars").select("owner_id, image_url, make, model").eq("id", carId).maybeSingle();
     if (error) { logger.error(`Error fetching car ${carId} for notification:`, error); return { success: false, error: `Failed to fetch car: ${error.message}` }; }
@@ -240,6 +243,7 @@ export async function notifyCarAdmin(carId: string, message: string): Promise<{ 
 }
 
 export async function superNotification(message: string): Promise<{ success: boolean; error?: string }> {
+   if (!TELEGRAM_BOT_TOKEN) { logger.error("superNotification: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
    try {
     const { data: owners, error } = await supabaseAdmin.from("cars").select("owner_id", { count: 'exact', head: false }).neq("owner_id", null)
       .then(response => { if (response.error) return response; const distinctOwners = Array.from(new Set(response.data?.map(o => o.owner_id))); return { data: distinctOwners.map(id => ({ owner_id: id })), error: null }; });
@@ -256,6 +260,7 @@ export async function superNotification(message: string): Promise<{ success: boo
 }
 
 export async function broadcastMessage(message: string, role?: User['role']): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("broadcastMessage: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   try {
     let query = supabaseAdmin.from("users").select("user_id"); if (role) { query = query.eq("role", role); }
     const { data: users, error } = await query;
@@ -273,10 +278,11 @@ export async function broadcastMessage(message: string, role?: User['role']): Pr
 
 export async function notifyCaptchaSuccess(userId: string, username?: string | null): Promise<{ success: boolean; error?: string }> {
   const message = `🔔 Пользователь ${username || userId} (${userId}) успешно прошел CAPTCHA.`;
-  return notifyAdmins(message);
+  return notifyAdmins(message); // notifyAdmins уже async
 }
 
 export async function notifySuccessfulUsers(userIds: string[]) {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("notifySuccessfulUsers: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   try {
     const message = `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`;
     for (const userId of userIds) { const result = await sendTelegramMessage( message, [], undefined, userId ); if (!result.success) { console.error(`Failed to notify user ${userId}:`, result.error); }}
@@ -287,6 +293,7 @@ export async function notifySuccessfulUsers(userIds: string[]) {
 }
 
 export async function notifyUsers(userIds: string[], message: string): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("notifyUsers: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   if (!userIds || userIds.length === 0) { return { success: true }; }
   logger.info(`Notifying ${userIds.length} users.`);
   let allSuccessful = true;
@@ -300,6 +307,7 @@ export async function notifyUsers(userIds: string[], message: string): Promise<{
 }
 
 export async function notifyWinners(winningNumber: number, winners: User[]): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("notifyWinners: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   if (!winners || winners.length === 0) { logger.info("Wheel of Fortune: No winners to notify."); return { success: true }; }
   try {
     const winnerNotificationMessage = `🎉 Congratulations! Your lucky number ${winningNumber} has been drawn in the Wheel of Fortune! You are a winner! 🏆`;
@@ -316,7 +324,7 @@ export async function notifyWinners(winningNumber: number, winners: User[]): Pro
 }
 
 export async function executeCozeAgent(botId: string, userId: string, content: string, metadata?: Record<string, any>): Promise<{ success: boolean; data?: string; error?: string }> {
-    if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
+    if (!COZE_API_KEY) { logger.error("executeCozeAgent: COZE_API_KEY not configured"); return { success: false, error: "Coze API Key not configured" }; }
     try {
         const initResponse = await axios.post("https://api.coze.com/v3/chat", { bot_id: botId, user_id: userId, stream: false, auto_save_history: true, additional_messages: [{ role: "user", content: content, content_type: "text" }], }, { headers: { Authorization: `Bearer ${COZE_API_KEY}`, "Content-Type": "application/json" }, timeout: 10000 });
         const chatId = initResponse.data?.data?.id; const conversationId = initResponse.data?.data?.conversation_id;
@@ -332,7 +340,7 @@ export async function executeCozeAgent(botId: string, userId: string, content: s
 }
 
 export async function runCozeAgent(botId: string, userId: string, content: string): Promise<{ success: boolean; data?: string; error?: string }> {
-     if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
+     if (!COZE_API_KEY) { logger.error("runCozeAgent: COZE_API_KEY not configured"); return { success: false, error: "Coze API Key not configured" }; }
     try {
         const initResponse = await axios.post("https://api.coze.com/v3/chat", { bot_id: botId, user_id: userId, stream: false, auto_save_history: true, additional_messages: [{ role: "user", content: content, content_type: "text" }], }, { headers: { Authorization: `Bearer ${COZE_API_KEY}`, "Content-Type": "application/json" }, timeout: 10000 });
         const chatId = initResponse.data?.data?.id; const conversationId = initResponse.data?.data?.conversation_id;
@@ -347,8 +355,8 @@ export async function runCozeAgent(botId: string, userId: string, content: strin
 
 export async function analyzeMessage(content: string): Promise<{ success: boolean; data?: { bullshit_percentage: number; emotional_comment: string; analyzed_content: string; content_summary: string; animation: string; }; error?: string; }> {
     const botId = COZE_BOT_ID; const userId = COZE_USER_ID;
-    if (!botId || !userId) { return { success: false, error: "Coze Bot ID or User ID for analysis not configured" }; }
-    if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
+    if (!botId || !userId) { logger.error("analyzeMessage: COZE_BOT_ID or COZE_USER_ID not configured"); return { success: false, error: "Coze Bot ID or User ID for analysis not configured" }; }
+    if (!COZE_API_KEY) { logger.error("analyzeMessage: COZE_API_KEY not configured"); return { success: false, error: "Coze API Key not configured" }; }
     try {
         logger.info(`Analyzing message with Coze Bot ${botId}...`);
         const agentResult = await runCozeAgent(botId, userId, content);
@@ -436,9 +444,9 @@ export async function validateToken(token: string): Promise<{ success: boolean; 
   }
 }
 
-interface CaptchaSettings { string_length: number; character_set: "letters" | "numbers" | "both"; case_sensitive: boolean; noise_level: number; font_size: number; background_color: string; text_color: string; distortion: number; }
+interface CaptchaSettingsInternal { string_length: number; character_set: "letters" | "numbers" | "both"; case_sensitive: boolean; noise_level: number; font_size: number; background_color: string; text_color: string; distortion: number; }
 
-export async function generateCaptcha(settings: CaptchaSettings): Promise<{ success: boolean; data?: { image: string; hash: string; text: string }; error?: string; }> {
+export async function generateCaptcha(settings: CaptchaSettingsInternal): Promise<{ success: boolean; data?: { image: string; hash: string; text: string }; error?: string; }> {
     try {
         if (settings.string_length <= 0 || settings.noise_level < 0 || settings.font_size < 10 || settings.distortion < 0 || settings.distortion > 1) { throw new Error("Invalid CAPTCHA settings provided.");}
         const chars = settings.character_set === "letters" ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ" : settings.character_set === "numbers" ? "0123456789" : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -509,7 +517,7 @@ export async function checkInvoiceStatus(token: string, invoiceId: string): Prom
 }
 
 export async function setTelegramWebhook(): Promise<{ success: boolean; data?: any; error?: string }> {
-  if (!TELEGRAM_BOT_TOKEN) { return { success: false, error: "Telegram bot token not configured" }; }
+  if (!TELEGRAM_BOT_TOKEN) { logger.error("setTelegramWebhook: TELEGRAM_BOT_TOKEN not configured"); return { success: false, error: "Telegram bot token not configured" }; }
   const webhookUrl = `${getBaseUrl()}/api/telegramWebhook`; 
   logger.info(`Setting Telegram webhook to: ${webhookUrl}`);
   try {
