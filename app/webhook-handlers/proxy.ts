@@ -1,34 +1,39 @@
-import { WebhookHandler } from "./types";
+// /app/webhook-handlers/proxy.ts
+import type { WebhookHandler } from "./types";
 import { subscriptionHandler } from "./subscription";
-import { carRentalHandler } from "./car-rental"; // Restored car rental handler
+import { carRentalHandler } from "./car-rental"; 
 import { supportHandler } from "./support";
 import { donationHandler } from "./donation";
 import { scriptAccessHandler } from "./script-access";
 import { inventoryScriptAccessHandler } from "./inventory-script-access";
 import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
-// Import the specific supabaseAdmin instance from your hook
-import { supabaseAdmin } from "@/hooks/supabase";
-import { sendTelegramMessage } from "../actions"; // Import from main actions
+import { protocardPurchaseHandler } from "./protocard-purchase-handler"; 
+// Импорты Supabase и Telegram Actions будут сделаны внутри функции
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!; // Это нормально здесь, т.к. используется только на сервере
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 
 // Ensure all required handlers are in this array
 const handlers: WebhookHandler[] = [
   subscriptionHandler,
-  carRentalHandler, // Restored
+  carRentalHandler, 
   supportHandler,
   donationHandler,
   scriptAccessHandler,
   inventoryScriptAccessHandler,
   selfDevBoostHandler,
   disableDummyModeHandler,
+  protocardPurchaseHandler, 
 ];
 
 export async function handleWebhookProxy(update: any) {
+  // Динамический импорт внутри функции
+  const { supabaseAdmin } = await import("@/hooks/supabase");
+  const { sendTelegramMessage } = await import("../actions"); 
+
   logger.log("Webhook Proxy: Received update", update);
 
   if (update.pre_checkout_query) {
@@ -49,13 +54,13 @@ export async function handleWebhookProxy(update: any) {
   if (update.message?.successful_payment) {
     const payment = update.message.successful_payment;
     const userId = update.message.chat.id.toString(); 
-    const { invoice_payload, total_amount } = payment;
-    logger.log(`Webhook Proxy: Handling successful_payment. Payload: ${invoice_payload}, Amount: ${total_amount}, UserID: ${userId}`);
+    const { invoice_payload, total_amount: totalAmountInStars } = payment; 
+    logger.log(`Webhook Proxy: Handling successful_payment. Payload: ${invoice_payload}, Amount: ${totalAmountInStars} XTR, UserID: ${userId}`);
 
     try {
       const { data: invoice, error: invoiceError } = await supabaseAdmin
         .from("invoices")
-        .select("*")
+        .select("*") 
         .eq("id", invoice_payload)
         .maybeSingle(); 
 
@@ -65,10 +70,9 @@ export async function handleWebhookProxy(update: any) {
       }
 
       if (!invoice) {
-        logger.error(`Webhook Proxy: Invoice not found in DB for payload: ${invoice_payload}. Payment amount: ${total_amount}, User: ${userId}`);
-        // Using correct sendTelegramMessage call from new version
+        logger.error(`Webhook Proxy: Invoice not found in DB for payload: ${invoice_payload}. Payment amount: ${totalAmountInStars} XTR, User: ${userId}`);
         await sendTelegramMessage(
-          `🚨 ВНИМАНИЕ: Получен платеж (${total_amount / 100} XTR) с неизвестным payload: ${invoice_payload} от пользователя ${userId}. Инвойс не найден в базе!`,
+          `🚨 ВНИМАНИЕ: Получен платеж (${totalAmountInStars} XTR) с неизвестным payload: ${invoice_payload} от пользователя ${userId}. Инвойс не найден в базе!`,
           [],
           undefined,
           ADMIN_CHAT_ID 
@@ -80,23 +84,12 @@ export async function handleWebhookProxy(update: any) {
         logger.warn(`Webhook Proxy: Invoice ${invoice_payload} already marked as paid. Skipping processing.`);
         return; 
       }
-
-      const { error: updateInvoiceError } = await supabaseAdmin
-        .from("invoices")
-        .update({ status: "paid", updated_at: new Date().toISOString() })
-        .eq("id", invoice_payload);
-
-      if (updateInvoiceError) {
-        logger.error(`Webhook Proxy: Error marking invoice ${invoice_payload} as paid:`, updateInvoiceError);
-        throw new Error(`Failed to update invoice status: ${updateInvoiceError.message}`);
-      }
-      logger.log(`Webhook Proxy: Invoice ${invoice_payload} marked as paid.`);
-
+      
       const { data: userData, error: userError } = await supabaseAdmin
         .from("users")
         .select("*") 
         .eq("user_id", userId)
-        .single(); // Using single as per new version, old was also single.
+        .single(); 
 
       if (userError && userError.code !== 'PGRST116') { 
          logger.error(`Webhook Proxy: Error fetching user ${userId} for invoice ${invoice_payload}:`, userError);
@@ -107,33 +100,26 @@ export async function handleWebhookProxy(update: any) {
           logger.log(`Webhook Proxy: Fetched user data for ${userId}:`, userData.username || 'No username');
       }
 
-      const handler = handlers.find(h => {
-         if (invoice.type) { 
-             return h.canHandle(invoice, invoice_payload); 
-         } else { 
-             return h.canHandle(invoice, invoice_payload); 
-         }
-      });
-
+      const handler = handlers.find(h => h.canHandle(invoice, invoice_payload));
 
       if (handler) {
-        logger.log(`Webhook Proxy: Found handler for invoice type "${invoice.type || 'type not in DB / checking payload'}". Executing...`);
+        logger.log(`Webhook Proxy: Found handler for invoice. Payload: ${invoice_payload}, DB Type: ${invoice.type}. Executing...`);
         const baseUrl = getBaseUrl(); 
         await handler.handle(
           invoice,
           userId,
-          userData || { user_id: userId, metadata: {}, id: parseInt(userId,10) }, 
-          total_amount / 100, 
-          supabaseAdmin,
+          userData || { user_id: userId, metadata: {}, username: `tg_user_${userId}` }, 
+          totalAmountInStars, 
+          supabaseAdmin, // Передаем уже импортированный клиент
           TELEGRAM_BOT_TOKEN, 
           ADMIN_CHAT_ID,
           baseUrl
         );
         logger.log(`Webhook Proxy: Handler for invoice ${invoice_payload} executed successfully.`);
       } else {
-        logger.warn(`Webhook Proxy: No handler found for invoice type "${invoice.type || 'unknown'}" with payload ${invoice_payload}.`);
-        await sendTelegramMessage( // Using correct sendTelegramMessage call
-          `⚠️ Необработанный платеж! Тип: ${invoice.type || 'Неизвестен (из payload?)'}, Payload: ${invoice_payload}, Сумма: ${total_amount / 100} XTR, Пользователь: ${userId}`,
+        logger.warn(`Webhook Proxy: No handler found for invoice. Payload: ${invoice_payload}, DB Type: ${invoice.type}.`);
+        await sendTelegramMessage( 
+          `⚠️ Необработанный платеж! Payload: ${invoice_payload}, Тип в БД: ${invoice.type || 'N/A'}, Сумма: ${totalAmountInStars} XTR, Пользователь: ${userId}`,
           [],
           undefined,
           ADMIN_CHAT_ID
@@ -141,7 +127,7 @@ export async function handleWebhookProxy(update: any) {
       }
     } catch (error) {
       logger.error("Webhook Proxy: Error processing successful_payment:", error);
-      await sendTelegramMessage( // Using correct sendTelegramMessage call
+      await sendTelegramMessage( 
         `🚨 Ошибка обработки успешного платежа! Payload: ${update.message?.successful_payment?.invoice_payload || 'N/A'}, User: ${update.message?.chat?.id || 'N/A'}. Ошибка: ${error instanceof Error ? error.message : String(error)}`,
         [],
         undefined,

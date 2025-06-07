@@ -15,8 +15,8 @@ import DevErrorOverlay from "@/components/DevErrorOverlay";
 import BottomNavigation from "@/components/layout/BottomNavigation";
 import { debugLogger as logger } from "@/lib/debugLogger"; 
 import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; 
-import { Analytics } from "@vercel/analytics/react"
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/react"; // <--- Импорт Vercel Analytics
+import { SpeedInsights } from "@vercel/speed-insights/next"; // <--- Импорт Vercel Speed Insights
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 
@@ -110,13 +110,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     // Note: This simple regex might need adjustment if your nickname patterns are more complex
     // or if you have other top-level routes that could be confused with nicknames.
   ];
-  if (pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
+  if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); // Dynamically add nickname paths
   }
 
-
-  const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname);
-  const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p));
+  const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname ?? ''); // Handle null pathname
+  const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)); // Handle null pathname
   
   const showBottomNav = isExactMatch || isStartsWithMatch;
   logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
@@ -135,7 +134,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   // The AppProvider should wrap any component that needs its context,
@@ -164,8 +162,8 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
           />
           <DevErrorOverlay />
         </TooltipProvider>
-        <Analytics />
-        <SpeedInsights />
+        <Analytics /> {/* <--- Vercel Analytics */}
+        <SpeedInsights /> {/* <--- Vercel Speed Insights */}
       </AppProvider>
     </ErrorOverlayProvider>
   );
