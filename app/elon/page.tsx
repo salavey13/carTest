@@ -1,4 +1,3 @@
-// /app/elon/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -18,7 +17,7 @@ interface TeslaStockData {
   change: number;
   changePercent: number;
   trend: "up" | "down" | "stable";
-  lastEventTrigger?: "musk_tweet" | "russian_economy" | "market_noise";
+  lastEventTrigger?: "musk_tweet" | "russian_economy" | "market_noise" | "musk_trump_feud";
   newsFlash?: string | null;
 }
 
@@ -39,7 +38,7 @@ const jordanBelfortAdvices = [
     {
         titleKey: "Волчий Вайб №3: ДЕРЖИ ПРЯМУЮ ЛИНИЮ!",
         textKey: "Рынок всегда пытается увести тебя с 'прямой линии' к успеху. Возражения, сомнения... Твоя задача – элегантно возвращать его, повышая уверенность. 'Маск твитнул про кота? Отлично! Это подтверждает мой анализ! Покупаем/Шортим СЕЙЧАС!' Каждое 'НЕТ' от рынка – запрос на большую уверенность.",
-        icon: "::FaChartLine className='transform rotate-90'::"
+        icon: "::FaChartLine className='transform rotate-90'::" // Иконка прямой линии
     },
     {
         titleKey: "Волчий Вайб №4: УПРАВЛЯЙ СВОИМ СОСТОЯНИЕМ!",
@@ -52,6 +51,7 @@ const jordanBelfortAdvices = [
         icon: "::FaScroll::"
     }
 ];
+
 
 export default function ElonPage() {
   const { dbUser, isAuthenticated, isLoading: appContextLoading } = useAppContext();
@@ -97,12 +97,11 @@ export default function ElonPage() {
       title: `Доступ к Симулятору Маска`,
       description: `Разблокировать симулятор влияния твитов Илона и 'русского вайба' на акции Tesla. Цена: ${SIMULATOR_ACCESS_PRICE_XTR} XTR.`,
       amountXTR: SIMULATOR_ACCESS_PRICE_XTR,
-      type: "simulation_access", // Важно для обработчика вебхука
+      type: "simulation_access", 
       metadata: { page_link: "/elon", simulator_name: "Рынок Маска TSLA Edition" }
     };
 
     try {
-      // Используем purchaseProtoCardAction из hotvibes/actions.ts
       const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails); 
       if (result.success) {
         toast.success("Запрос на доступ отправлен! Проверьте Telegram для оплаты счета.");
@@ -124,7 +123,7 @@ export default function ElonPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6 text-center">
         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
-          <VibeContentRenderer content="::FaRocket className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
+          <VibeContentRenderer content="::FaRocketLaunch className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
           <h1 className="text-4xl font-orbitron font-bold text-brand-yellow mb-4">Доступ к 'Рынку Маска' Закрыт!</h1>
           <p className="text-lg text-gray-300 mb-8 max-w-md">
             Чтобы войти в симулятор влияния твитов Илона и "русского экономического вайба" на фантомные акции, приобретите ПротоКарточку Доступа.
@@ -148,7 +147,7 @@ export default function ElonPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-4xl mx-auto" // Increased max-width for more content
+        className="max-w-4xl mx-auto" 
       >
         <Card className="bg-black/70 border-2 border-brand-purple shadow-2xl shadow-brand-purple/30 backdrop-blur-md">
           <CardHeader className="text-center">
@@ -185,7 +184,8 @@ export default function ElonPage() {
                 </p>
                 {stockData.newsFlash && (
                     <p className="text-xs sm:text-sm text-purple-300 mt-2 sm:mt-3 italic px-2">
-                        <VibeContentRenderer content="::FaNewspaper className='inline mr-1 text-base align-middle'::" /> {stockData.newsFlash}
+                        <VibeContentRenderer content="::FaNewspaper className='inline mr-1 text-base align-middle'::" /> 
+                        <VibeContentRenderer content={stockData.newsFlash} />
                     </p>
                 )}
               </motion.div>
@@ -195,14 +195,15 @@ export default function ElonPage() {
               disabled={isLoadingPrice}
               className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-orbitron py-3 text-lg rounded-md shadow-lg hover:shadow-purple-500/50 transition-all"
             >
-              {isLoadingPrice ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обновляю вайб..." /> : <VibeContentRenderer content="::FaDiceD6:: Какой Вайб Сегодня? (Маск/РФ)" />}
+              {isLoadingPrice ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обновляю вайб..." /> : <VibeContentRenderer content="::FaDiceD6:: Какой Вайб Сегодня? (Маск/РФ/Трамп)" />}
             </Button>
             
             <div className="space-y-3 text-xs sm:text-sm text-gray-300/90 font-mono p-3 sm:p-4 bg-black/40 rounded-md border border-gray-700/80">
               <h3 className="text-lg sm:text-xl font-orbitron text-brand-cyan mb-2 sm:mb-3">Механика Рынка (на пальцах):</h3>
               <p><VibeContentRenderer content="::FaInfoCircle:: Агент, это симулятор! Реальные деньги не участвуют. Мы играем с XTR и KiloVibes."/></p>
-              <p><strong className="text-brand-yellow">Вайбы Маска & РФ:</strong> Каждый клик на кнопку симулирует новый 'вайб' – твит Маска или 'экономическое чудо' из РФ. Позитив = <VibeContentRenderer content="::FaArrowTrendUp::"/>, Негатив = <VibeContentRenderer content="::FaArrowTrendDown::"/>. Следи за `NewsFlash`!</p>
-              <p className="text-brand-red/80"><VibeContentRenderer content="::FaExclamationTriangle:: Особый Русский Вайб:"/> Иногда, если 'стабильность' в РФ 'отрицательно растет', это может вызвать... неожиданные колебания на 'мировых рынках'. Или нет. Никто не знает. Это Россия, детка. <VibeContentRenderer content="::FaSnowflake::"/></p>
+              <p><strong className="text-brand-yellow">Вайбы Маска, Трампа & РФ:</strong> Каждый клик на кнопку симулирует новый 'вайб' – твит Маска, заявление Трампа или 'экономическое чудо' из РФ. Позитив = <VibeContentRenderer content="::FaArrowTrendUp::"/>, Негатив = <VibeContentRenderer content="::FaArrowTrendDown::"/>. Следи за `NewsFlash`!</p>
+              <p><strong className="text-brand-yellow">Конфликт Маск-Трамп:</strong> Публичная перепалка этих двоих – отдельный мощный фактор для TSLA. Обычно не в плюс. <VibeContentRenderer content="::FaUserNinja::"/> <VibeContentRenderer content="::FaUserTie::"/></p>
+              <p className="text-brand-red/80"><VibeContentRenderer content="::FaExclamationTriangle:: Особый Русский Вайб:"/> Иногда, если 'стабильность' в РФ 'отрицательно растет', это может вызвать... неожиданные колебания. Или нет. Никто не знает. Это Россия, детка. <VibeContentRenderer content="::FaSnowflake::"/></p>
               <p className="text-brand-green"><VibeContentRenderer content="::FaGraduationCap:: Цель Игры:"/> Понять, как инфо-шум влияет на настроения... и словить немного XTR-фана! VIBE ON!</p>
             </div>
 
@@ -217,9 +218,12 @@ export default function ElonPage() {
                         className="p-3 bg-gray-800/50 border border-pink-500/30 rounded-lg shadow-sm"
                     >
                         <h4 className="text-md font-orbitron text-pink-400 mb-1 flex items-center">
-                            <VibeContentRenderer content={`${advice.icon} `} className="mr-2 text-lg" /> {advice.titleKey}
+                            <VibeContentRenderer content={`${advice.icon} `} className="mr-2 text-lg" /> 
+                            <VibeContentRenderer content={advice.titleKey} />
                         </h4>
-                        <p className="text-xs text-gray-300/90">{advice.textKey}</p>
+                        <p className="text-xs text-gray-300/90">
+                            <VibeContentRenderer content={advice.textKey} />
+                        </p>
                     </motion.div>
                 ))}
             </div>
