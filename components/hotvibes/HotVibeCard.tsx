@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+// Link import не используется, можно убрать, если он не нужен для других целей в этом файле
+// import Link from 'next/link'; 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
@@ -30,8 +31,6 @@ export interface HotLeadData {
   client_name?: string | null;
 }
 
-// HotVibeCardTheme УДАЛЕНА - компонент больше не принимает theme как проп
-
 interface HotVibeCardProps {
   lead: HotLeadData;
   isMissionUnlocked: boolean;
@@ -41,7 +40,6 @@ interface HotVibeCardProps {
   isSpecial?: boolean; 
   onViewVip: (lead: HotLeadData) => void; 
   currentLang?: 'ru' | 'en';
-  // theme: HotVibeCardTheme; // <<< УДАЛЕН ПРОП THEME
   translations: Record<string, any>; 
   isPurchasePending: boolean;
   isAuthenticated: boolean;
@@ -55,10 +53,9 @@ export function HotVibeCard({
     onExecuteMission, 
     onSupportMission,
     isSupported,
-    isSpecial, // Этот флаг теперь будет напрямую влиять на классы
+    isSpecial, 
     onViewVip,
     currentLang = 'ru', 
-    // theme, // <<< ПРОП THEME УДАЛЕН
     translations,
     isPurchasePending,
     isAuthenticated
@@ -67,29 +64,30 @@ export function HotVibeCard({
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
 
-  // Определяем стили напрямую через Tailwind классы, используя isSpecial для вариативности
-  const borderColorClass = isSpecial ? "border-brand-yellow/70" : "border-brand-red/70";
-  const hoverBorderColorClass = isSpecial ? "hover:border-brand-yellow" : "hover:border-brand-red";
-  const shadowColorClass = isSpecial ? "shadow-yellow-glow" : "shadow-brand-red/40"; // Используем Tailwind box-shadow
-  const hoverShadowColorClass = isSpecial ? "hover:shadow-yellow-glow/60" : "hover:shadow-purple-glow"; // Используем Tailwind box-shadow
-  const textColorClass = isSpecial ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red";
-  const accentGradientClass = isSpecial 
+  const borderColorClass = isSpecial || isElonSimulatorCard ? "border-brand-yellow/70" : "border-brand-red/70";
+  const hoverBorderColorClass = isSpecial || isElonSimulatorCard ? "hover:border-brand-yellow" : "hover:border-brand-red";
+  const shadowColorClass = isSpecial || isElonSimulatorCard ? "shadow-yellow-glow" : "shadow-purple-glow"; 
+  const hoverShadowColorClass = isSpecial || isElonSimulatorCard ? "hover:shadow-yellow-glow/60" : "hover:shadow-purple-glow/60";
+  const textColorClass = isSpecial || isElonSimulatorCard ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red";
+  const accentGradientClass = isSpecial || isElonSimulatorCard
     ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500" 
     : "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500";
 
 
   const renderFooterButton = () => {
-    const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 sm:py-2.5 rounded-lg flex items-center justify-center text-center leading-tight shadow-md transition-all duration-200 ease-in-out transform group-hover:scale-105";
+    // Уменьшаем горизонтальные паддинги (px-2 или px-1.5) и вертикальные (py-1.5 или py-2)
+    // Добавляем min-h-fit чтобы кнопка не растягивалась излишне по высоте, если текст короткий
+    const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 px-1.5 sm:px-2 rounded-lg flex items-center justify-center text-center leading-tight shadow-md transition-all duration-200 ease-in-out transform group-hover:scale-105 min-h-fit";
     const disabledClasses = (isPurchasePending || !isAuthenticated) ? "opacity-60 cursor-not-allowed !scale-100" : "";
 
-    if (isElonSimulatorCard) { // Elon Card - особый случай, стилизуем как isSpecial
+    if (isElonSimulatorCard) { 
       if (isSupported) {
         return (
           <Button 
             onClick={() => window.location.href = '/elon'}
             className={cn(buttonBaseClasses, "bg-brand-orange hover:bg-yellow-400 text-black", disabledClasses)}
           >
-            <VibeContentRenderer content={`::FaGamepad className='mr-1.5':: ${translations.goToSimulatorText}`} />
+            <VibeContentRenderer content={`::FaGamepad className='mr-1 sm:mr-1.5 text-xs':: ${translations.goToSimulatorText}`} />
           </Button>
         );
       } else {
@@ -99,18 +97,18 @@ export function HotVibeCard({
             disabled={isPurchasePending || !isAuthenticated}
             className={cn(buttonBaseClasses, "bg-gradient-to-r from-yellow-400 via-brand-orange to-orange-600 hover:brightness-110", "text-black", disabledClasses)}
           >
-            <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin'::" : `::FaHandHoldingDollar:: ${translations.elonSimulatorAccessBtnText}`} />
+            <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin text-sm'::" : `::FaHandHoldingDollar className='mr-1 sm:mr-1.5 text-xs':: ${translations.elonSimulatorAccessBtnText}`} />
           </Button>
         );
       }
-    } else { // Обычные карточки лидов
+    } else { 
       if (isSupported) {
         return (
           <Button 
             onClick={() => onViewVip(lead)} 
             className={cn(buttonBaseClasses, "bg-brand-green hover:bg-green-400 text-black", disabledClasses)}
           >
-            <VibeContentRenderer content={`::FaEye className='mr-1.5':: ${translations.supportedText} (${translations.viewDemoText})`} />
+            <VibeContentRenderer content={`::FaEye className='mr-1 sm:mr-1.5 text-xs':: ${translations.supportedText} (${translations.viewDemoText})`} />
           </Button>
         );
       } else {
@@ -120,7 +118,7 @@ export function HotVibeCard({
             disabled={isPurchasePending || !isAuthenticated}
             className={cn(buttonBaseClasses, accentGradientClass, "text-black hover:brightness-110", disabledClasses)}
           >
-            <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin'::" : `::FaHandHoldingDollar:: ${translations.supportMissionBtnText}`} />
+            <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin text-sm'::" : `::FaHandHoldingDollar className='mr-1 sm:mr-1.5 text-xs':: ${translations.supportMissionBtnText}`} />
           </Button>
         );
       }
@@ -136,7 +134,7 @@ export function HotVibeCard({
         shadowColorClass,
         (isMissionUnlocked || isElonSimulatorCard || isSupported) 
           ? `${hoverBorderColorClass} ${hoverShadowColorClass} hover:scale-[1.03] hover:-translate-y-0.5` 
-          : "border-muted/30 opacity-80 hover:opacity-100", 
+          : `${isSpecial ? borderColorClass : 'border-muted/30'} opacity-80 hover:opacity-100`, 
         (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
       )}
     >
