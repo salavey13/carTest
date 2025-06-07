@@ -6,7 +6,7 @@ interface TeslaStockData {
   change: number;
   changePercent: number;
   trend: "up" | "down" | "stable";
-  lastEventTrigger?: "musk_tweet" | "russian_economy" | "market_noise";
+  lastEventTrigger?: "musk_tweet" | "russian_economy" | "market_noise" | "musk_trump_feud";
   newsFlash?: string | null;
 }
 
@@ -19,6 +19,8 @@ const positiveMuskNews = [
   "Tesla заключает мега-контракт на поставку Cybertruck'ов для колонизации Луны!",
   "Автопилот FSD V15 распознает мысли водителя и заказывает пиццу!",
   "Маск: 'Dogecoin станет официальной валютой на Марсе!' TSLA + Doge ::FaChartLine::",
+  "Срочно! Маск и Трамп замечены играющими в гольф! 'Недопонимание устранено, мы снова лучшие друзья!' – твитнул Маск. Акции TSLA ::FaRocket::?",
+  "Tesla объявляет о прорыве в гуманоидных роботах Optimus! Трамп: 'Отличные роботы, лучшие, я всегда это говорил!'",
 ];
 const negativeMuskNews = [
   "Маск снова пишет твиты в 3 часа ночи! На этот раз про то, что Земля плоская и рептилоиды существуют. Инвесторы TSLA ::FaFaceDizzy::.",
@@ -27,7 +29,17 @@ const negativeMuskNews = [
   "Внезапно! Маск объявляет, что следующая модель Tesla будет работать на дровах 'для экологии'. ::FaTree::",
 ];
 
-const russianEconomyPositiveNews = [ // Сарказм
+const muskTrumpFeudNews = [
+    "Трамп в ярости! Обещает 'регуляторный ад' для Tesla после твитов Маска о бюджете и Эпштейне! Акции TSLA ::FaArrowTrendDown:: ::FaFaceFlushed::",
+    "Forbes: 'Новый кошмар Tesla – Дональд Трамп'. Аналитики предрекают волну проверок безопасности Autopilot и FSD.",
+    "Маск призывает к импичменту Трампа и ставит на JD Vance! Белый Дом в шоке, инвесторы Tesla пьют корвалол.",
+    "Слухи: Трамп может позвонить губернатору Техаса и 'попросить' притормозить запуск RoboTaxi от Tesla в Остине. ::FaPhoneSlash::",
+    "Goldman Sachs УРОНИЛ прогнозы по поставкам Tesla за Q2! Продажи в Китае и Европе ::FaTemperatureQuarter::, а тут еще и война с Трампом!",
+    "Маск связал Трампа с Эпштейном, заявив, что имя Трампа есть в 'тех самых файлах', и поэтому их не публикуют. Ответный удар не заставил себя ждать...",
+    "Илон Маск заявил, что Трамп не победил бы на выборах без его (Маска) поддержки и денег. Трамп назвал Маска 'неблагодарным выскочкой'.",
+];
+
+const russianEconomyPositiveNews = [ 
   "РФ ТВ: 'Экономика России показала беспрецедентный рост! Рубль признан самой стабильной валютой Галактики!' ::FaFaceGrinStars::",
   "Замминистра финансов РФ: 'Дефицит бюджета? Это выдумки Госдепа! У нас профицит профицитов!'",
 ];
@@ -39,57 +51,60 @@ const russianEconomyNegativeNews = [
 ];
 
 export async function teslaStockSimulator(): Promise<TeslaStockData> {
-  logger.info("[ElonActions] Simulating Tesla stock price with Russian Spice...");
+  logger.info("[ElonActions] Simulating Tesla stock price with Russian Spice & Trump Feud...");
 
-  let priceChangeFactor = (Math.random() - 0.5) * 0.015; // Базовое рыночное колебание +/- 1.5%
+  let priceChangeFactor = (Math.random() - 0.5) * 0.01; // Базовое рыночное колебание +/- 1%
   let currentNewsFlash: string | null = null;
-  let eventTrigger: "musk_tweet" | "russian_economy" | "market_noise" = "market_noise";
+  let eventTrigger: TeslaStockData['lastEventTrigger'] = "market_noise";
 
   const eventRNG = Math.random();
 
-  if (eventRNG < 0.35) { // 35% шанс на событие от Маска
+  if (eventRNG < 0.30) { // 30% шанс на событие Маск vs Трамп
+    eventTrigger = "musk_trump_feud";
+    priceChangeFactor -= (Math.random() * 0.05 + 0.03); // Сильное негативное влияние -3% to -8%
+    currentNewsFlash = muskTrumpFeudNews[Math.floor(Math.random() * muskTrumpFeudNews.length)];
+    logger.debug(`[ElonActions] Musk vs Trump Feud! Factor: ${priceChangeFactor.toFixed(4)}`);
+  } else if (eventRNG < 0.55) { // 25% шанс на "обычный" твит Маска (после вычета Feud)
     eventTrigger = "musk_tweet";
     const muskTweetRNG = Math.random();
-    if (muskTweetRNG < 0.5) { // 50% негативный твит Маска
-      priceChangeFactor -= (Math.random() * 0.04 + 0.02); // Доп. падение -2% to -6%
+    if (muskTweetRNG < 0.5) { 
+      priceChangeFactor -= (Math.random() * 0.03 + 0.01); // -1% to -4%
       currentNewsFlash = negativeMuskNews[Math.floor(Math.random() * negativeMuskNews.length)];
       logger.debug(`[ElonActions] Musk Negative. Factor: ${priceChangeFactor.toFixed(4)}`);
-    } else { // 50% позитивный твит Маска
-      priceChangeFactor += (Math.random() * 0.03 + 0.015); // Доп. рост +1.5% to +4.5%
+    } else { 
+      priceChangeFactor += (Math.random() * 0.025 + 0.01); // +1% to +3.5%
       currentNewsFlash = positiveMuskNews[Math.floor(Math.random() * positiveMuskNews.length)];
       logger.debug(`[ElonActions] Musk Positive. Factor: ${priceChangeFactor.toFixed(4)}`);
     }
-  } else if (eventRNG < 0.6) { // 25% шанс на событие из "российской экономики"
+  } else if (eventRNG < 0.75) { // 20% шанс на событие из "российской экономики"
     eventTrigger = "russian_economy";
     const russiaRNG = Math.random();
-    if (russiaRNG < 0.85) { // 85% шанс на "классический" негативный русский вайб
-      priceChangeFactor -= (Math.random() * 0.015 + 0.005); // Небольшое доп. падение -0.5% to -2% (глобальные рынки чуть реагируют)
+    if (russiaRNG < 0.85) { 
+      priceChangeFactor -= (Math.random() * 0.01 + 0.002); // Небольшое доп. падение -0.2% to -1.2%
       currentNewsFlash = russianEconomyNegativeNews[Math.floor(Math.random() * russianEconomyNegativeNews.length)];
       logger.debug(`[ElonActions] Russian Economy Negative. Factor: ${priceChangeFactor.toFixed(4)}`);
-    } else { // 15% шанс на "саркастический позитив"
-      // priceChangeFactor += Math.random() * 0.005; // Минимальный или отсутствующий эффект
+    } else { 
       currentNewsFlash = russianEconomyPositiveNews[Math.floor(Math.random() * russianEconomyPositiveNews.length)];
       logger.debug(`[ElonActions] Russian Economy "Positive" (Sarcasm). Factor: ${priceChangeFactor.toFixed(4)}`);
     }
-  } else {
+  } else { // Остальное - рыночный шум
     logger.debug(`[ElonActions] Market Noise. Base Factor: ${priceChangeFactor.toFixed(4)}`);
-    currentNewsFlash = "Рыночный шум и легкая турбулентность... Маск пока молчит.";
+    currentNewsFlash = "Рыночный шум и легкая турбулентность... Все ждут, что еще выкинет Маск или Трамп.";
   }
 
-  // Инерция от прошлого тренда
-  if (lastTrend === "up") priceChangeFactor += 0.003;
-  else if (lastTrend === "down") priceChangeFactor -= 0.003;
+  if (lastTrend === "up") priceChangeFactor += 0.002;
+  else if (lastTrend === "down") priceChangeFactor -= 0.002;
 
   const change = lastPrice * priceChangeFactor;
   let newPrice = lastPrice + change;
 
-  newPrice = Math.max(75, Math.min(newPrice, 400)); // Ограничения цены
+  newPrice = Math.max(60, Math.min(newPrice, 380)); // Обновленные ограничения цены
 
   const finalChange = newPrice - lastPrice;
   const finalChangePercent = lastPrice === 0 ? 0 : (finalChange / lastPrice) * 100;
 
-  if (finalChangePercent > 0.2) lastTrend = "up";
-  else if (finalChangePercent < -0.2) lastTrend = "down";
+  if (finalChangePercent > 0.18) lastTrend = "up";
+  else if (finalChangePercent < -0.18) lastTrend = "down";
   else lastTrend = "stable";
 
   const result: TeslaStockData = {
@@ -103,6 +118,6 @@ export async function teslaStockSimulator(): Promise<TeslaStockData> {
 
   lastPrice = newPrice; 
 
-  logger.info("[ElonActions] Tesla stock price simulated (with Russian Spice):", result);
+  logger.info("[ElonActions] Tesla stock price simulated (with Russian Spice & Trump Feud):", result);
   return result;
 }
