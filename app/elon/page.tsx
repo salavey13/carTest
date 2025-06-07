@@ -1,3 +1,4 @@
+// /app/elon/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -51,7 +52,6 @@ const jordanBelfortAdvices = [
         icon: "::FaScroll::"
     }
 ];
-
 
 export default function ElonPage() {
   const { dbUser, isAuthenticated, isLoading: appContextLoading } = useAppContext();
@@ -124,7 +124,7 @@ export default function ElonPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6 text-center">
         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
-          <VibeContentRenderer content="::FaRocketLaunch className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
+          <VibeContentRenderer content="::FaRocket className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
           <h1 className="text-4xl font-orbitron font-bold text-brand-yellow mb-4">Доступ к 'Рынку Маска' Закрыт!</h1>
           <p className="text-lg text-gray-300 mb-8 max-w-md">
             Чтобы войти в симулятор влияния твитов Илона и "русского экономического вайба" на фантомные акции, приобретите ПротоКарточку Доступа.
