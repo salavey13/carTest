@@ -30,15 +30,7 @@ export interface HotLeadData {
   client_name?: string | null;
 }
 
-// HotVibeCardTheme больше не используется этим компонентом напрямую
-// export interface HotVibeCardTheme {
-//   borderColor: string; 
-//   accentGradient: string; 
-//   shadowColor?: string; 
-//   hoverBorderColor?: string; 
-//   hoverShadowColor?: string; 
-//   textColor?: string; 
-// }
+// HotVibeCardTheme УДАЛЕНА - компонент больше не принимает theme как проп
 
 interface HotVibeCardProps {
   lead: HotLeadData;
@@ -63,7 +55,7 @@ export function HotVibeCard({
     onExecuteMission, 
     onSupportMission,
     isSupported,
-    isSpecial,
+    isSpecial, // Этот флаг теперь будет напрямую влиять на классы
     onViewVip,
     currentLang = 'ru', 
     // theme, // <<< ПРОП THEME УДАЛЕН
@@ -75,11 +67,11 @@ export function HotVibeCard({
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
 
-  // Определяем стили напрямую через Tailwind классы
+  // Определяем стили напрямую через Tailwind классы, используя isSpecial для вариативности
   const borderColorClass = isSpecial ? "border-brand-yellow/70" : "border-brand-red/70";
   const hoverBorderColorClass = isSpecial ? "hover:border-brand-yellow" : "hover:border-brand-red";
-  const shadowColorClass = isSpecial ? "shadow-yellow-glow" : "shadow-brand-red/40";
-  const hoverShadowColorClass = isSpecial ? "hover:shadow-yellow-glow/60" : "hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]";
+  const shadowColorClass = isSpecial ? "shadow-yellow-glow" : "shadow-brand-red/40"; // Используем Tailwind box-shadow
+  const hoverShadowColorClass = isSpecial ? "hover:shadow-yellow-glow/60" : "hover:shadow-purple-glow"; // Используем Tailwind box-shadow
   const textColorClass = isSpecial ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red";
   const accentGradientClass = isSpecial 
     ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500" 
@@ -90,7 +82,7 @@ export function HotVibeCard({
     const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 sm:py-2.5 rounded-lg flex items-center justify-center text-center leading-tight shadow-md transition-all duration-200 ease-in-out transform group-hover:scale-105";
     const disabledClasses = (isPurchasePending || !isAuthenticated) ? "opacity-60 cursor-not-allowed !scale-100" : "";
 
-    if (isElonSimulatorCard) {
+    if (isElonSimulatorCard) { // Elon Card - особый случай, стилизуем как isSpecial
       if (isSupported) {
         return (
           <Button 
@@ -111,7 +103,7 @@ export function HotVibeCard({
           </Button>
         );
       }
-    } else { 
+    } else { // Обычные карточки лидов
       if (isSupported) {
         return (
           <Button 
