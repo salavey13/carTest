@@ -1,5 +1,6 @@
 "use server";
-import { logger } from "@/lib/logger";
+// import { debugLogger as logger } from "@/lib/debugLogger"; // Удаляем debugLogger
+import { logger } from "@/lib/logger"; // Используем стандартный logger
 
 interface TeslaStockData {
   price: number;
@@ -13,7 +14,6 @@ interface TeslaStockData {
 let lastPrice = 170.00; 
 let lastTrend: "up" | "down" | "stable" = "stable";
 
-// Строки теперь содержат плейсхолдеры для VibeContentRenderer, а не сам компонент
 const positiveMuskNews = [
   "Маск: 'Tesla Roadster нового поколения будет летать, буквально!' Акции TSLA ::FaRocket:: !",
   "Tesla заключает мега-контракт на поставку Cybertruck'ов для колонизации Луны!",
@@ -53,42 +53,42 @@ const russianEconomyNegativeNews = [
 export async function teslaStockSimulator(): Promise<TeslaStockData> {
   logger.info("[ElonActions] Simulating Tesla stock price with Russian Spice & Trump Feud...");
 
-  let priceChangeFactor = (Math.random() - 0.5) * 0.01; // Базовое рыночное колебание +/- 1%
+  let priceChangeFactor = (Math.random() - 0.5) * 0.01; 
   let currentNewsFlash: string | null = null;
   let eventTrigger: TeslaStockData['lastEventTrigger'] = "market_noise";
 
   const eventRNG = Math.random();
 
-  if (eventRNG < 0.30) { // 30% шанс на событие Маск vs Трамп
+  if (eventRNG < 0.30) { 
     eventTrigger = "musk_trump_feud";
-    priceChangeFactor -= (Math.random() * 0.05 + 0.03); // Сильное негативное влияние -3% to -8%
+    priceChangeFactor -= (Math.random() * 0.05 + 0.03); 
     currentNewsFlash = muskTrumpFeudNews[Math.floor(Math.random() * muskTrumpFeudNews.length)];
-    logger.debug(`[ElonActions] Musk vs Trump Feud! Factor: ${priceChangeFactor.toFixed(4)}`);
-  } else if (eventRNG < 0.55) { // 25% шанс на "обычный" твит Маска (после вычета Feud)
+    logger.info(`[ElonActions] Musk vs Trump Feud! Factor: ${priceChangeFactor.toFixed(4)}`); // Используем logger.info или logger.debug
+  } else if (eventRNG < 0.55) { 
     eventTrigger = "musk_tweet";
     const muskTweetRNG = Math.random();
     if (muskTweetRNG < 0.5) { 
-      priceChangeFactor -= (Math.random() * 0.03 + 0.01); // -1% to -4%
+      priceChangeFactor -= (Math.random() * 0.03 + 0.01); 
       currentNewsFlash = negativeMuskNews[Math.floor(Math.random() * negativeMuskNews.length)];
-      logger.debug(`[ElonActions] Musk Negative. Factor: ${priceChangeFactor.toFixed(4)}`);
+      logger.info(`[ElonActions] Musk Negative. Factor: ${priceChangeFactor.toFixed(4)}`);
     } else { 
-      priceChangeFactor += (Math.random() * 0.025 + 0.01); // +1% to +3.5%
+      priceChangeFactor += (Math.random() * 0.025 + 0.01); 
       currentNewsFlash = positiveMuskNews[Math.floor(Math.random() * positiveMuskNews.length)];
-      logger.debug(`[ElonActions] Musk Positive. Factor: ${priceChangeFactor.toFixed(4)}`);
+      logger.info(`[ElonActions] Musk Positive. Factor: ${priceChangeFactor.toFixed(4)}`);
     }
-  } else if (eventRNG < 0.75) { // 20% шанс на событие из "российской экономики"
+  } else if (eventRNG < 0.75) { 
     eventTrigger = "russian_economy";
     const russiaRNG = Math.random();
     if (russiaRNG < 0.85) { 
-      priceChangeFactor -= (Math.random() * 0.01 + 0.002); // Небольшое доп. падение -0.2% to -1.2%
+      priceChangeFactor -= (Math.random() * 0.01 + 0.002); 
       currentNewsFlash = russianEconomyNegativeNews[Math.floor(Math.random() * russianEconomyNegativeNews.length)];
-      logger.debug(`[ElonActions] Russian Economy Negative. Factor: ${priceChangeFactor.toFixed(4)}`);
+      logger.info(`[ElonActions] Russian Economy Negative. Factor: ${priceChangeFactor.toFixed(4)}`);
     } else { 
       currentNewsFlash = russianEconomyPositiveNews[Math.floor(Math.random() * russianEconomyPositiveNews.length)];
-      logger.debug(`[ElonActions] Russian Economy "Positive" (Sarcasm). Factor: ${priceChangeFactor.toFixed(4)}`);
+      logger.info(`[ElonActions] Russian Economy "Positive" (Sarcasm). Factor: ${priceChangeFactor.toFixed(4)}`);
     }
-  } else { // Остальное - рыночный шум
-    logger.debug(`[ElonActions] Market Noise. Base Factor: ${priceChangeFactor.toFixed(4)}`);
+  } else { 
+    logger.info(`[ElonActions] Market Noise. Base Factor: ${priceChangeFactor.toFixed(4)}`);
     currentNewsFlash = "Рыночный шум и легкая турбулентность... Все ждут, что еще выкинет Маск или Трамп.";
   }
 
@@ -98,7 +98,7 @@ export async function teslaStockSimulator(): Promise<TeslaStockData> {
   const change = lastPrice * priceChangeFactor;
   let newPrice = lastPrice + change;
 
-  newPrice = Math.max(60, Math.min(newPrice, 380)); // Обновленные ограничения цены
+  newPrice = Math.max(60, Math.min(newPrice, 380)); 
 
   const finalChange = newPrice - lastPrice;
   const finalChangePercent = lastPrice === 0 ? 0 : (finalChange / lastPrice) * 100;
