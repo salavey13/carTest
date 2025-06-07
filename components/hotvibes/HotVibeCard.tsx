@@ -30,14 +30,15 @@ export interface HotLeadData {
   client_name?: string | null;
 }
 
-export interface HotVibeCardTheme {
-  borderColor: string; 
-  accentGradient: string; 
-  shadowColor?: string; 
-  hoverBorderColor?: string; 
-  hoverShadowColor?: string; 
-  textColor?: string; 
-}
+// HotVibeCardTheme больше не используется этим компонентом напрямую
+// export interface HotVibeCardTheme {
+//   borderColor: string; 
+//   accentGradient: string; 
+//   shadowColor?: string; 
+//   hoverBorderColor?: string; 
+//   hoverShadowColor?: string; 
+//   textColor?: string; 
+// }
 
 interface HotVibeCardProps {
   lead: HotLeadData;
@@ -48,7 +49,7 @@ interface HotVibeCardProps {
   isSpecial?: boolean; 
   onViewVip: (lead: HotLeadData) => void; 
   currentLang?: 'ru' | 'en';
-  theme: HotVibeCardTheme;
+  // theme: HotVibeCardTheme; // <<< УДАЛЕН ПРОП THEME
   translations: Record<string, any>; 
   isPurchasePending: boolean;
   isAuthenticated: boolean;
@@ -65,7 +66,7 @@ export function HotVibeCard({
     isSpecial,
     onViewVip,
     currentLang = 'ru', 
-    theme, 
+    // theme, // <<< ПРОП THEME УДАЛЕН
     translations,
     isPurchasePending,
     isAuthenticated
@@ -74,11 +75,16 @@ export function HotVibeCard({
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
 
-  const effectiveBorderColor = theme.borderColor || "border-transparent";
-  const effectiveHoverBorderColor = theme.hoverBorderColor || theme.borderColor?.replace("/70", "") || "hover:border-transparent";
-  const effectiveShadowColor = theme.shadowColor || "shadow-md"; 
-  const effectiveHoverShadowColor = theme.hoverShadowColor || `hover:shadow-xl`; 
-  const effectiveTextColor = theme.textColor || "group-hover:text-brand-red";
+  // Определяем стили напрямую через Tailwind классы
+  const borderColorClass = isSpecial ? "border-brand-yellow/70" : "border-brand-red/70";
+  const hoverBorderColorClass = isSpecial ? "hover:border-brand-yellow" : "hover:border-brand-red";
+  const shadowColorClass = isSpecial ? "shadow-yellow-glow" : "shadow-brand-red/40";
+  const hoverShadowColorClass = isSpecial ? "hover:shadow-yellow-glow/60" : "hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]";
+  const textColorClass = isSpecial ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red";
+  const accentGradientClass = isSpecial 
+    ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500" 
+    : "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500";
+
 
   const renderFooterButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 sm:py-2.5 rounded-lg flex items-center justify-center text-center leading-tight shadow-md transition-all duration-200 ease-in-out transform group-hover:scale-105";
@@ -120,7 +126,7 @@ export function HotVibeCard({
           <Button 
             onClick={() => onSupportMission(lead)}
             disabled={isPurchasePending || !isAuthenticated}
-            className={cn(buttonBaseClasses, theme.accentGradient, "text-black hover:brightness-110", disabledClasses)}
+            className={cn(buttonBaseClasses, accentGradientClass, "text-black hover:brightness-110", disabledClasses)}
           >
             <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin'::" : `::FaHandHoldingDollar:: ${translations.supportMissionBtnText}`} />
           </Button>
@@ -134,11 +140,11 @@ export function HotVibeCard({
       onClick={isSupported && !isElonSimulatorCard ? () => onViewVip(lead) : undefined}
       className={cn(
         "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl bg-black/70 backdrop-blur-md transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        effectiveBorderColor, 
-        effectiveShadowColor,
+        borderColorClass, 
+        shadowColorClass,
         (isMissionUnlocked || isElonSimulatorCard || isSupported) 
-          ? `${effectiveHoverBorderColor} ${effectiveHoverShadowColor} hover:scale-[1.03] hover:-translate-y-0.5` 
-          : `${isSpecial ? theme.borderColor : 'border-muted/30'} opacity-80 hover:opacity-100`, // Заблокированные, но не специальные, имеют muted рамку
+          ? `${hoverBorderColorClass} ${hoverShadowColorClass} hover:scale-[1.03] hover:-translate-y-0.5` 
+          : "border-muted/30 opacity-80 hover:opacity-100", 
         (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
       )}
     >
@@ -173,7 +179,7 @@ export function HotVibeCard({
             <h3 
               className={cn(
                 "font-orbitron text-sm sm:text-base font-bold leading-tight transition-colors line-clamp-2", 
-                (isMissionUnlocked || isElonSimulatorCard || isSupported) ? `text-light-text ${effectiveTextColor}` : "text-muted-foreground/80"
+                (isMissionUnlocked || isElonSimulatorCard || isSupported) ? `text-light-text ${textColorClass}` : "text-muted-foreground/80"
               )} 
               title={lead.kwork_gig_title || "Untitled Gig"}
             >

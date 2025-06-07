@@ -13,7 +13,7 @@ import {
     CardDescription as ShadCardDescription 
 } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import type { HotLeadData } from './HotVibeCard'; // Используем только HotLeadData отсюда
+import type { HotLeadData } from './HotVibeCard'; 
 import { FaCopy, FaLink, FaClipboardList, FaLightbulb, FaCommentsDollar, FaGamepad } from "react-icons/fa6"; 
 import { toast } from 'sonner';
 import { ELON_SIMULATOR_CARD_ID } from '@/app/hotvibes/page'; 
@@ -86,7 +86,7 @@ export function VipLeadDisplay({ lead, currentLang = 'ru', isMissionUnlocked, on
   return (
     <Card className={cn(
         "overflow-hidden rounded-xl sm:rounded-2xl backdrop-blur-lg sm:backdrop-blur-2xl shadow-xl sm:shadow-2xl w-full", 
-        "border-brand-cyan/70", // Используем конкретный цвет рамки или border-transparent
+        "border-brand-cyan/70", // Явно задаем цвет рамки или border-transparent
         `shadow-[0_0_30px_-10px_rgba(var(--brand-cyan-rgb),0.5)] sm:shadow-[0_0_70px_-20px_rgba(var(--brand-cyan-rgb),0.7)]`, 
         "bg-gradient-to-br from-black/80 via-slate-900/70 to-black/80" 
     )}>
