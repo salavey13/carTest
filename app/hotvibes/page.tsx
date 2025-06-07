@@ -30,7 +30,7 @@ import Link from 'next/link';
 export const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 export const ELON_SIMULATOR_ACCESS_PRICE_XTR = 13;
 export const MISSION_SUPPORT_PRICE_XTR = 13;
-export const RUB_TO_XTR_RATE = 1 / 4.2; // 1 XTR = 4.2 RUB
+export const RUB_TO_XTR_RATE = 1 / 4.2; 
 
 const pageTranslations = {
     ru: {
@@ -184,7 +184,7 @@ function HotVibesClientContent() {
         const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (profileResult.success && profileResult.data) {
           tempCyberProfile = profileResult.data;
-          setCyberProfile(tempCyberProfile);
+          setCyberProfile(tempCyberProfile); // Обновляем стейт профиля
         } else { addToast(t.errorLoadingProfile, "error"); }
     }
     
@@ -228,7 +228,7 @@ function HotVibesClientContent() {
 
   useEffect(() => {
     loadPageData();
-  }, [loadPageData]); // Зависимость только от loadPageData, который уже включает initialVipIdentifier и activeFilter
+  }, [loadPageData]); // Зависимость только от loadPageData, так как activeFilter используется в useMemo
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
@@ -277,8 +277,8 @@ function HotVibesClientContent() {
         addToast("Запрос на ПротоКарточку отправлен! Проверьте Telegram для оплаты счета.", "success");
         if(refreshDbUser) {
             setTimeout(async () => {
-                await refreshDbUser();
-            }, 3000); 
+                await refreshDbUser(); // Это обновит dbUser в AppContext
+            }, 4000); // Увеличил задержку для обработки вебхука и обновления БД
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -291,8 +291,8 @@ function HotVibesClientContent() {
   };
 
   const handleExecuteMission = useCallback(async (leadId: string, questIdFromLead: string | undefined) => {
-    if (!isAuthenticated || !dbUser?.user_id || !cyberProfile) {
-      addToast("Аутентификация требуется", "error"); return;
+    if (!isAuthenticated || !dbUser?.user_id || !cyberProfile) { // cyberProfile здесь может быть null, если не загрузился
+      addToast("Аутентификация или профиль агента недоступны", "error"); return;
     }
     const targetQuestId = questIdFromLead || "image-swap-mission";
     if (targetQuestId === "none") {
@@ -300,11 +300,11 @@ function HotVibesClientContent() {
         if (leadId === ELON_SIMULATOR_CARD_ID) router.push("/elon");
         return;
     }
-    const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests, QUEST_ORDER);
+    const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests || [], QUEST_ORDER);
 
     if (!isActuallyUnlocked) {
       addToast(t.lockedMissionRedirect.replace("...", `'${targetQuestId}'`), "info", 7000);
-      if (targetQuestId === "image-swap-mission" && !cyberProfile.completedQuests.includes("image-swap-mission")) {
+      if (targetQuestId === "image-swap-mission" && !(cyberProfile.completedQuests || []).includes("image-swap-mission")) {
         logger.info(`[HotVibes] Auto-completing '${targetQuestId}' for courage boost for user ${dbUser.user_id}`);
         await markTutorialAsCompleted(dbUser.user_id, "image-swap-mission");
         const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
@@ -330,9 +330,12 @@ function HotVibesClientContent() {
     textColor: "text-brand-red"
   };
   
+  const elonCardIsSupportedActually = useMemo(() => {
+    return !!dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active';
+  }, [dbUser?.metadata?.xtr_protocards]);
+
   const displayedLeads = useMemo(() => {
-    const elonCardIsSupportedNow = !!dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active';
-    const elonCardWithStatus = { ...elonSimulatorProtoCardData, isSpecial: true, isSupported: elonCardIsSupportedNow };
+    const elonCardWithStatus = { ...elonSimulatorProtoCardData, isSpecial: true, isSupported: elonCardIsSupportedActually };
 
     let currentLobbyLeads = lobbyLeads.map(lead => ({
         ...lead, 
@@ -340,29 +343,27 @@ function HotVibesClientContent() {
         isSupported: !!dbUser?.metadata?.xtr_protocards?.[lead.id]?.status === 'active'
     }));
 
-    let filteredForDisplay: HotLeadData[] & {isSpecial?:boolean, isSupported?:boolean}[] = [];
+    let filteredForDisplay: Array<HotLeadData & {isSpecial?:boolean, isSupported?:boolean}> = [];
 
     if (activeFilter === 'supported') {
-        filteredForDisplay = currentLobbyLeads.filter(l => l.isSupported);
-        if (elonCardWithStatus.isSupported && !filteredForDisplay.find(l => l.id === ELON_SIMULATOR_CARD_ID)) {
+        filteredForDisplay = currentLobbyLeads.filter(l => l.isSupported && l.id !== ELON_SIMULATOR_CARD_ID);
+        if (elonCardWithStatus.isSupported) {
             filteredForDisplay.unshift(elonCardWithStatus);
         }
-    } else { // activeFilter === 'all'
-        const baseFiltered = cyberProfile
-            ? currentLobbyLeads.filter(mLead => mLead.id === ELON_SIMULATOR_CARD_ID || (mLead.required_quest_id && mLead.required_quest_id !== "none" ? checkQuestUnlocked(mLead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) )
+    } else { 
+        const baseFilteredLobby = cyberProfile
+            ? currentLobbyLeads.filter(mLead => mLead.required_quest_id && mLead.required_quest_id !== "none" ? checkQuestUnlocked(mLead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true )
             : isAuthenticated ? [] : currentLobbyLeads;
-
-        if (!baseFiltered.find(l=> l.id === ELON_SIMULATOR_CARD_ID)) {
-            filteredForDisplay = [elonCardWithStatus, ...baseFiltered];
-        } else {
-            filteredForDisplay = baseFiltered.map(l => l.id === ELON_SIMULATOR_CARD_ID ? elonCardWithStatus : l);
-        }
+        
+        // Убираем карточку Илона из основного списка, если она там случайно оказалась
+        const lobbyWithoutElon = baseFilteredLobby.filter(l => l.id !== ELON_SIMULATOR_CARD_ID);
+        filteredForDisplay = [elonCardWithStatus, ...lobbyWithoutElon];
     }
     
-    logger.debug(`[HotVibes displayedLeads] Filter: ${activeFilter}, ElonSupported: ${elonCardIsSupportedNow}, Output count: ${filteredForDisplay.length}`);
+    logger.debug(`[HotVibes displayedLeads] Filter: ${activeFilter}, ElonSupported: ${elonCardIsSupportedActually}, Output count: ${filteredForDisplay.length}`);
     return filteredForDisplay;
 
-  }, [lobbyLeads, dbUser?.metadata?.xtr_protocards, activeFilter, cyberProfile, isAuthenticated]);
+  }, [lobbyLeads, dbUser?.metadata?.xtr_protocards, activeFilter, cyberProfile, isAuthenticated, elonCardIsSupportedActually, currentLang]); // Добавил currentLang
 
 
   if (appCtxLoading && pageLoading && !vipLeadToShow) return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
