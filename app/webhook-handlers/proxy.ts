@@ -1,5 +1,5 @@
 // /app/webhook-handlers/proxy.ts
-import { WebhookHandler } from "./types";
+import type { WebhookHandler } from "./types";
 import { subscriptionHandler } from "./subscription";
 import { carRentalHandler } from "./car-rental"; 
 import { supportHandler } from "./support";
@@ -9,13 +9,11 @@ import { inventoryScriptAccessHandler } from "./inventory-script-access";
 import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
 import { protocardPurchaseHandler } from "./protocard-purchase-handler"; 
-// Import the specific supabaseAdmin instance from your hook
-import { supabaseAdmin } from "@/hooks/supabase";
-import { sendTelegramMessage } from "../actions"; 
+// Импорты Supabase и Telegram Actions будут сделаны внутри функции
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!; // Это нормально здесь, т.к. используется только на сервере
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 
 // Ensure all required handlers are in this array
@@ -32,6 +30,10 @@ const handlers: WebhookHandler[] = [
 ];
 
 export async function handleWebhookProxy(update: any) {
+  // Динамический импорт внутри функции
+  const { supabaseAdmin } = await import("@/hooks/supabase");
+  const { sendTelegramMessage } = await import("../actions"); 
+
   logger.log("Webhook Proxy: Received update", update);
 
   if (update.pre_checkout_query) {
@@ -52,8 +54,6 @@ export async function handleWebhookProxy(update: any) {
   if (update.message?.successful_payment) {
     const payment = update.message.successful_payment;
     const userId = update.message.chat.id.toString(); 
-    // total_amount приходит в минимальных единицах валюты (например, копейки для RUB, центы для USD, или сами XTR для XTR)
-    // Для XTR, total_amount УЖЕ является количеством звезд. Делить на 100 не нужно.
     const { invoice_payload, total_amount: totalAmountInStars } = payment; 
     logger.log(`Webhook Proxy: Handling successful_payment. Payload: ${invoice_payload}, Amount: ${totalAmountInStars} XTR, UserID: ${userId}`);
 
@@ -109,8 +109,8 @@ export async function handleWebhookProxy(update: any) {
           invoice,
           userId,
           userData || { user_id: userId, metadata: {}, username: `tg_user_${userId}` }, 
-          totalAmountInStars, // Передаем сумму как есть, в XTR
-          supabaseAdmin,
+          totalAmountInStars, 
+          supabaseAdmin, // Передаем уже импортированный клиент
           TELEGRAM_BOT_TOKEN, 
           ADMIN_CHAT_ID,
           baseUrl
