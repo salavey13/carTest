@@ -162,8 +162,11 @@ function HotVibesClientContent() {
       if (effectiveId) {
         logger.info(`[HotVibes InitialIdEffect] Setting initialVipIdentifier to: ${effectiveId}`);
         setInitialVipIdentifier(effectiveId);
+        // Clean URL only if startParamPayload was used to set lead_identifier via redirect in ClientLayout
+        // This useEffect in ClientLayout now handles the redirect for startParamPayload
+        // So if leadIdFromUrl is present and matches startParamPayload, it means redirect probably happened.
         if (startParamPayload && leadIdFromUrl === startParamPayload && router) {
-          router.replace('/hotvibes', { scroll: false });
+           // router.replace('/hotvibes', { scroll: false }); // Let ClientLayout handle this
         }
       }
       setIsInitialVipCheckDone(true); 
@@ -184,7 +187,7 @@ function HotVibesClientContent() {
         const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (profileResult.success && profileResult.data) {
           tempCyberProfile = profileResult.data;
-          setCyberProfile(tempCyberProfile); // Обновляем стейт профиля
+          setCyberProfile(tempCyberProfile);
         } else { addToast(t.errorLoadingProfile, "error"); }
     }
     
@@ -216,7 +219,7 @@ function HotVibesClientContent() {
                 } else {
                     addToast(t.vipLeadNotFound, "warning", { description: `ID: ${initialVipIdentifier}` });
                     setVipLeadToShow(null); 
-                    setInitialVipIdentifier(null); 
+                    setInitialVipIdentifier(null); // Reset if not found to avoid re-fetching
                 }
             }
         }
@@ -227,8 +230,9 @@ function HotVibesClientContent() {
   }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone]);
 
   useEffect(() => {
-    loadPageData();
-  }, [loadPageData]); // Зависимость только от loadPageData, так как activeFilter используется в useMemo
+      loadPageData();
+  }, [loadPageData]); // Primary trigger for data loading based on its own dependencies.
+
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
@@ -238,6 +242,7 @@ function HotVibesClientContent() {
   const handleBackToLobby = () => {
     logger.info(`[HotVibes] Returning to lobby view.`);
     setInitialVipIdentifier(null); 
+    setVipLeadToShow(null); // Explicitly clear vipLeadToShow to ensure lobby renders
   };
   
   const handlePurchaseProtoCard = async (cardToPurchase: HotLeadData) => {
@@ -277,8 +282,8 @@ function HotVibesClientContent() {
         addToast("Запрос на ПротоКарточку отправлен! Проверьте Telegram для оплаты счета.", "success");
         if(refreshDbUser) {
             setTimeout(async () => {
-                await refreshDbUser(); // Это обновит dbUser в AppContext
-            }, 4000); // Увеличил задержку для обработки вебхука и обновления БД
+                await refreshDbUser(); 
+            }, 4000); 
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -291,7 +296,7 @@ function HotVibesClientContent() {
   };
 
   const handleExecuteMission = useCallback(async (leadId: string, questIdFromLead: string | undefined) => {
-    if (!isAuthenticated || !dbUser?.user_id || !cyberProfile) { // cyberProfile здесь может быть null, если не загрузился
+    if (!isAuthenticated || !dbUser?.user_id || !cyberProfile) { 
       addToast("Аутентификация или профиль агента недоступны", "error"); return;
     }
     const targetQuestId = questIdFromLead || "image-swap-mission";
@@ -355,7 +360,6 @@ function HotVibesClientContent() {
             ? currentLobbyLeads.filter(mLead => mLead.required_quest_id && mLead.required_quest_id !== "none" ? checkQuestUnlocked(mLead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true )
             : isAuthenticated ? [] : currentLobbyLeads;
         
-        // Убираем карточку Илона из основного списка, если она там случайно оказалась
         const lobbyWithoutElon = baseFilteredLobby.filter(l => l.id !== ELON_SIMULATOR_CARD_ID);
         filteredForDisplay = [elonCardWithStatus, ...lobbyWithoutElon];
     }
@@ -363,8 +367,7 @@ function HotVibesClientContent() {
     logger.debug(`[HotVibes displayedLeads] Filter: ${activeFilter}, ElonSupported: ${elonCardIsSupportedActually}, Output count: ${filteredForDisplay.length}`);
     return filteredForDisplay;
 
-  }, [lobbyLeads, dbUser?.metadata?.xtr_protocards, activeFilter, cyberProfile, isAuthenticated, elonCardIsSupportedActually, currentLang]); // Добавил currentLang
-
+  }, [lobbyLeads, dbUser?.metadata?.xtr_protocards, activeFilter, cyberProfile, isAuthenticated, elonCardIsSupportedActually]);
 
   if (appCtxLoading && pageLoading && !vipLeadToShow) return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
 
@@ -476,8 +479,8 @@ function HotVibesClientContent() {
                           isMissionUnlocked={cyberProfile ? (lead.required_quest_id && lead.required_quest_id !== "none" ? checkQuestUnlocked(lead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
                           onExecuteMission={() => handleExecuteMission(lead.id, lead.required_quest_id)}
                           onSupportMission={() => handlePurchaseProtoCard(lead)}
-                          isSupported={isSupported}
-                          isSpecial={isSpecial}
+                          isSupported={!!isSupported} // Убедимся, что это булево
+                          isSpecial={!!isSpecial}   // Убедимся, что это булево
                           onViewVip={handleSelectLeadForVip} 
                           currentLang={currentLang}
                           theme={cardTheme}
