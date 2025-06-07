@@ -1,5 +1,5 @@
-// /app/webhook-handlers/protocard-purchase-handler.ts
-"use server";
+// Убираем "use server" с уровня модуля, так как экспортируется объект, а не async функция
+// "use server"; 
 
 import type { WebhookHandler } from "./types";
 import { supabaseAdmin, updateUserMetadata } from '@/hooks/supabase';
@@ -18,7 +18,7 @@ interface UserProtoCard {
   data?: Record<string, any>;   
 }
 
-interface UserMetadataWithProtoCards extends UserMetadata { // Расширяем UserMetadata
+interface UserMetadataWithProtoCards extends UserMetadata {
   xtr_protocards?: {
     [cardId: string]: UserProtoCard;
   };
@@ -33,7 +33,6 @@ export const protocardPurchaseHandler: WebhookHandler = {
   },
 
   handle: async (invoice, userId, userData, totalAmountXTR, supabase, telegramToken, adminChatId, baseUrl) => {
-    // totalAmountXTR здесь уже в XTR (например, 13), т.к. proxy.ts делит на 100
     logger.info(`[ProtoCardHandler] Processing ProtoCard purchase. UserID: ${userId}, InvoiceID: ${invoice.id}, Amount: ${totalAmountXTR} XTR.`);
     
     const cardId = invoice.subscription_id; 
@@ -55,7 +54,6 @@ export const protocardPurchaseHandler: WebhookHandler = {
     logger.debug(`[ProtoCardHandler] Extracted cardId: ${cardId}. Card metadata from invoice:`, cardMetadataFromInvoice);
 
     try {
-      // 1. Пометить инвойс как 'paid'
       const { error: updateInvoiceError } = await supabaseAdmin
         .from("invoices")
         .update({ status: "paid", updated_at: new Date().toISOString() })
@@ -68,7 +66,6 @@ export const protocardPurchaseHandler: WebhookHandler = {
         logger.info(`[ProtoCardHandler] Invoice ${invoice.id} marked as paid or was already paid.`);
       }
 
-      // 2. Обновить users.metadata
       const currentUserMetadata = (userData.metadata || {}) as UserMetadataWithProtoCards;
       const existingProtoCards = currentUserMetadata.xtr_protocards || {};
 
@@ -81,14 +78,12 @@ export const protocardPurchaseHandler: WebhookHandler = {
         data: {
             title: cardMetadataFromInvoice?.card_title || "ПротоКарточка",
             description: cardMetadataFromInvoice?.card_description || "Доступ или поддержка",
-            // Копируем специфичные метаданные, которые могли быть переданы
             ...(cardMetadataFromInvoice?.associated_lead_id && { lead_id: cardMetadataFromInvoice.associated_lead_id }),
             ...(cardMetadataFromInvoice?.lead_title && { lead_title: cardMetadataFromInvoice.lead_title }),
             ...(cardMetadataFromInvoice?.demo_link_param && { demo_link_param: cardMetadataFromInvoice.demo_link_param }),
             ...(cardMetadataFromInvoice?.simulator_page && { page_link: cardMetadataFromInvoice.simulator_page }),
         }
       };
-      // Удаляем data, если оно пустое, чтобы не засорять метаданные
       if (Object.keys(newProtoCardEntry.data || {}).length === 0) {
           delete newProtoCardEntry.data;
       }
@@ -115,13 +110,13 @@ export const protocardPurchaseHandler: WebhookHandler = {
       }
       logger.info(`[ProtoCardHandler] User ${userId} metadata updated successfully with ProtoCard ${cardId}.`);
 
-      // 3. Уведомить пользователя и админа
       const cardTitleForNotification = cardMetadataFromInvoice?.card_title || `Карточка ${cardId}`;
       let userMessage = `✅ Спасибо за покупку ПротоКарточки "${cardTitleForNotification}"! Она добавлена в ваш инвентарь. VIBE ON!`;
       if (newProtoCardEntry.data?.page_link) {
         userMessage += `\nДоступ к симулятору: ${baseUrl}${newProtoCardEntry.data.page_link}`;
       } else if (newProtoCardEntry.data?.lead_id && newProtoCardEntry.data?.demo_link_param) {
-        const demoUrl = `https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'webAnyBot'}/app?startapp=${newProtoCardEntry.data.demo_link_param}`;
+        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'webAnyBot'; // Получаем имя бота из env
+        const demoUrl = `https://t.me/${botUsername}/app?startapp=${newProtoCardEntry.data.demo_link_param}`;
         userMessage += `\nДоступ к демо для миссии "${newProtoCardEntry.data.lead_title || newProtoCardEntry.data.lead_id}": ${demoUrl}`;
       }
 
