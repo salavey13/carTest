@@ -1,3 +1,5 @@
+// Директива "use server" здесь не нужна, т.к. это Route Handler
+
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/hooks/supabase';
 import { sendTelegramMessage } from '@/app/actions'; 
@@ -5,7 +7,7 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import type { Database } from "@/types/database.types";
 
-// --- Types ---
+// --- Types (остаются неэкспортируемыми внутри модуля) ---
 type UserMetadata = {
   advice_broadcast?: {
     enabled: boolean;        
@@ -17,11 +19,11 @@ type UserMetadata = {
 };
 type UserWithMetadata = Database["public"]["Tables"]["users"]["Row"];
 
-// --- Constants ---
+// --- Constants (остаются неэкспортируемыми) ---
 const CRON_SECRET = process.env.CRON_SECRET;
 const MAX_USERS_PER_RUN = 50; 
 
-// --- Helpers ---
+// --- Helpers (остаются неэкспортируемыми) ---
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function escapeTelegramMarkdownV1(text: string): string {
@@ -33,8 +35,8 @@ function escapeTelegramMarkdownV1(text: string): string {
         .replace(/\[/g, '\\['); 
 }
 
-// --- API Route Handler ---
-async function processBroadcasts(request: Request) {
+// --- Основная логика обработки, вынесенная в отдельную функцию ---
+async function handleAdviceBroadcastProcessing(request: Request) {
     const authorization = request.headers.get('Authorization');
 
     if (authorization !== `Bearer ${CRON_SECRET}`) {
@@ -42,7 +44,7 @@ async function processBroadcasts(request: Request) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    debugLogger.log('Advice broadcast API triggered.');
+    debugLogger.log('Advice broadcast API processing started.');
 
     let processedUsers = 0;
     let sentMessages = 0;
@@ -199,19 +201,12 @@ async function processBroadcasts(request: Request) {
     }
 }
 
-
+// Экспортируем только HTTP метод хендлеры как async функции
 export async function POST(request: Request) {
-    return processBroadcasts(request);
+    return handleAdviceBroadcastProcessing(request);
 }
 
 export async function GET(request: Request) {
-    // Добавим дополнительную проверку, чтобы GET можно было вызвать только с определенным query-параметром, если нужно
-    // const { searchParams } = new URL(request.url);
-    // const cronKey = searchParams.get('cron_key');
-    // if (cronKey !== process.env.CRON_JOB_KEY_GET) { // Пример защиты GET-эндпоинта
-    //    logger.warn('Unauthorized GET attempt to advice broadcast API.');
-    //    return NextResponse.json({ error: 'Unauthorized for GET' }, { status: 401 });
-    // }
     logger.info('Advice broadcast API triggered by GET request. Delegating to POST logic (auth via header still checked).');
-    return processBroadcasts(request); 
+    return handleAdviceBroadcastProcessing(request); 
 }
