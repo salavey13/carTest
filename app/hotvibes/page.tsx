@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense, useCallback, useId, useMemo } from 'react'; // <--- ДОБАВЛЕН useMemo
+import React, { useState, useEffect, Suspense, useCallback, useId, useMemo } from 'react';
 import { useRouter, useSearchParams as useNextSearchParamsHook } from 'next/navigation';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ const extractPriceInRub = (potentialEarning: string | null | undefined): number 
         return parseInt(rubOnlyMatch[1].replace(/\s/g, ''), 10);
     }
     const rangeMatch = potentialEarning.match(/(\d+[\s\d]*)\s*₽\s*\/\s*(?:до\s*)?(\d+[\s\d]*)\s*₽/);
-    if (rangeMatch && rangeMatch[1]) { // Take the first number in a range as a base
+    if (rangeMatch && rangeMatch[1]) { 
         return parseInt(rangeMatch[1].replace(/\s/g, ''), 10);
     }
     const numbers = potentialEarning.match(/\d+[\s\d]*/g);
@@ -143,6 +143,7 @@ function HotVibesClientContent() {
 
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [vipLeadToShow, setVipLeadToShow] = useState<HotLeadData | null>(null);
+  const [initialVipIdentifier, setInitialVipIdentifier] = useState<string | null>(null);
   const [lobbyLeads, setLobbyLeads] = useState<HotLeadData[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -152,9 +153,28 @@ function HotVibesClientContent() {
   useEffect(() => {
     setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en');
   }, [tgUser?.language_code, platform]);
+
+  // Effect to capture initial VIP identifier from URL or startParamPayload
+  useEffect(() => {
+    if (!appCtxLoading && !isAuthenticating) {
+        const leadIdFromUrl = searchParamsHook.get('lead_identifier');
+        const effectiveInitialId = startParamPayload || leadIdFromUrl;
+        if (effectiveInitialId && effectiveInitialId !== initialVipIdentifier) {
+            logger.info(`[HotVibes Initial VIP Set] Effective ID: ${effectiveInitialId}`);
+            setInitialVipIdentifier(effectiveInitialId);
+            // Clean URL if it came from startParamPayload and was pushed to URL
+            if (startParamPayload && leadIdFromUrl === startParamPayload) {
+                 router.replace('/hotvibes', { scroll: false });
+            }
+        } else if (!effectiveInitialId && initialVipIdentifier) {
+            // If URL params are cleared and we had an initial VIP, clear it too
+            setInitialVipIdentifier(null);
+        }
+    }
+  }, [startParamPayload, searchParamsHook, appCtxLoading, isAuthenticating, initialVipIdentifier, router]);
   
-  const loadPageData = useCallback(async (filter: string) => {
-    logger.info(`[HotVibes loadPageData] Filter: ${filter}. AppCtxLoading: ${appCtxLoading}, Authenticating: ${isAuthenticating}`);
+  const loadPageData = useCallback(async () => {
+    logger.info(`[HotVibes loadPageData] AppCtxLoading: ${appCtxLoading}, Authenticating: ${isAuthenticating}, InitialVIP: ${initialVipIdentifier}, CurrentVIP: ${vipLeadToShow?.id}`);
     if (appCtxLoading || isAuthenticating) {
       setPageLoading(true); return;
     }
@@ -169,89 +189,63 @@ function HotVibesClientContent() {
       } else { addToast(t.errorLoadingProfile, "error"); }
     }
     
-    const leadIdentifierFromUrl = searchParamsHook.get('lead_identifier');
-    const identifierToShowAsVip = vipLeadToShow?.id || leadIdentifierFromUrl;
-
-    if (identifierToShowAsVip && identifierToShowAsVip !== ELON_SIMULATOR_CARD_ID) {
-      const leadIsAlreadyInLobby = lobbyLeads.find(l => l.id === identifierToShowAsVip);
-      if (leadIsAlreadyInLobby && vipLeadToShow?.id === identifierToShowAsVip) { 
-         logger.info(`[HotVibes] VIP lead ${identifierToShowAsVip} already loaded and selected.`);
-      } else {
-          logger.info(`[HotVibes] Attempting to fetch/set VIP lead: ${identifierToShowAsVip}`);
-          // fetchLeadByIdentifierOrNickname был удален из ./actions, ищем его в leads/actions
-          const { fetchLeadByIdentifierOrNickname: fetchLeadForVip } = await import('../leads/actions');
-          const vipResult = await fetchLeadForVip(identifierToShowAsVip, dbUser?.user_id || "guest");
-          if (vipResult.success && vipResult.data) {
-            const mappedVipLead = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang);
-            setVipLeadToShow(mappedVipLead); 
-            addToast(`Демонстрация VIP VIBE для: ${mappedVipLead.kwork_gig_title || mappedVipLead.client_name}`, "success");
-            if (leadIdentifierFromUrl === identifierToShowAsVip) {
-                router.replace('/hotvibes', { scroll: false });
-            }
-          } else {
-            addToast(t.vipLeadNotFound, "warning", { description: `Идентификатор: ${identifierToShowAsVip}` });
-            setVipLeadToShow(null); 
-          }
-      }
-    } else if (identifierToShowAsVip === ELON_SIMULATOR_CARD_ID) {
-        setVipLeadToShow(elonSimulatorProtoCardData); 
-        if (leadIdentifierFromUrl === ELON_SIMULATOR_CARD_ID) {
-             router.replace('/hotvibes', { scroll: false });
-        }
-    } else {
-      setVipLeadToShow(null); 
-    }
-    
-    const leadsRes = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all'); 
+    // Fetch all lobby leads first unconditionally
+    const leadsRes = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
+    let allFetchedLeads: HotLeadData[] = [];
     if (leadsRes.success && leadsRes.data) {
-        let allFetchedLeads = (leadsRes.data as LeadDataFromActions[]).map(lead => mapLeadToHotLeadData(lead, currentLang));
-        setLobbyLeads(allFetchedLeads); 
+        allFetchedLeads = (leadsRes.data as LeadDataFromActions[]).map(lead => mapLeadToHotLeadData(lead, currentLang));
+        setLobbyLeads(allFetchedLeads);
         logger.info(`[HotVibes loadPageData] Total lobby leads fetched: ${allFetchedLeads.length}`);
     } else { 
         addToast(t.errorLoadingLeads, "error"); 
         setLobbyLeads([]);
     }
-    setPageLoading(false);
-  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, router, searchParamsHook, vipLeadToShow, lobbyLeads]); // Добавлен lobbyLeads в зависимости
 
+    // Now, determine if we need to show a VIP lead
+    const identifierForVip = initialVipIdentifier; // Use the state that captures initial intent
 
-  useEffect(() => {
-    const leadIdFromUrl = searchParamsHook.get('lead_identifier');
-    if (startParamPayload && !appCtxLoading && !isAuthenticating && !leadIdFromUrl) {
-        logger.info(`[HotVibes] AppContext has startParamPayload: ${startParamPayload}, but URL doesn't have lead_identifier. Routing to show it.`);
-        // Не используем router.push, так как это может вызвать цикл, если loadPageData тоже роутит.
-        // Вместо этого, просто установим vipLeadToShow, если это Elon card, или дадим loadPageData его загрузить
-        if (startParamPayload === ELON_SIMULATOR_CARD_ID) {
+    if (identifierForVip) {
+        if (identifierForVip === ELON_SIMULATOR_CARD_ID) {
             setVipLeadToShow(elonSimulatorProtoCardData);
+            logger.info(`[HotVibes] Showing VIP (Elon Simulator) based on initialVipIdentifier.`);
         } else {
-            // Для обычных лидов, loadPageData должен их подхватить, если leadIdentifierFromUrl будет установлен
-            // Однако, если startParamPayload ЕСТЬ, а lead_identifier НЕТ, то loadPageData не узнает о startParamPayload
-            // поэтому, мы должны инициировать загрузку этого VIP лида
-            if (!vipLeadToShow || vipLeadToShow.id !== startParamPayload) { // Только если еще не загружен/выбран
-                 loadPageData(activeFilter); // Позволим loadPageData обработать startParamPayload, если он есть
+            // Try to find in already fetched lobby leads
+            let vipData = allFetchedLeads.find(l => l.id === identifierForVip);
+            if (vipData) {
+                setVipLeadToShow(vipData);
+                logger.info(`[HotVibes] Showing VIP (from lobby) based on initialVipIdentifier: ${identifierForVip}`);
+            } else {
+                // If not in lobby (e.g., direct access to a non-standard lead), fetch it specifically
+                logger.info(`[HotVibes] initialVipIdentifier ${identifierForVip} not in lobby, fetching specifically.`);
+                const vipResult = await fetchLeadByIdentifierOrNickname(identifierForVip, dbUser?.user_id || "guest");
+                if (vipResult.success && vipResult.data) {
+                    const mappedVipLead = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang);
+                    setVipLeadToShow(mappedVipLead);
+                } else {
+                    addToast(t.vipLeadNotFound, "warning", { description: `ID: ${identifierForVip}` });
+                    setVipLeadToShow(null); // Fallback to lobby
+                }
             }
         }
-    } else if (leadIdFromUrl && (!vipLeadToShow || vipLeadToShow.id !== leadIdFromUrl)) {
-        loadPageData(activeFilter); // Загружаем, если в URL есть ID и он еще не отображается
-    } else if (!leadIdFromUrl && !startParamPayload && vipLeadToShow) {
-        // Если в URL и startParam нет ID, а VIP все еще отображается, сбрасываем его
-        // setVipLeadToShow(null); // Это вызовет перерисовку и loadPageData(activeFilter) из useEffect ниже
-    } else if (!vipLeadToShow && !leadIdFromUrl && !startParamPayload) {
-        // Если ничего нет, просто загружаем текущий фильтр
-        loadPageData(activeFilter);
+    } else {
+      setVipLeadToShow(null); // No VIP to show, ensure lobby is displayed
     }
-  // Пересмотрел зависимости: startParamPayload, appCtxLoading, isAuthenticating, activeFilter, loadPageData, vipLeadToShow
-  // searchParamsHook сам по себе объект, лучше использовать searchParamsHook.get('lead_identifier')
-  }, [startParamPayload, appCtxLoading, isAuthenticating, activeFilter, loadPageData, vipLeadToShow, searchParamsHook.get('lead_identifier')]);
+    setPageLoading(false);
+  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier]); // Removed vipLeadToShow from deps
 
+  useEffect(() => {
+    loadPageData(); // Load data based on current initialVipIdentifier and activeFilter (filter is applied in useMemo for display)
+  }, [loadPageData, activeFilter]); 
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
-    setVipLeadToShow(lead);
+    setInitialVipIdentifier(lead.id); // This will trigger re-evaluation in loadPageData if needed, or just set vipLeadToShow
+    setVipLeadToShow(lead); // Directly set for immediate UI update
   };
 
   const handleBackToLobby = () => {
     logger.info(`[HotVibes] Returning to lobby view.`);
+    setInitialVipIdentifier(null); // Clear initial VIP intent
     setVipLeadToShow(null);
   };
   
@@ -290,7 +284,9 @@ function HotVibesClientContent() {
       const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
       if (result.success) {
         addToast("Запрос на ПротоКарточку отправлен! Проверьте Telegram для оплаты счета.", "success");
-        if(refreshDbUser) await refreshDbUser(); 
+        if(refreshDbUser) {
+            setTimeout(() => refreshDbUser(), 2000); // Даем время вебхуку обработаться
+        }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
       }
@@ -311,7 +307,7 @@ function HotVibesClientContent() {
         if (leadId === ELON_SIMULATOR_CARD_ID) router.push("/elon");
         return;
     }
-    const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests, QUEST_ORDER);
+    const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests || [], QUEST_ORDER);
 
     if (!isActuallyUnlocked) {
       addToast(t.lockedMissionRedirect.replace("...", `'${targetQuestId}'`), "info", 7000);
@@ -335,11 +331,10 @@ function HotVibesClientContent() {
   const cardTheme: HotVibeCardTheme = {
     borderColor: "border-brand-red/70", 
     accentGradient: "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500", 
-    modalOverlayGradient: "from-black/70 via-purple-900/50 to-black/80",
-    modalAccentColor: "text-brand-cyan", 
-    modalCardBg: "bg-black/70",
-    modalCardBorder: "border-white/20",
-    modalImageOverlayGradient: "bg-gradient-to-t from-black/90 via-black/50 to-transparent",
+    shadowColor: "shadow-brand-red/40",
+    hoverBorderColor: "hover:border-brand-red",
+    hoverShadowColor: "hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]",
+    textColor: "text-brand-red"
   };
 
   const elonCardIsSupported = !!dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active';
@@ -352,13 +347,18 @@ function HotVibesClientContent() {
         isSupported: !!dbUser?.metadata?.xtr_protocards?.[lead.id]?.status === 'active'
     }));
 
+    let filteredLeads = currentLobbyLeads;
     if (activeFilter === 'supported') {
-        currentLobbyLeads = currentLobbyLeads.filter(l => l.isSupported);
-        return elonCardWithStatus.isSupported ? [elonCardWithStatus, ...currentLobbyLeads] : currentLobbyLeads;
+        filteredLeads = currentLobbyLeads.filter(l => l.isSupported);
+        return elonCardWithStatus.isSupported ? [elonCardWithStatus, ...filteredLeads] : filteredLeads;
     }
-    return [elonCardWithStatus, ...currentLobbyLeads];
+    // Для фильтра 'all', показываем карточку Илона и все остальные отфильтрованные по уровню/квестам (если логика осталась)
+    // Убедимся, что карточка Илона не дублируется, если она уже есть в currentLobbyLeads (хотя не должна)
+    const finalLeads = [elonCardWithStatus, ...currentLobbyLeads.filter(l => l.id !== ELON_SIMULATOR_CARD_ID)];
+    return finalLeads;
 
-  }, [lobbyLeads, dbUser, elonCardIsSupported, activeFilter]);
+  }, [lobbyLeads, dbUser, elonCardIsSupported, activeFilter, cyberProfile]); // Добавил cyberProfile, т.к. от него может зависеть isMissionUnlocked
+
 
   if (appCtxLoading && pageLoading) return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
 
@@ -419,7 +419,7 @@ function HotVibesClientContent() {
               </CardTitle>
               {cyberProfile && ( 
                 <CardDescription className="text-muted-foreground font-mono text-center text-xs">
-                  Агент Ур. {cyberProfile.level} | Доступно вайбов (фильтр: {activeFilter}): {displayedLeads.filter(l => activeFilter === 'all' || (activeFilter === 'supported' && l.isSupported)).length - (activeFilter === 'all' ? 1:0) }
+                  Агент Ур. {cyberProfile.level} | Показано: {displayedLeads.length} (Фильтр: {activeFilter === 'all' ? 'Все' : 'Поддержанные'})
                 </CardDescription>
               )}
               <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2 justify-center">
@@ -448,11 +448,13 @@ function HotVibesClientContent() {
               {isAuthenticated && displayedLeads.length === 0 && !pageLoading && (
                  <div className="text-center text-muted-foreground py-8 font-mono text-sm sm:text-base">
                     <VibeContentRenderer content={t.noHotVibes} />
-                     <div className="mt-4">
-                        <Button variant="outline" asChild className="border-brand-orange text-brand-orange hover:bg-brand-orange/10">
-                            <Link href="/leads#scraperSectionAnchor">К Скрейперу в /leads</Link>
-                        </Button>
-                    </div>
+                     {activeFilter !== 'supported' && 
+                        <div className="mt-4">
+                            <Button variant="outline" asChild className="border-brand-orange text-brand-orange hover:bg-brand-orange/10">
+                                <Link href="/leads#scraperSectionAnchor">К Скрейперу в /leads</Link>
+                            </Button>
+                        </div>
+                    }
                  </div>
               )}
               {pageLoading && displayedLeads.length === 0 && <TutorialLoader message="Обновление матрицы вайбов..." />}
