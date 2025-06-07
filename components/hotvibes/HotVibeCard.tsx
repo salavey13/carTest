@@ -54,7 +54,7 @@ interface HotVibeCardProps {
   isAuthenticated: boolean;
 }
 
-const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"; // Placeholder общий
+const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"; 
 
 export function HotVibeCard({ 
     lead, 
@@ -134,12 +134,12 @@ export function HotVibeCard({
       onClick={isSupported && !isElonSimulatorCard ? () => onViewVip(lead) : undefined}
       className={cn(
         "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl bg-black/70 backdrop-blur-md transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        "border", // Используем просто border, цвет будет из theme
-        effectiveBorderColor,
+        // "border", // Убрали класс border для удаления стандартной рамки
+        effectiveBorderColor, // Цвет рамки будет применяться только если он задан в theme
         effectiveShadowColor,
         (isMissionUnlocked || isElonSimulatorCard || isSupported) 
           ? `${effectiveHoverBorderColor} ${effectiveHoverShadowColor} hover:scale-[1.03] hover:-translate-y-0.5` 
-          : "border-muted/30 opacity-80 hover:opacity-100",
+          : "border-muted/30 opacity-80 hover:opacity-100", // Для заблокированных карточек оставим рамку muted
         (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
       )}
     >
