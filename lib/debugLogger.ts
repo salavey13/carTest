@@ -13,17 +13,16 @@ class DebugLogger {
   private internalLogs: LogRecord[] = [];
   private logIdCounter = 0; // Counter for unique log IDs
   private maxInternalLogs = 200; // Keep a reasonable number of logs
-  private readonly isBrowser: boolean = typeof window !== 'undefined'; // Use readonly and initialize here
-  private isLoggingInternally: boolean = false; // Prevent recursion
+  private readonly isBrowser: boolean = typeof window !== 'undefined'; 
+  private isLoggingInternally: boolean = false; 
 
-  // --- Safely Stringify (Improved binding) ---
-  private safelyStringify = (arg: any): string => { // Use arrow function for 'this' binding
+  private safelyStringify = (arg: any): string => { 
     try {
       if (arg instanceof Error) {
         return `Error: ${arg.message}${arg.name ? ` (${arg.name})` : ''}${arg.stack ? `\nStack: ${arg.stack}` : ''}`;
       }
       if (typeof arg === 'object' && arg !== null) {
-        const seen = new WeakSet(); // Use WeakSet for circular reference checking
+        const seen = new WeakSet(); 
         const replacer = (key: string, value: any) => {
           if (typeof value === 'object' && value !== null) {
             if (seen.has(value)) {
@@ -37,10 +36,10 @@ class DebugLogger {
           if (this.isBrowser && value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
           if (this.isBrowser && value instanceof Event) { return `[Event: ${value.type}]`; }
           if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
-          if (value instanceof Error) { return `Error: ${value.message}${value.name ? ` (${value.name})` : ''}`; } // More detail for nested errors
+          if (value instanceof Error) { return `Error: ${value.message}${value.name ? ` (${value.name})` : ''}`; } 
           return value;
         };
-        return JSON.stringify(arg, replacer, 2); // Indent for readability
+        return JSON.stringify(arg, replacer, 2); 
       }
       if (typeof arg === 'symbol') { return arg.toString(); }
       if (arg === undefined) { return 'undefined'; }
@@ -55,7 +54,6 @@ class DebugLogger {
       return errorMsg;
     }
   }
-  // --- End Safely Stringify ---
 
   private logInternal(level: LogLevel, ...args: any[]) {
     if (this.isLoggingInternally) {
@@ -81,8 +79,11 @@ class DebugLogger {
         this.internalLogs = this.internalLogs.slice(this.internalLogs.length - this.maxInternalLogs);
       }
 
+      const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
+      const logOutput = `[${level.toUpperCase()}] ${timestampStr}: ${argsArray.map(arg => typeof arg === 'string' ? arg : this.safelyStringify(arg)).join(' ')}`;
+
+
       if (this.isBrowser && typeof console !== 'undefined') {
-        const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
         const prefix = `%c[${level.toUpperCase()}] %c${timestampStr}:`;
         let color = 'inherit';
         switch(level) {
@@ -94,7 +95,14 @@ class DebugLogger {
         }
         const consoleMethod = (console as any)[level] || console.log;
         try { consoleMethod(prefix, color, 'color: inherit;', ...argsArray); }
-        catch (e) { console.error("[Logger] Error during styled console output:", e); try { console.log(`[${level.toUpperCase()}] ${timestampStr}:`, ...argsArray); } catch {} }
+        catch (e) { console.error("[Logger] Error during styled console output:", e); try { console.log(logOutput); } catch {} }
+      } else if (!this.isBrowser) {
+        // Server-side logging
+        if (level === 'error' || level === 'fatal' || level === 'warn') {
+            process.stderr.write(logOutput + '\n');
+        } else {
+            process.stdout.write(logOutput + '\n');
+        }
       }
     } catch (e) {
       const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
@@ -131,4 +139,3 @@ class DebugLogger {
 }
 
 export const debugLogger = new DebugLogger();
-export type { LogLevel, LogRecord };
