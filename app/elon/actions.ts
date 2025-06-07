@@ -1,4 +1,3 @@
-// /app/elon/actions.ts
 "use server";
 import { logger } from "@/lib/logger";
 
@@ -14,28 +13,29 @@ interface TeslaStockData {
 let lastPrice = 170.00; 
 let lastTrend: "up" | "down" | "stable" = "stable";
 
+// Строки теперь содержат плейсхолдеры для VibeContentRenderer, а не сам компонент
 const positiveMuskNews = [
-  "Маск: 'Tesla Roadster нового поколения будет летать, буквально!' Акции TSLA <VibeContentRenderer content='::FaRocket::'/> !",
+  "Маск: 'Tesla Roadster нового поколения будет летать, буквально!' Акции TSLA ::FaRocket:: !",
   "Tesla заключает мега-контракт на поставку Cybertruck'ов для колонизации Луны!",
   "Автопилот FSD V15 распознает мысли водителя и заказывает пиццу!",
-  "Маск: 'Dogecoin станет официальной валютой на Марсе!' TSLA + Doge <VibeContentRenderer content='::FaChartLine::'/>",
+  "Маск: 'Dogecoin станет официальной валютой на Марсе!' TSLA + Doge ::FaChartLine::",
 ];
 const negativeMuskNews = [
-  "Маск снова пишет твиты в 3 часа ночи! На этот раз про то, что Земля плоская и рептилоиды существуют. Инвесторы TSLA <VibeContentRenderer content='::FaFaceDizzy::'/>.",
+  "Маск снова пишет твиты в 3 часа ночи! На этот раз про то, что Земля плоская и рептилоиды существуют. Инвесторы TSLA ::FaFaceDizzy::.",
   "SEC открывает новое расследование по манипуляциям Маска с ценой акций TSLA.",
   "Маск: 'Продаю еще 10% акций Tesla, нужны деньги на золотой унитаз для Starship'.",
-  "Внезапно! Маск объявляет, что следующая модель Tesla будет работать на дровах 'для экологии'. <VibeContentRenderer content='::FaTree::'/>",
+  "Внезапно! Маск объявляет, что следующая модель Tesla будет работать на дровах 'для экологии'. ::FaTree::",
 ];
 
 const russianEconomyPositiveNews = [ // Сарказм
-  "РФ ТВ: 'Экономика России показала беспрецедентный рост! Рубль признан самой стабильной валютой Галактики!' <VibeContentRenderer content='::FaFaceGrinStars::'/>",
+  "РФ ТВ: 'Экономика России показала беспрецедентный рост! Рубль признан самой стабильной валютой Галактики!' ::FaFaceGrinStars::",
   "Замминистра финансов РФ: 'Дефицит бюджета? Это выдумки Госдепа! У нас профицит профицитов!'",
 ];
 const russianEconomyNegativeNews = [
-  "Reuters: 'Доходы РФ от нефти/газа рухнули на 60% из-за потолка цен и санкций. Дыра в бюджете размером с Байкал.' <VibeContentRenderer content='::FaSackXmark::'/>",
-  "Bloomberg: 'ЦБ РФ экстренно повышает ставку до 30% в попытке остановить гиперинфляцию. Гречка по цене черной икры.' <VibeContentRenderer content='::FaChartPie::'/>",
+  "Reuters: 'Доходы РФ от нефти/газа рухнули на 60% из-за потолка цен и санкций. Дыра в бюджете размером с Байкал.' ::FaSackXmark::",
+  "Bloomberg: 'ЦБ РФ экстренно повышает ставку до 30% в попытке остановить гиперинфляцию. Гречка по цене черной икры.' ::FaChartPie::",
   "The Economist: 'Технологическая деградация в РФ ускоряется. Новые 'Москвичи' собирают с использованием изоленты и молитв.'",
-  "Forbes: 'Отток капитала из РФ превысил все мыслимые пределы. Остались только самые патриотичные рубли.' <VibeContentRenderer content='::FaPlaneDeparture::'/>",
+  "Forbes: 'Отток капитала из РФ превысил все мыслимые пределы. Остались только самые патриотичные рубли.' ::FaPlaneDeparture::",
 ];
 
 export async function teslaStockSimulator(): Promise<TeslaStockData> {
