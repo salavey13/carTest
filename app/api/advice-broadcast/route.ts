@@ -35,7 +35,7 @@ function escapeTelegramMarkdownV1(text: string): string {
         .replace(/\[/g, '\\['); 
 }
 
-// --- Основная логика обработки, вынесенная в отдельную функцию ---
+// --- Основная логика обработки, вынесенная в отдельную async функцию ---
 async function handleAdviceBroadcastProcessing(request: Request) {
     const authorization = request.headers.get('Authorization');
 
@@ -201,12 +201,12 @@ async function handleAdviceBroadcastProcessing(request: Request) {
     }
 }
 
-// Экспортируем только HTTP метод хендлеры как async функции
+// Экспортируем HTTP метод хендлеры как async функции
 export async function POST(request: Request) {
     return handleAdviceBroadcastProcessing(request);
 }
 
 export async function GET(request: Request) {
-    logger.info('Advice broadcast API triggered by GET request. Delegating to POST logic (auth via header still checked).');
+    logger.info('Advice broadcast API triggered by GET request. Delegating to processing logic (auth via header still checked).');
     return handleAdviceBroadcastProcessing(request); 
 }
