@@ -13,6 +13,7 @@ interface TeslaStockData {
 let lastPrice = 170.00; 
 let lastTrend: "up" | "down" | "stable" = "stable";
 
+// Строки теперь содержат плейсхолдеры для VibeContentRenderer, а не сам компонент
 const positiveMuskNews = [
   "Маск: 'Tesla Roadster нового поколения будет летать, буквально!' Акции TSLA ::FaRocket:: !",
   "Tesla заключает мега-контракт на поставку Cybertruck'ов для колонизации Луны!",

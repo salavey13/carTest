@@ -1,4 +1,3 @@
-// /app/elon/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -39,7 +38,7 @@ const jordanBelfortAdvices = [
     {
         titleKey: "Волчий Вайб №3: ДЕРЖИ ПРЯМУЮ ЛИНИЮ!",
         textKey: "Рынок всегда пытается увести тебя с 'прямой линии' к успеху. Возражения, сомнения... Твоя задача – элегантно возвращать его, повышая уверенность. 'Маск твитнул про кота? Отлично! Это подтверждает мой анализ! Покупаем/Шортим СЕЙЧАС!' Каждое 'НЕТ' от рынка – запрос на большую уверенность.",
-        icon: "::FaChartLine className='transform rotate-90'::" // Иконка прямой линии
+        icon: "::FaChartLine className='transform rotate-90'::"
     },
     {
         titleKey: "Волчий Вайб №4: УПРАВЛЯЙ СВОИМ СОСТОЯНИЕМ!",
@@ -123,7 +122,7 @@ export default function ElonPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-blue-900 p-6 text-center">
         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
-          <VibeContentRenderer content="::FaRocket className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
+          <VibeContentRenderer content="::FaRocket className='text-7xl text-brand-orange mb-6 animate-pulse'::" /> {/* FaRocketLaunch заменено на FaRocket */}
           <h1 className="text-4xl font-orbitron font-bold text-brand-yellow mb-4">Доступ к 'Рынку Маска' Закрыт!</h1>
           <p className="text-lg text-gray-300 mb-8 max-w-md">
             Чтобы войти в симулятор влияния твитов Илона и "русского экономического вайба" на фантомные акции, приобретите ПротоКарточку Доступа.
@@ -200,11 +199,11 @@ export default function ElonPage() {
             
             <div className="space-y-3 text-xs sm:text-sm text-gray-300/90 font-mono p-3 sm:p-4 bg-black/40 rounded-md border border-gray-700/80">
               <h3 className="text-lg sm:text-xl font-orbitron text-brand-cyan mb-2 sm:mb-3">Механика Рынка (на пальцах):</h3>
-              <p><VibeContentRenderer content="::FaInfoCircle:: Агент, это симулятор! Реальные деньги не участвуют. Мы играем с XTR и KiloVibes."/></p>
+              <p><VibeContentRenderer content="::FaCircleInfo:: Агент, это симулятор! Реальные деньги не участвуют. Мы играем с XTR и KiloVibes."/></p> {/* Исправлено */}
               <p><strong className="text-brand-yellow">Вайбы Маска, Трампа & РФ:</strong> Каждый клик на кнопку симулирует новый 'вайб' – твит Маска, заявление Трампа или 'экономическое чудо' из РФ. Позитив = <VibeContentRenderer content="::FaArrowTrendUp::"/>, Негатив = <VibeContentRenderer content="::FaArrowTrendDown::"/>. Следи за `NewsFlash`!</p>
               <p><strong className="text-brand-yellow">Конфликт Маск-Трамп:</strong> Публичная перепалка этих двоих – отдельный мощный фактор для TSLA. Обычно не в плюс. <VibeContentRenderer content="::FaUserNinja::"/> <VibeContentRenderer content="::FaUserTie::"/></p>
-              <p className="text-brand-red/80"><VibeContentRenderer content="::FaExclamationTriangle:: Особый Русский Вайб:"/> Иногда, если 'стабильность' в РФ 'отрицательно растет', это может вызвать... неожиданные колебания. Или нет. Никто не знает. Это Россия, детка. <VibeContentRenderer content="::FaSnowflake::"/></p>
-              <p className="text-brand-green"><VibeContentRenderer content="::FaGraduationCap:: Цель Игры:"/> Понять, как инфо-шум влияет на настроения... и словить немного XTR-фана! VIBE ON!</p>
+              <p className="text-brand-red/80"><VibeContentRenderer content="::FaTriangleExclamation:: Особый Русский Вайб:"/> Иногда, если 'стабильность' в РФ 'отрицательно растет', это может вызвать... неожиданные колебания. Или нет. Никто не знает. Это Россия, детка. <VibeContentRenderer content="::FaSnowflake::"/></p> {/* Исправлено */}
+              <p className="text-brand-green"><VibeContentRenderer content="::FaGraduationCap:: Главная Цель:"/> Понять, как инфо-шум влияет на настроения... и словить немного XTR-фана! VIBE ON!</p>
             </div>
 
             <div className="mt-6 space-y-4">
