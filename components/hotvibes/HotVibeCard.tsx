@@ -74,10 +74,10 @@ export function HotVibeCard({
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
 
-  const effectiveBorderColor = theme.borderColor || "border-brand-red/70";
-  const effectiveHoverBorderColor = theme.hoverBorderColor || theme.borderColor?.replace("/70", "") || "hover:border-brand-red";
-  const effectiveShadowColor = theme.shadowColor || "shadow-brand-red/30"; 
-  const effectiveHoverShadowColor = theme.hoverShadowColor || `hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.5)]`; 
+  const effectiveBorderColor = theme.borderColor || "border-transparent"; // По умолчанию без рамки
+  const effectiveHoverBorderColor = theme.hoverBorderColor || theme.borderColor?.replace("/70", "") || "hover:border-transparent";
+  const effectiveShadowColor = theme.shadowColor || "shadow-md"; // Небольшая тень по умолчанию
+  const effectiveHoverShadowColor = theme.hoverShadowColor || `hover:shadow-xl`; 
   const effectiveTextColor = theme.textColor || "group-hover:text-brand-red";
 
   const renderFooterButton = () => {
@@ -134,12 +134,11 @@ export function HotVibeCard({
       onClick={isSupported && !isElonSimulatorCard ? () => onViewVip(lead) : undefined}
       className={cn(
         "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl bg-black/70 backdrop-blur-md transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        // "border", // Убрали класс border для удаления стандартной рамки
-        effectiveBorderColor, // Цвет рамки будет применяться только если он задан в theme
+        effectiveBorderColor, // Применяем цвет рамки из темы или прозрачный
         effectiveShadowColor,
         (isMissionUnlocked || isElonSimulatorCard || isSupported) 
           ? `${effectiveHoverBorderColor} ${effectiveHoverShadowColor} hover:scale-[1.03] hover:-translate-y-0.5` 
-          : "border-muted/30 opacity-80 hover:opacity-100", // Для заблокированных карточек оставим рамку muted
+          : "border-muted/30 opacity-80 hover:opacity-100", 
         (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
       )}
     >
