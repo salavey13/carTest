@@ -19,7 +19,7 @@ import {
 } from '@/hooks/cyberFitnessSupabase';
 import { fetchLeadsForDashboard, fetchLeadByIdentifierOrNickname } from '../leads/actions'; 
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
-import { HotVibeCard, HotLeadData, HotVibeCardTheme } from '@/components/hotvibes/HotVibeCard'; 
+import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard';  // HotVibeCardTheme больше не импортируется
 import { VipLeadDisplay } from '@/components/hotvibes/VipLeadDisplay'; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
@@ -337,15 +337,6 @@ function HotVibesClientContent() {
     addToast(`${t.missionActivated} (Lead: ${leadId.substring(0,6)}..., Quest: ${targetQuestId})`, "success");
     router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission`);
   }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast]);
-
-  const cardTheme: HotVibeCardTheme = {
-    borderColor: "border-brand-red/70", 
-    accentGradient: "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500", 
-    shadowColor: "shadow-brand-red/40",
-    hoverBorderColor: "hover:border-brand-red",
-    hoverShadowColor: "hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]",
-    textColor: "group-hover:text-brand-red"
-  };
   
   const elonCardIsSupportedActually = useMemo(() => {
     const isSupported = !!dbUser?.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active';
@@ -401,7 +392,7 @@ function HotVibesClientContent() {
           >
             <VipLeadDisplay 
               lead={vipLeadToShow} 
-              theme={cardTheme} 
+              // theme={cardTheme} // theme больше не передается в VipLeadDisplay
               currentLang={currentLang}
               isMissionUnlocked={cyberProfile ? (vipLeadToShow.required_quest_id && vipLeadToShow.required_quest_id !== "none" ? checkQuestUnlocked(vipLeadToShow.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
               onExecuteMission={() => handleExecuteMission(vipLeadToShow.id, vipLeadToShow.required_quest_id)}
@@ -431,9 +422,8 @@ function HotVibesClientContent() {
           className="w-full max-w-5xl mx-auto"
         >
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl border shadow-2xl", 
-              theme.borderColor, 
-              theme.shadowColor
+              "bg-dark-card/95 backdrop-blur-xl shadow-2xl border-brand-red/70", // Убрали theme.borderColor, используем конкретный класс
+              "shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]" // Убрали theme.shadowColor
             )}
           >
             <CardHeader className="pb-4 pt-6">
@@ -491,6 +481,15 @@ function HotVibesClientContent() {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
                   {displayedLeads.map((leadWithStatus) => {
                       const { isSpecial, isSupported, ...lead } = leadWithStatus;
+                      // cardTheme больше не используется для HotVibeCard
+                      const currentCardTheme = { // Оставляем для HotVibeCard, если он всё ещё её использует, но лучше убрать и оттуда
+                        borderColor: isSpecial ? "border-brand-yellow/70" : "border-brand-red/70",
+                        accentGradient: isSpecial ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500" : "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500",
+                        shadowColor: isSpecial ? "shadow-yellow-glow" : "shadow-brand-red/40",
+                        hoverBorderColor: isSpecial ? "hover:border-brand-yellow" : "hover:border-brand-red",
+                        hoverShadowColor: isSpecial ? "hover:shadow-yellow-glow/60" : "hover:shadow-[0_0_25px_rgba(var(--brand-red-rgb),0.6)]",
+                        textColor: isSpecial ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red",
+                      };
                       return (
                         <HotVibeCard
                           key={lead.id}
@@ -502,7 +501,7 @@ function HotVibesClientContent() {
                           isSpecial={!!isSpecial}   
                           onViewVip={handleSelectLeadForVip} 
                           currentLang={currentLang}
-                          theme={cardTheme}
+                          theme={currentCardTheme} // Передаем вычисленную тему
                           translations={t}
                           isPurchasePending={isPurchasePending}
                           isAuthenticated={isAuthenticated}
