@@ -74,9 +74,9 @@ export function HotVibeCard({
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
 
-  const effectiveBorderColor = theme.borderColor || "border-transparent"; // По умолчанию без рамки
+  const effectiveBorderColor = theme.borderColor || "border-transparent";
   const effectiveHoverBorderColor = theme.hoverBorderColor || theme.borderColor?.replace("/70", "") || "hover:border-transparent";
-  const effectiveShadowColor = theme.shadowColor || "shadow-md"; // Небольшая тень по умолчанию
+  const effectiveShadowColor = theme.shadowColor || "shadow-md"; 
   const effectiveHoverShadowColor = theme.hoverShadowColor || `hover:shadow-xl`; 
   const effectiveTextColor = theme.textColor || "group-hover:text-brand-red";
 
@@ -134,11 +134,11 @@ export function HotVibeCard({
       onClick={isSupported && !isElonSimulatorCard ? () => onViewVip(lead) : undefined}
       className={cn(
         "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl bg-black/70 backdrop-blur-md transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        effectiveBorderColor, // Применяем цвет рамки из темы или прозрачный
+        effectiveBorderColor, 
         effectiveShadowColor,
         (isMissionUnlocked || isElonSimulatorCard || isSupported) 
           ? `${effectiveHoverBorderColor} ${effectiveHoverShadowColor} hover:scale-[1.03] hover:-translate-y-0.5` 
-          : "border-muted/30 opacity-80 hover:opacity-100", 
+          : `${isSpecial ? theme.borderColor : 'border-muted/30'} opacity-80 hover:opacity-100`, // Заблокированные, но не специальные, имеют muted рамку
         (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
       )}
     >
