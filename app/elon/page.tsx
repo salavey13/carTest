@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { useAppContext } from '@/contexts/AppContext';
-import { teslaStockSimulator } from './actions'; // Simulator function
-import { purchaseProtoCardAction } from '../hotvibes/actions'; // Action to buy card
+import { teslaStockSimulator } from './actions'; 
+import { purchaseProtoCardAction } from '../hotvibes/actions'; 
 import type { ProtoCardDetails } from '../hotvibes/actions';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -17,12 +17,41 @@ interface TeslaStockData {
   change: number;
   changePercent: number;
   trend: "up" | "down" | "stable";
-  lastElonTweetEffect?: "positive" | "negative" | "neutral" | null;
+  lastEventTrigger?: "musk_tweet" | "russian_economy" | "market_noise";
   newsFlash?: string | null;
 }
 
 const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 const SIMULATOR_ACCESS_PRICE_XTR = 13;
+
+const jordanBelfortAdvices = [
+    {
+        titleKey: "Волчий Вайб №1: НЕПРОБИВАЕМАЯ УВЕРЕННОСТЬ!",
+        textKey: "Джордан Белфорт учит: 'Продажа – это передача эмоции'. Главная эмоция – УВЕРЕННОСТЬ. Ты должен быть на 10 из 10 уверен, что твой 'продукт' (в нашем случае – твоя ставка на вайб Маска) – это лучшее, что есть! Если ты сам не веришь, что TSLA взлетит/упадет после 'прикола' Маска – как ты заставишь XTR-рынок поверить в это?",
+        icon: "::FaHandshake::"
+    },
+    {
+        titleKey: "Волчий Вайб №2: ЗАХВАТИ КОНТРОЛЬ ЗА 4 СЕКУНДЫ!",
+        textKey: "У тебя 4 секунды, чтобы показать, что ты: 1. Резкий как Пуля. 2. Энтузиаст до Мозга Костей. 3. Эксперт, Мать Его! В симуляторе: увидел Вайб -> мгновенно оценил -> с энтузиазмом 'купил ПротоКарточку' -> показал, что ты 'в теме' рынка Маска.",
+        icon: "::FaBolt::"
+    },
+    {
+        titleKey: "Волчий Вайб №3: ДЕРЖИ ПРЯМУЮ ЛИНИЮ!",
+        textKey: "Рынок всегда пытается увести тебя с 'прямой линии' к успеху. Возражения, сомнения... Твоя задача – элегантно возвращать его, повышая уверенность. 'Маск твитнул про кота? Отлично! Это подтверждает мой анализ! Покупаем/Шортим СЕЙЧАС!' Каждое 'НЕТ' от рынка – запрос на большую уверенность.",
+        icon: "::FaChartLine className='transform rotate-90'::"
+    },
+    {
+        titleKey: "Волчий Вайб №4: УПРАВЛЯЙ СВОИМ СОСТОЯНИЕМ!",
+        textKey: "Страх, сомнения, жадность – твои враги. Будь в ресурсном состоянии: уверенность, ясность, смелость. Потерял XTR? Не ной! Анализируй, управляй эмоциями, готовься к следующему Вайбу. Успешные 'трейдеры' действуют перед лицом страха.",
+        icon: "::FaBrain::"
+    },
+    {
+        titleKey: "Волчий Вайб №5: ПОДГОТОВКА РЕШАЕТ!",
+        textKey: "Белфорт писал скрипты часами. Ты – изучай 'историю твитов Маска' (предыдущие NewsFlash в симуляторе), смотри на 'тренд'. Не кликай наобум! Думай, Агент!",
+        icon: "::FaScroll::"
+    }
+];
+
 
 export default function ElonPage() {
   const { dbUser, isAuthenticated, isLoading: appContextLoading } = useAppContext();
@@ -66,17 +95,17 @@ export default function ElonPage() {
     const cardDetails: ProtoCardDetails = {
       cardId: ELON_SIMULATOR_CARD_ID,
       title: `Доступ к Симулятору Маска`,
-      description: `Разблокировать симулятор влияния твитов Илона на акции Tesla. Цена: ${SIMULATOR_ACCESS_PRICE_XTR} XTR.`,
+      description: `Разблокировать симулятор влияния твитов Илона и 'русского вайба' на акции Tesla. Цена: ${SIMULATOR_ACCESS_PRICE_XTR} XTR.`,
       amountXTR: SIMULATOR_ACCESS_PRICE_XTR,
-      type: "simulation_access",
-      metadata: { page_link: "/elon" }
+      type: "simulation_access", // Важно для обработчика вебхука
+      metadata: { page_link: "/elon", simulator_name: "Рынок Маска TSLA Edition" }
     };
 
     try {
-      const result = await purchaseProtoCardAction(cardDetails); // This action now calls sendAndRecordProtoCardInvoice
+      // Используем purchaseProtoCardAction из hotvibes/actions.ts
+      const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails); 
       if (result.success) {
         toast.success("Запрос на доступ отправлен! Проверьте Telegram для оплаты счета.");
-        // Доступ будет предоставлен через вебхук после оплаты
       } else {
         toast.error(result.error || "Не удалось инициировать покупку доступа.");
       }
@@ -98,7 +127,7 @@ export default function ElonPage() {
           <VibeContentRenderer content="::FaRocketLaunch className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
           <h1 className="text-4xl font-orbitron font-bold text-brand-yellow mb-4">Доступ к 'Рынку Маска' Закрыт!</h1>
           <p className="text-lg text-gray-300 mb-8 max-w-md">
-            Чтобы войти в симулятор влияния твитов Илона и понять, как новости (иногда фейковые) двигают рынки, приобретите ПротоКарточку Доступа.
+            Чтобы войти в симулятор влияния твитов Илона и "русского экономического вайба" на фантомные акции, приобретите ПротоКарточку Доступа.
           </p>
           <Button
             onClick={handlePurchaseAccess}
@@ -119,35 +148,35 @@ export default function ElonPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-3xl mx-auto"
+        className="max-w-4xl mx-auto" // Increased max-width for more content
       >
         <Card className="bg-black/70 border-2 border-brand-purple shadow-2xl shadow-brand-purple/30 backdrop-blur-md">
           <CardHeader className="text-center">
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 150 }}>
               <VibeContentRenderer content="::FaChartLine className='text-6xl text-brand-orange mx-auto mb-4 filter drop-shadow-[0_0_8px_hsl(var(--brand-orange-rgb))]'::" />
             </motion.div>
-            <CardTitle className="text-4xl font-orbitron font-bold text-brand-orange glitch" data-text="Рынок Маска: TSLA Edition">
-              Рынок Маска: TSLA Edition
+            <CardTitle className="text-3xl sm:text-4xl font-orbitron font-bold text-brand-orange glitch" data-text="Рынок Маска: TSLA & Russian Vibe Edition">
+              Рынок Маска: TSLA & Russian Vibe Edition
             </CardTitle>
-            <CardDescription className="text-md text-purple-300 font-mono mt-2">
-              Симулятор влияния твитов и новостей на (фантомные) акции Tesla.
+            <CardDescription className="text-sm sm:text-md text-purple-300 font-mono mt-2">
+              Симулятор влияния твитов, новостей и "особого русского вайба" на фантомные акции Tesla.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {stockData && (
               <motion.div
-                key={stockData.price} // Re-trigger animation on price change
+                key={`${stockData.price}-${stockData.newsFlash}`} 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center p-6 bg-gray-800/50 rounded-lg border border-purple-500/50"
+                className="text-center p-4 sm:p-6 bg-gray-800/60 rounded-lg border border-purple-500/60 shadow-inner"
               >
-                <p className="text-sm text-gray-400 font-mono">Симулированная цена TSLA:</p>
-                <p className={`text-6xl font-orbitron font-bold my-2 ${
+                <p className="text-xs sm:text-sm text-gray-400 font-mono">Симулированная цена TSLA:</p>
+                <p className={`text-5xl sm:text-6xl font-orbitron font-bold my-1 sm:my-2 ${
                   stockData.trend === 'up' ? 'text-green-400' : stockData.trend === 'down' ? 'text-red-400' : 'text-gray-200'
                 }`}>
                   ${stockData.price.toFixed(2)}
                 </p>
-                <p className={`text-lg font-mono ${
+                <p className={`text-md sm:text-lg font-mono ${
                   stockData.change >= 0 ? 'text-green-500' : 'text-red-500'
                 }`}>
                   {stockData.change >= 0 ? '+' : ''}{stockData.change.toFixed(2)} ({stockData.changePercent.toFixed(2)}%)
@@ -155,8 +184,8 @@ export default function ElonPage() {
                   {stockData.trend === 'down' && <VibeContentRenderer content="::FaArrowTrendDown::" />}
                 </p>
                 {stockData.newsFlash && (
-                    <p className="text-sm text-purple-300 mt-3 italic">
-                        <VibeContentRenderer content="::FaNewspaper className='inline mr-1'::" /> {stockData.newsFlash}
+                    <p className="text-xs sm:text-sm text-purple-300 mt-2 sm:mt-3 italic px-2">
+                        <VibeContentRenderer content="::FaNewspaper className='inline mr-1 text-base align-middle'::" /> {stockData.newsFlash}
                     </p>
                 )}
               </motion.div>
@@ -166,19 +195,36 @@ export default function ElonPage() {
               disabled={isLoadingPrice}
               className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-orbitron py-3 text-lg rounded-md shadow-lg hover:shadow-purple-500/50 transition-all"
             >
-              {isLoadingPrice ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обновляю вайб..." /> : <VibeContentRenderer content="::FaRandom:: Какой Вайб Сегодня? (Твит Маска)" />}
+              {isLoadingPrice ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обновляю вайб..." /> : <VibeContentRenderer content="::FaDiceD6:: Какой Вайб Сегодня? (Маск/РФ)" />}
             </Button>
             
-            <div className="space-y-4 text-sm text-gray-300 font-mono p-4 bg-black/30 rounded-md border border-gray-700">
-              <h3 className="text-xl font-orbitron text-brand-cyan mb-3">Механика Рынка (на пальцах):</h3>
+            <div className="space-y-3 text-xs sm:text-sm text-gray-300/90 font-mono p-3 sm:p-4 bg-black/40 rounded-md border border-gray-700/80">
+              <h3 className="text-lg sm:text-xl font-orbitron text-brand-cyan mb-2 sm:mb-3">Механика Рынка (на пальцах):</h3>
               <p><VibeContentRenderer content="::FaInfoCircle:: Агент, это симулятор! Реальные деньги не участвуют. Мы играем с XTR и KiloVibes."/></p>
-              <p><strong className="text-brand-yellow">Твиты Маска:</strong> Каждый клик на кнопку "Какой Вайб Сегодня?" симулирует новый твит или новость. Иногда это позитив (новые технологии, рекорды продаж) - цена TSLA <VibeContentRenderer content="::FaArrowTrendUp::"/>. Иногда - негатив (скандалы, проблемы с производством) - цена TSLA <VibeContentRenderer content="::FaArrowTrendDown::"/>. Иногда - нейтрально.</p>
-              <p><strong className="text-brand-yellow">Шорт (Short Selling):</strong> Видишь, что Маск "чудит" и ждешь падения? В реальном мире трейдеры "шортят": берут акции взаймы у брокера, продают по текущей высокой цене. Если цена падает, они откупают акции дешевле, возвращают брокеру, а разницу кладут в карман. Риск: если цена пойдет вверх, убытки могут быть большими. Здесь мы это просто симулируем для понимания.</p>
-              <p><strong className="text-brand-yellow">Лонг (Long Position):</strong> Веришь в Tesla и Маска? "Покупаешь" (фантомно), когда цена кажется низкой, и "держишь" (HODL!), ожидая роста. Если цена растет - ты в "профите".</p>
-              <p className="text-brand-red/80"><VibeContentRenderer content="::FaExclamationTriangle:: Особенность Российского Вайба:"/> В отличие от некоторых западных рынков, где после падения часто бывает отскок (bounce back), на нашем специфическом рынке иногда "если упало - то лежит". Это значит, что слепое копирование стратегий "купи на низах" или "шорти на хаях" без учета локального контекста может привести к... ну, ты понял. <VibeContentRenderer content="::FaSkullCrossbones::"/></p>
-              <p className="text-brand-green"><VibeContentRenderer content="::FaGraduationCap:: Главная Цель:"/> Научиться "чувствовать" вайбы рынка, понимать, как информация (и дезинформация) влияет на настроения... и просто повеселиться с XTR! VIBE ON!</p>
+              <p><strong className="text-brand-yellow">Вайбы Маска & РФ:</strong> Каждый клик на кнопку симулирует новый 'вайб' – твит Маска или 'экономическое чудо' из РФ. Позитив = <VibeContentRenderer content="::FaArrowTrendUp::"/>, Негатив = <VibeContentRenderer content="::FaArrowTrendDown::"/>. Следи за `NewsFlash`!</p>
+              <p className="text-brand-red/80"><VibeContentRenderer content="::FaExclamationTriangle:: Особый Русский Вайб:"/> Иногда, если 'стабильность' в РФ 'отрицательно растет', это может вызвать... неожиданные колебания на 'мировых рынках'. Или нет. Никто не знает. Это Россия, детка. <VibeContentRenderer content="::FaSnowflake::"/></p>
+              <p className="text-brand-green"><VibeContentRenderer content="::FaGraduationCap:: Цель Игры:"/> Понять, как инфо-шум влияет на настроения... и словить немного XTR-фана! VIBE ON!</p>
             </div>
-             <Link href="/hotvibes" className="block text-center mt-6">
+
+            <div className="mt-6 space-y-4">
+                <h3 className="text-2xl font-orbitron text-brand-pink text-center glitch" data-text="Советы Волка">Советы Волка</h3>
+                {jordanBelfortAdvices.map((advice, index) => (
+                    <motion.div 
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 + index * 0.1 }}
+                        className="p-3 bg-gray-800/50 border border-pink-500/30 rounded-lg shadow-sm"
+                    >
+                        <h4 className="text-md font-orbitron text-pink-400 mb-1 flex items-center">
+                            <VibeContentRenderer content={`${advice.icon} `} className="mr-2 text-lg" /> {advice.titleKey}
+                        </h4>
+                        <p className="text-xs text-gray-300/90">{advice.textKey}</p>
+                    </motion.div>
+                ))}
+            </div>
+
+             <Link href="/hotvibes" className="block text-center mt-8">
                 <Button variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10">
                     <VibeContentRenderer content="::FaArrowLeft:: Назад в Лобби Горячих Вайбов"/>
                 </Button>
