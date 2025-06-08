@@ -64,10 +64,10 @@ export function HotVibeCard({
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
   const isPdfGeneratorCard = lead.id === PERSONALITY_REPORT_PDF_CARD_ID;
 
-  let cardGradientClass = "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900"; // Default
+  let cardGradientClass = "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900"; 
   let titleTextColorClass = "text-slate-100 group-hover:text-brand-cyan";
   let earningTextColorClass = "text-brand-lime";
-  let buttonTextColorClass = "text-black"; // Default for gradient buttons
+  let buttonTextColorClass = "text-black"; 
 
   if (isSpecial || isElonSimulatorCard || isPdfGeneratorCard) {
     cardGradientClass = "bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600";
@@ -82,67 +82,70 @@ export function HotVibeCard({
      titleTextColorClass = "text-white group-hover:text-indigo-200";
      earningTextColorClass = "text-indigo-300";
   } else {
-    // Not unlocked, not special, not supported - more muted
     cardGradientClass = "bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900";
     titleTextColorClass = "text-gray-300 group-hover:text-gray-100";
     earningTextColorClass = "text-gray-400";
   }
 
-
   const handleCardClick = (event: React.MouseEvent) => {
     if ((event.target as HTMLElement).closest('button, a')) {
       return;
     }
-    if (isSupported || isSpecial) {
-        onViewVip(lead);
-    }
+    // Now always call onViewVip when the card body is clicked
+    onViewVip(lead);
   };
 
   const renderFooterButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 px-1.5 sm:px-2 rounded-md flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105 min-h-fit";
     const disabledClasses = (isPurchasePending || !isAuthenticated) ? "opacity-70 cursor-not-allowed !scale-100" : "";
 
-    let buttonText = "";
-    let buttonIcon = "";
-    let buttonAction = () => onSupportMission(lead); // Default to support/purchase
+    let buttonTextKey = ""; // e.g., "goToSimulatorText"
+    let buttonIconName = ""; // e.g., "FaGamepad"
+    let buttonAction = () => onSupportMission(lead); 
     let buttonSpecificClass = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-500 text-white hover:brightness-110";
-
 
     if (isElonSimulatorCard) {
       if (isSupported) {
-        buttonText = translations.goToSimulatorText;
-        buttonIcon = "::FaGamepad::";
+        buttonTextKey = "goToSimulatorText";
+        buttonIconName = "FaGamepad";
         buttonAction = () => onViewVip(lead); 
         buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 text-black hover:brightness-110";
       } else {
-        buttonText = translations.elonSimulatorAccessBtnText;
-        buttonIcon = isPurchasePending ? "::FaSpinner className='animate-spin'::" : "::FaHandHoldingDollar::";
+        buttonTextKey = "elonSimulatorAccessBtnText";
+        buttonIconName = isPurchasePending ? "FaSpinner" : "FaHandHoldingDollar";
         buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600 text-black hover:brightness-110";
       }
     } else if (isPdfGeneratorCard) {
         if (isSupported) {
-            buttonText = translations.goToPdfGeneratorText;
-            buttonIcon = "::FaFilePdf::";
+            buttonTextKey = "goToPdfGeneratorText";
+            buttonIconName = "FaFilePdf";
             buttonAction = () => onViewVip(lead);
             buttonSpecificClass = "bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 text-white hover:brightness-110";
         } else {
-            buttonText = translations.pdfGeneratorAccessBtnText;
-            buttonIcon = isPurchasePending ? "::FaSpinner className='animate-spin'::" : "::FaHandHoldingDollar::";
+            buttonTextKey = "pdfGeneratorAccessBtnText";
+            buttonIconName = isPurchasePending ? "FaSpinner" : "FaHandHoldingDollar";
             buttonSpecificClass = "bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white hover:brightness-110";
         }
-    }
-    else { 
+    } else { 
       if (isSupported) {
-        buttonText = `${translations.supportedText} (${translations.viewDemoText})`;
-        buttonIcon = "::FaEye::";
+        buttonTextKey = "supportedText"; // This will be combined with viewDemoText
+        buttonIconName = "FaEye";
         buttonAction = () => onViewVip(lead);
         buttonSpecificClass = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
       } else {
-        buttonText = translations.supportMissionBtnText;
-        buttonIcon = isPurchasePending ? "::FaSpinner className='animate-spin'::" : "::FaHandHoldingDollar::";
-        // Uses default buttonSpecificClass
+        buttonTextKey = "supportMissionBtnText";
+        buttonIconName = isPurchasePending ? "FaSpinner" : "FaHandHoldingDollar";
       }
     }
+    
+    let fullButtonText = translations[buttonTextKey] || buttonTextKey;
+    if (buttonTextKey === "supportedText" && !isElonSimulatorCard && !isPdfGeneratorCard) {
+        fullButtonText = `${translations.supportedText} (${translations.viewDemoText})`;
+    }
+    if (isPurchasePending && (isElonSimulatorCard || isPdfGeneratorCard || !isSupported)) {
+        fullButtonText = ""; // Spinner only
+    }
+
 
     return (
       <Button 
@@ -150,21 +153,22 @@ export function HotVibeCard({
         disabled={(isPurchasePending || !isAuthenticated) && !(isSupported && (isElonSimulatorCard || isPdfGeneratorCard))}
         className={cn(buttonBaseClasses, buttonSpecificClass, buttonTextColorClass, disabledClasses)}
       >
-        <VibeContentRenderer content={`${buttonIcon} className='mr-1 sm:mr-1.5 text-xs':: ${buttonText}`} />
+        <VibeContentRenderer content={`::${buttonIconName}::`} className={cn("mr-1 sm:mr-1.5 text-xs", isPurchasePending && "animate-spin")} />
+        {fullButtonText}
       </Button>
     );
   };
 
   return (
     <Card 
-      onClick={handleCardClick}
+      onClick={handleCardClick} // Attach click handler here
       className={cn(
         "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
         cardGradientClass, 
-        (isSupported || isSpecial || isMissionUnlocked) 
+        "cursor-pointer", // Make all cards appear clickable
+        (isMissionUnlocked || isSpecial || isSupported) 
           ? "hover:scale-[1.03] hover:-translate-y-0.5" 
-          : "opacity-80 hover:opacity-100", 
-        (isSupported || isSpecial) ? "cursor-pointer" : "cursor-default"
+          : "opacity-80 hover:opacity-100"
       )}
     >
         <div className="relative aspect-[1/1] w-full overflow-hidden"> 
@@ -181,12 +185,12 @@ export function HotVibeCard({
           )} />
           {(lead.status === 'client_responded_positive' || lead.status === 'interested') && !isElonSimulatorCard && !isPdfGeneratorCard && (
             <div className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full animate-pulse flex items-center gap-1">
-              HOT <VibeContentRenderer content="::FaFireAlt className='w-2.5 h-2.5'::" />
+              HOT <VibeContentRenderer content="::FaFireAlt::" className="w-2.5 h-2.5" />
             </div>
           )}
           {isSupported && (
              <div className="absolute top-1.5 left-1.5 bg-brand-green/80 text-black text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full flex items-center gap-1">
-                <VibeContentRenderer content="::FaCheckCircle className='w-3 h-3'::" /> 
+                <VibeContentRenderer content="::FaCheckCircle::" className="w-3 h-3" /> 
                 <span className="leading-none">
                     {isElonSimulatorCard || isPdfGeneratorCard ? (currentLang === 'ru' ? "Доступен" : "Access") : (currentLang === 'ru' ? "Поддержано" : "Supported")}
                 </span>
