@@ -160,6 +160,68 @@ const generateFullPromptForAI = (userName?: string, userAge?: string, userGender
     return fullPrompt;
 };
 
+const handleXlsxFileAndPreparePromptInternal = async (
+    file: File, 
+    currentUserName: string, 
+    currentUserAge: string, 
+    currentUserGender: string,
+    translateFunc: (key: string, replacements?: Record<string, string | number>) => string,
+    setLoadingFunc: React.Dispatch<React.SetStateAction<boolean>>, // Corrected type
+    setStatusMsgFunc: React.Dispatch<React.SetStateAction<string>> // Corrected type
+): Promise<{ success: boolean, prompt?: string, error?: string}> => {
+    setLoadingFunc(true); 
+    setStatusMsgFunc(translateFunc('parsingXlsx'));
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
+
+        setStatusMsgFunc(translateFunc('generatingPrompt'));
+        const promptForAI = `Ты — высококвалифицированный AI-аналитик. Твоя задача — проанализировать предоставленные данные из отчета (возможно, XLSX) и составить подробное резюме в формате Markdown.
+ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
+
+Исходное имя файла отчета (если был загружен): "${file.name}".
+Данные взяты с листа (если был загружен): "${firstSheetName}".
+
+Информация о пользователе (если предоставлена):
+Имя: ${currentUserName || "Не указано"}
+Возраст: ${currentUserAge || "Не указан"}
+Пол: ${currentUserGender || "Не указан"}
+
+**Запрос на Анализ (если есть данные из файла):**
+Пожалуйста, проведи тщательный анализ данных ниже. Сконцентрируйся на следующем:
+1.  **Краткое резюме (Executive Summary):** Сжатый (3-5 предложений) обзор ключевой информации из данных.
+2.  **Основные тезисы и наблюдения:** Выдели значительные моменты. Используй маркированные списки.
+3.  **Потенциальные инсайты:** Какие интересные закономерности или выводы можно сделать?
+
+**Если данные из файла НЕ предоставлены, или ты анализируешь другой текст (например, ответы на вопросы, вставленные пользователем):**
+Составь структурированный отчет на основе предоставленного текста в поле "Содержимое Отчета". Учитывай информацию о пользователе (имя, возраст, пол), если она есть. Отчет должен быть в формате Markdown на русском языке.
+
+**Требования к формату вывода (Markdown на русском языке):**
+- Используй заголовки (например, \`# Расшифровка для ${currentUserName || 'Пользователя'}\`, \`## Ответы на вопросы\`).
+- Используй маркированные списки (\`* \` или \`- \`).
+- Используй выделение жирным шрифтом (\`**текст**\`).
+
+**Данные из XLSX (если были загружены, могут быть усечены):**
+\`\`\`csv
+${csvDataString.substring(0, 15000)} 
+\`\`\`
+
+Пожалуйста, предоставь подробный и содержательный отчет.
+`;
+        return { success: true, prompt: promptForAI };
+    } catch (error) {
+        logger.error("Error parsing XLSX for AI prompt:", error);
+        return { success: false, error: (error as Error).message };
+    } finally {
+        setLoadingFunc(false);
+    }
+};
+
+
 export default function ToPdfPageWithPsychoFocus() {
     const { user, isAuthLoading } = useAppContext();
     const [selectedFile, setSelectedFile] = useState<File | null>(null); 
@@ -196,6 +258,31 @@ export default function ToPdfPageWithPsychoFocus() {
     useEffect(() => {
         setStatusMessage(t('readyForUserData'));
     }, [t, currentLang]);
+
+    const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            setSelectedFile(null); setGeneratedDataForAI(''); setStatusMessage(t('noFileSelected'));
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
+        }
+        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) {
+            toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
+        }
+        setSelectedFile(file);
+        // Передаем setIsLoading и setStatusMessage в handleXlsxFileAndPreparePromptInternal
+        const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
+        if(result.success && result.prompt){
+            setGeneratedDataForAI(result.prompt);
+            setStatusMessage(t('promptGenerated'));
+            toast.success(t('promptGenerated'));
+        } else {
+            toast.error(t('unexpectedError', { ERROR: result.error || 'Failed to process XLSX' }));
+            setStatusMessage(t('readyForUserData'));
+        }
+    };
 
     const handleGenerateDemoQuestionsAndPrompt = () => {
         const fullPromptText = generateFullPromptForAI(userName, userAge, userGender);
@@ -273,9 +360,9 @@ export default function ToPdfPageWithPsychoFocus() {
             </div>
 
             <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
-                <div className="relative w-full h-40 sm:h-48 md:h-56 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-lg overflow-hidden shadow-lg shadow-pink-glow/70">
+                <div className="relative w-full h-40 sm:h-48 md:h-56 -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden shadow-lg shadow-pink-glow/70">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/0"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10"></div>
                 </div>
                 
                 <h1 
@@ -307,7 +394,7 @@ export default function ToPdfPageWithPsychoFocus() {
                                 <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder="Мужчина/Женщина" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                         </div>
-                        <Button onClick={handleGenerateDemoQuestions} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
+                        <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
                             <VibeContentRenderer content="::FaQuestionCircle::" className="mr-2"/>{t("generateDemoQuestions")}
                         </Button>
                     </div>
