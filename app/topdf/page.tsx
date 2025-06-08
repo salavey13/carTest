@@ -2,16 +2,18 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
+import { generatePdfFromMarkdownAndSend, saveUserPdfFormData, loadUserPdfFormData } from '@/app/topdf/actions'; // Импортируем новые actions
 import { logger } from '@/lib/logger';
+import { debugLogger } from '@/lib/debugLogger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
-import * as XLSX from 'xlsx'; // Оставляем для опциональной загрузки XLSX
+import * as XLSX from 'xlsx'; 
 import { Button } from "@/components/ui/button"; 
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
 import Image from 'next/image'; 
+import { useDebounce } from '@/hooks/useDebounce'; // Предполагается, что хук useDebounce существует
 
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png"; 
 
@@ -20,15 +22,15 @@ const translations: Record<string, Record<string, string>> = {
     "pageTitle": "AI PDF Report Generator ✨", 
     "pageSubtitle": "Generate a personalized PDF report. Input user data and answers, or analyze an XLSX with AI.", 
     "step1Title": "Step 1: User Data & Questions for AI",
-    "generateDemoQuestions": "Generate Demo Questions & AI Prompt",
-    "demoQuestionsGenerated": "Demo questions & AI prompt prepared!",
+    "generateDemoQuestions": "Generate Demo Questions + User Data",
+    "demoQuestionsGenerated": "Demo questions & user data prepared!",
     "userDataTitle": "User Data for Report", 
     "userNameLabel": "User's Name",
     "userAgeLabel": "User's Age",
     "userGenderLabel": "User's Gender",
     "step2Title": "Step 2: Report Content (Paste AI Response or Final Answers)", 
     "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's final answers to questions):", 
-    "copyPromptAndData": "Copy Prompt & Data for AI",
+    "copyPromptAndData": "Copy User Data & Questions for AI",
     "goToGemini": "Open Gemini AI Studio",
     "step3Title": "Step 3: Create & Send PDF",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
@@ -43,7 +45,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Processing failed. Please try again.",
     "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
     "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
-    "promptCopySuccess": "Prompt & data for AI copied to clipboard!",
+    "promptCopySuccess": "User data & questions for AI copied to clipboard!",
     "promptCopyError": "Failed to copy. Please copy manually.",
     "unexpectedError": "An unexpected error occurred: %%ERROR%%",
     "loadingUser": "Loading user data...",
@@ -57,20 +59,22 @@ const translations: Record<string, Record<string, string>> = {
     "fileSelected": "File: %%FILENAME%%",
     "errorFileTooLarge": "File is too large. Maximum size: 5MB.",
     "errorInvalidFileType": "Invalid file type. Only .xlsx files are accepted.",
+    "formDataSaved": "User data auto-saved.",
+    "formDataError": "Error auto-saving user data.",
   },
   ru: {
     "pageTitle": "AI Генератор PDF Отчетов ✨", 
     "pageSubtitle": "Создайте персонализированный PDF-отчет. Введите данные пользователя и ответы, или проанализируйте XLSX с помощью AI.", 
     "step1Title": "Шаг 1: Данные Пользователя и Вопросы для AI",
-    "generateDemoQuestions": "Сгенерировать Демо-Вопросы и Промпт для AI",
-    "demoQuestionsGenerated": "Демо-вопросы и промпт для AI подготовлены!",
+    "generateDemoQuestions": "Сгенерировать Демо-Вопросы и Данные Пользователя",
+    "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены!",
     "userDataTitle": "Данные Пользователя для Отчета", 
     "userNameLabel": "Имя пользователя",
     "userAgeLabel": "Возраст пользователя",
     "userGenderLabel": "Пол пользователя",
     "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Финальные Ответы)", 
     "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или финальные ответы пользователя на вопросы):", 
-    "copyPromptAndData": "Копировать Промпт и Данные для AI",
+    "copyPromptAndData": "Копировать Данные Пользователя и Вопросы для AI",
     "goToGemini": "Открыть Gemini AI Studio",
     "step3Title": "Шаг 3: Создать и Отправить PDF",
     "generateAndSendPdf": "PDF в Telegram",
@@ -85,7 +89,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
     "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
     "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
-    "promptCopySuccess": "Промпт и данные для AI скопированы в буфер обмена!",
+    "promptCopySuccess": "Данные пользователя и вопросы для AI скопированы в буфер обмена!",
     "promptCopyError": "Не удалось скопировать. Скопируйте вручную.",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
@@ -99,51 +103,21 @@ const translations: Record<string, Record<string, string>> = {
     "fileSelected": "Файл: %%FILENAME%%",
     "errorFileTooLarge": "Файл слишком большой. Максимальный размер: 5МБ.",
     "errorInvalidFileType": "Неверный тип файла. Принимаются только .xlsx файлы.",
+    "formDataSaved": "Данные пользователя автосохранены.",
+    "formDataError": "Ошибка автосохранения данных пользователя.",
   }
 };
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const generateFullPromptForAI = (userName?: string, userAge?: string, userGender?: string): string => {
+// Только вопросы и данные пользователя, БЕЗ системного промпта
+const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string): string => {
     const name = userName || "Пользователь";
-    let fullPrompt = `**Системный Промпт для AI (Gemini/Claude/ChatGPT):**
-Ты — эмпатичный AI-психолог и аналитик личности. Твоя задача — на основе предоставленных данных о пользователе и его ответов на 15 вопросов составить глубокую, но позитивную и вдохновляющую "расшифровку личности". Отчет должен быть структурирован, легок для восприятия и полезен пользователю для самопознания.
-ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ и в формате Markdown.
-
-**Информация о пользователе:**
-Имя: ${userName || "Не указано"}
-Возраст: ${userAge || "Не указан"}
-Пол: ${userGender || "Не указан"}
-
-**Инструкции для отчета:**
-1.  **Общее Впечатление и Ключевые Черты (Markdown Заголовок \`## Общее впечатление и ключевые черты\`):**
-    *   Начни с теплого приветствия.
-    *   Основываясь на ответах, выдели 3-5 наиболее ярких положительных черт личности. Опиши каждую кратко.
-    *   Дай общую позитивную характеристику.
-2.  **Анализ Ответов по Темам (Markdown Заголовок \`## Анализ ответов по темам\`):**
-    *   Сгруппируй вопросы и ответы по возможным темам (например, "Ценности и Убеждения", "Отношение к Успеху и Трудностям", "Самовосприятие и Мечты", "Взаимодействие с Миром").
-    *   Для каждой темы дай краткий анализ ответов, подсвечивая интересные моменты и возможные интерпретации. Избегай категоричных суждений, используй мягкие формулировки ("возможно, это указывает на...", "складывается впечатление, что...").
-3.  **Потенциальные Сильные Стороны и Ресурсы (Markdown Заголовок \`## Ваши сильные стороны и ресурсы\`):**
-    *   Перечисли выявленные сильные стороны, которые могут помочь пользователю в достижении целей.
-4.  **Рекомендации для Саморазвития (Markdown Заголовок \`## Направления для дальнейшего роста\`):**
-    *   Предложи 1-3 мягкие, конструктивные рекомендации или вопросы для дальнейшего самоанализа, основанные на ответах.
-5.  **Вдохновляющее Заключение (Markdown Заголовок \`### Заключение\`):**
-    *   Заверши отчет позитивным и мотивирующим посланием.
-
-**Требования к формату вывода (Markdown на русском языке):**
-- Используй заголовки Markdown (\`#\`, \`##\`, \`###\`).
-- Используй маркированные списки (\`* \` или \`- \`) для перечислений.
-- Используй выделение жирным шрифтом (\`**текст**\`) и курсивом (\`*текст*\`) для акцентов.
-
----
-**ДАННЫЕ ОТ ПОЛЬЗОВАТЕЛЯ ДЛЯ АНАЛИЗА:**
-
-# Расшифровка Личности для ${name}
-`;
-    if (userAge) fullPrompt += `**Возраст:** ${userAge}\n`;
-    if (userGender) fullPrompt += `**Пол:** ${userGender}\n\n`;
-    fullPrompt += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
+    let content = `# Расшифровка Личности для ${name}\n\n`;
+    if (userAge) content += `**Возраст:** ${userAge}\n`;
+    if (userGender) content += `**Пол:** ${userGender}\n\n`;
+    content += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
     
     const demoQuestions = [
         "1. Опишите себя тремя словами.", "2. Какое ваше самое яркое детское воспоминание и почему?", "3. Что для вас значит успех?",
@@ -154,62 +128,26 @@ const generateFullPromptForAI = (userName?: string, userAge?: string, userGender
         "13. Есть ли у вас хобби или увлечение, которое много для вас значит? Расскажите о нем.", "14. Как вы видите себя через 5 лет?",
         "15. Если бы вам нужно было выбрать саундтрек к вашей жизни, какая песня это была бы и почему?"
     ];
-    fullPrompt += demoQuestions.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
-    return fullPrompt;
+    content += demoQuestions.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
+    return content;
 };
 
 const handleXlsxFileAndPreparePromptInternal = async (
     file: File, 
-    currentUserName: string, 
-    currentUserAge: string, 
-    currentUserGender: string,
     translateFunc: (key: string, replacements?: Record<string, string | number>) => string,
     setLoadingFunc: React.Dispatch<React.SetStateAction<boolean>>, 
     setStatusMsgFunc: React.Dispatch<React.SetStateAction<string>> 
 ): Promise<{ success: boolean, prompt?: string, error?: string}> => {
     setLoadingFunc(true); 
     setStatusMsgFunc(translateFunc('parsingXlsx'));
-
     try {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
-
         setStatusMsgFunc(translateFunc('generatingPrompt'));
-        const promptForAI = `Ты — высококвалифицированный AI-аналитик. Твоя задача — проанализировать предоставленные данные из отчета (возможно, XLSX) и составить подробное резюме в формате Markdown.
-ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
-
-Исходное имя файла отчета (если был загружен): "${file.name}".
-Данные взяты с листа (если был загружен): "${firstSheetName}".
-
-Информация о пользователе (если предоставлена):
-Имя: ${currentUserName || "Не указано"}
-Возраст: ${currentUserAge || "Не указан"}
-Пол: ${currentUserGender || "Не указан"}
-
-**Запрос на Анализ (если есть данные из файла):**
-Пожалуйста, проведи тщательный анализ данных ниже. Сконцентрируйся на следующем:
-1.  **Краткое резюме (Executive Summary):** Сжатый (3-5 предложений) обзор ключевой информации из данных.
-2.  **Основные тезисы и наблюдения:** Выдели значительные моменты. Используй маркированные списки.
-3.  **Потенциальные инсайты:** Какие интересные закономерности или выводы можно сделать?
-
-**Если данные из файла НЕ предоставлены, или ты анализируешь другой текст (например, ответы на вопросы, вставленные пользователем):**
-Составь структурированный отчет на основе предоставленного текста в поле "Содержимое Отчета". Учитывай информацию о пользователе (имя, возраст, пол), если она есть. Отчет должен быть в формате Markdown на русском языке.
-
-**Требования к формату вывода (Markdown на русском языке):**
-- Используй заголовки (например, \`# Расшифровка для ${currentUserName || 'Пользователя'}\`, \`## Ответы на вопросы\`).
-- Используй маркированные списки (\`* \` или \`- \`).
-- Используй выделение жирным шрифтом (\`**текст**\`).
-
-**Данные из XLSX (если были загружены, могут быть усечены):**
-\`\`\`csv
-${csvDataString.substring(0, 15000)} 
-\`\`\`
-
-Пожалуйста, предоставь подробный и содержательный отчет.
-`;
+        const promptForAI = `Проанализируй следующие данные из XLSX файла "${file.name}" (лист: "${firstSheetName}"):\n\`\`\`csv\n${csvDataString.substring(0, 15000)}\n\`\`\`\nСоставь краткое резюме, выдели ключевые показатели и инсайты. Ответ дай на русском в Markdown.`;
         return { success: true, prompt: promptForAI };
     } catch (error) {
         logger.error("Error parsing XLSX for AI prompt:", error);
@@ -218,7 +156,6 @@ ${csvDataString.substring(0, 15000)}
         setLoadingFunc(false);
     }
 };
-
 
 export default function ToPdfPageWithPsychoFocus() {
     const { user, isAuthLoading } = useAppContext();
@@ -232,6 +169,10 @@ export default function ToPdfPageWithPsychoFocus() {
     const [userName, setUserName] = useState<string>('');
     const [userAge, setUserAge] = useState<string>('');
     const [userGender, setUserGender] = useState<string>('');
+
+    const debouncedUserName = useDebounce(userName, 1000);
+    const debouncedUserAge = useDebounce(userAge, 1000);
+    const debouncedUserGender = useDebounce(userGender, 1000);
 
     const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
     const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
@@ -257,6 +198,43 @@ export default function ToPdfPageWithPsychoFocus() {
         setStatusMessage(t('readyForUserData'));
     }, [t, currentLang]);
 
+    // Load user data on mount
+    useEffect(() => {
+        if (user?.id) {
+            loadUserPdfFormData(String(user.id)).then(result => {
+                if (result.success && result.data) {
+                    setUserName(result.data.userName || '');
+                    setUserAge(result.data.userAge || '');
+                    setUserGender(result.data.userGender || '');
+                    debugLogger.info("[ToPdfPage] User PDF form data loaded.", result.data);
+                } else if (result.error) {
+                    // toast.error(t('formDataError')); // Maybe too noisy
+                    debugLogger.warn("[ToPdfPage] Error loading user PDF form data:", result.error);
+                }
+            });
+        }
+    }, [user?.id, t]);
+
+    // Auto-save user data on change (debounced)
+    useEffect(() => {
+        if (user?.id && (debouncedUserName || debouncedUserAge || debouncedUserGender)) {
+            const dataToSave = {
+                userName: debouncedUserName,
+                userAge: debouncedUserAge,
+                userGender: debouncedUserGender,
+            };
+            saveUserPdfFormData(String(user.id), dataToSave).then(result => {
+                if (result.success) {
+                    // toast.success(t('formDataSaved'), { duration: 1500 });
+                } else {
+                    // toast.error(t('formDataError'));
+                    debugLogger.warn("[ToPdfPage] Error auto-saving user PDF form data:", result.error);
+                }
+            });
+        }
+    }, [debouncedUserName, debouncedUserAge, debouncedUserGender, user?.id, t]);
+
+
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) {
@@ -272,8 +250,8 @@ export default function ToPdfPageWithPsychoFocus() {
         setSelectedFile(file);
         const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
         if(result.success && result.prompt){
-            setGeneratedDataForAI(result.prompt);
-            setMarkdownInput(result.prompt); // Pre-fill markdown with AI prompt for XLSX case
+            setGeneratedDataForAI(result.prompt); // This now holds the XLSX-based prompt
+            setMarkdownInput(result.prompt); 
             setStatusMessage(t('promptGenerated'));
             toast.success(t('promptGenerated'));
         } else {
@@ -283,17 +261,17 @@ export default function ToPdfPageWithPsychoFocus() {
     };
 
     const handleGenerateDemoQuestionsAndPrompt = () => {
-        const fullPromptText = generateFullPromptForAI(userName, userAge, userGender);
-        setGeneratedDataForAI(fullPromptText);
-        setMarkdownInput(fullPromptText); 
+        const userDataAndQuestions = generateUserDataAndQuestionsForAI(userName, userAge, userGender);
+        setGeneratedDataForAI(userDataAndQuestions); // Store user data + questions for copying
+        setMarkdownInput(userDataAndQuestions); // Pre-fill markdown for editing or direct PDF generation
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
     };
     
     const handleCopyToClipboard = () => {
-        const textToCopy = generatedDataForAI.trim(); // Always copy the fully prepared prompt for AI
+        const textToCopy = generatedDataForAI.trim(); 
         if (!textToCopy) {
-            toast.info(currentLang === 'ru' ? "Сначала сгенерируйте данные для AI." : "First, generate data for AI.");
+            toast.info(currentLang === 'ru' ? "Сначала сгенерируйте данные для AI (кнопка 'Сгенерировать Демо-Вопросы')." : "First, generate data for AI (use 'Generate Demo Questions' button).");
             return;
         }
         navigator.clipboard.writeText(textToCopy)
@@ -324,8 +302,11 @@ export default function ToPdfPageWithPsychoFocus() {
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
                 setStatusMessage(result.message || t('successMessage'));
-                setMarkdownInput(''); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = "";
-                setGeneratedDataForAI(''); setUserName(''); setUserAge(''); setUserGender('');
+                // Не сбрасываем userName, userAge, userGender, так как они могут быть нужны для следующего отчета
+                setMarkdownInput(''); 
+                setSelectedFile(null); 
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                setGeneratedDataForAI(''); 
                 setStatusMessage(t('readyForUserData'));
             } else {
                 toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }), { duration: 7000 });
