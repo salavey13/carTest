@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx'; // Оставляем для опциональной загрузки XLSX
 import { Button } from "@/components/ui/button"; 
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
@@ -51,7 +51,6 @@ const translations: Record<string, Record<string, string>> = {
     "readyForUserData": "Ready for user data and report content.",
     "readyForPdf": "Ready to generate PDF from content.", 
     "toggleLanguage": "Toggle Language",
-    "manualCopyPrompt": "Manual Copy Area (if auto-copy fails):",
     "xlsxUploadOptionalTitle": "Optional: Upload XLSX for AI Analysis (Alternative Flow)",
     "selectFile": "Select XLSX Report (Optional)",
     "noFileSelected": "No file selected",
@@ -94,7 +93,6 @@ const translations: Record<string, Record<string, string>> = {
     "readyForUserData": "Готово к вводу данных и контента.",
     "readyForPdf": "Готово к генерации PDF.", 
     "toggleLanguage": "Переключить язык",
-    "manualCopyPrompt": "Область для ручного копирования (если авто-копирование не удалось):",
     "xlsxUploadOptionalTitle": "Опционально: Загрузка XLSX для Анализа AI (Альтернативный Сценарий)",
     "selectFile": "Выберите XLSX Отчет (Опционально)",
     "noFileSelected": "Файл не выбран",
@@ -166,8 +164,8 @@ const handleXlsxFileAndPreparePromptInternal = async (
     currentUserAge: string, 
     currentUserGender: string,
     translateFunc: (key: string, replacements?: Record<string, string | number>) => string,
-    setLoadingFunc: React.Dispatch<React.SetStateAction<boolean>>, // Corrected type
-    setStatusMsgFunc: React.Dispatch<React.SetStateAction<string>> // Corrected type
+    setLoadingFunc: React.Dispatch<React.SetStateAction<boolean>>, 
+    setStatusMsgFunc: React.Dispatch<React.SetStateAction<string>> 
 ): Promise<{ success: boolean, prompt?: string, error?: string}> => {
     setLoadingFunc(true); 
     setStatusMsgFunc(translateFunc('parsingXlsx'));
@@ -272,10 +270,10 @@ export default function ToPdfPageWithPsychoFocus() {
             toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
         }
         setSelectedFile(file);
-        // Передаем setIsLoading и setStatusMessage в handleXlsxFileAndPreparePromptInternal
         const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
         if(result.success && result.prompt){
             setGeneratedDataForAI(result.prompt);
+            setMarkdownInput(result.prompt); // Pre-fill markdown with AI prompt for XLSX case
             setStatusMessage(t('promptGenerated'));
             toast.success(t('promptGenerated'));
         } else {
@@ -293,7 +291,7 @@ export default function ToPdfPageWithPsychoFocus() {
     };
     
     const handleCopyToClipboard = () => {
-        const textToCopy = generatedDataForAI.trim();
+        const textToCopy = generatedDataForAI.trim(); // Always copy the fully prepared prompt for AI
         if (!textToCopy) {
             toast.info(currentLang === 'ru' ? "Сначала сгенерируйте данные для AI." : "First, generate data for AI.");
             return;
@@ -360,7 +358,7 @@ export default function ToPdfPageWithPsychoFocus() {
             </div>
 
             <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
-                <div className="relative w-full h-40 sm:h-48 md:h-56 -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden shadow-lg shadow-pink-glow/70">
+                <div className="relative w-full h-40 sm:h-48 md:h-56 -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden ">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10"></div>
                 </div>
