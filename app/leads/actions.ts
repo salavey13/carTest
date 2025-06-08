@@ -48,7 +48,6 @@ async function verifyUserPermissions(userId: string, allowedRoles: UserRole[], a
       console.warn(`[LeadsActions verifyUserPermissions] User ${userId} not found.`);
       return false;
     }
-    // Check if user status is one of the allowed statuses OR user role is one of the allowed roles
     const statusMatch = allowedStatuses.includes(user.status || '');
     const roleMatch = user.role ? allowedRoles.includes(user.role) : false;
     
