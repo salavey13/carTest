@@ -13,15 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
 import Image from 'next/image'; 
-import { PSYCHO_ANALYSIS_SYSTEM_PROMPT } from './psychoAnalysisPrompt';
-import { purchaseProtoCardAction } from '../hotvibes/actions'; // For purchasing access
-import type { ProtoCardDetails } from '../hotvibes/actions';   // For purchasing access
+import { PSYCHO_ANALYSIS_SYSTEM_PROMPT, REFINED_PERSONALITY_QUESTIONS_RU } from './psychoAnalysisPrompt'; // Import REFINED questions
+import { purchaseProtoCardAction } from '../hotvibes/actions'; 
+import type { ProtoCardDetails } from '../hotvibes/actions';   
 import Link from 'next/link';
 
 
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png"; 
 
-// Constants for PDF Generator Access ProtoCard
 const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
 
@@ -143,16 +142,8 @@ const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, 
     if (userAge) content += `**Возраст:** ${userAge}\n`;
     if (userGender) content += `**Пол:** ${userGender}\n\n`;
     content += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
-    const demoQuestions = [
-        "1. Опишите себя тремя словами.", "2. Какое ваше самое яркое детское воспоминание и почему?", "3. Что для вас значит успех?",
-        "4. Если бы вы могли изменить одну вещь в мире, что бы это было?", "5. Какая книга или фильм оказали на вас наибольшее влияние и почему?",
-        "6. Что вас больше всего вдохновляет?", "7. Как вы справляетесь со стрессом или трудностями?", "8. Опишите идеальный для вас день.",
-        "9. Какие качества вы больше всего цените в других людях?", "10. Какая ваша самая большая мечта или цель в жизни на данный момент?",
-        "11. Что бы вы посоветовали себе 10-летней давности?", "12. В какой ситуации вы чувствуете себя наиболее комфортно и уверенно?",
-        "13. Есть ли у вас хобби или увлечение, которое много для вас значит? Расскажите о нем.", "14. Как вы видите себя через 5 лет?",
-        "15. Если бы вам нужно было выбрать саундтрек к вашей жизни, какая песня это была бы и почему?"
-    ];
-    content += demoQuestions.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
+    
+    content += REFINED_PERSONALITY_QUESTIONS_RU.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
     return content;
 };
 
@@ -215,7 +206,7 @@ ${csvDataString.substring(0, 15000)}
 export default function ToPdfPageWithPsychoFocus() {
     const { user, dbUser, isAuthenticated, isLoading: appContextLoading, isAuthenticating: appContextAuthenticating, refreshDbUser } = useAppContext();
     const [selectedFile, setSelectedFile] = useState<File | null>(null); 
-    const [isLoading, setIsLoading] = useState(false); // General loading for page operations
+    const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [generatedDataForAI, setGeneratedDataForAI] = useState<string>('');
     const [markdownInput, setMarkdownInput] = useState<string>('');
@@ -253,7 +244,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
      useEffect(() => {
         if (!appContextLoading && !appContextAuthenticating) {
-            setIsCheckingAccess(true); 
+            setIsCheckingAccess(true);
             if (isAuthenticated && dbUser) {
                 const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
                 if (cards && cards[PERSONALITY_REPORT_PDF_CARD_ID]?.status === 'active') {
@@ -471,7 +462,7 @@ export default function ToPdfPageWithPsychoFocus() {
             <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
                 <div className="relative w-full h-[50vh] -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden ">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black to-transparent"></div>
+                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 via-black/50 to-transparent"></div> {/* Fade to main card bg */}
                 </div>
                 
                 <h1 
