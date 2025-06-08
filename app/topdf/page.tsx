@@ -330,7 +330,6 @@ export default function ToPdfPageWithPsychoFocus() {
                 return;
              }
         }
-        // Corrected order: User data first, then system prompt
         const fullTextForAI = `${textForUserAndQuestions}\n\n---\n${PSYCHO_ANALYSIS_SYSTEM_PROMPT}`;
         
         navigator.clipboard.writeText(fullTextForAI)
@@ -557,7 +556,7 @@ export default function ToPdfPageWithPsychoFocus() {
                     </summary>
                     <div className="mt-4 p-4 sm:p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl bg-slate-800/40 shadow-inner">
                         <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow/80 hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/10")}>
-                            <VibeContentRenderer content="::FaCloudUploadAlt::" className="text-2xl mb-1.5" />
+                            <VibeContentRenderer content="::FaUpload::" className="text-2xl mb-1.5" /> {/* Icon changed */}
                             <span className="font-medium text-xs">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
                             <input id="xlsxFileOptional" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleXlsxFileChange} className="sr-only" disabled={isLoading} />
                         </label>
