@@ -29,13 +29,16 @@ import Link from 'next/link';
 
 export const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 export const ELON_SIMULATOR_ACCESS_PRICE_XTR = 13;
-export const MISSION_SUPPORT_PRICE_XTR = 13;
+export const MISSION_SUPPORT_PRICE_XTR = 13; // Default price for supporting a lead
+export const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
+export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
 export const RUB_TO_XTR_RATE = 1 / 4.2; 
+
 
 const pageTranslations = {
     ru: {
         pageTitle: "::FaFire:: ГОРЯЧИЕ ВАЙБЫ ::FaFireAlt::",
-        pageSubtitle: "Агент! Это твой доступ к самым перспективным возможностям и XTR-играм. Инвестируй в миссии, открывай демо, играй на 'Рынке Маска'!",
+        pageSubtitle: "Агент! Это твой доступ к самым перспективным возможностям и XTR-играм. Инвестируй в миссии, открывай демо, играй на 'Рынке Маска' или создавай PDF-отчеты!",
         lobbyTitle: "::FaConciergeBell:: Лобби Горячих Возможностей",
         noHotVibes: "Пока нет подходящих вайбов для твоего уровня или по текущему фильтру. Прокачивайся в Тренировках, запускай Скрейпер в /leads или загляни позже!",
         noHotVibesForGuest: "Доступ к горячим вайбам и XTR-картам открывается после базовой аутентификации. Войди через Telegram, чтобы начать!",
@@ -46,16 +49,18 @@ const pageTranslations = {
         lockedMissionRedirect: "Навык для этой миссии еще не открыт. Начинаем экспресс-тренировку...",
         supportMissionBtnText: `Поддержать за ${MISSION_SUPPORT_PRICE_XTR} XTR`,
         elonSimulatorAccessBtnText: `Доступ к Рынку Маска за ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR`,
+        pdfGeneratorAccessBtnText: `Доступ к PDF Генератору за ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
         supportedText: "Поддержано",
         viewDemoText: "Смотреть Демо",
         goToSimulatorText: "К Симулятору Маска",
+        goToPdfGeneratorText: "К PDF Генератору",
         filterAll: "Все Вайбы",
         filterSupported: "Мои ПротоКарты",
         backToLobby: "::FaArrowLeft:: К Лобби Вайбов",
     },
     en: {
         pageTitle: "::FaFire:: HOT VIBES ::FaFire::",
-        pageSubtitle: "Agent! Access promising opportunities & XTR games. Invest in missions, unlock demos, play the 'Musk Market'!",
+        pageSubtitle: "Agent! Access promising opportunities & XTR games. Invest in missions, unlock demos, play the 'Musk Market', or create PDF reports!",
         lobbyTitle: "::FaConciergeBell:: Hot Opportunity Lobby",
         noHotVibes: "No suitable vibes for your level or current filter. Level up in Training, run Scraper in /leads, or check back!",
         noHotVibesForGuest: "Access to Hot Vibes & XTR cards unlocks after auth. Log in via Telegram!",
@@ -66,9 +71,11 @@ const pageTranslations = {
         lockedMissionRedirect: "Skill for this mission not yet unlocked. Initiating express training...",
         supportMissionBtnText: `Support for ${MISSION_SUPPORT_PRICE_XTR} XTR`,
         elonSimulatorAccessBtnText: `Musk Market Access: ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR`,
+        pdfGeneratorAccessBtnText: `PDF Generator Access: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
         supportedText: "Supported",
         viewDemoText: "View Demo",
         goToSimulatorText: "To Musk Simulator",
+        goToPdfGeneratorText: "To PDF Generator",
         filterAll: "All Vibes",
         filterSupported: "My ProtoCards",
         backToLobby: "::FaArrowLeft:: Back to Lobby",
@@ -102,10 +109,13 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions, lang: 'ru' | 'en'): Hot
     earningText = `${lead.budget_range} (≈${xtrPrice} XTR)`;
   }
 
+  let demoLinkParam = (lead.supervibe_studio_links as any)?.demo_link_param || lead.client_name || lead.id;
+
+
   return {
     id: lead.id || `fallback_id_${Math.random().toString(36).substring(7)}`,
     kwork_gig_title: lead.kwork_title || lead.project_description?.substring(0, 70) || (lang === 'ru' ? "Без названия" : "Untitled Gig"),
-    client_name: lead.client_name,
+    client_name: lead.client_name, // This is important for startapp param logic
     ai_summary: (lead as any).ai_summary || lead.project_description?.substring(0, 150) || (lang === 'ru' ? "Краткое описание от AI..." : "Brief AI summary..."),
     demo_image_url: demoImageUrlProvided,
     potential_earning: earningText,
@@ -117,6 +127,11 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions, lang: 'ru' | 'en'): Hot
     ai_generated_proposal_draft: lead.generated_offer,
     status: lead.status,
     project_type_guess: lead.project_type_guess,
+    notes: lead.notes, // Added notes field
+    supervibe_studio_links: { // Ensure this is an object
+        ...(typeof lead.supervibe_studio_links === 'object' ? lead.supervibe_studio_links : {}),
+        demo_link_param: demoLinkParam 
+    },
   };
 }
 
@@ -130,6 +145,19 @@ const elonSimulatorProtoCardData: HotLeadData = {
     required_quest_id: "none", 
     project_type_guess: "XTR Game/Simulator",
     status: "active_game",
+};
+
+const personalityPdfGeneratorCardData: HotLeadData = {
+    id: PERSONALITY_REPORT_PDF_CARD_ID,
+    kwork_gig_title: "Генератор PDF: Расшифровка Личности",
+    client_name: "PsychoVibe Tools", // A generic client_name for this tool card
+    ai_summary: "Создавай персонализированные PDF-отчеты для психологической расшифровки. Вводи данные, получай результат для AI, генерируй PDF.",
+    demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png", // Use the same hero image
+    potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
+    required_quest_id: "none",
+    project_type_guess: "Tool/Utility",
+    status: "active_tool",
+    notes: "/topdf" // Store the target path here
 };
 
 function HotVibesClientContent() {
@@ -158,7 +186,14 @@ function HotVibesClientContent() {
   useEffect(() => {
     if (!appCtxLoading && !isAuthenticating && !isInitialVipCheckDone) {
       const leadIdFromUrl = searchParamsHook.get('lead_identifier');
-      const effectiveId = startParamPayload || leadIdFromUrl;
+      let effectiveId = startParamPayload || leadIdFromUrl;
+
+      // Specific startapp logic for /topdf
+      if (startParamPayload === 'topdf_psycho' || startParamPayload === 'AlexandraSergeevna') {
+        effectiveId = PERSONALITY_REPORT_PDF_CARD_ID; // Route to the PDF generator card
+        logger.info(`[HotVibes InitialIdEffect] 'topdf_psycho' or 'AlexandraSergeevna' startParam detected, targeting PDF Generator card.`);
+      }
+      
       if (effectiveId) {
         logger.info(`[HotVibes InitialIdEffect] Setting initialVipIdentifier to: ${effectiveId}`);
         setInitialVipIdentifier(effectiveId);
@@ -178,7 +213,7 @@ function HotVibesClientContent() {
     setPageLoading(true);
     logger.debug("[HotVibes loadPageData] Proceeding with data fetch.");
 
-    if (isAuthenticated && dbUser?.user_id && (!cyberProfile || dbUser?.updated_at !== cyberProfile?.lastActivityTimestamp)) { // Запрашиваем профиль только если он изменился или не загружен
+    if (isAuthenticated && dbUser?.user_id && (!cyberProfile || dbUser?.updated_at !== cyberProfile?.lastActivityTimestamp)) {
         logger.debug(`[HotVibes loadPageData] Fetching CyberFitness profile for user: ${dbUser.user_id}`);
         const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (profileResult.success && profileResult.data) {
@@ -196,7 +231,7 @@ function HotVibesClientContent() {
     if (leadsRes.success && leadsRes.data) {
         allFetchedLeads = (leadsRes.data as LeadDataFromActions[]).map(lead => mapLeadToHotLeadData(lead, currentLang));
         setLobbyLeads(allFetchedLeads);
-        logger.info(`[HotVibes loadPageData] Total lobby leads fetched: ${allFetchedLeads.length}`);
+        logger.info(`[HotVibes loadPageData] Total real leads fetched: ${allFetchedLeads.length}`);
     } else { 
         addToast(t.errorLoadingLeads, "error"); 
         logger.warn("[HotVibes loadPageData] Failed to fetch leads:", leadsRes.error);
@@ -207,9 +242,12 @@ function HotVibesClientContent() {
         logger.debug(`[HotVibes loadPageData] Processing initialVipIdentifier: ${initialVipIdentifier}`);
         if (initialVipIdentifier === ELON_SIMULATOR_CARD_ID) {
             setVipLeadToShow(elonSimulatorProtoCardData);
-            logger.info(`[HotVibes loadPageData] Set VIP to Elon Simulator.`);
+            logger.info(`[HotVibes loadPageData] Set VIP to Elon Simulator Card.`);
+        } else if (initialVipIdentifier === PERSONALITY_REPORT_PDF_CARD_ID) {
+            setVipLeadToShow(personalityPdfGeneratorCardData);
+            logger.info(`[HotVibes loadPageData] Set VIP to Personality PDF Generator Card.`);
         } else {
-            let vipData = allFetchedLeads.find(l => l.id === initialVipIdentifier);
+            let vipData = allFetchedLeads.find(l => l.id === initialVipIdentifier || l.client_name === initialVipIdentifier); // Check by client_name too
             if (vipData) {
                 setVipLeadToShow(vipData);
                 logger.info(`[HotVibes loadPageData] Set VIP (from lobby) to: ${initialVipIdentifier}`);
@@ -217,8 +255,26 @@ function HotVibesClientContent() {
                 logger.info(`[HotVibes loadPageData] VIP ${initialVipIdentifier} not in current lobby, fetching specifically.`);
                 const vipResult = await fetchLeadByIdentifierOrNickname(initialVipIdentifier, dbUser?.user_id || "guest");
                 if (vipResult.success && vipResult.data) {
-                    setVipLeadToShow(mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang));
-                    logger.info(`[HotVibes loadPageData] Fetched and set VIP to: ${initialVipIdentifier}`);
+                    const mappedVip = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang);
+                    setVipLeadToShow(mappedVip);
+                    // If this specific lead should point to /topdf
+                    if (mappedVip.client_name === "AlexandraSergeevna" || mappedVip.notes === "/topdf") {
+                        // Augment or replace to show as PDF generator access
+                        const pdfGenVip = {
+                            ...personalityPdfGeneratorCardData, // Base PDF generator card
+                            id: mappedVip.id, // Keep original lead ID for purchase tracking
+                            kwork_gig_title: mappedVip.kwork_gig_title || personalityPdfGeneratorCardData.kwork_gig_title,
+                            ai_summary: mappedVip.ai_summary || personalityPdfGeneratorCardData.ai_summary,
+                            client_name: mappedVip.client_name, // Keep original client name
+                            potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`, // Standard price for tool
+                            notes: mappedVip.notes, // Keep original notes for routing
+                            // Keep other fields from mappedVip if necessary or override with PDF gen defaults
+                        };
+                        setVipLeadToShow(pdfGenVip);
+                         logger.info(`[HotVibes loadPageData] Fetched and set VIP to Lead ID ${initialVipIdentifier}, identified as /topdf target.`);
+                    } else {
+                        logger.info(`[HotVibes loadPageData] Fetched and set VIP to: ${initialVipIdentifier}`);
+                    }
                 } else {
                     addToast(t.vipLeadNotFound, "warning", { description: `ID: ${initialVipIdentifier}` });
                     logger.warn(`[HotVibes loadPageData] VIP lead ${initialVipIdentifier} not found after specific fetch.`);
@@ -233,14 +289,13 @@ function HotVibesClientContent() {
     }
     setPageLoading(false);
     logger.debug("[HotVibes loadPageData] Finished.");
-  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone, cyberProfile]); // Добавил cyberProfile
+  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, initialVipIdentifier, isInitialVipCheckDone, cyberProfile]);
 
   useEffect(() => {
     if (isInitialVipCheckDone) { 
         loadPageData();
     }
-  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); // dbUser.metadata.xtr_protocards как зависимость
-
+  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); 
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
@@ -251,6 +306,10 @@ function HotVibesClientContent() {
     logger.info(`[HotVibes] Returning to lobby view.`);
     setInitialVipIdentifier(null); 
     setVipLeadToShow(null); 
+    // Reset URL if it was a direct VIP link
+    if (searchParamsHook.get('lead_identifier') || startParamPayload) {
+        router.replace('/hotvibes', undefined);
+    }
   };
   
   const handlePurchaseProtoCard = async (cardToPurchase: HotLeadData) => {
@@ -261,24 +320,38 @@ function HotVibesClientContent() {
     if (isPurchasePending) return;
 
     setIsPurchasePending(true);
-    let price = MISSION_SUPPORT_PRICE_XTR;
-    let cardType = "mission_support";
-    let specificMetadata: Record<string, any> = { 
-        associated_lead_id: cardToPurchase.id, 
-        lead_title: cardToPurchase.kwork_gig_title,
-        demo_link_param: cardToPurchase.client_name 
-    };
+    let price: number;
+    let cardType: string;
+    let specificMetadata: Record<string, any> = {};
+    let cardTitle = cardToPurchase.kwork_gig_title || "ПротоКарточка Доступа";
+    let cardDescription = cardToPurchase.ai_summary || "Доступ к эксклюзивному контенту или инструменту.";
 
     if (cardToPurchase.id === ELON_SIMULATOR_CARD_ID) {
         price = ELON_SIMULATOR_ACCESS_PRICE_XTR;
         cardType = "simulation_access";
         specificMetadata = { page_link: "/elon", simulator_name: "Рынок Маска" };
+        cardTitle = elonSimulatorProtoCardData.kwork_gig_title!;
+        cardDescription = elonSimulatorProtoCardData.ai_summary!;
+    } else if (cardToPurchase.id === PERSONALITY_REPORT_PDF_CARD_ID || cardToPurchase.notes === "/topdf") {
+        price = PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR;
+        cardType = "tool_access";
+        specificMetadata = { page_link: "/topdf", tool_name: "AI Генератор PDF Отчетов" };
+        cardTitle = personalityPdfGeneratorCardData.kwork_gig_title!;
+        cardDescription = personalityPdfGeneratorCardData.ai_summary!;
+    } else { // Default for other leads
+        price = MISSION_SUPPORT_PRICE_XTR;
+        cardType = "mission_support";
+        specificMetadata = { 
+            associated_lead_id: cardToPurchase.id, 
+            lead_title: cardToPurchase.kwork_gig_title,
+            demo_link_param: cardToPurchase.supervibe_studio_links?.demo_link_param || cardToPurchase.client_name || cardToPurchase.id
+        };
     }
     
     const cardDetails: ProtoCardDetails = {
-      cardId: cardToPurchase.id,
-      title: cardToPurchase.kwork_gig_title || "ПротоКарточка Доступа",
-      description: cardToPurchase.ai_summary || `Доступ к ${cardType === "simulation_access" ? "симулятору" : "демо миссии"}. Цена: ${price} XTR.`,
+      cardId: cardToPurchase.id, // Use original lead ID for mission_support, or special ID for tools
+      title: cardTitle,
+      description: cardDescription,
       amountXTR: price,
       type: cardType,
       metadata: specificMetadata,
@@ -293,7 +366,7 @@ function HotVibesClientContent() {
             setTimeout(async () => {
                 logger.info("[HotVibes handlePurchaseProtoCard] Executing scheduled dbUser refresh.");
                 await refreshDbUser(); 
-            }, 5000); 
+            }, 7000); // Increased delay for payment processing
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -309,10 +382,21 @@ function HotVibesClientContent() {
     if (!isAuthenticated || !dbUser?.user_id || !cyberProfile) { 
       addToast("Аутентификация или профиль агента недоступны", "error"); return;
     }
+
+    // Handle special cards like PDF Generator or Elon Simulator
+    if (leadId === PERSONALITY_REPORT_PDF_CARD_ID) {
+        router.push("/topdf");
+        return;
+    }
+    if (leadId === ELON_SIMULATOR_CARD_ID) {
+        router.push("/elon");
+        return;
+    }
+    
+    // Logic for regular missions
     const targetQuestId = questIdFromLead || "image-swap-mission";
-    if (targetQuestId === "none") {
-        addToast("Эта карточка открывает доступ к симулятору, а не к миссии в Studio.", "info");
-        if (leadId === ELON_SIMULATOR_CARD_ID) router.push("/elon");
+    if (targetQuestId === "none") { // Should be caught by above checks, but as a fallback
+        addToast("Эта карточка не является стандартной миссией.", "info");
         return;
     }
     const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests || [], QUEST_ORDER);
@@ -333,50 +417,48 @@ function HotVibesClientContent() {
       return;
     }
     addToast(`${t.missionActivated} (Lead: ${leadId.substring(0,6)}..., Quest: ${targetQuestId})`, "success");
-    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission`);
-  }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast]);
+    const leadData = lobbyLeads.find(l => l.id === leadId);
+    const demoLinkParam = leadData?.supervibe_studio_links?.demo_link_param || leadData?.client_name || leadId;
+    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission&startapp=${demoLinkParam}`);
+  }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast, lobbyLeads]);
   
-  const elonCardIsSupportedActually = useMemo(() => {
+  const getIsSupported = useCallback((cardId: string): boolean => {
     const cards = dbUser?.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
-    if (!cards) {
-      logger.debug(`[HotVibes elonCardIsSupportedActually] xtr_protocards is missing or not an object. Result: false`);
-      return false;
-    }
-    const elonCard = cards[ELON_SIMULATOR_CARD_ID];
-    const isSupported = elonCard?.status?.toLowerCase() === 'active';
-    logger.debug(`[HotVibes elonCardIsSupportedActually] ID: ${ELON_SIMULATOR_CARD_ID}, CardData: ${JSON.stringify(elonCard)}, Status from DB: ${elonCard?.status}, Comparison result: ${isSupported}`);
-    return isSupported;
+    if (!cards) return false;
+    const card = cards[cardId];
+    return card?.status?.toLowerCase() === 'active';
   }, [dbUser?.metadata?.xtr_protocards]);
 
   const displayedLeads = useMemo(() => {
-    const elonCardWithStatus = { ...elonSimulatorProtoCardData, isSpecial: true, isSupported: elonCardIsSupportedActually };
+    const elonCardWithStatus = { ...elonSimulatorProtoCardData, isSpecial: true, isSupported: getIsSupported(ELON_SIMULATOR_CARD_ID) };
+    const pdfGenCardWithStatus = { ...personalityPdfGeneratorCardData, isSpecial: true, isSupported: getIsSupported(PERSONALITY_REPORT_PDF_CARD_ID) };
 
     let currentLobbyLeads = lobbyLeads.map(lead => ({
         ...lead, 
         isSpecial: false, 
-        isSupported: !!dbUser?.metadata?.xtr_protocards?.[lead.id]?.status === 'active'
+        isSupported: getIsSupported(lead.id)
     }));
 
     let filteredForDisplay: Array<HotLeadData & {isSpecial?:boolean, isSupported?:boolean}> = [];
+    const specialCardIds = [ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID];
 
     if (activeFilter === 'supported') {
-        filteredForDisplay = currentLobbyLeads.filter(l => l.isSupported && l.id !== ELON_SIMULATOR_CARD_ID);
-        if (elonCardWithStatus.isSupported) {
-            filteredForDisplay.unshift(elonCardWithStatus);
-        }
+        filteredForDisplay = currentLobbyLeads.filter(l => l.isSupported && !specialCardIds.includes(l.id));
+        if (pdfGenCardWithStatus.isSupported) filteredForDisplay.unshift(pdfGenCardWithStatus);
+        if (elonCardWithStatus.isSupported) filteredForDisplay.unshift(elonCardWithStatus);
     } else { 
         const baseFilteredLobby = cyberProfile
-            ? currentLobbyLeads.filter(mLead => mLead.required_quest_id && mLead.required_quest_id !== "none" ? checkQuestUnlocked(mLead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true )
+            ? currentLobbyLeads.filter(mLead => (mLead.notes && mLead.notes.startsWith('/')) || (mLead.required_quest_id && mLead.required_quest_id !== "none" ? checkQuestUnlocked(mLead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true ))
             : isAuthenticated ? [] : currentLobbyLeads;
         
-        const lobbyWithoutElon = baseFilteredLobby.filter(l => l.id !== ELON_SIMULATOR_CARD_ID);
-        filteredForDisplay = [elonCardWithStatus, ...lobbyWithoutElon];
+        const lobbyWithoutSpecial = baseFilteredLobby.filter(l => !specialCardIds.includes(l.id));
+        filteredForDisplay = [elonCardWithStatus, pdfGenCardWithStatus, ...lobbyWithoutSpecial];
     }
     
-    logger.debug(`[HotVibes displayedLeads] Memo re-calc. Filter: ${activeFilter}, ElonSupported: ${elonCardIsSupportedActually}, Lobby size: ${lobbyLeads.length}, CyberProfile: ${!!cyberProfile}, isAuthenticated: ${isAuthenticated}. Output count: ${filteredForDisplay.length}`);
+    logger.debug(`[HotVibes displayedLeads] Memo re-calc. Filter: ${activeFilter}, ElonSupported: ${elonCardWithStatus.isSupported}, PDFGenSupported: ${pdfGenCardWithStatus.isSupported}, Lobby size: ${lobbyLeads.length}, CyberProfile: ${!!cyberProfile}, isAuthenticated: ${isAuthenticated}. Output count: ${filteredForDisplay.length}`);
     return filteredForDisplay;
 
-  }, [lobbyLeads, dbUser?.metadata?.xtr_protocards, activeFilter, cyberProfile, isAuthenticated, elonCardIsSupportedActually]);
+  }, [lobbyLeads, getIsSupported, activeFilter, cyberProfile, isAuthenticated]);
 
   if (appCtxLoading && pageLoading && !vipLeadToShow) return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
 
@@ -435,7 +517,7 @@ function HotVibesClientContent() {
               </CardTitle>
               {cyberProfile && ( 
                 <CardDescription className="text-muted-foreground font-mono text-center text-xs">
-                 Агент Ур. {cyberProfile.level} | Показано: {displayedLeads.filter(l => l.id !== ELON_SIMULATOR_CARD_ID || activeFilter === 'supported').length} (Фильтр: {activeFilter === 'all' ? t.filterAll : t.filterSupported})
+                 Агент Ур. {cyberProfile.level} | Показано: {displayedLeads.filter(l => !l.isSpecial || activeFilter === 'supported').length} (Фильтр: {activeFilter === 'all' ? t.filterAll : t.filterSupported})
                 </CardDescription>
               )}
               <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2 justify-center">
@@ -484,6 +566,7 @@ function HotVibesClientContent() {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
                   {displayedLeads.map((leadWithStatus) => {
                       const { isSpecial, isSupported, ...lead } = leadWithStatus;
+                      const isActuallySupported = getIsSupported(lead.id); // Re-check for dynamic updates
                       return (
                         <HotVibeCard
                           key={lead.id}
@@ -491,11 +574,10 @@ function HotVibesClientContent() {
                           isMissionUnlocked={cyberProfile ? (lead.required_quest_id && lead.required_quest_id !== "none" ? checkQuestUnlocked(lead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
                           onExecuteMission={() => handleExecuteMission(lead.id, lead.required_quest_id)}
                           onSupportMission={() => handlePurchaseProtoCard(lead)}
-                          isSupported={!!isSupported} 
+                          isSupported={isActuallySupported} 
                           isSpecial={!!isSpecial}   
                           onViewVip={handleSelectLeadForVip} 
                           currentLang={currentLang}
-                          // theme prop удален из HotVibeCard
                           translations={t}
                           isPurchasePending={isPurchasePending}
                           isAuthenticated={isAuthenticated}
