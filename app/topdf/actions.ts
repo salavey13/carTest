@@ -1,64 +1,183 @@
 "use server";
 
-import { sendTelegramDocument } from '@/app/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
+// MODIFICATION: Directly import supabaseAdmin for these specific actions
+import { supabaseAdmin } from '@/hooks/supabase'; 
+// We will not use fetchUserData and updateUserMetadata from the hook here,
+// as they might be using a client-side authenticated client.
 
-// Use require for pdf-lib and fontkit
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
 
-// --- PDF LIBRARY DIAGNOSTICS (runs once on cold start) ---
-// This section is valuable for debugging and can be kept or removed once stable.
-console.log('--- PDF LIBRARY DIAGNOSTICS START (v2) ---');
-try {
-    const pdfLibKeys = Object.keys(pdfLibModule || {});
-    console.log(`[PDF DIAG] Keys of require("pdf-lib") (${pdfLibKeys.length}): ${pdfLibKeys.join(', ')}`);
-    console.log(`[PDF DIAG] typeof require("pdf-lib").registerFontkit (on module itself): typeof ${(pdfLibModule || {}).registerFontkit}`);
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
-    if (pdfLibModule && pdfLibModule.PDFDocument) {
-        const PDFD = pdfLibModule.PDFDocument;
-        console.log('[PDF DIAG] pdfLibModule.PDFDocument IS PRESENT.');
-        const pdfDKeys = Object.keys(PDFD || {});
-        console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument (${pdfDKeys.length}): ${pdfDKeys.join(', ')}`); 
-        
-        if (typeof (PDFD || {}).registerFontkit === 'function') {
-            console.log('[PDF DIAG] pdfLibModule.PDFDocument.registerFontkit IS A FUNCTION (STATIC). This is expected.');
-        } else {
-            console.log('[PDF DIAG] pdfLibModule.PDFDocument.registerFontkit IS NOT a function (STATIC). Current typeof: ' + typeof (PDFD || {}).registerFontkit);
-        }
-
-        if (PDFD.prototype) {
-            const protoKeys = Object.keys(PDFD.prototype);
-            console.log(`[PDF DIAG] Keys of pdfLibModule.PDFDocument.prototype (${protoKeys.length}): ${protoKeys.join(', ')}`);
-             if (typeof (PDFD.prototype || {}).registerFontkit === 'function') {
-                console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype.registerFontkit IS A FUNCTION (INSTANCE/PROTOTYPE). This is UNEXPECTED for static registration but observed.');
-            } else {
-                 console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype.registerFontkit IS NOT a function (INSTANCE/PROTOTYPE).');
-            }
-        } else {
-            console.log('[PDF DIAG] pdfLibModule.PDFDocument.prototype IS NOT PRESENT.');
-        }
-    } else {
-        console.log('[PDF DIAG] require("pdf-lib").PDFDocument IS UNDEFINED or NULL.');
-    }
-
-    const fontkitKeys = Object.keys(fontkitModule || {});
-    console.log(`[PDF DIAG] Keys of require("@pdf-lib/fontkit") (${fontkitKeys.length}): ${fontkitKeys.join(', ')}`);
-    console.log(`[PDF DIAG] typeof require("@pdf-lib/fontkit").default: typeof ${(fontkitModule || {}).default}`);
-    const fontkitInstanceForDiag = fontkitModule.default || fontkitModule;
-    console.log(`[PDF DIAG] Determined fontkit instance for registration (typeof): typeof ${fontkitInstanceForDiag}`);
-    if(typeof fontkitInstanceForDiag !== 'object' && typeof fontkitInstanceForDiag !== 'function'){
-        console.warn('[PDF DIAG] fontkitInstanceForDiag does not appear to be a valid fontkit instance object/function.');
-    }
-
-} catch (e: any) {
-    console.error('[PDF DIAG] Error during initial diagnostics logging:', e.message, e.stack);
+if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { 
+    logger.error("[topdf/actions.ts] Missing critical environment variable: TELEGRAM_BOT_TOKEN for PDF sending.");
 }
-console.log('--- PDF LIBRARY DIAGNOSTICS END (v2) ---');
-// --- END DIAGNOSTICS ---
+
+interface TelegramApiResponse {
+  ok: boolean;
+  result?: any;
+  description?: string;
+  error_code?: number;
+}
+
+const PDF_FORM_DATA_KEY = 'pdfFormCache'; 
+
+export async function saveUserPdfFormData(
+  userId: string,
+  formData: { userName?: string; userAge?: string; userGender?: string }
+): Promise<{ success: boolean; error?: string }> {
+  if (!userId) {
+    return { success: false, error: "User ID is required to save PDF form data." };
+  }
+  if (!supabaseAdmin) { // Check if admin client is available
+    logger.error("[topdf/actions saveUserPdfFormData] Supabase admin client is not available.");
+    return { success: false, error: "Server configuration error (admin client)." };
+  }
+
+  try {
+    // Fetch current metadata using supabaseAdmin
+    const { data: userData, error: fetchError } = await supabaseAdmin
+        .from('users')
+        .select('metadata')
+        .eq('user_id', userId)
+        .single();
+
+    if (fetchError) {
+        logger.error(`[topdf/actions saveUserPdfFormData] Error fetching user metadata for ${userId}:`, fetchError);
+        return { success: false, error: fetchError.message || "Failed to fetch user data." };
+    }
+    if (!userData) {
+      // This case might be valid if you want to create the metadata field on a user who doesn't have one yet.
+      // However, typically, the user record should exist.
+      logger.warn(`[topdf/actions saveUserPdfFormData] User ${userId} not found or no metadata field.`);
+      // Depending on desired behavior, you might want to return an error or proceed to create/update.
+      // For now, let's assume we proceed and it will create/update the metadata field.
+    }
+
+    const currentMetadata = userData?.metadata || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      [PDF_FORM_DATA_KEY]: formData,
+    };
+
+    // Update metadata using supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({ metadata: updatedMetadata, updated_at: new Date().toISOString() })
+      .eq('user_id', userId);
+
+    if (updateError) {
+      logger.error(`[topdf/actions saveUserPdfFormData] Failed to save PDF form data for user ${userId}:`, updateError);
+      return { success: false, error: updateError.message || "Failed to save PDF form data." };
+    }
+    
+    debugLogger.log(`[topdf/actions saveUserPdfFormData] PDF form data saved for user ${userId}`, formData);
+    return { success: true };
+
+  } catch (e: any) {
+    logger.error(`[topdf/actions saveUserPdfFormData] Exception for user ${userId}:`, e);
+    return { success: false, error: e.message || "Server error saving PDF form data." };
+  }
+}
+
+export async function loadUserPdfFormData(
+  userId: string
+): Promise<{ success: boolean; data?: { userName?: string; userAge?: string; userGender?: string }; error?: string }> {
+  if (!userId) {
+    return { success: false, error: "User ID is required to load PDF form data." };
+  }
+   if (!supabaseAdmin) { // Check if admin client is available
+    logger.error("[topdf/actions loadUserPdfFormData] Supabase admin client is not available.");
+    return { success: false, error: "Server configuration error (admin client)." };
+  }
+
+  try {
+    // Fetch metadata using supabaseAdmin
+    const { data: userData, error: fetchError } = await supabaseAdmin
+        .from('users')
+        .select('metadata')
+        .eq('user_id', userId)
+        .single();
+        
+    if (fetchError) {
+        logger.error(`[topdf/actions loadUserPdfFormData] Error fetching user metadata for ${userId}:`, fetchError);
+        return { success: false, error: fetchError.message || "Failed to fetch user data." };
+    }
+    if (!userData) {
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found.`);
+      return { success: false, error: "User not found to load PDF form data." };
+    }
+
+    const formData = userData.metadata?.[PDF_FORM_DATA_KEY] as { userName?: string; userAge?: string; userGender?: string } | undefined;
+    
+    if (formData) {
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] PDF form data loaded for user ${userId}`, formData);
+      return { success: true, data: formData };
+    } else {
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] No PDF form data found for user ${userId}`);
+      return { success: true, data: undefined }; 
+    }
+  } catch (e: any) {
+    logger.error(`[topdf/actions loadUserPdfFormData] Exception for user ${userId}:`, e);
+    return { success: false, error: e.message || "Server error loading PDF form data." };
+  }
+}
+
+// ... (The rest of the file: sendTelegramDocument, drawMarkdownWrappedText, generatePdfFromMarkdownAndSend
+//      should remain the same as the last correct version you provided, as they don't depend on user-specific RLS
+//      for their core PDF generation and Telegram sending logic. Their dependencies are file system access and Telegram bot token.)
+
+async function sendTelegramDocument( 
+  chatId: string,
+  fileBlob: Blob,
+  fileName: string,
+  caption?: string 
+): Promise<{ success: boolean; data?: any; error?: string }> {
+   if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') {
+    logger.error("[topdf/actions.ts sendTelegramDocument] Telegram bot token not configured");
+    return { success: false, error: "Telegram bot token not configured" };
+  }
+   if (process.env.NODE_ENV === 'test' && !TELEGRAM_BOT_TOKEN) { 
+     logger.warn("[topdf/actions.ts sendTelegramDocument] TEST MODE: Telegram bot token not configured, simulating success.");
+     return { success: true, data: { message_id: 12345 } };
+   }
+
+  try {
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append("document", fileBlob, fileName);
+
+    if (caption) {
+      formData.append("caption", caption);
+      formData.append("parse_mode", "Markdown"); 
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
+      method: "POST",
+      body: formData, 
+    });
+
+    const data: TelegramApiResponse = await response.json();
+    if (!data.ok) {
+       logger.error(`[topdf/actions.ts sendTelegramDocument] Telegram API error: ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code, captionProvided: !!caption });
+      throw new Error(data.description || "Failed to send document");
+    }
+
+    logger.info(`[topdf/actions.ts sendTelegramDocument] Successfully sent document "${fileName}" to chat ${chatId}${caption ? ' with caption.' : '.'}`);
+    return { success: true, data: data.result };
+  } catch (error) {
+     logger.error(`[topdf/actions.ts sendTelegramDocument] Error (chatId: ${chatId}, fileName: ${fileName}):`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "An unexpected error occurred while sending document",
+    };
+  }
+}
 
 const { StandardFonts, rgb, PageSizes } = pdfLibModule; 
 type PDFFont = any; 
@@ -149,9 +268,12 @@ const pageMargins = 50;
 export async function generatePdfFromMarkdownAndSend(
     markdownContent: string,
     chatId: string,
-    originalFileName: string = "report"
+    originalFileName: string = "report",
+    userName?: string, 
+    userAge?: string,  
+    userGender?: string 
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-    debugLogger.log(`[Markdown to PDF Action] Initiated for Chat ID: ${chatId}`);
+    debugLogger.log(`[Markdown to PDF Action] Initiated for Chat ID: ${chatId}, User: ${userName || 'N/A'}`);
 
     if (!chatId) {
         return { success: false, error: "User chat ID not provided." };
@@ -173,19 +295,15 @@ export async function generatePdfFromMarkdownAndSend(
             return { success: false, error: "Critical PDF library load error (fontkit instance is invalid)." };
         }
 
-        // Create PDF document instance FIRST
         if (typeof PDFDocumentClass.create !== 'function') {
             logger.error("[PDF Gen] CRITICAL: PDFDocumentClass.create is not a function. Cannot create PDF document.", PDFDocumentClass);
             return { success: false, error: "Internal error: PDFDocument class is not correctly initialized for PDF creation." };
         }
         const pdfDoc = await PDFDocumentClass.create();
 
-        // Attempt to register fontkit
         let registrationAttempted = false;
         let registrationSuccessful = false;
 
-        // Attempt 1: Register on the instance (if method exists)
-        // Based on diagnostics, registerFontkit is on the prototype, so instances should inherit it.
         if (typeof pdfDoc.registerFontkit === 'function') {
             registrationAttempted = true;
             debugLogger.log("[PDF Gen] Attempting registration: pdfDoc.registerFontkit()");
@@ -200,7 +318,6 @@ export async function generatePdfFromMarkdownAndSend(
              debugLogger.log("[PDF Gen] pdfDoc.registerFontkit is NOT a function.");
         }
 
-        // Attempt 2: Fallback to calling prototype's registerFontkit with Class context
         if (!registrationSuccessful && PDFDocumentClass.prototype && typeof PDFDocumentClass.prototype.registerFontkit === 'function') {
             registrationAttempted = true;
             debugLogger.log("[PDF Gen] Attempting fallback registration: PDFDocumentClass.prototype.registerFontkit.call(PDFDocumentClass, ...)");
@@ -213,7 +330,6 @@ export async function generatePdfFromMarkdownAndSend(
             }
         }
 
-        // Attempt 3: Static registration on PDFDocumentClass directly (if it magically appeared)
         if (!registrationSuccessful && typeof PDFDocumentClass.registerFontkit === 'function') {
             registrationAttempted = true;
             debugLogger.log("[PDF Gen] Attempting fallback registration: PDFDocumentClass.registerFontkit(...) (STATIC direct)");
@@ -280,19 +396,32 @@ export async function generatePdfFromMarkdownAndSend(
         let currentY = height - pageMargins;
         const baseFontSize = 10;
         const lineHeight = 14;
-        const sanitizedTitleFileName = originalFileName.replace(/[^\w\s\d.,!?"'%*()\-+=\[\]{};:@#~$&\/\\]/g, "_");
+        
+        const sanitizedTitleFileNameBase = originalFileName.replace(/[^\w\s\d.,!?"'%*()\-+=\[\]{};:@#~$&\/\\]/g, "_").substring(0, 50);
+        const pdfTitle = userName ? `Отчет для ${userName}: ${sanitizedTitleFileNameBase}` : `Отчет: ${sanitizedTitleFileNameBase}`;
 
-        page.drawText(`AI Analysis Report: ${sanitizedTitleFileName}`, {
+        page.drawText(pdfTitle, {
             x: pageMargins, y: currentY, font: customBoldFont, size: 16, color: rgb(0.1, 0.1, 0.4)
         });
-        currentY -= 30;
+        currentY -= 20;
+        if(userName || userAge || userGender) {
+            let userInfoLine = "Данные пользователя: ";
+            if(userName) userInfoLine += `Имя: ${userName}`;
+            if(userAge) userInfoLine += `${userName ? ', ' : ''}Возраст: ${userAge}`;
+            if(userGender) userInfoLine += `${(userName || userAge) ? ', ' : ''}Пол: ${userGender}`;
+            page.drawText(userInfoLine, {
+                x: pageMargins, y: currentY, font: customFont, size: baseFontSize - 1, color: rgb(0.3, 0.3, 0.3)
+            });
+            currentY -= (lineHeight - 2);
+        }
+        currentY -= 10; 
 
         const lines = markdownContent.split('\n');
         for (const line of lines) {
             if (currentY < pageMargins + lineHeight) { 
                 page = pdfDoc.addPage(PageSizes.A4);
                 currentY = height - pageMargins;
-                page.drawText(`AI Analysis Report: ${sanitizedTitleFileName} (cont.)`, {
+                page.drawText(`${pdfTitle} (продолжение)`, { 
                     x: pageMargins, y: currentY, font: customBoldFont, size: 12, color: rgb(0.2,0.2,0.2)
                 });
                 currentY -= 20;
@@ -313,11 +442,19 @@ export async function generatePdfFromMarkdownAndSend(
         }
 
         const pdfBytes = await pdfDoc.save();
-        const pdfFileName = `AI_Report_${originalFileName.replace(/[^\w\d_.-]/g, "_").replace(/\.\w+$/, "")}.pdf`;
-        const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName);
+        const pdfFileName = `Report_${(userName || originalFileName).replace(/[^\w\d_.-]/g, "_").substring(0, 50)}.pdf`;
+        
+        let caption = `📄 Ваш PDF отчет готов: "${pdfFileName}"`;
+        if (userName || userAge || userGender) {
+            caption += `\n\n👤 Для: ${userName || 'N/A'}`;
+            if (userAge) caption += `, Возраст: ${userAge}`;
+            if (userGender) caption += `, Пол: ${userGender}`;
+        }
+        
+        const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName, caption);
 
         if (sendResult.success) {
-            return { success: true, message: `PDF report "${pdfFileName}" sent.` };
+            return { success: true, message: `PDF отчет "${pdfFileName}" отправлен с информацией о пользователе.` };
         } else {
             return { success: false, error: `Failed to send PDF: ${sendResult.error}` };
         }

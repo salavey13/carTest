@@ -2,8 +2,6 @@
 
 import React from 'react';
 import Image from 'next/image';
-// Link import не используется, можно убрать, если он не нужен для других целей в этом файле
-// import Link from 'next/link'; 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
@@ -12,7 +10,7 @@ import {
     CardFooter, 
 } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { ELON_SIMULATOR_CARD_ID } from '@/app/hotvibes/page'; 
+import { ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID } from '@/app/hotvibes/page';
 
 export interface HotLeadData {
   id: string;
@@ -29,6 +27,8 @@ export interface HotLeadData {
   status?: string;
   project_type_guess?: string | null;
   client_name?: string | null;
+  notes?: string | null; 
+  supervibe_studio_links?: any; 
 }
 
 interface HotVibeCardProps {
@@ -50,7 +50,6 @@ const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage
 export function HotVibeCard({ 
     lead, 
     isMissionUnlocked, 
-    onExecuteMission, 
     onSupportMission,
     isSupported,
     isSpecial, 
@@ -63,79 +62,113 @@ export function HotVibeCard({
   
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
+  const isPdfGeneratorCard = lead.id === PERSONALITY_REPORT_PDF_CARD_ID;
 
-  const borderColorClass = isSpecial || isElonSimulatorCard ? "border-brand-yellow/70" : "border-brand-red/70";
-  const hoverBorderColorClass = isSpecial || isElonSimulatorCard ? "hover:border-brand-yellow" : "hover:border-brand-red";
-  const shadowColorClass = isSpecial || isElonSimulatorCard ? "shadow-yellow-glow" : "shadow-purple-glow"; 
-  const hoverShadowColorClass = isSpecial || isElonSimulatorCard ? "hover:shadow-yellow-glow/60" : "hover:shadow-purple-glow/60";
-  const textColorClass = isSpecial || isElonSimulatorCard ? "group-hover:text-brand-yellow" : "group-hover:text-brand-red";
-  const accentGradientClass = isSpecial || isElonSimulatorCard
-    ? "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500" 
-    : "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500";
+  let cardGradientClass = "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900"; 
+  let titleTextColorClass = "text-slate-100 group-hover:text-brand-cyan";
+  let earningTextColorClass = "text-brand-lime";
+  let buttonTextColorClass = "text-black"; 
 
+  if (isSpecial || isElonSimulatorCard || isPdfGeneratorCard) {
+    cardGradientClass = "bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600";
+    titleTextColorClass = "text-white group-hover:text-yellow-200";
+    earningTextColorClass = "text-yellow-200";
+  } else if (isSupported) {
+    cardGradientClass = "bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600";
+    titleTextColorClass = "text-white group-hover:text-lime-200";
+    earningTextColorClass = "text-lime-300";
+  } else if (isMissionUnlocked) {
+     cardGradientClass = "bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700";
+     titleTextColorClass = "text-white group-hover:text-indigo-200";
+     earningTextColorClass = "text-indigo-300";
+  } else {
+    cardGradientClass = "bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900";
+    titleTextColorClass = "text-gray-300 group-hover:text-gray-100";
+    earningTextColorClass = "text-gray-400";
+  }
+
+  const handleCardClick = (event: React.MouseEvent) => {
+    if ((event.target as HTMLElement).closest('button, a')) {
+      return;
+    }
+    // Now always call onViewVip when the card body is clicked
+    onViewVip(lead);
+  };
 
   const renderFooterButton = () => {
-    // Уменьшаем горизонтальные паддинги (px-2 или px-1.5) и вертикальные (py-1.5 или py-2)
-    // Добавляем min-h-fit чтобы кнопка не растягивалась излишне по высоте, если текст короткий
-    const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 px-1.5 sm:px-2 rounded-lg flex items-center justify-center text-center leading-tight shadow-md transition-all duration-200 ease-in-out transform group-hover:scale-105 min-h-fit";
-    const disabledClasses = (isPurchasePending || !isAuthenticated) ? "opacity-60 cursor-not-allowed !scale-100" : "";
+    const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 px-1.5 sm:px-2 rounded-md flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105 min-h-fit";
+    const disabledClasses = (isPurchasePending || !isAuthenticated) ? "opacity-70 cursor-not-allowed !scale-100" : "";
 
-    if (isElonSimulatorCard) { 
+    let buttonTextKey = ""; // e.g., "goToSimulatorText"
+    let buttonIconName = ""; // e.g., "FaGamepad"
+    let buttonAction = () => onSupportMission(lead); 
+    let buttonSpecificClass = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-500 text-white hover:brightness-110";
+
+    if (isElonSimulatorCard) {
       if (isSupported) {
-        return (
-          <Button 
-            onClick={() => window.location.href = '/elon'}
-            className={cn(buttonBaseClasses, "bg-brand-orange hover:bg-yellow-400 text-black", disabledClasses)}
-          >
-            <VibeContentRenderer content={`::FaGamepad className='mr-1 sm:mr-1.5 text-xs':: ${translations.goToSimulatorText}`} />
-          </Button>
-        );
+        buttonTextKey = "goToSimulatorText";
+        buttonIconName = "FaGamepad";
+        buttonAction = () => onViewVip(lead); 
+        buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 text-black hover:brightness-110";
       } else {
-        return (
-          <Button 
-            onClick={() => onSupportMission(lead)}
-            disabled={isPurchasePending || !isAuthenticated}
-            className={cn(buttonBaseClasses, "bg-gradient-to-r from-yellow-400 via-brand-orange to-orange-600 hover:brightness-110", "text-black", disabledClasses)}
-          >
-            <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin text-sm'::" : `::FaHandHoldingDollar className='mr-1 sm:mr-1.5 text-xs':: ${translations.elonSimulatorAccessBtnText}`} />
-          </Button>
-        );
+        buttonTextKey = "elonSimulatorAccessBtnText";
+        buttonIconName = isPurchasePending ? "FaSpinner" : "FaHandHoldingDollar";
+        buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600 text-black hover:brightness-110";
       }
+    } else if (isPdfGeneratorCard) {
+        if (isSupported) {
+            buttonTextKey = "goToPdfGeneratorText";
+            buttonIconName = "FaFilePdf";
+            buttonAction = () => onViewVip(lead);
+            buttonSpecificClass = "bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 text-white hover:brightness-110";
+        } else {
+            buttonTextKey = "pdfGeneratorAccessBtnText";
+            buttonIconName = isPurchasePending ? "FaSpinner" : "FaHandHoldingDollar";
+            buttonSpecificClass = "bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white hover:brightness-110";
+        }
     } else { 
       if (isSupported) {
-        return (
-          <Button 
-            onClick={() => onViewVip(lead)} 
-            className={cn(buttonBaseClasses, "bg-brand-green hover:bg-green-400 text-black", disabledClasses)}
-          >
-            <VibeContentRenderer content={`::FaEye className='mr-1 sm:mr-1.5 text-xs':: ${translations.supportedText} (${translations.viewDemoText})`} />
-          </Button>
-        );
+        buttonTextKey = "supportedText"; // This will be combined with viewDemoText
+        buttonIconName = "FaEye";
+        buttonAction = () => onViewVip(lead);
+        buttonSpecificClass = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
       } else {
-        return (
-          <Button 
-            onClick={() => onSupportMission(lead)}
-            disabled={isPurchasePending || !isAuthenticated}
-            className={cn(buttonBaseClasses, accentGradientClass, "text-black hover:brightness-110", disabledClasses)}
-          >
-            <VibeContentRenderer content={isPurchasePending ? "::FaSpinner className='animate-spin text-sm'::" : `::FaHandHoldingDollar className='mr-1 sm:mr-1.5 text-xs':: ${translations.supportMissionBtnText}`} />
-          </Button>
-        );
+        buttonTextKey = "supportMissionBtnText";
+        buttonIconName = isPurchasePending ? "FaSpinner" : "FaHandHoldingDollar";
       }
     }
+    
+    let fullButtonText = translations[buttonTextKey] || buttonTextKey;
+    if (buttonTextKey === "supportedText" && !isElonSimulatorCard && !isPdfGeneratorCard) {
+        fullButtonText = `${translations.supportedText} (${translations.viewDemoText})`;
+    }
+    if (isPurchasePending && (isElonSimulatorCard || isPdfGeneratorCard || !isSupported)) {
+        fullButtonText = ""; // Spinner only
+    }
+
+
+    return (
+      <Button 
+        onClick={buttonAction}
+        disabled={(isPurchasePending || !isAuthenticated) && !(isSupported && (isElonSimulatorCard || isPdfGeneratorCard))}
+        className={cn(buttonBaseClasses, buttonSpecificClass, buttonTextColorClass, disabledClasses)}
+      >
+        <VibeContentRenderer content={`::${buttonIconName}::`} className={cn("mr-1 sm:mr-1.5 text-xs", isPurchasePending && "animate-spin")} />
+        {fullButtonText}
+      </Button>
+    );
   };
 
   return (
     <Card 
-      onClick={isSupported && !isElonSimulatorCard ? () => onViewVip(lead) : undefined}
+      onClick={handleCardClick} // Attach click handler here
       className={cn(
-        "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl bg-black/70 backdrop-blur-md transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        borderColorClass, 
-        shadowColorClass,
-        (isMissionUnlocked || isElonSimulatorCard || isSupported) 
-          ? `${hoverBorderColorClass} ${hoverShadowColorClass} hover:scale-[1.03] hover:-translate-y-0.5` 
-          : `${isSpecial ? borderColorClass : 'border-muted/30'} opacity-80 hover:opacity-100`, 
-        (isSupported && !isElonSimulatorCard) ? "cursor-pointer" : "cursor-default"
+        "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
+        cardGradientClass, 
+        "cursor-pointer", // Make all cards appear clickable
+        (isMissionUnlocked || isSpecial || isSupported) 
+          ? "hover:scale-[1.03] hover:-translate-y-0.5" 
+          : "opacity-80 hover:opacity-100"
       )}
     >
         <div className="relative aspect-[1/1] w-full overflow-hidden"> 
@@ -148,18 +181,19 @@ export function HotVibeCard({
             onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE_CARD; }}
           />
           <div className={cn(
-              "absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-black/80 via-black/40 to-transparent group-hover:opacity-80",
-              (isMissionUnlocked || isElonSimulatorCard || isSupported) ? "opacity-60" : "bg-gray-900/60 opacity-80"
+              "absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent group-hover:from-black/60"
           )} />
-          {(lead.status === 'client_responded_positive' || lead.status === 'interested') && !isElonSimulatorCard && (
-            <div className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full shadow-lg animate-pulse flex items-center gap-1 ring-1 ring-white/30">
-              HOT <VibeContentRenderer content="::FaFireAlt className='w-2.5 h-2.5'::" />
+          {(lead.status === 'client_responded_positive' || lead.status === 'interested') && !isElonSimulatorCard && !isPdfGeneratorCard && (
+            <div className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full animate-pulse flex items-center gap-1">
+              HOT <VibeContentRenderer content="::FaFireAlt::" className="w-2.5 h-2.5" />
             </div>
           )}
           {isSupported && (
-             <div className="absolute top-1.5 left-1.5 bg-brand-green text-black text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full shadow-lg flex items-center gap-1 ring-1 ring-black/20">
-                <VibeContentRenderer content="::FaCheckCircle className='w-3 h-3'::" /> 
-                <span className="leading-none">{isElonSimulatorCard ? "Доступен" : "Поддержано"}</span>
+             <div className="absolute top-1.5 left-1.5 bg-brand-green/80 text-black text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full flex items-center gap-1">
+                <VibeContentRenderer content="::FaCheckCircle::" className="w-3 h-3" /> 
+                <span className="leading-none">
+                    {isElonSimulatorCard || isPdfGeneratorCard ? (currentLang === 'ru' ? "Доступен" : "Access") : (currentLang === 'ru' ? "Поддержано" : "Supported")}
+                </span>
               </div>
           )}
         </div>
@@ -169,7 +203,7 @@ export function HotVibeCard({
             <h3 
               className={cn(
                 "font-orbitron text-sm sm:text-base font-bold leading-tight transition-colors line-clamp-2", 
-                (isMissionUnlocked || isElonSimulatorCard || isSupported) ? `text-light-text ${textColorClass}` : "text-muted-foreground/80"
+                titleTextColorClass
               )} 
               title={lead.kwork_gig_title || "Untitled Gig"}
             >
@@ -179,7 +213,7 @@ export function HotVibeCard({
               <p 
                 className={cn(
                     "mt-1 text-[0.6rem] sm:text-[0.7rem] leading-snug line-clamp-2", 
-                    (isMissionUnlocked || isElonSimulatorCard || isSupported) ? "text-gray-400 group-hover:text-gray-300" : "text-gray-500/80"
+                     "text-gray-300 group-hover:text-gray-200"
                 )} 
                 title={lead.ai_summary}
               >
@@ -189,11 +223,7 @@ export function HotVibeCard({
           </div>
           <div className="text-[0.7rem] sm:text-xs font-orbitron font-semibold">
             {lead.potential_earning && 
-                <span className={cn(
-                    (isMissionUnlocked || isElonSimulatorCard || isSupported) 
-                        ? (isElonSimulatorCard ? "text-brand-orange" : "text-brand-green text-glow") 
-                        : "text-muted-foreground/70"
-                )}>
+                <span className={cn(earningTextColorClass)}>
                     {lead.potential_earning}
                 </span>
             }
