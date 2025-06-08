@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
 import Image from 'next/image'; 
-import { PSYCHO_ANALYSIS_SYSTEM_PROMPT } from './psychoAnalysisPrompt'; // Импортируем системный промпт
+import { PSYCHO_ANALYSIS_SYSTEM_PROMPT } from './psychoAnalysisPrompt';
 
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png"; 
 
@@ -22,21 +22,21 @@ const translations: Record<string, Record<string, string>> = {
     "pageTitle": "AI PDF Report Generator ✨", 
     "pageSubtitle": "Generate a personalized PDF report. Input user data and answers, or analyze an XLSX with AI.", 
     "step1Title": "Step 1: User Data & Questions for AI",
-    "generateDemoQuestions": "Generate Demo Questions & User Data", // Changed
-    "demoQuestionsGenerated": "Demo questions & user data prepared!",
+    "generateDemoQuestions": "Generate Demo Questions & User Data",
+    "demoQuestionsGenerated": "Demo questions & user data prepared! Copied to Markdown area.",
     "userDataTitle": "User Data for Report", 
     "userNameLabel": "User's Name",
     "userAgeLabel": "User's Age",
     "userGenderLabel": "User's Gender",
     "step2Title": "Step 2: Report Content (Paste AI Response or Final Answers)", 
     "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's final answers to questions):", 
-    "copyPromptAndData": "Copy Full AI Prompt (System + User Data + Questions)", // Updated
+    "copyPromptAndData": "Copy Full AI Prompt (System + User Data + Questions)", 
     "goToGemini": "Open Gemini AI Studio",
     "step3Title": "Step 3: Create & Send PDF",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
     "processing": "Processing...",
     "parsingXlsx": "Parsing XLSX...", 
-    "generatingPrompt": "Generating AI Prompt...", 
+    "generatingPromptForXlsx": "Generating AI Prompt for XLSX...",
     "generatingPdf": "Generating PDF Report...",
     "sendingPdf": "Sending PDF to Telegram...",
     "errorNoUser": "User information not available. Please ensure you are logged in via Telegram.",
@@ -45,7 +45,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Processing failed. Please try again.",
     "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
     "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
-    "promptCopySuccess": "Full AI prompt (system + user data + questions) copied to clipboard!", // Updated
+    "promptCopySuccess": "Full AI prompt (system + user data + questions) copied to clipboard!", 
     "promptCopyError": "Failed to copy. Please copy manually.",
     "unexpectedError": "An unexpected error occurred: %%ERROR%%",
     "loadingUser": "Loading user data...",
@@ -59,28 +59,28 @@ const translations: Record<string, Record<string, string>> = {
     "fileSelected": "File: %%FILENAME%%",
     "errorFileTooLarge": "File is too large. Maximum size: 5MB.",
     "errorInvalidFileType": "Invalid file type. Only .xlsx files are accepted.",
-    "formDataSaved": "User data auto-saved.",
-    "formDataError": "Error auto-saving user data.",
+    "formDataSaved": "User data saved for this session.",
+    "formDataError": "Error saving user data for session.",
   },
   ru: {
     "pageTitle": "AI Генератор PDF Отчетов ✨", 
     "pageSubtitle": "Создайте персонализированный PDF-отчет. Введите данные пользователя и ответы, или проанализируйте XLSX с помощью AI.", 
     "step1Title": "Шаг 1: Данные Пользователя и Вопросы для AI",
-    "generateDemoQuestions": "Сгенерировать Демо-Вопросы и Данные Пользователя", // Changed
-    "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены!",
+    "generateDemoQuestions": "Сгенерировать Демо-Вопросы и Данные Пользователя", 
+    "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены! Скопированы в область Markdown.",
     "userDataTitle": "Данные Пользователя для Отчета", 
     "userNameLabel": "Имя пользователя",
     "userAgeLabel": "Возраст пользователя",
     "userGenderLabel": "Пол пользователя",
     "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Финальные Ответы)", 
     "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или финальные ответы пользователя на вопросы):", 
-    "copyPromptAndData": "Копировать Полный Промпт для AI (Система + Данные + Вопросы)", // Updated
+    "copyPromptAndData": "Копировать Полный Промпт для AI (Система + Данные + Вопросы)", 
     "goToGemini": "Открыть Gemini AI Studio",
     "step3Title": "Шаг 3: Создать и Отправить PDF",
     "generateAndSendPdf": "PDF в Telegram",
     "processing": "Обработка...",
     "parsingXlsx": "Парсинг XLSX...", 
-    "generatingPrompt": "Генерация AI Промпта...", 
+    "generatingPromptForXlsx": "Генерация AI Промпта для XLSX...",
     "generatingPdf": "Генерация PDF Отчета...",
     "sendingPdf": "Отправка PDF в Telegram...",
     "errorNoUser": "Информация о пользователе недоступна. Убедитесь, что вы авторизованы через Telegram.",
@@ -89,7 +89,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
     "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
     "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
-    "promptCopySuccess": "Полный промпт для AI (система + данные + вопросы) скопирован в буфер обмена!", // Updated
+    "promptCopySuccess": "Полный промпт для AI (система + данные + вопросы) скопирован в буфер обмена!", 
     "promptCopyError": "Не удалось скопировать. Скопируйте вручную.",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
@@ -103,22 +103,20 @@ const translations: Record<string, Record<string, string>> = {
     "fileSelected": "Файл: %%FILENAME%%",
     "errorFileTooLarge": "Файл слишком большой. Максимальный размер: 5МБ.",
     "errorInvalidFileType": "Неверный тип файла. Принимаются только .xlsx файлы.",
-    "formDataSaved": "Данные пользователя автосохранены.",
-    "formDataError": "Ошибка автосохранения данных пользователя.",
+    "formDataSaved": "Данные пользователя сохранены для этой сессии.",
+    "formDataError": "Ошибка сохранения данных пользователя для сессии.",
   }
 };
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-// Только вопросы и данные пользователя, БЕЗ системного промпта
 const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string): string => {
     const name = userName || "Пользователь";
     let content = `# Расшифровка Личности для ${name}\n\n`;
     if (userAge) content += `**Возраст:** ${userAge}\n`;
     if (userGender) content += `**Пол:** ${userGender}\n\n`;
     content += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
-    
     const demoQuestions = [
         "1. Опишите себя тремя словами.", "2. Какое ваше самое яркое детское воспоминание и почему?", "3. Что для вас значит успех?",
         "4. Если бы вы могли изменить одну вещь в мире, что бы это было?", "5. Какая книга или фильм оказали на вас наибольшее влияние и почему?",
@@ -134,7 +132,7 @@ const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, 
 
 const handleXlsxFileAndPreparePromptInternal = async (
     file: File, 
-    currentUserName: string, // Добавлены для включения в XLSX промпт
+    currentUserName: string, 
     currentUserAge: string, 
     currentUserGender: string,
     translateFunc: (key: string, replacements?: Record<string, string | number>) => string,
@@ -149,8 +147,7 @@ const handleXlsxFileAndPreparePromptInternal = async (
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
-        setStatusMsgFunc(translateFunc('generatingPrompt'));
-        // Промпт для XLSX теперь тоже может включать данные пользователя, если они есть
+        setStatusMsgFunc(translateFunc('generatingPromptForXlsx')); // Updated key
         const promptForAI = `Ты — высококвалифицированный AI-аналитик. Твоя задача — проанализировать предоставленные данные из отчета (возможно, XLSX) и составить подробное резюме в формате Markdown.
 ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
 
@@ -170,7 +167,7 @@ const handleXlsxFileAndPreparePromptInternal = async (
 
 **Требования к формату вывода (Markdown на русском языке):**
 - Используй заголовки (например, \`# Анализ файла ${file.name}\`).
-- Используй маркированные списки (\`* \` или \`- \`) для перечислений.
+- Используй маркированные списки (\`* \` или \`- \`).
 - Используй выделение жирным шрифтом (\`**текст**\`).
 
 **Данные из XLSX (могут быть усечены):**
@@ -195,33 +192,14 @@ export default function ToPdfPageWithPsychoFocus() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null); 
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
-    const [generatedDataForAI, setGeneratedDataForAI] = useState<string>(''); // Теперь хранит только данные+вопросы
+    const [generatedDataForAI, setGeneratedDataForAI] = useState<string>('');
     const [markdownInput, setMarkdownInput] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [userName, setUserName] = useState<string>('');
     const [userAge, setUserAge] = useState<string>('');
     const [userGender, setUserGender] = useState<string>('');
-
-    const debouncedSaveData = useDebounce(async (dataToSave: { userName: string; userAge: string; userGender: string }) => {
-        if (user?.id) {
-            const result = await saveUserPdfFormData(String(user.id), dataToSave);
-            if (result.success) {
-                // toast.success(t('formDataSaved'), { duration: 1500 }); // Можно раскомментировать для отладки
-            } else {
-                // toast.error(t('formDataError'));
-                debugLogger.warn("[ToPdfPage] Error auto-saving user PDF form data:", result.error);
-            }
-        }
-    }, 1000);
-
-    useEffect(() => {
-        if (userName || userAge || userGender) { // Сохраняем только если есть что сохранять
-             debouncedSaveData({ userName, userAge, userGender });
-        }
-    }, [userName, userAge, userGender, debouncedSaveData]);
-
-
+    
     const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
     const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
 
@@ -247,7 +225,7 @@ export default function ToPdfPageWithPsychoFocus() {
     }, [t, currentLang]);
 
     useEffect(() => {
-        if (user?.id && !isAuthLoading) { // Загружаем данные только после загрузки AppContext
+        if (user?.id && !isAuthLoading) { 
             setIsLoading(true);
             loadUserPdfFormData(String(user.id)).then(result => {
                 if (result.success && result.data) {
@@ -260,7 +238,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 }
             }).finally(() => setIsLoading(false));
         }
-    }, [user?.id, isAuthLoading]); // Добавил isAuthLoading
+    }, [user?.id, isAuthLoading]);
 
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -293,23 +271,27 @@ export default function ToPdfPageWithPsychoFocus() {
         setMarkdownInput(userDataAndQuestions); 
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
-        // Save user data when generating questions
-        if (user?.id) {
-            debouncedSaveData({ userName, userAge, userGender });
+        if (user?.id) { // Save data on generation
+            saveUserPdfFormData(String(user.id), { userName, userAge, userGender }).then(res => {
+                 if(res.success) toast.info(t('formDataSaved'), {duration: 1500});
+            });
         }
     };
     
     const handleCopyToClipboard = () => {
-        let textToCopy = generatedDataForAI.trim(); 
-        if (!textToCopy) {
-            textToCopy = generateUserDataAndQuestionsForAI(userName,userAge,userGender); // Генерируем если пусто
-            if (!textToCopy) {
-                 toast.info(currentLang === 'ru' ? "Введите данные пользователя и/или сгенерируйте вопросы." : "Enter user data and/or generate demo questions.");
-                return;
-            }
+        let textForUserAndQuestions = generatedDataForAI.trim(); 
+        if (!textForUserAndQuestions && markdownInput.trim()) { // If user pasted answers directly
+            textForUserAndQuestions = markdownInput.trim();
         }
-        // Добавляем системный промпт ПЕРЕД данными пользователя и вопросами
-        const fullTextForAI = `${PSYCHO_ANALYSIS_SYSTEM_PROMPT}\n\n${textToCopy}`;
+        if (!textForUserAndQuestions) { // If still empty, generate if user data exists
+             if(userName || userAge || userGender) {
+                textForUserAndQuestions = generateUserDataAndQuestionsForAI(userName,userAge,userGender);
+             } else {
+                toast.info(currentLang === 'ru' ? "Введите данные пользователя и сгенерируйте вопросы, или введите текст в поле содержимого." : "Enter user data and generate questions, or input content in the markdown field.");
+                return;
+             }
+        }
+        const fullTextForAI = `${PSYCHO_ANALYSIS_SYSTEM_PROMPT}\n\n${textForUserAndQuestions}`;
         
         navigator.clipboard.writeText(fullTextForAI)
             .then(() => toast.success(t('promptCopySuccess')))
@@ -340,10 +322,12 @@ export default function ToPdfPageWithPsychoFocus() {
                 toast.success(result.message || t('successMessage'));
                 setStatusMessage(result.message || t('successMessage'));
                 setMarkdownInput(''); 
-                // setSelectedFile(null); // Оставляем, если был выбран XLSX для имени файла
-                // if (fileInputRef.current) fileInputRef.current.value = ""; // Не сбрасываем файл, если он был для имени
                 setGeneratedDataForAI(''); 
-                // Не сбрасываем userName, userAge, userGender, так как они могут быть нужны для следующего отчета
+                // Оставляем данные пользователя, но сбрасываем файл XLSX если он был только для имени
+                if (selectedFile && (!userName && !userAge && !userGender)) { // если файл был, но данные юзера не вводились, возможно файл был для данных
+                    setSelectedFile(null); 
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                }
                 setStatusMessage(t('readyForUserData'));
             } else {
                 toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }), { duration: 7000 });
@@ -357,7 +341,7 @@ export default function ToPdfPageWithPsychoFocus() {
         }
     };
     
-    if (isAuthLoading) {
+    if (isAuthLoading && !user?.id) { // Показываем загрузку, если контекст еще грузится И нет user.id
         return (
             <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-900">
                 <VibeContentRenderer content="::FaSpinner className='animate-spin text-brand-cyan text-2xl'::" />
