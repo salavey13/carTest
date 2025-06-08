@@ -292,7 +292,7 @@ export async function assignLead(
 
 export async function fetchLeadsForDashboard(
   currentUserId: string,
-  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' | string // Allow string for client_name
+  filter: 'all' | 'my' | 'support' | 'tank' | 'carry' | 'new' | 'in_progress' | 'interested' | string 
 ): Promise<{ success: boolean; data?: LeadRow[]; error?: string }> {
   if (!supabaseAdmin) {
     console.error("[LeadsActions fetchLeadsForDashboard] Клиент БД не инициализирован");
@@ -317,7 +317,6 @@ export async function fetchLeadsForDashboard(
     const predefinedFilters = ['all', 'my', 'support', 'tank', 'carry', 'new', 'in_progress', 'interested'];
 
     if (predefinedFilters.includes(filter)) {
-      // Existing filter logic for predefined keywords
       if (currentUserStatus === 'admin' || currentUserRole === 'support') {
         if (filter === 'tank') query = query.neq('assigned_to_tank', null);
         else if (filter === 'carry') query = query.neq('assigned_to_carry', null);
@@ -328,28 +327,14 @@ export async function fetchLeadsForDashboard(
         else if (filter === 'my' && currentUserStatus === 'admin') { 
           query = query.or(`assigned_to_tank.eq.${currentUserId},assigned_to_carry.eq.${currentUserId},assigned_to_support.eq.${currentUserId}`);
         }
-        // 'all' filter doesn't add specific role/status based WHERE clauses here for admin/support, shows all.
       } else if (currentUserRole === 'tank') {
         query = query.eq('assigned_to_tank', currentUserId);
         if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
       } else if (currentUserRole === 'carry') {
         query = query.eq('assigned_to_carry', currentUserId);
         if (['new', 'in_progress', 'interested'].includes(filter) && filter !== 'all' && filter !== 'my') query = query.eq('status', filter);
-      } else { // Guest or other roles with no specific assignments viewable might see nothing or a restricted set
-        // If non-admin/non-support/non-assigned role tries 'all', what should they see?
-        // For now, let's assume they see nothing unless explicitly assigned or it's a client_name search.
-        // If filter is 'all' or 'my' for these roles, and they are not assigned, they'd see 0.
-        // This path will be hit if filter is 'all' or 'my' for tank/carry but they have no assignments.
-        // Or if it's a guest-like role.
-        // If the goal is to prevent any data unless it's a client_name search below, we might return empty.
-        // However, the client_name search below will apply if filter isn't a predefined one.
-      }
+      } 
     } else {
-      // If filter is not one of the predefined, assume it's a client_name for searching.
-      // This allows HotVibes to pass "pavele0903" directly as the filter.
-      console.log(`[LeadsActions fetchLeadsForDashboard] Custom filter detected (treating as client_name): '${filter}'. Using ILIKE for case-insensitive exact match.`);
-      // Using ilike without '%' for case-insensitive exact match.
-      // If partial match is desired, use `'%${filter.trim()}%'`
       query = query.ilike('client_name', filter.trim()); 
     }
     
@@ -366,6 +351,55 @@ export async function fetchLeadsForDashboard(
   } catch (error: any) {
     console.error('[LeadsActions fetchLeadsForDashboard] Критическая ошибка:', error.message);
     return { success: false, error: error.message || 'Неожиданная серверная ошибка.' };
+  }
+}
+
+export async function fetchLeadByIdentifierOrNickname(
+  identifierOrNickname: string,
+  currentUserId: string 
+): Promise<{ success: boolean; data?: LeadRow; error?: string }> {
+  if (!supabaseAdmin) {
+    console.error("[LeadsActions fetchLeadByIdentifierOrNickname] Клиент БД не инициализирован");
+    return { success: false, error: "Клиент БД не инициализирован" };
+  }
+  if (!identifierOrNickname) {
+    return { success: false, error: "Идентификатор или никнейм лида не указан." };
+  }
+
+  try {
+    let query = supabaseAdmin.from('leads').select('*').eq('id', identifierOrNickname).maybeSingle();
+    let { data, error } = await query;
+
+    if (error && error.code !== 'PGRST116') { 
+      console.error(`[LeadsActions fetchLeadByIdentifierOrNickname] Ошибка поиска по ID ${identifierOrNickname}:`, error);
+      return { success: false, error: `Ошибка БД при поиске по ID: ${error.message}` };
+    }
+
+    if (data) {
+      console.log(`[LeadsActions fetchLeadByIdentifierOrNickname] Лид найден по ID: ${identifierOrNickname}`);
+      return { success: true, data };
+    }
+
+    console.log(`[LeadsActions fetchLeadByIdentifierOrNickname] Лид по ID ${identifierOrNickname} не найден, ищем по client_name (никнейму).`);
+    query = supabaseAdmin.from('leads').select('*').ilike('client_name', identifierOrNickname).maybeSingle();
+    ({ data, error } = await query);
+
+    if (error && error.code !== 'PGRST116') {
+      console.error(`[LeadsActions fetchLeadByIdentifierOrNickname] Ошибка поиска по никнейму ${identifierOrNickname}:`, error);
+      return { success: false, error: `Ошибка БД при поиске по никнейму: ${error.message}` };
+    }
+
+    if (data) {
+      console.log(`[LeadsActions fetchLeadByIdentifierOrNickname] Лид найден по никнейму: ${identifierOrNickname}`);
+      return { success: true, data };
+    }
+
+    console.warn(`[LeadsActions fetchLeadByIdentifierOrNickname] Лид с идентификатором/никнеймом '${identifierOrNickname}' не найден.`);
+    return { success: false, error: `Лид '${identifierOrNickname}' не найден.` };
+
+  } catch (e: any) {
+    console.error(`[LeadsActions fetchLeadByIdentifierOrNickname] Критическая ошибка для '${identifierOrNickname}':`, e.message);
+    return { success: false, error: e.message || 'Неожиданная серверная ошибка при поиске лида.' };
   }
 }
 
@@ -413,7 +447,7 @@ export async function scrapePageContent(
       '.project-description', '.task__description', '.job-description', '.vacancy-description', 
       '.product-description', '[itemprop="description"]', 
       '.text-content', '.content-text', '.article-text', 
-      '.job_show_description', '.b-description__text', // Kwork specific: .b-description__text
+      '.job_show_description', '.b-description__text', 
       '.page-content', '.content', '#content', '.main-content', '#main-content', 
       'section', 
     ];
@@ -457,7 +491,7 @@ export async function scrapePageContent(
     const $tempForText = cheerio.load(`<body>${targetHtmlForText}</body>`); 
     
     let extractedTexts: string[] = [];
-    $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a, .break-words') // Added .break-words
+    $tempForText('body').find('p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, article, section, pre, code, blockquote, strong, em, b, i, u, dd, dt, label, a, .break-words') 
         .each(function() {
             const $this = $(this);
             const elementText = $this.clone().children().remove().end().text().replace(/\s\s+/g, ' ').trim();
@@ -501,7 +535,7 @@ export async function scrapePageContent(
       return { success: false, error: `Не удалось извлечь контент (длина ${textContent?.length || 0}). Страница может быть пустой, требовать JS или быть honeypot.` };
     }
     
-    const MAX_LENGTH = 35000; // Increased max length
+    const MAX_LENGTH = 35000; 
     if (textContent.length > MAX_LENGTH) {
         textContent = textContent.substring(0, MAX_LENGTH) + "\n\n--- СОДЕРЖИМОЕ ОБРЕЗАНО ИЗ-ЗА ПРЕВЫШЕНИЯ ЛИМИТА ---";
         console.warn(`[Scraper Action] Контент с URL ${targetUrl} был обрезан до ${MAX_LENGTH} символов.`);
@@ -536,10 +570,9 @@ export async function updateUserRole(
 
   const isAdmin = await verifyUserPermissions(currentUserId, ['vprAdmin' as UserRole, 'admin' as UserRole], ['admin']);
   
-  // Разрешить пользователю менять свою роль на 'tank' или 'support'
   if (targetUserId === currentUserId && (newRole === 'tank' || newRole === 'support')) {
-    // Разрешено
-  } else if (!isAdmin) { // Если не админ и пытается изменить роль не себе ИЛИ на запрещенную роль
+    // Allowed
+  } else if (!isAdmin) { 
       console.warn(`[LeadsActions updateUserRole] User ${currentUserId} (not admin or invalid self-assign) attempted to change role for ${targetUserId} to ${newRole}. Denied.`);
       return { success: false, error: "Недостаточно прав для этой операции." };
   }

@@ -10,7 +10,7 @@ const fontkitModule = require('@pdf-lib/fontkit');
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
-if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { // Добавил проверку на process.env.NODE_ENV
+if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { 
     logger.error("[topdf/actions.ts] Missing critical environment variable: TELEGRAM_BOT_TOKEN for PDF sending.");
 }
 
@@ -31,11 +31,10 @@ async function sendTelegramDocument(
     logger.error("[topdf/actions.ts sendTelegramDocument] Telegram bot token not configured");
     return { success: false, error: "Telegram bot token not configured" };
   }
-   if (process.env.NODE_ENV === 'test' && !TELEGRAM_BOT_TOKEN) { // Мок для тестов
+   if (process.env.NODE_ENV === 'test' && !TELEGRAM_BOT_TOKEN) { 
      logger.warn("[topdf/actions.ts sendTelegramDocument] TEST MODE: Telegram bot token not configured, simulating success.");
      return { success: true, data: { message_id: 12345 } };
    }
-
 
   try {
     const formData = new FormData();
