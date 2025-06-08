@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense, useCallback, useId, useMemo } from 'react';
-import { useRouter, useSearchParams as useNextSearchParamsHook, usePathname } from 'next/navigation'; // Added usePathname
+import { useRouter, useSearchParams as useNextSearchParamsHook, usePathname } from 'next/navigation';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -81,7 +81,6 @@ const pageTranslations = {
     }
 };
 
-// --- mapLeadToHotLeadData, elonSimulatorProtoCardData, personalityPdfGeneratorCardData (unchanged) ---
 const extractPriceInRub = (potentialEarning: string | null | undefined): number | null => {
     if (!potentialEarning) return null;
     const rubOnlyMatch = potentialEarning.match(/^(?:до\s*)?(\d+[\s\d]*)\s*₽$/);
@@ -109,7 +108,8 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions, lang: 'ru' | 'en'): Hot
     earningText = `${lead.budget_range} (≈${xtrPrice} XTR)`;
   }
 
-  let demoLinkParam = (lead.supervibe_studio_links as any)?.demo_link_param || lead.client_name || lead.id;
+  let demoLinkParam = (lead.supervibe_studio_links as any)?.demo_link_param || lead.notes || lead.client_name || lead.id;
+  // Prioritize lead.notes if it might contain a path like "/topdf"
 
   return {
     id: lead.id || `fallback_id_${Math.random().toString(36).substring(7)}`,
@@ -129,7 +129,7 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions, lang: 'ru' | 'en'): Hot
     notes: lead.notes, 
     supervibe_studio_links: { 
         ...(typeof lead.supervibe_studio_links === 'object' ? lead.supervibe_studio_links : {}),
-        demo_link_param: demoLinkParam 
+        demo_link_param: demoLinkParam // Ensure this is correctly populated
     },
   };
 }
@@ -144,6 +144,7 @@ const elonSimulatorProtoCardData: HotLeadData = {
     required_quest_id: "none", 
     project_type_guess: "XTR Game/Simulator",
     status: "active_game",
+    notes: "/elon", // Direct path for this special card
 };
 
 const personalityPdfGeneratorCardData: HotLeadData = {
@@ -159,10 +160,9 @@ const personalityPdfGeneratorCardData: HotLeadData = {
     notes: "/topdf" 
 };
 
-
 function HotVibesClientContent() {
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname(); 
   const searchParamsHook = useNextSearchParamsHook(); 
   const { dbUser, isAuthenticated, user: tgUser, isLoading: appCtxLoading, isAuthenticating, platform, startParamPayload, refreshDbUser } = useAppContext();
   const { addToast } = useAppToast();
@@ -171,13 +171,8 @@ function HotVibesClientContent() {
   const [isPurchasePending, setIsPurchasePending] = useState(false);
 
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
-  
-  // This state will determine if a VIP view is shown or the lobby.
   const [activeVipLead, setActiveVipLead] = useState<HotLeadData | null>(null);
-  
-  // This state is for the *identifier* that might trigger a VIP view, either from URL or click.
   const [targetVipIdentifier, setTargetVipIdentifier] = useState<string | null>(null);
-
   const [isInitialVipCheckDone, setIsInitialVipCheckDone] = useState(false);
   const [lobbyLeads, setLobbyLeads] = useState<HotLeadData[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -189,7 +184,6 @@ function HotVibesClientContent() {
     setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en');
   }, [tgUser?.language_code, platform]);
 
-  // Effect to handle initial VIP lead from URL or startParam
   useEffect(() => {
     if (!appCtxLoading && !isAuthenticating && !isInitialVipCheckDone) {
       const leadIdFromUrl = searchParamsHook.get('lead_identifier');
@@ -202,14 +196,13 @@ function HotVibesClientContent() {
       
       if (effectiveId) {
         logger.info(`[HotVibes InitialIdEffect] Setting targetVipIdentifier to: ${effectiveId}`);
-        setTargetVipIdentifier(effectiveId); // Set the target, loadPageData will use this
+        setTargetVipIdentifier(effectiveId); 
       }
       setIsInitialVipCheckDone(true); 
     }
   }, [startParamPayload, searchParamsHook, appCtxLoading, isAuthenticating, isInitialVipCheckDone]);
   
-  // Main data loading and VIP lead processing logic
-  const loadPageData = useCallback(async () => {
+  const loadPageData = useCallback(async () => { // Removed currentInitialVipId param, will use state
     logger.info(`[HotVibes loadPageData] Triggered. AppCtxLoading: ${appCtxLoading}, isInitialVipCheckDone: ${isInitialVipCheckDone}, TargetVIP_ID_State: ${targetVipIdentifier}`);
     
     if (appCtxLoading || !isInitialVipCheckDone) {
@@ -219,14 +212,12 @@ function HotVibesClientContent() {
     }
     setPageLoading(true);
 
-    // Fetch CyberFitness Profile
     if (isAuthenticated && dbUser?.user_id && (!cyberProfile || dbUser?.updated_at !== cyberProfile?.lastActivityTimestamp)) {
         const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (profileResult.success && profileResult.data) setCyberProfile(profileResult.data);
         else { addToast(t.errorLoadingProfile, "error"); logger.warn("[HotVibes loadPageData] Failed to fetch CyberFitness profile:", profileResult.error); }
     }
     
-    // Fetch Lobby Leads
     const leadsRes = await fetchLeadsForDashboard(dbUser?.user_id || "guest", 'all');
     let allFetchedLeads: HotLeadData[] = [];
     if (leadsRes.success && leadsRes.data) {
@@ -236,77 +227,66 @@ function HotVibesClientContent() {
         addToast(t.errorLoadingLeads, "error"); logger.warn("[HotVibes loadPageData] Failed to fetch leads:", leadsRes.error); setLobbyLeads([]);
     }
 
-    // Process VIP Lead based on targetVipIdentifier state
     if (targetVipIdentifier) {
         logger.debug(`[HotVibes loadPageData] Processing targetVipIdentifier: ${targetVipIdentifier}`);
         let foundVip: HotLeadData | null = null;
         if (targetVipIdentifier === ELON_SIMULATOR_CARD_ID) {
             foundVip = elonSimulatorProtoCardData;
-            logger.info(`[HotVibes loadPageData] Set VIP to Elon Simulator Card.`);
         } else if (targetVipIdentifier === PERSONALITY_REPORT_PDF_CARD_ID) {
             foundVip = personalityPdfGeneratorCardData;
-            logger.info(`[HotVibes loadPageData] Set VIP to Personality PDF Generator Card.`);
         } else {
             foundVip = allFetchedLeads.find(l => l.id === targetVipIdentifier || l.client_name === targetVipIdentifier) || null;
-            if (foundVip) {
-                logger.info(`[HotVibes loadPageData] Set VIP (from lobby) to: ${targetVipIdentifier}`);
-            } else {
-                logger.info(`[HotVibes loadPageData] VIP ${targetVipIdentifier} not in current lobby, fetching specifically.`);
+            if (!foundVip) {
                 const vipResult = await fetchLeadByIdentifierOrNickname(targetVipIdentifier, dbUser?.user_id || "guest");
                 if (vipResult.success && vipResult.data) {
                     const mappedVip = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang);
-                    if (mappedVip.client_name === "AlexandraSergeevna" || mappedVip.notes === "/topdf") {
+                    if (mappedVip.client_name === "AlexandraSergeevna" || mappedVip.notes === "/topdf") { // This logic is fine
                         foundVip = { ...personalityPdfGeneratorCardData, id: mappedVip.id, kwork_gig_title: mappedVip.kwork_gig_title || personalityPdfGeneratorCardData.kwork_gig_title, ai_summary: mappedVip.ai_summary || personalityPdfGeneratorCardData.ai_summary, client_name: mappedVip.client_name, potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`, notes: mappedVip.notes };
-                        logger.info(`[HotVibes loadPageData] Fetched and set VIP to Lead ID ${targetVipIdentifier}, identified as /topdf target.`);
                     } else {
                         foundVip = mappedVip;
-                        logger.info(`[HotVibes loadPageData] Fetched and set VIP to: ${targetVipIdentifier}`);
                     }
                 } else {
                     addToast(t.vipLeadNotFound, "warning", { description: `ID: ${targetVipIdentifier}` });
-                    logger.warn(`[HotVibes loadPageData] VIP lead ${targetVipIdentifier} not found after specific fetch.`);
                 }
             }
         }
         setActiveVipLead(foundVip);
+        if(foundVip) logger.info(`[HotVibes loadPageData] VIP set to: ${foundVip.id}`);
+        else logger.warn(`[HotVibes loadPageData] VIP ${targetVipIdentifier} could not be resolved.`);
+
     } else {
-      logger.debug("[HotVibes loadPageData] No targetVipIdentifier, ensuring activeVipLead is null.");
       setActiveVipLead(null); 
     }
     setPageLoading(false);
-  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, isInitialVipCheckDone, cyberProfile, targetVipIdentifier]); // Added targetVipIdentifier
+  }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, isInitialVipCheckDone, cyberProfile, targetVipIdentifier]);
 
-  // Effect to run loadPageData when critical dependencies change or when initial check is done
   useEffect(() => {
     if (isInitialVipCheckDone) { 
         loadPageData();
     }
-  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards]); 
+  }, [loadPageData, isInitialVipCheckDone, dbUser?.metadata?.xtr_protocards, targetVipIdentifier]); // Added targetVipIdentifier here
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
-    setTargetVipIdentifier(lead.id); // This will trigger loadPageData via useEffect dependency change
-                                     // which will then set activeVipLead
+    setTargetVipIdentifier(lead.id); 
   };
 
   const handleBackToLobby = () => {
     logger.info(`[HotVibes] Returning to lobby view.`);
-    setActiveVipLead(null);      // Clear the displayed VIP lead
-    setTargetVipIdentifier(null); // Clear the trigger
+    setActiveVipLead(null);      
+    setTargetVipIdentifier(null); 
 
-    // Clean up URL search params if they were from a direct link or startapp
     const currentUrl = new URL(window.location.href);
-    if (currentUrl.searchParams.has('lead_identifier')) {
-        currentUrl.searchParams.delete('lead_identifier');
-        window.history.replaceState({ ...window.history.state, as: currentUrl.pathname + currentUrl.search, url: currentUrl.pathname + currentUrl.search }, '', currentUrl.pathname + currentUrl.search);
-        logger.info(`[HotVibes] URL 'lead_identifier' cleaned.`);
+    currentUrl.searchParams.delete('lead_identifier');
+    // Also clear startParam from URL if it was used to set targetVipIdentifier,
+    // but only if current pathname is /hotvibes. This prevents clearing startParam on other pages.
+    if (pathname === '/hotvibes' && startParamPayload && targetVipIdentifier) {
+        // No direct way to remove TG start_param from URL, but we are ensuring it doesn't re-trigger VIP view
     }
-    // If startParamPayload was the source for a VIP view, setting targetVipIdentifier to null
-    // and re-running loadPageData will ensure the lobby is shown.
-    // No direct URL manipulation for startParamPayload is done here, as it's part of the initial TG context.
+    window.history.replaceState({ ...window.history.state, as: currentUrl.pathname + currentUrl.search, url: currentUrl.pathname + currentUrl.search }, '', currentUrl.pathname + currentUrl.search);
+    logger.info(`[HotVibes] URL params potentially cleaned for lobby view.`);
   };
   
-  // --- handlePurchaseProtoCard, handleExecuteMission, getIsSupported, displayedLeads (unchanged) ---
   const handlePurchaseProtoCard = async (cardToPurchase: HotLeadData) => {
     if (!isAuthenticated || !dbUser?.user_id) {
       addToast("Сначала авторизуйтесь для покупки ПротоКарточки!", "error");
@@ -339,7 +319,7 @@ function HotVibesClientContent() {
         specificMetadata = { 
             associated_lead_id: cardToPurchase.id, 
             lead_title: cardToPurchase.kwork_gig_title,
-            demo_link_param: cardToPurchase.supervibe_studio_links?.demo_link_param || cardToPurchase.client_name || cardToPurchase.id
+            demo_link_param: cardToPurchase.supervibe_studio_links?.demo_link_param || cardToPurchase.notes || cardToPurchase.client_name || cardToPurchase.id
         };
     }
     
@@ -360,11 +340,7 @@ function HotVibesClientContent() {
       if (result.success) {
         addToast("Запрос на ПротоКарточку отправлен! Проверьте Telegram для оплаты счета.", "success");
         if(refreshDbUser) {
-            logger.info("[HotVibes handlePurchaseProtoCard] Purchase initiated, scheduling dbUser refresh.");
-            setTimeout(async () => {
-                logger.info("[HotVibes handlePurchaseProtoCard] Executing scheduled dbUser refresh.");
-                await refreshDbUser(); 
-            }, 7000); 
+            setTimeout(async () => { await refreshDbUser(); }, 7000); 
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -381,18 +357,23 @@ function HotVibesClientContent() {
       addToast("Аутентификация или профиль агента недоступны", "error"); return;
     }
 
-    if (leadId === PERSONALITY_REPORT_PDF_CARD_ID) {
-        router.push("/topdf");
-        return;
-    }
-    if (leadId === ELON_SIMULATOR_CARD_ID) {
-        router.push("/elon");
-        return;
-    }
+    const leadData = lobbyLeads.find(l => l.id === leadId) || activeVipLead; // Use activeVipLead if already in VIP view
+    // Prioritize lead.notes for navigation, then special card IDs, then demo_link_param from supervibe_studio_links
+    let navTarget = leadData?.notes || leadData?.supervibe_studio_links?.demo_link_param;
+
+    if (leadId === PERSONALITY_REPORT_PDF_CARD_ID) navTarget = "/topdf";
+    else if (leadId === ELON_SIMULATOR_CARD_ID) navTarget = "/elon";
     
+    if (typeof navTarget === 'string' && navTarget.startsWith('/')) {
+        logger.info(`[HotVibes ExecuteMission] Navigating directly to internal path: ${navTarget} for lead ${leadId}`);
+        router.push(navTarget);
+        return;
+    }
+
+    // If not a direct internal path, proceed with mission/tutorial logic
     const targetQuestId = questIdFromLead || "image-swap-mission";
     if (targetQuestId === "none") { 
-        addToast("Эта карточка не является стандартной миссией.", "info");
+        addToast("Эта карточка не является стандартной миссией и не имеет прямого демо-пути.", "info");
         return;
     }
     const isActuallyUnlocked = checkQuestUnlocked(targetQuestId, cyberProfile.completedQuests || [], QUEST_ORDER);
@@ -400,7 +381,6 @@ function HotVibesClientContent() {
     if (!isActuallyUnlocked) {
       addToast(t.lockedMissionRedirect.replace("...", `'${targetQuestId}'`), "info", 7000);
       if (targetQuestId === "image-swap-mission" && !(cyberProfile.completedQuests || []).includes("image-swap-mission")) {
-        logger.info(`[HotVibes] Auto-completing '${targetQuestId}' for courage boost for user ${dbUser.user_id}`);
         await markTutorialAsCompleted(dbUser.user_id, "image-swap-mission");
         const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (updatedProfileResult.success && updatedProfileResult.data) {
@@ -413,10 +393,9 @@ function HotVibesClientContent() {
       return;
     }
     addToast(`${t.missionActivated} (Lead: ${leadId.substring(0,6)}..., Quest: ${targetQuestId})`, "success");
-    const leadData = lobbyLeads.find(l => l.id === leadId);
-    const demoLinkParam = leadData?.supervibe_studio_links?.demo_link_param || leadData?.client_name || leadId;
-    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission&startapp=${demoLinkParam}`);
-  }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast, lobbyLeads]);
+    const finalDemoLinkParam = navTarget || leadData?.client_name || leadId; // Fallback for startapp if not an internal path
+    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission&startapp=${finalDemoLinkParam}`);
+  }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast, lobbyLeads, activeVipLead]);
   
   const getIsSupported = useCallback((cardId: string): boolean => {
     const cards = dbUser?.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
@@ -459,7 +438,7 @@ function HotVibesClientContent() {
 
   if (appCtxLoading && pageLoading && !activeVipLead) return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
 
-  if (activeVipLead) { // Changed from vipLeadToShow to activeVipLead
+  if (activeVipLead) { 
     return (
       <div className="relative min-h-screen bg-gradient-to-br from-black via-slate-900 to-purple-900/50 text-foreground overflow-x-hidden py-20 md:py-24">
         <div className="container mx-auto px-2 sm:px-4 relative z-10">
