@@ -19,7 +19,7 @@ import {
 } from '@/hooks/cyberFitnessSupabase';
 import { fetchLeadsForDashboard, fetchLeadByIdentifierOrNickname } from '../leads/actions'; 
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
-import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard';
+import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard'; 
 import { VipLeadDisplay } from '@/components/hotvibes/VipLeadDisplay'; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from '@/hooks/useAppToast';
@@ -29,11 +29,10 @@ import Link from 'next/link';
 
 export const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 export const ELON_SIMULATOR_ACCESS_PRICE_XTR = 13;
-export const MISSION_SUPPORT_PRICE_XTR = 13; // Default price for supporting a lead
+export const MISSION_SUPPORT_PRICE_XTR = 13; 
 export const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
 export const RUB_TO_XTR_RATE = 1 / 4.2; 
-
 
 const pageTranslations = {
     ru: {
@@ -111,11 +110,10 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions, lang: 'ru' | 'en'): Hot
 
   let demoLinkParam = (lead.supervibe_studio_links as any)?.demo_link_param || lead.client_name || lead.id;
 
-
   return {
     id: lead.id || `fallback_id_${Math.random().toString(36).substring(7)}`,
     kwork_gig_title: lead.kwork_title || lead.project_description?.substring(0, 70) || (lang === 'ru' ? "Без названия" : "Untitled Gig"),
-    client_name: lead.client_name, // This is important for startapp param logic
+    client_name: lead.client_name, 
     ai_summary: (lead as any).ai_summary || lead.project_description?.substring(0, 150) || (lang === 'ru' ? "Краткое описание от AI..." : "Brief AI summary..."),
     demo_image_url: demoImageUrlProvided,
     potential_earning: earningText,
@@ -127,8 +125,8 @@ function mapLeadToHotLeadData(lead: LeadDataFromActions, lang: 'ru' | 'en'): Hot
     ai_generated_proposal_draft: lead.generated_offer,
     status: lead.status,
     project_type_guess: lead.project_type_guess,
-    notes: lead.notes, // Added notes field
-    supervibe_studio_links: { // Ensure this is an object
+    notes: lead.notes, 
+    supervibe_studio_links: { 
         ...(typeof lead.supervibe_studio_links === 'object' ? lead.supervibe_studio_links : {}),
         demo_link_param: demoLinkParam 
     },
@@ -150,14 +148,14 @@ const elonSimulatorProtoCardData: HotLeadData = {
 const personalityPdfGeneratorCardData: HotLeadData = {
     id: PERSONALITY_REPORT_PDF_CARD_ID,
     kwork_gig_title: "Генератор PDF: Расшифровка Личности",
-    client_name: "PsychoVibe Tools", // A generic client_name for this tool card
+    client_name: "PsychoVibe Tools", 
     ai_summary: "Создавай персонализированные PDF-отчеты для психологической расшифровки. Вводи данные, получай результат для AI, генерируй PDF.",
-    demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png", // Use the same hero image
+    demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png", 
     potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
     required_quest_id: "none",
     project_type_guess: "Tool/Utility",
     status: "active_tool",
-    notes: "/topdf" // Store the target path here
+    notes: "/topdf" 
 };
 
 function HotVibesClientContent() {
@@ -188,9 +186,8 @@ function HotVibesClientContent() {
       const leadIdFromUrl = searchParamsHook.get('lead_identifier');
       let effectiveId = startParamPayload || leadIdFromUrl;
 
-      // Specific startapp logic for /topdf
       if (startParamPayload === 'topdf_psycho' || startParamPayload === 'AlexandraSergeevna') {
-        effectiveId = PERSONALITY_REPORT_PDF_CARD_ID; // Route to the PDF generator card
+        effectiveId = PERSONALITY_REPORT_PDF_CARD_ID; 
         logger.info(`[HotVibes InitialIdEffect] 'topdf_psycho' or 'AlexandraSergeevna' startParam detected, targeting PDF Generator card.`);
       }
       
@@ -247,7 +244,7 @@ function HotVibesClientContent() {
             setVipLeadToShow(personalityPdfGeneratorCardData);
             logger.info(`[HotVibes loadPageData] Set VIP to Personality PDF Generator Card.`);
         } else {
-            let vipData = allFetchedLeads.find(l => l.id === initialVipIdentifier || l.client_name === initialVipIdentifier); // Check by client_name too
+            let vipData = allFetchedLeads.find(l => l.id === initialVipIdentifier || l.client_name === initialVipIdentifier);
             if (vipData) {
                 setVipLeadToShow(vipData);
                 logger.info(`[HotVibes loadPageData] Set VIP (from lobby) to: ${initialVipIdentifier}`);
@@ -256,23 +253,21 @@ function HotVibesClientContent() {
                 const vipResult = await fetchLeadByIdentifierOrNickname(initialVipIdentifier, dbUser?.user_id || "guest");
                 if (vipResult.success && vipResult.data) {
                     const mappedVip = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang);
-                    setVipLeadToShow(mappedVip);
-                    // If this specific lead should point to /topdf
+                    
                     if (mappedVip.client_name === "AlexandraSergeevna" || mappedVip.notes === "/topdf") {
-                        // Augment or replace to show as PDF generator access
                         const pdfGenVip = {
-                            ...personalityPdfGeneratorCardData, // Base PDF generator card
-                            id: mappedVip.id, // Keep original lead ID for purchase tracking
+                            ...personalityPdfGeneratorCardData, 
+                            id: mappedVip.id, 
                             kwork_gig_title: mappedVip.kwork_gig_title || personalityPdfGeneratorCardData.kwork_gig_title,
                             ai_summary: mappedVip.ai_summary || personalityPdfGeneratorCardData.ai_summary,
-                            client_name: mappedVip.client_name, // Keep original client name
-                            potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`, // Standard price for tool
-                            notes: mappedVip.notes, // Keep original notes for routing
-                            // Keep other fields from mappedVip if necessary or override with PDF gen defaults
+                            client_name: mappedVip.client_name, 
+                            potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`, 
+                            notes: mappedVip.notes, 
                         };
                         setVipLeadToShow(pdfGenVip);
                          logger.info(`[HotVibes loadPageData] Fetched and set VIP to Lead ID ${initialVipIdentifier}, identified as /topdf target.`);
                     } else {
+                         setVipLeadToShow(mappedVip);
                         logger.info(`[HotVibes loadPageData] Fetched and set VIP to: ${initialVipIdentifier}`);
                     }
                 } else {
@@ -300,15 +295,16 @@ function HotVibesClientContent() {
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
     setInitialVipIdentifier(lead.id); 
+    // Optional: Update URL to reflect the selected VIP lead, if desired
+    // router.push(`/hotvibes?lead_identifier=${lead.id}`, { scroll: false });
   };
 
   const handleBackToLobby = () => {
     logger.info(`[HotVibes] Returning to lobby view.`);
     setInitialVipIdentifier(null); 
     setVipLeadToShow(null); 
-    // Reset URL if it was a direct VIP link
     if (searchParamsHook.get('lead_identifier') || startParamPayload) {
-        router.replace('/hotvibes', undefined);
+        router.replace('/hotvibes', { scroll: false }); // Use replace to clean URL
     }
   };
   
@@ -338,7 +334,7 @@ function HotVibesClientContent() {
         specificMetadata = { page_link: "/topdf", tool_name: "AI Генератор PDF Отчетов" };
         cardTitle = personalityPdfGeneratorCardData.kwork_gig_title!;
         cardDescription = personalityPdfGeneratorCardData.ai_summary!;
-    } else { // Default for other leads
+    } else { 
         price = MISSION_SUPPORT_PRICE_XTR;
         cardType = "mission_support";
         specificMetadata = { 
@@ -349,12 +345,15 @@ function HotVibesClientContent() {
     }
     
     const cardDetails: ProtoCardDetails = {
-      cardId: cardToPurchase.id, // Use original lead ID for mission_support, or special ID for tools
+      cardId: cardToPurchase.id, 
       title: cardTitle,
       description: cardDescription,
       amountXTR: price,
       type: cardType,
-      metadata: specificMetadata,
+      metadata: {
+          ...specificMetadata,
+          photo_url: cardToPurchase.demo_image_url // Pass image URL for Telegram Invoice if available
+      },
     };
 
     try {
@@ -366,7 +365,7 @@ function HotVibesClientContent() {
             setTimeout(async () => {
                 logger.info("[HotVibes handlePurchaseProtoCard] Executing scheduled dbUser refresh.");
                 await refreshDbUser(); 
-            }, 7000); // Increased delay for payment processing
+            }, 7000); 
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -383,7 +382,6 @@ function HotVibesClientContent() {
       addToast("Аутентификация или профиль агента недоступны", "error"); return;
     }
 
-    // Handle special cards like PDF Generator or Elon Simulator
     if (leadId === PERSONALITY_REPORT_PDF_CARD_ID) {
         router.push("/topdf");
         return;
@@ -393,9 +391,8 @@ function HotVibesClientContent() {
         return;
     }
     
-    // Logic for regular missions
     const targetQuestId = questIdFromLead || "image-swap-mission";
-    if (targetQuestId === "none") { // Should be caught by above checks, but as a fallback
+    if (targetQuestId === "none") { 
         addToast("Эта карточка не является стандартной миссией.", "info");
         return;
     }
@@ -481,6 +478,11 @@ function HotVibesClientContent() {
               currentLang={currentLang}
               isMissionUnlocked={cyberProfile ? (vipLeadToShow.required_quest_id && vipLeadToShow.required_quest_id !== "none" ? checkQuestUnlocked(vipLeadToShow.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
               onExecuteMission={() => handleExecuteMission(vipLeadToShow.id, vipLeadToShow.required_quest_id)}
+              onSupportMission={() => handlePurchaseProtoCard(vipLeadToShow)} // Pass the lead to purchase
+              isSupported={getIsSupported(vipLeadToShow.id)} // Check if this specific VIP lead is supported
+              isPurchasePending={isPurchasePending}
+              translations={t}
+              isAuthenticated={isAuthenticated}
             />
           </motion.div>
         </div>
@@ -566,17 +568,17 @@ function HotVibesClientContent() {
                 <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
                   {displayedLeads.map((leadWithStatus) => {
                       const { isSpecial, isSupported, ...lead } = leadWithStatus;
-                      const isActuallySupported = getIsSupported(lead.id); // Re-check for dynamic updates
+                      const isActuallySupported = getIsSupported(lead.id); 
                       return (
                         <HotVibeCard
                           key={lead.id}
                           lead={lead}
                           isMissionUnlocked={cyberProfile ? (lead.required_quest_id && lead.required_quest_id !== "none" ? checkQuestUnlocked(lead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
                           onExecuteMission={() => handleExecuteMission(lead.id, lead.required_quest_id)}
-                          onSupportMission={() => handlePurchaseProtoCard(lead)}
+                          onSupportMission={() => handlePurchaseProtoCard(lead)} // Pass the specific lead to purchase
                           isSupported={isActuallySupported} 
                           isSpecial={!!isSpecial}   
-                          onViewVip={handleSelectLeadForVip} 
+                          onViewVip={handleSelectLeadForVip} // Passed correctly. Implementation of clickability is within HotVibeCard.tsx
                           currentLang={currentLang}
                           translations={t}
                           isPurchasePending={isPurchasePending}
