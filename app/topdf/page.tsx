@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
 import Image from 'next/image'; 
-import { PSYCHO_ANALYSIS_SYSTEM_PROMPT, REFINED_PERSONALITY_QUESTIONS_RU } from './psychoAnalysisPrompt'; // Import REFINED questions
+import { PSYCHO_ANALYSIS_SYSTEM_PROMPT, REFINED_PERSONALITY_QUESTIONS_RU } from './psychoAnalysisPrompt';
 import { purchaseProtoCardAction } from '../hotvibes/actions'; 
 import type { ProtoCardDetails } from '../hotvibes/actions';   
 import Link from 'next/link';
@@ -29,7 +29,7 @@ const translations: Record<string, Record<string, string>> = {
     "pageTitle": "AI PDF Report Generator ✨", 
     "pageSubtitle": "Generate a personalized PDF report. Input user data and answers, or analyze an XLSX with AI.", 
     "step1Title": "Step 1: User Data & Questions for AI",
-    "generateDemoQuestions": "Demo Q's & Data", // Shortened
+    "generateDemoQuestions": "Demo Q's & Data",
     "demoQuestionsGenerated": "Demo questions & user data prepared! Copied to Markdown area.",
     "userDataTitle": "User Data for Report", 
     "userNameLabel": "User's Name",
@@ -37,7 +37,7 @@ const translations: Record<string, Record<string, string>> = {
     "userGenderLabel": "User's Gender",
     "step2Title": "Step 2: Report Content (Paste AI Response or Final Answers)", 
     "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's final answers to questions):", 
-    "copyPromptAndData": "Copy AI Prompt", // Shortened
+    "copyPromptAndData": "Copy AI Prompt",
     "goToGemini": "Open Gemini AI Studio",
     "step3Title": "Step 3: Create & Send PDF",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
@@ -52,7 +52,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Processing failed. Please try again.",
     "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
     "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
-    "promptCopySuccess": "Full AI prompt (system + user data + questions) copied to clipboard!", 
+    "promptCopySuccess": "Full AI prompt (user data + system instructions) copied to clipboard!", 
     "promptCopyError": "Failed to copy. Please copy manually.",
     "unexpectedError": "An unexpected error occurred: %%ERROR%%",
     "loadingUser": "Loading user data...",
@@ -82,7 +82,7 @@ const translations: Record<string, Record<string, string>> = {
     "pageTitle": "AI Генератор PDF Отчетов ✨", 
     "pageSubtitle": "Создайте персонализированный PDF-отчет. Введите данные пользователя и ответы, или проанализируйте XLSX с помощью AI.", 
     "step1Title": "Шаг 1: Данные Пользователя и Вопросы для AI",
-    "generateDemoQuestions": "Демо-Вопросы и Данные", // Shortened
+    "generateDemoQuestions": "Демо-Вопросы и Данные",
     "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены! Скопированы в область Markdown.",
     "userDataTitle": "Данные Пользователя для Отчета", 
     "userNameLabel": "Имя пользователя",
@@ -90,7 +90,7 @@ const translations: Record<string, Record<string, string>> = {
     "userGenderLabel": "Пол пользователя",
     "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Финальные Ответы)", 
     "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или финальные ответы пользователя на вопросы):", 
-    "copyPromptAndData": "Копировать Промпт AI", // Shortened
+    "copyPromptAndData": "Копировать Промпт AI",
     "goToGemini": "Открыть Gemini AI Studio",
     "step3Title": "Шаг 3: Создать и Отправить PDF",
     "generateAndSendPdf": "PDF в Telegram",
@@ -105,7 +105,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
     "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
     "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
-    "promptCopySuccess": "Полный промпт для AI (система + данные + вопросы) скопирован в буфер обмена!", 
+    "promptCopySuccess": "Полный промпт для AI (данные пользователя + системные инструкции) скопирован в буфер обмена!", 
     "promptCopyError": "Не удалось скопировать. Скопируйте вручную.",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
@@ -330,7 +330,8 @@ export default function ToPdfPageWithPsychoFocus() {
                 return;
              }
         }
-        const fullTextForAI = `${PSYCHO_ANALYSIS_SYSTEM_PROMPT}\n\n${textForUserAndQuestions}`;
+        // Corrected order: User data first, then system prompt
+        const fullTextForAI = `${textForUserAndQuestions}\n\n---\n${PSYCHO_ANALYSIS_SYSTEM_PROMPT}`;
         
         navigator.clipboard.writeText(fullTextForAI)
             .then(() => toast.success(t('promptCopySuccess')))
@@ -462,7 +463,8 @@ export default function ToPdfPageWithPsychoFocus() {
             <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
                 <div className="relative w-full h-[50vh] -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden ">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 via-black/50 to-transparent"></div> {/* Fade to main card bg */}
+                    {/* Adjusted fade to match card background */}
+                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/75 via-black/50 to-transparent"></div> 
                 </div>
                 
                 <h1 
@@ -476,7 +478,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
                  <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-blue-glow/40 transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
-                        <VibeContentRenderer content="::FaUserCog::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
+                        <VibeContentRenderer content="::FaUserCog::" className="mr-2 w-5 h-5"/>
                         {t("step1Title")}
                     </h2>
                     <div className="space-y-3 sm:space-y-4">
@@ -495,14 +497,14 @@ export default function ToPdfPageWithPsychoFocus() {
                             </div>
                         </div>
                         <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
-                            <VibeContentRenderer content="::FaQuestionCircle::" className="mr-2"/>{t("generateDemoQuestions")}
+                            <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")} {/* Icon changed */}
                         </Button>
                     </div>
                 </div>
 
                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-cyan-glow/40 transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-cyan mb-3 sm:mb-4 flex items-center">
-                        <VibeContentRenderer content="::FaPencilAlt::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
+                        <VibeContentRenderer content="::FaPencilAlt::" className="mr-2 w-5 h-5"/>
                         {t("step2Title")}
                     </h2>
                      <label htmlFor="markdownInput" className="text-sm text-gray-300 block mt-2 mb-1.5">{t("pasteMarkdown")}</label>
@@ -531,7 +533,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 
                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/70 rounded-xl bg-slate-800/70 shadow-md hover:shadow-pink-glow/40 transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
                      <h2 className="text-lg sm:text-xl font-semibold text-brand-pink mb-3 sm:mb-4 flex items-center">
-                        <VibeContentRenderer content="::FaFileDownload::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
+                        <VibeContentRenderer content="::FaFileDownload::" className="mr-2 w-5 h-5"/>
                         {t("step3Title")}
                      </h2>
                     <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/70 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
@@ -550,7 +552,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
                 <details className="mt-8 pt-6 border-t border-slate-700/60 group">
                     <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-300 transition-colors font-semibold flex items-center gap-2">
-                        <VibeContentRenderer content="::FaFileImport::"/> {/* Icon changed */}
+                        <VibeContentRenderer content="::FaFileImport::" />
                         {t("xlsxUploadOptionalTitle")}
                         <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
                     </summary>
