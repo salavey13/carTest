@@ -463,8 +463,7 @@ export default function ToPdfPageWithPsychoFocus() {
             <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
                 <div className="relative w-full h-[50vh] -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden ">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    {/* Adjusted fade to match card background */}
-                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/75 via-black/50 to-transparent"></div> 
+                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[hsl(var(--card-rgb))] via-[hsl(var(--card-rgb)/0.7)] to-transparent"></div> 
                 </div>
                 
                 <h1 
@@ -497,7 +496,7 @@ export default function ToPdfPageWithPsychoFocus() {
                             </div>
                         </div>
                         <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
-                            <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")} {/* Icon changed */}
+                            <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")}
                         </Button>
                     </div>
                 </div>
