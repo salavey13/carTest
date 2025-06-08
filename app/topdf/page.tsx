@@ -11,10 +11,9 @@ import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button"; 
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
-import Image from 'next/image'; // Для Hero Image
+import Image from 'next/image'; 
 
-// --- Hero Image Placeholder ---
-const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v1.png"; // Замени на свой URL
+const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v2.png"; 
 
 const translations: Record<string, Record<string, string>> = {
   en: {
@@ -34,8 +33,8 @@ const translations: Record<string, Record<string, string>> = {
     "step3Title": "Step 3: Create & Send PDF",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
     "processing": "Processing...",
-    "parsingXlsx": "Parsing XLSX...", // Keep for optional XLSX flow
-    "generatingPrompt": "Generating AI Prompt...", // Keep for optional XLSX flow
+    "parsingXlsx": "Parsing XLSX...", 
+    "generatingPrompt": "Generating AI Prompt...", 
     "generatingPdf": "Generating PDF Report...",
     "sendingPdf": "Sending PDF to Telegram...",
     "errorNoUser": "User information not available. Please ensure you are logged in via Telegram.",
@@ -77,8 +76,8 @@ const translations: Record<string, Record<string, string>> = {
     "step3Title": "Шаг 3: Создать и Отправить PDF",
     "generateAndSendPdf": "PDF в Telegram",
     "processing": "Обработка...",
-    "parsingXlsx": "Парсинг XLSX...", // Оставляем для опционального XLSX
-    "generatingPrompt": "Генерация AI Промпта...", // Оставляем для опционального XLSX
+    "parsingXlsx": "Парсинг XLSX...", 
+    "generatingPrompt": "Генерация AI Промпта...", 
     "generatingPdf": "Генерация PDF Отчета...",
     "sendingPdf": "Отправка PDF в Telegram...",
     "errorNoUser": "Информация о пользователе недоступна. Убедитесь, что вы авторизованы через Telegram.",
@@ -135,13 +134,75 @@ const generateDemoPsychoQuestions = (userName?: string, userAge?: string, userGe
     return questions;
 };
 
+const handleXlsxFileAndPreparePromptInternal = async (
+    file: File, 
+    currentUserName: string, 
+    currentUserAge: string, 
+    currentUserGender: string,
+    translateFunc: (key: string, replacements?: Record<string, string | number>) => string,
+    setLoadingFunc: (loading: boolean) => void,
+    setStatusMsgFunc: (message: string) => void
+): Promise<{ success: boolean, prompt?: string, error?: string}> => {
+    setLoadingFunc(true); 
+    setStatusMsgFunc(translateFunc('parsingXlsx'));
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
+
+        setStatusMsgFunc(translateFunc('generatingPrompt'));
+        const promptForAI = `Ты — высококвалифицированный AI-аналитик. Твоя задача — проанализировать предоставленные данные из отчета (возможно, XLSX) и составить подробное резюме в формате Markdown.
+ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
+
+Исходное имя файла отчета (если был загружен): "${file.name}".
+Данные взяты с листа (если был загружен): "${firstSheetName}".
+
+Информация о пользователе (если предоставлена):
+Имя: ${currentUserName || "Не указано"}
+Возраст: ${currentUserAge || "Не указан"}
+Пол: ${currentUserGender || "Не указан"}
+
+**Запрос на Анализ (если есть данные из файла):**
+Пожалуйста, проведи тщательный анализ данных ниже. Сконцентрируйся на следующем:
+1.  **Краткое резюме (Executive Summary):** Сжатый (3-5 предложений) обзор ключевой информации из данных.
+2.  **Основные тезисы и наблюдения:** Выдели значительные моменты. Используй маркированные списки.
+3.  **Потенциальные инсайты:** Какие интересные закономерности или выводы можно сделать?
+
+**Если данные из файла НЕ предоставлены, или ты анализируешь другой текст (например, ответы на вопросы, вставленные пользователем):**
+Составь структурированный отчет на основе предоставленного текста в поле "Содержимое Отчета". Учитывай информацию о пользователе (имя, возраст, пол), если она есть. Отчет должен быть в формате Markdown на русском языке.
+
+**Требования к формату вывода (Markdown на русском языке):**
+- Используй заголовки (например, \`# Расшифровка для ${currentUserName || 'Пользователя'}\`, \`## Ответы на вопросы\`).
+- Используй маркированные списки (\`* \` или \`- \`).
+- Используй выделение жирным шрифтом (\`**текст**\`).
+
+**Данные из XLSX (если были загружены, могут быть усечены):**
+\`\`\`csv
+${csvDataString.substring(0, 15000)} 
+\`\`\`
+
+Пожалуйста, предоставь подробный и содержательный отчет.
+`;
+        return { success: true, prompt: promptForAI };
+    } catch (error) {
+        logger.error("Error parsing XLSX for AI prompt:", error);
+        return { success: false, error: (error as Error).message };
+    } finally {
+        setLoadingFunc(false);
+    }
+};
+
+
 export default function ToPdfPageWithPsychoFocus() {
     const { user, isAuthLoading } = useAppContext();
     const [selectedFile, setSelectedFile] = useState<File | null>(null); 
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
-    const [generatedDataForAI, setGeneratedDataForAI] = useState<string>(''); // Stores user data + questions
-    const [markdownInput, setMarkdownInput] = useState<string>(''); // For AI response or direct answers
+    const [generatedDataForAI, setGeneratedDataForAI] = useState<string>('');
+    const [markdownInput, setMarkdownInput] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [userName, setUserName] = useState<string>('');
@@ -172,20 +233,44 @@ export default function ToPdfPageWithPsychoFocus() {
         setStatusMessage(t('readyForUserData'));
     }, [t, currentLang]);
 
+    const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            setSelectedFile(null); setGeneratedDataForAI(''); setStatusMessage(t('noFileSelected'));
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
+        }
+        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) {
+            toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
+        }
+        setSelectedFile(file);
+        const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
+        if(result.success && result.prompt){
+            setGeneratedDataForAI(result.prompt);
+            setStatusMessage(t('promptGenerated'));
+            toast.success(t('promptGenerated'));
+        } else {
+            toast.error(t('unexpectedError', { ERROR: result.error || 'Failed to process XLSX' }));
+            setStatusMessage(t('readyForUserData'));
+        }
+    };
+
     const handleGenerateDemoQuestions = () => {
         const questions = generateDemoPsychoQuestions(userName, userAge, userGender);
         setGeneratedDataForAI(questions);
-        setMarkdownInput(questions); // Pre-fill markdown input with questions
+        setMarkdownInput(questions); 
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
     };
     
     const handleCopyToClipboard = () => {
-        if (!generatedDataForAI.trim() && !markdownInput.trim()) {
-            toast.info("Сначала сгенерируйте демо-вопросы или введите текст отчета.");
+        const textToCopy = generatedDataForAI.trim() || markdownInput.trim();
+        if (!textToCopy) {
+            toast.info(currentLang === 'ru' ? "Сначала введите данные пользователя и сгенерируйте вопросы, или введите текст отчета." : "First, enter user data and generate demo questions, or input report content.");
             return;
         }
-        const textToCopy = generatedDataForAI.trim() || markdownInput.trim(); // Prefer generated questions if available
         navigator.clipboard.writeText(textToCopy)
             .then(() => toast.success(t('promptCopySuccess')))
             .catch(err => {
@@ -198,7 +283,7 @@ export default function ToPdfPageWithPsychoFocus() {
         if (!markdownInput.trim()) { toast.error(t('errorNoMarkdown')); return; }
         if (!user?.id) { toast.error(t('errorNoUser')); return; }
         
-        const reportFileNameBase = selectedFile?.name || (userName ? `Расшифровка_${userName.replace(/\s/g, '_')}` : "Отчет_Расшифровка");
+        const reportFileNameBase = selectedFile?.name || (userName ? `Расшифровка_${userName.replace(/\s/g, '_')}` : "Отчет_Расшифровка_Личности");
 
         setIsLoading(true); setStatusMessage(t('generatingPdf'));
 
@@ -247,49 +332,50 @@ export default function ToPdfPageWithPsychoFocus() {
                 </button> 
             </div>
 
-            <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border border-brand-purple/50 rounded-xl bg-black/60 backdrop-blur-md shadow-2xl shadow-brand-purple/40">
-                <div className="relative w-full h-40 sm:h-48 md:h-56 mb-4 sm:mb-6 rounded-lg overflow-hidden border-2 border-brand-pink/30 shadow-lg">
-                    <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-80"/>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
+            <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/60 rounded-xl bg-black/70 backdrop-blur-lg shadow-2xl shadow-brand-purple/50">
+                <div className="relative w-full h-40 sm:h-48 md:h-56 mb-4 sm:mb-6 rounded-lg overflow-hidden border-2 border-brand-pink/40 shadow-lg shadow-pink-glow">
+                    <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10"></div>
                 </div>
                 
                 <h1 
-                    className="font-sans text-3xl sm:text-4xl md:text-5xl font-extrabold text-center mb-2 sm:mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400" 
-                    style={{filter: "drop-shadow(0 0 8px hsl(var(--brand-pink)))"}}
+                    className="font-orbitron text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-2 sm:mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 animate-glitch" 
+                    data-text={t("pageTitle")}
+                    style={{filter: "drop-shadow(0 0 10px hsl(var(--brand-pink))) drop-shadow(0 0 5px hsl(var(--brand-cyan)/0.7))"}}
                 >
                     {t("pageTitle")}
                 </h1>
                 <p className="text-sm sm:text-base text-center text-gray-300 mb-8 sm:mb-10">{t("pageSubtitle")}</p>
 
-                {/* User Data Inputs */}
-                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/50 rounded-xl mb-6 sm:mb-8 bg-slate-800/50 shadow-md")}>
+                {/* User Data Inputs & Demo Questions */}
+                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/60 rounded-xl mb-6 sm:mb-8 bg-slate-800/60 shadow-md hover:shadow-blue-glow transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
                         <VibeContentRenderer content="::FaUserEdit::" className="mr-2 w-5 h-5"/>
-                        {t("userDataTitle")}
+                        {t("step1Title")}
                     </h2>
                     <div className="space-y-3 sm:space-y-4">
                         <div>
                             <Label htmlFor="userName" className="text-xs text-gray-400">{t("userNameLabel")}</Label>
-                            <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Иван Иванов" className="w-full p-2 text-sm bg-slate-700/60 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                            <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Иван Иванов" className="w-full p-2 text-sm bg-slate-700/70 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                         </div>
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             <div>
                                 <Label htmlFor="userAge" className="text-xs text-gray-400">{t("userAgeLabel")}</Label>
-                                <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full p-2 text-sm bg-slate-700/60 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                                <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full p-2 text-sm bg-slate-700/70 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                             <div>
                                 <Label htmlFor="userGender" className="text-xs text-gray-400">{t("userGenderLabel")}</Label>
-                                <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder="Мужчина/Женщина" className="w-full p-2 text-sm bg-slate-700/60 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                                <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder="Мужчина/Женщина" className="w-full p-2 text-sm bg-slate-700/70 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                         </div>
-                        <Button onClick={handleGenerateDemoQuestions} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm">
+                        <Button onClick={handleGenerateDemoQuestions} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/30">
                             <VibeContentRenderer content="::FaQuestionCircle::" className="mr-2"/>{t("generateDemoQuestions")}
                         </Button>
                     </div>
                 </div>
 
-                {/* Markdown Input */}
-                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/50 rounded-xl mb-6 sm:mb-8 bg-slate-800/50 shadow-md")}>
+                {/* Markdown Input for AI Response / Answers */}
+                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/60 rounded-xl mb-6 sm:mb-8 bg-slate-800/60 shadow-md hover:shadow-cyan-glow transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-cyan mb-3 sm:mb-4 flex items-center">
                         <VibeContentRenderer content="::FaKeyboard::" className="mr-2 w-5 h-5"/>
                         {t("step2Title")}
@@ -299,17 +385,17 @@ export default function ToPdfPageWithPsychoFocus() {
                         id="markdownInput"
                         value={markdownInput}
                         onChange={(e) => setMarkdownInput(e.target.value)}
-                        placeholder={currentLang === 'ru' ? "Пример:\n# Расшифровка для Ивана\n\n**Возраст:** 30\n**Пол:** Мужчина\n\n## Ответы на вопросы:\n* 1. Опишите себя тремя словами.\n  *Ответ:* Креативный, добрый, умный.\n* 2. ..." : "Example:\n# Report for John\n\n**Age:** 30\n**Gender:** Male\n\n## Question Answers:\n* 1. Describe yourself in three words.\n  *Answer:* Creative, kind, smart.\n* 2. ..."}
+                        placeholder={currentLang === 'ru' ? "Вставьте сюда ответы на вопросы или текст отчета от AI..." : "Paste user's answers or AI report content here..."}
                         rows={12}
-                        className="w-full p-2.5 sm:p-3 border rounded-md bg-slate-900/60 border-slate-600 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-xs sm:text-sm simple-scrollbar shadow-sm"
+                        className="w-full p-2.5 sm:p-3 border rounded-md bg-slate-900/70 border-slate-600 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-xs sm:text-sm simple-scrollbar shadow-sm"
                         disabled={isLoading}
                     />
                     {(generatedDataForAI || markdownInput) && (
                         <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                             <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-xs sm:text-sm">
+                             <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-cyan-glow/20">
                                 <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")}
                             </Button>
-                            <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-xs sm:text-sm">
+                            <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-blue-glow/20">
                               <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" >
                                 <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToGemini")}
                               </a>
@@ -319,12 +405,12 @@ export default function ToPdfPageWithPsychoFocus() {
                 </div>
                 
                 {/* Generate PDF */}
-                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/50 rounded-xl bg-slate-800/50 shadow-md", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
+                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/60 rounded-xl bg-slate-800/60 shadow-md hover:shadow-pink-glow transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
                      <h2 className="text-lg sm:text-xl font-semibold text-brand-pink mb-3 sm:mb-4 flex items-center">
                         <VibeContentRenderer content="::FaFilePdf::" className="mr-2 w-5 h-5"/>
                         {t("step3Title")}
                      </h2>
-                    <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white hover:shadow-purple-500/50 hover:brightness-110 focus:ring-purple-500 shadow-lg transition-all duration-200", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
+                    <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/60 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
                         {isLoading
                             ? (<span className="flex items-center justify-center text-sm">
                                 <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2.5'::" /> {statusMessage || t('processing')}
@@ -338,18 +424,18 @@ export default function ToPdfPageWithPsychoFocus() {
                    {t('status')}: {isLoading ? statusMessage : (!markdownInput.trim() ? t('readyForUserData') : t('readyForPdf'))}
                 </div>
 
-                {/* Optional XLSX Upload Section */}
-                <details className="mt-8 pt-6 border-t border-slate-700/50">
+                {/* Optional XLSX Upload Section (Kept for flexibility) */}
+                <details className="mt-8 pt-6 border-t border-slate-700/50 group">
                     <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-300 transition-colors font-semibold flex items-center gap-2">
                         <VibeContentRenderer content="::FaFileExcel::"/>
                         {t("xlsxUploadOptionalTitle")}
                         <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
                     </summary>
                     <div className="mt-4 p-4 sm:p-5 border-2 border-dashed border-brand-yellow/30 rounded-xl bg-slate-800/30 shadow-inner">
-                        <label htmlFor="xlsxFile" className={cn("w-full flex flex-col items-center justify-center px-4 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/50 hover:border-brand-yellow text-brand-yellow/80 hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/5")}>
+                        <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/50 hover:border-brand-yellow text-brand-yellow/80 hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/5")}>
                             <VibeContentRenderer content="::FaCloudUploadAlt::" className="text-2xl mb-1.5" />
                             <span className="font-medium text-xs">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
-                            <input id="xlsxFile" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleFileChangeAndPreparePrompt} className="sr-only" disabled={isLoading} />
+                            <input id="xlsxFileOptional" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleXlsxFileChange} className="sr-only" disabled={isLoading} />
                         </label>
                     </div>
                 </details>
