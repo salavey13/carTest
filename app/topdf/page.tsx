@@ -13,22 +13,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label'; 
 import Image from 'next/image'; 
 
-const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v2.png"; 
+const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png"; 
 
 const translations: Record<string, Record<string, string>> = {
   en: {
     "pageTitle": "AI PDF Report Generator ✨", 
     "pageSubtitle": "Generate a personalized PDF report. Input user data and answers, or analyze an XLSX with AI.", 
-    "step1Title": "Step 1: User Data & Questions",
-    "generateDemoQuestions": "Generate Demo Questions + Data for AI",
-    "demoQuestionsGenerated": "Demo questions & user data prepared for AI!",
+    "step1Title": "Step 1: User Data & Questions for AI",
+    "generateDemoQuestions": "Generate Demo Questions & AI Prompt",
+    "demoQuestionsGenerated": "Demo questions & AI prompt prepared!",
     "userDataTitle": "User Data for Report", 
     "userNameLabel": "User's Name",
     "userAgeLabel": "User's Age",
     "userGenderLabel": "User's Gender",
-    "step2Title": "Step 2: Report Content (Paste AI Response or Answers)", 
-    "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's answers to questions):", 
-    "copyPromptAndData": "Copy Data for AI",
+    "step2Title": "Step 2: Report Content (Paste AI Response or Final Answers)", 
+    "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's final answers to questions):", 
+    "copyPromptAndData": "Copy Prompt & Data for AI",
     "goToGemini": "Open Gemini AI Studio",
     "step3Title": "Step 3: Create & Send PDF",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
@@ -43,7 +43,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Processing failed. Please try again.",
     "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
     "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
-    "promptCopySuccess": "Data for AI copied to clipboard!",
+    "promptCopySuccess": "Prompt & data for AI copied to clipboard!",
     "promptCopyError": "Failed to copy. Please copy manually.",
     "unexpectedError": "An unexpected error occurred: %%ERROR%%",
     "loadingUser": "Loading user data...",
@@ -62,16 +62,16 @@ const translations: Record<string, Record<string, string>> = {
   ru: {
     "pageTitle": "AI Генератор PDF Отчетов ✨", 
     "pageSubtitle": "Создайте персонализированный PDF-отчет. Введите данные пользователя и ответы, или проанализируйте XLSX с помощью AI.", 
-    "step1Title": "Шаг 1: Данные Пользователя и Вопросы",
-    "generateDemoQuestions": "Сгенерировать Демо-Вопросы + Данные для AI",
-    "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены для AI!",
+    "step1Title": "Шаг 1: Данные Пользователя и Вопросы для AI",
+    "generateDemoQuestions": "Сгенерировать Демо-Вопросы и Промпт для AI",
+    "demoQuestionsGenerated": "Демо-вопросы и промпт для AI подготовлены!",
     "userDataTitle": "Данные Пользователя для Отчета", 
     "userNameLabel": "Имя пользователя",
     "userAgeLabel": "Возраст пользователя",
     "userGenderLabel": "Пол пользователя",
-    "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Ответы на Вопросы)", 
-    "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или ответы пользователя на вопросы):", 
-    "copyPromptAndData": "Копировать Данные для AI",
+    "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Финальные Ответы)", 
+    "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или финальные ответы пользователя на вопросы):", 
+    "copyPromptAndData": "Копировать Промпт и Данные для AI",
     "goToGemini": "Открыть Gemini AI Studio",
     "step3Title": "Шаг 3: Создать и Отправить PDF",
     "generateAndSendPdf": "PDF в Telegram",
@@ -86,7 +86,7 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
     "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
     "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
-    "promptCopySuccess": "Данные для AI скопированы в буфер обмена!",
+    "promptCopySuccess": "Промпт и данные для AI скопированы в буфер обмена!",
     "promptCopyError": "Не удалось скопировать. Скопируйте вручную.",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
@@ -107,94 +107,58 @@ const translations: Record<string, Record<string, string>> = {
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const generateDemoPsychoQuestions = (userName?: string, userAge?: string, userGender?: string): string => {
+const generateFullPromptForAI = (userName?: string, userAge?: string, userGender?: string): string => {
     const name = userName || "Пользователь";
-    let questions = `# Расшифровка Личности для ${name}\n\n`;
-    if (userAge) questions += `**Возраст:** ${userAge}\n`;
-    if (userGender) questions += `**Пол:** ${userGender}\n\n`;
-    questions += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
-    const demoQuestions = [
-        "1. Опишите себя тремя словами.",
-        "2. Какое ваше самое яркое детское воспоминание и почему?",
-        "3. Что для вас значит успех?",
-        "4. Если бы вы могли изменить одну вещь в мире, что бы это было?",
-        "5. Какая книга или фильм оказали на вас наибольшее влияние и почему?",
-        "6. Что вас больше всего вдохновляет?",
-        "7. Как вы справляетесь со стрессом или трудностями?",
-        "8. Опишите идеальный для вас день.",
-        "9. Какие качества вы больше всего цените в других людях?",
-        "10. Какая ваша самая большая мечта или цель в жизни на данный момент?",
-        "11. Что бы вы посоветовали себе 10-летней давности?",
-        "12. В какой ситуации вы чувствуете себя наиболее комфортно и уверенно?",
-        "13. Есть ли у вас хобби или увлечение, которое много для вас значит? Расскажите о нем.",
-        "14. Как вы видите себя через 5 лет?",
-        "15. Если бы вам нужно было выбрать саундтрек к вашей жизни, какая песня это была бы и почему?"
-    ];
-    questions += demoQuestions.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
-    return questions;
-};
+    let fullPrompt = `**Системный Промпт для AI (Gemini/Claude/ChatGPT):**
+Ты — эмпатичный AI-психолог и аналитик личности. Твоя задача — на основе предоставленных данных о пользователе и его ответов на 15 вопросов составить глубокую, но позитивную и вдохновляющую "расшифровку личности". Отчет должен быть структурирован, легок для восприятия и полезен пользователю для самопознания.
+ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ и в формате Markdown.
 
-const handleXlsxFileAndPreparePromptInternal = async (
-    file: File, 
-    currentUserName: string, 
-    currentUserAge: string, 
-    currentUserGender: string,
-    translateFunc: (key: string, replacements?: Record<string, string | number>) => string,
-    setLoadingFunc: (loading: boolean) => void,
-    setStatusMsgFunc: (message: string) => void
-): Promise<{ success: boolean, prompt?: string, error?: string}> => {
-    setLoadingFunc(true); 
-    setStatusMsgFunc(translateFunc('parsingXlsx'));
+**Информация о пользователе:**
+Имя: ${userName || "Не указано"}
+Возраст: ${userAge || "Не указан"}
+Пол: ${userGender || "Не указан"}
 
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
-
-        setStatusMsgFunc(translateFunc('generatingPrompt'));
-        const promptForAI = `Ты — высококвалифицированный AI-аналитик. Твоя задача — проанализировать предоставленные данные из отчета (возможно, XLSX) и составить подробное резюме в формате Markdown.
-ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
-
-Исходное имя файла отчета (если был загружен): "${file.name}".
-Данные взяты с листа (если был загружен): "${firstSheetName}".
-
-Информация о пользователе (если предоставлена):
-Имя: ${currentUserName || "Не указано"}
-Возраст: ${currentUserAge || "Не указан"}
-Пол: ${currentUserGender || "Не указан"}
-
-**Запрос на Анализ (если есть данные из файла):**
-Пожалуйста, проведи тщательный анализ данных ниже. Сконцентрируйся на следующем:
-1.  **Краткое резюме (Executive Summary):** Сжатый (3-5 предложений) обзор ключевой информации из данных.
-2.  **Основные тезисы и наблюдения:** Выдели значительные моменты. Используй маркированные списки.
-3.  **Потенциальные инсайты:** Какие интересные закономерности или выводы можно сделать?
-
-**Если данные из файла НЕ предоставлены, или ты анализируешь другой текст (например, ответы на вопросы, вставленные пользователем):**
-Составь структурированный отчет на основе предоставленного текста в поле "Содержимое Отчета". Учитывай информацию о пользователе (имя, возраст, пол), если она есть. Отчет должен быть в формате Markdown на русском языке.
+**Инструкции для отчета:**
+1.  **Общее Впечатление и Ключевые Черты (Markdown Заголовок \`## Общее впечатление и ключевые черты\`):**
+    *   Начни с теплого приветствия.
+    *   Основываясь на ответах, выдели 3-5 наиболее ярких положительных черт личности. Опиши каждую кратко.
+    *   Дай общую позитивную характеристику.
+2.  **Анализ Ответов по Темам (Markdown Заголовок \`## Анализ ответов по темам\`):**
+    *   Сгруппируй вопросы и ответы по возможным темам (например, "Ценности и Убеждения", "Отношение к Успеху и Трудностям", "Самовосприятие и Мечты", "Взаимодействие с Миром").
+    *   Для каждой темы дай краткий анализ ответов, подсвечивая интересные моменты и возможные интерпретации. Избегай категоричных суждений, используй мягкие формулировки ("возможно, это указывает на...", "складывается впечатление, что...").
+3.  **Потенциальные Сильные Стороны и Ресурсы (Markdown Заголовок \`## Ваши сильные стороны и ресурсы\`):**
+    *   Перечисли выявленные сильные стороны, которые могут помочь пользователю в достижении целей.
+4.  **Рекомендации для Саморазвития (Markdown Заголовок \`## Направления для дальнейшего роста\`):**
+    *   Предложи 1-3 мягкие, конструктивные рекомендации или вопросы для дальнейшего самоанализа, основанные на ответах.
+5.  **Вдохновляющее Заключение (Markdown Заголовок \`### Заключение\`):**
+    *   Заверши отчет позитивным и мотивирующим посланием.
 
 **Требования к формату вывода (Markdown на русском языке):**
-- Используй заголовки (например, \`# Расшифровка для ${currentUserName || 'Пользователя'}\`, \`## Ответы на вопросы\`).
-- Используй маркированные списки (\`* \` или \`- \`).
-- Используй выделение жирным шрифтом (\`**текст**\`).
+- Используй заголовки Markdown (\`#\`, \`##\`, \`###\`).
+- Используй маркированные списки (\`* \` или \`- \`) для перечислений.
+- Используй выделение жирным шрифтом (\`**текст**\`) и курсивом (\`*текст*\`) для акцентов.
 
-**Данные из XLSX (если были загружены, могут быть усечены):**
-\`\`\`csv
-${csvDataString.substring(0, 15000)} 
-\`\`\`
+---
+**ДАННЫЕ ОТ ПОЛЬЗОВАТЕЛЯ ДЛЯ АНАЛИЗА:**
 
-Пожалуйста, предоставь подробный и содержательный отчет.
+# Расшифровка Личности для ${name}
 `;
-        return { success: true, prompt: promptForAI };
-    } catch (error) {
-        logger.error("Error parsing XLSX for AI prompt:", error);
-        return { success: false, error: (error as Error).message };
-    } finally {
-        setLoadingFunc(false);
-    }
+    if (userAge) fullPrompt += `**Возраст:** ${userAge}\n`;
+    if (userGender) fullPrompt += `**Пол:** ${userGender}\n\n`;
+    fullPrompt += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
+    
+    const demoQuestions = [
+        "1. Опишите себя тремя словами.", "2. Какое ваше самое яркое детское воспоминание и почему?", "3. Что для вас значит успех?",
+        "4. Если бы вы могли изменить одну вещь в мире, что бы это было?", "5. Какая книга или фильм оказали на вас наибольшее влияние и почему?",
+        "6. Что вас больше всего вдохновляет?", "7. Как вы справляетесь со стрессом или трудностями?", "8. Опишите идеальный для вас день.",
+        "9. Какие качества вы больше всего цените в других людях?", "10. Какая ваша самая большая мечта или цель в жизни на данный момент?",
+        "11. Что бы вы посоветовали себе 10-летней давности?", "12. В какой ситуации вы чувствуете себя наиболее комфортно и уверенно?",
+        "13. Есть ли у вас хобби или увлечение, которое много для вас значит? Расскажите о нем.", "14. Как вы видите себя через 5 лет?",
+        "15. Если бы вам нужно было выбрать саундтрек к вашей жизни, какая песня это была бы и почему?"
+    ];
+    fullPrompt += demoQuestions.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
+    return fullPrompt;
 };
-
 
 export default function ToPdfPageWithPsychoFocus() {
     const { user, isAuthLoading } = useAppContext();
@@ -233,42 +197,18 @@ export default function ToPdfPageWithPsychoFocus() {
         setStatusMessage(t('readyForUserData'));
     }, [t, currentLang]);
 
-    const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) {
-            setSelectedFile(null); setGeneratedDataForAI(''); setStatusMessage(t('noFileSelected'));
-            return;
-        }
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
-        }
-        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) {
-            toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
-        }
-        setSelectedFile(file);
-        const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
-        if(result.success && result.prompt){
-            setGeneratedDataForAI(result.prompt);
-            setStatusMessage(t('promptGenerated'));
-            toast.success(t('promptGenerated'));
-        } else {
-            toast.error(t('unexpectedError', { ERROR: result.error || 'Failed to process XLSX' }));
-            setStatusMessage(t('readyForUserData'));
-        }
-    };
-
-    const handleGenerateDemoQuestions = () => {
-        const questions = generateDemoPsychoQuestions(userName, userAge, userGender);
-        setGeneratedDataForAI(questions);
-        setMarkdownInput(questions); 
+    const handleGenerateDemoQuestionsAndPrompt = () => {
+        const fullPromptText = generateFullPromptForAI(userName, userAge, userGender);
+        setGeneratedDataForAI(fullPromptText);
+        setMarkdownInput(fullPromptText); 
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
     };
     
     const handleCopyToClipboard = () => {
-        const textToCopy = generatedDataForAI.trim() || markdownInput.trim();
+        const textToCopy = generatedDataForAI.trim();
         if (!textToCopy) {
-            toast.info(currentLang === 'ru' ? "Сначала введите данные пользователя и сгенерируйте вопросы, или введите текст отчета." : "First, enter user data and generate demo questions, or input report content.");
+            toast.info(currentLang === 'ru' ? "Сначала сгенерируйте данные для AI." : "First, generate data for AI.");
             return;
         }
         navigator.clipboard.writeText(textToCopy)
@@ -324,7 +264,7 @@ export default function ToPdfPageWithPsychoFocus() {
     }
 
     return (
-        <div className={cn("min-h-screen flex flex-col items-center pt-16 sm:pt-20 pb-10", "bg-gradient-to-br from-gray-900 via-purple-950 to-blue-950 text-gray-100 px-4 font-mono")}>
+        <div className={cn("min-h-screen flex flex-col items-center pt-16 sm:pt-20 pb-10", "bg-gradient-to-br from-slate-800 via-purple-900 to-blue-900 text-gray-100 px-4 font-mono")}>
             <Toaster position="bottom-center" richColors toastOptions={{ className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm' }} />
             <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"> 
                 <button onClick={toggleLang} className="p-1.5 sm:p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> 
@@ -332,10 +272,10 @@ export default function ToPdfPageWithPsychoFocus() {
                 </button> 
             </div>
 
-            <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/60 rounded-xl bg-black/70 backdrop-blur-lg shadow-2xl shadow-brand-purple/50">
-                <div className="relative w-full h-40 sm:h-48 md:h-56 mb-4 sm:mb-6 rounded-lg overflow-hidden border-2 border-brand-pink/40 shadow-lg shadow-pink-glow">
+            <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
+                <div className="relative w-full h-40 sm:h-48 md:h-56 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-lg overflow-hidden shadow-lg shadow-pink-glow/70">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/0"></div>
                 </div>
                 
                 <h1 
@@ -347,8 +287,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 </h1>
                 <p className="text-sm sm:text-base text-center text-gray-300 mb-8 sm:mb-10">{t("pageSubtitle")}</p>
 
-                {/* User Data Inputs & Demo Questions */}
-                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/60 rounded-xl mb-6 sm:mb-8 bg-slate-800/60 shadow-md hover:shadow-blue-glow transition-shadow duration-300")}>
+                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-blue-glow/40 transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
                         <VibeContentRenderer content="::FaUserEdit::" className="mr-2 w-5 h-5"/>
                         {t("step1Title")}
@@ -356,26 +295,25 @@ export default function ToPdfPageWithPsychoFocus() {
                     <div className="space-y-3 sm:space-y-4">
                         <div>
                             <Label htmlFor="userName" className="text-xs text-gray-400">{t("userNameLabel")}</Label>
-                            <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Иван Иванов" className="w-full p-2 text-sm bg-slate-700/70 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                            <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Иван Иванов" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                         </div>
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             <div>
                                 <Label htmlFor="userAge" className="text-xs text-gray-400">{t("userAgeLabel")}</Label>
-                                <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full p-2 text-sm bg-slate-700/70 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                                <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                             <div>
                                 <Label htmlFor="userGender" className="text-xs text-gray-400">{t("userGenderLabel")}</Label>
-                                <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder="Мужчина/Женщина" className="w-full p-2 text-sm bg-slate-700/70 border-slate-600 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                                <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder="Мужчина/Женщина" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                         </div>
-                        <Button onClick={handleGenerateDemoQuestions} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/30">
+                        <Button onClick={handleGenerateDemoQuestions} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
                             <VibeContentRenderer content="::FaQuestionCircle::" className="mr-2"/>{t("generateDemoQuestions")}
                         </Button>
                     </div>
                 </div>
 
-                {/* Markdown Input for AI Response / Answers */}
-                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/60 rounded-xl mb-6 sm:mb-8 bg-slate-800/60 shadow-md hover:shadow-cyan-glow transition-shadow duration-300")}>
+                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-cyan-glow/40 transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-cyan mb-3 sm:mb-4 flex items-center">
                         <VibeContentRenderer content="::FaKeyboard::" className="mr-2 w-5 h-5"/>
                         {t("step2Title")}
@@ -387,15 +325,15 @@ export default function ToPdfPageWithPsychoFocus() {
                         onChange={(e) => setMarkdownInput(e.target.value)}
                         placeholder={currentLang === 'ru' ? "Вставьте сюда ответы на вопросы или текст отчета от AI..." : "Paste user's answers or AI report content here..."}
                         rows={12}
-                        className="w-full p-2.5 sm:p-3 border rounded-md bg-slate-900/70 border-slate-600 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-xs sm:text-sm simple-scrollbar shadow-sm"
+                        className="w-full p-2.5 sm:p-3 border rounded-md bg-slate-900/80 border-slate-600/70 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-xs sm:text-sm simple-scrollbar shadow-sm"
                         disabled={isLoading}
                     />
                     {(generatedDataForAI || markdownInput) && (
                         <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                             <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-cyan-glow/20">
+                             <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan/80 text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-cyan-glow/30">
                                 <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")}
                             </Button>
-                            <Button variant="outline" asChild className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-blue-glow/20">
+                            <Button variant="outline" asChild className="border-brand-blue/80 text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-blue-glow/30">
                               <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" >
                                 <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToGemini")}
                               </a>
@@ -404,13 +342,12 @@ export default function ToPdfPageWithPsychoFocus() {
                     )}
                 </div>
                 
-                {/* Generate PDF */}
-                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/60 rounded-xl bg-slate-800/60 shadow-md hover:shadow-pink-glow transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
+                <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/70 rounded-xl bg-slate-800/70 shadow-md hover:shadow-pink-glow/40 transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
                      <h2 className="text-lg sm:text-xl font-semibold text-brand-pink mb-3 sm:mb-4 flex items-center">
                         <VibeContentRenderer content="::FaFilePdf::" className="mr-2 w-5 h-5"/>
                         {t("step3Title")}
                      </h2>
-                    <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/60 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
+                    <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/70 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
                         {isLoading
                             ? (<span className="flex items-center justify-center text-sm">
                                 <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2.5'::" /> {statusMessage || t('processing')}
@@ -424,15 +361,14 @@ export default function ToPdfPageWithPsychoFocus() {
                    {t('status')}: {isLoading ? statusMessage : (!markdownInput.trim() ? t('readyForUserData') : t('readyForPdf'))}
                 </div>
 
-                {/* Optional XLSX Upload Section (Kept for flexibility) */}
-                <details className="mt-8 pt-6 border-t border-slate-700/50 group">
+                <details className="mt-8 pt-6 border-t border-slate-700/60 group">
                     <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-300 transition-colors font-semibold flex items-center gap-2">
                         <VibeContentRenderer content="::FaFileExcel::"/>
                         {t("xlsxUploadOptionalTitle")}
                         <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
                     </summary>
-                    <div className="mt-4 p-4 sm:p-5 border-2 border-dashed border-brand-yellow/30 rounded-xl bg-slate-800/30 shadow-inner">
-                        <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/50 hover:border-brand-yellow text-brand-yellow/80 hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/5")}>
+                    <div className="mt-4 p-4 sm:p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl bg-slate-800/40 shadow-inner">
+                        <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow/80 hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/10")}>
                             <VibeContentRenderer content="::FaCloudUploadAlt::" className="text-2xl mb-1.5" />
                             <span className="font-medium text-xs">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
                             <input id="xlsxFileOptional" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleXlsxFileChange} className="sr-only" disabled={isLoading} />
