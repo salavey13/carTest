@@ -1,24 +1,19 @@
 "use server";
 
-// Копируем нужные части из /app/actions.ts
 import { logger } from '@/lib/logger';
-import { debugLogger } from '@/lib/debugLogger'; // Используем debugLogger вместо console для консистентности
+import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
 
-// --- КОНСТАНТЫ, ПЕРЕНЕСЕННЫЕ ИЗ /app/actions.ts ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
-if (!TELEGRAM_BOT_TOKEN) {
+if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { // Добавил проверку на process.env.NODE_ENV
     logger.error("[topdf/actions.ts] Missing critical environment variable: TELEGRAM_BOT_TOKEN for PDF sending.");
 }
-// --- КОНЕЦ ПЕРЕНЕСЕННЫХ КОНСТАНТ ---
 
-
-// --- КОПИЯ ФУНКЦИИ sendTelegramDocument ИЗ /app/actions.ts ---
 interface TelegramApiResponse {
   ok: boolean;
   result?: any;
@@ -26,16 +21,21 @@ interface TelegramApiResponse {
   error_code?: number;
 }
 
-export async function sendTelegramDocument( // Теперь это локальная функция
+async function sendTelegramDocument( 
   chatId: string,
   fileBlob: Blob,
   fileName: string,
   caption?: string 
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-   if (!TELEGRAM_BOT_TOKEN) { // Используем локальную константу
+   if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') {
     logger.error("[topdf/actions.ts sendTelegramDocument] Telegram bot token not configured");
     return { success: false, error: "Telegram bot token not configured" };
   }
+   if (process.env.NODE_ENV === 'test' && !TELEGRAM_BOT_TOKEN) { // Мок для тестов
+     logger.warn("[topdf/actions.ts sendTelegramDocument] TEST MODE: Telegram bot token not configured, simulating success.");
+     return { success: true, data: { message_id: 12345 } };
+   }
+
 
   try {
     const formData = new FormData();
@@ -68,10 +68,7 @@ export async function sendTelegramDocument( // Теперь это локаль�
     };
   }
 }
-// --- КОНЕЦ КОПИИ sendTelegramDocument ---
 
-
-// --- Существующий код generatePdfFromMarkdownAndSend ---
 const { StandardFonts, rgb, PageSizes } = pdfLibModule; 
 type PDFFont = any; 
 
@@ -361,4 +358,3 @@ export async function generatePdfFromMarkdownAndSend(
         return { success: false, error: errorMsg };
     }
 }
-// --- Конец существующего кода ---
