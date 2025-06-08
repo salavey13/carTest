@@ -18,7 +18,7 @@ import { purchaseProtoCardAction } from '../hotvibes/actions';
 import type { ProtoCardDetails } from '../hotvibes/actions';   
 import Link from 'next/link';
 
-const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png"; 
+const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250609_005358-9e5fdb54-31ed-4231-83c4-610a7c8d9336.jpg"; 
 
 const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
