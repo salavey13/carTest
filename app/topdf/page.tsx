@@ -14,15 +14,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label'; 
 import Image from 'next/image'; 
 import { PSYCHO_ANALYSIS_SYSTEM_PROMPT } from './psychoAnalysisPrompt';
+import { purchaseProtoCardAction } from '../hotvibes/actions'; // For purchasing access
+import type { ProtoCardDetails } from '../hotvibes/actions';   // For purchasing access
+import Link from 'next/link';
+
 
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png"; 
+
+// Constants for PDF Generator Access ProtoCard
+const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
+const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
 
 const translations: Record<string, Record<string, string>> = {
   en: {
     "pageTitle": "AI PDF Report Generator ✨", 
     "pageSubtitle": "Generate a personalized PDF report. Input user data and answers, or analyze an XLSX with AI.", 
     "step1Title": "Step 1: User Data & Questions for AI",
-    "generateDemoQuestions": "Generate Demo Questions & User Data",
+    "generateDemoQuestions": "Demo Q's & Data", // Shortened
     "demoQuestionsGenerated": "Demo questions & user data prepared! Copied to Markdown area.",
     "userDataTitle": "User Data for Report", 
     "userNameLabel": "User's Name",
@@ -30,7 +38,7 @@ const translations: Record<string, Record<string, string>> = {
     "userGenderLabel": "User's Gender",
     "step2Title": "Step 2: Report Content (Paste AI Response or Final Answers)", 
     "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's final answers to questions):", 
-    "copyPromptAndData": "Copy Full AI Prompt (System + User Data + Questions)", 
+    "copyPromptAndData": "Copy AI Prompt", // Shortened
     "goToGemini": "Open Gemini AI Studio",
     "step3Title": "Step 3: Create & Send PDF",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
@@ -61,12 +69,21 @@ const translations: Record<string, Record<string, string>> = {
     "errorInvalidFileType": "Invalid file type. Only .xlsx files are accepted.",
     "formDataSaved": "User data saved for this session.",
     "formDataError": "Error saving user data for session.",
+    "accessDeniedTitle": "Access to PDF Generator Denied!",
+    "accessDeniedSubtitle": "To use the AI PDF Report Generator, please purchase an access ProtoCard.",
+    "purchaseAccessButton": "Purchase Access for %%PRICE%% XTR",
+    "purchasingInProgress": "Processing Purchase...",
+    "errorNotAuthenticated": "Please log in via Telegram to purchase access.",
+    "purchaseSuccessMessage": "Access request sent! Check Telegram to complete payment.",
+    "purchaseErrorMessage": "Failed to initiate access purchase. %%ERROR%%",
+    "backToHotVibes": "::FaArrowLeft:: Back to Hot Vibes",
+    "promptGenerated": "AI prompt for XLSX prepared and copied to Markdown area.",
   },
   ru: {
     "pageTitle": "AI Генератор PDF Отчетов ✨", 
     "pageSubtitle": "Создайте персонализированный PDF-отчет. Введите данные пользователя и ответы, или проанализируйте XLSX с помощью AI.", 
     "step1Title": "Шаг 1: Данные Пользователя и Вопросы для AI",
-    "generateDemoQuestions": "Сгенерировать Демо-Вопросы и Данные Пользователя", 
+    "generateDemoQuestions": "Демо-Вопросы и Данные", // Shortened
     "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены! Скопированы в область Markdown.",
     "userDataTitle": "Данные Пользователя для Отчета", 
     "userNameLabel": "Имя пользователя",
@@ -74,7 +91,7 @@ const translations: Record<string, Record<string, string>> = {
     "userGenderLabel": "Пол пользователя",
     "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Финальные Ответы)", 
     "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или финальные ответы пользователя на вопросы):", 
-    "copyPromptAndData": "Копировать Полный Промпт для AI (Система + Данные + Вопросы)", 
+    "copyPromptAndData": "Копировать Промпт AI", // Shortened
     "goToGemini": "Открыть Gemini AI Studio",
     "step3Title": "Шаг 3: Создать и Отправить PDF",
     "generateAndSendPdf": "PDF в Telegram",
@@ -105,6 +122,15 @@ const translations: Record<string, Record<string, string>> = {
     "errorInvalidFileType": "Неверный тип файла. Принимаются только .xlsx файлы.",
     "formDataSaved": "Данные пользователя сохранены для этой сессии.",
     "formDataError": "Ошибка сохранения данных пользователя для сессии.",
+    "accessDeniedTitle": "Доступ к Генератору PDF Закрыт!",
+    "accessDeniedSubtitle": "Для использования AI Генератора PDF Отчетов, пожалуйста, приобретите ПротоКарточку Доступа.",
+    "purchaseAccessButton": "Купить Доступ за %%PRICE%% XTR",
+    "purchasingInProgress": "Обработка покупки...",
+    "errorNotAuthenticated": "Пожалуйста, авторизуйтесь через Telegram для покупки доступа.",
+    "purchaseSuccessMessage": "Запрос на доступ отправлен! Проверьте Telegram для завершения оплаты.",
+    "purchaseErrorMessage": "Не удалось инициировать покупку доступа. %%ERROR%%",
+    "backToHotVibes": "::FaArrowLeft:: Назад в Горячие Вайбы",
+    "promptGenerated": "AI промпт для XLSX подготовлен и скопирован в область Markdown.",
   }
 };
 
@@ -147,7 +173,7 @@ const handleXlsxFileAndPreparePromptInternal = async (
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
-        setStatusMsgFunc(translateFunc('generatingPromptForXlsx')); // Updated key
+        setStatusMsgFunc(translateFunc('generatingPromptForXlsx'));
         const promptForAI = `Ты — высококвалифицированный AI-аналитик. Твоя задача — проанализировать предоставленные данные из отчета (возможно, XLSX) и составить подробное резюме в формате Markdown.
 ВАЖНО: Твой ответ ДОЛЖЕН БЫТЬ ПОЛНОСТЬЮ НА РУССКОМ ЯЗЫКЕ.
 
@@ -186,11 +212,10 @@ ${csvDataString.substring(0, 15000)}
     }
 };
 
-
 export default function ToPdfPageWithPsychoFocus() {
-    const { user, isAuthLoading } = useAppContext();
+    const { user, dbUser, isAuthenticated, isLoading: appContextLoading, isAuthenticating: appContextAuthenticating, refreshDbUser } = useAppContext();
     const [selectedFile, setSelectedFile] = useState<File | null>(null); 
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // General loading for page operations
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [generatedDataForAI, setGeneratedDataForAI] = useState<string>('');
     const [markdownInput, setMarkdownInput] = useState<string>('');
@@ -200,6 +225,10 @@ export default function ToPdfPageWithPsychoFocus() {
     const [userAge, setUserAge] = useState<string>('');
     const [userGender, setUserGender] = useState<string>('');
     
+    const [hasAccess, setHasAccess] = useState(false);
+    const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+    const [isPurchasing, setIsPurchasing] = useState(false);
+
     const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
     const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
 
@@ -218,14 +247,32 @@ export default function ToPdfPageWithPsychoFocus() {
         return translation;
     }, [currentLang]);
 
-    const toggleLang = useCallback(() => setCurrentLang(p => p === 'en' ? 'ru' : 'en'), []);
-
     useEffect(() => {
         setStatusMessage(t('readyForUserData'));
     }, [t, currentLang]);
 
+     useEffect(() => {
+        if (!appContextLoading && !appContextAuthenticating) {
+            setIsCheckingAccess(true); 
+            if (isAuthenticated && dbUser) {
+                const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
+                if (cards && cards[PERSONALITY_REPORT_PDF_CARD_ID]?.status === 'active') {
+                    setHasAccess(true);
+                    debugLogger.info(`[ToPdfPage] User ${dbUser.user_id} has access to PDF Generator.`);
+                } else {
+                    setHasAccess(false);
+                    debugLogger.info(`[ToPdfPage] User ${dbUser.user_id} does NOT have access. Cards:`, cards);
+                }
+            } else {
+                setHasAccess(false); 
+                 debugLogger.info(`[ToPdfPage] No access: User not authenticated or dbUser missing. isAuthenticated: ${isAuthenticated}`);
+            }
+            setIsCheckingAccess(false);
+        }
+    }, [dbUser, isAuthenticated, appContextLoading, appContextAuthenticating]);
+
     useEffect(() => {
-        if (user?.id && !isAuthLoading) { 
+        if (user?.id && !appContextLoading && !appContextAuthenticating && hasAccess) { 
             setIsLoading(true);
             loadUserPdfFormData(String(user.id)).then(result => {
                 if (result.success && result.data) {
@@ -238,7 +285,8 @@ export default function ToPdfPageWithPsychoFocus() {
                 }
             }).finally(() => setIsLoading(false));
         }
-    }, [user?.id, isAuthLoading]);
+    }, [user?.id, appContextLoading, appContextAuthenticating, hasAccess]);
+
 
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -271,7 +319,7 @@ export default function ToPdfPageWithPsychoFocus() {
         setMarkdownInput(userDataAndQuestions); 
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
-        if (user?.id) { // Save data on generation
+        if (user?.id) { 
             saveUserPdfFormData(String(user.id), { userName, userAge, userGender }).then(res => {
                  if(res.success) toast.info(t('formDataSaved'), {duration: 1500});
             });
@@ -280,10 +328,10 @@ export default function ToPdfPageWithPsychoFocus() {
     
     const handleCopyToClipboard = () => {
         let textForUserAndQuestions = generatedDataForAI.trim(); 
-        if (!textForUserAndQuestions && markdownInput.trim()) { // If user pasted answers directly
+        if (!textForUserAndQuestions && markdownInput.trim()) { 
             textForUserAndQuestions = markdownInput.trim();
         }
-        if (!textForUserAndQuestions) { // If still empty, generate if user data exists
+        if (!textForUserAndQuestions) {
              if(userName || userAge || userGender) {
                 textForUserAndQuestions = generateUserDataAndQuestionsForAI(userName,userAge,userGender);
              } else {
@@ -323,8 +371,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 setStatusMessage(result.message || t('successMessage'));
                 setMarkdownInput(''); 
                 setGeneratedDataForAI(''); 
-                // Оставляем данные пользователя, но сбрасываем файл XLSX если он был только для имени
-                if (selectedFile && (!userName && !userAge && !userGender)) { // если файл был, но данные юзера не вводились, возможно файл был для данных
+                if (selectedFile && (!userName && !userAge && !userGender)) { 
                     setSelectedFile(null); 
                     if (fileInputRef.current) fileInputRef.current.value = "";
                 }
@@ -340,8 +387,42 @@ export default function ToPdfPageWithPsychoFocus() {
             setIsLoading(false);
         }
     };
+
+    const handlePurchaseAccess = async () => {
+        if (!isAuthenticated || !dbUser?.user_id) {
+          toast.error(t('errorNotAuthenticated'));
+          return;
+        }
+        setIsPurchasing(true);
+        const cardDetails: ProtoCardDetails = {
+          cardId: PERSONALITY_REPORT_PDF_CARD_ID,
+          title: currentLang === 'ru' ? `Доступ к Генератору PDF Отчетов` : `PDF Report Generator Access`,
+          description: currentLang === 'ru' ? `Разблокировать AI Генератор PDF для психологических расшифровок. Цена: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.` : `Unlock the AI PDF Generator for personality insights. Price: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.`,
+          amountXTR: PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR,
+          type: "tool_access",
+          metadata: { page_link: "/topdf", tool_name: "AI PDF Generator - PsychoVibe" }
+        };
     
-    if (isAuthLoading && !user?.id) { // Показываем загрузку, если контекст еще грузится И нет user.id
+        try {
+          const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
+          if (result.success) {
+            toast.success(t('purchaseSuccessMessage'));
+            if(refreshDbUser) { 
+                setTimeout(async () => { await refreshDbUser(); }, 7000);
+            }
+          } else {
+            toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));
+          }
+        } catch (error) {
+          toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));
+          logger.error("[ToPdfPage] Error purchasing access ProtoCard:", error);
+        }
+        setIsPurchasing(false);
+      };
+    
+    const toggleLang = useCallback(() => setCurrentLang(p => p === 'en' ? 'ru' : 'en'), []);
+
+    if (appContextLoading || appContextAuthenticating || isCheckingAccess) {
         return (
             <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-900">
                 <VibeContentRenderer content="::FaSpinner className='animate-spin text-brand-cyan text-2xl'::" />
@@ -349,6 +430,34 @@ export default function ToPdfPageWithPsychoFocus() {
             </div>
         );
     }
+
+    if (!hasAccess) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-purple-950 to-blue-900 p-6 text-center text-gray-100">
+            <VibeContentRenderer content="::FaLock className='text-7xl text-brand-red mb-6 animate-pulse'::" />
+            <h1 className="text-3xl sm:text-4xl font-orbitron font-bold text-brand-red mb-4">{t("accessDeniedTitle")}</h1>
+            <p className="text-md sm:text-lg text-gray-300 mb-8 max-w-md">{t("accessDeniedSubtitle")}</p>
+            <Button
+              onClick={handlePurchaseAccess}
+              disabled={isPurchasing || !isAuthenticated}
+              size="lg"
+              className="bg-gradient-to-r from-brand-orange to-red-600 text-white font-orbitron font-bold py-3 px-8 rounded-lg text-lg hover:from-brand-orange/90 hover:to-red-600/90 transition-all shadow-lg hover:shadow-yellow-500/50"
+            >
+              {isPurchasing 
+                ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> 
+                : <VibeContentRenderer content="::FaKey::" className="mr-2" />
+              }
+              {isPurchasing ? t("purchasingInProgress") : t("purchaseAccessButton", { PRICE: PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR })}
+            </Button>
+            {!isAuthenticated && <p className="text-xs text-red-400 mt-3">{t("errorNotAuthenticated")}</p>}
+             <Link href="/hotvibes" className="block mt-10">
+                <Button variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 text-sm">
+                    <VibeContentRenderer content={t("backToHotVibes")}/>
+                </Button>
+            </Link>
+          </div>
+        );
+      }
 
     return (
         <div className={cn("min-h-screen flex flex-col items-center pt-16 sm:pt-20 pb-10", "bg-gradient-to-br from-slate-800 via-purple-900 to-blue-900 text-gray-100 px-4 font-mono")}>
@@ -360,9 +469,9 @@ export default function ToPdfPageWithPsychoFocus() {
             </div>
 
             <div className="w-full max-w-2xl lg:max-w-3xl p-5 sm:p-6 md:p-8 border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 -mt-2 mb-6 sm:-mt-4 sm:mb-8 md:-mt-6 md:mb-10">
-                <div className="relative w-full h-40 sm:h-48 md:h-56 -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden ">
+                <div className="relative w-full h-[50vh] -mx-5 sm:-mx-6 md:-mx-8 -mt-10 sm:-mt-12 md:-mt-14 mb-4 sm:mb-6 rounded-t-lg overflow-hidden ">
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/10"></div>
+                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black to-transparent"></div>
                 </div>
                 
                 <h1 
@@ -376,22 +485,22 @@ export default function ToPdfPageWithPsychoFocus() {
 
                  <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-blue-glow/40 transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
-                        <VibeContentRenderer content="::FaUserEdit::" className="mr-2 w-5 h-5"/>
+                        <VibeContentRenderer content="::FaUserCog::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
                         {t("step1Title")}
                     </h2>
                     <div className="space-y-3 sm:space-y-4">
                         <div>
                             <Label htmlFor="userName" className="text-xs text-gray-400">{t("userNameLabel")}</Label>
-                            <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Иван Иванов" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                            <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder={currentLang === 'ru' ? "Иван Иванов" : "John Doe"} className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                         </div>
-                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                             <div>
                                 <Label htmlFor="userAge" className="text-xs text-gray-400">{t("userAgeLabel")}</Label>
                                 <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                             <div>
                                 <Label htmlFor="userGender" className="text-xs text-gray-400">{t("userGenderLabel")}</Label>
-                                <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder="Мужчина/Женщина" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
+                                <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder={currentLang === 'ru' ? "Мужчина/Женщина" : "Male/Female"} className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
                             </div>
                         </div>
                         <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
@@ -402,7 +511,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-cyan-glow/40 transition-shadow duration-300")}>
                     <h2 className="text-lg sm:text-xl font-semibold text-brand-cyan mb-3 sm:mb-4 flex items-center">
-                        <VibeContentRenderer content="::FaKeyboard::" className="mr-2 w-5 h-5"/>
+                        <VibeContentRenderer content="::FaPencilAlt::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
                         {t("step2Title")}
                     </h2>
                      <label htmlFor="markdownInput" className="text-sm text-gray-300 block mt-2 mb-1.5">{t("pasteMarkdown")}</label>
@@ -431,7 +540,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 
                 <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/70 rounded-xl bg-slate-800/70 shadow-md hover:shadow-pink-glow/40 transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
                      <h2 className="text-lg sm:text-xl font-semibold text-brand-pink mb-3 sm:mb-4 flex items-center">
-                        <VibeContentRenderer content="::FaFilePdf::" className="mr-2 w-5 h-5"/>
+                        <VibeContentRenderer content="::FaFileDownload::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
                         {t("step3Title")}
                      </h2>
                     <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/70 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
@@ -450,7 +559,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
                 <details className="mt-8 pt-6 border-t border-slate-700/60 group">
                     <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-300 transition-colors font-semibold flex items-center gap-2">
-                        <VibeContentRenderer content="::FaFileExcel::"/>
+                        <VibeContentRenderer content="::FaFileImport::"/> {/* Icon changed */}
                         {t("xlsxUploadOptionalTitle")}
                         <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
                     </summary>
