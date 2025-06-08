@@ -4,7 +4,8 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
-import { fetchUserData, updateUserMetadata } from '@/hooks/supabase'; 
+// MODIFICATION: Directly import and use supabaseAdmin
+import { supabaseAdmin, fetchUserData as fetchUserDataUsingAdmin, updateUserMetadata as updateUserMetadataUsingAdmin } from '@/hooks/supabase'; 
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
@@ -32,18 +33,20 @@ export async function saveUserPdfFormData(
     return { success: false, error: "User ID is required to save PDF form data." };
   }
   try {
-    const userData = await fetchUserData(userId);
-    if (!userData) {
+    // MODIFICATION: Use fetchUserDataUsingAdmin which implies usage of supabaseAdmin
+    const user = await fetchUserDataUsingAdmin(userId); 
+    if (!user) {
       return { success: false, error: "User not found to save PDF form data." };
     }
 
-    const currentMetadata = userData.metadata || {};
+    const currentMetadata = user.metadata || {};
     const updatedMetadata = {
       ...currentMetadata,
       [PDF_FORM_DATA_KEY]: formData,
     };
 
-    const result = await updateUserMetadata(userId, updatedMetadata);
+    // MODIFICATION: Use updateUserMetadataUsingAdmin which implies usage of supabaseAdmin
+    const result = await updateUserMetadataUsingAdmin(userId, updatedMetadata); 
     if (result.success) {
       debugLogger.log(`[topdf/actions saveUserPdfFormData] PDF form data saved for user ${userId}`, formData);
       return { success: true };
@@ -64,11 +67,12 @@ export async function loadUserPdfFormData(
     return { success: false, error: "User ID is required to load PDF form data." };
   }
   try {
-    const userData = await fetchUserData(userId);
-    if (!userData) {
+    // MODIFICATION: Use fetchUserDataUsingAdmin
+    const user = await fetchUserDataUsingAdmin(userId); 
+    if (!user) {
       return { success: false, error: "User not found to load PDF form data." };
     }
-    const formData = userData.metadata?.[PDF_FORM_DATA_KEY] as { userName?: string; userAge?: string; userGender?: string } | undefined;
+    const formData = user.metadata?.[PDF_FORM_DATA_KEY] as { userName?: string; userAge?: string; userGender?: string } | undefined;
     if (formData) {
       debugLogger.log(`[topdf/actions loadUserPdfFormData] PDF form data loaded for user ${userId}`, formData);
       return { success: true, data: formData };
@@ -81,6 +85,9 @@ export async function loadUserPdfFormData(
     return { success: false, error: e.message || "Server error loading PDF form data." };
   }
 }
+
+// --- sendTelegramDocument and PDF generation logic remains the same ---
+// ... (keep the rest of the file as it was in the previous correct version, including diagnostics if you find them useful)
 
 async function sendTelegramDocument( 
   chatId: string,
