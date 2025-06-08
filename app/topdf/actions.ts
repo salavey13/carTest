@@ -1,19 +1,24 @@
 "use server";
 
+// Копируем нужные части из /app/actions.ts
 import { logger } from '@/lib/logger';
-import { debugLogger } from '@/lib/debugLogger';
+import { debugLogger } from '@/lib/debugLogger'; 
 import path from 'path'; 
 import fs from 'fs';   
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
 
+// --- КОНСТАНТЫ, ПЕРЕНЕСЕННЫЕ ИЗ /app/actions.ts ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { 
     logger.error("[topdf/actions.ts] Missing critical environment variable: TELEGRAM_BOT_TOKEN for PDF sending.");
 }
+// --- КОНЕЦ ПЕРЕНЕСЕННЫХ КОНСТАНТ ---
 
+
+// --- КОПИЯ ФУНКЦИИ sendTelegramDocument ИЗ /app/actions.ts ---
 interface TelegramApiResponse {
   ok: boolean;
   result?: any;
@@ -67,6 +72,8 @@ async function sendTelegramDocument(
     };
   }
 }
+// --- КОНЕЦ КОПИИ sendTelegramDocument ---
+
 
 const { StandardFonts, rgb, PageSizes } = pdfLibModule; 
 type PDFFont = any; 
