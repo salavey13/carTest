@@ -1,30 +1,89 @@
 "use server";
 
-// Копируем нужные части из /app/actions.ts
 import { logger } from '@/lib/logger';
-import { debugLogger } from '@/lib/debugLogger'; 
+import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
+import { fetchUserData, updateUserMetadata } from '@/hooks/supabase'; // Импортируем функции для работы с метаданными
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
 
-// --- КОНСТАНТЫ, ПЕРЕНЕСЕННЫЕ ИЗ /app/actions.ts ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { 
     logger.error("[topdf/actions.ts] Missing critical environment variable: TELEGRAM_BOT_TOKEN for PDF sending.");
 }
-// --- КОНЕЦ ПЕРЕНЕСЕННЫХ КОНСТАНТ ---
 
-
-// --- КОПИЯ ФУНКЦИИ sendTelegramDocument ИЗ /app/actions.ts ---
 interface TelegramApiResponse {
   ok: boolean;
   result?: any;
   description?: string;
   error_code?: number;
 }
+
+// --- Функции для работы с данными формы PDF в metadata пользователя ---
+const PDF_FORM_DATA_KEY = 'pdfFormCache'; // Ключ в metadata
+
+export async function saveUserPdfFormData(
+  userId: string,
+  formData: { userName?: string; userAge?: string; userGender?: string }
+): Promise<{ success: boolean; error?: string }> {
+  if (!userId) {
+    return { success: false, error: "User ID is required to save PDF form data." };
+  }
+  try {
+    const userData = await fetchUserData(userId);
+    if (!userData) {
+      return { success: false, error: "User not found to save PDF form data." };
+    }
+
+    const currentMetadata = userData.metadata || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      [PDF_FORM_DATA_KEY]: formData,
+    };
+
+    const result = await updateUserMetadata(userId, updatedMetadata);
+    if (result.success) {
+      debugLogger.log(`[topdf/actions saveUserPdfFormData] PDF form data saved for user ${userId}`, formData);
+      return { success: true };
+    } else {
+      logger.error(`[topdf/actions saveUserPdfFormData] Failed to save PDF form data for user ${userId}: ${result.error}`);
+      return { success: false, error: result.error || "Failed to save PDF form data." };
+    }
+  } catch (e: any) {
+    logger.error(`[topdf/actions saveUserPdfFormData] Exception for user ${userId}:`, e);
+    return { success: false, error: e.message || "Server error saving PDF form data." };
+  }
+}
+
+export async function loadUserPdfFormData(
+  userId: string
+): Promise<{ success: boolean; data?: { userName?: string; userAge?: string; userGender?: string }; error?: string }> {
+  if (!userId) {
+    return { success: false, error: "User ID is required to load PDF form data." };
+  }
+  try {
+    const userData = await fetchUserData(userId);
+    if (!userData) {
+      return { success: false, error: "User not found to load PDF form data." };
+    }
+    const formData = userData.metadata?.[PDF_FORM_DATA_KEY] as { userName?: string; userAge?: string; userGender?: string } | undefined;
+    if (formData) {
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] PDF form data loaded for user ${userId}`, formData);
+      return { success: true, data: formData };
+    } else {
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] No PDF form data found for user ${userId}`);
+      return { success: true, data: undefined }; // Нет данных - это не ошибка
+    }
+  } catch (e: any) {
+    logger.error(`[topdf/actions loadUserPdfFormData] Exception for user ${userId}:`, e);
+    return { success: false, error: e.message || "Server error loading PDF form data." };
+  }
+}
+// --- Конец функций для работы с данными формы PDF ---
+
 
 async function sendTelegramDocument( 
   chatId: string,
@@ -72,8 +131,6 @@ async function sendTelegramDocument(
     };
   }
 }
-// --- КОНЕЦ КОПИИ sendTelegramDocument ---
-
 
 const { StandardFonts, rgb, PageSizes } = pdfLibModule; 
 type PDFFont = any; 
