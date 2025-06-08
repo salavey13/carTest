@@ -23,7 +23,7 @@ const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/obje
 const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
 
-// ... (translations remain the same as previous correct version)
+// translations object (remains the same as your last correct version)
 const translations: Record<string, Record<string, string>> = {
   en: {
     "pageTitle": "AI PDF Report Generator ✨", 
@@ -134,7 +134,6 @@ const translations: Record<string, Record<string, string>> = {
     "workingAreaMark": "ВАША РАБОЧАЯ ОБЛАСТЬ: Сюда вставляйте ответы AI или финальные ответы для генерации PDF.",
   }
 };
-
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -248,10 +247,9 @@ export default function ToPdfPageWithPsychoFocus() {
         if (!appContextLoading && !appContextAuthenticating) {
             setIsCheckingAccess(true);
             if (isAuthenticated && dbUser) {
-                const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
-                // Ensure correct ProtoCard data for PDF Generator
+                const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string; type?: string; data?: { page_link?: string } }> | undefined;
                 const pdfCard = cards?.[PERSONALITY_REPORT_PDF_CARD_ID];
-                if (pdfCard?.status === 'active' && pdfCard.type === 'tool_access' && (pdfCard.data as any)?.page_link === '/topdf') {
+                if (pdfCard?.status === 'active' && pdfCard.type === 'tool_access' && pdfCard.data?.page_link === '/topdf') {
                     setHasAccess(true);
                     debugLogger.info(`[ToPdfPage] User ${dbUser.user_id} has VALID access to PDF Generator.`);
                 } else {
@@ -275,16 +273,14 @@ export default function ToPdfPageWithPsychoFocus() {
                     setUserAge(result.data.userAge || '');
                     setUserGender(result.data.userGender || '');
                     debugLogger.info("[ToPdfPage] User PDF form data loaded.", result.data);
-                } else if (result.error && result.error !== "User not found to load PDF form data.") { // Don't toast if just no data
+                } else if (result.error && result.error !== "User not found to load PDF form data.") { 
                     debugLogger.warn("[ToPdfPage] Error loading user PDF form data:", result.error);
-                    // toast.error(t('formDataError')); // Optional: notify user about load error
                 }
             }).finally(() => setIsLoading(false));
         }
-    }, [user?.id, appContextLoading, appContextAuthenticating, hasAccess, t]);
+    }, [user?.id, appContextLoading, appContextAuthenticating, hasAccess]);
 
-
-    const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleXlsxFileChange = /* ... (same) ... */ async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) {
             setSelectedFile(null); setGeneratedDataForAI(''); setStatusMessage(t('noFileSelected'));
@@ -308,8 +304,7 @@ export default function ToPdfPageWithPsychoFocus() {
             setStatusMessage(t('readyForUserData'));
         }
     };
-
-    const handleGenerateDemoQuestionsAndPrompt = () => {
+    const handleGenerateDemoQuestionsAndPrompt = /* ... (same) ... */ () => {
         const userDataAndQuestions = generateUserDataAndQuestionsForAI(userName, userAge, userGender);
         setGeneratedDataForAI(userDataAndQuestions); 
         setMarkdownInput(userDataAndQuestions); 
@@ -322,8 +317,7 @@ export default function ToPdfPageWithPsychoFocus() {
             });
         }
     };
-    
-    const handleCopyToClipboard = () => {
+    const handleCopyToClipboard = /* ... (same, uses corrected prompt order) ... */ () => {
         let textForUserAndQuestions = generatedDataForAI.trim(); 
         if (!textForUserAndQuestions && markdownInput.trim()) { 
             textForUserAndQuestions = markdownInput.trim();
@@ -345,8 +339,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 logger.error('Clipboard copy failed:', err);
             });
     };
-
-    const handleGeneratePdf = async () => {
+    const handleGeneratePdf = /* ... (same) ... */ async () => {
         if (!markdownInput.trim()) { toast.error(t('errorNoMarkdown')); return; }
         if (!user?.id) { toast.error(t('errorNoUser')); return; }
         
@@ -384,8 +377,7 @@ export default function ToPdfPageWithPsychoFocus() {
             setIsLoading(false);
         }
     };
-
-    const handlePurchaseAccess = async () => {
+    const handlePurchaseAccess = /* ... (same) ... */ async () => {
         if (!isAuthenticated || !dbUser?.user_id) {
           toast.error(t('errorNotAuthenticated'));
           return;
@@ -400,7 +392,7 @@ export default function ToPdfPageWithPsychoFocus() {
           metadata: { 
             page_link: "/topdf", 
             tool_name: "AI PDF Generator - PsychoVibe",
-            photo_url: HERO_IMAGE_URL // Use hero image for invoice
+            photo_url: HERO_IMAGE_URL 
           }
         };
     
@@ -420,7 +412,6 @@ export default function ToPdfPageWithPsychoFocus() {
         }
         setIsPurchasing(false);
       };
-    
     const toggleLang = useCallback(() => setCurrentLang(p => p === 'en' ? 'ru' : 'en'), []);
 
     if (appContextLoading || appContextAuthenticating || isCheckingAccess) {
@@ -461,8 +452,7 @@ export default function ToPdfPageWithPsychoFocus() {
       }
 
     return (
-        // Ensure sufficient top padding to clear the fixed Header
-        <div className={cn("min-h-screen flex flex-col items-center pt-[calc(var(--header-height,60px)+2rem)] sm:pt-[calc(var(--header-height,60px)+3rem)] pb-10", "bg-gradient-to-br from-slate-800 via-purple-900 to-blue-900 text-gray-100 px-4 font-mono")}>
+        <div className={cn("min-h-screen flex flex-col items-center pt-[calc(var(--header-height,60px)+1rem)] sm:pt-[calc(var(--header-height,60px)+1.5rem)] pb-10", "bg-gradient-to-br from-slate-800 via-purple-900 to-blue-900 text-gray-100 px-4 font-mono")}>
             <Toaster position="bottom-center" richColors toastOptions={{ className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm' }} />
             <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"> 
                 <button onClick={toggleLang} className="p-1.5 sm:p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> 
@@ -470,15 +460,12 @@ export default function ToPdfPageWithPsychoFocus() {
                 </button> 
             </div>
 
-            {/* Main content card STARTS HERE, hero image is part of this card now */}
-            <div className="w-full max-w-2xl lg:max-w-3xl border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60">
-                {/* Hero Image Section - Full width of the card, specific height */}
-                <div className="relative w-full h-[50vh] rounded-t-xl overflow-hidden"> {/* Hero takes 50% of viewport height */}
+            <div className="w-full max-w-2xl lg:max-w-3xl border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 mt-4 md:mt-6">
+                <div className="relative w-full h-[50vh] rounded-t-xl overflow-hidden"> 
                     <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
                     <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[hsl(var(--card-rgb))] via-[hsl(var(--card-rgb)/0.7)] to-transparent"></div> 
                 </div>
                 
-                {/* Content below the hero image, inside the same card */}
                 <div className="p-5 sm:p-6 md:p-8">
                     <h1 
                         className="font-orbitron text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-2 sm:mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 animate-glitch" 
@@ -491,7 +478,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
                     <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-blue-glow/40 transition-shadow duration-300")}>
                         <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaUser::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
+                            <VibeContentRenderer content="::FaUserEdit::" className="mr-2 w-5 h-5"/> {/* Changed: FaUserGear -> FaUserEdit (FA6) */}
                             {t("step1Title")}
                         </h2>
                         <div className="space-y-3 sm:space-y-4">
@@ -517,12 +504,11 @@ export default function ToPdfPageWithPsychoFocus() {
 
                     <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-cyan-glow/40 transition-shadow duration-300")}>
                         <h2 className="text-lg sm:text-xl font-semibold text-brand-cyan mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaEdit::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
+                            <VibeContentRenderer content="::FaPenToSquare::" className="mr-2 w-5 h-5"/> {/* Changed: FaPencilAlt -> FaPenToSquare (FA6) */}
                             {t("step2Title")}
                         </h2>
                         <label htmlFor="markdownInput" className="text-sm text-gray-300 block mt-2 mb-1.5">{t("pasteMarkdown")}</label>
-                        {/* Highlight working area */}
-                        <div className="p-1 bg-slate-700/30 rounded-lg border border-dashed border-brand-cyan/30"> 
+                        <div className="p-1 bg-gradient-to-br from-slate-700/50 to-slate-800/30 rounded-lg border border-dashed border-brand-cyan/40 shadow-inner"> 
                             <textarea
                                 id="markdownInput"
                                 value={markdownInput}
@@ -549,7 +535,7 @@ export default function ToPdfPageWithPsychoFocus() {
                     
                     <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/70 rounded-xl bg-slate-800/70 shadow-md hover:shadow-pink-glow/40 transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
                         <h2 className="text-lg sm:text-xl font-semibold text-brand-pink mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaArrowDownToLine::" className="mr-2 w-5 h-5"/> {/* Icon changed */}
+                            <VibeContentRenderer content="::FaFileArrowDown::" className="mr-2 w-5 h-5"/> {/* Changed: FaFileDownload -> FaFileArrowDown (FA6) */}
                             {t("step3Title")}
                         </h2>
                         <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/70 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
@@ -580,8 +566,8 @@ export default function ToPdfPageWithPsychoFocus() {
                             </label>
                         </div>
                     </details>
-                </div> {/* End of p-5/6/8 content div */}
-            </div> {/* End of main content card */}
+                </div>
+            </div>
         </div>
     );
 }
