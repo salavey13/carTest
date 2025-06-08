@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
-import { fetchUserData, updateUserMetadata } from '@/hooks/supabase'; // Импортируем функции для работы с метаданными
+import { fetchUserData, updateUserMetadata } from '@/hooks/supabase'; 
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
@@ -22,8 +22,7 @@ interface TelegramApiResponse {
   error_code?: number;
 }
 
-// --- Функции для работы с данными формы PDF в metadata пользователя ---
-const PDF_FORM_DATA_KEY = 'pdfFormCache'; // Ключ в metadata
+const PDF_FORM_DATA_KEY = 'pdfFormCache'; 
 
 export async function saveUserPdfFormData(
   userId: string,
@@ -75,15 +74,13 @@ export async function loadUserPdfFormData(
       return { success: true, data: formData };
     } else {
       debugLogger.log(`[topdf/actions loadUserPdfFormData] No PDF form data found for user ${userId}`);
-      return { success: true, data: undefined }; // Нет данных - это не ошибка
+      return { success: true, data: undefined }; 
     }
   } catch (e: any) {
     logger.error(`[topdf/actions loadUserPdfFormData] Exception for user ${userId}:`, e);
     return { success: false, error: e.message || "Server error loading PDF form data." };
   }
 }
-// --- Конец функций для работы с данными формы PDF ---
-
 
 async function sendTelegramDocument( 
   chatId: string,
