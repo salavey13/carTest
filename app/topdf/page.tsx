@@ -27,8 +27,8 @@ type PsychoFocusStep =
   | 'userData' 
   | 'questions' 
   | 'analyzing'
-  | 'basicAnalysisReady' // New step after basic PDF is generated
-  | 'paymentOfferDetails' // New step for showing the detailed payment card
+  | 'basicAnalysisReady' 
+  | 'paymentOfferDetails' 
   | 'paymentSuccess' 
   | 'paymentError'
   | 'generalError';
@@ -305,10 +305,11 @@ export default function ToPdfPageWithPsychoFocus() {
 
 
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        // ... (same as before, but set isLoading and setCurrentStep('analyzing') during processing)
         const file = event.target.files?.[0];
         if (!file) { setSelectedFile(null); setMarkdownInput(''); setStatusMessage(t('noFileSelected')); return; }
-        // ... (file validation)
+        if (file.size > MAX_FILE_SIZE_BYTES) { toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return; }
+        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) { toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return; }
+        
         setSelectedFile(file);
         setIsLoading(true); setCurrentStep('analyzing'); setStatusMessage(t('parsingXlsx'));
         const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
@@ -319,7 +320,7 @@ export default function ToPdfPageWithPsychoFocus() {
             toast.error(t('unexpectedError', { ERROR: result.error || 'Failed to process XLSX' })); setStatusMessage(t('readyForUserData'));
             setCurrentStep('questions'); 
         }
-        setIsLoading(false); // Reset isLoading after processing
+        setIsLoading(false); 
     };
 
     const handleGenerateDemoQuestionsAndPrompt = () => {
@@ -330,7 +331,6 @@ export default function ToPdfPageWithPsychoFocus() {
     };
 
     const handleCopyToClipboard = () => {
-        // ... (same as before)
         let textToCopy = markdownInput.trim(); 
         if (!textToCopy) {
              if(userName || userAge || userGender) { textToCopy = generateUserDataAndQuestionsForAI(userName,userAge,userGender); } 
@@ -362,24 +362,60 @@ export default function ToPdfPageWithPsychoFocus() {
         } finally { setIsLoading(false); }
     };
     
-    const handlePurchaseAccess = async () => { /* ... (same as before) ... */ };
+    const handlePurchaseAccess = async () => {
+        if (!isAuthenticated || !dbUser?.user_id) {
+          toast.error(t('errorNotAuthenticated'));
+          return;
+        }
+        setIsPurchasing(true);
+        const cardDetails: ProtoCardDetails = {
+          cardId: PERSONALITY_REPORT_PDF_CARD_ID,
+          title: currentLang === 'ru' ? `Доступ к PRIZMA Анализатору` : `PRIZMA Analyzer Access`,
+          description: currentLang === 'ru' ? `Разблокировать AI Генератор PDF для психологических расшифровок PRIZMA. Цена: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.` : `Unlock the AI PDF Generator for PRIZMA personality insights. Price: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.`,
+          amountXTR: PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR,
+          type: "tool_access",
+          metadata: { page_link: "/topdf", tool_name: "PRIZMA PDF Generator", photo_url: HERO_IMAGE_URL }
+        };
+        try {
+          const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
+          if (result.success) {
+            toast.success(t('purchaseSuccessMessage'));
+            if(refreshDbUser) { setTimeout(async () => { await refreshDbUser(); }, 7000); }
+          } else { toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));}
+        } catch (error) {
+          toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));
+        }
+        setIsPurchasing(false);
+    };
+
     const handleProceedToUserData = () => setCurrentStep('userData');
     const handleProceedToQuestions = () => {
       if (!userName.trim()) { toast.error(currentLang === 'ru' ? "Пожалуйста, введите ваше имя." : "Please enter your name."); return; }
       if (user?.id) { saveUserPdfFormData(String(user.id), { userName, userAge, userGender }); }
       setCurrentStep('questions');
     };
-    const handlePurchaseFullAnalysis = () => { // Placeholder for actual payment logic
+    const handlePurchaseFullAnalysis = () => { 
         toast.info("Функция покупки полной версии в разработке!");
-        // Example: setCurrentStep('paymentSuccess'); // For testing flow
     };
     const toggleLang = useCallback(() => setCurrentLang(p => p === 'en' ? 'ru' : 'en'), []);
 
-    if (appContextLoading || appContextAuthenticating || isCheckingAccess) { /* ... (loading screen same as before) ... */ 
+    if (appContextLoading || appContextAuthenticating || isCheckingAccess) { 
         return ( <div className="flex flex-col justify-center items-center min-h-screen pt-20 bg-background text-foreground"> <VibeContentRenderer content="::FaSpinner className='animate-spin text-brand-purple text-4xl'::" /> <span className="mt-4 text-lg font-mono">{t('loadingUser')}</span> </div> );
     }
-    if (!hasAccess) { /* ... (access denied screen same as before) ... */ 
-        return ( <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center text-foreground"> {/* Content same as before */} </div> );
+    if (!hasAccess) { 
+        return ( <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center text-foreground">
+            <VibeContentRenderer content="::FaLock className='text-7xl text-brand-red mb-6 animate-pulse'::" />
+            <h1 className="text-3xl sm:text-4xl font-orbitron font-bold text-brand-red mb-4">{t("accessDeniedTitle")}</h1>
+            <p className="text-md sm:text-lg text-muted-foreground mb-8 max-w-md">{t("accessDeniedSubtitle")}</p>
+            <Button onClick={handlePurchaseAccess} disabled={isPurchasing || !isAuthenticated} size="lg" className="bg-gradient-to-r from-brand-orange to-red-600 text-white font-orbitron font-bold py-3 px-8 rounded-lg text-lg hover:from-brand-orange/90 hover:to-red-600/90 transition-all shadow-lg hover:shadow-yellow-500/50">
+              {isPurchasing ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaKey::" className="mr-2" />}
+              {isPurchasing ? t("purchasingInProgress") : t("purchaseAccessButton", { PRICE: PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR })}
+            </Button>
+            {!isAuthenticated && <p className="text-xs text-red-400 mt-3">{t("errorNotAuthenticated")}</p>}
+            <Link href="/hotvibes" className="block mt-10">
+                <Button variant="outline" className="border-brand-blue text-brand-blue hover:bg-brand-blue/10 text-sm"> <VibeContentRenderer content={t("backToHotVibes")}/> </Button>
+            </Link>
+        </div> );
     }
     
     const StepContainer: React.FC<{children: React.ReactNode, title?: string, showBackButton?: boolean, onBack?: () => void, className?: string}> = ({ children, title, showBackButton, onBack, className }) => (
@@ -397,14 +433,14 @@ export default function ToPdfPageWithPsychoFocus() {
     return (
         <div className={cn("min-h-screen flex flex-col items-center justify-center pt-[var(--header-height,60px)] pb-10", "bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 text-foreground px-4 font-sans")}>
             <Toaster position="bottom-center" richColors theme="light" toastOptions={{ className: '!font-mono !shadow-lg' }} />
-            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20">  {/* Language toggle */}
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20">  
                 <button onClick={toggleLang} className="p-1.5 sm:p-2 bg-card/80 border border-border rounded-md hover:bg-muted/30 transition-colors flex items-center gap-1 text-xs text-muted-foreground shadow-sm" title={t("toggleLanguage")}> 
                     <VibeContentRenderer content="::FaLanguage::" className="w-4 h-4 sm:w-3.5 sm:h-3.5"/> <span className="hidden sm:inline">{currentLang === 'en' ? 'RU' : 'EN'}</span>
                 </button> 
             </div>
 
             {currentStep === 'intro' && (
-                <div className="w-full max-w-md mx-auto p-6 md:p-8 space-y-6 text-center"> {/* No card bg for intro */}
+                <div className="w-full max-w-md mx-auto p-6 md:p-8 space-y-6 text-center"> 
                     <VibeContentRenderer content="::FaAtom size=80 className='text-brand-purple mx-auto mb-4 animate-pulse-slow'::" /> 
                     <h1 className="text-5xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue mb-3">{t("prizmaIntroTitle")}</h1>
                     <p className="text-lg text-muted-foreground mb-2">{t("prizmaIntroSubtitle")}</p>
@@ -417,7 +453,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
             {currentStep === 'userData' && (
                 <StepContainer title={t("prizmaUserDataPrompt")} showBackButton onBack={() => setCurrentStep('intro')}>
-                    <div className="space-y-4"> {/* Inputs same as before */}
+                    <div className="space-y-4"> 
                         <div> <Label htmlFor="userName" className="text-sm font-medium text-muted-foreground">{t("userNameLabel")}</Label> <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder={currentLang === 'ru' ? "Иван Иванов" : "John Doe"} className="w-full mt-1 input-cyber" /> </div>
                         <div> <Label htmlFor="userAge" className="text-sm font-medium text-muted-foreground">{t("userAgeLabel")}</Label> <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full mt-1 input-cyber" /> </div>
                         <div> <Label htmlFor="userGender" className="text-sm font-medium text-muted-foreground">{t("userGenderLabel")}</Label> <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder={currentLang === 'ru' ? "Мужчина/Женщина" : "Male/Female"} className="w-full mt-1 input-cyber" /> </div>
@@ -430,12 +466,26 @@ export default function ToPdfPageWithPsychoFocus() {
             
             {currentStep === 'questions' && (
                  <StepContainer title={t("prizmaQuestionsTitle")} showBackButton onBack={() => setCurrentStep('userData')}>
-                    {/* ... Content: Demo questions, textarea, copy, gemini, xlsx ... same as before ... */}
                     <div className="space-y-4">
                         <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/10"> <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")} </Button>
                         <div> <Label htmlFor="markdownInput" className="text-sm font-medium text-muted-foreground">{t("pasteMarkdown")}</Label> <textarea id="markdownInput" value={markdownInput} onChange={(e) => setMarkdownInput(e.target.value)} placeholder={t('workingAreaMark')} rows={15} className="w-full mt-1 p-2.5 sm:p-3 input-cyber simple-scrollbar" disabled={isLoading}/> </div>
                         {(markdownInput) && ( <div className="mt-4 flex flex-col sm:flex-row gap-3"> <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan/80 text-brand-cyan hover:bg-brand-cyan/10 flex-1"> <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")} </Button> <Button variant="outline" asChild className="border-brand-blue/80 text-brand-blue hover:bg-brand-blue/10 flex-1"> <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" > <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToGemini")} </a> </Button> </div> )}
-                        <details className="mt-4 pt-4 border-t border-border group"> {/* XLSX Upload */} </details>
+                        <details className="mt-4 pt-4 border-t border-border group">
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors font-semibold flex items-center gap-1">
+                                <span className="flex items-center gap-1"> {/* Wrapper span */}
+                                    <VibeContentRenderer content="::FaFileImport::" />
+                                    {t("xlsxUploadOptionalTitle")}
+                                    <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
+                                </span>
+                            </summary>
+                            <div className="mt-3 p-3 border border-dashed border-border rounded-lg bg-background shadow-inner">
+                                <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-4 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-input-border hover:border-brand-yellow text-muted-foreground hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/5")}>
+                                    <VibeContentRenderer content="::FaUpload::" className="text-xl mb-1" /> 
+                                    <span className="font-medium text-xs">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
+                                    <input id="xlsxFileOptional" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleXlsxFileChange} className="sr-only" disabled={isLoading} />
+                                </label>
+                            </div>
+                        </details>
                     </div>
                     <Button onClick={handleGeneratePdfAndProceed} disabled={isLoading || !markdownInput.trim()} size="lg" className="w-full mt-8 bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
                         {isLoading ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/>{t("prizmaAnalyzing")}</> : t("prizmaNext")}
@@ -491,7 +541,7 @@ export default function ToPdfPageWithPsychoFocus() {
                 </StepContainer>
             )}
             
-            {currentStep === 'generalError' && ( /* ... (same as before) ... */ 
+            {currentStep === 'generalError' && ( 
                  <StepContainer title={t("prizmaErrorTitle")} className="text-center">
                     <VibeContentRenderer content="::FaTimesCircle className='text-6xl text-red-500 mx-auto mb-4'::" /> <p className="text-md text-muted-foreground mb-6">{statusMessage || t("prizmaErrorDesc")}</p> <div className="space-y-3"> <Button onClick={() => setCurrentStep('questions')} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg"> {t("prizmaTryAgain")} </Button> <Button onClick={() => { toast.info("Связь с поддержкой в разработке"); }} variant="outline" className="w-full"> {t("prizmaContactSupport")} </Button> </div>
                 </StepContainer>
