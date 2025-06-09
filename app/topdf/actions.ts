@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import { supabaseAdmin } from '@/hooks/supabase'; 
 import { sendTelegramMessage as commonSendTelegramMessage } from '@/app/actions'; 
-import { generatePdfBytes } from './pdfGenerator'; // Import the core PDF generation logic
+import { generatePdfBytes } from './pdfGenerator'; 
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
@@ -113,6 +113,33 @@ export async function loadUserPdfFormData(
   }
 }
 
+function escapeTelegramMarkdown(text: string): string {
+    if (!text) return '';
+    // Escape characters: _, *, [, ], (, ), ~, `, >, #, +, -, =, |, {, }, ., !
+    // Note: Escaping all of them might be too much for some cases, adjust as needed.
+    // For captions, usually '_', '*', '`', '[' are the most problematic.
+    return text
+        .replace(/_/g, '\\_')
+        .replace(/\*/g, '\\*')
+        .replace(/\[/g, '\\[')
+        .replace(/]/g, '\\]')
+        // .replace(/\(/g, '\\(') // Parentheses are tricky, often not needed for escaping
+        // .replace(/\)/g, '\\)')
+        .replace(/`/g, '\\`')
+        // .replace(/~/g, '\\~') // Strikethrough might be desired
+        // .replace(/>/g, '\\>') // Blockquotes might be desired
+        // .replace(/#/g, '\\#') // Headers might be desired
+        // .replace(/\+/g, '\\+')
+        // .replace(/-/g, '\\-') // Often part of lists or horizontal rules
+        // .replace(/=/g, '\\=')
+        // .replace(/\|/g, '\\|')
+        // .replace(/{/g, '\\{')
+        // .replace(/}/g, '\\}')
+        // .replace(/\./g, '\\.') // Escaping dots can break URLs
+        // .replace(/!/g, '\\!');
+}
+
+
 async function sendTelegramDocument( 
   chatId: string,
   fileBlob: Blob,
@@ -134,8 +161,8 @@ async function sendTelegramDocument(
     formData.append("document", fileBlob, fileName);
 
     if (caption) {
-      formData.append("caption", caption);
-      formData.append("parse_mode", "Markdown"); 
+      formData.append("caption", escapeTelegramMarkdown(caption)); // Escape caption
+      formData.append("parse_mode", "MarkdownV2"); // Use MarkdownV2 for better escaping support
     }
 
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
@@ -145,7 +172,7 @@ async function sendTelegramDocument(
 
     const data: TelegramApiResponse = await response.json();
     if (!data.ok) {
-       logger.error(`[topdf/actions.ts sendTelegramDocument] Telegram API error: ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code, captionProvided: !!caption });
+       logger.error(`[topdf/actions.ts sendTelegramDocument] Telegram API error: ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code, captionProvided: !!caption, originalCaption: caption });
       throw new Error(data.description || "Failed to send document");
     }
 
@@ -188,6 +215,7 @@ export async function generatePdfFromMarkdownAndSend(
         
         let caption = `📄 Ваш PDF отчет PRIZMA готов: "${pdfFileName}"`;
         if (userName) caption += `\n👤 Для: ${userName}`;
+        // No userAge or userGender in caption to simplify and reduce risk of parse errors
         
         const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName, caption);
 
@@ -213,9 +241,9 @@ export async function notifyAdminAction(
         logger.error("[topdf/actions notifyAdminAction] Telegram Bot Token or Admin Chat ID not configured.");
         return { success: false, error: "Server configuration error for notifications." };
     }
-    const adminMessage = `🆘 Запрос в поддержку от PRIZMA:\n\nПользователь: ${username || 'N/A'} (ID: ${userId})\nСообщение: "${messageFromUser}"\nСтраница: /topdf`;
+    const adminMessage = `🆘 Запрос в поддержку от PRIZMA:\n\nПользователь: ${username || 'N/A'} (ID: ${userId})\nСообщение: "${escapeTelegramMarkdown(messageFromUser)}"\nСтраница: /topdf`;
     try {
-        const result = await commonSendTelegramMessage(String(ADMIN_CHAT_ID), adminMessage);
+        const result = await commonSendTelegramMessage(String(ADMIN_CHAT_ID), adminMessage, [], undefined, "MarkdownV2");
         if (result.success) {
             logger.info(`[topdf/actions notifyAdminAction] Support request from user ${userId} sent to admin.`);
             return { success: true };
