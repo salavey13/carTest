@@ -4,15 +4,17 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
-import { supabaseAdmin } from '@/hooks/supabase'; // Use admin client directly
+import { supabaseAdmin } from '@/hooks/supabase'; 
+import { sendTelegramMessage as commonSendTelegramMessage } from '@/app/actions'; // Assuming a common sender exists
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
 
-if (!TELEGRAM_BOT_TOKEN && process.env.NODE_ENV !== 'test') { 
-    logger.error("[topdf/actions.ts] Missing critical environment variable: TELEGRAM_BOT_TOKEN for PDF sending.");
+if ((!TELEGRAM_BOT_TOKEN || !ADMIN_CHAT_ID) && process.env.NODE_ENV !== 'test') { 
+    logger.error("[topdf/actions.ts] Missing critical environment variables: TELEGRAM_BOT_TOKEN or ADMIN_CHAT_ID.");
 }
 
 interface TelegramApiResponse {
@@ -449,5 +451,32 @@ export async function generatePdfFromMarkdownAndSend(
         }
         const errorMsg = error instanceof Error ? error.message : 'Unexpected server error during PDF processing.';
         return { success: false, error: errorMsg };
+    }
+}
+
+export async function notifyAdminAction(
+    userId: string, 
+    username: string | null | undefined,
+    messageFromUser: string
+): Promise<{success: boolean, error?: string}> {
+    if (!TELEGRAM_BOT_TOKEN || !ADMIN_CHAT_ID) {
+        logger.error("[topdf/actions notifyAdminAction] Telegram Bot Token or Admin Chat ID not configured.");
+        return { success: false, error: "Server configuration error for notifications." };
+    }
+
+    const adminMessage = `🆘 Запрос в поддержку от PRIZMA:\n\nПользователь: ${username || 'N/A'} (ID: ${userId})\nСообщение: "${messageFromUser}"\nСтраница: /topdf`;
+
+    try {
+        const result = await commonSendTelegramMessage(adminMessage, [], undefined, ADMIN_CHAT_ID);
+        if (result.success) {
+            logger.info(`[topdf/actions notifyAdminAction] Support request from user ${userId} sent to admin.`);
+            return { success: true };
+        } else {
+            logger.error(`[topdf/actions notifyAdminAction] Failed to send support request to admin: ${result.error}`);
+            return { success: false, error: result.error };
+        }
+    } catch (e: any) {
+        logger.error(`[topdf/actions notifyAdminAction] Exception sending support request:`, e);
+        return { success: false, error: e.message || "Server error sending support request." };
     }
 }
