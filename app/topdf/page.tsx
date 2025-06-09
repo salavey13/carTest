@@ -10,8 +10,7 @@ import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
 import * as XLSX from 'xlsx'; 
 import { Button } from "@/components/ui/button"; 
-import { Input } from '@/components/ui/input'; 
-import { Label } from '@/components/ui/label'; 
+// Input, Label, Image are used within step components now
 import { 
     PSYCHO_ANALYSIS_SYSTEM_PROMPT, 
     REFINED_PERSONALITY_QUESTIONS_RU,
@@ -22,13 +21,24 @@ import { purchaseProtoCardAction } from '../hotvibes/actions';
 import type { ProtoCardDetails } from '../hotvibes/actions';   
 import Link from 'next/link';
 
+// Step Components
+import { IntroStep } from './components/steps/IntroStep';
+import { UserDataStep } from './components/steps/UserDataStep';
+import { QuestionsStep } from './components/steps/QuestionsStep';
+import { AnalyzingStep } from './components/steps/AnalyzingStep';
+import { BasicAnalysisReadyStep } from './components/steps/BasicAnalysisReadyStep';
+import { PaymentOfferDetailsStep } from './components/steps/PaymentOfferDetailsStep';
+import { PaymentSuccessStep } from './components/steps/PaymentSuccessStep';
+import { GeneralErrorStep } from './components/steps/GeneralErrorStep';
+
+
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250609_005358-9e5fdb54-31ed-4231-83c4-610a7c8d9336.jpg"; 
 
 const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
-const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7; // Example: 7 XTR for basic access
+const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7; 
 
 const PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID = "personality_pdf_pro_access_v1";
-const PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR = 2990; // Example: 2990 XTR for Pro access
+const PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR = 2990; 
 
 type PsychoFocusStep = 
   | 'intro' 
@@ -210,6 +220,9 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string, hasProAccess?: boolean): string => {
     const name = userName || "Пользователь";
     let content = `# Расшифровка Личности для ${name}\n\n`;
@@ -334,22 +347,33 @@ export default function ToPdfPageWithPsychoFocus() {
      useEffect(() => {
         if (!appContextLoading && !appContextAuthenticating) {
             setIsCheckingAccess(true);
+            debugLogger.info("[ToPdfPage AccessCheck] Starting. isAuthenticated:", isAuthenticated, "dbUser exists:", !!dbUser);
             if (isAuthenticated && dbUser) {
                 const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string; type?: string; data?: { page_link?: string } }> | undefined;
+                debugLogger.info("[ToPdfPage AccessCheck] User cards:", cards);
                 
                 const baseAccessCard = cards?.[PERSONALITY_REPORT_PDF_CARD_ID];
                 if (baseAccessCard?.status === 'active' && baseAccessCard.type === 'tool_access' && baseAccessCard.data?.page_link === '/topdf') {
                     setHasAccess(true);
-                } else { setHasAccess(false); }
+                    debugLogger.info("[ToPdfPage AccessCheck] Basic access GRANTED.");
+                } else { 
+                    setHasAccess(false); 
+                    debugLogger.info("[ToPdfPage AccessCheck] Basic access DENIED. Card:", baseAccessCard);
+                }
 
                 const proAccessCard = cards?.[PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID];
                 if (proAccessCard?.status === 'active' && proAccessCard.type === 'tool_access') { 
                     setHasProAccess(true);
-                } else { setHasProAccess(false); }
+                    debugLogger.info("[ToPdfPage AccessCheck] Pro access GRANTED.");
+                } else { 
+                    setHasProAccess(false); 
+                    debugLogger.info("[ToPdfPage AccessCheck] Pro access DENIED. Card:", proAccessCard);
+                }
 
             } else { 
                 setHasAccess(false);
                 setHasProAccess(false);
+                debugLogger.info("[ToPdfPage AccessCheck] No auth or dbUser, all access DENIED.");
             }
             setIsCheckingAccess(false);
         }
@@ -357,15 +381,26 @@ export default function ToPdfPageWithPsychoFocus() {
 
     useEffect(() => {
         if (user?.id && !appContextLoading && !appContextAuthenticating && hasAccess) { 
-            loadUserPdfFormData(String(user.id)).then(result => {
-                if (result.success && result.data) {
-                    setUserName(result.data.userName || (user.first_name || ''));
-                    setUserAge(result.data.userAge || '');
-                    setUserGender(result.data.userGender || '');
-                } else if (!result.data && user.first_name) { setUserName(user.first_name); }
-            });
-        } else if (user?.first_name && !userName) { setUserName(user.first_name); }
-    }, [user?.id, user?.first_name, appContextLoading, appContextAuthenticating, hasAccess, userName]);
+            // Only load form data if it hasn't been potentially set by user input already
+            if (!userName && !userAge && !userGender) {
+                loadUserPdfFormData(String(user.id)).then(result => {
+                    if (result.success && result.data) {
+                        setUserName(result.data.userName || (user.first_name || ''));
+                        setUserAge(result.data.userAge || '');
+                        setUserGender(result.data.userGender || '');
+                    } else if (!result.data && user.first_name && !userName) { // Ensure userName isn't already set by user
+                        setUserName(user.first_name);
+                    }
+                });
+            } else if (user.first_name && !userName) { // If form data is empty but user has a first name
+                 setUserName(user.first_name);
+            }
+        } else if (user?.first_name && !userName && !appContextLoading && !appContextAuthenticating) {
+            // If not authenticated for form data load yet, but we have a telegram first name
+            setUserName(user.first_name);
+        }
+    }, [user?.id, user?.first_name, appContextLoading, appContextAuthenticating, hasAccess, userName, userAge, userGender]);
+
 
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -416,7 +451,7 @@ export default function ToPdfPageWithPsychoFocus() {
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
                 if (hasProAccess) {
-                    setCurrentStep('paymentSuccess'); 
+                    setCurrentStep('paymentSuccess'); // This step now shows "Pro analysis sent"
                     setStatusMessage(t('prizmaProAnalysisSent'));
                 } else {
                     setCurrentStep('basicAnalysisReady'); 
@@ -471,6 +506,8 @@ export default function ToPdfPageWithPsychoFocus() {
             if(refreshDbUser) { 
                 setTimeout(async () => { 
                     await refreshDbUser(); 
+                    // After refresh, hasProAccess should be true.
+                    // Navigate to questions, where they can use the new Pro features.
                     setCurrentStep('questions'); 
                     toast.info(currentLang === 'ru' ? "Pro-доступ активирован! Теперь вам доступны все вопросы." : "Pro access activated! All questions are now available to you.");
                 }, 7000); 
@@ -527,17 +564,29 @@ export default function ToPdfPageWithPsychoFocus() {
         </div> );
     }
     
-    const StepContainer: React.FC<{children: React.ReactNode, title?: string, showBackButton?: boolean, onBack?: () => void, className?: string}> = ({ children, title, showBackButton, onBack, className }) => (
-        <div className={cn("w-full max-w-md mx-auto p-6 md:p-8 space-y-6 bg-card rounded-xl shadow-xl", className)}>
-            {showBackButton && onBack && (
-                <Button onClick={onBack} variant="ghost" size="sm" className="absolute top-5 left-5 text-muted-foreground hover:text-foreground">
-                    <VibeContentRenderer content="::FaArrowLeft::" className="mr-2"/> {currentLang === 'ru' ? 'Назад' : 'Back'}
-                </Button>
-            )}
-            {title && <h2 className="text-2xl font-orbitron font-bold text-center text-foreground">{title}</h2>}
-            {children}
-        </div>
-    );
+    // Current step rendering logic
+    const renderStep = () => {
+        switch (currentStep) {
+            case 'intro':
+                return <IntroStep translations={t} onStartAnalysis={handleProceedToUserData} heroImageUrl={HERO_IMAGE_URL} />;
+            case 'userData':
+                return <UserDataStep translations={t} userName={userName} setUserName={setUserName} userAge={userAge} setUserAge={setUserAge} userGender={userGender} setUserGender={setUserGender} onContinue={handleProceedToQuestions} onBack={() => setCurrentStep('intro')} currentLang={currentLang} />;
+            case 'questions':
+                return <QuestionsStep translations={t} markdownInput={markdownInput} setMarkdownInput={setMarkdownInput} selectedFile={selectedFile} isLoading={isLoading} onGenerateDemoQuestions={handleGenerateDemoQuestionsAndPrompt} onCopyToClipboard={handleCopyToClipboard} onGeneratePdf={handleGeneratePdfAndProceed} onBack={() => setCurrentStep('userData')} onXlsxFileChange={handleXlsxFileChange} />;
+            case 'analyzing':
+                return <AnalyzingStep translations={t} statusMessage={statusMessage} />;
+            case 'basicAnalysisReady':
+                return <BasicAnalysisReadyStep translations={t} onGetFullAnalysis={() => setCurrentStep('paymentOfferDetails')} onGoToIntro={() => setCurrentStep('intro')} hasProAccess={hasProAccess} />;
+            case 'paymentOfferDetails':
+                return <PaymentOfferDetailsStep translations={t} onPurchaseFullAnalysis={handlePurchaseFullAnalysis} onBack={() => setCurrentStep('basicAnalysisReady')} isPurchasing={isPurchasing} proAccessPrice={PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR} currentLang={currentLang} />;
+            case 'paymentSuccess':
+                return <PaymentSuccessStep translations={t} onContinue={() => setCurrentStep(hasProAccess ? 'intro' : 'questions')} hasProAccess={hasProAccess} />;
+            case 'generalError':
+                return <GeneralErrorStep translations={t} statusMessage={statusMessage} onTryAgain={() => setCurrentStep('questions')} onContactSupport={handleContactSupport} isLoading={isLoading} />;
+            default:
+                return <IntroStep translations={t} onStartAnalysis={handleProceedToUserData} heroImageUrl={HERO_IMAGE_URL} />;
+        }
+    };
     
     return (
         <div ref={pageContainerRef} className={cn("min-h-screen flex flex-col items-center justify-center pt-10 sm:pt-12 pb-10", "bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 text-foreground px-4 font-sans")}>
@@ -547,154 +596,7 @@ export default function ToPdfPageWithPsychoFocus() {
                     <VibeContentRenderer content="::FaLanguage::" className="w-4 h-4 sm:w-3.5 sm:h-3.5"/> <span className="hidden sm:inline">{currentLang === 'en' ? 'RU' : 'EN'}</span>
                 </button> 
             </div>
-
-            {currentStep === 'intro' && (
-                <div className="w-full max-w-md mx-auto p-6 md:p-8 space-y-6 text-center"> 
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-4 rounded-full overflow-hidden shadow-lg animate-pulse-slow">
-                         <VibeContentRenderer content={`::img src="${HERO_IMAGE_URL}" alt="PRIZMA Sphere" className="w-full h-full object-cover"::`} />
-                    </div>
-                    <h1 className="text-5xl font-orbitron font-black text-transparent bg-clip-text bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue mb-3">{t("prizmaIntroTitle")}</h1>
-                    <p className="text-lg text-muted-foreground mb-2">{t("prizmaIntroSubtitle")}</p>
-                    <p className="text-sm text-muted-foreground mb-8">{t("prizmaIntroDesc")}</p>
-                    <Button onClick={handleProceedToUserData} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                        {t("prizmaStartAnalysis")} <VibeContentRenderer content="::FaChevronRight className='ml-2'::"/>
-                    </Button>
-                </div>
-            )}
-
-            {currentStep === 'userData' && (
-                <StepContainer title={t("prizmaUserDataPrompt")} showBackButton onBack={() => setCurrentStep('intro')}>
-                    <div className="space-y-4"> 
-                        <div> <Label htmlFor="userName" className="text-sm font-medium text-muted-foreground">{t("userNameLabel")}</Label> <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder={currentLang === 'ru' ? "Иван Иванов" : "John Doe"} className="w-full mt-1 input-cyber" /> </div>
-                        <div> <Label htmlFor="userAge" className="text-sm font-medium text-muted-foreground">{t("userAgeLabel")}</Label> <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full mt-1 input-cyber" /> </div>
-                        <div> <Label htmlFor="userGender" className="text-sm font-medium text-muted-foreground">{t("userGenderLabel")}</Label> <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder={currentLang === 'ru' ? "Мужчина/Женщина" : "Male/Female"} className="w-full mt-1 input-cyber" /> </div>
-                    </div>
-                    <Button onClick={handleProceedToQuestions} size="lg" className="w-full mt-8 bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                        {t("prizmaContinue")} <VibeContentRenderer content="::FaChevronRight className='ml-2'::"/>
-                    </Button>
-                </StepContainer>
-            )}
-            
-            {currentStep === 'questions' && (
-                 <StepContainer title={t("prizmaQuestionsTitle")} showBackButton onBack={() => setCurrentStep('userData')}>
-                    <div className="space-y-4">
-                        <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/10"> 
-                           <span className="flex items-center justify-center">
-                                <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")}
-                           </span>
-                        </Button>
-                        <div> <Label htmlFor="markdownInput" className="text-sm font-medium text-muted-foreground">{t("pasteMarkdown")}</Label> <textarea id="markdownInput" value={markdownInput} onChange={(e) => setMarkdownInput(e.target.value)} placeholder={t('workingAreaMark')} rows={15} className="w-full mt-1 p-2.5 sm:p-3 input-cyber simple-scrollbar" disabled={isLoading}/> </div>
-                        {(markdownInput) && ( <div className="mt-4 flex flex-col sm:flex-row gap-3"> 
-                            <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan/80 text-brand-cyan hover:bg-brand-cyan/10 flex-1"> 
-                                <span className="flex items-center justify-center">
-                                    <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")} 
-                                </span>
-                            </Button> 
-                            <div className="flex-1">
-                                <Button variant="outline" asChild className="border-brand-blue/80 text-brand-blue hover:bg-brand-blue/10 w-full"> 
-                                    <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" > 
-                                        <span className="flex items-center justify-center">
-                                            <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToAiStudio")} 
-                                        </span>
-                                    </a> 
-                                </Button>
-                                <p className="text-xs text-muted-foreground text-center mt-1">{t("goToAiStudioSubtext")}</p>
-                            </div>
-                        </div> )}
-                        <details className="mt-4 pt-4 border-t border-border group">
-                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors font-semibold flex items-center gap-1">
-                                <span className="flex items-center gap-1"> 
-                                    <VibeContentRenderer content="::FaFileImport::" />
-                                    {t("xlsxUploadOptionalTitle")}
-                                    <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
-                                </span>
-                            </summary>
-                            <div className="mt-3 p-3 border border-dashed border-border rounded-lg bg-background shadow-inner">
-                                <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-4 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-input-border hover:border-brand-yellow text-muted-foreground hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/5")}>
-                                    <VibeContentRenderer content="::FaUpload::" className="text-xl mb-1" /> 
-                                    <span className="font-medium text-xs">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
-                                    <input id="xlsxFileOptional" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleXlsxFileChange} className="sr-only" disabled={isLoading} />
-                                </label>
-                            </div>
-                        </details>
-                    </div>
-                    <Button onClick={handleGeneratePdfAndProceed} disabled={isLoading || !markdownInput.trim()} size="lg" className="w-full mt-8 bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                        {isLoading ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/>{t("prizmaAnalyzing")}</> : t("prizmaNext")}
-                    </Button>
-                 </StepContainer>
-            )}
-
-            {currentStep === 'analyzing' && isLoading && ( 
-                 <StepContainer className="text-center">
-                    <VibeContentRenderer content="::FaSpinner className='text-6xl text-brand-purple mx-auto mb-6 animate-spin'::" />
-                    <h1 className="text-3xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue mb-3">{t("prizmaAnalyzingTitle")}</h1>
-                    <p className="text-lg text-muted-foreground">{statusMessage || t("prizmaAnalyzing")}</p>
-                 </StepContainer>
-            )}
-
-            {currentStep === 'basicAnalysisReady' && (
-                <StepContainer className="text-center">
-                    <VibeContentRenderer content="::FaCheckCircle className='text-6xl text-green-500 mx-auto mb-4'::" />
-                    <h1 className="text-3xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue mb-3">
-                        {t("prizmaBasicAnalysisReadyTitle")}
-                    </h1>
-                    <p className="text-md text-muted-foreground mb-6">
-                        {t("prizmaBasicAnalysisSent")}
-                    </p>
-                    {!hasProAccess && (
-                        <Button onClick={() => setCurrentStep('paymentOfferDetails')} size="lg" className="w-full bg-brand-gradient-pink-purple text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                            {t("prizmaGetFullAnalysis")}
-                        </Button>
-                    )}
-                     {hasProAccess && ( 
-                        <p className="text-md text-green-600 font-semibold mb-6">{t("prizmaProAnalysisSent")}</p>
-                    )}
-                    <Button onClick={() => setCurrentStep('intro')} variant="link" className="text-brand-blue mt-4">Вернуться на главный экран</Button>
-                </StepContainer>
-            )}
-            
-            {currentStep === 'paymentOfferDetails' && !hasProAccess && (
-                <StepContainer showBackButton onBack={() => setCurrentStep('basicAnalysisReady')} className="text-center">
-                    <div className="bg-card border border-border rounded-xl p-6 shadow-xl my-6 relative overflow-hidden">
-                        <div className="absolute -top-px -right-px bg-brand-pink text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg shadow-md transform-gpu">{currentLang === 'ru' ? 'ХИТ' : 'POPULAR'}</div>
-                        <h2 className="text-2xl font-orbitron font-bold text-foreground mb-2">{t("prizmaPaymentOfferTitle")}</h2>
-                        <div className="my-4">
-                            <span className="text-4xl font-orbitron font-black text-brand-purple">{t("prizmaPaymentOfferPrice", { PRICE: PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR })}</span> 
-                            <span className="text-lg text-muted-foreground line-through ml-2">{t("prizmaPaymentOfferPriceOld")}</span>
-                        </div>
-                        <VibeContentRenderer content={t("prizmaPaymentOfferFeatures")} className="text-sm text-muted-foreground space-y-1 text-left prose prose-sm max-w-none prose-p:my-0.5 prose-ul:my-1 prose-li:my-0"/>
-                        <Button onClick={handlePurchaseFullAnalysis} disabled={isPurchasing} size="lg" className="w-full mt-6 bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                            {isPurchasing ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> : t("prizmaChoosePayment")}
-                        </Button>
-                         <p className="text-xs text-muted-foreground mt-3">{t("prizmaPaymentGuarantee")}</p>
-                    </div>
-                </StepContainer>
-            )}
-            
-            {currentStep === 'paymentSuccess' && ( 
-                <StepContainer title={hasProAccess ? t("prizmaProAnalysisReadyTitle") : t("prizmaPaymentSuccessTitle")} className="text-center">
-                     <VibeContentRenderer content="::FaCreditCard className='text-6xl text-green-500 mx-auto mb-4'::" />
-                    <p className="text-md text-muted-foreground mb-6">
-                        {hasProAccess ? t("prizmaProAnalysisSent") : t("prizmaPaymentSuccessDesc", {REMAINING: PRO_ADDITIONAL_QUESTIONS_RU.length})}
-                    </p>
-                    <Button onClick={() => setCurrentStep(hasProAccess ? 'intro' : 'questions')} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                        {t("prizmaContinue")}
-                    </Button>
-                </StepContainer>
-            )}
-            
-            {currentStep === 'generalError' && ( 
-                 <StepContainer title={t("prizmaErrorTitle")} className="text-center">
-                    <VibeContentRenderer content="::FaCircleXmark className='text-6xl text-red-500 mx-auto mb-4'::" /> 
-                    <p className="text-md text-muted-foreground mb-6">{statusMessage || t("prizmaErrorDesc")}</p> 
-                    <div className="space-y-3"> 
-                        <Button onClick={() => setCurrentStep('questions')} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg"> {t("prizmaTryAgain")} </Button> 
-                        <Button onClick={handleContactSupport} disabled={isLoading} variant="outline" className="w-full"> 
-                            {isLoading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> : t("prizmaContactSupport")}
-                        </Button> 
-                    </div>
-                </StepContainer>
-            )}
+            {renderStep()}
         </div>
     );
 }
