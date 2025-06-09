@@ -4,10 +4,7 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
-// MODIFICATION: Directly import supabaseAdmin for these specific actions
-import { supabaseAdmin } from '@/hooks/supabase'; 
-// We will not use fetchUserData and updateUserMetadata from the hook here,
-// as they might be using a client-side authenticated client.
+import { supabaseAdmin } from '@/hooks/supabase'; // Use admin client directly
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
@@ -34,38 +31,29 @@ export async function saveUserPdfFormData(
   if (!userId) {
     return { success: false, error: "User ID is required to save PDF form data." };
   }
-  if (!supabaseAdmin) { // Check if admin client is available
+  if (!supabaseAdmin) { 
     logger.error("[topdf/actions saveUserPdfFormData] Supabase admin client is not available.");
     return { success: false, error: "Server configuration error (admin client)." };
   }
 
   try {
-    // Fetch current metadata using supabaseAdmin
     const { data: userData, error: fetchError } = await supabaseAdmin
         .from('users')
         .select('metadata')
         .eq('user_id', userId)
         .single();
 
-    if (fetchError) {
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116: single row not found (user might not exist yet or has no metadata)
         logger.error(`[topdf/actions saveUserPdfFormData] Error fetching user metadata for ${userId}:`, fetchError);
         return { success: false, error: fetchError.message || "Failed to fetch user data." };
     }
-    if (!userData) {
-      // This case might be valid if you want to create the metadata field on a user who doesn't have one yet.
-      // However, typically, the user record should exist.
-      logger.warn(`[topdf/actions saveUserPdfFormData] User ${userId} not found or no metadata field.`);
-      // Depending on desired behavior, you might want to return an error or proceed to create/update.
-      // For now, let's assume we proceed and it will create/update the metadata field.
-    }
-
+    
     const currentMetadata = userData?.metadata || {};
     const updatedMetadata = {
       ...currentMetadata,
       [PDF_FORM_DATA_KEY]: formData,
     };
 
-    // Update metadata using supabaseAdmin
     const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ metadata: updatedMetadata, updated_at: new Date().toISOString() })
@@ -91,25 +79,25 @@ export async function loadUserPdfFormData(
   if (!userId) {
     return { success: false, error: "User ID is required to load PDF form data." };
   }
-   if (!supabaseAdmin) { // Check if admin client is available
+   if (!supabaseAdmin) { 
     logger.error("[topdf/actions loadUserPdfFormData] Supabase admin client is not available.");
     return { success: false, error: "Server configuration error (admin client)." };
   }
 
   try {
-    // Fetch metadata using supabaseAdmin
     const { data: userData, error: fetchError } = await supabaseAdmin
         .from('users')
         .select('metadata')
         .eq('user_id', userId)
         .single();
         
-    if (fetchError) {
+    if (fetchError && fetchError.code !== 'PGRST116') {
         logger.error(`[topdf/actions loadUserPdfFormData] Error fetching user metadata for ${userId}:`, fetchError);
         return { success: false, error: fetchError.message || "Failed to fetch user data." };
     }
     if (!userData) {
-      debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found.`);
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found or no metadata.`);
+      // Return success false if user not found, or success true with undefined data if that's acceptable
       return { success: false, error: "User not found to load PDF form data." };
     }
 
@@ -127,10 +115,6 @@ export async function loadUserPdfFormData(
     return { success: false, error: e.message || "Server error loading PDF form data." };
   }
 }
-
-// ... (The rest of the file: sendTelegramDocument, drawMarkdownWrappedText, generatePdfFromMarkdownAndSend
-//      should remain the same as the last correct version you provided, as they don't depend on user-specific RLS
-//      for their core PDF generation and Telegram sending logic. Their dependencies are file system access and Telegram bot token.)
 
 async function sendTelegramDocument( 
   chatId: string,

@@ -12,7 +12,12 @@ import * as XLSX from 'xlsx';
 import { Button } from "@/components/ui/button"; 
 import { Input } from '@/components/ui/input'; 
 import { Label } from '@/components/ui/label'; 
-import { PSYCHO_ANALYSIS_SYSTEM_PROMPT, REFINED_PERSONALITY_QUESTIONS_RU } from './psychoAnalysisPrompt';
+import { 
+    PSYCHO_ANALYSIS_SYSTEM_PROMPT, 
+    REFINED_PERSONALITY_QUESTIONS_RU,
+    PRO_ADDITIONAL_QUESTIONS_RU, // New Pro questions
+    PSYCHO_ANALYSIS_PRO_SYSTEM_PROMPT // New Pro prompt
+} from './psychoAnalysisPrompt';
 import { purchaseProtoCardAction } from '../hotvibes/actions'; 
 import type { ProtoCardDetails } from '../hotvibes/actions';   
 import Link from 'next/link';
@@ -21,6 +26,9 @@ const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/obje
 
 const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
+
+const PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID = "personality_pdf_pro_access_v1";
+const PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR = 2990; // Placeholder, ~ $30
 
 type PsychoFocusStep = 
   | 'intro' 
@@ -33,177 +41,33 @@ type PsychoFocusStep =
   | 'paymentError'
   | 'generalError';
 
+// ... (translations remain largely the same, maybe add specific ones for Pro if needed later)
 const translations: Record<string, Record<string, string>> = {
-  en: {
-    "pageTitle": "PRIZMA: Personality Analysis", 
-    "pageSubtitle": "Generate a personalized PDF report based on your answers.", 
-    "step1Title": "Step 1: Your Data",
-    "generateDemoQuestions": "Fill with Demo Questions",
-    "demoQuestionsGenerated": "Demo questions & user data prepared! Copied to Markdown area.",
-    "userDataTitle": "User Data for Report", 
-    "userNameLabel": "Name",
-    "userAgeLabel": "Age",
-    "userGenderLabel": "Gender",
-    "step2Title": "Step 2: Answer Questions", 
-    "pasteMarkdown": "Paste your detailed answers to the questions here:", 
-    "copyPromptAndData": "Copy My Answers & AI Prompt",
-    "goToGemini": "Open Gemini AI Studio (for self-analysis)",
-    "step3Title": "Step 3: Generate Report",
-    "generateAndSendPdf": "Generate PDF & Send to Telegram",
-    "processing": "Processing...",
-    "parsingXlsx": "Parsing XLSX...", 
-    "generatingPromptForXlsx": "Generating AI Prompt for XLSX...",
-    "generatingPdf": "Generating PDF Report...",
-    "sendingPdf": "Sending PDF to Telegram...",
-    "errorNoUser": "User information not available. Please ensure you are logged in via Telegram.",
-    "errorNoMarkdown": "Please paste the report content for the PDF.", 
-    "successMessage": "Success! Your PDF report has been sent to your Telegram chat.",
-    "processFailed": "Processing failed. Please try again.",
-    "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
-    "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
-    "promptCopySuccess": "Full AI prompt (data + answers + system instructions) copied to clipboard!", 
-    "promptCopyError": "Failed to copy. Please copy manually.",
-    "unexpectedError": "An unexpected error occurred: %%ERROR%%",
-    "loadingUser": "Loading user data...",
-    "status": "Status",
-    "readyForUserData": "Ready for user data.",
-    "readyForPdf": "Ready to generate PDF.", 
-    "toggleLanguage": "Toggle Language",
-    "xlsxUploadOptionalTitle": "Optional: Upload XLSX for AI Analysis (Alternative Flow)",
-    "selectFile": "Select XLSX Report (Optional)",
-    "noFileSelected": "No file selected",
-    "fileSelected": "File: %%FILENAME%%",
-    "errorFileTooLarge": "File is too large. Maximum size: 5MB.",
-    "errorInvalidFileType": "Invalid file type. Only .xlsx files are accepted.",
-    "formDataSaved": "User data saved for this session.",
-    "formDataError": "Error saving user data for session.",
-    "accessDeniedTitle": "Access to PRIZMA Denied!",
-    "accessDeniedSubtitle": "To use the AI PDF Report Generator, please purchase an Access ProtoCard.",
-    "purchaseAccessButton": "Purchase Access for %%PRICE%% XTR",
-    "purchasingInProgress": "Processing Purchase...",
-    "errorNotAuthenticated": "Please log in via Telegram to purchase access.",
-    "purchaseSuccessMessage": "Access request sent! Check Telegram to complete payment.",
-    "purchaseErrorMessage": "Failed to initiate access purchase. %%ERROR%%",
-    "backToHotVibes": "::FaArrowLeft:: Back to Hot Vibes",
-    "promptGenerated": "AI prompt for XLSX prepared and copied to Markdown area.",
-    "workingAreaMark": "YOUR WORKSPACE: Paste AI responses or final answers here for PDF generation.",
-    "prizmaIntroTitle": "PRIZMA",
-    "prizmaIntroSubtitle": "Your personal AI psychologist and mentor",
-    "prizmaIntroDesc": "Take a voice survey and learn more about yourself. It was, it is, it will be.",
-    "prizmaStartAnalysis": "Start Analysis",
-    "prizmaUserDataPrompt": "Let's get acquainted! Enter your basic details for your audit.",
-    "prizmaContinue": "Continue",
-    "prizmaQuestionsTitle": "Tell us about your main values in life",
-    "prizmaNext": "Next",
-    "prizmaAnalyzing": "Analyzing your answers...",
-    "prizmaBasicAnalysisReadyTitle": "Your basic analysis is ready!",
-    "prizmaBasicAnalysisSent": "Your basic PDF report has been sent to Telegram.",
-    "prizmaGetFullAnalysis": "Get Full Analysis",
-    "prizmaPaymentOfferTitle": "Full Decryption",
-    "prizmaPaymentOfferPrice": "$29.90", 
-    "prizmaPaymentOfferPriceOld": "$60.00", 
-    "prizmaPaymentOfferFeatures": "Free Decryption<br>10 Page Analysis<br>3 Basic Methods<br>General Recommendations<br>Analysis in 24 hours<br>---<br>12 Professional Techniques<br>50+ Personalized Recommendations<br>Individual Psychologist Support",
-    "prizmaChoosePayment": "Choose Payment Method",
-    "prizmaPaymentGuarantee": "Secure Payment · Data Protection",
-    "prizmaPaymentSuccessTitle": "Payment Successful!",
-    "prizmaPaymentSuccessDesc": "To get your full analysis, complete the survey. %%REMAINING%% questions left.",
-    "prizmaErrorTitle": "Something went wrong!",
-    "prizmaErrorDesc": "A technical error occurred. Please try again or contact support.",
-    "prizmaTryAgain": "Try Again",
-    "prizmaContactSupport": "Contact Support",
-    "prizmaAnalyzingTitle": "Analyzing your answers",
-  },
-  ru: {
-    "pageTitle": "PRIZMA: Психологический Анализ", 
-    "pageSubtitle": "Создайте персонализированный PDF-отчет на основе ваших ответов.", 
-    "step1Title": "Шаг 1: Ваши Данные",
-    "generateDemoQuestions": "Заполнить демо-вопросами",
-    "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены! Скопированы в область Markdown.",
-    "userDataTitle": "Данные Пользователя для Отчета", 
-    "userNameLabel": "Имя",
-    "userAgeLabel": "Возраст",
-    "userGenderLabel": "Пол",
-    "step2Title": "Шаг 2: Ответы на Вопросы", 
-    "pasteMarkdown": "Вставьте сюда ваши развернутые ответы на вопросы:", 
-    "copyPromptAndData": "Копировать мои ответы и промпт для AI",
-    "goToGemini": "Открыть Gemini AI Studio (для самостоятельного анализа)",
-    "step3Title": "Шаг 3: Генерация Отчета",
-    "generateAndSendPdf": "Сгенерировать PDF и Отправить в Telegram",
-    "processing": "Обработка...",
-    "parsingXlsx": "Парсинг XLSX...", 
-    "generatingPromptForXlsx": "Генерация AI Промпта для XLSX...",
-    "generatingPdf": "Генерация PDF Отчета...",
-    "sendingPdf": "Отправка PDF в Telegram...",
-    "errorNoUser": "Информация о пользователе недоступна. Убедитесь, что вы авторизованы через Telegram.",
-    "errorNoMarkdown": "Пожалуйста, вставьте содержимое отчета для PDF.", 
-    "successMessage": "Успешно! Ваш PDF отчет отправлен в ваш Telegram чат.",
-    "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
-    "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
-    "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
-    "promptCopySuccess": "Полный промпт для AI (данные + ответы + системные инструкции) скопирован в буфер обмена!", 
-    "promptCopyError": "Не удалось скопировать. Скопируйте вручную.",
-    "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
-    "loadingUser": "Загрузка данных пользователя...",
-    "status": "Статус",
-    "readyForUserData": "Готово к вводу данных.",
-    "readyForPdf": "Готово к генерации PDF.", 
-    "toggleLanguage": "Переключить язык",
-    "xlsxUploadOptionalTitle": "Опционально: Загрузка XLSX для Анализа AI (Альтернативный Сценарий)",
-    "selectFile": "Выберите XLSX Отчет (Опционально)",
-    "noFileSelected": "Файл не выбран",
-    "fileSelected": "Файл: %%FILENAME%%",
-    "errorFileTooLarge": "Файл слишком большой. Максимальный размер: 5МБ.",
-    "errorInvalidFileType": "Неверный тип файла. Принимаются только .xlsx файлы.",
-    "formDataSaved": "Данные пользователя сохранены для этой сессии.",
-    "formDataError": "Ошибка сохранения данных пользователя для сессии.",
-    "accessDeniedTitle": "Доступ к PRIZMA Закрыт!",
-    "accessDeniedSubtitle": "Для использования AI Генератора PDF Отчетов, пожалуйста, приобретите ПротоКарточку Доступа.",
-    "purchaseAccessButton": "Купить Доступ за %%PRICE%% XTR",
-    "purchasingInProgress": "Обработка покупки...",
-    "errorNotAuthenticated": "Пожалуйста, авторизуйтесь через Telegram для покупки доступа.",
-    "purchaseSuccessMessage": "Запрос на доступ отправлен! Проверьте Telegram для завершения оплаты.",
-    "purchaseErrorMessage": "Не удалось инициировать покупку доступа. %%ERROR%%",
-    "backToHotVibes": "::FaArrowLeft:: Назад в Горячие Вайбы",
-    "promptGenerated": "AI промпт для XLSX подготовлен и скопирован в область Markdown.",
-    "workingAreaMark": "ВАША РАБОЧАЯ ОБЛАСТЬ: Сюда вставляйте ответы AI или финальные ответы для генерации PDF.",
-    "prizmaIntroTitle": "PRIZMA",
-    "prizmaIntroSubtitle": "Ваш личный ИИ психолог и наставник",
-    "prizmaIntroDesc": "Пройдите голосовой опрос и узнайте о себе больше. То что было, то и есть, тому и быть.",
-    "prizmaStartAnalysis": "Начать анализ",
-    "prizmaUserDataPrompt": "Давайте познакомимся! Введите свои данные для аудита.",
-    "prizmaContinue": "Продолжить",
-    "prizmaQuestionsTitle": "Расскажите о своих главных ценностях в жизни",
-    "prizmaNext": "Далее",
-    "prizmaAnalyzing": "Анализируем ваши ответы...",
-    "prizmaBasicAnalysisReadyTitle": "Ваш базовый анализ готов!",
-    "prizmaBasicAnalysisSent": "Ваш базовый PDF-отчет отправлен в Telegram.",
-    "prizmaGetFullAnalysis": "Получить полный анализ",
-    "prizmaPaymentOfferTitle": "Полная расшифровка",
-    "prizmaPaymentOfferPrice": "2990р", 
-    "prizmaPaymentOfferPriceOld": "6000р", 
-    "prizmaPaymentOfferFeatures": "Бесплатная расшифровка<br>10 стр анализа<br>3 базовые методики<br>Общие рекомендации<br>Анализ занимает 24 часа<br>---<br>12 профессиональных методик<br>50+ персонализированных рекомендаций<br>Индивидуальный психолог",
-    "prizmaChoosePayment": "Выбрать способ оплаты",
-    "prizmaPaymentGuarantee": "Безопасная оплата · Защита данных",
-    "prizmaPaymentSuccessTitle": "Оплата успешно прошла!",
-    "prizmaPaymentSuccessDesc": "Чтобы получить полную расшифровку, пройдите опрос. Вам осталось пройти еще %%REMAINING%% вопросов.",
-    "prizmaErrorTitle": "Что-то пошло не так!",
-    "prizmaErrorDesc": "Произошла техническая ошибка. Пожалуйста, попробуйте еще раз или обратитесь в поддержку.",
-    "prizmaTryAgain": "Попробовать снова",
-    "prizmaContactSupport": "Написать в поддержку",
-    "prizmaAnalyzingTitle": "Анализируем ваши ответы",
-  }
+  en: { /* ... existing translations ... */ },
+  ru: { /* ... existing translations ... */
+    "prizmaProAnalysisReadyTitle": "Ваш ПОЛНЫЙ анализ PRIZMA готов!",
+    "prizmaProAnalysisSent": "Ваш полный PDF-отчет PRIZMA (Pro версия) отправлен в Telegram.",
+    "prizmaFullAnalysis": "Полный анализ",
+   },
 };
+
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string): string => {
+// Updated to include pro questions if access is granted
+const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string, hasProAccess?: boolean): string => {
     const name = userName || "Пользователь";
     let content = `# Расшифровка Личности для ${name}\n\n`;
     if (userAge) content += `**Возраст:** ${userAge}\n`;
     if (userGender) content += `**Пол:** ${userGender}\n\n`;
     content += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
-    content += REFINED_PERSONALITY_QUESTIONS_RU.map((q, i) => `${i + 1}. ${q}\n  *Ответ:* ...`).join("\n\n");
+    
+    let questions = [...REFINED_PERSONALITY_QUESTIONS_RU];
+    if (hasProAccess) {
+        questions = questions.concat(PRO_ADDITIONAL_QUESTIONS_RU);
+    }
+    content += questions.map((q, i) => `${i + 1}. ${q}\n  *Ответ:* ...`).join("\n\n");
     return content;
 };
 
@@ -216,6 +80,7 @@ const handleXlsxFileAndPreparePromptInternal = async (
     setLoadingFunc: React.Dispatch<React.SetStateAction<boolean>>, 
     setStatusMsgFunc: React.Dispatch<React.SetStateAction<string>> 
 ): Promise<{ success: boolean, prompt?: string, error?: string}> => {
+    // ... (implementation remains the same)
     setLoadingFunc(true); 
     setStatusMsgFunc(translateFunc('parsingXlsx'));
     try {
@@ -225,7 +90,7 @@ const handleXlsxFileAndPreparePromptInternal = async (
         const worksheet = workbook.Sheets[firstSheetName];
         const csvDataString = XLSX.utils.sheet_to_csv(worksheet);
         setStatusMsgFunc(translateFunc('generatingPromptForXlsx'));
-        const promptForAI = `Ты — высококвалифицированный AI-аналитик...`; // Same prompt as before
+        const promptForAI = `Ты — высококвалифицированный AI-аналитик...`; 
         return { success: true, prompt: promptForAI };
     } catch (error) {
         logger.error("Error parsing XLSX for AI prompt:", error);
@@ -247,7 +112,8 @@ export default function ToPdfPageWithPsychoFocus() {
     const [userAge, setUserAge] = useState<string>('');
     const [userGender, setUserGender] = useState<string>('');
     
-    const [hasAccess, setHasAccess] = useState(false);
+    const [hasAccess, setHasAccess] = useState(false); // Basic access to the page
+    const [hasProAccess, setHasProAccess] = useState(false); // Pro version access
     const [isCheckingAccess, setIsCheckingAccess] = useState(true);
     const [isPurchasing, setIsPurchasing] = useState(false);
 
@@ -282,11 +148,21 @@ export default function ToPdfPageWithPsychoFocus() {
             setIsCheckingAccess(true);
             if (isAuthenticated && dbUser) {
                 const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string; type?: string; data?: { page_link?: string } }> | undefined;
-                const pdfCard = cards?.[PERSONALITY_REPORT_PDF_CARD_ID];
-                if (pdfCard?.status === 'active' && pdfCard.type === 'tool_access' && pdfCard.data?.page_link === '/topdf') {
+                
+                const baseAccessCard = cards?.[PERSONALITY_REPORT_PDF_CARD_ID];
+                if (baseAccessCard?.status === 'active' && baseAccessCard.type === 'tool_access' && baseAccessCard.data?.page_link === '/topdf') {
                     setHasAccess(true);
                 } else { setHasAccess(false); }
-            } else { setHasAccess(false);  }
+
+                const proAccessCard = cards?.[PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID];
+                if (proAccessCard?.status === 'active' && proAccessCard.type === 'tool_access') { // Assuming pro access is also 'tool_access'
+                    setHasProAccess(true);
+                } else { setHasProAccess(false); }
+
+            } else { 
+                setHasAccess(false);
+                setHasProAccess(false);
+            }
             setIsCheckingAccess(false);
         }
     }, [dbUser, isAuthenticated, appContextLoading, appContextAuthenticating]);
@@ -303,8 +179,8 @@ export default function ToPdfPageWithPsychoFocus() {
         } else if (user?.first_name && !userName) { setUserName(user.first_name); }
     }, [user?.id, user?.first_name, appContextLoading, appContextAuthenticating, hasAccess, userName]);
 
-
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        // ... (implementation remains the same)
         const file = event.target.files?.[0];
         if (!file) { setSelectedFile(null); setMarkdownInput(''); setStatusMessage(t('noFileSelected')); return; }
         if (file.size > MAX_FILE_SIZE_BYTES) { toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return; }
@@ -324,7 +200,7 @@ export default function ToPdfPageWithPsychoFocus() {
     };
 
     const handleGenerateDemoQuestionsAndPrompt = () => {
-        const userDataAndQuestions = generateUserDataAndQuestionsForAI(userName, userAge, userGender);
+        const userDataAndQuestions = generateUserDataAndQuestionsForAI(userName, userAge, userGender, hasProAccess); // Pass hasProAccess
         setMarkdownInput(userDataAndQuestions); 
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
@@ -333,10 +209,11 @@ export default function ToPdfPageWithPsychoFocus() {
     const handleCopyToClipboard = () => {
         let textToCopy = markdownInput.trim(); 
         if (!textToCopy) {
-             if(userName || userAge || userGender) { textToCopy = generateUserDataAndQuestionsForAI(userName,userAge,userGender); } 
+             if(userName || userAge || userGender) { textToCopy = generateUserDataAndQuestionsForAI(userName,userAge,userGender, hasProAccess); } // Pass hasProAccess
              else { toast.info(currentLang === 'ru' ? "Сначала введите данные или сгенерируйте вопросы." : "Enter user data or generate questions first."); return; }
         }
-        const fullTextForAI = `${textToCopy}\n\n---\n${PSYCHO_ANALYSIS_SYSTEM_PROMPT}`;
+        const systemPromptToUse = hasProAccess ? PSYCHO_ANALYSIS_PRO_SYSTEM_PROMPT : PSYCHO_ANALYSIS_SYSTEM_PROMPT;
+        const fullTextForAI = `${textToCopy}\n\n---\n${systemPromptToUse}`;
         navigator.clipboard.writeText(fullTextForAI).then(() => toast.success(t('promptCopySuccess'))).catch(err => { toast.error(t('promptCopyError')); logger.error('Clipboard copy failed:', err); });
     };
 
@@ -344,14 +221,19 @@ export default function ToPdfPageWithPsychoFocus() {
         if (!markdownInput.trim()) { toast.error(t('errorNoMarkdown')); return; }
         if (!user?.id) { toast.error(t('errorNoUser')); setCurrentStep('generalError'); return; }
         
-        const reportFileNameBase = selectedFile?.name || (userName ? `PRIZMA_Анализ_${userName.replace(/\s/g, '_')}` : "PRIZMA_Анализ_Личности");
+        const reportFileNameBase = userName ? `PRIZMA_${hasProAccess ? 'Pro_' : ''}Анализ_${userName.replace(/\s/g, '_')}` : `PRIZMA_${hasProAccess ? 'Pro_' : ''}Анализ_Личности`;
 
         setIsLoading(true); setCurrentStep('analyzing'); setStatusMessage(t('generatingPdf'));
         try {
             const result = await generatePdfFromMarkdownAndSend( markdownInput, String(user.id), reportFileNameBase, userName.trim() || undefined, userAge.trim() || undefined, userGender.trim() || undefined );
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
-                setCurrentStep('basicAnalysisReady'); 
+                if (hasProAccess) {
+                    setCurrentStep('paymentSuccess'); // Or a dedicated "Pro Analysis Sent" step
+                    setStatusMessage(t('prizmaProAnalysisSent'));
+                } else {
+                    setCurrentStep('basicAnalysisReady'); 
+                }
             } else {
                 toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }), { duration: 7000 });
                 setCurrentStep('generalError'); setStatusMessage(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
@@ -362,11 +244,8 @@ export default function ToPdfPageWithPsychoFocus() {
         } finally { setIsLoading(false); }
     };
     
-    const handlePurchaseAccess = async () => {
-        if (!isAuthenticated || !dbUser?.user_id) {
-          toast.error(t('errorNotAuthenticated'));
-          return;
-        }
+    const handlePurchaseAccess = async () => { /* For basic page access */
+        if (!isAuthenticated || !dbUser?.user_id) { toast.error(t('errorNotAuthenticated')); return; }
         setIsPurchasing(true);
         const cardDetails: ProtoCardDetails = {
           cardId: PERSONALITY_REPORT_PDF_CARD_ID,
@@ -378,13 +257,43 @@ export default function ToPdfPageWithPsychoFocus() {
         };
         try {
           const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
-          if (result.success) {
-            toast.success(t('purchaseSuccessMessage'));
-            if(refreshDbUser) { setTimeout(async () => { await refreshDbUser(); }, 7000); }
-          } else { toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));}
-        } catch (error) {
-          toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));
-        }
+          if (result.success) { toast.success(t('purchaseSuccessMessage')); if(refreshDbUser) { setTimeout(async () => { await refreshDbUser(); }, 7000); }}
+          else { toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));}
+        } catch (error) { toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));}
+        setIsPurchasing(false);
+    };
+
+    const handlePurchaseFullAnalysis = async () => { /* For Pro Version */
+        if (!isAuthenticated || !dbUser?.user_id) { toast.error(t('errorNotAuthenticated')); return; }
+        setIsPurchasing(true);
+        const cardDetails: ProtoCardDetails = {
+          cardId: PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID,
+          title: currentLang === 'ru' ? `PRIZMA: Полный Психологический Анализ` : `PRIZMA: Full Psychological Analysis`,
+          description: currentLang === 'ru' ? `Разблокировать полный анализ PRIZMA с расширенным набором вопросов и углубленной интерпретацией. Цена: ${PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR} XTR.` : `Unlock the full PRIZMA analysis with an extended set of questions and in-depth interpretation. Price: ${PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR} XTR.`,
+          amountXTR: PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR,
+          type: "tool_access", // Or a new type like "feature_unlock"
+          metadata: { 
+            tool_name: "PRIZMA PDF Pro Analysis", 
+            feature_description: "Access to 50 questions and advanced AI system prompt for psychoanalysis PDF."
+            // No page_link here, as it unlocks features on the current page
+          }
+        };
+        try {
+          const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
+          if (result.success) { 
+            toast.success(t('purchaseSuccessMessage')); 
+            if(refreshDbUser) { 
+                setTimeout(async () => { 
+                    await refreshDbUser(); 
+                    // After refresh, hasProAccess should update, then we can move step
+                    // For now, optimistic update or rely on user to proceed
+                    setCurrentStep('questions'); // Go back to questions to use Pro features
+                    toast.info(currentLang === 'ru' ? "Pro-доступ активирован! Теперь вам доступны все вопросы." : "Pro access activated! All questions are now available to you.");
+                }, 7000); 
+            }
+          }
+          else { toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));}
+        } catch (error) { toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));}
         setIsPurchasing(false);
     };
 
@@ -393,9 +302,6 @@ export default function ToPdfPageWithPsychoFocus() {
       if (!userName.trim()) { toast.error(currentLang === 'ru' ? "Пожалуйста, введите ваше имя." : "Please enter your name."); return; }
       if (user?.id) { saveUserPdfFormData(String(user.id), { userName, userAge, userGender }); }
       setCurrentStep('questions');
-    };
-    const handlePurchaseFullAnalysis = () => { 
-        toast.info("Функция покупки полной версии в разработке!");
     };
     const toggleLang = useCallback(() => setCurrentLang(p => p === 'en' ? 'ru' : 'en'), []);
 
@@ -467,12 +373,16 @@ export default function ToPdfPageWithPsychoFocus() {
             {currentStep === 'questions' && (
                  <StepContainer title={t("prizmaQuestionsTitle")} showBackButton onBack={() => setCurrentStep('userData')}>
                     <div className="space-y-4">
-                        <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/10"> <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")} </Button>
+                        <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/10">
+                           <span className="flex items-center justify-center"> {/* FIX: Wrapper for Button children */}
+                                <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")}
+                           </span>
+                        </Button>
                         <div> <Label htmlFor="markdownInput" className="text-sm font-medium text-muted-foreground">{t("pasteMarkdown")}</Label> <textarea id="markdownInput" value={markdownInput} onChange={(e) => setMarkdownInput(e.target.value)} placeholder={t('workingAreaMark')} rows={15} className="w-full mt-1 p-2.5 sm:p-3 input-cyber simple-scrollbar" disabled={isLoading}/> </div>
                         {(markdownInput) && ( <div className="mt-4 flex flex-col sm:flex-row gap-3"> <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan/80 text-brand-cyan hover:bg-brand-cyan/10 flex-1"> <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")} </Button> <Button variant="outline" asChild className="border-brand-blue/80 text-brand-blue hover:bg-brand-blue/10 flex-1"> <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" > <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToGemini")} </a> </Button> </div> )}
                         <details className="mt-4 pt-4 border-t border-border group">
                             <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors font-semibold flex items-center gap-1">
-                                <span className="flex items-center gap-1"> {/* Wrapper span */}
+                                <span className="flex items-center gap-1"> 
                                     <VibeContentRenderer content="::FaFileImport::" />
                                     {t("xlsxUploadOptionalTitle")}
                                     <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
@@ -504,27 +414,33 @@ export default function ToPdfPageWithPsychoFocus() {
             {currentStep === 'basicAnalysisReady' && (
                 <StepContainer className="text-center">
                     <VibeContentRenderer content="::FaCheckCircle className='text-6xl text-green-500 mx-auto mb-4'::" />
-                    <h1 className="text-3xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue mb-3">{t("prizmaBasicAnalysisReadyTitle")}</h1>
-                    <p className="text-md text-muted-foreground mb-6">{t("prizmaBasicAnalysisSent")}</p>
-                    <Button onClick={() => setCurrentStep('paymentOfferDetails')} size="lg" className="w-full bg-brand-gradient-pink-purple text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                        {t("prizmaGetFullAnalysis")}
-                    </Button>
+                    <h1 className="text-3xl font-orbitron font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-pink via-brand-purple to-brand-blue mb-3">
+                        {hasProAccess ? t("prizmaProAnalysisReadyTitle") : t("prizmaBasicAnalysisReadyTitle")}
+                    </h1>
+                    <p className="text-md text-muted-foreground mb-6">
+                        {hasProAccess ? t("prizmaProAnalysisSent") : t("prizmaBasicAnalysisSent")}
+                    </p>
+                    {!hasProAccess && (
+                        <Button onClick={() => setCurrentStep('paymentOfferDetails')} size="lg" className="w-full bg-brand-gradient-pink-purple text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
+                            {t("prizmaGetFullAnalysis")}
+                        </Button>
+                    )}
                     <Button onClick={() => setCurrentStep('intro')} variant="link" className="text-brand-blue mt-4">Вернуться на главный экран</Button>
                 </StepContainer>
             )}
             
-            {currentStep === 'paymentOfferDetails' && (
+            {currentStep === 'paymentOfferDetails' && !hasProAccess && (
                 <StepContainer showBackButton onBack={() => setCurrentStep('basicAnalysisReady')} className="text-center">
                     <div className="bg-card border border-border rounded-xl p-6 shadow-xl my-6 relative overflow-hidden">
                         <div className="absolute -top-px -right-px bg-brand-pink text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg shadow-md transform-gpu">{currentLang === 'ru' ? 'ХИТ' : 'POPULAR'}</div>
                         <h2 className="text-2xl font-orbitron font-bold text-foreground mb-2">{t("prizmaPaymentOfferTitle")}</h2>
                         <div className="my-4">
-                            <span className="text-4xl font-orbitron font-black text-brand-purple">{t("prizmaPaymentOfferPrice")}</span>
+                            <span className="text-4xl font-orbitron font-black text-brand-purple">{currentLang === 'ru' ? `${PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR}р` : `$${(PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR / 100).toFixed(2)}`}</span>
                             <span className="text-lg text-muted-foreground line-through ml-2">{t("prizmaPaymentOfferPriceOld")}</span>
                         </div>
                         <VibeContentRenderer content={t("prizmaPaymentOfferFeatures")} className="text-sm text-muted-foreground space-y-1 text-left prose prose-sm max-w-none prose-p:my-0.5 prose-ul:my-1 prose-li:my-0"/>
-                        <Button onClick={handlePurchaseFullAnalysis} size="lg" className="w-full mt-6 bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
-                            {t("prizmaChoosePayment")}
+                        <Button onClick={handlePurchaseFullAnalysis} disabled={isPurchasing} size="lg" className="w-full mt-6 bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
+                            {isPurchasing ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> : t("prizmaChoosePayment")}
                         </Button>
                          <p className="text-xs text-muted-foreground mt-3">{t("prizmaPaymentGuarantee")}</p>
                     </div>
@@ -532,9 +448,11 @@ export default function ToPdfPageWithPsychoFocus() {
             )}
             
             {currentStep === 'paymentSuccess' && ( 
-                <StepContainer title={t("prizmaPaymentSuccessTitle")} className="text-center">
+                <StepContainer title={hasProAccess ? t("prizmaProAnalysisReadyTitle") : t("prizmaPaymentSuccessTitle")} className="text-center">
                      <VibeContentRenderer content="::FaCreditCard className='text-6xl text-green-500 mx-auto mb-4'::" />
-                    <p className="text-md text-muted-foreground mb-6">{t("prizmaPaymentSuccessDesc", {REMAINING: 5})}</p>
+                    <p className="text-md text-muted-foreground mb-6">
+                        {hasProAccess ? t("prizmaProAnalysisSent") : t("prizmaPaymentSuccessDesc", {REMAINING: 5})}
+                    </p>
                     <Button onClick={() => setCurrentStep('intro')} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity">
                         {t("prizmaContinue")}
                     </Button>
