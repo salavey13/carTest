@@ -46,7 +46,10 @@ const config: Config = {
           foreground: "hsl(var(--destructive-foreground))",
         },
         border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
+        input: {
+          DEFAULT: "hsl(var(--input))", // For input background
+          border: "hsl(var(--input-border))", // For input border
+        },
         ring: "hsl(var(--ring))",
         
         // Brand colors referencing CSS variables
@@ -89,7 +92,7 @@ const config: Config = {
         mono: ["monospace", ...fontFamily.mono],
         orbitron: ["Orbitron", "sans-serif"],
       },
-      boxShadow: {
+      boxShadow: { // Shadows might need adjustment for light theme if too heavy
         "glow-sm": "0 0 8px rgba(var(--default-glow-rgb), 0.5)",
         "glow-md": "0 0 15px rgba(var(--default-glow-rgb), 0.6)",
         "glow-lg": "0 0 25px rgba(var(--default-glow-rgb), 0.7)",
@@ -100,12 +103,14 @@ const config: Config = {
         "blue-glow": "0 0 15px hsla(var(--blue-rgb), 0.4), 0 0 30px hsla(var(--blue-rgb), 0.2)",
         "cyan-glow": "0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2)",
         "orange-glow": "0 0 15px hsla(var(--orange-rgb), 0.4), 0 0 30px hsla(var(--orange-rgb), 0.2)",
-        "lime-glow": "0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2)", // Added lime glow
+        "lime-glow": "0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2)", 
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic": "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        "page-gradient":"linear-gradient(145deg, hsl(var(--background)), hsl(var(--card)))",
+        "page-gradient":"linear-gradient(145deg, hsl(var(--background)), hsl(var(--card)))", // Will adapt to light/dark
+        "brand-gradient-purple-blue": "linear-gradient(to right, hsl(var(--brand-purple)), hsl(var(--brand-blue)))",
+        "brand-gradient-pink-purple": "linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-purple)))",
       },
       animation: {
         "subtle-pulse": "subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
@@ -122,7 +127,7 @@ const config: Config = {
         "glitch-border": "glitch-border 2s linear infinite", 
         "ticker": "ticker 20s linear infinite",
       },
-      keyframes: {
+      keyframes: { // Keyframes remain the same, their perceived effect might change with colors
         "subtle-pulse": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: ".7" },

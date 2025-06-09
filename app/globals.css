@@ -12,56 +12,59 @@
 }
 
 :root {
-  /* Core Theme Colors (Dark Mode Default) */
-  --background: 263 80% 6%; /* Slightly darker background */        
-  --foreground: 0 0% 95%; /* Slightly brighter foreground */        
-  --card: 264 70% 11%; /* Darker card */          
-  --card-foreground: 0 0% 95%;   
-  --popover: 264 70% 9%; /* Darker popover */         
-  --popover-foreground: 0 0% 95%; 
-  --muted: 263 40% 30%; /* Adjusted muted */          
-  --muted-foreground: 0 0% 70%;  /* Adjusted muted foreground */
-  --destructive: 0 80% 60%;     /* Brighter, more vibrant red */
-  --destructive-foreground: 0 0% 98%; 
+  /* Core Theme Colors (Light Mode Default) */
+  --background: 220 25% 98%;       /* Very light cool gray/blueish white */
+  --foreground: 222 47% 11%;       /* Dark blueish gray for text */
+  --card: 0 0% 100%;               /* White for cards */
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --muted: 220 15% 90%;            /* Light gray */
+  --muted-foreground: 220 10% 40%;   /* Medium-light gray */
+  --destructive: 0 80% 60%;         /* Brighter, more vibrant red */
+  --destructive-foreground: 0 0% 98%;
   --radius: 0.75rem;
 
-  /* Brand Colors - Adjusted for more vibrancy */
-  --brand-purple: 270 70% 70%;    
-  --brand-pink: 330 75% 72%;      
-  --brand-cyan: 180 65% 65%;      
-  --brand-blue: 210 75% 70%;      
-  --brand-yellow: 50 80% 65%;     
-  --brand-green: 145 55% 60%; /* Toxic lime-ish */   
-  --brand-orange: 28 75% 60%;     
-  --brand-lime: 90 70% 65%; /* More vibrant lime */
+  /* Brand Colors - Adjusted for vibrancy on light/dark backgrounds */
+  --brand-purple: 270 70% 60%;
+  --brand-pink: 330 80% 65%;
+  --brand-cyan: 180 70% 55%;
+  --brand-blue: 210 85% 60%;
+  --brand-yellow: 50 80% 60%;
+  --brand-green: 145 60% 50%; /* Slightly deeper green */
+  --brand-orange: 28 80% 60%;
+  --brand-lime: 90 70% 55%;   /* Slightly deeper lime */
 
-  /* Derived UI Element Colors */
-  --primary: hsl(var(--brand-cyan)); /* Cyan as primary */
-  --primary-foreground: 210 40% 98%; /* Light text for cyan */
-  --secondary: hsl(var(--brand-purple)); /* Purple as secondary */
-  --secondary-foreground: 270 80% 98%; /* Light text for purple */
-  --accent: hsl(var(--brand-lime)); /* Toxic lime as accent */
-  --accent-foreground: 90 50% 10%;   /* Dark text for lime */
+  /* Derived UI Element Colors (for Light Theme) */
+  --primary: hsl(var(--brand-purple)); /* Purple as primary */
+  --primary-foreground: 0 0% 100%;    /* White text for purple */
+  --secondary: hsl(var(--brand-blue)); /* Blue as secondary */
+  --secondary-foreground: 0 0% 100%;   /* White text for blue */
+  --accent: hsl(var(--brand-pink));    /* Pink as accent */
+  --accent-foreground: 0 0% 100%;      /* White text for pink */
   
-  --border: hsl(var(--brand-cyan) / 0.4); /* Cyanish border */       
-  --input: hsl(var(--brand-purple) / 0.2); /* Purplish input bg */          
-  --ring: hsl(var(--brand-lime)); /* Lime ring */          
+  --border: 220 15% 88%;              /* Light gray for borders */
+  --input: 0 0% 100%;                 /* White background for inputs in light theme */
+  --input-border: 220 15% 85%;        /* Slightly darker border for inputs */
+  --ring: hsl(var(--brand-blue));     /* Blue for focus rings */
 
   /* RGB Versions for Shadows/Gradients */
-  --purple-rgb: 179, 138, 245; 
-  --pink-rgb: 247, 137, 180;   
-  --cyan-rgb: 105, 224, 224;   
-  --blue-rgb: 122, 173, 245;   
-  --yellow-rgb: 240, 201, 84;  
-  --green-rgb: 110, 207, 134;  
-  --orange-rgb: 237, 150, 94;  
-  --lime-rgb: 176, 230, 107;   
-  --neon-lime-rgb: var(--lime-rgb); /* Alias for backward compatibility */
+  --purple-rgb: 153, 102, 255; 
+  --pink-rgb: 255, 102, 178;   
+  --cyan-rgb: 77, 204, 204;    
+  --blue-rgb: 77, 153, 255;    
+  --yellow-rgb: 255, 204, 77;  
+  --green-rgb: 77, 179, 77;    
+  --orange-rgb: 255, 153, 77;  
+  --lime-rgb: 153, 230, 77;    
+  --neon-lime-rgb: var(--lime-rgb);
+  --black-rgb: 0,0,0;
+
 
   /* Static Background RGB Values */
-  --bg-rgb: 10, 2, 28; 
-  --card-rgb: 22, 8, 49;  
-  --default-glow-rgb: var(--lime-rgb); /* Default glow to lime */
+  --bg-rgb: 249, 250, 251; 
+  --card-rgb: 255, 255, 255; 
+  --default-glow-rgb: var(--cyan-rgb); 
 
   /* Chart Colors */
   --chart-1: hsl(var(--brand-purple));
@@ -70,7 +73,7 @@
   --chart-4: hsl(var(--brand-blue));
   --chart-5: hsl(var(--brand-orange));
 
-  /* Sidebar Colors */
+  /* Sidebar Colors (assuming sidebar might remain dark) */
   --sidebar-background: 263 75% 9%; 
   --sidebar-foreground: 0 0% 88%;   
   --sidebar-primary: hsl(var(--brand-cyan) / 0.9); 
@@ -84,78 +87,61 @@
   --red-500-rgb: 239, 68, 68; 
   --gray-500-rgb: 107, 114, 128; 
 
-  /* Text Colors */
-  --light-text: hsl(var(--foreground));      
-  --accent-text: hsl(var(--brand-yellow));       
+  /* Text Colors (for Light Theme) */
+  --light-text: hsl(var(--foreground)); 
+  --accent-text: hsl(var(--brand-purple)); 
 }
 
 .dark {
-  /* Values are identical to :root for now, as dark mode is default */
-  --background: 263 80% 6%;
-  --foreground: 0 0% 95%;
-  --card: 264 70% 11%;
-  --card-foreground: 0 0% 95%;
-  --popover: 264 70% 9%;
-  --popover-foreground: 0 0% 95%;
-  --muted: 263 40% 30%;
-  --muted-foreground: 0 0% 70%;
+  /* Core Theme Colors (Dark Mode) */
+  --background: 263 80% 6%;         
+  --foreground: 0 0% 95%;         
+  --card: 264 70% 11%;           
+  --card-foreground: 0 0% 95%;   
+  --popover: 264 70% 9%;          
+  --popover-foreground: 0 0% 95%; 
+  --muted: 263 40% 30%;         
+  --muted-foreground: 0 0% 70%;  
   --destructive: 0 80% 60%;     
   --destructive-foreground: 0 0% 98%; 
   
-  --brand-purple: 270 70% 70%;
-  --brand-pink: 330 75% 72%;
-  --brand-cyan: 180 65% 65%;
-  --brand-blue: 210 75% 70%;
-  --brand-yellow: 50 80% 65%;
-  --brand-green: 145 55% 60%;
-  --brand-orange: 28 75% 60%;
-  --brand-lime: 90 70% 65%;
+  --brand-purple: 270 70% 60%;
+  --brand-pink: 330 80% 65%;
+  --brand-cyan: 180 70% 55%;
+  --brand-blue: 210 85% 60%;
+  --brand-yellow: 50 80% 60%;
+  --brand-green: 145 60% 50%;
+  --brand-orange: 28 80% 60%;
+  --brand-lime: 90 70% 55%;
 
-  --primary: hsl(var(--brand-cyan));
-  --primary-foreground: 210 40% 98%; 
-  --secondary: hsl(var(--brand-purple));
+  /* Derived UI Element Colors (for Dark Theme) */
+  --primary: hsl(var(--brand-cyan)); 
+  --primary-foreground: 180 60% 20%; /* Dark teal for text on light cyan buttons */
+  --secondary: hsl(var(--brand-purple)); 
   --secondary-foreground: 270 80% 98%; 
-  --accent: hsl(var(--brand-lime));
+  --accent: hsl(var(--brand-lime)); 
   --accent-foreground: 90 50% 10%;   
 
-  --border: hsl(var(--brand-cyan) / 0.4);
-  --input: hsl(var(--brand-purple) / 0.2);
-  --ring: hsl(var(--brand-lime));
-
-  --purple-rgb: 179, 138, 245;
-  --pink-rgb: 247, 137, 180;
-  --cyan-rgb: 105, 224, 224;
-  --blue-rgb: 122, 173, 245;
-  --yellow-rgb: 240, 201, 84;
-  --green-rgb: 110, 207, 134;
-  --orange-rgb: 237, 150, 94;
-  --lime-rgb: 176, 230, 107;
-  --neon-lime-rgb: var(--lime-rgb);
+  --border: hsl(var(--brand-cyan) / 0.4);       
+  --input: hsl(var(--brand-purple) / 0.15); 
+  --input-border: hsl(var(--brand-purple) / 0.4); 
+  --ring: hsl(var(--brand-lime));       
   
   --bg-rgb: 10, 2, 28;
   --card-rgb: 22, 8, 49;
   --default-glow-rgb: var(--lime-rgb); 
   
-  --chart-1: hsl(var(--brand-purple));
-  --chart-2: hsl(var(--brand-cyan));
-  --chart-3: hsl(var(--brand-yellow));
-  --chart-4: hsl(var(--brand-blue));
-  --chart-5: hsl(var(--brand-orange));
+  --light-text: hsl(var(--foreground)); 
+  --accent-text: hsl(var(--brand-yellow)); 
 
-  --sidebar-background: 263 75% 9%;
-  --sidebar-foreground: 0 0% 88%;
-  --sidebar-primary: hsl(var(--brand-cyan) / 0.9);
-  --sidebar-primary-foreground: 180 80% 98%;
-  --sidebar-accent: hsl(var(--brand-purple) / 0.9);
+  --sidebar-background: 263 75% 9%; 
+  --sidebar-foreground: 0 0% 88%;   
+  --sidebar-primary: hsl(var(--brand-cyan) / 0.9); 
+  --sidebar-primary-foreground: 180 80% 98%; 
+  --sidebar-accent: hsl(var(--brand-purple) / 0.9);     
   --sidebar-accent-foreground: 270 80% 98%;
-  --sidebar-border: hsl(var(--brand-cyan) / 0.25);
+  --sidebar-border: hsl(var(--brand-cyan) / 0.25);    
   --sidebar-ring: hsl(var(--brand-lime) / 0.95);
-  
-  --red-500-rgb: 239, 68, 68;
-  --gray-500-rgb: 107, 114, 128;
-  
-  --light-text: hsl(var(--foreground));
-  --accent-text: hsl(var(--brand-yellow));
 }
 
 @layer base {
@@ -169,37 +155,18 @@
     -moz-osx-font-smoothing: grayscale;
   }
   h1 { 
-    @apply text-4xl md:text-5xl; 
-    @apply uppercase tracking-wider; 
-    background-image: linear-gradient(
-      to top, 
-      hsl(var(--brand-orange)), 
-      hsl(var(--brand-pink)) 50%, 
-      hsl(var(--brand-purple))
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-fill-color: transparent;
-    text-shadow:
-      0px 2px 1px hsla(var(--brand-purple), 0.85), 
-      0px 2px 3px hsla(var(--brand-purple), 0.65),
-      0px 0px 5px hsla(var(--brand-pink), 0.75),   
-      0px 0px 10px hsla(var(--brand-pink), 0.55),
-      0px -2px 1px hsla(var(--brand-blue), 0.85),  
-      0px -2px 3px hsla(var(--brand-blue), 0.65);
-    user-select: none;
+    @apply text-4xl font-bold md:text-5xl; 
   }
-  h2 { @apply text-3xl md:text-4xl; } 
-  h3 { @apply text-2xl md:text-3xl; } 
-  h4 { @apply text-xl md:text-2xl; } 
-  h5 { @apply text-lg md:text-xl; } 
-  h6 { @apply text-base md:text-lg; } 
+  h2 { @apply text-3xl font-bold md:text-4xl; } 
+  h3 { @apply text-2xl font-semibold md:text-3xl; } 
+  h4 { @apply text-xl font-semibold md:text-2xl; } 
+  h5 { @apply text-lg font-medium md:text-xl; } 
+  h6 { @apply text-base font-medium md:text-lg; } 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Orbitron', sans-serif; 
   }
   section {
-    scroll-margin-top: 96px; /* Standard scroll margin for sections */
+    scroll-margin-top: 96px; 
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -207,7 +174,7 @@
 }
 
 @layer components {
-  .gta-vibe-text-effect {
+  .gta-vibe-text-effect { 
     font-family: 'Orbitron', sans-serif; 
     @apply tracking-wider uppercase; 
     background-image: linear-gradient(
@@ -220,6 +187,13 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     text-fill-color: transparent;
+    text-shadow: 
+      0px 1px 0px hsla(var(--purple-rgb), 0.25), 
+      0px 0px 2px hsla(var(--pink-rgb), 0.25),   
+      0px -1px 0px hsla(var(--blue-rgb), 0.25);
+    user-select: none;
+  }
+  .dark .gta-vibe-text-effect { 
     text-shadow:
       0px 2px 1px hsla(var(--brand-purple), 0.85), 
       0px 2px 3px hsla(var(--brand-purple), 0.65),
@@ -227,12 +201,13 @@
       0px 0px 10px hsla(var(--brand-pink), 0.55),
       0px -2px 1px hsla(var(--brand-blue), 0.85),  
       0px -2px 3px hsla(var(--brand-blue), 0.65);
-    user-select: none;
   }
 
   .gta-icon-fix {
     -webkit-text-fill-color: currentColor !important;
     text-fill-color: currentColor !important;
+  }
+  .dark .gta-icon-fix {
     color: hsl(var(--brand-cyan)); 
     filter: drop-shadow(0 0 3px hsla(var(--cyan-rgb), 0.7)) drop-shadow(0 0 1px black);
   }
@@ -241,17 +216,23 @@
   }
 
   .input-cyber {
-    @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+    @apply bg-input border border-input-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
-           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+           transition-all duration-200 ease-in-out shadow-sm; 
+  }
+  .dark .input-cyber { 
+     @apply bg-input border-border text-foreground placeholder-muted-foreground/70 shadow-inner shadow-black/30;
   }
   .input-cyber:disabled {
-      @apply opacity-50 cursor-not-allowed;
+      @apply opacity-60 cursor-not-allowed bg-muted/30;
   }
   .textarea-cyber {
-      @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+      @apply bg-input border border-input-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
              focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
-             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+             transition-all duration-200 ease-in-out shadow-sm; 
+  }
+  .dark .textarea-cyber {
+      @apply bg-input border-border text-foreground placeholder-muted-foreground/70 shadow-inner shadow-black/30;
   }
   .text-shadow-brand-lime { 
     text-shadow: 0 0 10px hsla(var(--lime-rgb), 0.7), 0 0 20px hsla(var(--lime-rgb), 0.5);
@@ -265,27 +246,30 @@
   .filter-drop-shadow-brand-yellow { 
     filter: drop-shadow(0 0 15px hsl(var(--brand-yellow)));
   }
+  .light-theme-text-shadow {
+    text-shadow: 1px 1px 2px hsla(var(--black-rgb), 0.1); 
+  }
 }
 
 .homepage-wrapper {
   @apply min-h-screen text-foreground relative overflow-x-hidden pt-20 pb-28;
-  background-color: hsl(var(--background));
+  background-color: hsl(var(--background)); 
 }
 .homepage-bg-effects-container {
   @apply absolute inset-0 z-0 overflow-hidden pointer-events-none;
 }
 .homepage-bg-pulse-fast {
   @apply absolute top-[-15%] left-[-15%] w-3/5 h-3/5 rounded-full blur-[150px] opacity-50;
-  background-color: hsl(var(--brand-purple) / 0.2);
+  background-color: hsl(var(--brand-purple) / 0.2); /* Adapts with brand-purple changes */
   animation: bg_pulse_fast 8s cubic-bezier(0.4,0,0.6,1) infinite;
 }
 .homepage-bg-pulse-slow {
   @apply absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 rounded-full blur-[180px] opacity-40;
-  background-color: hsl(var(--brand-pink) / 0.15);
+  background-color: hsl(var(--brand-pink) / 0.15); /* Adapts with brand-pink changes */
   animation: bg_pulse_slow 10s cubic-bezier(0.4,0,0.6,1) infinite 1s;
 }
 
-.loading-spinner-cyber {
+.loading-spinner-cyber { /* This spinner is designed for dark themes, might need light theme variant if used on light bg */
   border-width: 4px;
   border-radius: 9999px; 
   border-top-color: hsl(var(--brand-cyan) / 0.5);
@@ -295,14 +279,14 @@
   border-style: solid;
   box-shadow: 0 0 25px hsl(var(--brand-cyan)), 0 0 15px hsl(var(--brand-pink));
 }
-.avatar-cyber {
+.avatar-cyber { /* This is for dark themes too, consider light theme variant */
   @apply rounded-full border-2 object-cover;
   border-color: hsl(var(--brand-pink) / 0.8);
   box-shadow: 0 0 10px hsla(var(--pink-rgb), 0.5); 
 }
-.featured-quest-card {
+.featured-quest-card { /* Dark theme component */
   @apply backdrop-blur-md shadow-xl overflow-hidden transition-all duration-300;
-  background-color: hsl(var(--card) / 0.9);
+  background-color: hsl(var(--card) / 0.9); /* will be dark card bg */
   border: 1px solid hsl(var(--brand-purple) / 0.5); 
 }
 .featured-quest-card:hover {
@@ -312,7 +296,7 @@
 .featured-quest-image-overlay {
   @apply absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none;
 }
-.activity-card-cyber {
+.activity-card-cyber { /* Dark theme component */
   @apply backdrop-blur-sm shadow-2xl text-black rounded-xl md:rounded-2xl;
   background-image: linear-gradient(to bottom right, hsl(var(--brand-pink) / 0.95), hsl(var(--brand-purple) / 0.9));
   border: 1px solid hsl(var(--brand-pink) / 0.7); 
@@ -320,6 +304,11 @@
 }
 .bottom-nav-cyber {
   @apply fixed bottom-0 left-0 right-0 backdrop-blur-xl z-40 py-1.5 px-1;
+  background-color: hsl(var(--background) / 0.85); 
+  border-top: 1px solid hsl(var(--border)); 
+  box-shadow: 0 -4px 15px hsla(var(--foreground), 0.05); 
+}
+.dark .bottom-nav-cyber {
   background-color: hsl(var(--background) / 0.9);
   border-top: 2px solid hsl(var(--brand-purple) / 0.6);
   box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
@@ -339,21 +328,30 @@
   outline-offset: 2px;
   box-shadow: 0 0 0 1px hsl(var(--brand-cyan)); 
 }
-.active-bottom-link {
-  background-color: hsl(var(--card) / 0.7);
+.active-bottom-link { /* Needs theme specific version */
+  background-color: hsl(var(--muted) / 0.5); /* Light theme active */
 }
-.current-nav-glow {
+.dark .active-bottom-link {
+  background-color: hsl(var(--card) / 0.7); /* Dark theme active */
+}
+.current-nav-glow { /* Needs theme specific version */
+  color: hsl(var(--brand-blue)); /* Light theme glow color */
+  text-shadow: 0 0 6px hsla(var(--brand-blue), 0.7), 0 0 10px hsla(var(--brand-blue),0.5);
+}
+.dark .current-nav-glow {
+  color: hsl(var(--brand-cyan)); /* Default was for dark */
   text-shadow: 0 0 6px currentColor, 0 0 10px currentColor;
 }
+
 .bottom-nav-item-central {
   @apply text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4;
-  border-color: hsl(var(--background));
+  border-color: hsl(var(--background)); /* Adapts */
 }
 .bottom-nav-item-central:hover {
   border-color: hsl(var(--brand-pink));
 }
 .bottom-nav-item-central:focus {
-  box-shadow: 0 0 0 4px hsl(var(--brand-pink) / 0.5); 
+  box-shadow: 0 0 0 4px hsla(var(--brand-pink), 0.5); 
 }
 
 .repo-xml-content-wrapper {
@@ -370,31 +368,55 @@
   }
 }
 
-.text-shadow-neon { text-shadow: 0 0 5px hsl(var(--brand-pink)), 0 0 10px hsl(var(--brand-pink)), 0 0 15px hsl(var(--brand-purple)), 0 0 20px hsl(var(--brand-purple));}
-.text-shadow-cyber { text-shadow: 0 0 4px hsla(var(--cyan-rgb), 0.8), 0 0 10px hsla(var(--pink-rgb), 0.6); }
+.text-shadow-neon { /* Dark theme oriented */
+  text-shadow: 0 0 5px hsl(var(--brand-pink)), 0 0 10px hsl(var(--brand-pink)), 0 0 15px hsl(var(--brand-purple)), 0 0 20px hsl(var(--brand-purple));
+}
+.text-shadow-cyber { /* Dark theme oriented */
+  text-shadow: 0 0 4px hsla(var(--cyan-rgb), 0.8), 0 0 10px hsla(var(--pink-rgb), 0.6); 
+}
 
-.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px); }
-.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px); }
+.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--purple-rgb), 0.05) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--purple-rgb), 0.05) 1px, transparent 1px); }
+.dark .bg-grid-pattern { background-image: linear-gradient(to right, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--purple-rgb), 0.1) 1px, transparent 1px); }
+
+.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--pink-rgb), 0.04) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--pink-rgb), 0.04) 1px, transparent 1px); }
+.dark .bg-grid-pattern-pink { background-image: linear-gradient(to right, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--pink-rgb), 0.08) 1px, transparent 1px); }
 
 .simple-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-.simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--card-rgb), 0.5); }
-.simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsl(var(--brand-purple) / 0.7); border-radius: 4px; border: 1px solid hsl(var(--brand-pink) / 0.3); }
-.simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--brand-pink) / 0.8); }
-.simple-scrollbar { scrollbar-width: thin; scrollbar-color: hsl(var(--brand-purple) / 0.7) hsla(var(--card-rgb), 0.5); }
+.simple-scrollbar::-webkit-scrollbar-track { background: hsl(var(--muted) / 0.3); } 
+.simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsl(var(--muted-foreground) / 0.5); border-radius: 4px; border: 1px solid hsl(var(--border) / 0.3); }
+.simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--muted-foreground) / 0.7); }
+.simple-scrollbar { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / 0.5) hsl(var(--muted) / 0.3); }
 
-.cyber-text { font-family: "Orbitron", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--brand-cyan)); text-shadow: 0 0 3px hsl(var(--brand-cyan) / 0.7), 0 0 5px hsl(var(--brand-cyan) / 0.5), 0 0 8px hsl(var(--brand-pink) / 0.6); }
-.cyber-text.glitch-heavy { text-shadow: 0.05em 0 0 hsl(var(--brand-pink) / 0.75), -0.025em -0.025em 0 hsl(var(--brand-green) / 0.75), -0.01em 0.025em 0 hsl(var(--brand-cyan) / 0.75); }
+.dark .simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--card-rgb), 0.5); }
+.dark .simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsl(var(--brand-purple) / 0.7); border: 1px solid hsl(var(--brand-pink) / 0.3); }
+.dark .simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--brand-pink) / 0.8); }
+.dark .simple-scrollbar { scrollbar-color: hsl(var(--brand-purple) / 0.7) hsla(var(--card-rgb), 0.5); }
+
+.cyber-text { 
+  font-family: "Orbitron", sans-serif; 
+  text-transform: uppercase; 
+  letter-spacing: 0.1em; 
+  color: hsl(var(--brand-purple)); 
+  text-shadow: 0 0 2px hsl(var(--brand-purple) / 0.5), 0 0 4px hsl(var(--brand-pink) / 0.4); 
+}
+.dark .cyber-text { 
+  color: hsl(var(--brand-cyan)); 
+  text-shadow: 0 0 3px hsl(var(--brand-cyan) / 0.7), 0 0 5px hsl(var(--brand-cyan) / 0.5), 0 0 8px hsl(var(--brand-pink) / 0.6); 
+}
+.cyber-text.glitch-heavy { /* Dark theme oriented */
+  text-shadow: 0.05em 0 0 hsl(var(--brand-pink) / 0.75), -0.025em -0.025em 0 hsl(var(--brand-green) / 0.75), -0.01em 0.025em 0 hsl(var(--brand-cyan) / 0.75); 
+}
 
 .text-gradient { background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 @keyframes glow { 0% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); } 50% { text-shadow: 0 0 20px hsla(var(--pink-rgb), 0.8), 0 0 30px hsla(var(--purple-rgb), 0.5); } 100% { text-shadow: 0 0 5px hsla(var(--pink-rgb), 0.5); }}
-.text-glow { animation: glow 2.5s infinite ease-in-out; } 
+.text-glow { animation: glow 2.5s infinite ease-in-out; } /* Dark theme oriented */
 
 input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-clear { display: none; }
 .comic-bubble { position: relative; background: hsl(var(--card)); border: 2px solid hsl(var(--brand-pink)); border-radius: 15px; color: hsl(var(--foreground));}
 
 @keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }} 
 
-.shadow-glow { box-shadow: 0 0 10px hsla(var(--cyan-rgb), 0.5); }
+.shadow-glow { box-shadow: 0 0 10px hsla(var(--cyan-rgb), 0.5); } /* Dark theme oriented */
 .shadow-glow:hover { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.7), 0 0 5px hsla(var(--pink-rgb), 0.3); }
 .shadow-yellow-glow { box-shadow: 0 0 15px hsla(var(--yellow-rgb), 0.4), 0 0 30px hsla(var(--yellow-rgb), 0.2); }
 .hover\:shadow-yellow-glow:hover { box-shadow: 0 0 20px hsla(var(--yellow-rgb), 0.6), 0 0 40px hsla(var(--yellow-rgb), 0.3); }
@@ -404,13 +426,12 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
 .shadow-blue-glow { box-shadow: 0 0 15px hsla(var(--blue-rgb), 0.4), 0 0 30px hsla(var(--blue-rgb), 0.2); }
 .shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2); }
 .shadow-orange-glow { box-shadow: 0 0 15px hsla(var(--orange-rgb), 0.4), 0 0 30px hsla(var(--orange-rgb), 0.2); }
-.shadow-lime-glow { box-shadow: 0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2); } /* Added lime glow */
-
+.shadow-lime-glow { box-shadow: 0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2); } 
 
 .highlight-scroll { transition: outline 0.5s ease-out; outline: 2px solid hsl(var(--brand-green) / 0.7); outline-offset: 2px; box-shadow: 0 0 15px hsl(var(--brand-green) / 0.5); }
 .text-animated-gradient { @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange; background-size: 200% auto; animation: gradient-text-flow 3s linear infinite; }
 
-.tutorial-hero-bg-mask { 
+.tutorial-hero-bg-mask { /* Dark theme oriented */
   -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
   mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
 }
