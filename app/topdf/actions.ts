@@ -43,7 +43,7 @@ export async function saveUserPdfFormData(
         .eq('user_id', userId)
         .single();
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116: single row not found (user might not exist yet or has no metadata)
+    if (fetchError && fetchError.code !== 'PGRST116') { 
         logger.error(`[topdf/actions saveUserPdfFormData] Error fetching user metadata for ${userId}:`, fetchError);
         return { success: false, error: fetchError.message || "Failed to fetch user data." };
     }
@@ -97,7 +97,6 @@ export async function loadUserPdfFormData(
     }
     if (!userData) {
       debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found or no metadata.`);
-      // Return success false if user not found, or success true with undefined data if that's acceptable
       return { success: false, error: "User not found to load PDF form data." };
     }
 
