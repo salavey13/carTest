@@ -5,7 +5,7 @@ import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
 import { supabaseAdmin } from '@/hooks/supabase'; 
-import { sendTelegramMessage as commonSendTelegramMessage } from '@/app/actions'; // Assuming a common sender exists
+import { sendTelegramMessage as commonSendTelegramMessage } from '@/app/actions'; 
 
 const pdfLibModule = require('pdf-lib');
 const fontkitModule = require('@pdf-lib/fontkit');
@@ -99,7 +99,7 @@ export async function loadUserPdfFormData(
     }
     if (!userData) {
       debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found or no metadata.`);
-      return { success: false, error: "User not found to load PDF form data." };
+      return { success: false, error: "User not found to load PDF form data." }; // Or { success: true, data: undefined } if that's preferred for "not found"
     }
 
     const formData = userData.metadata?.[PDF_FORM_DATA_KEY] as { userName?: string; userAge?: string; userGender?: string } | undefined;
@@ -454,6 +454,7 @@ export async function generatePdfFromMarkdownAndSend(
     }
 }
 
+
 export async function notifyAdminAction(
     userId: string, 
     username: string | null | undefined,
@@ -467,7 +468,7 @@ export async function notifyAdminAction(
     const adminMessage = `🆘 Запрос в поддержку от PRIZMA:\n\nПользователь: ${username || 'N/A'} (ID: ${userId})\nСообщение: "${messageFromUser}"\nСтраница: /topdf`;
 
     try {
-        const result = await commonSendTelegramMessage(adminMessage, [], undefined, ADMIN_CHAT_ID);
+        const result = await commonSendTelegramMessage(ADMIN_CHAT_ID, adminMessage); // Adjusted to match commonSendTelegramMessage signature
         if (result.success) {
             logger.info(`[topdf/actions notifyAdminAction] Support request from user ${userId} sent to admin.`);
             return { success: true };
