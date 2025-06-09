@@ -8,9 +8,11 @@ import { debugLogger } from '@/lib/debugLogger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
-import * as XLSX from 'xlsx'; 
-import { Button } from "@/components/ui/button"; 
-// Input, Label, Image are used within step components now
+// import * as XLSX from 'xlsx'; // Not used directly in this file anymore
+// import { Button } from "@/components/ui/button"; // Used in step components
+// import { Input } from '@/components/ui/input'; // Used in step components
+// import { Label } from '@/components/ui/label'; // Used in step components
+// import Image from 'next/image'; // Used in IntroStep
 import { 
     PSYCHO_ANALYSIS_SYSTEM_PROMPT, 
     REFINED_PERSONALITY_QUESTIONS_RU,
@@ -30,6 +32,7 @@ import { BasicAnalysisReadyStep } from './components/steps/BasicAnalysisReadySte
 import { PaymentOfferDetailsStep } from './components/steps/PaymentOfferDetailsStep';
 import { PaymentSuccessStep } from './components/steps/PaymentSuccessStep';
 import { GeneralErrorStep } from './components/steps/GeneralErrorStep';
+import { Button } from '@/components/ui/button';
 
 
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250609_005358-9e5fdb54-31ed-4231-83c4-610a7c8d9336.jpg"; 
@@ -300,7 +303,7 @@ export default function ToPdfPageWithPsychoFocus() {
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
     const [markdownInput, setMarkdownInput] = useState<string>('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // const fileInputRef = useRef<HTMLInputElement>(null); // Moved to QuestionsStep
     const pageContainerRef = useRef<HTMLDivElement>(null); 
 
     const [userName, setUserName] = useState<string>('');
@@ -313,6 +316,7 @@ export default function ToPdfPageWithPsychoFocus() {
     const [isPurchasing, setIsPurchasing] = useState(false);
 
     const [currentStep, setCurrentStep] = useState<PsychoFocusStep>('intro');
+    const firstLoadDoneRef = useRef(false); 
 
     const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
     const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
@@ -381,23 +385,21 @@ export default function ToPdfPageWithPsychoFocus() {
 
     useEffect(() => {
         if (user?.id && !appContextLoading && !appContextAuthenticating && hasAccess) { 
-            // Only load form data if it hasn't been potentially set by user input already
-            if (!userName && !userAge && !userGender) {
+            if (!firstLoadDoneRef.current) { 
                 loadUserPdfFormData(String(user.id)).then(result => {
                     if (result.success && result.data) {
-                        setUserName(result.data.userName || (user.first_name || ''));
-                        setUserAge(result.data.userAge || '');
-                        setUserGender(result.data.userGender || '');
-                    } else if (!result.data && user.first_name && !userName) { // Ensure userName isn't already set by user
+                        if (userName === '') setUserName(result.data.userName || (user.first_name || ''));
+                        if (userAge === '') setUserAge(result.data.userAge || '');
+                        if (userGender === '') setUserGender(result.data.userGender || '');
+                    } else if (!result.data && user.first_name && userName === '') { 
                         setUserName(user.first_name);
                     }
+                    firstLoadDoneRef.current = true; 
                 });
-            } else if (user.first_name && !userName) { // If form data is empty but user has a first name
-                 setUserName(user.first_name);
             }
-        } else if (user?.first_name && !userName && !appContextLoading && !appContextAuthenticating) {
-            // If not authenticated for form data load yet, but we have a telegram first name
+        } else if (user?.first_name && userName === '' && !appContextLoading && !appContextAuthenticating && !firstLoadDoneRef.current) {
             setUserName(user.first_name);
+            firstLoadDoneRef.current = true;
         }
     }, [user?.id, user?.first_name, appContextLoading, appContextAuthenticating, hasAccess, userName, userAge, userGender]);
 
@@ -405,8 +407,9 @@ export default function ToPdfPageWithPsychoFocus() {
     const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) { setSelectedFile(null); setMarkdownInput(''); setStatusMessage(t('noFileSelected')); return; }
-        if (file.size > MAX_FILE_SIZE_BYTES) { toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return; }
-        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) { toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return; }
+        // Assuming MAX_FILE_SIZE_BYTES is defined elsewhere
+        if (file.size > MAX_FILE_SIZE_BYTES) { toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (event.target) event.target.value = ""; return; }
+        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) { toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (event.target) event.target.value = ""; return; }
         
         setSelectedFile(file);
         setIsLoading(true); setCurrentStep('analyzing'); setStatusMessage(t('parsingXlsx'));
@@ -451,7 +454,7 @@ export default function ToPdfPageWithPsychoFocus() {
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
                 if (hasProAccess) {
-                    setCurrentStep('paymentSuccess'); // This step now shows "Pro analysis sent"
+                    setCurrentStep('paymentSuccess'); 
                     setStatusMessage(t('prizmaProAnalysisSent'));
                 } else {
                     setCurrentStep('basicAnalysisReady'); 
@@ -506,8 +509,6 @@ export default function ToPdfPageWithPsychoFocus() {
             if(refreshDbUser) { 
                 setTimeout(async () => { 
                     await refreshDbUser(); 
-                    // After refresh, hasProAccess should be true.
-                    // Navigate to questions, where they can use the new Pro features.
                     setCurrentStep('questions'); 
                     toast.info(currentLang === 'ru' ? "Pro-доступ активирован! Теперь вам доступны все вопросы." : "Pro access activated! All questions are now available to you.");
                 }, 7000); 
@@ -563,8 +564,7 @@ export default function ToPdfPageWithPsychoFocus() {
             </Link>
         </div> );
     }
-    
-    // Current step rendering logic
+        
     const renderStep = () => {
         switch (currentStep) {
             case 'intro':
@@ -584,6 +584,7 @@ export default function ToPdfPageWithPsychoFocus() {
             case 'generalError':
                 return <GeneralErrorStep translations={t} statusMessage={statusMessage} onTryAgain={() => setCurrentStep('questions')} onContactSupport={handleContactSupport} isLoading={isLoading} />;
             default:
+                debugLogger.warn(`[ToPdfPage] Unknown step: ${currentStep}. Defaulting to intro.`);
                 return <IntroStep translations={t} onStartAnalysis={handleProceedToUserData} heroImageUrl={HERO_IMAGE_URL} />;
         }
     };
