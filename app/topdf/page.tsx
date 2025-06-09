@@ -1,46 +1,76 @@
-// /app/topdf/page.tsx
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { generatePdfFromMarkdownAndSend, saveUserPdfFormData, loadUserPdfFormData } from '@/app/topdf/actions';
+import { generatePdfFromMarkdownAndSend, saveUserPdfFormData, loadUserPdfFormData, notifyAdminAction } from '@/app/topdf/actions';
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
-import * as XLSX from 'xlsx'; 
-import { Button } from "@/components/ui/button"; 
-import { Input } from '@/components/ui/input'; 
-import { Label } from '@/components/ui/label'; 
-import Image from 'next/image'; 
-import { PSYCHO_ANALYSIS_SYSTEM_PROMPT, REFINED_PERSONALITY_QUESTIONS_RU } from './psychoAnalysisPrompt';
+// import * as XLSX from 'xlsx'; // Not used directly in this file anymore
+// import { Button } from "@/components/ui/button"; // Used in step components
+// import { Input } from '@/components/ui/input'; // Used in step components
+// import { Label } from '@/components/ui/label'; // Used in step components
+// import Image from 'next/image'; // Used in IntroStep
+import { 
+    PSYCHO_ANALYSIS_SYSTEM_PROMPT, 
+    REFINED_PERSONALITY_QUESTIONS_RU,
+    PRO_ADDITIONAL_QUESTIONS_RU, 
+    PSYCHO_ANALYSIS_PRO_SYSTEM_PROMPT 
+} from './psychoAnalysisPrompt';
 import { purchaseProtoCardAction } from '../hotvibes/actions'; 
 import type { ProtoCardDetails } from '../hotvibes/actions';   
 import Link from 'next/link';
 
+// Step Components
+import { IntroStep } from './components/steps/IntroStep';
+import { UserDataStep } from './components/steps/UserDataStep';
+import { QuestionsStep } from './components/steps/QuestionsStep';
+import { AnalyzingStep } from './components/steps/AnalyzingStep';
+import { BasicAnalysisReadyStep } from './components/steps/BasicAnalysisReadyStep';
+import { PaymentOfferDetailsStep } from './components/steps/PaymentOfferDetailsStep';
+import { PaymentSuccessStep } from './components/steps/PaymentSuccessStep';
+import { GeneralErrorStep } from './components/steps/GeneralErrorStep';
+import { Button } from '@/components/ui/button';
+
+
 const HERO_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250609_005358-9e5fdb54-31ed-4231-83c4-610a7c8d9336.jpg"; 
 
 const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
-const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
+const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7; 
 
-// translations object (remains the same as your last correct version)
+const PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID = "personality_pdf_pro_access_v1";
+const PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR = 2990; 
+
+type PsychoFocusStep = 
+  | 'intro' 
+  | 'userData' 
+  | 'questions' 
+  | 'analyzing'
+  | 'basicAnalysisReady' 
+  | 'paymentOfferDetails' 
+  | 'paymentSuccess' 
+  | 'paymentError'
+  | 'generalError';
+
 const translations: Record<string, Record<string, string>> = {
   en: {
-    "pageTitle": "AI PDF Report Generator ✨", 
-    "pageSubtitle": "Generate a personalized PDF report. Input user data and answers, or analyze an XLSX with AI.", 
-    "step1Title": "Step 1: User Data & Questions for AI",
-    "generateDemoQuestions": "Demo Q's & Data",
+    "pageTitle": "PRIZMA: Personality Analysis", 
+    "pageSubtitle": "Generate a personalized PDF report based on your answers.", 
+    "step1Title": "Step 1: Your Data",
+    "generateDemoQuestions": "Fill with Demo Questions",
     "demoQuestionsGenerated": "Demo questions & user data prepared! Copied to Markdown area.",
     "userDataTitle": "User Data for Report", 
-    "userNameLabel": "User's Name",
-    "userAgeLabel": "User's Age",
-    "userGenderLabel": "User's Gender",
-    "step2Title": "Step 2: Report Content (Paste AI Response or Final Answers)", 
-    "pasteMarkdown": "Paste Markdown content here (e.g., AI analysis, or user's final answers to questions):", 
-    "copyPromptAndData": "Copy AI Prompt",
-    "goToGemini": "Open Gemini AI Studio",
-    "step3Title": "Step 3: Create & Send PDF",
+    "userNameLabel": "Name",
+    "userAgeLabel": "Age",
+    "userGenderLabel": "Gender",
+    "step2Title": "Step 2: Answer Questions", 
+    "pasteMarkdown": "Paste your detailed answers to the questions here:", 
+    "copyPromptAndData": "Copy My Answers & AI Prompt",
+    "goToAiStudio": "Open AI Studio",
+    "goToAiStudioSubtext": "(for self-analysis)",
+    "step3Title": "Step 3: Generate Report",
     "generateAndSendPdf": "Generate PDF & Send to Telegram",
     "processing": "Processing...",
     "parsingXlsx": "Parsing XLSX...", 
@@ -53,13 +83,13 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Processing failed. Please try again.",
     "pdfGenerationFailed": "PDF Generation Failed: %%ERROR%%",
     "telegramSendFailed": "Failed to send PDF to Telegram: %%ERROR%%",
-    "promptCopySuccess": "Full AI prompt (user data + system instructions) copied to clipboard!", 
+    "promptCopySuccess": "Full AI prompt (data + answers + system instructions) copied to clipboard!", 
     "promptCopyError": "Failed to copy. Please copy manually.",
     "unexpectedError": "An unexpected error occurred: %%ERROR%%",
     "loadingUser": "Loading user data...",
     "status": "Status",
-    "readyForUserData": "Ready for user data and report content.",
-    "readyForPdf": "Ready to generate PDF from content.", 
+    "readyForUserData": "Ready for user data.",
+    "readyForPdf": "Ready to generate PDF.", 
     "toggleLanguage": "Toggle Language",
     "xlsxUploadOptionalTitle": "Optional: Upload XLSX for AI Analysis (Alternative Flow)",
     "selectFile": "Select XLSX Report (Optional)",
@@ -69,8 +99,8 @@ const translations: Record<string, Record<string, string>> = {
     "errorInvalidFileType": "Invalid file type. Only .xlsx files are accepted.",
     "formDataSaved": "User data saved for this session.",
     "formDataError": "Error saving user data for session.",
-    "accessDeniedTitle": "Access to PDF Generator Denied!",
-    "accessDeniedSubtitle": "To use the AI PDF Report Generator, please purchase an access ProtoCard.",
+    "accessDeniedTitle": "Access to PRIZMA Denied!",
+    "accessDeniedSubtitle": "To use the AI PDF Report Generator, please purchase an Access ProtoCard.",
     "purchaseAccessButton": "Purchase Access for %%PRICE%% XTR",
     "purchasingInProgress": "Processing Purchase...",
     "errorNotAuthenticated": "Please log in via Telegram to purchase access.",
@@ -79,23 +109,52 @@ const translations: Record<string, Record<string, string>> = {
     "backToHotVibes": "::FaArrowLeft:: Back to Hot Vibes",
     "promptGenerated": "AI prompt for XLSX prepared and copied to Markdown area.",
     "workingAreaMark": "YOUR WORKSPACE: Paste AI responses or final answers here for PDF generation.",
+    "prizmaIntroTitle": "PRIZMA",
+    "prizmaIntroSubtitle": "Your personal AI psychologist and mentor",
+    "prizmaIntroDesc": "Take a voice survey and learn more about yourself. It was, it is, it will be.",
+    "prizmaStartAnalysis": "Start Analysis",
+    "prizmaUserDataPrompt": "Let's get acquainted! Enter your basic details for your audit.",
+    "prizmaContinue": "Continue",
+    "prizmaQuestionsTitle": "Tell us about your main values in life",
+    "prizmaNext": "Next",
+    "prizmaAnalyzing": "Analyzing your answers...",
+    "prizmaBasicAnalysisReadyTitle": "Your basic analysis is ready!",
+    "prizmaBasicAnalysisSent": "Your basic PDF report has been sent to Telegram.",
+    "prizmaGetFullAnalysis": "Get Full Analysis",
+    "prizmaPaymentOfferTitle": "Full Decryption",
+    "prizmaPaymentOfferPrice": "$%%PRICE%%", 
+    "prizmaPaymentOfferPriceOld": "$60.00", 
+    "prizmaPaymentOfferFeatures": "Free Decryption<br>10 Page Analysis<br>3 Basic Methods<br>General Recommendations<br>Analysis in 24 hours<br>---<br>12 Professional Techniques<br>50+ Personalized Recommendations<br>Individual Psychologist Support",
+    "prizmaChoosePayment": "Choose Payment Method",
+    "prizmaPaymentGuarantee": "Secure Payment · Data Protection",
+    "prizmaPaymentSuccessTitle": "Payment Successful!",
+    "prizmaPaymentSuccessDesc": "To get your full analysis, complete the survey. %%REMAINING%% questions left.",
+    "prizmaErrorTitle": "Something went wrong!",
+    "prizmaErrorDesc": "A technical error occurred. Please try again or contact support.",
+    "prizmaTryAgain": "Try Again",
+    "prizmaContactSupport": "Contact Support",
+    "prizmaAnalyzingTitle": "Analyzing your answers",
+    "prizmaProAnalysisReadyTitle": "Your FULL PRIZMA analysis is ready!",
+    "prizmaProAnalysisSent": "Your full PRIZMA PDF report (Pro version) has been sent to Telegram.",
+    "prizmaFullAnalysis": "Full Analysis",
   },
   ru: {
-    "pageTitle": "AI Генератор PDF Отчетов ✨", 
-    "pageSubtitle": "Создайте персонализированный PDF-отчет. Введите данные пользователя и ответы, или проанализируйте XLSX с помощью AI.", 
-    "step1Title": "Шаг 1: Данные Пользователя и Вопросы для AI",
-    "generateDemoQuestions": "Демо-Вопросы и Данные",
+    "pageTitle": "PRIZMA: Психологический Анализ", 
+    "pageSubtitle": "Создайте персонализированный PDF-отчет на основе ваших ответов.", 
+    "step1Title": "Шаг 1: Ваши Данные",
+    "generateDemoQuestions": "Заполнить демо-вопросами",
     "demoQuestionsGenerated": "Демо-вопросы и данные пользователя подготовлены! Скопированы в область Markdown.",
     "userDataTitle": "Данные Пользователя для Отчета", 
-    "userNameLabel": "Имя пользователя",
-    "userAgeLabel": "Возраст пользователя",
-    "userGenderLabel": "Пол пользователя",
-    "step2Title": "Шаг 2: Содержимое Отчета (Вставьте Ответ AI или Финальные Ответы)", 
-    "pasteMarkdown": "Вставьте сюда Markdown-контент (например, анализ от AI или финальные ответы пользователя на вопросы):", 
-    "copyPromptAndData": "Копировать Промпт AI",
-    "goToGemini": "Открыть Gemini AI Studio",
-    "step3Title": "Шаг 3: Создать и Отправить PDF",
-    "generateAndSendPdf": "PDF в Telegram",
+    "userNameLabel": "Имя",
+    "userAgeLabel": "Возраст",
+    "userGenderLabel": "Пол",
+    "step2Title": "Шаг 2: Ответы на Вопросы", 
+    "pasteMarkdown": "Вставьте сюда ваши развернутые ответы на вопросы:", 
+    "copyPromptAndData": "Копировать мои ответы и промпт для AI",
+    "goToAiStudio": "Открыть AI Studio",
+    "goToAiStudioSubtext": "(для самостоятельного анализа)",
+    "step3Title": "Шаг 3: Генерация Отчета",
+    "generateAndSendPdf": "Сгенерировать PDF и Отправить в Telegram",
     "processing": "Обработка...",
     "parsingXlsx": "Парсинг XLSX...", 
     "generatingPromptForXlsx": "Генерация AI Промпта для XLSX...",
@@ -107,12 +166,12 @@ const translations: Record<string, Record<string, string>> = {
     "processFailed": "Ошибка обработки. Пожалуйста, попробуйте снова.",
     "pdfGenerationFailed": "Ошибка Генерации PDF: %%ERROR%%",
     "telegramSendFailed": "Не удалось отправить PDF в Telegram: %%ERROR%%",
-    "promptCopySuccess": "Полный промпт для AI (данные пользователя + системные инструкции) скопирован в буфер обмена!", 
+    "promptCopySuccess": "Полный промпт для AI (данные + ответы + системные инструкции) скопирован в буфер обмена!", 
     "promptCopyError": "Не удалось скопировать. Скопируйте вручную.",
     "unexpectedError": "Произошла непредвиденная ошибка: %%ERROR%%",
     "loadingUser": "Загрузка данных пользователя...",
     "status": "Статус",
-    "readyForUserData": "Готово к вводу данных и контента.",
+    "readyForUserData": "Готово к вводу данных.",
     "readyForPdf": "Готово к генерации PDF.", 
     "toggleLanguage": "Переключить язык",
     "xlsxUploadOptionalTitle": "Опционально: Загрузка XLSX для Анализа AI (Альтернативный Сценарий)",
@@ -123,7 +182,7 @@ const translations: Record<string, Record<string, string>> = {
     "errorInvalidFileType": "Неверный тип файла. Принимаются только .xlsx файлы.",
     "formDataSaved": "Данные пользователя сохранены для этой сессии.",
     "formDataError": "Ошибка сохранения данных пользователя для сессии.",
-    "accessDeniedTitle": "Доступ к Генератору PDF Закрыт!",
+    "accessDeniedTitle": "Доступ к PRIZMA Закрыт!",
     "accessDeniedSubtitle": "Для использования AI Генератора PDF Отчетов, пожалуйста, приобретите ПротоКарточку Доступа.",
     "purchaseAccessButton": "Купить Доступ за %%PRICE%% XTR",
     "purchasingInProgress": "Обработка покупки...",
@@ -133,23 +192,56 @@ const translations: Record<string, Record<string, string>> = {
     "backToHotVibes": "::FaArrowLeft:: Назад в Горячие Вайбы",
     "promptGenerated": "AI промпт для XLSX подготовлен и скопирован в область Markdown.",
     "workingAreaMark": "ВАША РАБОЧАЯ ОБЛАСТЬ: Сюда вставляйте ответы AI или финальные ответы для генерации PDF.",
+    "prizmaIntroTitle": "PRIZMA",
+    "prizmaIntroSubtitle": "Ваш личный ИИ психолог и наставник",
+    "prizmaIntroDesc": "Пройдите голосовой опрос и узнайте о себе больше. То что было, то и есть, тому и быть.",
+    "prizmaStartAnalysis": "Начать анализ",
+    "prizmaUserDataPrompt": "Давайте познакомимся! Введите свои данные для аудита.",
+    "prizmaContinue": "Продолжить",
+    "prizmaQuestionsTitle": "Расскажите о своих главных ценностях в жизни",
+    "prizmaNext": "Далее",
+    "prizmaAnalyzing": "Анализируем ваши ответы...",
+    "prizmaBasicAnalysisReadyTitle": "Ваш базовый анализ готов!",
+    "prizmaBasicAnalysisSent": "Ваш базовый PDF-отчет отправлен в Telegram.",
+    "prizmaGetFullAnalysis": "Получить полный анализ",
+    "prizmaPaymentOfferTitle": "Полная расшифровка",
+    "prizmaPaymentOfferPrice": "%%PRICE%%р", 
+    "prizmaPaymentOfferPriceOld": "6000р", 
+    "prizmaPaymentOfferFeatures": "Бесплатная расшифровка<br>10 стр анализа<br>3 базовые методики<br>Общие рекомендации<br>Анализ занимает 24 часа<br>---<br>12 профессиональных методик<br>50+ персонализированных рекомендаций<br>Индивидуальный психолог",
+    "prizmaChoosePayment": "Выбрать способ оплаты",
+    "prizmaPaymentGuarantee": "Безопасная оплата · Защита данных",
+    "prizmaPaymentSuccessTitle": "Оплата успешно прошла!",
+    "prizmaPaymentSuccessDesc": "Чтобы получить полную расшифровку, пройдите опрос. Вам осталось пройти еще %%REMAINING%% вопросов.",
+    "prizmaErrorTitle": "Что-то пошло не так!",
+    "prizmaErrorDesc": "Произошла техническая ошибка. Пожалуйста, попробуйте еще раз или обратитесь в поддержку.",
+    "prizmaTryAgain": "Попробовать снова",
+    "prizmaContactSupport": "Написать в поддержку",
+    "prizmaAnalyzingTitle": "Анализируем ваши ответы",
+    "prizmaProAnalysisReadyTitle": "Ваш ПОЛНЫЙ анализ PRIZMA готов!",
+    "prizmaProAnalysisSent": "Ваш полный PDF-отчет PRIZMA (Pro версия) отправлен в Telegram.",
+    "prizmaFullAnalysis": "Полный анализ",
   }
 };
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string): string => {
+const generateUserDataAndQuestionsForAI = (userName?: string, userAge?: string, userGender?: string, hasProAccess?: boolean): string => {
     const name = userName || "Пользователь";
     let content = `# Расшифровка Личности для ${name}\n\n`;
     if (userAge) content += `**Возраст:** ${userAge}\n`;
     if (userGender) content += `**Пол:** ${userGender}\n\n`;
     content += `## Ответы на вопросы (пожалуйста, предоставьте развернутые ответы):\n\n`;
-    content += REFINED_PERSONALITY_QUESTIONS_RU.map(q => `* ${q}\n  *Ответ:* ...`).join("\n\n");
+    
+    let questions = [...REFINED_PERSONALITY_QUESTIONS_RU];
+    if (hasProAccess) {
+        questions = questions.concat(PRO_ADDITIONAL_QUESTIONS_RU);
+    }
+    content += questions.map((q, i) => `${i + 1}. ${q}\n  *Ответ:* ...`).join("\n\n");
     return content;
 };
 
-const handleXlsxFileAndPreparePromptInternal = /* ... (same as before) ... */ async (
+const handleXlsxFileAndPreparePromptInternal = async (
     file: File, 
     currentUserName: string, 
     currentUserAge: string, 
@@ -210,20 +302,30 @@ export default function ToPdfPageWithPsychoFocus() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null); 
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string>('');
-    const [generatedDataForAI, setGeneratedDataForAI] = useState<string>('');
     const [markdownInput, setMarkdownInput] = useState<string>('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // const fileInputRef = useRef<HTMLInputElement>(null); // Moved to QuestionsStep
+    const pageContainerRef = useRef<HTMLDivElement>(null); 
 
     const [userName, setUserName] = useState<string>('');
     const [userAge, setUserAge] = useState<string>('');
     const [userGender, setUserGender] = useState<string>('');
     
-    const [hasAccess, setHasAccess] = useState(false);
+    const [hasAccess, setHasAccess] = useState(false); 
+    const [hasProAccess, setHasProAccess] = useState(false); 
     const [isCheckingAccess, setIsCheckingAccess] = useState(true);
     const [isPurchasing, setIsPurchasing] = useState(false);
 
+    const [currentStep, setCurrentStep] = useState<PsychoFocusStep>('intro');
+    const firstLoadDoneRef = useRef(false); 
+
     const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
     const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
+
+    useEffect(() => {
+        if (pageContainerRef.current) {
+            window.scrollTo(0,0); 
+        }
+    }, [currentStep]);
 
     useEffect(() => {
         const newLang = user?.language_code === 'ru' ? 'ru' : 'en';
@@ -239,27 +341,43 @@ export default function ToPdfPageWithPsychoFocus() {
         }
         return translation;
     }, [currentLang]);
-
+    
     useEffect(() => {
+      if (currentStep !== 'analyzing') { 
         setStatusMessage(t('readyForUserData'));
-    }, [t, currentLang]);
+      }
+    }, [t, currentLang, currentStep]);
 
      useEffect(() => {
         if (!appContextLoading && !appContextAuthenticating) {
             setIsCheckingAccess(true);
+            debugLogger.info("[ToPdfPage AccessCheck] Starting. isAuthenticated:", isAuthenticated, "dbUser exists:", !!dbUser);
             if (isAuthenticated && dbUser) {
                 const cards = dbUser.metadata?.xtr_protocards as Record<string, { status: string; type?: string; data?: { page_link?: string } }> | undefined;
-                const pdfCard = cards?.[PERSONALITY_REPORT_PDF_CARD_ID];
-                if (pdfCard?.status === 'active' && pdfCard.type === 'tool_access' && pdfCard.data?.page_link === '/topdf') {
+                debugLogger.info("[ToPdfPage AccessCheck] User cards:", cards);
+                
+                const baseAccessCard = cards?.[PERSONALITY_REPORT_PDF_CARD_ID];
+                if (baseAccessCard?.status === 'active' && baseAccessCard.type === 'tool_access' && baseAccessCard.data?.page_link === '/topdf') {
                     setHasAccess(true);
-                    debugLogger.info(`[ToPdfPage] User ${dbUser.user_id} has VALID access to PDF Generator.`);
-                } else {
-                    setHasAccess(false);
-                    debugLogger.warn(`[ToPdfPage] User ${dbUser.user_id} has INVALID or NO access to PDF Generator. Card data:`, pdfCard);
+                    debugLogger.info("[ToPdfPage AccessCheck] Basic access GRANTED.");
+                } else { 
+                    setHasAccess(false); 
+                    debugLogger.info("[ToPdfPage AccessCheck] Basic access DENIED. Card:", baseAccessCard);
                 }
-            } else {
-                setHasAccess(false); 
-                 debugLogger.info(`[ToPdfPage] No access: User not authenticated or dbUser missing. isAuthenticated: ${isAuthenticated}`);
+
+                const proAccessCard = cards?.[PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID];
+                if (proAccessCard?.status === 'active' && proAccessCard.type === 'tool_access') { 
+                    setHasProAccess(true);
+                    debugLogger.info("[ToPdfPage AccessCheck] Pro access GRANTED.");
+                } else { 
+                    setHasProAccess(false); 
+                    debugLogger.info("[ToPdfPage AccessCheck] Pro access DENIED. Card:", proAccessCard);
+                }
+
+            } else { 
+                setHasAccess(false);
+                setHasProAccess(false);
+                debugLogger.info("[ToPdfPage AccessCheck] No auth or dbUser, all access DENIED.");
             }
             setIsCheckingAccess(false);
         }
@@ -267,308 +385,219 @@ export default function ToPdfPageWithPsychoFocus() {
 
     useEffect(() => {
         if (user?.id && !appContextLoading && !appContextAuthenticating && hasAccess) { 
-            setIsLoading(true);
-            loadUserPdfFormData(String(user.id)).then(result => {
-                if (result.success && result.data) {
-                    setUserName(result.data.userName || '');
-                    setUserAge(result.data.userAge || '');
-                    setUserGender(result.data.userGender || '');
-                    debugLogger.info("[ToPdfPage] User PDF form data loaded.", result.data);
-                } else if (result.error && result.error !== "User not found to load PDF form data.") { 
-                    debugLogger.warn("[ToPdfPage] Error loading user PDF form data:", result.error);
-                }
-            }).finally(() => setIsLoading(false));
+            if (!firstLoadDoneRef.current) { 
+                loadUserPdfFormData(String(user.id)).then(result => {
+                    if (result.success && result.data) {
+                        if (userName === '') setUserName(result.data.userName || (user.first_name || ''));
+                        if (userAge === '') setUserAge(result.data.userAge || '');
+                        if (userGender === '') setUserGender(result.data.userGender || '');
+                    } else if (!result.data && user.first_name && userName === '') { 
+                        setUserName(user.first_name);
+                    }
+                    firstLoadDoneRef.current = true; 
+                });
+            }
+        } else if (user?.first_name && userName === '' && !appContextLoading && !appContextAuthenticating && !firstLoadDoneRef.current) {
+            setUserName(user.first_name);
+            firstLoadDoneRef.current = true;
         }
-    }, [user?.id, appContextLoading, appContextAuthenticating, hasAccess]);
+    }, [user?.id, user?.first_name, appContextLoading, appContextAuthenticating, hasAccess, userName, userAge, userGender]);
 
-    const handleXlsxFileChange = /* ... (same) ... */ async (event: React.ChangeEvent<HTMLInputElement>) => {
+
+    const handleXlsxFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file) {
-            setSelectedFile(null); setGeneratedDataForAI(''); setStatusMessage(t('noFileSelected'));
-            return;
-        }
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
-        }
-        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) {
-            toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; return;
-        }
+        if (!file) { setSelectedFile(null); setMarkdownInput(''); setStatusMessage(t('noFileSelected')); return; }
+        // Assuming MAX_FILE_SIZE_BYTES is defined elsewhere
+        if (file.size > MAX_FILE_SIZE_BYTES) { toast.error(t('errorFileTooLarge')); setSelectedFile(null); if (event.target) event.target.value = ""; return; }
+        if (file.type !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && !file.name.endsWith('.xlsx')) { toast.error(t('errorInvalidFileType')); setSelectedFile(null); if (event.target) event.target.value = ""; return; }
+        
         setSelectedFile(file);
+        setIsLoading(true); setCurrentStep('analyzing'); setStatusMessage(t('parsingXlsx'));
         const result = await handleXlsxFileAndPreparePromptInternal(file, userName, userAge, userGender, t, setIsLoading, setStatusMessage);
         if(result.success && result.prompt){
-            setGeneratedDataForAI(result.prompt); 
-            setMarkdownInput(result.prompt); 
-            setStatusMessage(t('promptGenerated'));
-            toast.success(t('promptGenerated'));
+            setMarkdownInput(result.prompt); setStatusMessage(t('promptGenerated')); toast.success(t('promptGenerated'));
+            setCurrentStep('questions'); 
         } else {
-            toast.error(t('unexpectedError', { ERROR: result.error || 'Failed to process XLSX' }));
-            setStatusMessage(t('readyForUserData'));
+            toast.error(t('unexpectedError', { ERROR: result.error || 'Failed to process XLSX' })); setStatusMessage(t('readyForUserData'));
+            setCurrentStep('questions'); 
         }
+        setIsLoading(false); 
     };
-    const handleGenerateDemoQuestionsAndPrompt = /* ... (same) ... */ () => {
-        const userDataAndQuestions = generateUserDataAndQuestionsForAI(userName, userAge, userGender);
-        setGeneratedDataForAI(userDataAndQuestions); 
+
+    const handleGenerateDemoQuestionsAndPrompt = () => {
+        const userDataAndQuestions = generateUserDataAndQuestionsForAI(userName, userAge, userGender, hasProAccess);
         setMarkdownInput(userDataAndQuestions); 
         toast.success(t('demoQuestionsGenerated'));
         setStatusMessage(t('readyForPdf'));
-        if (user?.id) { 
-            saveUserPdfFormData(String(user.id), { userName, userAge, userGender }).then(res => {
-                 if(res.success) toast.info(t('formDataSaved'), {duration: 1500});
-                 else toast.error(t('formDataError'));
-            });
-        }
     };
-    const handleCopyToClipboard = /* ... (same, uses corrected prompt order) ... */ () => {
-        let textForUserAndQuestions = generatedDataForAI.trim(); 
-        if (!textForUserAndQuestions && markdownInput.trim()) { 
-            textForUserAndQuestions = markdownInput.trim();
+
+    const handleCopyToClipboard = () => {
+        let textToCopy = markdownInput.trim(); 
+        if (!textToCopy) {
+             if(userName || userAge || userGender) { textToCopy = generateUserDataAndQuestionsForAI(userName,userAge,userGender, hasProAccess); } 
+             else { toast.info(currentLang === 'ru' ? "Сначала введите данные или сгенерируйте вопросы." : "Enter user data or generate questions first."); return; }
         }
-        if (!textForUserAndQuestions) {
-             if(userName || userAge || userGender) {
-                textForUserAndQuestions = generateUserDataAndQuestionsForAI(userName,userAge,userGender);
-             } else {
-                toast.info(currentLang === 'ru' ? "Введите данные пользователя и сгенерируйте вопросы, или введите текст в поле содержимого." : "Enter user data and generate questions, or input content in the markdown field.");
-                return;
-             }
-        }
-        const fullTextForAI = `${textForUserAndQuestions}\n\n---\n${PSYCHO_ANALYSIS_SYSTEM_PROMPT}`;
-        
-        navigator.clipboard.writeText(fullTextForAI)
-            .then(() => toast.success(t('promptCopySuccess')))
-            .catch(err => {
-                toast.error(t('promptCopyError'));
-                logger.error('Clipboard copy failed:', err);
-            });
+        const systemPromptToUse = hasProAccess ? PSYCHO_ANALYSIS_PRO_SYSTEM_PROMPT : PSYCHO_ANALYSIS_SYSTEM_PROMPT;
+        const fullTextForAI = `${textToCopy}\n\n---\n${systemPromptToUse}`;
+        navigator.clipboard.writeText(fullTextForAI).then(() => toast.success(t('promptCopySuccess'))).catch(err => { toast.error(t('promptCopyError')); logger.error('Clipboard copy failed:', err); });
     };
-    const handleGeneratePdf = /* ... (same) ... */ async () => {
+
+    const handleGeneratePdfAndProceed = async () => {
         if (!markdownInput.trim()) { toast.error(t('errorNoMarkdown')); return; }
-        if (!user?.id) { toast.error(t('errorNoUser')); return; }
+        if (!user?.id) { toast.error(t('errorNoUser')); setCurrentStep('generalError'); return; }
         
-        const reportFileNameBase = selectedFile?.name || (userName ? `Расшифровка_${userName.replace(/\s/g, '_')}` : "Отчет_Расшифровка_Личности");
+        const reportFileNameBase = userName ? `PRIZMA_${hasProAccess ? 'Pro_' : ''}Анализ_${userName.replace(/\s/g, '_')}` : `PRIZMA_${hasProAccess ? 'Pro_' : ''}Анализ_Личности`;
 
-        setIsLoading(true); setStatusMessage(t('generatingPdf'));
-
+        setIsLoading(true); setCurrentStep('analyzing'); setStatusMessage(t('generatingPdf'));
         try {
-            const result = await generatePdfFromMarkdownAndSend(
-                markdownInput, 
-                String(user.id), 
-                reportFileNameBase,
-                userName.trim() || undefined,
-                userAge.trim() || undefined,
-                userGender.trim() || undefined
-            );
+            const result = await generatePdfFromMarkdownAndSend( markdownInput, String(user.id), reportFileNameBase, userName.trim() || undefined, userAge.trim() || undefined, userGender.trim() || undefined, hasProAccess ? undefined : HERO_IMAGE_URL );
             if (result.success) {
                 toast.success(result.message || t('successMessage'));
-                setStatusMessage(result.message || t('successMessage'));
-                setMarkdownInput(''); 
-                setGeneratedDataForAI(''); 
-                if (selectedFile && (!userName && !userAge && !userGender)) { 
-                    setSelectedFile(null); 
-                    if (fileInputRef.current) fileInputRef.current.value = "";
+                if (hasProAccess) {
+                    setCurrentStep('paymentSuccess'); 
+                    setStatusMessage(t('prizmaProAnalysisSent'));
+                } else {
+                    setCurrentStep('basicAnalysisReady'); 
                 }
-                setStatusMessage(t('readyForUserData'));
             } else {
                 toast.error(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }), { duration: 7000 });
-                setStatusMessage(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
+                setCurrentStep('generalError'); setStatusMessage(t('pdfGenerationFailed', { ERROR: result.error || 'Unknown error' }));
             }
         } catch (error) {
             toast.error(t('unexpectedError', { ERROR: (error as Error).message }), { duration: 7000 });
-            setStatusMessage(t('unexpectedError', { ERROR: (error as Error).message }));
-        } finally {
-            setIsLoading(false);
-        }
+            setCurrentStep('generalError'); setStatusMessage(t('unexpectedError', { ERROR: (error as Error).message }));
+        } finally { setIsLoading(false); }
     };
-    const handlePurchaseAccess = /* ... (same) ... */ async () => {
-        if (!isAuthenticated || !dbUser?.user_id) {
-          toast.error(t('errorNotAuthenticated'));
-          return;
-        }
+    
+    const handlePurchaseAccess = async () => { 
+        if (!isAuthenticated || !dbUser?.user_id) { toast.error(t('errorNotAuthenticated')); return; }
         setIsPurchasing(true);
         const cardDetails: ProtoCardDetails = {
           cardId: PERSONALITY_REPORT_PDF_CARD_ID,
-          title: currentLang === 'ru' ? `Доступ к Генератору PDF Отчетов` : `PDF Report Generator Access`,
-          description: currentLang === 'ru' ? `Разблокировать AI Генератор PDF для психологических расшифровок. Цена: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.` : `Unlock the AI PDF Generator for personality insights. Price: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.`,
+          title: currentLang === 'ru' ? `Доступ к PRIZMA Анализатору` : `PRIZMA Analyzer Access`,
+          description: currentLang === 'ru' ? `Разблокировать AI Генератор PDF для психологических расшифровок PRIZMA. Цена: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.` : `Unlock the AI PDF Generator for PRIZMA personality insights. Price: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR.`,
           amountXTR: PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR,
           type: "tool_access",
-          metadata: { 
-            page_link: "/topdf", 
-            tool_name: "AI PDF Generator - PsychoVibe",
-            photo_url: HERO_IMAGE_URL 
-          }
+          metadata: { page_link: "/topdf", tool_name: "PRIZMA PDF Generator", photo_url: HERO_IMAGE_URL }
         };
-    
         try {
           const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
-          if (result.success) {
-            toast.success(t('purchaseSuccessMessage'));
-            if(refreshDbUser) { 
-                setTimeout(async () => { await refreshDbUser(); }, 7000);
-            }
-          } else {
-            toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));
-          }
-        } catch (error) {
-          toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));
-          logger.error("[ToPdfPage] Error purchasing access ProtoCard:", error);
-        }
+          if (result.success) { toast.success(t('purchaseSuccessMessage')); if(refreshDbUser) { setTimeout(async () => { await refreshDbUser(); }, 7000); }}
+          else { toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));}
+        } catch (error) { toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));}
         setIsPurchasing(false);
-      };
+    };
+
+    const handlePurchaseFullAnalysis = async () => { 
+        if (!isAuthenticated || !dbUser?.user_id) { toast.error(t('errorNotAuthenticated')); return; }
+        setIsPurchasing(true);
+        const cardDetails: ProtoCardDetails = {
+          cardId: PSYCHO_ANALYSIS_PRO_ACCESS_CARD_ID,
+          title: currentLang === 'ru' ? `PRIZMA: ${t('prizmaFullAnalysis')}` : `PRIZMA: ${t('prizmaFullAnalysis')}`,
+          description: currentLang === 'ru' ? `Разблокировать полный анализ PRIZMA с расширенным набором вопросов (50) и углубленной интерпретацией. Цена: ${PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR} XTR.` : `Unlock the full PRIZMA analysis with 50 questions and in-depth interpretation. Price: ${PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR} XTR.`,
+          amountXTR: PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR,
+          type: "tool_access", 
+          metadata: { 
+            tool_name: "PRIZMA PDF Pro Analysis", 
+            feature_description: "Access to 50 questions and advanced AI system prompt for psychoanalysis PDF."
+          }
+        };
+        try {
+          const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
+          if (result.success) { 
+            toast.success(t('purchaseSuccessMessage')); 
+            if(refreshDbUser) { 
+                setTimeout(async () => { 
+                    await refreshDbUser(); 
+                    setCurrentStep('questions'); 
+                    toast.info(currentLang === 'ru' ? "Pro-доступ активирован! Теперь вам доступны все вопросы." : "Pro access activated! All questions are now available to you.");
+                }, 7000); 
+            }
+          }
+          else { toast.error(t('purchaseErrorMessage', { ERROR: result.error || '' }));}
+        } catch (error) { toast.error(t('purchaseErrorMessage', { ERROR: (error as Error).message || '' }));}
+        setIsPurchasing(false);
+    };
+
+    const handleContactSupport = async () => {
+        if (!user?.id) {
+            toast.error(t("errorNoUser"));
+            return;
+        }
+        setIsLoading(true);
+        const result = await notifyAdminAction(
+            String(user.id), 
+            user.username || user.first_name,
+            `Пользователь столкнулся с проблемой на странице PRIZMA на шаге "${currentStep}". Текущее сообщение статуса: "${statusMessage}"`
+        );
+        setIsLoading(false);
+        if (result.success) {
+            toast.success(currentLang === 'ru' ? "Ваш запрос отправлен в поддержку!" : "Your support request has been sent!");
+        } else {
+            toast.error(currentLang === 'ru' ? "Не удалось отправить запрос. Попробуйте позже." : "Failed to send request. Please try again later.");
+        }
+    };
+
+    const handleProceedToUserData = () => setCurrentStep('userData');
+    const handleProceedToQuestions = () => {
+      if (!userName.trim()) { toast.error(currentLang === 'ru' ? "Пожалуйста, введите ваше имя." : "Please enter your name."); return; }
+      if (user?.id) { saveUserPdfFormData(String(user.id), { userName, userAge, userGender }); }
+      setCurrentStep('questions');
+    };
     const toggleLang = useCallback(() => setCurrentLang(p => p === 'en' ? 'ru' : 'en'), []);
 
-    if (appContextLoading || appContextAuthenticating || isCheckingAccess) {
-        return (
-            <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-900">
-                <VibeContentRenderer content="::FaSpinner className='animate-spin text-brand-cyan text-2xl'::" />
-                <span className="ml-3 text-brand-cyan font-mono">{t('loadingUser')}</span>
-            </div>
-        );
+    if (appContextLoading || appContextAuthenticating || isCheckingAccess) { 
+        return ( <div className="flex flex-col justify-center items-center min-h-screen pt-20 bg-background text-foreground"> <VibeContentRenderer content="::FaSpinner className='animate-spin text-brand-purple text-4xl'::" /> <span className="mt-4 text-lg font-mono">{t('loadingUser')}</span> </div> );
     }
-
-    if (!hasAccess) {
-        return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-purple-950 to-blue-900 p-6 text-center text-gray-100">
+    if (!hasAccess) { 
+        return ( <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center text-foreground">
             <VibeContentRenderer content="::FaLock className='text-7xl text-brand-red mb-6 animate-pulse'::" />
             <h1 className="text-3xl sm:text-4xl font-orbitron font-bold text-brand-red mb-4">{t("accessDeniedTitle")}</h1>
-            <p className="text-md sm:text-lg text-gray-300 mb-8 max-w-md">{t("accessDeniedSubtitle")}</p>
-            <Button
-              onClick={handlePurchaseAccess}
-              disabled={isPurchasing || !isAuthenticated}
-              size="lg"
-              className="bg-gradient-to-r from-brand-orange to-red-600 text-white font-orbitron font-bold py-3 px-8 rounded-lg text-lg hover:from-brand-orange/90 hover:to-red-600/90 transition-all shadow-lg hover:shadow-yellow-500/50"
-            >
-              {isPurchasing 
-                ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> 
-                : <VibeContentRenderer content="::FaKey::" className="mr-2" />
-              }
+            <p className="text-md sm:text-lg text-muted-foreground mb-8 max-w-md">{t("accessDeniedSubtitle")}</p>
+            <Button onClick={handlePurchaseAccess} disabled={isPurchasing || !isAuthenticated} size="lg" className="bg-gradient-to-r from-brand-orange to-red-600 text-white font-orbitron font-bold py-3 px-8 rounded-lg text-lg hover:from-brand-orange/90 hover:to-red-600/90 transition-all shadow-lg hover:shadow-yellow-500/50">
+              {isPurchasing ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaKey::" className="mr-2" />}
               {isPurchasing ? t("purchasingInProgress") : t("purchaseAccessButton", { PRICE: PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR })}
             </Button>
             {!isAuthenticated && <p className="text-xs text-red-400 mt-3">{t("errorNotAuthenticated")}</p>}
-             <Link href="/hotvibes" className="block mt-10">
-                <Button variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 text-sm">
-                    <VibeContentRenderer content={t("backToHotVibes")}/>
-                </Button>
+            <Link href="/hotvibes" className="block mt-10">
+                <Button variant="outline" className="border-brand-blue text-brand-blue hover:bg-brand-blue/10 text-sm"> <VibeContentRenderer content={t("backToHotVibes")}/> </Button>
             </Link>
-          </div>
-        );
-      }
-
+        </div> );
+    }
+        
+    const renderStep = () => {
+        switch (currentStep) {
+            case 'intro':
+                return <IntroStep translations={t} onStartAnalysis={handleProceedToUserData} heroImageUrl={HERO_IMAGE_URL} />;
+            case 'userData':
+                return <UserDataStep translations={t} userName={userName} setUserName={setUserName} userAge={userAge} setUserAge={setUserAge} userGender={userGender} setUserGender={setUserGender} onContinue={handleProceedToQuestions} onBack={() => setCurrentStep('intro')} currentLang={currentLang} />;
+            case 'questions':
+                return <QuestionsStep translations={t} markdownInput={markdownInput} setMarkdownInput={setMarkdownInput} selectedFile={selectedFile} isLoading={isLoading} onGenerateDemoQuestions={handleGenerateDemoQuestionsAndPrompt} onCopyToClipboard={handleCopyToClipboard} onGeneratePdf={handleGeneratePdfAndProceed} onBack={() => setCurrentStep('userData')} onXlsxFileChange={handleXlsxFileChange} />;
+            case 'analyzing':
+                return <AnalyzingStep translations={t} statusMessage={statusMessage} />;
+            case 'basicAnalysisReady':
+                return <BasicAnalysisReadyStep translations={t} onGetFullAnalysis={() => setCurrentStep('paymentOfferDetails')} onGoToIntro={() => setCurrentStep('intro')} hasProAccess={hasProAccess} />;
+            case 'paymentOfferDetails':
+                return <PaymentOfferDetailsStep translations={t} onPurchaseFullAnalysis={handlePurchaseFullAnalysis} onBack={() => setCurrentStep('basicAnalysisReady')} isPurchasing={isPurchasing} proAccessPrice={PSYCHO_ANALYSIS_PRO_ACCESS_PRICE_XTR} currentLang={currentLang} />;
+            case 'paymentSuccess':
+                return <PaymentSuccessStep translations={t} onContinue={() => setCurrentStep(hasProAccess ? 'intro' : 'questions')} hasProAccess={hasProAccess} />;
+            case 'generalError':
+                return <GeneralErrorStep translations={t} statusMessage={statusMessage} onTryAgain={() => setCurrentStep('questions')} onContactSupport={handleContactSupport} isLoading={isLoading} />;
+            default:
+                debugLogger.warn(`[ToPdfPage] Unknown step: ${currentStep}. Defaulting to intro.`);
+                return <IntroStep translations={t} onStartAnalysis={handleProceedToUserData} heroImageUrl={HERO_IMAGE_URL} />;
+        }
+    };
+    
     return (
-        <div className={cn("min-h-screen flex flex-col items-center pt-[calc(var(--header-height,60px)+1rem)] sm:pt-[calc(var(--header-height,60px)+1.5rem)] pb-10", "bg-gradient-to-br from-slate-800 via-purple-900 to-blue-900 text-gray-100 px-4 font-mono")}>
-            <Toaster position="bottom-center" richColors toastOptions={{ className: '!bg-gray-800/90 !border !border-brand-purple/50 !text-gray-200 !font-mono !shadow-lg !backdrop-blur-sm' }} />
-            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20"> 
-                <button onClick={toggleLang} className="p-1.5 sm:p-2 bg-slate-700/50 rounded-md hover:bg-slate-600/70 transition-colors flex items-center gap-1 text-xs text-cyan-300 shadow-md" title={t("toggleLanguage")}> 
+        <div ref={pageContainerRef} className={cn("min-h-screen flex flex-col items-center justify-center pt-10 sm:pt-12 pb-10", "bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 text-foreground px-4 font-sans")}>
+            <Toaster position="bottom-center" richColors theme="light" toastOptions={{ className: '!font-mono !shadow-lg' }} />
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20">  
+                <button onClick={toggleLang} className="p-1.5 sm:p-2 bg-card/80 border border-border rounded-md hover:bg-muted/30 transition-colors flex items-center gap-1 text-xs text-muted-foreground shadow-sm" title={t("toggleLanguage")}> 
                     <VibeContentRenderer content="::FaLanguage::" className="w-4 h-4 sm:w-3.5 sm:h-3.5"/> <span className="hidden sm:inline">{currentLang === 'en' ? 'RU' : 'EN'}</span>
                 </button> 
             </div>
-
-            <div className="w-full max-w-2xl lg:max-w-3xl border-2 border-brand-purple/70 rounded-xl bg-black/75 backdrop-blur-xl shadow-2xl shadow-brand-purple/60 mt-4 md:mt-6">
-                <div className="relative w-full h-[50vh] rounded-t-xl overflow-hidden"> 
-                    <Image src={HERO_IMAGE_URL} alt="Personality Insights Hero" layout="fill" objectFit="cover" className="opacity-90" priority />
-                    <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[hsl(var(--card-rgb))] via-[hsl(var(--card-rgb)/0.7)] to-transparent"></div> 
-                </div>
-                
-                <div className="p-5 sm:p-6 md:p-8">
-                    <h1 
-                        className="font-orbitron text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-2 sm:mb-3 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400 animate-glitch" 
-                        data-text={t("pageTitle")}
-                        style={{filter: "drop-shadow(0 0 10px hsl(var(--brand-pink))) drop-shadow(0 0 5px hsl(var(--brand-cyan)/0.7))"}}
-                    >
-                        {t("pageTitle")}
-                    </h1>
-                    <p className="text-sm sm:text-base text-center text-gray-300 mb-8 sm:mb-10">{t("pageSubtitle")}</p>
-
-                    <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-blue-glow/40 transition-shadow duration-300")}>
-                        <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaUserSecret::" className="mr-2 w-5 h-5"/> {/* Changed: FaUserGear -> FaUserEdit (FA6) */}
-                            {t("step1Title")}
-                        </h2>
-                        <div className="space-y-3 sm:space-y-4">
-                            <div>
-                                <Label htmlFor="userName" className="text-xs text-gray-400">{t("userNameLabel")}</Label>
-                                <Input id="userName" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder={currentLang === 'ru' ? "Иван Иванов" : "John Doe"} className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                                <div>
-                                    <Label htmlFor="userAge" className="text-xs text-gray-400">{t("userAgeLabel")}</Label>
-                                    <Input id="userAge" type="text" value={userAge} onChange={(e) => setUserAge(e.target.value)} placeholder="30" className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
-                                </div>
-                                <div>
-                                    <Label htmlFor="userGender" className="text-xs text-gray-400">{t("userGenderLabel")}</Label>
-                                    <Input id="userGender" type="text" value={userGender} onChange={(e) => setUserGender(e.target.value)} placeholder={currentLang === 'ru' ? "Мужчина/Женщина" : "Male/Female"} className="w-full p-2 text-sm bg-slate-700/80 border-slate-600/70 rounded-md focus:ring-brand-blue focus:border-brand-blue placeholder-gray-500" />
-                                </div>
-                            </div>
-                            <Button onClick={handleGenerateDemoQuestionsAndPrompt} variant="outline" className="w-full mt-2 sm:mt-3 border-brand-yellow/80 text-brand-yellow hover:bg-brand-yellow/20 hover:text-brand-yellow py-2 text-xs sm:text-sm shadow-sm hover:shadow-yellow-glow/40">
-                                <VibeContentRenderer content="::FaCircleQuestion::" className="mr-2"/>{t("generateDemoQuestions")}
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-cyan/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-cyan-glow/40 transition-shadow duration-300")}>
-                        <h2 className="text-lg sm:text-xl font-semibold text-brand-cyan mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaPenToSquare::" className="mr-2 w-5 h-5"/> {/* Changed: FaPencilAlt -> FaPenToSquare (FA6) */}
-                            {t("step2Title")}
-                        </h2>
-                        <label htmlFor="markdownInput" className="text-sm text-gray-300 block mt-2 mb-1.5">{t("pasteMarkdown")}</label>
-                        <div className="p-1 bg-gradient-to-br from-slate-700/50 to-slate-800/30 rounded-lg border border-dashed border-brand-cyan/40 shadow-inner"> 
-                            <textarea
-                                id="markdownInput"
-                                value={markdownInput}
-                                onChange={(e) => setMarkdownInput(e.target.value)}
-                                placeholder={t('workingAreaMark')}
-                                rows={12}
-                                className="w-full p-2.5 sm:p-3 border rounded-md bg-slate-900/80 border-slate-600/70 text-gray-200 focus:ring-2 focus:ring-brand-pink outline-none placeholder-gray-500 font-mono text-xs sm:text-sm simple-scrollbar shadow-sm"
-                                disabled={isLoading}
-                            />
-                        </div>
-                        {(generatedDataForAI || markdownInput) && (
-                            <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                                <Button onClick={handleCopyToClipboard} variant="outline" className="border-brand-cyan/80 text-brand-cyan hover:bg-brand-cyan/20 hover:text-brand-cyan flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-cyan-glow/30">
-                                    <VibeContentRenderer content="::FaCopy::" className="mr-2"/>{t("copyPromptAndData")}
-                                </Button>
-                                <Button variant="outline" asChild className="border-brand-blue/80 text-brand-blue hover:bg-brand-blue/20 hover:text-brand-blue flex-1 py-2.5 text-xs sm:text-sm shadow-sm hover:shadow-blue-glow/30">
-                                <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" >
-                                    <VibeContentRenderer content="::FaGoogle::" className="mr-2"/>{t("goToGemini")}
-                                </a>
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                    
-                    <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-pink/70 rounded-xl bg-slate-800/70 shadow-md hover:shadow-pink-glow/40 transition-shadow duration-300", !markdownInput.trim() && "opacity-60 blur-sm pointer-events-none")}>
-                        <h2 className="text-lg sm:text-xl font-semibold text-brand-pink mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaFileArrowDown::" className="mr-2 w-5 h-5"/> {/* Changed: FaFileDownload -> FaFileArrowDown (FA6) */}
-                            {t("step3Title")}
-                        </h2>
-                        <Button onClick={handleGeneratePdf} disabled={isLoading || !markdownInput.trim() || !user?.id } className={cn("w-full text-base sm:text-lg py-3 sm:py-3.5 bg-gradient-to-r from-pink-500 via-purple-600 to-blue-600 text-white hover:shadow-purple-600/70 hover:brightness-110 focus:ring-purple-500 shadow-xl transition-all duration-200 active:scale-95", (isLoading || !markdownInput.trim()) && "opacity-50 cursor-not-allowed")}>
-                            {isLoading
-                                ? (<span className="flex items-center justify-center text-sm">
-                                    <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2.5'::" /> {statusMessage || t('processing')}
-                                </span>) 
-                                : <><VibeContentRenderer content="::FaPaperPlane::" className="mr-2.5"/> {t('generateAndSendPdf')}</>
-                            }
-                        </Button>
-                    </div>
-                    
-                    <div className="mt-6 sm:mt-8 text-xs text-center text-gray-400 min-h-[20px] font-orbitron uppercase tracking-wider">
-                    {t('status')}: {isLoading ? statusMessage : (!markdownInput.trim() ? t('readyForUserData') : t('readyForPdf'))}
-                    </div>
-
-                    <details className="mt-8 pt-6 border-t border-slate-700/60 group">
-                        <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-300 transition-colors font-semibold flex items-center gap-2">
-                            <VibeContentRenderer content="::FaFileImport::" />
-                            {t("xlsxUploadOptionalTitle")}
-                            <VibeContentRenderer content="::FaChevronDown className='ml-auto group-open:rotate-180 transition-transform'::"/>
-                        </summary>
-                        <div className="mt-4 p-4 sm:p-5 border-2 border-dashed border-brand-yellow/40 rounded-xl bg-slate-800/40 shadow-inner">
-                            <label htmlFor="xlsxFileOptional" className={cn("w-full flex flex-col items-center justify-center px-4 py-5 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out", "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow/80 hover:text-brand-yellow", isLoading ? "opacity-70 cursor-not-allowed" : "hover:bg-brand-yellow/10")}>
-                                <VibeContentRenderer content="::FaUpload::" className="text-2xl mb-1.5" /> 
-                                <span className="font-medium text-xs">{selectedFile ? t('fileSelected', { FILENAME: selectedFile.name }) : t('selectFile')}</span>
-                                <input id="xlsxFileOptional" ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleXlsxFileChange} className="sr-only" disabled={isLoading} />
-                            </label>
-                        </div>
-                    </details>
-                </div>
-            </div>
+            {renderStep()}
         </div>
     );
 }
