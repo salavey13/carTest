@@ -1,3 +1,4 @@
+// /app/topdf/page.tsx
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -478,7 +479,7 @@ export default function ToPdfPageWithPsychoFocus() {
 
                     <div className={cn("p-4 sm:p-5 border-2 border-dashed border-brand-blue/70 rounded-xl mb-6 sm:mb-8 bg-slate-800/70 shadow-md hover:shadow-blue-glow/40 transition-shadow duration-300")}>
                         <h2 className="text-lg sm:text-xl font-semibold text-brand-blue mb-3 sm:mb-4 flex items-center">
-                            <VibeContentRenderer content="::FaUserEdit::" className="mr-2 w-5 h-5"/> {/* Changed: FaUserGear -> FaUserEdit (FA6) */}
+                            <VibeContentRenderer content="::FaUserSecret::" className="mr-2 w-5 h-5"/> {/* Changed: FaUserGear -> FaUserEdit (FA6) */}
                             {t("step1Title")}
                         </h2>
                         <div className="space-y-3 sm:space-y-4">
