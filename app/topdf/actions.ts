@@ -115,30 +115,11 @@ export async function loadUserPdfFormData(
 
 function escapeTelegramMarkdown(text: string): string {
     if (!text) return '';
-    // Escape characters: _, *, [, ], (, ), ~, `, >, #, +, -, =, |, {, }, ., !
-    // Note: Escaping all of them might be too much for some cases, adjust as needed.
-    // For captions, usually '_', '*', '`', '[' are the most problematic.
-    return text
-        .replace(/_/g, '\\_')
-        .replace(/\*/g, '\\*')
-        .replace(/\[/g, '\\[')
-        .replace(/]/g, '\\]')
-        // .replace(/\(/g, '\\(') // Parentheses are tricky, often not needed for escaping
-        // .replace(/\)/g, '\\)')
-        .replace(/`/g, '\\`')
-        // .replace(/~/g, '\\~') // Strikethrough might be desired
-        // .replace(/>/g, '\\>') // Blockquotes might be desired
-        // .replace(/#/g, '\\#') // Headers might be desired
-        // .replace(/\+/g, '\\+')
-        // .replace(/-/g, '\\-') // Often part of lists or horizontal rules
-        // .replace(/=/g, '\\=')
-        // .replace(/\|/g, '\\|')
-        // .replace(/{/g, '\\{')
-        // .replace(/}/g, '\\}')
-        // .replace(/\./g, '\\.') // Escaping dots can break URLs
-        // .replace(/!/g, '\\!');
+    // For MarkdownV2, these characters must be escaped:
+    // _ * [ ] ( ) ~ ` > # + - = | { } . !
+    const charsToEscape = /[_*[\]()~`>#+\-=|{}.!]/g;
+    return text.replace(charsToEscape, '\\$&');
 }
-
 
 async function sendTelegramDocument( 
   chatId: string,
@@ -161,8 +142,8 @@ async function sendTelegramDocument(
     formData.append("document", fileBlob, fileName);
 
     if (caption) {
-      formData.append("caption", escapeTelegramMarkdown(caption)); // Escape caption
-      formData.append("parse_mode", "MarkdownV2"); // Use MarkdownV2 for better escaping support
+      formData.append("caption", escapeTelegramMarkdown(caption)); 
+      formData.append("parse_mode", "MarkdownV2"); 
     }
 
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
@@ -215,7 +196,6 @@ export async function generatePdfFromMarkdownAndSend(
         
         let caption = `📄 Ваш PDF отчет PRIZMA готов: "${pdfFileName}"`;
         if (userName) caption += `\n👤 Для: ${userName}`;
-        // No userAge or userGender in caption to simplify and reduce risk of parse errors
         
         const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName, caption);
 
