@@ -93,22 +93,22 @@ export async function loadUserPdfFormData(
         .eq('user_id', userId)
         .single();
         
-    if (fetchError && fetchError.code !== 'PGRST116') {
+    if (fetchError && fetchError.code === 'PGRST116') { // User not found, no metadata yet
+        debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found, no PDF form data to load.`);
+        return { success: true, data: undefined }; // No data, but not an error
+    }
+    if (fetchError) { // Other errors
         logger.error(`[topdf/actions loadUserPdfFormData] Error fetching user metadata for ${userId}:`, fetchError);
         return { success: false, error: fetchError.message || "Failed to fetch user data." };
     }
-    if (!userData) {
-      debugLogger.log(`[topdf/actions loadUserPdfFormData] User ${userId} not found or no metadata.`);
-      return { success: false, error: "User not found to load PDF form data." }; // Or { success: true, data: undefined } if that's preferred for "not found"
-    }
-
+    
     const formData = userData.metadata?.[PDF_FORM_DATA_KEY] as { userName?: string; userAge?: string; userGender?: string } | undefined;
     
     if (formData) {
       debugLogger.log(`[topdf/actions loadUserPdfFormData] PDF form data loaded for user ${userId}`, formData);
       return { success: true, data: formData };
     } else {
-      debugLogger.log(`[topdf/actions loadUserPdfFormData] No PDF form data found for user ${userId}`);
+      debugLogger.log(`[topdf/actions loadUserPdfFormData] No PDF form data found for user ${userId} (metadata exists but no key).`);
       return { success: true, data: undefined }; 
     }
   } catch (e: any) {
@@ -184,9 +184,9 @@ async function drawMarkdownWrappedText(
     const margin = 50; 
 
     for (const line of lines) {
-        if (currentY < margin) {
-            debugLogger.warn("[PDF Gen] Content overflowing page, stopping text draw for this line.");
-            break;
+        if (currentY < margin + lineHeight) { // Check if enough space for at least one line
+            debugLogger.warn("[PDF Gen drawMarkdownWrappedText] Content potentially overflowing page for this line segment. Stopping text draw for this line and subsequent ones in this call.");
+            return currentY; // Return currentY to indicate where drawing stopped
         }
 
         let effectiveFont = baseFont;
@@ -194,59 +194,59 @@ async function drawMarkdownWrappedText(
         let currentX = x;
         let lineToDraw = line;
 
+        // --- Style parsing ---
         if (line.startsWith('### ')) {
-            effectiveFont = boldFont;
-            effectiveSize = baseFontSize + 2;
-            lineToDraw = line.substring(4);
+            effectiveFont = boldFont; effectiveSize = baseFontSize + 2; lineToDraw = line.substring(4);
         } else if (line.startsWith('## ')) {
-            effectiveFont = boldFont;
-            effectiveSize = baseFontSize + 4;
-            lineToDraw = line.substring(3);
+            effectiveFont = boldFont; effectiveSize = baseFontSize + 4; lineToDraw = line.substring(3);
         } else if (line.startsWith('# ')) {
-            effectiveFont = boldFont;
-            effectiveSize = baseFontSize + 6;
-            lineToDraw = line.substring(2);
+            effectiveFont = boldFont; effectiveSize = baseFontSize + 6; lineToDraw = line.substring(2);
         } else if (line.startsWith('* ') || line.startsWith('- ')) {
-            lineToDraw = `• ${line.substring(2)}`;
-            currentX += 10;
+            lineToDraw = `• ${line.substring(2)}`; currentX += 10;
         } else if (line.match(/^(\s*)\* /) || line.match(/^(\s*)- /)) {
             const indentMatch = line.match(/^(\s*)/);
             const indent = indentMatch ? indentMatch[0].length : 0;
             currentX += 10 + (indent * 5);
             lineToDraw = `• ${line.replace(/^(\s*)[\*-] /, '')}`;
         }
+        // --- End Style parsing ---
 
         const words = lineToDraw.split(' ');
         let currentLineSegment = '';
         for (const word of words) {
             const testSegment = currentLineSegment + (currentLineSegment ? ' ' : '') + word;
+            let textWidth = 0;
             try {
-                const textWidth = effectiveFont.widthOfTextAtSize(testSegment, effectiveSize);
+                 // Attempt to replace unsupported characters before measuring and drawing
+                const sanitizedTestSegment = testSegment.replace(/[^\x00-\uFFFF]/g, "?"); // Allow wider range, replace truly unsupported with ?
+                textWidth = effectiveFont.widthOfTextAtSize(sanitizedTestSegment, effectiveSize);
+
                 if (currentX + textWidth > maxWidth && currentLineSegment) {
-                    page.drawText(currentLineSegment, { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
+                    if (currentY < margin + lineHeight) { debugLogger.warn("[PDF Gen drawMarkdownWrappedText] Overflow during word wrap."); return currentY; }
+                    page.drawText(currentLineSegment.replace(/[^\x00-\uFFFF]/g, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
                     currentY -= lineHeight * (effectiveSize / baseFontSize);
-                    currentLineSegment = word;
-                    if (currentY < margin) break;
+                    currentLineSegment = word; // Start new line with current word
                 } else {
                     currentLineSegment = testSegment;
                 }
             } catch (e: any) {
-                logger.warn(`[PDF Gen] Skipping character/word due to font error: "${word}" in segment "${testSegment}". Error: ${e.message}`);
-                currentLineSegment = currentLineSegment.replace(/[^\x00-\u04FF\u0500-\u052F\s\d\p{P}]/gu, "?"); 
+                logger.warn(`[PDF Gen drawMarkdownWrappedText] Error measuring/processing word: "${word}" in segment "${testSegment}". Error: ${e.message}. Replacing unsupported chars.`);
+                // Sanitize the problematic segment and try to continue if possible, or just the word
+                const sanitizedWord = word.replace(/[^\x00-\uFFFF]/g, "?");
+                currentLineSegment = currentLineSegment + (currentLineSegment ? ' ' : '') + sanitizedWord; 
             }
         }
-        if (currentLineSegment && currentY >= margin) {
-            try {
-                page.drawText(currentLineSegment, { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
+        if (currentLineSegment) { // Draw remaining part of the line
+            if (currentY < margin + lineHeight) { debugLogger.warn("[PDF Gen drawMarkdownWrappedText] Overflow at end of line."); return currentY; }
+             try {
+                page.drawText(currentLineSegment.replace(/[^\x00-\uFFFF]/g, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
             } catch (e: any) {
-                logger.warn(`[PDF Gen] Skipping final line segment due to font error: "${currentLineSegment}". Error: ${e.message}`);
-                page.drawText(currentLineSegment.replace(/[^\x00-\u04FF\u0500-\u052F\s\d\p{P}]/gu, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
+                logger.warn(`[PDF Gen drawMarkdownWrappedText] Final attempt to draw sanitized line segment failed: "${currentLineSegment}". Error: ${e.message}`);
             }
-            currentY -= lineHeight * (effectiveSize / baseFontSize);
         }
-        if (currentY < margin) break;
+        currentY -= lineHeight * (effectiveSize / baseFontSize); // Move to next line position
     }
-    return currentY;
+    return currentY; // Return Y position after drawing all lines
 }
 const pageMargins = 50;
 
@@ -256,147 +256,93 @@ export async function generatePdfFromMarkdownAndSend(
     originalFileName: string = "report",
     userName?: string, 
     userAge?: string,  
-    userGender?: string 
+    userGender?: string,
+    heroImageUrl?: string 
 ): Promise<{ success: boolean; message?: string; error?: string }> {
     debugLogger.log(`[Markdown to PDF Action] Initiated for Chat ID: ${chatId}, User: ${userName || 'N/A'}`);
 
-    if (!chatId) {
-        return { success: false, error: "User chat ID not provided." };
-    }
-    if (!markdownContent || !markdownContent.trim()) {
-        return { success: false, error: "No Markdown content provided to generate PDF." };
-    }
+    if (!chatId) return { success: false, error: "User chat ID not provided." };
+    if (!markdownContent || !markdownContent.trim()) return { success: false, error: "No Markdown content provided." };
     
     try {
         const PDFDocumentClass = pdfLibModule.PDFDocument;
         const fontkitInstanceToUse = fontkitModule.default || fontkitModule;
 
-        if (!PDFDocumentClass) {
-            logger.error("[PDF Gen] CRITICAL: pdfLibModule.PDFDocument is undefined. Cannot proceed.");
-            return { success: false, error: "Critical PDF library load error (PDFDocument class not found)." };
-        }
-        if (!fontkitInstanceToUse || (typeof fontkitInstanceToUse !== 'object' && typeof fontkitInstanceToUse !== 'function')) {
-            logger.error("[PDF Gen] CRITICAL: fontkitInstanceToUse is not a valid object or function. Cannot proceed.", fontkitInstanceToUse);
-            return { success: false, error: "Critical PDF library load error (fontkit instance is invalid)." };
-        }
-
-        if (typeof PDFDocumentClass.create !== 'function') {
-            logger.error("[PDF Gen] CRITICAL: PDFDocumentClass.create is not a function. Cannot create PDF document.", PDFDocumentClass);
-            return { success: false, error: "Internal error: PDFDocument class is not correctly initialized for PDF creation." };
+        if (!PDFDocumentClass || typeof PDFDocumentClass.create !== 'function') {
+            logger.error("[PDF Gen] CRITICAL: PDFDocumentClass or PDFDocumentClass.create is not available.");
+            return { success: false, error: "Critical PDF library load error." };
         }
         const pdfDoc = await PDFDocumentClass.create();
-
-        let registrationAttempted = false;
-        let registrationSuccessful = false;
-
+        
         if (typeof pdfDoc.registerFontkit === 'function') {
-            registrationAttempted = true;
-            debugLogger.log("[PDF Gen] Attempting registration: pdfDoc.registerFontkit()");
-            try {
-                pdfDoc.registerFontkit(fontkitInstanceToUse);
-                registrationSuccessful = true;
-                debugLogger.log("[PDF Gen] Registered fontkit via pdfDoc.registerFontkit() (ON INSTANCE).");
-            } catch (e: any) {
-                debugLogger.warn(`[PDF Gen] Failed pdfDoc.registerFontkit() (ON INSTANCE): ${e.message}`);
-            }
+            pdfDoc.registerFontkit(fontkitInstanceToUse);
         } else {
-             debugLogger.log("[PDF Gen] pdfDoc.registerFontkit is NOT a function.");
-        }
-
-        if (!registrationSuccessful && PDFDocumentClass.prototype && typeof PDFDocumentClass.prototype.registerFontkit === 'function') {
-            registrationAttempted = true;
-            debugLogger.log("[PDF Gen] Attempting fallback registration: PDFDocumentClass.prototype.registerFontkit.call(PDFDocumentClass, ...)");
-            try {
-                PDFDocumentClass.prototype.registerFontkit.call(PDFDocumentClass, fontkitInstanceToUse);
-                registrationSuccessful = true; 
-                debugLogger.log("[PDF Gen] Fallback PDFDocumentClass.prototype.registerFontkit.call(PDFDocumentClass) SUCCEEDED (or did not throw).");
-            } catch (e: any) {
-                debugLogger.warn(`[PDF Gen] Fallback PDFDocumentClass.prototype.registerFontkit.call(PDFDocumentClass) FAILED: ${e.message}`);
-            }
-        }
-
-        if (!registrationSuccessful && typeof PDFDocumentClass.registerFontkit === 'function') {
-            registrationAttempted = true;
-            debugLogger.log("[PDF Gen] Attempting fallback registration: PDFDocumentClass.registerFontkit(...) (STATIC direct)");
-            try {
-                PDFDocumentClass.registerFontkit(fontkitInstanceToUse);
-                registrationSuccessful = true;
-                debugLogger.log("[PDF Gen] Fallback PDFDocumentClass.registerFontkit (STATIC direct) SUCCEEDED.");
-            } catch (e: any) {
-                 debugLogger.warn(`[PDF Gen] Fallback PDFDocumentClass.registerFontkit (STATIC direct) FAILED: ${e.message}`);
-            }
-        }
-
-        if (!registrationSuccessful) {
-            if (registrationAttempted) {
-                 logger.error("[PDF Gen] CRITICAL: All fontkit registration attempts failed or were ineffective.");
-                 return { success: false, error: "Critical PDF library setup error (All fontkit registration attempts failed or were ineffective)." };
-            } else {
-                 logger.error("[PDF Gen] CRITICAL: No suitable fontkit registration method found on PDFDocument or its instance. Check diagnostics.");
-                 return { success: false, error: "Critical PDF library setup error (No fontkit registration method found. Diagnostics might provide clues)." };
-            }
+            logger.warn("[PDF Gen] pdfDoc.registerFontkit is not a function. Font embedding might be limited.");
         }
         
-        debugLogger.log("[PDF Gen] Fontkit registration process completed. Registration successful: " + registrationSuccessful + ". Proceeding to embed fonts.");
-
-        const regularFontName = 'DejaVuSans.ttf';
-        const boldFontName = 'DejaVuSans-Bold.ttf';
-        const currentWorkingDirectory = process.cwd();
-        const fontsDir = path.join(currentWorkingDirectory, 'server-assets', 'fonts');
-
-        debugLogger.log(`[PDF Gen] Current working directory (process.cwd()): ${currentWorkingDirectory}`);
-        debugLogger.log(`[PDF Gen] Attempting to access fonts directory at absolute path: ${fontsDir}`);
-
-        if (!fs.existsSync(fontsDir)) {
-            logger.error(`[PDF Gen] CRITICAL: Fonts directory NOT FOUND at specified path: ${fontsDir}.`);
-            return { success: false, error: `Core fonts directory missing on server. Expected at: ${fontsDir}.` };
-        }
-        
-        const regularFontPath = path.join(fontsDir, regularFontName);
-        if (!fs.existsSync(regularFontPath)) {
-            logger.error(`[PDF Gen] CRITICAL: Regular font file '${regularFontName}' NOT FOUND at: ${regularFontPath}.`);
-            return { success: false, error: `Font file (${regularFontName}) missing. Path: ${regularFontPath}` };
-        }
-        
-        const regularFontBytes = fs.readFileSync(regularFontPath);
-        const customFont = await pdfDoc.embedFont(regularFontBytes); 
-        
-        let customBoldFont: PDFFont; 
-        const boldFontPath = path.join(fontsDir, boldFontName);
-        if (!fs.existsSync(boldFontPath)) {
-            logger.warn(`[PDF Gen] Bold font file '${boldFontName}' NOT FOUND at: ${boldFontPath}. Using regular font as bold.`);
-            customBoldFont = customFont; 
-        } else {
-            try {
-                const boldFontBytes = fs.readFileSync(boldFontPath);
-                customBoldFont = await pdfDoc.embedFont(boldFontBytes); 
-            } catch (fontError: any) {
-                logger.warn(`[PDF Gen] Error embedding bold font '${boldFontName}': ${fontError.message}. Using regular font as bold.`);
-                customBoldFont = customFont; 
-            }
-        }
+        const regularFontBytes = fs.readFileSync(path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans.ttf'));
+        const boldFontBytes = fs.readFileSync(path.join(process.cwd(), 'server-assets', 'fonts', 'DejaVuSans-Bold.ttf'));
+        const customFont = await pdfDoc.embedFont(regularFontBytes);
+        const customBoldFont = await pdfDoc.embedFont(boldFontBytes);
 
         let page = pdfDoc.addPage(PageSizes.A4);
         const { width, height } = page.getSize();
         let currentY = height - pageMargins;
         const baseFontSize = 10;
         const lineHeight = 14;
+
+        // Embed Hero Image if URL is provided
+        if (heroImageUrl) {
+            try {
+                const imageResponse = await fetch(heroImageUrl);
+                if (!imageResponse.ok) throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+                const imageBytes = await imageResponse.arrayBuffer();
+                let embeddedImage;
+                if (heroImageUrl.toLowerCase().endsWith('.png')) {
+                    embeddedImage = await pdfDoc.embedPng(imageBytes);
+                } else if (heroImageUrl.toLowerCase().endsWith('.jpg') || heroImageUrl.toLowerCase().endsWith('.jpeg')) {
+                    embeddedImage = await pdfDoc.embedJpg(imageBytes);
+                } else {
+                    logger.warn(`[PDF Gen] Unsupported hero image type: ${heroImageUrl}. Skipping image.`);
+                }
+
+                if (embeddedImage) {
+                    const imgMaxWidth = width - 2 * pageMargins;
+                    const aspectRatio = embeddedImage.width / embeddedImage.height;
+                    const imgDisplayWidth = imgMaxWidth;
+                    const imgDisplayHeight = imgDisplayWidth / aspectRatio;
+
+                    if (currentY - imgDisplayHeight - 10 < pageMargins) { // Check if space for image + title
+                        page = pdfDoc.addPage(PageSizes.A4);
+                        currentY = height - pageMargins;
+                    }
+                    page.drawImage(embeddedImage, {
+                        x: pageMargins,
+                        y: currentY - imgDisplayHeight,
+                        width: imgDisplayWidth,
+                        height: imgDisplayHeight,
+                    });
+                    currentY -= (imgDisplayHeight + 15); // Space after image
+                }
+            } catch (imgError: any) {
+                logger.error(`[PDF Gen] Error embedding hero image from ${heroImageUrl}: ${imgError.message}`);
+            }
+        }
         
         const sanitizedTitleFileNameBase = originalFileName.replace(/[^\w\s\d.,!?"'%*()\-+=\[\]{};:@#~$&\/\\]/g, "_").substring(0, 50);
         const pdfTitle = userName ? `Отчет для ${userName}: ${sanitizedTitleFileNameBase}` : `Отчет: ${sanitizedTitleFileNameBase}`;
 
-        page.drawText(pdfTitle, {
-            x: pageMargins, y: currentY, font: customBoldFont, size: 16, color: rgb(0.1, 0.1, 0.4)
-        });
+        if (currentY < pageMargins + 20 ) { page = pdfDoc.addPage(PageSizes.A4); currentY = height - pageMargins; }
+        page.drawText(pdfTitle, { x: pageMargins, y: currentY, font: customBoldFont, size: 16, color: rgb(0.1, 0.1, 0.4) });
         currentY -= 20;
+
         if(userName || userAge || userGender) {
+            if (currentY < pageMargins + lineHeight ) { page = pdfDoc.addPage(PageSizes.A4); currentY = height - pageMargins; }
             let userInfoLine = "Данные пользователя: ";
             if(userName) userInfoLine += `Имя: ${userName}`;
             if(userAge) userInfoLine += `${userName ? ', ' : ''}Возраст: ${userAge}`;
             if(userGender) userInfoLine += `${(userName || userAge) ? ', ' : ''}Пол: ${userGender}`;
-            page.drawText(userInfoLine, {
-                x: pageMargins, y: currentY, font: customFont, size: baseFontSize - 1, color: rgb(0.3, 0.3, 0.3)
-            });
+            page.drawText(userInfoLine, { x: pageMargins, y: currentY, font: customFont, size: baseFontSize - 1, color: rgb(0.3, 0.3, 0.3) });
             currentY -= (lineHeight - 2);
         }
         currentY -= 10; 
@@ -406,54 +352,38 @@ export async function generatePdfFromMarkdownAndSend(
             if (currentY < pageMargins + lineHeight) { 
                 page = pdfDoc.addPage(PageSizes.A4);
                 currentY = height - pageMargins;
-                page.drawText(`${pdfTitle} (продолжение)`, { 
-                    x: pageMargins, y: currentY, font: customBoldFont, size: 12, color: rgb(0.2,0.2,0.2)
-                });
+                page.drawText(`${pdfTitle} (стр. ${pdfDoc.getPageCount()})`, {  x: pageMargins, y: currentY, font: customBoldFont, size: 12, color: rgb(0.2,0.2,0.2) });
                 currentY -= 20;
             }
             if (line.trim() === '---' || line.trim() === '***' || line.trim() === '___') {
-                page.drawLine({
-                    start: { x: pageMargins, y: currentY - (lineHeight / 3) },
-                    end: { x: width - pageMargins, y: currentY - (lineHeight / 3) },
-                    thickness: 1, color: rgb(0.7, 0.7, 0.7),
-                });
+                 if (currentY < pageMargins + lineHeight ) { page = pdfDoc.addPage(PageSizes.A4); currentY = height - pageMargins; }
+                page.drawLine({ start: { x: pageMargins, y: currentY - (lineHeight / 3) }, end: { x: width - pageMargins, y: currentY - (lineHeight / 3) }, thickness: 1, color: rgb(0.7, 0.7, 0.7) });
                 currentY -= lineHeight;
             } else {
-                 currentY = await drawMarkdownWrappedText(
-                    page, line, pageMargins, currentY, width - 2 * pageMargins,
-                    lineHeight, customFont, customBoldFont, baseFontSize, rgb(0.1, 0.1, 0.1)
-                );
+                 currentY = await drawMarkdownWrappedText( page, line, pageMargins, currentY, width - 2 * pageMargins, lineHeight, customFont, customBoldFont, baseFontSize, rgb(0.1, 0.1, 0.1) );
             }
         }
 
         const pdfBytes = await pdfDoc.save();
-        const pdfFileName = `Report_${(userName || originalFileName).replace(/[^\w\d_.-]/g, "_").substring(0, 50)}.pdf`;
+        const pdfFileName = `PRIZMA_${(userName || originalFileName).replace(/[^\w\d_.-]/g, "_").substring(0, 40)}.pdf`;
         
-        let caption = `📄 Ваш PDF отчет готов: "${pdfFileName}"`;
-        if (userName || userAge || userGender) {
-            caption += `\n\n👤 Для: ${userName || 'N/A'}`;
-            if (userAge) caption += `, Возраст: ${userAge}`;
-            if (userGender) caption += `, Пол: ${userGender}`;
-        }
+        let caption = `📄 Ваш PDF отчет PRIZMA готов: "${pdfFileName}"`;
+        if (userName) caption += `\n👤 Для: ${userName}`;
         
         const sendResult = await sendTelegramDocument(chatId, new Blob([pdfBytes], { type: 'application/pdf' }), pdfFileName, caption);
 
         if (sendResult.success) {
-            return { success: true, message: `PDF отчет "${pdfFileName}" отправлен с информацией о пользователе.` };
+            return { success: true, message: `PDF отчет "${pdfFileName}" успешно отправлен.` };
         } else {
             return { success: false, error: `Failed to send PDF: ${sendResult.error}` };
         }
 
     } catch (error: any) {
         logger.error('[Markdown to PDF Action] Critical error during PDF generation or sending:', error, error.stack);
-        if (error.constructor && error.constructor.name === 'FontkitNotRegisteredError') {
-             return { success: false, error: `PDF library error: Font system (fontkit) not available. Original: ${error.message}` };
-        }
         const errorMsg = error instanceof Error ? error.message : 'Unexpected server error during PDF processing.';
         return { success: false, error: errorMsg };
     }
 }
-
 
 export async function notifyAdminAction(
     userId: string, 
@@ -464,11 +394,10 @@ export async function notifyAdminAction(
         logger.error("[topdf/actions notifyAdminAction] Telegram Bot Token or Admin Chat ID not configured.");
         return { success: false, error: "Server configuration error for notifications." };
     }
-
     const adminMessage = `🆘 Запрос в поддержку от PRIZMA:\n\nПользователь: ${username || 'N/A'} (ID: ${userId})\nСообщение: "${messageFromUser}"\nСтраница: /topdf`;
-
     try {
-        const result = await commonSendTelegramMessage(ADMIN_CHAT_ID, adminMessage); // Adjusted to match commonSendTelegramMessage signature
+        // Ensure ADMIN_CHAT_ID is a string, commonSendTelegramMessage expects string targetId
+        const result = await commonSendTelegramMessage(String(ADMIN_CHAT_ID), adminMessage);
         if (result.success) {
             logger.info(`[topdf/actions notifyAdminAction] Support request from user ${userId} sent to admin.`);
             return { success: true };
