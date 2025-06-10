@@ -1,17 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Added useCallback
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button"; // <--- ИСПРАВЛЕН ИМПОРТ
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Для вкладок
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { useAppContext } from '@/contexts/AppContext';
-import { logger } from '@/lib/logger';
+import { debugLogger as logger } from '@/lib/debugLogger'; // Используем debugLogger как logger
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox'; 
-import { Label } from '@/components/ui/label';  
+import { Label } from '@/components/ui/label';   
+// УДАЛЕНЫ ПРЯМЫЕ ИМПОРТЫ ИКОНОК ИЗ FA6
 
 const pageTranslations: Record<string, Record<string, any>> = {
   ru: {
@@ -20,7 +21,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
     
     tabBasics: "::FaRocket:: Основы & Философия",
     tabMonitoring: "::FaBoxOpen:: Механика Мониторинга",
-    tabSettingsErrors: "::FaCogs:: Настройки & Ошибки",
+    tabSettingsErrors: "::FaToolbox:: Настройки & Ошибки",
     tabBundleStructure: "::FaListOl:: Структура Связки",
     tabChecklist: "::FaTasks:: Чек-лист",
 
@@ -30,7 +31,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
         "Это означает, что любая \"найденная\" связка потенциально может измениться или исчезнуть в течение миллисекунд. Скорость — это всё в арбитраже."
     ],
     
-    publicVsPrivateTitle: "::FaShieldAlt:: Публичный бот vs. Персональный бот",
+    publicVsPrivateTitle: "::FaShieldHalved:: Публичный бот vs. Персональный бот", // FaShieldAlt -> FaShieldHalved
     publicVsPrivateIntro: "Сравним типичного публичного Telegram-бота для арбитража (сигнальный канал) с тем, что мы стремимся создать (персональный инструмент). Публичные боты часто являются воронкой продаж, предлагая бесплатные, но не всегда практически применимые сигналы.",
     comparisonTableHeaders: ["Аспект", "Типичный Публичный Канал", "Твой Персональный Инструмент (Цель)"],
     comparisonTableRows: [
@@ -43,7 +44,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
       ["Гибкость Настроек", "Нет. Вы просто потребитель.", "Полная. Вы настраиваете всё."],
       ["Итог", "Информационный шум. Для обучения или развлечения.", "Профессиональный рабочий инструмент."],
     ],
-    publicBotProblemsTitle: "::FaLockOpen:: Ключевые Проблемы Публичных Ботов:",
+    publicBotProblemsTitle: "::FaLockOpen:: Ключевые Проблемы Публичных Ботов:", // FaLock -> FaLockOpen
     publicBotProblems: [
       "**Теоретический спред:** Используют last price, а не реальные цены bid/ask из стакана.",
       "**Отсутствие учета ликвидности:** Неизвестно, какой объем можно прогнать.",
@@ -119,9 +120,9 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Курс:** Средний курс для вашего объема, кол-во ордеров в стакане, общий объем в этих ордерах. Если ордеров много – диапазон цен.",
       "**Хеджирование:** Значок ::FaUmbrellaBeach:: для маржи, ссылки на фьючерсы (если доступны).",
       "**Рейтинг CMC:** Ранг монеты и ссылка на CoinMarketCap.",
-      "**Сеть перевода:** Название сети, комиссия за вывод (в монете и USDT), доступность ввода/вывода (✅/❌).",
+      "**Сеть перевода:** Название сети, комиссия за вывод (в монете и USDT), доступность ввода/вывода (::FaCheckCircle::/::FaTimesCircle::).", // Replaced checkmark/cross with icons
       "**Контракты:** Указание на совпадение контрактов (если информация доступна).",
-      "**Время перевода:** Примерное время разлока монет (зеленый <15м, желтый 15-60м, красный >60м).",
+      "**Время перевода:** Примерное время разлока монет (::FaHourglassStart className='text-green-500':: <15м, ::FaHourglassHalf className='text-yellow-500':: 15-60м, ::FaHourglassEnd className='text-red-500':: >60м).", // Replaced color text with icons
       "**Спред:** В % и $ по вашей рабочей сумме, с учетом комиссий (если включено).",
       "**Время жизни связки:** Как давно бот зафиксировал положительный спред.",
       "**Увеличение спреда:** Появляется, если включена функция переприсылки.",
@@ -154,7 +155,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
         "This means any \"found\" bundle can potentially change or disappear within milliseconds. Speed is everything in arbitrage."
     ],
     
-    publicVsPrivateTitle: "::FaShieldAlt:: Public Bot vs. Your Personal Bot",
+    publicVsPrivateTitle: "::FaShieldHalved:: Public Bot vs. Your Personal Bot",
     publicVsPrivateIntro: "Let's compare a typical public Telegram arbitrage bot (signal channel) with what we aim to create (a personal tool). Public bots are often sales funnels, offering free but not always actionable signals.",
     comparisonTableHeaders: ["Aspect", "Typical Public Channel", "Your Personal Tool (Target)"],
     comparisonTableRows: [
@@ -243,9 +244,9 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Rate:** Average rate for your volume, no. of orders in book, total volume in these orders. If many orders – price range.",
       "**Hedging:** ::FaUmbrellaBeach:: icon for margin, links to futures (if available).",
       "**CMC Rank:** Coin rank & link to CoinMarketCap.",
-      "**Transfer Network:** Network name, withdrawal fee (coin & USDT), deposit/withdrawal availability (✅/❌).",
+      "**Transfer Network:** Network name, withdrawal fee (coin & USDT), deposit/withdrawal availability (::FaCheckCircle::/::FaTimesCircle::).",
       "**Contracts:** Indication of matching contracts (if info available).",
-      "**Transfer Time:** Approx. coin unlock time (green <15m, yellow 15-60m, red >60m).",
+      "**Transfer Time:** Approx. coin unlock time (::FaHourglassStart className='text-green-500':: <15m, ::FaHourglassHalf className='text-yellow-500':: 15-60m, ::FaHourglassEnd className='text-red-500':: >60m).",
       "**Spread:** In % and $ for your working amount, considering fees (if enabled).",
       "**Bundle Lifespan:** How long ago the bot detected a positive spread.",
       "**Spread Increase:** Appears if resend function is active.",
@@ -283,7 +284,7 @@ export default function ArbitrageExplainedPage() {
         langToSet = tgUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
     }
     setCurrentLang(langToSet);
-    logger.debug(`[ArbitrageExplainedPage] Language set to: ${langToSet}`);
+    logger.log(`[ArbitrageExplainedPage] Language set to: ${langToSet}`); // Corrected from logger.debug
   }, [tgUser?.language_code]);
 
   const t = useMemo(() => pageTranslations[currentLang] || pageTranslations['ru'], [currentLang]);
@@ -343,16 +344,16 @@ export default function ArbitrageExplainedPage() {
         <CardContent className="p-4 md:p-6 ">
           <Tabs defaultValue="basics" className="w-full">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 bg-black/50 p-1 h-auto mb-6">
-              <TabsTrigger value="basics" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaRocket:: {t.tabBasics}"/></TabsTrigger>
-              <TabsTrigger value="monitoring" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaBoxOpen:: {t.tabMonitoring}"/></TabsTrigger>
-              <TabsTrigger value="settings_errors" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaCogs:: {t.tabSettingsErrors}"/></TabsTrigger>
-              <TabsTrigger value="bundle_structure" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaListOl:: {t.tabBundleStructure}"/></TabsTrigger>
-              <TabsTrigger value="checklist" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaTasks:: {t.tabChecklist}"/></TabsTrigger>
+              <TabsTrigger value="basics" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="{t.tabBasics}"/></TabsTrigger>
+              <TabsTrigger value="monitoring" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="{t.tabMonitoring}"/></TabsTrigger>
+              <TabsTrigger value="settings_errors" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="{t.tabSettingsErrors}"/></TabsTrigger>
+              <TabsTrigger value="bundle_structure" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="{t.tabBundleStructure}"/></TabsTrigger>
+              <TabsTrigger value="checklist" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="{t.tabChecklist}"/></TabsTrigger>
             </TabsList>
 
             <TabsContent value="basics" className="space-y-6">
               {renderSection("realTimeSectionTitle", "realTimeSectionContent", "::FaBolt::")}
-              {renderSection("publicVsPrivateTitle", "publicVsPrivateIntro", "::FaShieldAlt::")}
+              {renderSection("publicVsPrivateTitle", "publicVsPrivateIntro", "::FaShieldHalved::")}
               {renderComparisonTable()}
               {renderSection("publicBotProblemsTitle", "publicBotProblems", "::FaLockOpen::", "ul", "text-red-400/90 leading-relaxed text-sm")}
               <VibeContentRenderer content={`**${t.ourBotGoal}**`} className="block mt-4 font-semibold text-brand-lime text-center" />
