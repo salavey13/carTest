@@ -167,7 +167,7 @@ export default function ElonPage() {
         langToSet = tgUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
     }
     setCurrentLang(langToSet);
-    logger.debug(`[ElonPage] Language set to: ${langToSet} (dbUser lang: ${dbUser?.language_code}, tgUser lang: ${tgUser?.language_code})`);
+    logger.info(`[ElonPage] Language set to: ${langToSet} (dbUser lang: ${dbUser?.language_code}, tgUser lang: ${tgUser?.language_code})`);
   }, [dbUser?.language_code, tgUser?.language_code]);
 
   const t = useCallback((key: string, params?: Record<string, string | number>) => {
