@@ -58,11 +58,11 @@ const pageTranslations: Record<string, Record<string, any>> = {
     marketMechanicsVibes: "<strong class=\"text-brand-yellow\">Вайбы Маска, Трампа & РФ:</strong> Каждый клик на кнопку симулирует новый 'вайб'. Следи за `NewsFlash`!",
     wolfAdvicesTitle: "Советы Волка",
     jordanBelfortAdvices: [
-        { titleKey: "Волчий Вайб №1: НЕПРОБИВАЕМАЯ УВЕРЕННОСТЬ!", textKey: "Джордан Белфорт учит: 'Продажа – это передача эмоции'. Главная эмоция – УВЕРЕННОСТЬ...", icon: "::FaHandshake::" },
-        { titleKey: "Волчий Вайб №2: ЗАХВАТИ КОНТРОЛЬ ЗА 4 СЕКУНДЫ!", textKey: "У тебя 4 секунды, чтобы показать, что ты: 1. Резкий как Пуля. 2. Энтузиаст до Мозга Костей. 3. Эксперт...", icon: "::FaBolt::" },
-        { titleKey: "Волчий Вайб №3: ДЕРЖИ ПРЯМУЮ ЛИНИЮ!", textKey: "Рынок всегда пытается увести тебя с 'прямой линии' к успеху. Возражения, сомнения... Твоя задача – элегантно возвращать его...", icon: "::FaChartLine className='transform rotate-90'::" },
-        { titleKey: "Волчий Вайб №4: УПРАВЛЯЙ СВОИМ СОСТОЯНИЕМ!", textKey: "Страх, сомнения, жадность – твои враги. Будь в ресурсном состоянии: уверенность, ясность, смелость...", icon: "::FaBrain::" },
-        { titleKey: "Волчий Вайб №5: ПОДГОТОВКА РЕШАЕТ!", textKey: "Белфорт писал скрипты часами. Ты – изучай 'историю твитов Маска', смотри на 'тренд'. Не кликай наобум! Думай, Агент!", icon: "::FaScroll::" }
+        { titleKey: "Волчий Вайб №1: НЕПРОБИВАЕМАЯ УВЕРЕННОСТЬ!", textKey: "Джордан Белфорт учит: 'Продажа – это передача эмоции'. Главная эмоция – УВЕРЕННОСТЬ. Ты должен быть на 10 из 10 уверен, что твой 'продукт' (в нашем случае – твоя ставка на вайб Маска) – это лучшее, что есть! Если ты сам не веришь, что TSLA взлетит/упадет после 'прикола' Маска – как ты заставишь XTR-рынок поверить в это?", icon: "::FaHandshake::" },
+        { titleKey: "Волчий Вайб №2: ЗАХВАТИ КОНТРОЛЬ ЗА 4 СЕКУНДЫ!", textKey: "У тебя 4 секунды, чтобы показать, что ты: 1. Резкий как Пуля. 2. Энтузиаст до Мозга Костей. 3. Эксперт, Мать Его! В симуляторе: увидел Вайб -> мгновенно оценил -> с энтузиазмом 'купил ПротоКарточку' -> показал, что ты 'в теме' рынка Маска.", icon: "::FaBolt::" },
+        { titleKey: "Волчий Вайб №3: ДЕРЖИ ПРЯМУЮ ЛИНИЮ!", textKey: "Рынок всегда пытается увести тебя с 'прямой линии' к успеху. Возражения, сомнения... Твоя задача – элегантно возвращать его, повышая уверенность. 'Маск твитнул про кота? Отлично! Это подтверждает мой анализ! Покупаем/Шортим СЕЙЧАС!' Каждое 'НЕТ' от рынка – запрос на большую уверенность.", icon: "::FaChartLine className='transform rotate-90'::" },
+        { titleKey: "Волчий Вайб №4: УПРАВЛЯЙ СВОИМ СОСТОЯНИЕМ!", textKey: "Страх, сомнения, жадность – твои враги. Будь в ресурсном состоянии: уверенность, ясность, смелость. Потерял XTR? Не ной! Анализируй, управляй эмоциями, готовься к следующему Вайбу. Успешные 'трейдеры' действуют перед лицом страха.", icon: "::FaBrain::" },
+        { titleKey: "Волчий Вайб №5: ПОДГОТОВКА РЕШАЕТ!", textKey: "Белфорт писал скрипты часами. Ты – изучай 'историю твитов Маска' (предыдущие NewsFlash в симуляторе), смотри на 'тренд'. Не кликай наобум! Думай, Агент!", icon: "::FaScroll::" }
     ],
     backToHotVibes: "Назад в Лобби Горячих Вайбов",
     arbitrageSeekerTitle: "Arbitrage Alpha Seeker",
@@ -112,11 +112,11 @@ const pageTranslations: Record<string, Record<string, any>> = {
     marketMechanicsVibes: "<strong class=\"text-brand-yellow\">Musk, Trump & RF Vibes:</strong> Each button click simulates a new 'vibe'. Watch the `NewsFlash`!",
     wolfAdvicesTitle: "Wolf's Advices",
     jordanBelfortAdvices: [
-        { titleKey: "Wolf Vibe #1: UNBREAKABLE CERTAINTY!", textKey: "Jordan Belfort teaches: 'Selling is a transference of emotion.' The main emotion is CERTAINTY...", icon: "::FaHandshake::" },
-        { titleKey: "Wolf Vibe #2: TAKE CONTROL IN 4 SECONDS!", textKey: "You have 4 seconds to show you are: 1. Sharp as a Tack. 2. Enthusiastic to the Core. 3. An Expert, Damn It!...", icon: "::FaBolt::" },
-        { titleKey: "Wolf Vibe #3: HOLD THE STRAIGHT LINE!", textKey: "The market always tries to pull you off the 'straight line' to success. Objections, doubts... Your job is to elegantly bring it back...", icon: "::FaChartLine className='transform rotate-90'::" },
-        { titleKey: "Wolf Vibe #4: MANAGE YOUR STATE!", textKey: "Fear, doubt, greed – your enemies. Be in a resourceful state: certainty, clarity, courage...", icon: "::FaBrain::" },
-        { titleKey: "Wolf Vibe #5: PREPARATION IS KEY!", textKey: "Belfort wrote scripts for hours. You – study 'Musk's tweet history', look at the 'trend'. Don't click randomly! Think, Agent!", icon: "::FaScroll::" }
+        { titleKey: "Wolf Vibe #1: UNBREAKABLE CERTAINTY!", textKey: "Jordan Belfort teaches: 'Selling is a transference of emotion.' The main emotion is CERTAINTY. You must be 10/10 certain that your 'product' (in our case - your bet on Musk's vibe) is the best thing out there! If you don't believe TSLA will rise/fall after Musk's 'stunt' – how will you make the XTR market believe it?", icon: "::FaHandshake::" },
+        { titleKey: "Wolf Vibe #2: TAKE CONTROL IN 4 SECONDS!", textKey: "You have 4 seconds to show you are: 1. Sharp as a Tack. 2. Enthusiastic to the Core. 3. An Expert, Damn It! In the simulator: saw the Vibe -> instantly assessed -> enthusiastically 'bought a ProtoCard' -> showed you're 'in the know' of Musk's market.", icon: "::FaBolt::" },
+        { titleKey: "Wolf Vibe #3: HOLD THE STRAIGHT LINE!", textKey: "The market always tries to pull you off the 'straight line' to success. Objections, doubts... Your job is to elegantly bring it back, increasing certainty. 'Musk tweeted about a cat? Great! This confirms my analysis! Buy/Short NOW!' Every 'NO' from the market is a request for more certainty.", icon: "::FaChartLine className='transform rotate-90'::" },
+        { titleKey: "Wolf Vibe #4: MANAGE YOUR STATE!", textKey: "Fear, doubt, greed – your enemies. Be in a resourceful state: certainty, clarity, courage. Lost XTR? Don't whine! Analyze, manage emotions, prepare for the next Vibe. Successful 'traders' act in the face of fear.", icon: "::FaBrain::" },
+        { titleKey: "Wolf Vibe #5: PREPARATION IS KEY!", textKey: "Belfort wrote scripts for hours. You – study 'Musk's tweet history' (previous NewsFlashes in the simulator), look at the 'trend'. Don't click randomly! Think, Agent!", icon: "::FaScroll::" }
     ],
     backToHotVibes: "Back to Hot Vibes Lobby",
     arbitrageSeekerTitle: "Arbitrage Alpha Seeker",
@@ -270,7 +270,7 @@ export default function ElonPage() {
     setIsPurchasing(true);
     const cardDetails: ProtoCardDetails = {
       cardId: ELON_SIMULATOR_CARD_ID,
-      title: `Доступ к Симулятору Маска`,
+      title: `Доступ к Симулятору Маска`, // This title is for TG invoice, can be left in one lang or made dynamic
       description: `Разблокировать симулятор влияния твитов Илона и 'русского вайба' на акции Tesla. Включает доступ к Arbitrage Alpha Seeker. Цена: ${SIMULATOR_ACCESS_PRICE_XTR} XTR.`,
       amountXTR: SIMULATOR_ACCESS_PRICE_XTR,
       type: "simulation_access", 
@@ -445,10 +445,10 @@ export default function ElonPage() {
 
                             {currentArbitrageSettings && !isLoadingArbitrageSettings && (
                                 <div className="p-3 bg-gray-800/50 border border-purple-600/50 rounded-lg text-xs">
-                                    <h4 className="text-sm font-orbitron text-purple-300 mb-1">{t("currentScannerSettingsTitle")}</h4>
-                                    <p>{t("minSpreadLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.minSpreadPercent}%</span> | {t("tradeVolumeLabel")} <span className="text-brand-yellow">${currentArbitrageSettings.defaultTradeVolumeUSD}</span></p>
-                                    <p>{t("exchangesLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.enabledExchanges.join(', ') || t("noValue")}</span></p>
-                                    <p>{t("pairsLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.trackedPairs.join(', ') || t("noValue")}</span></p>
+                                    <h4 className="text-sm font-orbitron text-gray-700 dark:text-purple-300 mb-1">{t("currentScannerSettingsTitle")}</h4>
+                                    <p className="text-gray-600 dark:text-gray-400">{t("minSpreadLabel")} <span className="text-gray-800 dark:text-brand-yellow">{currentArbitrageSettings.minSpreadPercent}%</span> | {t("tradeVolumeLabel")} <span className="text-gray-800 dark:text-brand-yellow">${currentArbitrageSettings.defaultTradeVolumeUSD}</span></p>
+                                    <p className="text-gray-600 dark:text-gray-400">{t("exchangesLabel")} <span className="text-gray-800 dark:text-brand-yellow">{currentArbitrageSettings.enabledExchanges.join(', ') || t("noValue")}</span></p>
+                                    <p className="text-gray-600 dark:text-gray-400">{t("pairsLabel")} <span className="text-gray-800 dark:text-brand-yellow">{currentArbitrageSettings.trackedPairs.join(', ') || t("noValue")}</span></p>
                                     <Link href="/settings" className="text-brand-cyan hover:underline mt-1 block">{t("changeSettingsLink")}</Link>
                                 </div>
                             )}
@@ -477,27 +477,27 @@ export default function ElonPage() {
                                         </span>
                                         <span className="text-xl font-bold">{formatNum(op.profitPercentage, 3)}%</span>
                                         </CardTitle>
-                                        <CardDescription className="text-xs text-gray-400">
+                                        <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
                                         Profit: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum(op.potentialProfitUSD)} (on <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum(op.tradeVolumeUSD,0)} vol)
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="text-sm space-y-1">
-                                        <p className="font-mono text-gray-300 text-xs md:text-sm">{(op as any).details}</p>
+                                        <p className="font-mono text-gray-800 dark:text-gray-300 text-xs md:text-sm">{(op as any).details}</p>
                                         {op.type === '2-leg' && (
                                             <>
-                                                <p><VibeContentRenderer content="::FaArrowRightFromBracket className='inline mr-1 text-blue-400'::" /> Buy: <strong>{(op as TwoLegArbitrageOpportunity).buyExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).buyPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).buyFeePercentage,3)}%)</p>
-                                                <p><VibeContentRenderer content="::FaArrowRightToBracket className='inline mr-1 text-teal-400'::" /> Sell: <strong>{(op as TwoLegArbitrageOpportunity).sellExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).sellPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).sellFeePercentage,3)}%)</p>
-                                                <p className="text-xs text-gray-500">Network Fee: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)}</p>
+                                                <p className="text-gray-700 dark:text-gray-300"><VibeContentRenderer content="::FaArrowRightFromBracket className='inline mr-1 text-blue-600 dark:text-blue-400'::" /> Buy: <strong>{(op as TwoLegArbitrageOpportunity).buyExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).buyPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).buyFeePercentage,3)}%)</p>
+                                                <p className="text-gray-700 dark:text-gray-300"><VibeContentRenderer content="::FaArrowRightToBracket className='inline mr-1 text-teal-600 dark:text-teal-400'::" /> Sell: <strong>{(op as TwoLegArbitrageOpportunity).sellExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).sellPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).sellFeePercentage,3)}%)</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-500">Network Fee: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)}</p>
                                             </>
                                         )}
                                         {op.type === '3-leg' && (
-                                            <div className="text-xs text-gray-400 space-y-0.5">
+                                            <div className="text-xs text-gray-700 dark:text-gray-400 space-y-0.5">
                                                 {(op as ThreeLegArbitrageOpportunity).legs.map((leg, i) => (
                                                     <p key={i}><VibeContentRenderer content="::FaSyncAlt className='inline mr-1'::" /> Leg {i+1}: {leg.action.toUpperCase()} {leg.asset} on {leg.pair} @ ~${formatNum(leg.price, leg.pair.includes('BTC') ? 5 : 2)} (Fee: {formatNum(leg.feeApplied*100,3)}%)</p>
                                                 ))}
                                             </div>
                                         )}
-                                        <p className="text-xs text-gray-500 pt-1">Identified: {new Date(op.timestamp).toLocaleString()}</p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-500 pt-1">Identified: {new Date(op.timestamp).toLocaleString()}</p>
                                     </CardContent>
                                     </Card>
                                 </motion.div>

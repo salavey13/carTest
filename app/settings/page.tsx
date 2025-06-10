@@ -106,10 +106,10 @@ export default function SettingsPage() {
   }, [dbUser, isAppContextLoading, appContextError]);
 
   const loadArbitrageSettings = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+    if (!dbUser?.user_id) return; // Corrected to user_id
     setIsLoadingArbitrageSettings(true);
     try {
-      const result = await getArbitrageScannerSettings(dbUser.user_id);
+      const result = await getArbitrageScannerSettings(dbUser.user_id); // Corrected to user_id
       if (result.success && result.data) {
         setArbitrageSettings(result.data);
         logger.debug("[SettingsPage] Arbitrage settings loaded:", result.data);
@@ -123,17 +123,17 @@ export default function SettingsPage() {
       setArbitrageSettings({ ...DEFAULT_ARBITRAGE_SETTINGS }); 
     }
     setIsLoadingArbitrageSettings(false);
-  }, [dbUser?.user_id]);
+  }, [dbUser?.user_id]); // Corrected to user_id
 
   useEffect(() => {
-    if (dbUser?.user_id) {
+    if (dbUser?.user_id) { // Corrected to user_id
       loadArbitrageSettings();
     }
-  }, [dbUser?.user_id, loadArbitrageSettings]);
+  }, [dbUser?.user_id, loadArbitrageSettings]); // Corrected to user_id
 
 
   const handleGeneralSettingChange = useCallback(async (settingKey: string, value: boolean) => {
-    if (!generalSettingsProfile || !dbUser?.id) { // Check generalSettingsProfile here
+    if (!generalSettingsProfile || !dbUser?.user_id) { // Corrected to user_id and check generalSettingsProfile
       toast.error("Профиль пользователя не загружен для общих настроек. Попробуйте позже.");
       return;
     }
@@ -152,8 +152,8 @@ export default function SettingsPage() {
     setIsSavingGeneral(true);
     try {
       const currentMetadata = dbUser.metadata || {};
-      const updatedMetadata = { ...currentMetadata, settings_profile: newSettings }; // Ensure settings_profile key is used
-      const result = await updateGeneralUserSettings(dbUser.id, updatedMetadata); // Pass updatedMetadata
+      const updatedMetadata = { ...currentMetadata, settings_profile: newSettings }; 
+      const result = await updateGeneralUserSettings(dbUser.user_id, updatedMetadata); // Corrected to user_id
       if (result.success) {
         toast.success(toastMessage);
       } else {
@@ -222,13 +222,13 @@ export default function SettingsPage() {
   };
 
   const handleSaveArbitrageSettings = async () => {
-    if (!dbUser?.user_id || !arbitrageSettings) {
+    if (!dbUser?.user_id || !arbitrageSettings) { // Corrected to user_id
       toast.error("Пользователь или настройки арбитража не определены.");
       return;
     }
     setIsSavingArbitrage(true);
     try {
-      const result = await updateArbitrageUserSettings(dbUser.user_id, arbitrageSettings);
+      const result = await updateArbitrageUserSettings(dbUser.user_id, arbitrageSettings); // Corrected to user_id
       if (result.success) {
         toast.success("Настройки арбитражного сканера сохранены!");
         if (result.data) setArbitrageSettings(result.data);
@@ -247,7 +247,7 @@ export default function SettingsPage() {
         toast.error("Сообщение обратной связи не может быть пустым.");
         return;
     }
-    logger.log("Feedback submitted (client-side):", { userId: dbUser?.id, message: feedbackMessage });
+    logger.log("Feedback submitted (client-side):", { userId: dbUser?.user_id, message: feedbackMessage }); // Corrected to user_id
     toast.success("Спасибо за ваш VIBE-отзыв! Мы его изучим.");
     setFeedbackMessage("");
     setIsFeedbackModalOpen(false);
@@ -347,7 +347,7 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                     <h4 className="text-lg font-orbitron text-brand-cyan/90 mt-4">
-                        <VibeContentRenderer content="::FaCoins className='inline mr-1.5'::" />Комиссии Бирж (%) {/* Replaced FaDollarSign with FaCoins */}
+                        <VibeContentRenderer content="::FaCoins className='inline mr-1.5'::" />Комиссии Бирж (%)
                     </h4>
                     <ScrollArea className="h-[250px] p-2 border border-brand-cyan/30 rounded-md simple-scrollbar bg-dark-bg/30">
                         <div className="space-y-3 pr-2">
