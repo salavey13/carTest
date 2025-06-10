@@ -157,11 +157,18 @@ const formatNum = (num: number | undefined, digits = 2) => {
 
 export default function ElonPage() {
   const { dbUser, isAuthenticated, isLoading: appContextLoading, user: tgUser } = useAppContext();
-  const [currentLang, setCurrentLang] = useState<'ru' | 'en'>('ru');
+  const [currentLang, setCurrentLang] = useState<'ru' | 'en'>('en'); // Default to 'en' or a sensible fallback
 
   useEffect(() => {
-    setCurrentLang(tgUser?.language_code === 'ru' ? 'ru' : 'en');
-  }, [tgUser?.language_code]);
+    let langToSet: 'ru' | 'en' = 'en'; // Default to 'en'
+    if (dbUser?.language_code) { // Prioritize dbUser's language code
+        langToSet = dbUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+    } else if (tgUser?.language_code) { // Fallback to Telegram user's language code
+        langToSet = tgUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+    }
+    setCurrentLang(langToSet);
+    logger.debug(`[ElonPage] Language set to: ${langToSet} (dbUser lang: ${dbUser?.language_code}, tgUser lang: ${tgUser?.language_code})`);
+  }, [dbUser?.language_code, tgUser?.language_code]);
 
   const t = useCallback((key: string, params?: Record<string, string | number>) => {
     let text = pageTranslations[currentLang]?.[key] || pageTranslations['en']?.[key] || key;
@@ -270,7 +277,7 @@ export default function ElonPage() {
     setIsPurchasing(true);
     const cardDetails: ProtoCardDetails = {
       cardId: ELON_SIMULATOR_CARD_ID,
-      title: `Доступ к Симулятору Маска`, // This title is for TG invoice, can be left in one lang or made dynamic
+      title: `Доступ к Симулятору Маска`, 
       description: `Разблокировать симулятор влияния твитов Илона и 'русского вайба' на акции Tesla. Включает доступ к Arbitrage Alpha Seeker. Цена: ${SIMULATOR_ACCESS_PRICE_XTR} XTR.`,
       amountXTR: SIMULATOR_ACCESS_PRICE_XTR,
       type: "simulation_access", 
@@ -493,7 +500,7 @@ export default function ElonPage() {
                                         {op.type === '3-leg' && (
                                             <div className="text-xs text-gray-700 dark:text-gray-400 space-y-0.5">
                                                 {(op as ThreeLegArbitrageOpportunity).legs.map((leg, i) => (
-                                                    <p key={i}><VibeContentRenderer content="::FaSyncAlt className='inline mr-1'::" /> Leg {i+1}: {leg.action.toUpperCase()} {leg.asset} on {leg.pair} @ ~${formatNum(leg.price, leg.pair.includes('BTC') ? 5 : 2)} (Fee: {formatNum(leg.feeApplied*100,3)}%)</p>
+                                                    <p key={i}><VibeContentRenderer content="::FaRepeat className='inline mr-1'::" /> Leg {i+1}: {leg.action.toUpperCase()} {leg.asset} on {leg.pair} @ ~${formatNum(leg.price, leg.pair.includes('BTC') ? 5 : 2)} (Fee: {formatNum(leg.feeApplied*100,3)}%)</p>
                                                 ))}
                                             </div>
                                         )}
