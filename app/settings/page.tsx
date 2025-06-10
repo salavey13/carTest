@@ -257,7 +257,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
         <div className="flex flex-col items-center">
-            <VibeContentRenderer content="::FaSlidersH className='text-6xl text-brand-purple animate-pulse mb-6'::" />
+            <VibeContentRenderer content="::FaSliders className='text-6xl text-brand-purple animate-pulse mb-6'::" />
             <h1 className="text-2xl text-brand-purple animate-pulse font-orbitron tracking-wider">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</h1>
             {pageError && <p className="text-red-500 mt-2 font-mono">{pageError}</p>}
         </div>
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="arbMinSpread" className="text-brand-cyan/90 font-orbitron">
-                            <VibeContentRenderer content="::FaPercentage className='inline mr-1.5'::" />Мин. Спред (%)
+                            <VibeContentRenderer content="::FaPercent className='inline mr-1.5'::" />Мин. Спред (%)
                         </Label>
                         <Input id="arbMinSpread" type="number" step="0.01" value={arbitrageSettings.minSpreadPercent} onChange={e => handleArbitrageSettingChange('minSpreadPercent', e.target.value)} className="input-cyber border-brand-cyan/50 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
                     </div>
