@@ -30,7 +30,7 @@ interface VipLeadDisplayProps {
   isAuthenticated: boolean; 
 }
 
-const MODAL_BACKGROUND_FALLBACK_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/cyberpunk-cityscape-artistic-4k-ax-1920x1080.jpg";
+const MODAL_BACKGROUND_FALLBACK_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-25-17-45-57-940_org.adblockplus.browser-35d69b1d-a040-494d-a207-fb6997924a85.jpg";
 const PLACEHOLDER_DEMO_IMAGE_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vibe_city_neon_future-2d7a8b9e-a9f9-4b1f-8e4d-9f6a123b4c5d.jpg"; 
 
 const vipPageTranslations = { 
