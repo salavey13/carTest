@@ -8,15 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from '@/components/ui/scroll-area';
-// Removed direct Fa6Icons imports, VibeContentRenderer will handle them
 import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
-import { updateUserSettings as updateGeneralUserSettings } from "@/app/actions"; // General user settings
+import { updateUserSettings as updateGeneralUserSettings } from "@/app/actions"; 
 import { 
     getArbitrageScannerSettings, 
     updateArbitrageUserSettings 
-} from "@/app/elon/arbitrage_scanner_actions"; // Arbitrage specific settings
+} from "@/app/elon/arbitrage_scanner_actions"; 
 import type { 
     ArbitrageSettings, 
     ExchangeName 
@@ -31,10 +30,9 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 
-// Simplified General Settings
 interface GeneralSettingConfig {
   key: string;
-  iconName: string; // Icon name for VibeContentRenderer, e.g., "FaMoon"
+  iconName: string; 
   title: string;
   description: string;
   colorClass: string;
@@ -62,10 +60,8 @@ type GeneralSettingsProfile = Record<string, boolean>;
 const getDefaultGeneralSettings = (): GeneralSettingsProfile => {
   const defaults: GeneralSettingsProfile = {};
   generalSettingDefinitions.forEach(s => {
-    // Default experimental_alpha_protocols to false, others based on their definition or true
     defaults[s.key] = s.key === 'experimental_alpha_protocols' ? false : true;
   });
-  // Ensure dark_mode_enabled default if not in definitions
   if (defaults['dark_mode_enabled'] === undefined) {
     defaults['dark_mode_enabled'] = true;
   }
@@ -119,12 +115,12 @@ export default function SettingsPage() {
         logger.debug("[SettingsPage] Arbitrage settings loaded:", result.data);
       } else {
         toast.error("Failed to load arbitrage settings: " + (result.error || "Using defaults."));
-        setArbitrageSettings({ ...DEFAULT_ARBITRAGE_SETTINGS });
+        setArbitrageSettings({ ...DEFAULT_ARBITRAGE_SETTINGS }); 
       }
     } catch (error) {
       toast.error("Error loading arbitrage settings. Using defaults.");
       logger.error("[SettingsPage] Error loading arbitrage settings", error);
-      setArbitrageSettings({ ...DEFAULT_ARBITRAGE_SETTINGS });
+      setArbitrageSettings({ ...DEFAULT_ARBITRAGE_SETTINGS }); 
     }
     setIsLoadingArbitrageSettings(false);
   }, [dbUser?.user_id]);
@@ -137,8 +133,8 @@ export default function SettingsPage() {
 
 
   const handleGeneralSettingChange = useCallback(async (settingKey: string, value: boolean) => {
-    if (!generalSettingsProfile || !dbUser?.id) {
-      toast.error("Профиль пользователя не загружен. Попробуйте позже.");
+    if (!generalSettingsProfile || !dbUser?.id) { // Check generalSettingsProfile here
+      toast.error("Профиль пользователя не загружен для общих настроек. Попробуйте позже.");
       return;
     }
 
@@ -156,8 +152,8 @@ export default function SettingsPage() {
     setIsSavingGeneral(true);
     try {
       const currentMetadata = dbUser.metadata || {};
-      const updatedMetadata = { ...currentMetadata, settings_profile: newSettings };
-      const result = await updateGeneralUserSettings(dbUser.id, updatedMetadata);
+      const updatedMetadata = { ...currentMetadata, settings_profile: newSettings }; // Ensure settings_profile key is used
+      const result = await updateGeneralUserSettings(dbUser.id, updatedMetadata); // Pass updatedMetadata
       if (result.success) {
         toast.success(toastMessage);
       } else {
@@ -173,6 +169,7 @@ export default function SettingsPage() {
       setIsSavingGeneral(false);
     }
   }, [generalSettingsProfile, dbUser]);
+
 
   const handleArbitrageSettingChange = (key: keyof Omit<ArbitrageSettings, "exchangeFees" | "networkFees">, value: any) => {
     setArbitrageSettings(prev => {
@@ -260,7 +257,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
         <div className="flex flex-col items-center">
-            <VibeContentRenderer content="::FaSliders className='text-6xl text-brand-purple animate-pulse mb-6'::" />
+            <VibeContentRenderer content="::FaSlidersH className='text-6xl text-brand-purple animate-pulse mb-6'::" />
             <h1 className="text-2xl text-brand-purple animate-pulse font-orbitron tracking-wider">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</h1>
             {pageError && <p className="text-red-500 mt-2 font-mono">{pageError}</p>}
         </div>
@@ -330,7 +327,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                     <Label className="text-brand-cyan/90 font-orbitron mb-2 block">
-                        <VibeContentRenderer content="::FaExchangeAlt className='inline mr-1.5'::" />Активные Биржи (симуляция)
+                        <VibeContentRenderer content="::FaRightLeft className='inline mr-1.5'::" />Активные Биржи (симуляция)
                     </Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {ALL_POSSIBLE_EXCHANGES_CONST.map(ex => (
@@ -350,7 +347,7 @@ export default function SettingsPage() {
                 
                 <div className="space-y-4">
                     <h4 className="text-lg font-orbitron text-brand-cyan/90 mt-4">
-                        <VibeContentRenderer content="::FaDollarSign className='inline mr-1.5'::" />Комиссии Бирж (%)
+                        <VibeContentRenderer content="::FaCoins className='inline mr-1.5'::" />Комиссии Бирж (%) {/* Replaced FaDollarSign with FaCoins */}
                     </h4>
                     <ScrollArea className="h-[250px] p-2 border border-brand-cyan/30 rounded-md simple-scrollbar bg-dark-bg/30">
                         <div className="space-y-3 pr-2">
@@ -441,7 +438,7 @@ export default function SettingsPage() {
 }
 
 interface SettingToggleProps {
-  iconName: string; // Expects string like "FaMoon"
+  iconName: string; 
   title: string;
   description: string;
   isChecked: boolean;
