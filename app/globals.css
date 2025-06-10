@@ -36,12 +36,15 @@
   --brand-lime: 90 70% 55%;   
 
   /* Derived UI Element Colors (for Light Theme) */
-  --primary: hsl(var(--brand-purple)); 
-  --primary-foreground: 0 0% 100%;    /* White text for purple primary */
-  --secondary: hsl(var(--brand-blue)); 
-  --secondary-foreground: 0 0% 100%;   /* White text for blue secondary */
-  --accent: hsl(var(--brand-pink));    
-  --accent-foreground: 0 0% 100%;      /* White text for pink accent */
+  /* These are the button background colors for light theme */
+  --primary: 270 70% 60%;             /* Purple */
+  --secondary: 210 85% 60%;           /* Blue */
+  --accent: 330 80% 65%;              /* Pink */
+
+  /* These are the text colors on those buttons for light theme */
+  --primary-foreground: 0 0% 100%;    /* White text */
+  --secondary-foreground: 0 0% 100%;   /* White text */
+  --accent-foreground: 0 0% 100%;      /* White text */
   
   --border: 220 15% 88%;              /* Light gray for borders */
   --input: 0 0% 100%;                 /* White background for inputs in light theme */
