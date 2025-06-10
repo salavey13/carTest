@@ -74,22 +74,22 @@ export function HotVibeCard({
     cardGradientClass = "bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600";
     titleTextColorClass = "text-white group-hover:text-yellow-200";
     earningTextColorClass = "text-yellow-300 font-bold"; 
-    contentBgClass = "bg-yellow-700";
+    contentBgClass = "bg-yellow-700"; // Solid color
   } else if (isSupported) {
     cardGradientClass = "bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600";
     titleTextColorClass = "text-white group-hover:text-lime-200";
     earningTextColorClass = "text-lime-300";
-    contentBgClass = "bg-emerald-700";
+    contentBgClass = "bg-emerald-700"; // Solid color
   } else if (isMissionUnlocked) {
      cardGradientClass = "bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700";
      titleTextColorClass = "text-white group-hover:text-indigo-200";
      earningTextColorClass = "text-indigo-300";
-     contentBgClass = "bg-indigo-700";
+     contentBgClass = "bg-indigo-700"; // Solid color
   } else { // Locked
     cardGradientClass = "bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900";
     titleTextColorClass = "text-gray-300 group-hover:text-gray-100";
     earningTextColorClass = "text-gray-400";
-    contentBgClass = "bg-gray-800";
+    contentBgClass = "bg-gray-800"; // Solid color
   }
   titleTextColorClass = `${titleTextColorClass} !text-gray-50`;
 
@@ -218,7 +218,7 @@ export function HotVibeCard({
 
         <CardContent className={cn(
             "flex flex-1 flex-col justify-between p-2.5 sm:p-3 text-center space-y-1.5",
-            contentBgClass // Solid background for content area
+            contentBgClass 
             )}
         >
           <div className="min-h-[3.5em] sm:min-h-[4em]"> 
