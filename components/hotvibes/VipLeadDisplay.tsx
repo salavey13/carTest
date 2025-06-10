@@ -22,7 +22,7 @@ interface VipLeadDisplayProps {
   lead: HotLeadData;
   currentLang?: 'ru' | 'en';
   isMissionUnlocked: boolean; 
-  onExecuteMission: () => void; // This will be repurposed for generic leads
+  onExecuteMission: () => void; 
   onSupportMission: (lead: HotLeadData) => void; 
   isSupported: boolean; 
   isProcessingThisCard: boolean; 
@@ -30,7 +30,7 @@ interface VipLeadDisplayProps {
   isAuthenticated: boolean; 
 }
 
-const MODAL_BACKGROUND_FALLBACK_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/cyberpunk-cityscape-artistic-4k-ax-1920x1080.jpg";
+const MODAL_BACKGROUND_FALLBACK_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-05-25-17-45-57-940_org.adblockplus.browser-35d69b1d-a040-494d-a207-fb6997924a85.jpg";
 const PLACEHOLDER_DEMO_IMAGE_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vibe_city_neon_future-2d7a8b9e-a9f9-4b1f-8e4d-9f6a123b4c5d.jpg"; 
 
 const vipPageTranslations = { 
@@ -110,7 +110,7 @@ export function VipLeadDisplay({
     lead, 
     currentLang = 'ru', 
     isMissionUnlocked, 
-    onExecuteMission, // For special cards, this will navigate. For generic, it's redefined below.
+    onExecuteMission, 
     onSupportMission, 
     isSupported,      
     isProcessingThisCard, 
@@ -130,7 +130,7 @@ export function VipLeadDisplay({
     navigator.clipboard.writeText(text)
       .then(() => { toast.success(message); return true; })
       .catch(err => { toast.error(`${currentLang === 'ru' ? "Ошибка копирования" : "Copy error"}: ${err.message}`); return false; });
-    return true; // Optimistic return for flow
+    return true; 
   };
 
   const t = vipPageTranslations[currentLang]; 
@@ -163,7 +163,6 @@ export function VipLeadDisplay({
     }
   };
 
-
   const renderActionButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-sm sm:text-base py-3 sm:py-3.5 shadow-lg hover:shadow-xl active:scale-95 transition-all";
     
@@ -171,7 +170,7 @@ export function VipLeadDisplay({
     let buttonText = "";
     let specificStyling = "";
     let isDisabled = false;
-    let actionToCall = onExecuteMission; // Default to onExecuteMission for special cards
+    let actionToCall = onExecuteMission; 
 
     if (isSpecialCard) {
         if (isSupported) { 
@@ -179,7 +178,7 @@ export function VipLeadDisplay({
             buttonText = isElonCard ? t.goToSimulator : t.goToPdfGenerator;
             specificStyling = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
             isDisabled = !isAuthenticated; 
-            actionToCall = onExecuteMission; // This should navigate for special cards
+            actionToCall = onExecuteMission; 
         } else { 
             iconName = isProcessingThisCard ? "FaSpinner" : t.purchaseAccessIcon.replace(/::/g, '');
             buttonText = isProcessingThisCard ? "" : t.purchaseAccess;
@@ -187,19 +186,19 @@ export function VipLeadDisplay({
             specificStyling = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110";
             isDisabled = isProcessingThisCard || !isAuthenticated;
             actionToCall = () => onSupportMission(lead);
-             return ( // Specific rendering for purchase button to include price
+             return ( 
                  <Button onClick={actionToCall} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
                     <VibeContentRenderer content={`::${iconName}::`} className={cn("mr-1.5 sm:mr-2", isProcessingThisCard && "animate-spin")} /> {buttonText} {!isProcessingThisCard && priceText}
                 </Button>
             );
         }
-    } else { // Generic leads
-        iconName = t.activateGenericLeadIcon.replace(/::/g, ''); // Using FaCopy icon
+    } else { 
+        iconName = t.activateGenericLeadIcon.replace(/::/g, ''); 
         buttonText = t.activateGenericLeadAction;
-        specificStyling = isMissionUnlocked // Using isMissionUnlocked to keep similar visual cue, though behavior is different
+        specificStyling = isMissionUnlocked 
             ? `bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110` 
-            : "bg-muted text-muted-foreground"; // Style for "locked" or unsupported generic leads
-        isDisabled = !isAuthenticated; // Can be refined if generic leads also have a "locked" state meaning no action
+            : "bg-muted text-muted-foreground"; 
+        isDisabled = !isAuthenticated; 
         actionToCall = handleGenericLeadAction;
     }
     

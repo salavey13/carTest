@@ -41,7 +41,7 @@ interface HotVibeCardProps {
   onViewVip: (lead: HotLeadData) => void; 
   currentLang?: 'ru' | 'en';
   translations: Record<string, any>; 
-  isProcessingThisCard: boolean; // Changed from isPurchasePending
+  isProcessingThisCard: boolean;
   isAuthenticated: boolean;
 }
 
@@ -56,7 +56,7 @@ export function HotVibeCard({
     onViewVip,
     currentLang = 'ru', 
     translations,
-    isProcessingThisCard, // Changed from isPurchasePending
+    isProcessingThisCard,
     isAuthenticated
 }: HotVibeCardProps) {
   
@@ -68,32 +68,30 @@ export function HotVibeCard({
   let titleTextColorClass = "text-slate-100 group-hover:text-brand-cyan";
   let earningTextColorClass = "text-brand-lime";
   let buttonTextColorClass = "text-black"; 
-  let contentBgClass = "bg-slate-800/80"; // Opaque background for content area
+  let contentBgClass = "bg-slate-800"; // Solid background for content area
 
   if (isSpecial || isElonSimulatorCard || isPdfGeneratorCard) {
     cardGradientClass = "bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600";
     titleTextColorClass = "text-white group-hover:text-yellow-200";
-    earningTextColorClass = "text-yellow-300 font-bold"; // Made earning text bolder for special cards
-    contentBgClass = "bg-yellow-700/80";
+    earningTextColorClass = "text-yellow-300 font-bold"; 
+    contentBgClass = "bg-yellow-700"; // Solid color
   } else if (isSupported) {
     cardGradientClass = "bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600";
     titleTextColorClass = "text-white group-hover:text-lime-200";
     earningTextColorClass = "text-lime-300";
-    contentBgClass = "bg-emerald-700/80";
+    contentBgClass = "bg-emerald-700"; // Solid color
   } else if (isMissionUnlocked) {
      cardGradientClass = "bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700";
      titleTextColorClass = "text-white group-hover:text-indigo-200";
      earningTextColorClass = "text-indigo-300";
-     contentBgClass = "bg-indigo-700/80";
+     contentBgClass = "bg-indigo-700"; // Solid color
   } else { // Locked
     cardGradientClass = "bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900";
     titleTextColorClass = "text-gray-300 group-hover:text-gray-100";
     earningTextColorClass = "text-gray-400";
-    contentBgClass = "bg-gray-800/80";
+    contentBgClass = "bg-gray-800"; // Solid color
   }
-  // Ensure title text is always light, overriding any potential theme issues for black text
   titleTextColorClass = `${titleTextColorClass} !text-gray-50`;
-
 
   const handleCardClick = (event: React.MouseEvent) => {
     if ((event.target as HTMLElement).closest('button, a')) {
@@ -104,24 +102,21 @@ export function HotVibeCard({
 
   const renderFooterButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 px-1.5 sm:px-2 rounded-md flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105 min-h-fit";
-    // Disable if processing this card OR if not authenticated (for purchase buttons)
-    // For "Go to..." buttons (isSupported=true for special cards), only !isAuthenticated should disable
     let isDisabled = false;
     if (isElonSimulatorCard || isPdfGeneratorCard) {
-        if (isSupported) { // "Go to..." button
+        if (isSupported) { 
             isDisabled = !isAuthenticated;
-        } else { // "Purchase Access" button
+        } else { 
             isDisabled = isProcessingThisCard || !isAuthenticated;
         }
-    } else { // Regular mission card
-        if (isSupported) { // "View Demo / Supported" button
-             isDisabled = !isAuthenticated; // Or never disabled if it just opens VIP
-        } else { // "Support Mission" button
+    } else { 
+        if (isSupported) { 
+             isDisabled = !isAuthenticated; 
+        } else { 
             isDisabled = isProcessingThisCard || !isAuthenticated;
         }
     }
     const disabledClasses = isDisabled ? "opacity-70 cursor-not-allowed !scale-100" : "";
-
 
     let buttonTextKey = ""; 
     let buttonIconName = ""; 
@@ -132,7 +127,7 @@ export function HotVibeCard({
       if (isSupported) {
         buttonTextKey = "goToSimulatorText";
         buttonIconName = "FaGamepad";
-        buttonAction = () => onViewVip(lead); // Or direct execute if preferred: onExecuteMission(lead.id, lead.required_quest_id)
+        buttonAction = () => onViewVip(lead); 
         buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 text-black hover:brightness-110";
       } else {
         buttonTextKey = "elonSimulatorAccessBtnText";
@@ -143,23 +138,22 @@ export function HotVibeCard({
         if (isSupported) {
             buttonTextKey = "goToPdfGeneratorText";
             buttonIconName = "FaFilePdf";
-            buttonAction = () => onViewVip(lead); // Or direct execute
+            buttonAction = () => onViewVip(lead); 
             buttonSpecificClass = "bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 text-white hover:brightness-110";
         } else {
             buttonTextKey = "pdfGeneratorAccessBtnText";
             buttonIconName = isProcessingThisCard ? "FaSpinner" : "FaHandHoldingDollar";
             buttonSpecificClass = "bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white hover:brightness-110";
         }
-    } else { // Regular mission leads
+    } else { 
       if (isSupported) {
         buttonTextKey = "supportedText"; 
         buttonIconName = "FaEye";
-        buttonAction = () => onViewVip(lead); // Opens VIP view
+        buttonAction = () => onViewVip(lead); 
         buttonSpecificClass = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
       } else {
         buttonTextKey = "supportMissionBtnText";
         buttonIconName = isProcessingThisCard ? "FaSpinner" : "FaHandHoldingDollar";
-        // Default specific class already set for this case
       }
     }
     
@@ -168,7 +162,7 @@ export function HotVibeCard({
         fullButtonText = `${translations.supportedText} (${translations.viewDemoText})`;
     }
     if (isProcessingThisCard && (isElonSimulatorCard || isPdfGeneratorCard || !isSupported)) {
-        fullButtonText = ""; // Spinner only for purchase actions
+        fullButtonText = ""; 
     }
 
     return (
@@ -224,15 +218,14 @@ export function HotVibeCard({
 
         <CardContent className={cn(
             "flex flex-1 flex-col justify-between p-2.5 sm:p-3 text-center space-y-1.5",
-            contentBgClass, // Added opaque background for content area
-            "backdrop-blur-sm" // Optional: add blur if bg is semi-transparent like /80
+            contentBgClass 
             )}
         >
           <div className="min-h-[3.5em] sm:min-h-[4em]"> 
             <h3 
               className={cn(
                 "font-orbitron text-sm sm:text-base font-bold leading-tight transition-colors line-clamp-2", 
-                titleTextColorClass // This should now be light text on the contentBgClass
+                titleTextColorClass 
               )} 
               title={lead.kwork_gig_title || "Untitled Gig"}
             >
@@ -242,7 +235,7 @@ export function HotVibeCard({
               <p 
                 className={cn(
                     "mt-1 text-[0.6rem] sm:text-[0.7rem] leading-snug line-clamp-2", 
-                     "text-gray-300 group-hover:text-gray-200" // This is already light
+                     "text-gray-300 group-hover:text-gray-200" 
                 )} 
                 title={lead.ai_summary}
               >
@@ -252,14 +245,14 @@ export function HotVibeCard({
           </div>
           <div className="text-[0.7rem] sm:text-xs font-orbitron font-semibold">
             {lead.potential_earning && 
-                <span className={cn(earningTextColorClass, "text-gray-50")}> {/* Ensure earning text is also light */}
+                <span className={cn(earningTextColorClass, "text-gray-50")}> 
                     {lead.potential_earning}
                 </span>
             }
           </div>
         </CardContent>
         
-        <CardFooter className={cn("p-2 sm:p-2.5 pt-0 mt-auto", contentBgClass, "rounded-b-xl")}> {/* Ensure footer also has the background */}
+        <CardFooter className={cn("p-2 sm:p-2.5 pt-0 mt-auto", contentBgClass, "rounded-b-xl")}> 
             {renderFooterButton()}
         </CardFooter>
     </Card>

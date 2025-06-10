@@ -22,7 +22,7 @@
   --muted: 220 15% 90%;            /* Light gray */
   --muted-foreground: 220 10% 40%;   /* Medium-light gray */
   --destructive: 0 80% 60%;         /* Brighter, more vibrant red */
-  --destructive-foreground: 0 0% 98%;
+  --destructive-foreground: 0 0% 98%; /* White text for destructive */
   --radius: 0.75rem;
 
   /* Brand Colors - Adjusted for vibrancy on light/dark backgrounds */
@@ -31,17 +31,20 @@
   --brand-cyan: 180 70% 55%;
   --brand-blue: 210 85% 60%;
   --brand-yellow: 50 80% 60%;
-  --brand-green: 145 60% 50%; /* Slightly deeper green */
+  --brand-green: 145 60% 50%; 
   --brand-orange: 28 80% 60%;
-  --brand-lime: 90 70% 55%;   /* Slightly deeper lime */
+  --brand-lime: 90 70% 55%;   
 
   /* Derived UI Element Colors (for Light Theme) */
-  --primary: hsl(var(--brand-purple)); /* Purple as primary */
-  --primary-foreground: 0 0% 100%;    /* White text for purple */
-  --secondary: hsl(var(--brand-blue)); /* Blue as secondary */
-  --secondary-foreground: 0 0% 100%;   /* White text for blue */
-  --accent: hsl(var(--brand-pink));    /* Pink as accent */
-  --accent-foreground: 0 0% 100%;      /* White text for pink */
+  /* These are the button background colors for light theme */
+  --primary: 270 70% 60%;             /* Purple */
+  --secondary: 210 85% 60%;           /* Blue */
+  --accent: 330 80% 65%;              /* Pink */
+
+  /* These are the text colors on those buttons for light theme */
+  --primary-foreground: 0 0% 100%;    /* White text */
+  --secondary-foreground: 0 0% 100%;   /* White text */
+  --accent-foreground: 0 0% 100%;      /* White text */
   
   --border: 220 15% 88%;              /* Light gray for borders */
   --input: 0 0% 100%;                 /* White background for inputs in light theme */
@@ -59,7 +62,6 @@
   --lime-rgb: 153, 230, 77;    
   --neon-lime-rgb: var(--lime-rgb);
   --black-rgb: 0,0,0;
-
 
   /* Static Background RGB Values */
   --bg-rgb: 249, 250, 251; 
@@ -103,8 +105,9 @@
   --muted: 263 40% 30%;         
   --muted-foreground: 0 0% 70%;  
   --destructive: 0 80% 60%;     
-  --destructive-foreground: 0 0% 98%; 
+  --destructive-foreground: 0 0% 98%; /* White text for destructive */
   
+  /* Brand Colors (Dark Mode can use the same vibrant brand colors) */
   --brand-purple: 270 70% 60%;
   --brand-pink: 330 80% 65%;
   --brand-cyan: 180 70% 55%;
@@ -116,11 +119,11 @@
 
   /* Derived UI Element Colors (for Dark Theme) */
   --primary: hsl(var(--brand-cyan)); 
-  --primary-foreground: 180 60% 20%; /* Dark teal for text on light cyan buttons */
+  --primary-foreground: 180 60% 10%;   /* Dark teal text for cyan primary */
   --secondary: hsl(var(--brand-purple)); 
-  --secondary-foreground: 270 80% 98%; 
+  --secondary-foreground: 270 80% 98%; /* Light purple/white text for purple secondary */
   --accent: hsl(var(--brand-lime)); 
-  --accent-foreground: 90 50% 10%;   
+  --accent-foreground: 90 50% 10%;     /* Dark lime text for lime accent */
 
   --border: hsl(var(--brand-cyan) / 0.4);       
   --input: hsl(var(--brand-purple) / 0.15); 
@@ -216,23 +219,27 @@
   }
 
   .input-cyber {
-    @apply bg-input border border-input-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+    @apply bg-input border border-input-border text-foreground placeholder:opacity-70 rounded-md px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
            transition-all duration-200 ease-in-out shadow-sm; 
+    placeholder-color: hsl(var(--muted-foreground));
   }
   .dark .input-cyber { 
-     @apply bg-input border-border text-foreground placeholder-muted-foreground/70 shadow-inner shadow-black/30;
+     @apply bg-input border-border text-foreground placeholder:opacity-70 shadow-inner shadow-black/30;
+     placeholder-color: hsl(var(--muted-foreground));
   }
   .input-cyber:disabled {
-      @apply opacity-60 cursor-not-allowed bg-muted/30;
+      @apply opacity-60 cursor-not-allowed bg-card bg-opacity-30 dark:bg-muted dark:bg-opacity-30; 
   }
   .textarea-cyber {
-      @apply bg-input border border-input-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+      @apply bg-input border border-input-border text-foreground placeholder:opacity-70 rounded-md px-3 py-2 text-sm min-h-[80px]
              focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
-             transition-all duration-200 ease-in-out shadow-sm; 
+             transition-all duration-200 ease-in-out shadow-sm;
+      placeholder-color: hsl(var(--muted-foreground));
   }
   .dark .textarea-cyber {
-      @apply bg-input border-border text-foreground placeholder-muted-foreground/70 shadow-inner shadow-black/30;
+      @apply bg-input border-border text-foreground placeholder:opacity-70 shadow-inner shadow-black/30;
+      placeholder-color: hsl(var(--muted-foreground));
   }
   .text-shadow-brand-lime { 
     text-shadow: 0 0 10px hsla(var(--lime-rgb), 0.7), 0 0 20px hsla(var(--lime-rgb), 0.5);
