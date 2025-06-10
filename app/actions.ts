@@ -3,8 +3,8 @@
 import {
   generateCarEmbedding, 
   supabaseAdmin, // Импортируем supabaseAdmin
-  dbFetchUserData, // Используем dbFetchUserData, который работает через supabaseAdmin
-  dbUpdateUserMetadata, // Используем dbUpdateUserMetadata, который работает через supabaseAdmin
+  fetchUserData as dbFetchUserData, // Используем dbFetchUserData, который работает через supabaseAdmin
+  updateUserMetadata as dbUpdateUserMetadata, // Используем dbUpdateUserMetadata, который работает через supabaseAdmin
   uploadImage, 
 } from "@/hooks/supabase"; 
 import axios from "axios";
