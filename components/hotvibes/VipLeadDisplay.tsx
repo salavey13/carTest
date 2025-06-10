@@ -13,18 +13,19 @@ import {
 } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import type { HotLeadData } from './HotVibeCard'; 
-import { FaCopy, FaLink, FaRocket, FaLock } from "react-icons/fa6"; 
+import { FaCopy, FaLink, FaRocket, FaLock, FaArrowUpRightFromSquare } from "react-icons/fa6"; 
 import { toast } from 'sonner';
 import { ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID } from '@/app/hotvibes/page';
+import { useAppContext } from '@/contexts/AppContext';
 
 interface VipLeadDisplayProps {
   lead: HotLeadData;
   currentLang?: 'ru' | 'en';
   isMissionUnlocked: boolean; 
-  onExecuteMission: () => void;
+  onExecuteMission: () => void; // This will be repurposed for generic leads
   onSupportMission: (lead: HotLeadData) => void; 
   isSupported: boolean; 
-  isProcessingThisCard: boolean; // Changed from isPurchasePending
+  isProcessingThisCard: boolean; 
   translations: Record<string, any>; 
   isAuthenticated: boolean; 
 }
@@ -65,6 +66,8 @@ const vipPageTranslations = {
     goToPdfGenerator: "К Генератору PDF",
     purchaseAccessIcon: "::FaKey::",
     purchaseAccess: "Купить Доступ",
+    activateGenericLeadAction: "Копировать Оффер & Открыть Заказ",
+    activateGenericLeadIcon: "::FaCopy::",
   },
   en: {
     pageTitleBase: "VIP Prototype for",
@@ -98,6 +101,8 @@ const vipPageTranslations = {
     goToPdfGenerator: "Go to PDF Generator",
     purchaseAccessIcon: "::FaKey::",
     purchaseAccess: "Purchase Access",
+    activateGenericLeadAction: "Copy Offer & Open Order",
+    activateGenericLeadIcon: "::FaCopy::",
   }
 };
 
@@ -105,13 +110,14 @@ export function VipLeadDisplay({
     lead, 
     currentLang = 'ru', 
     isMissionUnlocked, 
-    onExecuteMission,
+    onExecuteMission, // For special cards, this will navigate. For generic, it's redefined below.
     onSupportMission, 
     isSupported,      
-    isProcessingThisCard, // Changed from isPurchasePending
+    isProcessingThisCard, 
     translations: parentTranslations, 
     isAuthenticated   
 }: VipLeadDisplayProps) {
+  const { openLink } = useAppContext();
   const isElonCard = lead.id === ELON_SIMULATOR_CARD_ID;
   const isPdfGeneratorCard = lead.id === PERSONALITY_REPORT_PDF_CARD_ID;
   const isSpecialCard = isElonCard || isPdfGeneratorCard;
@@ -120,16 +126,43 @@ export function VipLeadDisplay({
   const actualDemoImage = lead.demo_image_url || PLACEHOLDER_DEMO_IMAGE_VIP; 
 
   const handleCopyToClipboard = (text: string | null | undefined, message: string) => {
-    if (!text) { toast.error("Нет текста для копирования."); return; }
+    if (!text) { toast.error(currentLang === 'ru' ? "Нет текста для копирования." : "Nothing to copy."); return false; }
     navigator.clipboard.writeText(text)
-      .then(() => toast.success(message))
-      .catch(err => toast.error(`Ошибка копирования: ${err.message}`));
+      .then(() => { toast.success(message); return true; })
+      .catch(err => { toast.error(`${currentLang === 'ru' ? "Ошибка копирования" : "Copy error"}: ${err.message}`); return false; });
+    return true; // Optimistic return for flow
   };
 
   const t = vipPageTranslations[currentLang]; 
   let pageTitle = `${t.pageTitleBase} ${lead.client_name || lead.kwork_gig_title || (currentLang === 'ru' ? 'Агента' : 'Agent')}`;
   if (isElonCard) pageTitle = t.elonPageTitle;
   if (isPdfGeneratorCard) pageTitle = t.pdfGenPageTitle;
+
+  const handleGenericLeadAction = () => {
+    let offerCopied = false;
+    if (lead.ai_generated_proposal_draft) {
+      offerCopied = handleCopyToClipboard(lead.ai_generated_proposal_draft, currentLang === 'ru' ? "Оффер скопирован!" : "Offer copied!");
+    } else {
+      toast.info(currentLang === 'ru' ? "Нет готового оффера для копирования." : "No offer draft to copy.");
+    }
+
+    let linkOpened = false;
+    if (lead.kwork_url) {
+      openLink(lead.kwork_url);
+      linkOpened = true;
+    } else {
+      toast.info(currentLang === 'ru' ? "Нет ссылки на оригинальный заказ." : "No original order link.");
+    }
+
+    if (offerCopied && linkOpened) {
+      toast.success(currentLang === 'ru' ? "Оффер скопирован, заказ открыт!" : "Offer copied, order opened!");
+    } else if (offerCopied) {
+      toast.info(currentLang === 'ru' ? "Оффер скопирован (ссылки на заказ нет)." : "Offer copied (no order link).");
+    } else if (linkOpened) {
+      toast.info(currentLang === 'ru' ? "Заказ открыт (оффера для копирования нет)." : "Order opened (no offer to copy).");
+    }
+  };
+
 
   const renderActionButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-sm sm:text-base py-3 sm:py-3.5 shadow-lg hover:shadow-xl active:scale-95 transition-all";
@@ -138,41 +171,43 @@ export function VipLeadDisplay({
     let buttonText = "";
     let specificStyling = "";
     let isDisabled = false;
+    let actionToCall = onExecuteMission; // Default to onExecuteMission for special cards
 
     if (isSpecialCard) {
-        if (isSupported) { // "Go to..." button
+        if (isSupported) { 
             iconName = isElonCard ? t.goToSimulatorIcon.replace(/::/g, '') : t.goToPdfGeneratorIcon.replace(/::/g, '');
             buttonText = isElonCard ? t.goToSimulator : t.goToPdfGenerator;
             specificStyling = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
-            isDisabled = !isAuthenticated; // Only disable if not authenticated
-            return (
-                <Button onClick={onExecuteMission} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
-                    <VibeContentRenderer content={`::${iconName}::`} className="mr-1.5 sm:mr-2" /> {buttonText}
-                </Button>
-            );
-        } else { // "Purchase Access" button
+            isDisabled = !isAuthenticated; 
+            actionToCall = onExecuteMission; // This should navigate for special cards
+        } else { 
             iconName = isProcessingThisCard ? "FaSpinner" : t.purchaseAccessIcon.replace(/::/g, '');
             buttonText = isProcessingThisCard ? "" : t.purchaseAccess;
             const priceText = isElonCard ? ` ${parentTranslations.elonSimulatorAccessBtnText.split('за ')[1]}` : ` ${parentTranslations.pdfGeneratorAccessBtnText.split('за ')[1]}`;
             specificStyling = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110";
             isDisabled = isProcessingThisCard || !isAuthenticated;
-             return (
-                 <Button onClick={() => onSupportMission(lead)} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
+            actionToCall = () => onSupportMission(lead);
+             return ( // Specific rendering for purchase button to include price
+                 <Button onClick={actionToCall} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
                     <VibeContentRenderer content={`::${iconName}::`} className={cn("mr-1.5 sm:mr-2", isProcessingThisCard && "animate-spin")} /> {buttonText} {!isProcessingThisCard && priceText}
                 </Button>
             );
         }
-    } else { // Regular mission leads
-        iconName = isMissionUnlocked ? t.executeMissionIcon.replace(/::/g, '') : t.skillLockedIcon.replace(/::/g, '');
-        buttonText = isMissionUnlocked ? t.executeMission : t.skillLocked;
-        specificStyling = isMissionUnlocked ? `bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110` : "bg-muted text-muted-foreground cursor-not-allowed";
-        isDisabled = !isMissionUnlocked; // Disable if skill is locked
-        return (
-            <Button onClick={onExecuteMission} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
-                 <VibeContentRenderer content={`::${iconName}::`} className="mr-1.5 sm:mr-2" /> {buttonText}
-            </Button>
-        );
+    } else { // Generic leads
+        iconName = t.activateGenericLeadIcon.replace(/::/g, ''); // Using FaCopy icon
+        buttonText = t.activateGenericLeadAction;
+        specificStyling = isMissionUnlocked // Using isMissionUnlocked to keep similar visual cue, though behavior is different
+            ? `bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110` 
+            : "bg-muted text-muted-foreground"; // Style for "locked" or unsupported generic leads
+        isDisabled = !isAuthenticated; // Can be refined if generic leads also have a "locked" state meaning no action
+        actionToCall = handleGenericLeadAction;
     }
+    
+    return (
+        <Button onClick={actionToCall} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
+             <VibeContentRenderer content={`::${iconName}::`} className="mr-1.5 sm:mr-2" /> {buttonText}
+        </Button>
+    );
   };
 
   return (
@@ -243,11 +278,15 @@ export function VipLeadDisplay({
                     </ShadCardTitle>
                     <div className="flex items-center gap-1 sm:gap-1.5">
                         {lead.kwork_url && (
-                            <Link href={lead.kwork_url} target="_blank" rel="noopener noreferrer" passHref legacyBehavior>
-                            <Button variant="outline" size="xs" className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-blue/50 text-brand-blue hover:bg-brand-blue/10 hover:text-blue-300 focus:ring-brand-blue")} title={t.viewOriginalKwork}>
-                                <FaLink className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5"/> {t.viewOriginalKwork}
+                            <Button 
+                                variant="outline" 
+                                size="xs" 
+                                className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-blue/50 text-brand-blue hover:bg-brand-blue/10 hover:text-blue-300 focus:ring-brand-blue")} 
+                                title={t.viewOriginalKwork}
+                                onClick={() => openLink(lead.kwork_url!)}
+                            >
+                                <FaArrowUpRightFromSquare className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5"/> {t.viewOriginalKwork}
                             </Button>
-                            </Link>
                         )}
                         <Button variant="outline" size="xs" className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 hover:text-pink-300 focus:ring-brand-pink")}
                                 title={t.copyOffer}
