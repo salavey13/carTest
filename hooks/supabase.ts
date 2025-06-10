@@ -3,9 +3,8 @@ import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger"; 
-import type { Database } from "@/types/database.types.ts"; // Ensure .ts extension for import
+import type { Database } from "@/types/database.types.ts"; 
 
-// --- Type Aliases ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type DbCar = Database["public"]["Tables"]["cars"]["Row"];
 type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
@@ -17,9 +16,13 @@ type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
 type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
 type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
+type DbFeedback = Database["public"]["Tables"]["feedback"]["Row"];
+type DbPageVisit = Database["public"]["Tables"]["page_visits"]["Row"];
+type DbUserActivity = Database["public"]["Tables"]["user_activity"]["Row"];
+type DbCozeResponse = Database["public"]["Tables"]["coze_responses"]["Row"];
+type DbArbitrageUserSettings = Database["public"]["Tables"]["arbitrage_user_settings"]["Row"];
  
 
-// --- Supabase Client Initialization ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
@@ -57,7 +60,7 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
         return null;
     }
     try {
-        const token = await generateJwtToken(userId);
+        const token = await generateJwtToken(userId); 
         if (!token) {
             logger.warn(`Failed to generate JWT for user ${userId}. Cannot create authenticated client.`);
             return null;
@@ -72,8 +75,6 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
     }
 };
 
-// --- User Management ---
-
 export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     if (!userId) {
         debugLogger.warn("fetchUserData called with empty userId");
@@ -81,7 +82,7 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     }
     debugLogger.log(`Fetching user data for userId: ${userId}`);
     if (!supabaseAdmin) { 
-        logger.error("Admin client unavailable for fetchUserData.");
+        logger.error("[SupabaseHook] fetchUserData: Admin client unavailable.");
         return null;
     }
 
@@ -93,29 +94,29 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
             .maybeSingle();
 
         if (error) {
-            logger.error(`Error fetching user data for ${userId}:`, error);
+            logger.error(`[SupabaseHook] Error fetching user data for ${userId}:`, error);
             return null;
         }
 
-        debugLogger.log(`Fetched user data for ${userId}:`, data ? 'User found' : 'User not found');
+        debugLogger.log(`[SupabaseHook] Fetched user data for ${userId}:`, data ? 'User found' : 'User not found');
         return data;
     } catch (catchError) {
-        logger.error(`Exception in fetchUserData for ${userId}:`, catchError);
+        logger.error(`[SupabaseHook] Exception in fetchUserData for ${userId}:`, catchError);
         return null;
     }
 };
 
 export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: DbUser['role']; status?: DbUser['status']; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
      if (!userId) {
-        debugLogger.error("createOrUpdateUser called with empty userId");
+        debugLogger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
         return null;
     }
      if (!supabaseAdmin) {
-         logger.error("Admin client unavailable for createOrUpdateUser.");
+         logger.error("[SupabaseHook] createOrUpdateUser: Admin client unavailable.");
          return null;
      }
 
-    debugLogger.log("Attempting to create or update user:", { userId, username: userInfo.username });
+    debugLogger.log("[SupabaseHook] Attempting to create or update user:", { userId, username: userInfo.username });
 
     try {
         const userData: Partial<DbUser> = { 
@@ -126,12 +127,13 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
             language_code: userInfo.language_code || null,
             ...(userInfo.role && { role: userInfo.role }),
             ...(userInfo.status && { status: userInfo.status }),
-            ...(userInfo.metadata !== undefined && { metadata: userInfo.metadata }),
+            ...(userInfo.metadata !== undefined && { metadata: userInfo.metadata }), 
             updated_at: new Date().toISOString(),
         };
+        
         Object.keys(userData).forEach(key => {
             const k = key as keyof typeof userData;
-            if (userData[k] === undefined && k !== 'metadata') { // keep metadata if explicitly set to null
+            if (userData[k] === undefined && k !== 'metadata') {
                  delete userData[k];
             }
         });
@@ -145,35 +147,40 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
             .single();
 
         if (error) {
-            logger.error(`Error upserting user ${userId}:`, error);
+            logger.error(`[SupabaseHook] Error upserting user ${userId}:`, error);
             throw error;
         }
 
         if (!data) {
-             logger.error(`Upsert for user ${userId} returned no data.`);
+             logger.error(`[SupabaseHook] Upsert for user ${userId} returned no data.`);
             throw new Error("Failed to get user data after upsert.");
         }
 
-        debugLogger.log(`User ${userId} upserted successfully.`);
+        debugLogger.log(`[SupabaseHook] User ${userId} upserted successfully.`);
         return data;
     } catch (catchError) {
-        logger.error(`Exception in createOrUpdateUser for ${userId}:`, catchError);
+        logger.error(`[SupabaseHook] Exception in createOrUpdateUser for ${userId}:`, catchError);
         return null;
     }
 };
 
-export const updateUserMetadata = async (
+export async function updateUserMetadata(
   userId: string,
   metadata: Record<string, any> | null 
-): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
-  if (!userId) return { success: false, error: "User ID is required." };
+): Promise<{ success: boolean; data?: DbUser; error?: string }> {
+  if (!userId) {
+    logger.error("[SupabaseHook updateUserMetadata] User ID is required.");
+    return { success: false, error: "User ID is required." };
+  }
+  
+  if (!supabaseAdmin) {
+    logger.error("[SupabaseHook updateUserMetadata] Supabase admin client is not available.");
+    return { success: false, error: "Database admin client is not available." };
+  }
 
-  const client = await createAuthenticatedClient(userId);
-  if (!client) return { success: false, error: "Failed to create authenticated client." };
-
-  debugLogger.log(`Updating metadata for user ${userId}`, metadata);
+  debugLogger.log(`[SupabaseHook updateUserMetadata] Updating metadata for user ${userId} using supabaseAdmin. New metadata:`, metadata);
   try {
-    const { data, error } = await client
+    const { data, error } = await supabaseAdmin
       .from("users") 
       .update({ metadata: metadata, updated_at: new Date().toISOString() })
       .eq("user_id", userId) 
@@ -181,20 +188,22 @@ export const updateUserMetadata = async (
       .single();
 
     if (error) {
-      logger.error(`Error updating metadata for user ${userId}:`, error);
+      logger.error(`[SupabaseHook updateUserMetadata] Error updating metadata for user ${userId} with supabaseAdmin:`, error);
       if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
-      if (error.code === '42501') return { success: false, error: `Permission denied to update metadata for user ${userId}. Check RLS policy.` };
-      throw error;
+      throw error; 
     }
-    if (!data) return { success: false, error: `User ${userId} not found after metadata update attempt.` };
+    if (!data) {
+        logger.warn(`[SupabaseHook updateUserMetadata] User ${userId} not found after metadata update attempt, or update returned no data.`);
+        return { success: false, error: `User ${userId} not found after metadata update attempt.` };
+    }
 
-    debugLogger.log(`Successfully updated metadata for user ${userId}.`);
+    debugLogger.log(`[SupabaseHook updateUserMetadata] Successfully updated metadata for user ${userId} with supabaseAdmin.`);
     return { success: true, data };
   } catch (catchError) {
-    logger.error(`Exception in updateUserMetadata for user ${userId}:`, catchError);
-    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata" };
+    logger.error(`[SupabaseHook updateUserMetadata] Exception for user ${userId} (using supabaseAdmin):`, catchError);
+    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata due to an unexpected error." };
   }
-};
+}
 
 const VECTOR_DIMENSIONS = 384; 
 
@@ -219,7 +228,7 @@ export async function generateCarEmbedding(
   payload?: {
     carId?: string; 
     carData?: {
-        make: string; model: string; description: string; specs: Record<string, any>; // specs is Json
+        make: string; model: string; description: string; specs: Record<string, any>; 
         owner_id?: string; daily_price?: number; image_url?: string; rent_link?: string; status?: string;
     };
   }
@@ -338,8 +347,8 @@ export async function generateCarEmbedding(
                         make: payload.carData.make, model: payload.carData.model, description: payload.carData.description,
                         specs: payload.carData.specs, owner_id: payload.carData.owner_id, daily_price: payload.carData.daily_price,
                         image_url: payload.carData.image_url, rent_link: payload.carData.rent_link,
-                        embedding, is_test_result: false, // Default as per schema
-                        status: payload.carData.status || 'available', // Default status
+                        embedding, is_test_result: false, 
+                        status: payload.carData.status || 'available', 
                  };
                  const { data: newCar, error: insertError } = await supabaseAdmin
                     .from("cars")
@@ -505,24 +514,23 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
 
 export const updateUserSubscription = async (
   userId: string,
-  subscriptionId: string | null // Changed from number | string | null to string | null
+  subscriptionId: string | null 
 ): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Attempting to update subscription-related info for user ${userId}. New subscription_id (from users table): ${subscriptionId}`);
+    debugLogger.log(`Attempting to update subscription-related info for user ${userId}. New subscription_id: ${subscriptionId}`);
     try {
-        // The 'users' table in database.types.ts has 'subscription_id TEXT'.
         const updatePayload: Partial<DbUser> = { 
             updated_at: new Date().toISOString(),
-            subscription_id: subscriptionId, // Directly assign the string or null
+            subscription_id: subscriptionId, 
         };
         
         const { data, error } = await supabaseAdmin
             .from("users") 
             .update(updatePayload)
             .eq("user_id", userId) 
-            .select("*, metadata") // Select all fields including the updated subscription_id
+            .select("*, metadata") 
             .single();
 
         if (error) {
@@ -542,7 +550,7 @@ export const updateUserSubscription = async (
 
 export const getUserSubscription = async (
   userId: string
-): Promise<{ success: boolean; data?: string | null; error?: string }> => { // Return type changed to string | null
+): Promise<{ success: boolean; data?: string | null; error?: string }> => { 
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
@@ -559,7 +567,7 @@ export const getUserSubscription = async (
             throw userError;
         }
         
-        const subIdFromDb = userData?.subscription_id; // This will be string | null
+        const subIdFromDb = userData?.subscription_id; 
         debugLogger.log(`User ${userId} current subscription_id from DB: ${subIdFromDb}`);
         return { success: true, data: subIdFromDb ?? null };
 
@@ -574,14 +582,13 @@ export const createInvoice = async (
     id: string, 
     userId: string,
     amount: number,
-    subscriptionId?: string | null, // Changed to string | null to match DB TEXT type
+    subscriptionId?: string | null, 
     metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
     if (!id || !userId || amount == null || !type) return { success: false, error: "Missing required parameters for invoice creation." };
 
     try {
-        // subscriptionId is now string | null, directly usable if DB column is TEXT
         const { data, error } = await supabaseAdmin
             .from("invoices")
             .insert({
@@ -590,7 +597,7 @@ export const createInvoice = async (
                 type: type,
                 amount: amount, 
                 status: 'pending', 
-                subscription_id: subscriptionId, // Pass string or null directly
+                subscription_id: subscriptionId, 
                 metadata: metadata,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -618,7 +625,6 @@ export const createInvoice = async (
         debugLogger.log(`Invoice ${id} created successfully for user ${userId}.`);
         return { success: true, data };
     } catch (error) {
-        // Catch block error logging is already comprehensive
         const castError = error as any;
         logger.error(`Exception creating invoice ${id} for user ${userId}:`, {
             message: castError.message,
@@ -892,7 +898,7 @@ export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; e
     const { data, error } = await supabaseAnon
         .from("cars")
         .select("*")
-        .order("model", { ascending: true }); // cars table has no created_at
+        .order("model", { ascending: true }); 
     if (error) throw error;
     return { success: true, data: data || [] };
   } catch (error) {
