@@ -206,7 +206,6 @@ function HotVibesClientContent() {
     }
   }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, cyberProfile, addToast, t.errorLoadingProfile]);
 
-
   // Effect for initial VIP identification from URL or startParam
   useEffect(() => {
     if (!appCtxLoading && !isAuthenticating && !isInitialVipCheckDone) {
@@ -276,7 +275,7 @@ function HotVibesClientContent() {
       setActiveVipLead(null); 
     }
     setPageLoading(false);
-  }, [dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, isInitialVipCheckDone, targetVipIdentifier]); // Removed cyberProfile from here, it's read from state
+  }, [dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, isInitialVipCheckDone, targetVipIdentifier]); 
 
   // Effect to run core data loading logic
   useEffect(() => {
@@ -288,14 +287,12 @@ function HotVibesClientContent() {
 
   const handleSelectLeadForVip = (lead: HotLeadData) => {
     logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
-    // Update URL first
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top when VIP view is opened
     const currentUrl = new URL(window.location.href);
     currentUrl.searchParams.set('lead_identifier', lead.id);
     window.history.pushState({ ...window.history.state, as: currentUrl.pathname + currentUrl.search, url: currentUrl.pathname + currentUrl.search }, '', currentUrl.pathname + currentUrl.search);
     
     setTargetVipIdentifier(lead.id); 
-    // For faster perceived opening, could optimistically set activeVipLead here if all data is available
-    // setActiveVipLead(lead); // This can be done, but ensure profile-dependent checks in VIP display handle it.
   };
 
   const handleBackToLobby = () => {
@@ -303,7 +300,7 @@ function HotVibesClientContent() {
     setActiveVipLead(null);      
     setTargetVipIdentifier(null); 
 
-    router.replace(pathname, { shallow: true }); // Clears query params from current path
+    router.replace(pathname, { shallow: true }); 
     logger.info(`[HotVibes] URL params cleaned for lobby view. New path: ${pathname}`);
   };
   
@@ -312,7 +309,7 @@ function HotVibesClientContent() {
       addToast("Сначала авторизуйтесь для покупки ПротоКарточки!", "error");
       return;
     }
-    if (processingCardId) return; // Already processing a card
+    if (processingCardId) return; 
 
     setProcessingCardId(cardToPurchase.id);
     let price: number;
@@ -360,7 +357,6 @@ function HotVibesClientContent() {
       if (result.success) {
         addToast("Запрос на ПротоКарточку отправлен! Проверьте Telegram для оплаты счета.", "success");
         if(refreshDbUser) {
-            // Refresh user data after a delay to allow webhook processing
             setTimeout(async () => { await refreshDbUser(); }, 7000); 
         }
       } else {
@@ -403,7 +399,7 @@ function HotVibesClientContent() {
         await markTutorialAsCompleted(dbUser.user_id, "image-swap-mission");
         const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (updatedProfileResult.success && updatedProfileResult.data) {
-          setCyberProfile(updatedProfileResult.data); // Update profile state directly
+          setCyberProfile(updatedProfileResult.data); 
           addToast(`Навык '${targetQuestId}' экспресс-активирован! Попробуйте снова.`, "success", 3000);
           return;
         }
@@ -413,8 +409,8 @@ function HotVibesClientContent() {
     }
     addToast(`${t.missionActivated} (Lead: ${leadId.substring(0,6)}..., Quest: ${targetQuestId})`, "success");
     const finalDemoLinkParam = navTarget || leadData?.client_name || leadId; 
-    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&flow=liveFireMission&startapp=${finalDemoLinkParam}`);
-  }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast, lobbyLeads, activeVipLead, setCyberProfile /* Added */]);
+    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&startapp=${finalDemoLinkParam}`); // Removed flow=liveFireMission
+  }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast, lobbyLeads, activeVipLead, setCyberProfile]);
   
   const getIsSupported = useCallback((cardId: string): boolean => {
     const cards = dbUser?.metadata?.xtr_protocards as Record<string, { status: string }> | undefined;
@@ -455,17 +451,18 @@ function HotVibesClientContent() {
   }, [lobbyLeads, getIsSupported, activeFilter, cyberProfile, isAuthenticated]);
 
   if ((appCtxLoading || (isAuthenticated && !cyberProfile && !pageLoading)) && !activeVipLead) { 
-    // Show loader if app context is loading OR if authenticated but profile not yet loaded (and not in pageLoading state already, to avoid flicker)
-    // unless a VIP lead is already active (to prevent loader from covering VIP view during profile refresh)
     return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
   }
-
 
   if (activeVipLead) { 
     return (
       <div className="relative min-h-screen bg-gradient-to-br from-black via-slate-900 to-purple-900/50 text-foreground overflow-x-hidden py-20 md:py-24">
         <div className="container mx-auto px-2 sm:px-4 relative z-10">
-         <Button onClick={handleBackToLobby} variant="outline" className="mb-4 text-brand-cyan border-brand-cyan hover:bg-brand-cyan/10 fixed top-[calc(var(--header-height,60px)+10px)] left-4 z-[60] backdrop-blur-sm bg-black/50">
+         <Button 
+            onClick={handleBackToLobby} 
+            variant="outline" 
+            className="mb-4 text-brand-cyan border-brand-cyan hover:bg-brand-cyan/10 fixed top-[calc(var(--header-height,60px)+10px)] left-4 z-[60] backdrop-blur-sm bg-black/70 hover:text-white hover:border-white transition-all duration-200 ease-in-out shadow-lg"
+          >
             <VibeContentRenderer content={t.backToLobby}/>
           </Button>
           <motion.div
@@ -511,7 +508,7 @@ function HotVibesClientContent() {
           className="w-full max-w-5xl mx-auto"
         >
           <Card className={cn(
-              "bg-dark-card/95 backdrop-blur-xl shadow-2xl border-brand-red/70", 
+              "bg-dark-card/98 backdrop-blur-2xl shadow-2xl border-brand-red/70", 
               "shadow-[0_0_35px_rgba(var(--brand-red-rgb),0.5)]" 
             )}
           >
@@ -520,7 +517,7 @@ function HotVibesClientContent() {
                 <VibeContentRenderer content={t.lobbyTitle} />
               </CardTitle>
               {cyberProfile && ( 
-                <CardDescription className="text-muted-foreground font-mono text-center text-xs">
+                <CardDescription className="font-mono text-center text-xs text-gray-300 dark:text-gray-400">
                  Агент Ур. {cyberProfile.level} | Показано: {displayedLeads.filter(l => !l.isSpecial || activeFilter === 'supported').length} (Фильтр: {activeFilter === 'all' ? t.filterAll : t.filterSupported})
                 </CardDescription>
               )}

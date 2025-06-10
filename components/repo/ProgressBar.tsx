@@ -1,40 +1,39 @@
 "use client";
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FetchStatus } from '@/contexts/RepoXmlPageContext'; // Import FetchStatus if needed for typing
+import { FetchStatus } from '@/contexts/RepoXmlPageContext'; 
+import { cn } from '@/lib/utils';
 
 interface ProgressBarProps {
-    // Use a union including the specific fetch statuses for better type safety
     status: FetchStatus | 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
-    progress: number; // Percentage (0-100)
+    progress: number; 
 }
 
 const ProgressBar: React.FC<ProgressBarProps> = ({ status, progress }) => {
-    let barColorClass = "from-purple-600 to-cyan-500"; // Default/loading/retrying
-    let shouldAnimate = true;
-
+    let barColorClasses = "from-brand-purple to-brand-cyan"; // Default/loading/retrying
+    
     if (status === 'success') {
-        barColorClass = "from-green-500 to-emerald-500";
+        barColorClasses = "from-brand-green to-emerald-500"; // emerald-500 is a Tailwind default
     } else if (status === 'error' || status === 'failed_retries') {
-        barColorClass = "from-red-500 to-pink-500";
-        // Optional: Stop animation on error? Or let it complete to current progress?
-        // For error, we usually want it to be static (at 0 or last known progress)
-        // Let's make it static at the current 'progress' value passed (likely 0 on error reset)
-        shouldAnimate = false; // Don't animate width on error states
+        barColorClasses = "from-destructive to-pink-500"; // destructive is from our theme, pink-500 is Tailwind default
     } else if (status === 'idle') {
-         // Don't show or animate if idle
-         return null; // Or return an empty div if needed for layout consistency
+         return null; 
     }
 
     return (
-        <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden my-1"> {/* Added margin */}
+        <div className={cn(
+            "w-full rounded-full h-1.5 overflow-hidden my-1",
+            "bg-muted/70 dark:bg-muted/30" // Track background
+        )}>
             <motion.div
-                className={`h-1.5 rounded-full bg-gradient-to-r ${barColorClass} shadow-[0_0_8px_rgba(255,255,255,0.3)]`}
+                className={cn(
+                    `h-1.5 rounded-full bg-gradient-to-r shadow-md shadow-ring/50`,
+                    barColorClasses
+                )}
                 initial={{ width: 0 }}
-                // Animate only if not in error state
                 animate={{ width: `${progress}%` }}
                 transition={{
-                    duration: (status === 'loading' || status === 'retrying') ? 0.2 : 0.3, // Faster updates during loading/retrying simulation ticks
+                    duration: (status === 'loading' || status === 'retrying') ? 0.2 : 0.3, 
                     ease: "linear"
                  }}
             />

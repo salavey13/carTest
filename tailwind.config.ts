@@ -33,10 +33,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
@@ -51,6 +47,7 @@ const config: Config = {
           border: "hsl(var(--input-border))", // For input border
         },
         ring: "hsl(var(--ring))",
+        muted: "hsl(var(--muted))", // Added muted here for bg-muted to work generally
         
         // Brand colors referencing CSS variables
         "brand-purple": "hsl(var(--brand-purple))",
