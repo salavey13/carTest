@@ -226,7 +226,7 @@
      placeholder-color: hsl(var(--muted-foreground));
   }
   .input-cyber:disabled {
-      @apply opacity-60 cursor-not-allowed bg-muted bg-opacity-30; /* Corrected opacity class */
+      @apply opacity-60 cursor-not-allowed bg-card bg-opacity-30 dark:bg-muted dark:bg-opacity-30; 
   }
   .textarea-cyber {
       @apply bg-input border border-input-border text-foreground placeholder:opacity-70 rounded-md px-3 py-2 text-sm min-h-[80px]
