@@ -1,10 +1,10 @@
-"use server"; // Эта директива применяется ко всему файлу
+"use server"; 
 
 import {
   generateCarEmbedding, 
-  supabaseAdmin, // Импортируем supabaseAdmin
-  fetchUserData as dbFetchUserData, // Используем dbFetchUserData, который работает через supabaseAdmin
-  updateUserMetadata as dbUpdateUserMetadata, // Используем dbUpdateUserMetadata, который работает через supabaseAdmin
+  supabaseAdmin, 
+  fetchUserData as dbFetchUserData, 
+  updateUserMetadata as dbUpdateUserMetadata, // <--- ВОССТАНОВЛЕН АЛИАС
   uploadImage, 
 } from "@/hooks/supabase"; 
 import axios from "axios";
@@ -19,7 +19,7 @@ import { Bucket } from '@supabase/storage-js';
 import { v4 as uuidv4 } from 'uuid'; 
 
 type User = Database["public"]["Tables"]["users"]["Row"];
-type UserSettings = User['metadata']; // Это User['metadata'], то есть Record<string, any> | null
+type UserSettings = User['metadata']; 
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; 
@@ -593,7 +593,8 @@ export async function listPublicBuckets(): Promise<{ success: boolean; data?: Bu
     }
 }
 
-export async function updateUserSettings(userId: string, newFullMetadata: UserSettings): Promise<{ success: boolean; error?: string }> {
+// Corrected function to merge settings properly
+export async function updateUserSettings(userId: string, partialSettingsToUpdate: Partial<UserSettings>): Promise<{ success: boolean; error?: string }> {
   if (!userId) { return { success: false, error: "User ID is required." }; }
   if (!supabaseAdmin) { 
     logger.error("[updateUserSettings] Supabase admin client is not available.");
@@ -601,15 +602,29 @@ export async function updateUserSettings(userId: string, newFullMetadata: UserSe
   }
   
   try {
-    // dbUpdateUserMetadata ожидает полный объект metadata для замены.
-    // newFullMetadata здесь - это уже подготовленный полный объект метаданных.
-    const result = await dbUpdateUserMetadata(userId, newFullMetadata); 
+    // 1. Fetch current user data, including metadata
+    const currentUserData = await dbFetchUserData(userId); // This uses supabaseAdmin
+    if (!currentUserData) {
+      logger.error(`[updateUserSettings] User ${userId} not found. Cannot update settings.`);
+      return { success: false, error: "User not found." };
+    }
+    
+    const currentMetadata = currentUserData.metadata || {};
+    
+    // 2. Merge current metadata with the partial updates
+    const updatedFullMetadata: UserSettings = {
+      ...currentMetadata,
+      ...partialSettingsToUpdate 
+    };
+    
+    // 3. Update the database with the full, merged metadata object
+    const result = await dbUpdateUserMetadata(userId, updatedFullMetadata); // This uses supabaseAdmin as per previous fix
     
     if (result.success) { 
-        logger.info(`User settings updated successfully for user ${userId}`); 
+        logger.info(`User settings updated successfully for user ${userId}. New metadata snapshot:`, updatedFullMetadata); 
         return { success: true }; 
     } else { 
-        logger.error(`Failed to update user settings for ${userId}: ${result.error}`); 
+        logger.error(`Failed to update user settings for ${userId}: ${result.error}. Attempted to save:`, updatedFullMetadata); 
         return { success: false, error: result.error || "Failed to update settings." }; 
     }
   } catch (e) {
