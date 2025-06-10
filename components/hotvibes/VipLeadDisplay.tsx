@@ -24,7 +24,7 @@ interface VipLeadDisplayProps {
   onExecuteMission: () => void;
   onSupportMission: (lead: HotLeadData) => void; 
   isSupported: boolean; 
-  isPurchasePending: boolean; 
+  isProcessingThisCard: boolean; // Changed from isPurchasePending
   translations: Record<string, any>; 
   isAuthenticated: boolean; 
 }
@@ -108,7 +108,7 @@ export function VipLeadDisplay({
     onExecuteMission,
     onSupportMission, 
     isSupported,      
-    isPurchasePending,
+    isProcessingThisCard, // Changed from isPurchasePending
     translations: parentTranslations, 
     isAuthenticated   
 }: VipLeadDisplayProps) {
@@ -133,39 +133,42 @@ export function VipLeadDisplay({
 
   const renderActionButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-sm sm:text-base py-3 sm:py-3.5 shadow-lg hover:shadow-xl active:scale-95 transition-all";
-    const disabledClasses = (isPurchasePending || !isAuthenticated) ? "opacity-70 cursor-not-allowed !scale-100" : "hover:brightness-110";
     
     let iconName = "";
     let buttonText = "";
     let specificStyling = "";
+    let isDisabled = false;
 
     if (isSpecialCard) {
-        if (isSupported) { 
+        if (isSupported) { // "Go to..." button
             iconName = isElonCard ? t.goToSimulatorIcon.replace(/::/g, '') : t.goToPdfGeneratorIcon.replace(/::/g, '');
             buttonText = isElonCard ? t.goToSimulator : t.goToPdfGenerator;
-            specificStyling = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black";
+            specificStyling = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
+            isDisabled = !isAuthenticated; // Only disable if not authenticated
             return (
-                <Button onClick={onExecuteMission} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, disabledClasses)} >
+                <Button onClick={onExecuteMission} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
                     <VibeContentRenderer content={`::${iconName}::`} className="mr-1.5 sm:mr-2" /> {buttonText}
                 </Button>
             );
-        } else { 
-            iconName = isPurchasePending ? "FaSpinner" : t.purchaseAccessIcon.replace(/::/g, '');
-            buttonText = isPurchasePending ? "" : t.purchaseAccess;
+        } else { // "Purchase Access" button
+            iconName = isProcessingThisCard ? "FaSpinner" : t.purchaseAccessIcon.replace(/::/g, '');
+            buttonText = isProcessingThisCard ? "" : t.purchaseAccess;
             const priceText = isElonCard ? ` ${parentTranslations.elonSimulatorAccessBtnText.split('за ')[1]}` : ` ${parentTranslations.pdfGeneratorAccessBtnText.split('за ')[1]}`;
-            specificStyling = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white";
+            specificStyling = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110";
+            isDisabled = isProcessingThisCard || !isAuthenticated;
              return (
-                 <Button onClick={() => onSupportMission(lead)} disabled={isPurchasePending || !isAuthenticated} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, disabledClasses)} >
-                    <VibeContentRenderer content={`::${iconName}::`} className={cn("mr-1.5 sm:mr-2", isPurchasePending && "animate-spin")} /> {buttonText} {!isPurchasePending && priceText}
+                 <Button onClick={() => onSupportMission(lead)} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
+                    <VibeContentRenderer content={`::${iconName}::`} className={cn("mr-1.5 sm:mr-2", isProcessingThisCard && "animate-spin")} /> {buttonText} {!isProcessingThisCard && priceText}
                 </Button>
             );
         }
-    } else { 
+    } else { // Regular mission leads
         iconName = isMissionUnlocked ? t.executeMissionIcon.replace(/::/g, '') : t.skillLockedIcon.replace(/::/g, '');
         buttonText = isMissionUnlocked ? t.executeMission : t.skillLocked;
         specificStyling = isMissionUnlocked ? `bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110` : "bg-muted text-muted-foreground cursor-not-allowed";
+        isDisabled = !isMissionUnlocked; // Disable if skill is locked
         return (
-            <Button onClick={onExecuteMission} disabled={!isMissionUnlocked} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling)} >
+            <Button onClick={onExecuteMission} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
                  <VibeContentRenderer content={`::${iconName}::`} className="mr-1.5 sm:mr-2" /> {buttonText}
             </Button>
         );
