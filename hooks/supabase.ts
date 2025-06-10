@@ -3,9 +3,8 @@ import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger"; 
-import type { Database } from "@/types/database.types.ts"; // Ensure .ts extension for import
+import type { Database } from "@/types/database.types.ts"; 
 
-// --- Type Aliases ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type DbCar = Database["public"]["Tables"]["cars"]["Row"];
 type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
@@ -17,9 +16,13 @@ type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
 type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
 type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
+type DbFeedback = Database["public"]["Tables"]["feedback"]["Row"];
+type DbPageVisit = Database["public"]["Tables"]["page_visits"]["Row"];
+type DbUserActivity = Database["public"]["Tables"]["user_activity"]["Row"];
+type DbCozeResponse = Database["public"]["Tables"]["coze_responses"]["Row"];
+type DbArbitrageUserSettings = Database["public"]["Tables"]["arbitrage_user_settings"]["Row"];
  
 
-// --- Supabase Client Initialization ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
@@ -47,8 +50,6 @@ export const supabaseAdmin: SupabaseClient<Database> = serviceRoleKey
     })
     : (()=>{ logger.error("Admin client creation failed due to missing service role key."); return null as any; })(); 
 
-// createAuthenticatedClient - This function is primarily for client-side use cases or specific server scenarios
-// where RLS policies require acting as a specific user via JWT, NOT for general server-side admin tasks.
 export const createAuthenticatedClient = async (userId: string): Promise<SupabaseClient<Database> | null> => {
     if (!userId) {
         logger.warn("Attempted to create authenticated client without a user ID.");
@@ -59,7 +60,7 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
         return null;
     }
     try {
-        const token = await generateJwtToken(userId); // This JWT generation is for specific auth scenarios
+        const token = await generateJwtToken(userId); 
         if (!token) {
             logger.warn(`Failed to generate JWT for user ${userId}. Cannot create authenticated client.`);
             return null;
@@ -73,8 +74,6 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
         return null;
     }
 };
-
-// --- User Management ---
 
 export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     if (!userId) {
@@ -128,10 +127,10 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
             language_code: userInfo.language_code || null,
             ...(userInfo.role && { role: userInfo.role }),
             ...(userInfo.status && { status: userInfo.status }),
-            ...(userInfo.metadata !== undefined && { metadata: userInfo.metadata }), // This handles setting metadata
+            ...(userInfo.metadata !== undefined && { metadata: userInfo.metadata }), 
             updated_at: new Date().toISOString(),
         };
-        // Remove undefined keys, except for metadata if explicitly set to null
+        
         Object.keys(userData).forEach(key => {
             const k = key as keyof typeof userData;
             if (userData[k] === undefined && k !== 'metadata') {
@@ -165,21 +164,23 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
     }
 };
 
-// **CRITICAL FIX:** This function MUST use supabaseAdmin for server-side actions.
-export const updateUserMetadata = async (
+export async function updateUserMetadata(
   userId: string,
   metadata: Record<string, any> | null 
-): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
-  if (!userId) return { success: false, error: "User ID is required." };
+): Promise<{ success: boolean; data?: DbUser; error?: string }> {
+  if (!userId) {
+    logger.error("[SupabaseHook updateUserMetadata] User ID is required.");
+    return { success: false, error: "User ID is required." };
+  }
   
-  if (!supabaseAdmin) { // Use supabaseAdmin
-    logger.error("[SupabaseHook] updateUserMetadata: Admin client unavailable.");
-    return { success: false, error: "Database admin client unavailable." };
+  if (!supabaseAdmin) {
+    logger.error("[SupabaseHook updateUserMetadata] Supabase admin client is not available.");
+    return { success: false, error: "Database admin client is not available." };
   }
 
-  debugLogger.log(`[SupabaseHook] Updating metadata for user ${userId} using supabaseAdmin. New metadata:`, metadata);
+  debugLogger.log(`[SupabaseHook updateUserMetadata] Updating metadata for user ${userId} using supabaseAdmin. New metadata:`, metadata);
   try {
-    const { data, error } = await supabaseAdmin // Use supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("users") 
       .update({ metadata: metadata, updated_at: new Date().toISOString() })
       .eq("user_id", userId) 
@@ -187,21 +188,22 @@ export const updateUserMetadata = async (
       .single();
 
     if (error) {
-      logger.error(`[SupabaseHook] Error updating metadata for user ${userId} with supabaseAdmin:`, error);
-      // No RLS errors should occur with admin client unless table policies are extremely restrictive
+      logger.error(`[SupabaseHook updateUserMetadata] Error updating metadata for user ${userId} with supabaseAdmin:`, error);
       if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
-      throw error;
+      throw error; 
     }
-    if (!data) return { success: false, error: `User ${userId} not found after metadata update attempt.` };
+    if (!data) {
+        logger.warn(`[SupabaseHook updateUserMetadata] User ${userId} not found after metadata update attempt, or update returned no data.`);
+        return { success: false, error: `User ${userId} not found after metadata update attempt.` };
+    }
 
-    debugLogger.log(`[SupabaseHook] Successfully updated metadata for user ${userId} with supabaseAdmin.`);
+    debugLogger.log(`[SupabaseHook updateUserMetadata] Successfully updated metadata for user ${userId} with supabaseAdmin.`);
     return { success: true, data };
   } catch (catchError) {
-    logger.error(`[SupabaseHook] Exception in updateUserMetadata for user ${userId} (using supabaseAdmin):`, catchError);
-    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata" };
+    logger.error(`[SupabaseHook updateUserMetadata] Exception for user ${userId} (using supabaseAdmin):`, catchError);
+    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata due to an unexpected error." };
   }
-};
-
+}
 
 const VECTOR_DIMENSIONS = 384; 
 
@@ -226,7 +228,7 @@ export async function generateCarEmbedding(
   payload?: {
     carId?: string; 
     carData?: {
-        make: string; model: string; description: string; specs: Record<string, any>; // specs is Json
+        make: string; model: string; description: string; specs: Record<string, any>; 
         owner_id?: string; daily_price?: number; image_url?: string; rent_link?: string; status?: string;
     };
   }
@@ -345,8 +347,8 @@ export async function generateCarEmbedding(
                         make: payload.carData.make, model: payload.carData.model, description: payload.carData.description,
                         specs: payload.carData.specs, owner_id: payload.carData.owner_id, daily_price: payload.carData.daily_price,
                         image_url: payload.carData.image_url, rent_link: payload.carData.rent_link,
-                        embedding, is_test_result: false, // Default as per schema
-                        status: payload.carData.status || 'available', // Default status
+                        embedding, is_test_result: false, 
+                        status: payload.carData.status || 'available', 
                  };
                  const { data: newCar, error: insertError } = await supabaseAdmin
                     .from("cars")
@@ -467,8 +469,6 @@ export const fetchArticleSections = async (articleId: string): Promise<{ success
 };
 
 export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> => {
-    // This function uses createAuthenticatedClient, which is fine if RLS policies for 'users' table
-    // allow users to update their own 'test_progress' field.
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
@@ -488,8 +488,6 @@ export const saveTestProgress = async (userId: string, progress: any): Promise<{
 };
 
 export const loadTestProgress = async (userId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
-    // This function uses createAuthenticatedClient, which is fine if RLS policies for 'users' table
-    // allow users to select their own 'test_progress' field.
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
@@ -514,7 +512,6 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
     }
 };
 
-// updateUserSubscription should use supabaseAdmin if it's a privileged operation
 export const updateUserSubscription = async (
   userId: string,
   subscriptionId: string | null 
@@ -551,14 +548,13 @@ export const updateUserSubscription = async (
     }
 };
 
-// getUserSubscription should use supabaseAdmin for consistency and to bypass RLS if needed for admin purposes
 export const getUserSubscription = async (
   userId: string
 ): Promise<{ success: boolean; data?: string | null; error?: string }> => { 
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Fetching subscription_id for user ${userId} from users table using supabaseAdmin.`);
+    debugLogger.log(`Fetching subscription_id for user ${userId} from users table.`);
     try {
         const { data: userData, error: userError } = await supabaseAdmin
             .from("users")
@@ -580,17 +576,6 @@ export const getUserSubscription = async (
         return { success: false, error: error instanceof Error ? error.message : "Failed to fetch subscription-related info" };
     }
 };
-
-// --- Invoice, Rental, Image, Question/Answer/Car, UserResult functions remain as they mostly use supabaseAdmin or supabaseAnon appropriately ---
-// ... (rest of the functions from previous context, assuming they are correct or not part of this specific fix)
-// createInvoice, updateInvoiceStatus, getInvoiceById, getUserInvoices
-// createRental, getUserRentals, updateRentalPaymentStatus
-// uploadImage (uses supabaseAdmin)
-// fetchQuestions, fetchAnswers, fetchCars, fetchCarById (use supabaseAnon, which is fine for public data)
-// saveUserResult, getUserResults (use createAuthenticatedClient - review RLS for these if they are sensitive)
-
-// --- Ensure to re-paste the rest of the functions if they were omitted for brevity ---
-// ... (The remaining functions from your original hooks/supabase.ts)
 
 export const createInvoice = async (
     type: string,
@@ -729,6 +714,12 @@ export const getUserInvoices = async (userId: string): Promise<{ success: boolea
         return { success: false, error: error instanceof Error ? error.message : "Failed to fetch user invoices" };
     }
 };
+
+export interface RentalWithCarDetails extends DbRental {
+  car_make?: string | null;
+  car_model?: string | null;
+  car_image_url?: string | null;
+}
 
 export const createRental = async (
     userId: string,
@@ -940,7 +931,6 @@ export const fetchCarById = async (id: string): Promise<{ success: boolean; data
 }
 
 export const saveUserResult = async (userId: string, carId: string): Promise<{ success: boolean; error?: string }> => {
-    // Uses createAuthenticatedClient - review RLS for user_results if needed
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
@@ -968,7 +958,6 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
 };
 
 export const getUserResults = async (userId: string): Promise<{ success: boolean; data?: DbUserResult[]; error?: string }> => {
-    // Uses createAuthenticatedClient - review RLS
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
