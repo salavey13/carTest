@@ -216,23 +216,23 @@
   }
 
   .input-cyber {
-    @apply bg-input border border-input-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+    @apply bg-input border border-input-border text-foreground placeholder-muted-foreground /* Removed /70 */ rounded-md px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
            transition-all duration-200 ease-in-out shadow-sm; 
   }
   .dark .input-cyber { 
-     @apply bg-input border-border text-foreground placeholder-muted-foreground/70 shadow-inner shadow-black/30;
+     @apply bg-input border-border text-foreground placeholder-muted-foreground /* Removed /70 */ shadow-inner shadow-black/30;
   }
   .input-cyber:disabled {
       @apply opacity-60 cursor-not-allowed bg-muted/30;
   }
   .textarea-cyber {
-      @apply bg-input border border-input-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+      @apply bg-input border border-input-border text-foreground placeholder-muted-foreground /* Removed /70 */ rounded-md px-3 py-2 text-sm min-h-[80px]
              focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
              transition-all duration-200 ease-in-out shadow-sm; 
   }
   .dark .textarea-cyber {
-      @apply bg-input border-border text-foreground placeholder-muted-foreground/70 shadow-inner shadow-black/30;
+      @apply bg-input border-border text-foreground placeholder-muted-foreground /* Removed /70 */ shadow-inner shadow-black/30;
   }
   .text-shadow-brand-lime { 
     text-shadow: 0 0 10px hsla(var(--lime-rgb), 0.7), 0 0 20px hsla(var(--lime-rgb), 0.5);
