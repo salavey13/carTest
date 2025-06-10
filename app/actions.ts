@@ -1,12 +1,11 @@
-"use server"; // Эта директива применяется ко всему файлу
+"use server"; 
 
 import {
   generateCarEmbedding, 
   supabaseAdmin, 
-  fetchUserData as dbFetchUserData,
-  createOrUpdateUser as dbCreateOrUpdateUser,
-  updateUserMetadata as dbUpdateUserMetadata,
-  uploadImage, // Assuming this one is also async or handled correctly by supabase.ts
+  fetchUserData as dbFetchUserData, 
+  updateUserMetadata as dbUpdateUserMetadata, // <--- ВОССТАНОВЛЕН АЛИАС
+  uploadImage, 
 } from "@/hooks/supabase"; 
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth"; 
@@ -20,7 +19,7 @@ import { Bucket } from '@supabase/storage-js';
 import { v4 as uuidv4 } from 'uuid'; 
 
 type User = Database["public"]["Tables"]["users"]["Row"];
-type UserSettings = User['metadata'];
+type UserSettings = User['metadata']; 
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; 
@@ -397,11 +396,25 @@ export async function createOrUpdateUser(userInfo: WebAppUser): Promise<{ succes
     if (!userInfo?.id) { return { success: false, error: "Invalid user info provided" }; }
     const userId = userInfo.id.toString();
     try {
-        const user = await dbCreateOrUpdateUser(userId, userInfo);
-        if (!user) { throw new Error("Failed to create or update user in database."); }
-        logger.info(`User ${user.username || userId} created or updated successfully.`);
-        await notifyAdmin(`User registered/updated: ${user.username || userId} (${userId})`);
-        return { success: true, data: user };
+        const user = await supabaseAdmin // Directly use supabaseAdmin
+            .from("users")
+            .upsert({ 
+                user_id: userId, 
+                username: userInfo.username || null,
+                full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
+                avatar_url: userInfo.photo_url || null,
+                language_code: userInfo.language_code || null,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' })
+            .select("*, metadata")
+            .single();
+
+        if (user.error) throw user.error;
+        if (!user.data) throw new Error("Failed to create or update user in database.");
+        
+        logger.info(`User ${user.data.username || userId} created or updated successfully.`);
+        await notifyAdmin(`User registered/updated: ${user.data.username || userId} (${userId})`);
+        return { success: true, data: user.data };
     } catch (error) {
         logger.error(`Error creating/updating user ${userId}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Failed to create or update user" };
@@ -410,8 +423,22 @@ export async function createOrUpdateUser(userInfo: WebAppUser): Promise<{ succes
 
 export async function authenticateUser(chatId: string, userInfo?: Partial<WebAppUser>): Promise<{ success: boolean; user?: User; token?: string; error?: string }> {
     try {
-        const user = await dbCreateOrUpdateUser(chatId, userInfo || { id: parseInt(chatId, 10) }); 
-        if (!user) { throw new Error("Failed to create or update user during authentication."); }
+        const { data: user, error: upsertError } = await supabaseAdmin // Directly use supabaseAdmin
+            .from("users") 
+            .upsert({ 
+                user_id: chatId, 
+                username: userInfo?.username || null,
+                full_name: `${userInfo?.first_name || ""} ${userInfo?.last_name || ""}`.trim() || null,
+                avatar_url: userInfo?.photo_url || null,
+                language_code: userInfo?.language_code || null,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' })
+            .select("*, metadata")
+            .single();
+
+        if (upsertError) throw upsertError;
+        if (!user) throw new Error("Failed to create or update user during authentication.");
+        
         const token = await generateJwtToken(chatId); 
         logger.info(`User ${chatId} authenticated successfully.`);
         return { success: true, user, token };
@@ -425,7 +452,7 @@ export async function validateToken(token: string): Promise<{ success: boolean; 
   try {
     const decoded = verifyJwtToken(token); 
     if (!decoded || !decoded.sub) { logger.warn("Token validation failed: Invalid or expired token."); return { success: false, error: "Invalid or expired token", user: null }; }
-    const user = await dbFetchUserData(decoded.sub);
+    const user = await dbFetchUserData(decoded.sub); // Uses supabaseAdmin internally
     if (!user) { logger.warn(`Token valid but user ${decoded.sub} not found in database.`); return { success: false, error: "User not found", user: null }; }
     logger.info(`Token validated successfully for user ${user.user_id}.`);
     return { success: true, user };
@@ -566,16 +593,40 @@ export async function listPublicBuckets(): Promise<{ success: boolean; data?: Bu
     }
 }
 
-export async function updateUserSettings(userId: string, newSettings: Partial<UserSettings>): Promise<{ success: boolean; error?: string }> {
+// Corrected function to merge settings properly
+export async function updateUserSettings(userId: string, partialSettingsToUpdate: Partial<UserSettings>): Promise<{ success: boolean; error?: string }> {
   if (!userId) { return { success: false, error: "User ID is required." }; }
+  if (!supabaseAdmin) { 
+    logger.error("[updateUserSettings] Supabase admin client is not available.");
+    return { success: false, error: "Database client (admin) unavailable." };
+  }
+  
   try {
-    const userData = await dbFetchUserData(userId); 
-    if (!userData) { return { success: false, error: "User not found." }; }
-    const currentMetadata = userData.metadata || {};
-    const updatedMetadata = { ...currentMetadata, ...newSettings };
-    const result = await dbUpdateUserMetadata(userId, updatedMetadata);
-    if (result.success) { logger.info(`User settings updated successfully for user ${userId}`); return { success: true }; }
-    else { logger.error(`Failed to update user settings for ${userId}: ${result.error}`); return { success: false, error: result.error || "Failed to update settings." }; }
+    // 1. Fetch current user data, including metadata
+    const currentUserData = await dbFetchUserData(userId); // This uses supabaseAdmin
+    if (!currentUserData) {
+      logger.error(`[updateUserSettings] User ${userId} not found. Cannot update settings.`);
+      return { success: false, error: "User not found." };
+    }
+    
+    const currentMetadata = currentUserData.metadata || {};
+    
+    // 2. Merge current metadata with the partial updates
+    const updatedFullMetadata: UserSettings = {
+      ...currentMetadata,
+      ...partialSettingsToUpdate 
+    };
+    
+    // 3. Update the database with the full, merged metadata object
+    const result = await dbUpdateUserMetadata(userId, updatedFullMetadata); // This uses supabaseAdmin as per previous fix
+    
+    if (result.success) { 
+        logger.info(`User settings updated successfully for user ${userId}. New metadata snapshot:`, updatedFullMetadata); 
+        return { success: true }; 
+    } else { 
+        logger.error(`Failed to update user settings for ${userId}: ${result.error}. Attempted to save:`, updatedFullMetadata); 
+        return { success: false, error: result.error || "Failed to update settings." }; 
+    }
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : "Unknown error during settings update.";
     logger.error(`Exception in updateUserSettings for ${userId}:`, e);
