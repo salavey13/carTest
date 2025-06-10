@@ -2,7 +2,7 @@
 
 import type React from "react"; 
 import { Suspense, useEffect, useRef, useCallback } from 'react';
-import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
+import { usePathname, useRouter } from 'next/navigation'; 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
@@ -15,8 +15,8 @@ import DevErrorOverlay from "@/components/DevErrorOverlay";
 import BottomNavigation from "@/components/layout/BottomNavigation";
 import { debugLogger as logger } from "@/lib/debugLogger"; 
 import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; 
-import { Analytics } from "@vercel/analytics/react"; // <--- Импорт Vercel Analytics
-import { SpeedInsights } from "@vercel/speed-insights/next"; // <--- Импорт Vercel Speed Insights
+import { Analytics } from "@vercel/analytics/react"; 
+import { SpeedInsights } from "@vercel/speed-insights/next"; 
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 
@@ -77,22 +77,44 @@ function AppInitializers() {
   return null; 
 }
 
-// This is the component that will consume context and handle routing
+// Карта для сопоставления startapp параметров с путями в приложении
+const START_PARAM_PAGE_MAP: Record<string, string> = {
+  "elon": "/elon",
+  "musk_market": "/elon", // Альтернативный ключ для той же страницы
+  "arbitrage_seeker": "/elon", // Может также вести на вкладку арбитража внутри /elon
+  "topdf_psycho": "/topdf", // Ваш рабочий пример
+  "settings": "/settings",
+  "profile": "/profile",
+  // Добавляйте другие страницы по мере необходимости
+  // "some_other_feature": "/some-other-feature-path"
+};
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { startParamPayload, isLoading: isAppLoading, isAuthenticating } = useAppContext();
 
   useEffect(() => {
-    // Wait for app context to be fully loaded and not authenticating
-    if (!isAppLoading && !isAuthenticating) {
-      if (startParamPayload && pathname === '/') {
-        // If there's a startParam (nickname) and we are on the exact root path,
-        // redirect to /<nickname_lowercase>
-        // This assumes you have a dynamic route like app/[nickname]/page.tsx
-        const targetPath = `/${startParamPayload.toLowerCase()}`;
-        logger.info(`[ClientLayout Logic] Root path ('/') detected with startParamPayload '${startParamPayload}'. Redirecting to '${targetPath}'.`);
-        router.replace(targetPath); // Use replace to avoid adding "/" to history
+    if (!isAppLoading && !isAuthenticating && startParamPayload) {
+      const lowerStartParam = startParamPayload.toLowerCase();
+      const targetPathFromMap = START_PARAM_PAGE_MAP[lowerStartParam];
+
+      if (targetPathFromMap) {
+        // Если ключ найден в карте, и мы еще не на этой странице
+        if (pathname !== targetPathFromMap) {
+          logger.info(`[ClientLayout Logic] startParamPayload '${startParamPayload}' mapped to '${targetPathFromMap}'. Redirecting from '${pathname}'.`);
+          router.replace(targetPathFromMap);
+        } else {
+          logger.info(`[ClientLayout Logic] startParamPayload '${startParamPayload}' matched, already on target path '${targetPathFromMap}'. No redirect needed.`);
+        }
+      } else if (pathname === '/') { 
+        // Если ключ не в карте, но мы на главной, используем старую логику (предполагая, что это никнейм)
+        const nicknamePath = `/${lowerStartParam}`;
+        logger.info(`[ClientLayout Logic] Root path ('/') detected with unmapped startParamPayload '${startParamPayload}'. Assuming nickname and redirecting to '${nicknamePath}'.`);
+        router.replace(nicknamePath);
+      } else {
+        // Ключ не в карте и мы не на главной - ничего не делаем
+        logger.info(`[ClientLayout Logic] startParamPayload '${startParamPayload}' not specifically mapped and not on root. No redirect for page mapping from current path '${pathname}'.`);
       }
     }
   }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating]);
@@ -104,18 +126,15 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/profile",
     "/hotvibes",
     "/leads",
-    // Add dynamic paths like /[nickname] if they should also have bottom nav
-    // This regex checks if the path is a single segment (likely a nickname)
-    // or if it's a nickname followed by / (e.g. /pavel/)
-    // Note: This simple regex might need adjustment if your nickname patterns are more complex
-    // or if you have other top-level routes that could be confused with nicknames.
+    "/elon", // Добавим /elon сюда, так как это важная страница
   ];
+  // Динамическое добавление путей типа /[nickname]
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
-    pathsToShowBottomNavForStartsWith.push(pathname); // Dynamically add nickname paths
+    pathsToShowBottomNavForStartsWith.push(pathname); 
   }
 
-  const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname ?? ''); // Handle null pathname
-  const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)); // Handle null pathname
+  const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname ?? ''); 
+  const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)); 
   
   const showBottomNav = isExactMatch || isStartsWithMatch;
   logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
@@ -136,8 +155,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 }
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
-  // The AppProvider should wrap any component that needs its context,
-  // including the LayoutLogicController which uses useAppContext.
   return (
     <ErrorOverlayProvider>
       <AppProvider> 
@@ -162,8 +179,8 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
           />
           <DevErrorOverlay />
         </TooltipProvider>
-        <Analytics /> {/* <--- Vercel Analytics */}
-        <SpeedInsights /> {/* <--- Vercel Speed Insights */}
+        <Analytics /> 
+        <SpeedInsights /> 
       </AppProvider>
     </ErrorOverlayProvider>
   );
