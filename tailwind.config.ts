@@ -47,6 +47,7 @@ const config: Config = {
           border: "hsl(var(--input-border))", // For input border
         },
         ring: "hsl(var(--ring))",
+        muted: "hsl(var(--muted))", // Added muted here for bg-muted to work generally
         
         // Brand colors referencing CSS variables
         "brand-purple": "hsl(var(--brand-purple))",
