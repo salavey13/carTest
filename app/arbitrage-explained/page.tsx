@@ -3,25 +3,54 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button"; // <--- ДОБАВЛЕН ИМПОРТ
+import { Button } from "@/components/ui/button"; // <--- ИСПРАВЛЕН ИМПОРТ
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Для вкладок
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { useAppContext } from '@/contexts/AppContext';
 import { logger } from '@/lib/logger';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox'; // Для чек-листа
-import { Label } from '@/components/ui/label';   // Для чек-листа
+import { Checkbox } from '@/components/ui/checkbox'; 
+import { Label } from '@/components/ui/label';  
 
 const pageTranslations: Record<string, Record<string, any>> = {
   ru: {
-    pageTitle: "::FaBookOpen:: Школа Арбитража: Гайд для Кибер-Волков",
+    pageTitle: "::FaGraduationCap:: Школа Арбитража: Гайд для Кибер-Волков",
     pageSubtitle: "Разбираем основы межбиржевого арбитража, логику работы сканеров и как выжать максимум профита в экосистеме oneSitePls.",
     
+    tabBasics: "::FaRocket:: Основы & Философия",
+    tabMonitoring: "::FaBoxOpen:: Механика Мониторинга",
+    tabSettingsErrors: "::FaCogs:: Настройки & Ошибки",
+    tabBundleStructure: "::FaListOl:: Структура Связки",
+    tabChecklist: "::FaTasks:: Чек-лист",
+
     realTimeSectionTitle: "::FaBolt:: Философия Реального Времени",
     realTimeSectionContent: [
-        "В отличие от многих сканеров, которые обновляют данные периодически (например, раз в минуту), наш подход — это **непрерывный поток данных**. Нет такого понятия, как \"сканирование раз в N времени\". Информация поступает и обрабатывается постоянно.",
-        "Это означает, что любая \"найденная\" связка потенциально может измениться или исчезнуть в течение миллисекунд. Скорость — это всё."
+        "В отличие от многих сканеров, которые обновляют данные периодически (например, раз в минуту), наш подход — это **непрерывный поток данных**. Информация поступает и обрабатывается постоянно.",
+        "Это означает, что любая \"найденная\" связка потенциально может измениться или исчезнуть в течение миллисекунд. Скорость — это всё в арбитраже."
     ],
+    
+    publicVsPrivateTitle: "::FaShieldAlt:: Публичный бот vs. Персональный бот",
+    publicVsPrivateIntro: "Сравним типичного публичного Telegram-бота для арбитража (сигнальный канал) с тем, что мы стремимся создать (персональный инструмент). Публичные боты часто являются воронкой продаж, предлагая бесплатные, но не всегда практически применимые сигналы.",
+    comparisonTableHeaders: ["Аспект", "Типичный Публичный Канал", "Твой Персональный Инструмент (Цель)"],
+    comparisonTableRows: [
+      ["Цель", "Привлечение массовой аудитории, лидогенерация.", "Ваш личный, приватный инструмент для извлечения прибыли."],
+      ["Расчет Спреда", "Теоретический (по тикерам). Часто вводит в заблуждение.", "Реальный (по стаканам bid/ask). Максимально точный."],
+      ["Учет Ликвидности", "Нет.", "Да, рассчитывает максимально возможный объем для сделки."],
+      ["Учет Комиссий", "Нет или используется среднее значение.", "Да, учитывает ваши личные торговые комиссии и актуальные комиссии сети."],
+      ["Скорость/Задержка", "Высокая. Сигнал приходит с опозданием.", "Минимальная. Уведомление приходит вам мгновенно."],
+      ["Конкуренция", "Максимальная. Вы конкурируете со всеми.", "Нулевая. Это ваша эксклюзивная информация."],
+      ["Гибкость Настроек", "Нет. Вы просто потребитель.", "Полная. Вы настраиваете всё."],
+      ["Итог", "Информационный шум. Для обучения или развлечения.", "Профессиональный рабочий инструмент."],
+    ],
+    publicBotProblemsTitle: "::FaLockOpen:: Ключевые Проблемы Публичных Ботов:",
+    publicBotProblems: [
+      "**Теоретический спред:** Используют last price, а не реальные цены bid/ask из стакана.",
+      "**Отсутствие учета ликвидности:** Неизвестно, какой объем можно прогнать.",
+      "**Задержка и конкуренция:** Пока сигнал дойдет, возможность упущена.",
+      "**Неучтенные издержки:** Ваши комиссии, актуальные сетевые сборы, время перевода.",
+    ],
+    ourBotGoal: "Этот симулятор и будущий бот создаются, чтобы дать тебе **конкурентное преимущество**, а не просто красивые цифры.",
 
     monitoringTitle: "::FaEye:: Мониторинг Связок: Принцип \"Сундука\"",
     monitoringIntro: "Чтобы не заваливать тебя уведомлениями каждую миллисекунду, мы используем интеллектуальную систему фильтрации и доставки уникальных возможностей, которую называем \"Сундук\".",
@@ -40,10 +69,10 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Кнопка \"Обновить Связку\" (под конкретным уведомлением):** Позволяет тебе вручную проверить АКТУАЛЬНОЕ состояние связки, которая уже есть в твоем сундуке. Если спред все еще выгоден (или стал еще лучше) – отлично! Если связка \"умерла\" (спред исчез или стал отрицательным), она **автоматически удаляется из твоего сундука**. Если позже условия снова станут выгодными, эта связка (как новая возможность) снова сможет попасть в твой сундук и ты получишь уведомление.",
       "**Функция \"Переприсылать Связку\" (настраиваемая):** Если ты активировал эту опцию (например, \"переприслать, если спред увеличился на 0.2%\"), то бот будет следить за связками в твоем \"Сундуке\". Если спред по одной из них **значительно улучшится** (превысит предыдущий зафиксированный для тебя спред на указанный тобой порог), бот пришлет тебе **обновленное уведомление** по этой же связке.",
     ],
-    monitoringWhyTitle: "::FaQuestionCircle:: Зачем такая логика?",
+    monitoringWhyTitle: "::FaCircleQuestion:: Зачем такая логика?",
     monitoringWhyText: "Скорость рынка криптовалют такова, что без такой системы ты бы получал тысячи уведомлений в минуту. \"Сундук\" и ручное обновление конкретных связок дают тебе контроль и предотвращают информационный перегруз, позволяя сосредоточиться на действительно интересных возможностях.",
     monitoringSettingsImpact: "Любое изменение твоих настроек (фильтров) **немедленно** влияет на то, какие НОВЫЕ связки из общего потока будут попадать в твой \"Сундук\". Старые связки в сундуке остаются до их ручного обновления или общей очистки сундука.",
-    monitoringDuration: "Мониторинг — это **непрерывный процесс** на выбранное тобой время. Он не останавливается после первой найденной связки. Цель — не завалить тебя количеством, а помочь найти качественные, отфильтрованные возможности. Хочешь больше связок? Смягчай фильтры. Логично!",
+    monitoringDuration: "Мониторинг — это **непрерывный процесс** на выбранное тобой время (от 1 до 6 часов) и не останавливается после нахождения первой связки. Ваша цель – не просто много связок, а хорошие, отфильтрованные связки. Хочешь больше связок? Смягчай фильтры. Логично!",
     
     errorsTitle: "::FaTriangleExclamation:: Частые Ошибки Новичков в Настройках",
     errorsIntro: "Иногда связок нет не потому, что рынок мертв или бот сломался, а из-за слишком специфичных или противоречивых настроек. Давай разберем типичные фейлы:",
@@ -65,57 +94,87 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Проблема:** Среднее время перевода BTC между биржами (с учетом подтверждений сети) — 20-60 минут. Требование 2 минуты невыполнимо для BTC.",
       "**Вердикт:** Либо выбирай более быстрые монеты/сети, либо увеличивай допустимое время перевода, либо используй стратегии без фактического перевода (например, хеджирование).",
     ],
-    errorsSolutionTitle: "::FaToolbox:: Как Избежать Фейлов?",
+    errorsSolutionTitle: "::FaTools:: Как Избежать Фейлов?",
     errorsSolutionPoints: [
       "**Начинай с Широкой Сети:** Не ставь сразу 10 фильтров. Начни с мин. спреда (например, 0.5%) и объема. Посмотри, что вообще есть на рынке.",
       "**Логика Прежде Всего:** Подумай, реалистичны ли твои ожидания. Если ты ищешь 5% спреда на BTC между Binance и Bybit с переводом за 1 минуту — это фантастика.",
       "**Изучай Инструменты:** Пойми, что означает каждая настройка. Для этого и создана эта страница!",
-      "**Кнопка \"Сбросить Настройки\":** Если совсем запутался, всегда можно вернуться к заводским установкам и начать сначала.",
+      "**Кнопка \"Сбросить Настройки\":** Если совсем запутался, всегда можно вернуться к заводским установкам и начать сначала (см. `/settings`).",
       "**Не Бойся Экспериментировать:** Это симулятор! Меняй настройки, наблюдай, как это влияет на результат. Это лучший способ обучения.",
     ],
 
-    botOverviewTitle: "::FaRobot:: Наш Бот: Краткий Обзор Возможностей",
-    botOverviewIntro: "Этот симулятор и будущий реальный бот основаны на принципах скорости, точности и гибкости.",
+    botOverviewTitle: "::FaRobot:: Наш Сканер: Краткий Обзор Возможностей",
+    botOverviewIntro: "Этот симулятор и будущий реальный бот основаны на принципах скорости, точности и гибкости для поиска арбитражных возможностей.",
     botKeyFeatures: [
-      "**Молниеносный Анализ:** Обработка данных и расчет спредов в реальном времени.",
+      "**Молниеносный Анализ:** Обработка данных и расчет спредов в реальном времени (цель для реального бота).",
       "**Гибкие Фильтры:** Настраивай всё — от мин. спреда до комиссий и времени жизни связки.",
       "**Учет Реальных Затрат:** Возможность включения комиссий бирж и сетей в расчет профита.",
       "**Умный Мониторинг:** Система \"Сундука\" и опциональная переотправка улучшенных связок.",
       "**Прозрачность Данных:** Подробная информация по каждой связке, включая объемы в стакане и детализацию комиссий (в будущем реальном боте).",
     ],
-    
-    publicVsPrivateTitle: "::FaShieldAlt:: Почему Персональный Бот Лучше Публичных Каналов?",
-    publicVsPrivateIntro: "Публичные каналы сигналов часто показывают \"красивые цифры\", но упускают ключевые детали. Твой персональный инструмент должен быть нацелен на **реальный профит**.",
-    comparisonTableHeaders: ["Аспект", "Типичный Публичный Канал", "Твой Персональный Инструмент (Цель)"],
-    comparisonTableRows: [
-      ["Расчет Спреда", "Часто по последней цене (ticker), не учитывая глубину стакана.", "По реальным ценам покупки (Ask) и продажи (Bid) из стакана ордеров."],
-      ["Ликвидность", "Не учитывается или дается общая цифра.", "Расчет доступного объема, который можно прогнать по связке с учетом твоего депозита."],
-      ["Комиссии", "Не учитываются или усредненные/минимальные.", "Учет ТВОИХ персональных торговых комиссий (мейкер/тейкер) и АКТУАЛЬНЫХ комиссий сети за перевод."],
-      ["Скорость и Задержка", "Сигнал приходит с опозданием. Возможность уже использована.", "Мгновенное уведомление ТОЛЬКО ТЕБЕ. Минимизация задержки."],
-      ["Конкуренция", "Ты конкурируешь со всеми подписчиками канала + другими ботами.", "Информация эксклюзивна для тебя."],
-      ["Гибкость", "Ты пассивный получатель информации.", "Полный контроль над настройками: биржи, пары, спреды, объемы, фильтры."],
-      ["Результат", "Часто информационный шум, упущенные возможности.", "Потенциально реальный профит, основанный на точных данных."],
+    whatInBundleTitle: "::FaBoxArchive:: Что в Связке? (Расшифровка)",
+    bundlePoints: [
+      "**Биржа и направление обмена:** (например, Gate.io: USDT → ATH).",
+      "**Ссылки:** На спотовую пару, окно вывода/ввода (в реальном боте).",
+      "**Курс:** Средний курс для вашего объема, кол-во ордеров в стакане, общий объем в этих ордерах. Если ордеров много – диапазон цен.",
+      "**Хеджирование:** Значок ::FaUmbrellaBeach:: для маржи, ссылки на фьючерсы (если доступны).",
+      "**Рейтинг CMC:** Ранг монеты и ссылка на CoinMarketCap.",
+      "**Сеть перевода:** Название сети, комиссия за вывод (в монете и USDT), доступность ввода/вывода (✅/❌).",
+      "**Контракты:** Указание на совпадение контрактов (если информация доступна).",
+      "**Время перевода:** Примерное время разлока монет (зеленый <15м, желтый 15-60м, красный >60м).",
+      "**Спред:** В % и $ по вашей рабочей сумме, с учетом комиссий (если включено).",
+      "**Время жизни связки:** Как давно бот зафиксировал положительный спред.",
+      "**Увеличение спреда:** Появляется, если включена функция переприсылки.",
     ],
-    ourBotGoal: "Этот симулятор и будущий бот создаются, чтобы дать тебе **конкурентное преимущество**, а не просто красивые цифры.",
-    externalInstructionsLink: "Полная инструкция от создателей BigBTC (внешний ресурс)",
+    externalInstructionsLink: "Подробная инструкция от создателей BigBTC (внешний ресурс)",
     
-    checklistTitle: "::FaListCheck:: Чек-лист Понимания Арбитражной Магии",
+    checklistTitle: "::FaTasks:: Чек-лист Понимания Арбитражной Магии",
     checklistItem1: "Я понимаю, что спред считается по ценам Ask (покупка) и Bid (продажа).",
     checklistItem2: "Я знаю, что комиссии (биржевые и сетевые) критически влияют на профит.",
     checklistItem3: "Я осознаю, что ликвидность в стакане определяет реальный объем сделки.",
     checklistItem4: "Я понимаю принцип \"Сундука\" и почему я не получаю одну и ту же связку постоянно.",
     checklistItem5: "Я готов(а) экспериментировать с настройками, чтобы найти свой \"золотой\" фильтр.",
-    checklistConclusion: "Отлично! Ты готов(а) к более глубокому погружению!",
+    checklistConclusion: "::FaCheckDouble:: Отлично! Ты готов(а) к более глубокому погружению и реальным тестам!",
+    backToSimulator: "::FaArrowLeft:: Назад к Симулятору Arbitrage Seeker",
   },
+  // --- English Translations ---
   en: {
-    pageTitle: "::FaBookOpen:: Arbitrage School: A Cyber Wolf's Guide",
-    pageSubtitle: "Understanding the basics of inter-exchange arbitrage, scanner logic, and how to maximize your profits within the oneSitePls ecosystem.",
+    pageTitle: "::FaGraduationCap:: Arbitrage School: A Cyber Wolf's Guide",
+    pageSubtitle: "Understanding the basics of inter-exchange arbitrage, scanner logic, and how to maximize your profits in the oneSitePls ecosystem.",
     
+    tabBasics: "::FaRocket:: Basics & Philosophy",
+    tabMonitoring: "::FaBoxOpen:: Monitoring Mechanics",
+    tabSettingsErrors: "::FaCogs:: Settings & Errors",
+    tabBundleStructure: "::FaListOl:: Bundle Structure",
+    tabChecklist: "::FaTasks:: Checklist",
+
     realTimeSectionTitle: "::FaBolt:: Real-Time Philosophy",
     realTimeSectionContent: [
-        "Unlike many scanners that update data periodically (e.g., once a minute), our approach is a **continuous data stream**. There's no such thing as \"scanning every N time units.\" Information flows and is processed constantly.",
-        "This means any \"found\" bundle can potentially change or disappear within milliseconds. Speed is everything."
+        "Unlike many scanners that update data periodically (e.g., once a minute), our approach is a **continuous data stream**. Information flows and is processed constantly.",
+        "This means any \"found\" bundle can potentially change or disappear within milliseconds. Speed is everything in arbitrage."
     ],
+    
+    publicVsPrivateTitle: "::FaShieldAlt:: Public Bot vs. Your Personal Bot",
+    publicVsPrivateIntro: "Let's compare a typical public Telegram arbitrage bot (signal channel) with what we aim to create (a personal tool). Public bots are often sales funnels, offering free but not always actionable signals.",
+    comparisonTableHeaders: ["Aspect", "Typical Public Channel", "Your Personal Tool (Target)"],
+    comparisonTableRows: [
+      ["Purpose", "Attract mass audience, lead generation.", "Your personal, private tool for profit extraction."],
+      ["Spread Calculation", "Theoretical (by tickers). Often misleading.", "Real (by order book bid/ask). Maximally accurate."],
+      ["Liquidity Accounting", "No.", "Yes, calculates max possible volume for the trade."],
+      ["Fee Accounting", "No or uses average values.", "Yes, considers your personal trading fees and current network fees."],
+      ["Speed/Delay", "High. Signal arrives late when opportunity is gone.", "Minimal. Notification arrives instantly TO YOU."],
+      ["Competition", "Maximum. You compete with everyone.", "None. This is your exclusive information."],
+      ["Settings Flexibility", "None. You are just a consumer.", "Full. You configure everything."],
+      ["Outcome", "Informational noise. For learning or entertainment.", "Professional working tool."],
+    ],
+    publicBotProblemsTitle: "::FaLockOpen:: Key Problems with Public Bots:",
+    publicBotProblems: [
+      "**Theoretical Spread:** Uses last price, not actual bid/ask from the order book.",
+      "**No Liquidity Consideration:** Unknown volume can be pushed through.",
+      "**Delay and Competition:** By the time the signal arrives, the opportunity is missed.",
+      "**Unaccounted Costs:** Your fees, current network charges, transfer times.",
+    ],
+    ourBotGoal: "This simulator and the future bot are designed to give you a **competitive edge**, not just pretty numbers.",
 
     monitoringTitle: "::FaEye:: Bundle Monitoring: The \"Chest\" Principle",
     monitoringIntro: "To avoid overwhelming you with notifications every millisecond, we use an intelligent filtering and delivery system for unique opportunities, which we call the \"Chest\".",
@@ -134,16 +193,16 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**\"Update Bundle\" Button (under a specific notification):** Allows you to manually check the CURRENT state of a bundle already in your chest. If the spread is still favorable (or even better) – great! If the bundle is \"dead\" (spread disappeared or became negative), it's **automatically removed from your chest**. If favorable conditions return later, this bundle (as a new opportunity) can re-enter your chest, and you'll get a notification.",
       "**\"Resend Bundle\" Function (configurable):** If you've enabled this option (e.g., \"resend if spread increases by 0.2%\"), the bot will monitor bundles in your \"Chest\". If the spread on one of them **significantly improves** (exceeds the previously recorded spread for you by your set threshold), the bot will send you an **updated notification** for that same bundle.",
     ],
-    monitoringWhyTitle: "::FaQuestionCircle:: Why This Logic?",
+    monitoringWhyTitle: "::FaCircleQuestion:: Why This Logic?",
     monitoringWhyText: "The speed of the crypto market is such that without this system, you'd receive thousands of notifications per minute. The \"Chest\" and manual updating of specific bundles give you control and prevent information overload, allowing you to focus on genuinely interesting opportunities.",
     monitoringSettingsImpact: "Any change to your settings (filters) **immediately** affects which NEW bundles from the general stream will enter your \"Chest\". Old bundles in the chest remain until manually updated or the chest is cleared.",
-    monitoringDuration: "Monitoring is a **continuous process** for your chosen duration. It doesn't stop after finding the first bundle. The goal is not to overwhelm you with quantity, but to help find quality, filtered opportunities. Want more bundles? Loosen your filters. Makes sense!",
+    monitoringDuration: "Monitoring is a **continuous process** for your chosen duration (1 to 6 hours) and doesn't stop after finding the first bundle. Your goal isn't just many bundles, but good, filtered ones. Want more bundles? Loosen your filters. Makes sense!",
     
     errorsTitle: "::FaTriangleExclamation:: Common Novice Mistakes in Settings",
-    errorsIntro: "Sometimes, bundles don't appear not because the market is dead or the bot is broken, but due to overly specific or contradictory settings. Let's review typical fails:",
+    errorsIntro: "Sometimes, bundles don't appear not because the market is dead or the bot is broken, but due to overly specific or contradictory settings. Let's look at typical fails:",
     errorExample1Title: "Case #1: \"Modest Deposit, Royal Appetite\"",
     errorExample1Points: [
-      "**Settings:** Deposit $150, Min. spread 2%, Withdrawal fee accounting ON.",
+      "**User Settings:** Deposit $150, Min. spread 2%, Withdrawal fee accounting ON.",
       "**Problem:** USDT withdrawal fee on ERC20 network can be $5-$20. Even at $5, that's (5/150)*100% = 3.33% of the deposit. The bot looks for ((SellPrice*(1-TakerFeeB) - BuyPrice*(1+TakerFeeA)) / (BuyPrice*(1+TakerFeeA)))*100 > 2%. But after deducting a $5 network fee, the final profit might be negative or tiny. The bot will honestly say: \"No such bundles, bro.\"",
       "**Verdict:** With a small deposit, either find networks with near-zero fees (TRC20, BEP20 for stables, or native coin networks), temporarily disable withdrawal fee accounting (but remember it!), or set a very high expected \"gross\" spread.",
     ],
@@ -153,7 +212,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Problem:** Requiring an arbitrage opportunity to exist and be profitable CONTINUOUSLY for over 16 minutes before the bot notifies you is like hunting for a unicorn. The market is too dynamic. Such bundles occur, but extremely rarely.",
       "**Verdict:** Reduce the bundle lifespan to reasonable limits (e.g., 30-120 seconds) or disable this filter initially to understand the current market situation.",
     ],
-    errorExample3Title: "Case #3: \"Bitcoin Jet Lag\"",
+     errorExample3Title: "Case #3: \"Bitcoin Jet Lag\"",
     errorExample3Points: [
         "**Settings:** BTC only, Max transfer time = 2 minutes.",
         "**Problem:** Average BTC transfer time between exchanges (including network confirmations) is 20-60 minutes. A 2-minute requirement is unfeasible for BTC.",
@@ -164,44 +223,46 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Start with a Wide Net:** Don't apply 10 filters at once. Begin with min. spread (e.g., 0.5%) and volume. See what's generally available.",
       "**Logic First:** Are your expectations realistic? If you're looking for a 5% BTC spread between Binance and Bybit with a 1-minute transfer, that's fantasy.",
       "**Study Your Tools:** Understand what each setting means. That's what this page is for!",
-      "**\"Reset Settings\" Button:** If completely confused, you can always revert to factory defaults and start over.",
+      "**\"Reset Settings\" Button:** If completely confused, you can always revert to factory defaults and start over (see `/settings`).",
       "**Don't Be Afraid to Experiment:** This is a simulator! Change settings, observe the impact. It's the best way to learn.",
     ],
 
-    botOverviewTitle: "::FaRobot:: Our Bot: A Brief Overview of Capabilities",
-    botOverviewIntro: "This simulator and the future real bot are built on principles of speed, accuracy, and flexibility.",
+    botOverviewTitle: "::FaRobot:: Our Scanner: A Brief Overview of Capabilities",
+    botOverviewIntro: "This simulator and the future real bot are built on principles of speed, accuracy, and flexibility for finding arbitrage opportunities.",
     botKeyFeatures: [
-      "**Lightning-Fast Analysis:** Real-time data processing and spread calculation.",
+      "**Lightning-Fast Analysis:** Real-time data processing and spread calculation (goal for the real bot).",
       "**Flexible Filters:** Customize everything—from min. spread to fees and bundle lifespan.",
       "**Real Cost Accounting:** Option to include exchange and network fees in profit calculations.",
       "**Smart Monitoring:** The \"Chest\" system and optional resending of improved bundles.",
       "**Data Transparency:** Detailed information for each bundle, including order book volumes and fee breakdowns (in the future real bot).",
     ],
-    
-    publicVsPrivateTitle: "::FaShieldAlt:: Why a Personal Bot is Better Than Public Channels",
-    publicVsPrivateIntro: "Public signal channels often show \"pretty numbers\" but miss key details. Your personal tool should aim for **real profit**.",
-    comparisonTableHeaders: ["Aspect", "Typical Public Channel", "Your Personal Tool (Goal)"],
-    comparisonTableRows: [
-      ["Spread Calculation", "Often last price (ticker), ignoring order book depth.", "Based on real buy (Ask) and sell (Bid) prices from the order book."],
-      ["Liquidity", "Not considered or a general figure is given.", "Calculation of available volume that can be pushed through the bundle based on your deposit."],
-      ["Commissions", "Not considered or averaged/minimal.", "Accounts for YOUR personal trading fees (maker/taker) and CURRENT network transfer fees."],
-      ["Speed & Delay", "Signal arrives late. Opportunity is already gone.", "Instant notification ONLY TO YOU. Minimized delay."],
-      ["Competition", "You compete with all channel subscribers + other bots.", "Information is exclusive to you."],
-      ["Flexibility", "You are a passive recipient of information.", "Full control over settings: exchanges, pairs, spreads, volumes, filters."],
-      ["Outcome", "Often informational noise, missed opportunities.", "Potentially real profit based on accurate data."],
+    whatInBundleTitle: "::FaBoxArchive:: What's in a Bundle? (Decryption)",
+    bundlePoints: [
+      "**Exchange & Direction:** (e.g., Gate.io: USDT → ATH).",
+      "**Links:** To spot pair, withdrawal/deposit window (in real bot).",
+      "**Rate:** Average rate for your volume, no. of orders in book, total volume in these orders. If many orders – price range.",
+      "**Hedging:** ::FaUmbrellaBeach:: icon for margin, links to futures (if available).",
+      "**CMC Rank:** Coin rank & link to CoinMarketCap.",
+      "**Transfer Network:** Network name, withdrawal fee (coin & USDT), deposit/withdrawal availability (✅/❌).",
+      "**Contracts:** Indication of matching contracts (if info available).",
+      "**Transfer Time:** Approx. coin unlock time (green <15m, yellow 15-60m, red >60m).",
+      "**Spread:** In % and $ for your working amount, considering fees (if enabled).",
+      "**Bundle Lifespan:** How long ago the bot detected a positive spread.",
+      "**Spread Increase:** Appears if resend function is active.",
     ],
-    ourBotGoal: "This simulator and the future bot are designed to give you a **competitive edge**, not just pretty numbers.",
     externalInstructionsLink: "Detailed Instructions from BigBTC creators (external resource)",
-
-    checklistTitle: "::FaListCheck:: Arbitrage Magic Comprehension Checklist",
+    
+    checklistTitle: "::FaTasks:: Arbitrage Magic Comprehension Checklist",
     checklistItem1: "I understand that spread is calculated using Ask (buy) and Bid (sell) prices.",
     checklistItem2: "I know that fees (exchange & network) critically impact profit.",
     checklistItem3: "I realize that order book liquidity determines the real trade volume.",
     checklistItem4: "I understand the \"Chest\" principle and why I don't get the same bundle repeatedly.",
     checklistItem5: "I am ready to experiment with settings to find my \"golden\" filter.",
-    checklistConclusion: "Excellent! You're ready for a deeper dive!",
+    checklistConclusion: "::FaCheckDouble:: Excellent! You're ready for a deeper dive and real tests!",
+    backToSimulator: "::FaArrowLeft:: Back to Arbitrage Seeker Simulator",
   }
 };
+
 
 export default function ArbitrageExplainedPage() {
   const { user: tgUser } = useAppContext();
@@ -227,19 +288,19 @@ export default function ArbitrageExplainedPage() {
 
   const t = useMemo(() => pageTranslations[currentLang] || pageTranslations['ru'], [currentLang]);
 
-  const renderSection = (titleKey: string, contentKey: string | string[], icon?: string, listType: 'ul' | 'ol' = 'ul') => (
+  const renderSection = (titleKey: string, contentKey: string | string[], icon?: string, listType: 'ul' | 'ol' = 'ul', contentClassName: string = "text-gray-300/90 leading-relaxed text-sm") => (
     <div className="mb-6 p-3 md:p-4 bg-gray-800/50 border border-gray-700/30 rounded-lg shadow-md">
       <h3 className="text-lg md:text-xl font-semibold text-brand-cyan mb-2 flex items-center">
         {icon && <VibeContentRenderer content={`${icon} mr-2`} />}
         {t[titleKey]}
       </h3>
       {typeof contentKey === 'string' ? (
-        <VibeContentRenderer content={t[contentKey]} className="text-gray-300/90 leading-relaxed text-sm" />
+        <VibeContentRenderer content={t[contentKey]} className={contentClassName} />
       ) : (
-        React.createElement(listType, { className: `list-${listType === 'ul' ? 'disc' : 'decimal'} list-outside pl-4 space-y-1 text-gray-300/90 leading-relaxed text-sm` }, 
-          contentKey.map((pointKey, index) => (
+        React.createElement(listType, { className: `list-${listType === 'ul' ? 'disc' : 'decimal'} list-outside pl-4 space-y-1 ${contentClassName}` }, 
+          contentKey.map((pointKeyOrString, index) => (
             <li key={index} className="pl-1">
-                <VibeContentRenderer content={t[pointKey]} />
+                <VibeContentRenderer content={typeof pointKeyOrString === 'string' && t[pointKeyOrString] ? t[pointKeyOrString] : pointKeyOrString} />
             </li>
             ))
         )
@@ -252,13 +313,13 @@ export default function ArbitrageExplainedPage() {
         <table className="min-w-full divide-y divide-gray-700 bg-gray-800/40 rounded-lg shadow-md">
             <thead className="bg-gray-700/60">
                 <tr>
-                    {t.comparisonTableHeaders.map((header: string, index: number) => (
+                    {(t.comparisonTableHeaders as string[]).map((header: string, index: number) => (
                         <th key={index} scope="col" className="px-3 py-2.5 text-left text-xs font-orbitron font-medium text-brand-lime uppercase tracking-wider">{header}</th>
                     ))}
                 </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/50">
-                {t.comparisonTableRows.map((row: string[], rowIndex: number) => (
+                {(t.comparisonTableRows as string[][]).map((row: string[], rowIndex: number) => (
                     <tr key={rowIndex} className="hover:bg-gray-700/30 transition-colors">
                         {row.map((cell, cellIndex) => (
                             <td key={cellIndex} className={`px-3 py-2.5 ${cellIndex === 0 ? 'font-semibold text-gray-100' : 'text-gray-300'}`}>{cell}</td>
@@ -279,98 +340,86 @@ export default function ArbitrageExplainedPage() {
             {t.pageSubtitle}
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-4 md:p-6 space-y-10">
-          
-          <Accordion type="multiple" className="w-full space-y-3">
-            {renderSection("realTimeSectionTitle", "realTimeSectionContent", "::FaBolt::")}
+        <CardContent className="p-4 md:p-6 ">
+          <Tabs defaultValue="basics" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 bg-black/50 p-1 h-auto mb-6">
+              <TabsTrigger value="basics" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaRocket:: {t.tabBasics}"/></TabsTrigger>
+              <TabsTrigger value="monitoring" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaBoxOpen:: {t.tabMonitoring}"/></TabsTrigger>
+              <TabsTrigger value="settings_errors" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaCogs:: {t.tabSettingsErrors}"/></TabsTrigger>
+              <TabsTrigger value="bundle_structure" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaListOl:: {t.tabBundleStructure}"/></TabsTrigger>
+              <TabsTrigger value="checklist" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-brand-blue/80 data-[state=active]:text-white font-orbitron"><VibeContentRenderer content="::FaTasks:: {t.tabChecklist}"/></TabsTrigger>
+            </TabsList>
 
-            <AccordionItem value="monitoring" className="border-brand-cyan/30 rounded-lg overflow-hidden bg-gray-800/20">
-              <AccordionTrigger className="hover:no-underline text-lg md:text-xl font-semibold text-brand-cyan hover:text-cyan-300 py-3 px-4 data-[state=open]:bg-brand-cyan/10">
-                <VibeContentRenderer content={`${t.monitoringTitle} mr-2`} />
-              </AccordionTrigger>
-              <AccordionContent className="pt-2 pb-4 px-4 text-sm bg-black/20">
-                <VibeContentRenderer content={t.monitoringIntro} className="mb-4 text-gray-300" />
+            <TabsContent value="basics" className="space-y-6">
+              {renderSection("realTimeSectionTitle", "realTimeSectionContent", "::FaBolt::")}
+              {renderSection("publicVsPrivateTitle", "publicVsPrivateIntro", "::FaShieldAlt::")}
+              {renderComparisonTable()}
+              {renderSection("publicBotProblemsTitle", "publicBotProblems", "::FaLockOpen::", "ul", "text-red-400/90 leading-relaxed text-sm")}
+              <VibeContentRenderer content={`**${t.ourBotGoal}**`} className="block mt-4 font-semibold text-brand-lime text-center" />
+            </TabsContent>
+
+            <TabsContent value="monitoring" className="space-y-6">
+                <VibeContentRenderer content={t.monitoringIntro} className="mb-4 text-gray-300 text-sm" />
                 {renderSection("monitoringChestTitle", "monitoringChestPoints", "::FaBoxOpen::")}
                 {renderSection("monitoringActionsTitle", "monitoringActionsPoints", "::FaHandPointer::")}
                 {renderSection("monitoringWhyTitle", "monitoringWhyText", "::FaCircleQuestion::")}
                 <VibeContentRenderer content={`**${t.monitoringSettingsImpact}**`} className="block mt-4 font-semibold text-brand-lime" />
                 <VibeContentRenderer content={t.monitoringDuration} className="block mt-2 text-gray-400 italic" />
-              </AccordionContent>
-            </AccordionItem>
+            </TabsContent>
 
-            <AccordionItem value="errors" className="border-brand-red/30 rounded-lg overflow-hidden bg-gray-800/20">
-              <AccordionTrigger className="hover:no-underline text-lg md:text-xl font-semibold text-brand-red hover:text-red-400 py-3 px-4 data-[state=open]:bg-brand-red/10">
-                <VibeContentRenderer content={`${t.errorsTitle} mr-2`} />
-              </AccordionTrigger>
-              <AccordionContent className="pt-2 pb-4 px-4 text-sm bg-black/20">
-                <VibeContentRenderer content={t.errorsIntro} className="mb-4 text-gray-300" />
+            <TabsContent value="settings_errors" className="space-y-6">
+                <VibeContentRenderer content={t.errorsIntro} className="mb-4 text-gray-300 text-sm" />
                 {renderSection("errorExample1Title", "errorExample1Points")}
                 {renderSection("errorExample2Title", "errorExample2Points")}
                 {renderSection("errorExample3Title", "errorExample3Points")}
                 {renderSection("errorsSolutionTitle", "errorsSolutionPoints", "::FaTools::")}
-              </AccordionContent>
-            </AccordionItem>
+            </TabsContent>
 
-            <AccordionItem value="overview" className="border-brand-green/30 rounded-lg overflow-hidden bg-gray-800/20">
-              <AccordionTrigger className="hover:no-underline text-lg md:text-xl font-semibold text-brand-green hover:text-green-400 py-3 px-4 data-[state=open]:bg-brand-green/10">
-                 <VibeContentRenderer content={`${t.botOverviewTitle} mr-2`} />
-              </AccordionTrigger>
-              <AccordionContent className="pt-2 pb-4 px-4 text-sm bg-black/20">
-                <VibeContentRenderer content={t.botOverviewIntro} className="mb-4 text-gray-300" />
+            <TabsContent value="bundle_structure" className="space-y-6">
+                {renderSection("botOverviewTitle", "botOverviewIntro", "::FaRobot::")}
                 {renderSection("", "botKeyFeatures", undefined, "ul")}
                 <div className="mt-6">
                     <h3 className="text-lg font-semibold text-brand-lime mb-2 flex items-center">
-                        <VibeContentRenderer content="::FaBoxArchive className='mr-2'::" />
+                        <VibeContentRenderer content="::FaBoxArchive::" className="mr-2"/>
                         {t.whatInBundleTitle}
                     </h3>
-                    <ul className="list-disc list-outside pl-5 space-y-1 text-gray-300 leading-relaxed">
-                        {t.bundlePoints.map((pointKey: string, index: number) => <li key={index} className="pl-1"><VibeContentRenderer content={t[pointKey]}/></li>)}
+                    <ul className="list-disc list-outside pl-5 space-y-1 text-gray-300/90 leading-relaxed text-sm">
+                        {(t.bundlePoints as string[]).map((pointKey: string, index: number) => <li key={index} className="pl-1"><VibeContentRenderer content={t[pointKey] || pointKey}/></li>)}
                     </ul>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
+            </TabsContent>
             
-            <AccordionItem value="comparison" className="border-brand-yellow/30 rounded-lg overflow-hidden bg-gray-800/20">
-              <AccordionTrigger className="hover:no-underline text-lg md:text-xl font-semibold text-brand-yellow hover:text-yellow-300 py-3 px-4 data-[state=open]:bg-brand-yellow/10">
-                 <VibeContentRenderer content={`${t.publicVsPrivateTitle} mr-2`} />
-              </AccordionTrigger>
-              <AccordionContent className="pt-2 pb-4 px-4 text-sm bg-black/20">
-                <VibeContentRenderer content={t.publicVsPrivateIntro} className="mb-4 text-gray-300" />
-                {renderComparisonTable()}
-                {renderSection("publicBotProblemsTitle", "publicBotProblems", "::FaLock::")}
-                <VibeContentRenderer content={`**${t.ourBotGoal}**`} className="block mt-4 font-semibold text-brand-lime" />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          <div className="mt-10 p-4 md:p-6 bg-gray-800/40 border border-brand-purple/30 rounded-xl shadow-lg">
-            <h2 className="text-xl md:text-2xl font-semibold text-brand-purple mb-4 text-center">
-                <VibeContentRenderer content={t.checklistTitle} />
-            </h2>
-            <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={`check-${i+1}`} className="flex items-center space-x-3 p-2 bg-black/30 rounded-md border border-gray-700/50">
-                        <Checkbox 
-                            id={`checkItem${i+1}`} 
-                            checked={checklist[`item${i+1}` as keyof typeof checklist]} 
-                            onCheckedChange={() => handleChecklistChange(`item${i+1}` as keyof typeof checklist)}
-                            className="border-brand-purple data-[state=checked]:bg-brand-purple data-[state=checked]:text-black"
-                        />
-                        <Label htmlFor={`checkItem${i+1}`} className="text-sm text-gray-300 cursor-pointer flex-1">
-                           <VibeContentRenderer content={t[`checklistItem${i+1}`]} />
-                        </Label>
+            <TabsContent value="checklist" className="space-y-6">
+                <div className="mt-6 p-4 md:p-6 bg-gray-800/40 border border-brand-purple/30 rounded-xl shadow-lg">
+                    <h2 className="text-xl md:text-2xl font-semibold text-brand-purple mb-4 text-center">
+                        <VibeContentRenderer content={t.checklistTitle} />
+                    </h2>
+                    <div className="space-y-3">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={`check-${i+1}`} className="flex items-center space-x-3 p-2.5 bg-black/30 rounded-md border border-gray-700/50 hover:border-purple-500/50 transition-colors">
+                                <Checkbox 
+                                    id={`checkItem${i+1}`} 
+                                    checked={checklist[`item${i+1}` as keyof typeof checklist]} 
+                                    onCheckedChange={() => handleChecklistChange(`item${i+1}` as keyof typeof checklist)}
+                                    className="border-brand-purple data-[state=checked]:bg-brand-purple data-[state=checked]:text-black"
+                                />
+                                <Label htmlFor={`checkItem${i+1}`} className="text-sm text-gray-200 cursor-pointer flex-1">
+                                   <VibeContentRenderer content={t[`checklistItem${i+1}`]} />
+                                </Label>
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
-            {allChecked && (
-                <motion.p 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 text-center font-semibold text-brand-green text-lg">
-                    <VibeContentRenderer content="::FaCheckDouble:: {t.checklistConclusion}" />
-                </motion.p>
-            )}
-          </div>
+                    {allChecked && (
+                        <motion.p 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-5 text-center font-semibold text-brand-green text-lg">
+                            <VibeContentRenderer content={t.checklistConclusion} />
+                        </motion.p>
+                    )}
+                </div>
+            </TabsContent>
+          </Tabs>
 
           <div className="mt-10 text-center">
             <Button asChild className="bg-brand-blue hover:bg-blue-500 text-white font-semibold">
@@ -383,7 +432,7 @@ export default function ArbitrageExplainedPage() {
            <div className="mt-12 text-center">
              <Link href="/elon#arbitrage_seeker" className="block" scroll={false}>
                 <Button variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/10 hover:text-white">
-                   <VibeContentRenderer content="::FaArrowLeft className='mr-2':: Назад к Симулятору Arbitrage Seeker"/>
+                   <VibeContentRenderer content="::FaArrowLeft className='mr-2':: {t.backToSimulator}"/>
                 </Button>
             </Link>
           </div>
