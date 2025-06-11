@@ -50,9 +50,9 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                 return;
             }
             setUploadedFile(file);
-            setNewImageUrlInput(""); 
-            setUploadedUrl(null); 
-            handleUpload(file); 
+            setNewImageUrlInput("");
+            setUploadedUrl(null);
+            handleUpload(file);
         }
     };
 
@@ -63,12 +63,12 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         toast.info(`Загрузка ${file.type.startsWith("video/") ? 'видео' : 'картинки'}...`);
 
         const formData = new FormData();
-        const bucketName = "about"; 
+        const bucketName = "about";
         formData.append("bucketName", bucketName);
-        formData.append("files", file); 
+        formData.append("files", file);
 
         try {
-            const result = await uploadBatchImages(formData); 
+            const result = await uploadBatchImages(formData);
 
             if (result.success && result.data && result.data.length > 0 && result.data[0].url) {
                 const uploadedUrlResult = result.data[0].url;
@@ -81,7 +81,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         } catch (error) {
             console.error("Upload failed:", error);
             toast.error(error instanceof Error ? error.message : "Ошибка загрузки.");
-            setUploadedFile(null); 
+            setUploadedFile(null);
         } finally {
             setIsUploading(false);
         }
@@ -115,10 +115,11 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
             <div className="flex items-center gap-2">
                 <Button
                     variant="outline"
-                    size="icon"
+                    // size="icon" // Убрали size="icon", чтобы кнопка не была строго квадратной
                     asChild
                     disabled={isUploading}
-                    className={`h-8 w-8 flex-shrink-0 ${uploadedFile ? 'border-green-500 hover:bg-green-600/20' : 'border-gray-500 hover:bg-gray-600/20'}`}
+                    // Изменили w-8 на px-3 для небольшой горизонтальной подбивки, сохраняя h-8 для высоты
+                    className={`h-8 px-3 flex-shrink-0 ${uploadedFile ? 'border-green-500 hover:bg-green-600/20' : 'border-gray-500 hover:bg-gray-600/20'}`}
                 >
                     <label
                         htmlFor="image-upload-input-tool"
@@ -145,6 +146,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                         setUploadedUrl(null);
                     }}
                     placeholder="Вставьте новый URL..."
+                    // Класс flex-grow здесь уже есть и это правильно, он заполнит оставшееся пространство
                     className="flex-grow p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 text-white"
                     disabled={isUploading || !!uploadedFile}
                 />
@@ -165,7 +167,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     onClick={handleConfirm}
                     disabled={!canConfirm}
                     size="sm"
-                    className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center" 
+                    className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center"
                 >
                      <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
                      <span>Заменить</span>
