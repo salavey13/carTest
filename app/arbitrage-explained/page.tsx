@@ -1,3 +1,4 @@
+// /app/arbitrage-explained/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -418,7 +419,7 @@ export default function ArbitrageExplainedPage() {
             <TabsContent value="basics" className="space-y-6">
               {renderSection("realTimeSectionTitle", "realTimeSectionContent", "::FaBolt::")}
               {renderSection("whySpeedMattersTitle", "whySpeedMattersContent", "::FaGaugeHigh::")} {/* Заменена иконка */}
-              <ImagePlaceholder placeholderUrl="/placeholders/arbitrage_flow_diagram.png" altTextKey={currentLang === 'ru' ? "altRealtimeFlowRu" : "altRealtimeFlowEn" } currentLang={currentLang} />
+              <ImagePlaceholder placeholderUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250611_055100-56c1e2b0-8f3f-430b-bd1e-84c1a76cb7e2.jpg" altTextKey={currentLang === 'ru' ? "altRealtimeFlowRu" : "altRealtimeFlowEn" } currentLang={currentLang} />
               {renderSection("publicVsPrivateTitle", "publicVsPrivateIntro", "::FaShieldHalved::")}
               {renderComparisonTable()}
               {renderSection("publicBotProblemsTitle", "publicBotProblems", "::FaLockOpen::", "ul", "text-destructive dark:text-red-400/90 leading-relaxed text-sm")}
@@ -428,7 +429,7 @@ export default function ArbitrageExplainedPage() {
             <TabsContent value="monitoring" className="space-y-6">
                 <VibeContentRenderer content={t.monitoringIntro} className="mb-4 text-foreground/90 dark:text-gray-300 text-sm" />
                 {renderSection("monitoringChestTitle", "monitoringChestPoints", "::FaBoxOpen::")}
-                <ImagePlaceholder placeholderUrl="/placeholders/arbitrage_chest_diagram.png" altTextKey={currentLang === 'ru' ? "altChestMechanismRu" : "altChestMechanismEn"} currentLang={currentLang} />
+                <ImagePlaceholder placeholderUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250611_054636-88c1bf8f-afc4-47a3-92e0-4e46a042579a.jpg" altTextKey={currentLang === 'ru' ? "altChestMechanismRu" : "altChestMechanismEn"} currentLang={currentLang} />
                 {renderSection("monitoringActionsTitle", "monitoringActionsPoints", "::FaHandPointer::")}
                 {renderSection("monitoringWhyTitle", "monitoringWhyText", "::FaCircleQuestion::")}
                 <VibeContentRenderer content={`**${t.monitoringSettingsImpact}**`} className="block mt-4 font-semibold text-brand-lime" />
@@ -455,7 +456,7 @@ export default function ArbitrageExplainedPage() {
                         </AccordionItem>
                     ))}
                 </Accordion>
-                <ImagePlaceholder placeholderUrl="/placeholders/arbitrage_settings_effect_diagram.png" altTextKey={currentLang === 'ru' ? "altSettingsImpactRu" : "altSettingsImpactEn"} currentLang={currentLang} />
+                <ImagePlaceholder placeholderUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250611_055248-e7ca4b1a-fe4e-4afe-a248-80fa53d21857.jpg" altTextKey={currentLang === 'ru' ? "altSettingsImpactRu" : "altSettingsImpactEn"} currentLang={currentLang} />
                 {renderSection("errorsSolutionTitle", "errorsSolutionPoints", "::FaTools::")}
             </TabsContent>
 
