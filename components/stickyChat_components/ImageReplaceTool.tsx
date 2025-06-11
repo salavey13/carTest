@@ -115,11 +115,11 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
             <div className="flex items-center gap-2">
                 <Button
                     variant="outline"
-                    // size="icon" // Убрали size="icon", чтобы кнопка не была строго квадратной
+                    size="icon" // Возвращаем size="icon"
                     asChild
                     disabled={isUploading}
-                    // Изменили w-8 на px-3 для небольшой горизонтальной подбивки, сохраняя h-8 для высоты
-                    className={`h-8 px-3 flex-shrink-0 ${uploadedFile ? 'border-green-500 hover:bg-green-600/20' : 'border-gray-500 hover:bg-gray-600/20'}`}
+                    // Возвращаем w-8 для квадратной кнопки, h-8 уже был и соответствует полю ввода
+                    className={`h-8 w-8 flex-shrink-0 ${uploadedFile ? 'border-green-500 hover:bg-green-600/20' : 'border-gray-500 hover:bg-gray-600/20'}`}
                 >
                     <label
                         htmlFor="image-upload-input-tool"
@@ -146,7 +146,6 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                         setUploadedUrl(null);
                     }}
                     placeholder="Вставьте новый URL..."
-                    // Класс flex-grow здесь уже есть и это правильно, он заполнит оставшееся пространство
                     className="flex-grow p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 text-white"
                     disabled={isUploading || !!uploadedFile}
                 />
