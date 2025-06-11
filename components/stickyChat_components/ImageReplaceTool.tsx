@@ -112,46 +112,62 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                 title={oldImageUrl}
             />
             <p className="text-xs text-gray-300">Новым изображением/видео (до {MAX_VIDEO_SIZE_MB}MB для видео):</p>
-            <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="icon" // Возвращаем size="icon"
-                    asChild
-                    disabled={isUploading}
-                    // Возвращаем w-8 для квадратной кнопки, h-8 уже был и соответствует полю ввода
-                    className={`h-8 w-8 flex-shrink-0 ${uploadedFile ? 'border-green-500 hover:bg-green-600/20' : 'border-gray-500 hover:bg-gray-600/20'}`}
+
+            {/* Блок загрузки файла */}
+            <Button
+                variant="outline"
+                asChild
+                disabled={isUploading}
+                className={`w-full h-10 text-sm flex items-center justify-center gap-x-2 ${
+                    uploadedFile
+                        ? 'border-green-500 hover:bg-green-600/20 text-green-300'
+                        : 'border-gray-500 hover:bg-gray-600/20 text-gray-300'
+                } ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+                <label
+                    htmlFor="image-upload-input-tool"
+                    // Добавляем классы для курсора и полного заполнения, если не загружается
+                    className={`flex items-center justify-center w-full h-full ${isUploading ? '' : 'cursor-pointer'}`}
                 >
-                    <label
-                        htmlFor="image-upload-input-tool"
-                        className={`cursor-pointer flex items-center justify-center w-full h-full ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        <VibeContentRenderer content={uploadedFile ? "::FaCircleCheck className='text-green-400 text-sm'::" : "::FaUpload className='text-gray-300 text-sm'::"} />
-                    </label>
-                </Button>
-                <input
-                    id="image-upload-input-tool"
-                    type="file"
-                    accept="image/*,video/mp4"
-                    onChange={handleFileChange}
-                    className="hidden"
-                    disabled={isUploading}
-                />
-                <span className="text-xs text-gray-400">или</span>
-                <Input
-                    type="url"
-                    value={newImageUrlInput}
-                    onChange={(e) => {
-                        setNewImageUrlInput(e.target.value);
-                        setUploadedFile(null);
-                        setUploadedUrl(null);
-                    }}
-                    placeholder="Вставьте новый URL..."
-                    className="flex-grow p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 text-white"
-                    disabled={isUploading || !!uploadedFile}
-                />
+                    <VibeContentRenderer content={uploadedFile ? "::FaCircleCheck className='text-green-400'::" : "::FaUpload className='text-gray-300'::"} />
+                    <span className="truncate max-w-[calc(100%-40px)] ml-2"> {/* Ограничиваем ширину текста имени файла */}
+                        {uploadedFile ? `${uploadedFile.name}` : "Загрузить с устройства"}
+                    </span>
+                </label>
+            </Button>
+            <input
+                id="image-upload-input-tool"
+                type="file"
+                accept="image/*,video/mp4"
+                onChange={handleFileChange}
+                className="hidden"
+                disabled={isUploading}
+            />
+
+            {/* Разделитель "или" */}
+            <div className="flex items-center">
+                <div className="flex-grow border-t border-gray-600"></div>
+                <span className="flex-shrink mx-2 text-xs text-gray-400">или</span>
+                <div className="flex-grow border-t border-gray-600"></div>
             </div>
-             {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center"><VibeContentRenderer content="::FaSpinner className='animate-spin inline mr-1'::" />Загрузка файла...</p>}
-             {uploadedUrl && <p className="text-xs text-green-400 break-all">Загружен: <span title={uploadedUrl}>{uploadedUrl.substring(0, 40)}...</span></p>}
+
+            {/* Поле ввода URL */}
+            <Input
+                type="url"
+                value={newImageUrlInput}
+                onChange={(e) => {
+                    setNewImageUrlInput(e.target.value);
+                    setUploadedFile(null);
+                    setUploadedUrl(null);
+                }}
+                placeholder="Вставьте URL изображения/видео..."
+                className="w-full p-1.5 text-xs h-10 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 text-white"
+                disabled={isUploading || !!uploadedFile} // Блокируем, если есть загруженный файл или идет загрузка
+            />
+
+            {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center"><VibeContentRenderer content="::FaSpinner className='animate-spin inline mr-1'::" />Загрузка файла...</p>}
+            {uploadedUrl && !newImageUrlInput && <p className="text-xs text-green-400 break-all">Загружен: <span title={uploadedUrl}>{uploadedUrl.substring(0, 40)}{uploadedUrl.length > 40 ? '...' : ''}</span></p>}
+
             <div className="flex justify-end gap-2 mt-2">
                 <Button
                     onClick={onCancel}
@@ -168,8 +184,8 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     size="sm"
                     className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center"
                 >
-                     <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
-                     <span>Заменить</span>
+                    <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
+                    <span>Заменить</span>
                 </Button>
             </div>
         </motion.div>
