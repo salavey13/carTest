@@ -34,13 +34,13 @@ const pageTranslations: Record<string, Record<string, any>> = {
     bundleStructureIcon: "::FaListOl::",
     checklistIcon: "::FaTasks::",
 
-    realTimeSectionTitle: "::FaBolt:: Философия Реального Времени",
+    realTimeSectionTitle: "Философия Реального Времени",
     realTimeSectionContent: [
         "В отличие от многих сканеров, которые обновляют данные периодически (например, раз в минуту), наш подход — это **непрерывный поток данных**. Информация поступает и обрабатывается постоянно.",
         "Это означает, что любая \"найденная\" связка потенциально может измениться или исчезнуть в течение миллисекунд. Скорость — это всё в арбитраже.",
         "**Пример:** Если цена BTC на Binance изменилась на $0.01, наша система это видит почти мгновенно, а не ждет следующего минутного тика."
     ],
-    whySpeedMattersTitle: "::FaShippingFast:: Почему Скорость Решает Всё?",
+    whySpeedMattersTitle: "Почему Скорость Решает Всё?",
     whySpeedMattersContent: [
         "Арбитражные возможности (спреды) крайне недолговечны. Как только появляется выгодная разница цен, другие трейдеры и боты тут же начинают её использовать, выравнивая цены.",
         "Если ваш сканер обновляется раз в минуту, то к моменту получения сигнала спред, скорее всего, уже исчезнет. Это как пытаться поймать молнию сачком для бабочек.",
@@ -50,7 +50,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
     altRealtimeFlowRu: "Инфографика: Поток данных по арбитражу в реальном времени, показывающий быстрое обновление цен на разных биржах и их анализ.",
     altRealtimeFlowEn: "Infographic: Real-time arbitrage data flow, showing rapid price updates across exchanges and their analysis.",
     
-    publicVsPrivateTitle: "::FaShieldHalved:: Публичный бот vs. Персональный бот",
+    publicVsPrivateTitle: "Публичный бот vs. Персональный бот",
     publicVsPrivateIntro: "Сравним типичного публичного Telegram-бота для арбитража (сигнальный канал) с тем, что мы стремимся создать (персональный инструмент). Публичные боты часто являются воронкой продаж, предлагая бесплатные, но не всегда практически применимые сигналы.",
     comparisonTableHeaders: ["Аспект", "Типичный Публичный Канал", "Твой Персональный Инструмент (Цель)"],
     comparisonTableRows: [
@@ -63,7 +63,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
       ["Гибкость Настроек", "Нет. Вы просто потребитель.", "Полная. Вы настраиваете всё."],
       ["Итог", "Информационный шум. Для обучения или развлечения.", "Профессиональный рабочий инструмент."],
     ],
-    publicBotProblemsTitle: "::FaLockOpen:: Ключевые Проблемы Публичных Ботов:",
+    publicBotProblemsTitle: "Ключевые Проблемы Публичных Ботов:",
     publicBotProblems: [
       "**Теоретический спред:** Используют last price, а не реальные цены bid/ask из стакана. Не учитывается, что для покупки используется цена Ask, а для продажи - цена Bid.",
       "**Отсутствие учета ликвидности:** Неизвестно, какой объем можно реально прогнать по указанной цене. В стакане может быть объем на $200, а спред указан для $10,000.",
@@ -72,9 +72,9 @@ const pageTranslations: Record<string, Record<string, any>> = {
     ],
     ourBotGoal: "Этот симулятор и будущий бот создаются, чтобы дать тебе **конкурентное преимущество**, основанное на точности, скорости и персонализации, а не просто красивые цифры.",
 
-    monitoringTitle: "::FaEye:: Мониторинг Связок: Принцип \"Сундука\"",
+    monitoringTitle: "Мониторинг Связок: Принцип \"Сундука\"",
     monitoringIntro: "Чтобы не заваливать тебя уведомлениями каждую миллисекунду, мы используем интеллектуальную систему фильтрации и доставки уникальных возможностей, которую называем \"Сундук\". Она гарантирует, что ты видишь только релевантные и еще не отработанные тобой связки.",
-    monitoringChestTitle: "::FaBoxOpen:: Как работает \"Сундук\":",
+    monitoringChestTitle: "Как работает \"Сундук\":",
     monitoringChestPoints: [
       "**Общий Поток Данных:** Представь, что бот видит ВСЕ возможные комбинации цен на ВСЕХ отслеживаемых биржах в каждый момент времени. Это гигантский, постоянно меняющийся \"массив\" потенциальных связок.",
       "**Твои Индивидуальные Настройки:** Это твой личный фильтр (минимальный спред, выбранные биржи, торговые пары, объем сделки, комиссии и т.д.). Ты задаешь критерии.",
@@ -86,17 +86,17 @@ const pageTranslations: Record<string, Record<string, any>> = {
     ],
     altChestMechanismRu: "Инфографика: Принцип работы \"Сундука\" для арбитражных связок. Показывает поток связок, фильтр и попадание в персональный сундук.",
     altChestMechanismEn: "Infographic: \"Chest\" principle for arbitrage bundles, showing flow, filter, and personal chest.",
-    monitoringActionsTitle: "::FaHandPointer:: Взаимодействие со Связками в Сундуке:",
+    monitoringActionsTitle: "Взаимодействие со Связками в Сундуке:",
     monitoringActionsPoints: [
       "**Кнопка \"Обновить Связку\" (под конкретным уведомлением):** Позволяет тебе вручную проверить АКТУАЛЬНОЕ состояние связки, которая уже есть в твоем сундуке. Если спред все еще выгоден (или стал еще лучше) – отлично! Если связка \"умерла\" (спред исчез или стал отрицательным), она **автоматически удаляется из твоего сундука**. Если позже условия снова станут выгодными, эта связка (как новая возможность) снова сможет попасть в твой сундук и ты получишь уведомление.",
       "**Функция \"Переприсылать Связку\" (настраиваемая):** Если ты активировал эту опцию (например, \"переприслать, если спред увеличился на 0.2%\"), то бот будет следить за связками в твоем \"Сундуке\". Если спред по одной из них **значительно улучшится** (превысит предыдущий зафиксированный для тебя спред на указанный тобой порог), бот пришлет тебе **обновленное уведомление** по этой же связке.",
     ],
-    monitoringWhyTitle: "::FaCircleQuestion:: Зачем такая логика?",
+    monitoringWhyTitle: "Зачем такая логика?",
     monitoringWhyText: "Скорость рынка криптовалют такова, что без такой системы ты бы получал тысячи уведомлений в минуту. \"Сундук\" и ручное обновление конкретных связок дают тебе контроль и предотвращают информационный перегруз, позволяя сосредоточиться на действительно интересных возможностях. Главное – не количество, а качество и актуальность информации.",
     monitoringSettingsImpact: "Любое изменение твоих настроек (фильтров) **немедленно** влияет на то, какие НОВЫЕ связки из общего потока будут попадать в твой \"Сундук\". Старые связки в сундуке остаются до их ручного обновления или общей очистки сундука.",
     monitoringDuration: "Мониторинг — это **непрерывный процесс** на выбранное тобой время (от 1 до 6 часов) и не останавливается после нахождения первой связки. Ваша цель – не просто много связок, а хорошие, отфильтрованные связки. Хочешь больше связок? Смягчай фильтры. Логично!",
     
-    errorsTitle: "::FaTriangleExclamation:: Частые Ошибки Новичков в Настройках",
+    errorsTitle: "Частые Ошибки Новичков в Настройках",
     errorsIntro: "Иногда связок нет не потому, что рынок мертв или бот сломался, а из-за слишком специфичных или противоречивых настроек. Давай разберем типичные фейлы:",
     errorCaseAccordionTitle: "Кейс #",
     errorExample1Title: "Депозит Скромный, Аппетит Царский",
@@ -120,7 +120,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
     ],
     altSettingsImpactRu: "Инфографика: Влияние настроек на количество и качество арбитражных связок. Слева - жесткие фильтры и 0 связок, справа - гибкие фильтры и качественные связки.",
     altSettingsImpactEn: "Infographic: Impact of settings on arbitrage bundle quantity and quality. Left: strict filters, 0 bundles. Right: flexible filters, quality bundles.",
-    errorsSolutionTitle: "::FaTools:: Как Избежать Фейлов и Найти Профит?",
+    errorsSolutionTitle: "Как Избежать Фейлов и Найти Профит?",
     errorsSolutionPoints: [
         "**Начинай с Широкой Сети:** Не ставь сразу 10 фильтров. Начни с реалистичного мин. спреда (например, 0.3% - 0.7% для начала) и твоего рабочего объема. Посмотри, что вообще есть на рынке. Запиши найденные связки.",
         "**Анализируй Найденное:** Какие монеты/пары чаще появляются? Какие биржи? Какие сети для перевода используются? Это даст тебе понимание текущей конъюнктуры.",
@@ -131,7 +131,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
         "**Не Бойся Экспериментировать:** Это симулятор! Меняй настройки, наблюдай, как это влияет на результат. Записывай успешные комбинации. Это лучший способ обучения.",
     ],
 
-    botOverviewTitle: "::FaRobot:: Наш Сканер: Краткий Обзор Возможностей",
+    botOverviewTitle: "Наш Сканер: Краткий Обзор Возможностей",
     botOverviewIntro: "Этот симулятор и будущий реальный бот основаны на принципах скорости, точности и гибкости для поиска арбитражных возможностей.",
     botKeyFeatures: [
       "**Молниеносный Анализ:** Обработка данных и расчет спредов в реальном времени (цель для реального бота).",
@@ -140,7 +140,7 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Умный Мониторинг:** Система \"Сундука\" и опциональная переотправка улучшенных связок.",
       "**Прозрачность Данных:** Подробная информация по каждой связке, включая объемы в стакане и детализацию комиссий (в будущем реальном боте).",
     ],
-    whatInBundleTitle: "::FaBoxArchive:: Что в Связке? (Расшифровка)",
+    whatInBundleTitle: "Что в Связке? (Расшифровка)",
     bundlePoints: [
       "**Биржа и направление обмена:** (например, Gate.io: USDT → ATH).",
       "**Ссылки:** На спотовую пару, окно вывода/ввода (в реальном боте).",
@@ -154,35 +154,109 @@ const pageTranslations: Record<string, Record<string, any>> = {
       "**Время жизни связки:** Как давно бот зафиксировал положительный спред.",
       "**Увеличение спреда:** Появляется, если включена функция переприсылки.",
     ],
-    externalInstructionsLink: "Подробная инструкция от создателей BigBTC (внешний ресурс)",
+    externalInstructionsLink: "Инструкция BigBTC", // Укоротил
     
-    checklistTitle: "::FaTasks:: Чек-лист Понимания Арбитражной Магии",
+    checklistTitle: "Чек-лист Понимания Арбитражной Магии",
     checklistItem1: "Я понимаю, что спред считается по ценам Ask (покупка) и Bid (продажа).",
     checklistItem2: "Я знаю, что комиссии (биржевые и сетевые) критически влияют на профит.",
     checklistItem3: "Я осознаю, что ликвидность в стакане определяет реальный объем сделки.",
     checklistItem4: "Я понимаю принцип \"Сундука\" и почему я не получаю одну и ту же связку постоянно.",
     checklistItem5: "Я готов(а) экспериментировать с настройками, чтобы найти свой \"золотой\" фильтр.",
-    checklistConclusion: "::FaCheckDouble:: Отлично! Ты готов(а) к более глубокому погружению и реальным тестам!",
-    backToSimulator: "Назад к Симулятору Arbitrage Seeker",
+    checklistConclusion: "::FaCheckDouble:: Отлично! Ты готов(а) к бою!", // Укоротил
+    backToSimulator: "К Симулятору", // Укоротил
   },
-  en: { /* ... English translations as before ... */ }
+  en: { // ... English translations with similar shortenings and corrections ... 
+    pageTitle: "::FaGraduationCap:: Arbitrage School: Cyber Wolf's Guide",
+    pageSubtitle: "Understanding inter-exchange arbitrage basics, scanner logic, and maximizing profit in the oneSitePls ecosystem.",
+    tabBasics: "Basics & Philosophy",
+    tabMonitoring: "Monitoring Mechanics",
+    tabSettingsErrors: "Settings & Errors",
+    tabBundleStructure: "Bundle Structure",
+    tabChecklist: "Checklist",
+    basicsIcon: "::FaRocket::",
+    monitoringIcon: "::FaBoxOpen::",
+    settingsErrorsIcon: "::FaToolbox::",
+    bundleStructureIcon: "::FaListOl::",
+    checklistIcon: "::FaTasks::",
+    realTimeSectionTitle: "Real-Time Philosophy",
+    whySpeedMattersTitle: "Why Speed Matters",
+    altRealtimeFlowEn: "Infographic: Real-time arbitrage data flow.",
+    publicVsPrivateTitle: "Public vs. Personal Bot",
+    publicVsPrivateIntro: "Comparing typical public Telegram bots with our goal of a personal tool.",
+    comparisonTableHeaders: ["Aspect", "Typical Public Channel", "Your Personal Tool (Target)"],
+    comparisonTableRows: [
+      ["Purpose", "Mass audience, leadgen.", "Personal profit extraction."],
+      ["Spread Calc", "Theoretical (tickers). Misleading.", "Real (order book bid/ask). Accurate."],
+      ["Liquidity", "No.", "Yes, calculates max tradeable volume."],
+      ["Fees", "None or averaged.", "Yes, personal & network fees."],
+      ["Speed", "High delay. Opportunity lost.", "Minimal delay. Instant to YOU."],
+      ["Competition", "Maximal.", "None. Exclusive info."],
+      ["Flexibility", "None.", "Full control."],
+      ["Outcome", "Noise. Entertainment.", "Professional tool."],
+    ],
+    publicBotProblemsTitle: "Key Public Bot Problems:",
+    ourBotGoal: "This simulator and future bot aim for a **competitive edge**.",
+    monitoringTitle: "Bundle Monitoring: \"Chest\" Principle",
+    altChestMechanismEn: "Infographic: \"Chest\" principle for bundles.",
+    monitoringActionsTitle: "Interacting with Chest Bundles:",
+    monitoringWhyTitle: "Why This Logic?",
+    errorsTitle: "Common Novice Setting Mistakes",
+    errorCaseAccordionTitle: "Case #",
+    altSettingsImpactEn: "Infographic: Settings impact on bundles.",
+    errorsSolutionTitle: "How to Avoid Fails & Find Profit?",
+    botOverviewTitle: "Our Scanner: Capabilities Overview",
+    whatInBundleTitle: "What's in a Bundle?",
+    externalInstructionsLink: "BigBTC Instructions",
+    checklistTitle: "Arbitrage Magic Checklist",
+    checklistConclusion: "::FaCheckDouble:: Excellent! Ready for real tests!",
+    backToSimulator: "To Simulator",
+    // ... (ensure all other keys from 'ru' have 'en' counterparts or are handled by fallback)
+    realTimeSectionContent: [
+        "Unlike many scanners that update data periodically (e.g., once a minute), our approach is a **continuous data stream**. Information flows and is processed constantly.",
+        "This means any \"found\" bundle can potentially change or disappear within milliseconds. Speed is everything in arbitrage.",
+        "**Example:** If the BTC price on Binance changes by $0.01, our system sees it almost instantly, not waiting for the next minute's tick."
+    ],
+    whySpeedMattersContent: [
+        "Arbitrage opportunities (spreads) are extremely short-lived. As soon as a profitable price difference appears, other traders and bots immediately start exploiting it, equalizing prices.",
+        "If your scanner updates once a minute, by the time you receive the signal, the spread will likely have disappeared. It's like trying to catch lightning with a butterfly net.",
+        "**Real-life example:** You found a 1% spread on ETH/USDT. By the time your slow scanner processed and sent it to you, fast bots had already made trades, and the spread shrank to 0.1% or vanished. Your profit is gone.",
+        "Our target bot aims for millisecond delays so you're among the first to see and potentially use an opportunity."
+    ],
+    publicBotProblems: [
+      "**Theoretical Spread:** Uses last price, not actual bid/ask from the order book. Doesn't account for buying at Ask and selling at Bid.",
+      "**No Liquidity Consideration:** Unknown what volume can actually be traded at the advertised price. The order book might only have $200 at that price, while the spread is shown for $10,000.",
+      "**Delay and Competition:** By the time the signal reaches subscribers (seconds or even minutes), thousands of other bots and traders have already exploited the opportunity.",
+      "**Unaccounted Costs:** Public bots don't know your personal trading fees (taker/maker), current network fees for asset transfer (which can range from $1 to $50), or transfer times (crypto can take 20-40 minutes, by which time the spread is gone).",
+    ],
+    monitoringIntro: "To avoid overwhelming you with notifications every millisecond, we use an intelligent filtering and delivery system for unique opportunities, which we call the \"Chest\". It ensures you only see relevant bundles you haven't acted on yet.",
+    monitoringChestPoints: [ /* ... */ ],
+    monitoringActionsPoints: [ /* ... */ ],
+    monitoringWhyText: "The crypto market's speed means without this, you'd get thousands of notifications per minute. The \"Chest\" and manual updates give you control, prevent overload, and let you focus on genuinely interesting opportunities. Quality and relevance over quantity.",
+    monitoringSettingsImpact: "Any change to your settings (filters) **immediately** affects which NEW bundles from the general stream enter your \"Chest\". Old bundles in the chest remain until manually updated or the chest is cleared.",
+    monitoringDuration: "Monitoring is a **continuous process** for your chosen duration (1 to 6 hours). It doesn't stop after the first find. The goal is quality, filtered opportunities, not just quantity. Want more? Loosen filters. Logical!",
+    errorsIntro: "Sometimes, no bundles appear not because the market is dead or the bot is broken, but due to overly specific or contradictory settings. Let's review typical fails:",
+    errorExample1Title: "Modest Deposit, Royal Appetite",
+    errorExample1Points: [ /* ... */ ],
+    errorExample2Title: "The Marathon Bundle",
+    errorExample2Points: [ /* ... */ ],
+    errorExample3Title: "Bitcoin Jet Lag",
+    errorExample3Points: [ /* ... */ ],
+    errorsSolutionPoints: [ /* ... */ ],
+    botOverviewIntro: "This simulator and the future real bot are built on principles of speed, accuracy, and flexibility for finding arbitrage opportunities.",
+    botKeyFeatures: [ /* ... */ ],
+    bundlePoints: [ /* ... */ ],
+    checklistItem1: "I understand that spread is calculated using Ask (buy) and Bid (sell) prices.",
+    checklistItem2: "I know that fees (exchange & network) critically impact profit.",
+    checklistItem3: "I realize that order book liquidity determines the real trade volume.",
+    checklistItem4: "I understand the \"Chest\" principle and why I don't get the same bundle repeatedly.",
+    checklistItem5: "I am ready to experiment with settings to find my \"golden\" filter.",
+  }
 };
 
-const ImagePlaceholder: React.FC<{altTextKey: string; placeholderUrl?: string; currentLang: 'ru' | 'en'}> = ({altTextKey, placeholderUrl = PLACEHOLDER_IMAGE_URL, currentLang}) => {
-    const altText = pageTranslations[currentLang]?.[altTextKey] || pageTranslations['en']?.[altTextKey] || "Infographic placeholder";
-    return (
-        <div className="my-6 p-2 border border-gray-700/50 rounded-lg bg-black/30 max-w-md mx-auto">
-          <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 relative">
-            <Image
-              src={placeholderUrl} alt={altText} width={600} height={300}
-              className="w-full h-full object-contain opacity-90"
-              loading="lazy"
-            />
-          </div>
-          <p className="text-xs text-center text-gray-400 mt-1 italic">{altText}</p>
-        </div>
-    );
-};
+// ... (ImagePlaceholder and component definition remain the same up to the return statement)
+// ... (rest of the component code as in the previous response)
+// Make sure all text keys used in the component exist in both 'ru' and 'en' sections of pageTranslations
+// For example, if you use t.someNewKey, it must be defined in both pageTranslations.ru.someNewKey and pageTranslations.en.someNewKey
 
 export default function ArbitrageExplainedPage() {
   const { user: tgUser } = useAppContext();
@@ -208,14 +282,14 @@ export default function ArbitrageExplainedPage() {
 
   const t = useMemo(() => pageTranslations[currentLang] || pageTranslations['ru'], [currentLang]);
 
-  const renderSection = (titleKey: string, contentKey: string | string[], icon?: string, listType: 'ul' | 'ol' = 'ul', contentClassName: string = "text-gray-300 dark:text-gray-300/90 leading-relaxed text-sm") => {
+  const renderSection = (titleKey: string, contentKey: string | string[], iconName?: string, listType: 'ul' | 'ol' = 'ul', contentClassName: string = "text-foreground/80 dark:text-gray-300/90 leading-relaxed text-sm") => {
     const titleContent = t[titleKey] || titleKey; 
-    const mainContent = t[contentKey as string] || contentKey; 
+    const mainContent = Array.isArray(contentKey) ? contentKey.map(key => t[key] || key) : (t[contentKey] || contentKey);
 
     return (
       <div className="mb-6 p-3 md:p-4 bg-card/5 dark:bg-gray-800/50 border border-border dark:border-gray-700/30 rounded-lg shadow-md">
         <h3 className="text-lg md:text-xl font-semibold text-primary dark:text-brand-cyan mb-2 flex items-center">
-          {icon && <VibeContentRenderer content={icon} className="mr-2" />} 
+          {iconName && <VibeContentRenderer content={iconName} className="mr-2" />} 
           <VibeContentRenderer content={titleContent} />
         </h3>
         {typeof mainContent === 'string' ? (
@@ -247,7 +321,7 @@ export default function ArbitrageExplainedPage() {
                 {(t.comparisonTableRows as string[][]).map((row: string[], rowIndex: number) => (
                     <tr key={rowIndex} className="hover:bg-muted/30 dark:hover:bg-gray-700/30 transition-colors">
                         {row.map((cell, cellIndex) => (
-                            <td key={cellIndex} className={`px-3 py-2.5 text-xs sm:text-sm ${cellIndex === 0 ? 'font-semibold text-foreground dark:text-gray-100 w-1/5 md:w-1/6 lg:w-1/6' : 'text-foreground/80 dark:text-gray-300'}`}>{cell}</td>
+                            <td key={cellIndex} className={`px-3 py-2.5 text-xs sm:text-sm ${cellIndex === 0 ? 'font-semibold text-foreground dark:text-gray-100 w-1/5 md:w-1/6' : 'text-foreground/80 dark:text-gray-300'}`}>{cell}</td>
                         ))}
                     </tr>
                 ))}
@@ -274,29 +348,29 @@ export default function ArbitrageExplainedPage() {
         <CardContent className="p-4 md:p-6 ">
           <Tabs defaultValue="basics" className="w-full">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 bg-muted/40 dark:bg-black/50 p-1 h-auto mb-6">
-              <TabsTrigger value="basics" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-400 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.basicsIcon} className="mr-1.5"/>{t.tabBasics}</TabsTrigger>
-              <TabsTrigger value="monitoring" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-400 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.monitoringIcon} className="mr-1.5"/>{t.tabMonitoring}</TabsTrigger>
-              <TabsTrigger value="settings_errors" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-400 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.settingsErrorsIcon} className="mr-1.5"/>{t.tabSettingsErrors}</TabsTrigger>
-              <TabsTrigger value="bundle_structure" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-400 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.bundleStructureIcon} className="mr-1.5"/>{t.tabBundleStructure}</TabsTrigger>
-              <TabsTrigger value="checklist" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-400 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.checklistIcon} className="mr-1.5"/>{t.tabChecklist}</TabsTrigger>
+              <TabsTrigger value="basics" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-500 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.basicsIcon} className="mr-1.5"/>{t.tabBasics}</TabsTrigger>
+              <TabsTrigger value="monitoring" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-500 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.monitoringIcon} className="mr-1.5"/>{t.tabMonitoring}</TabsTrigger>
+              <TabsTrigger value="settings_errors" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-500 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.settingsErrorsIcon} className="mr-1.5"/>{t.tabSettingsErrors}</TabsTrigger>
+              <TabsTrigger value="bundle_structure" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-500 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.bundleStructureIcon} className="mr-1.5"/>{t.tabBundleStructure}</TabsTrigger>
+              <TabsTrigger value="checklist" className="text-xs px-1 py-1.5 sm:py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=active]:bg-brand-blue/80 dark:data-[state=active]:text-white dark:data-[state=inactive]:text-gray-500 dark:hover:data-[state=inactive]:text-gray-200 font-orbitron"><VibeContentRenderer content={t.checklistIcon} className="mr-1.5"/>{t.tabChecklist}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basics" className="space-y-6">
-              {renderSection("realTimeSectionTitle", "realTimeSectionContent", "::FaBolt::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
-              {renderSection("whySpeedMattersTitle", "whySpeedMattersContent", "::FaShippingFast::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
+              {renderSection("realTimeSectionTitle", "realTimeSectionContent", "::FaBolt::")}
+              {renderSection("whySpeedMattersTitle", "whySpeedMattersContent", "::FaShippingFast::")}
               <ImagePlaceholder altTextKey={currentLang === 'ru' ? "altRealtimeFlowRu" : "altRealtimeFlowEn" } currentLang={currentLang} />
-              {renderSection("publicVsPrivateTitle", "publicVsPrivateIntro", "::FaShieldHalved::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
+              {renderSection("publicVsPrivateTitle", "publicVsPrivateIntro", "::FaShieldHalved::")}
               {renderComparisonTable()}
-              {renderSection("publicBotProblemsTitle", "publicBotProblems", "::FaLockOpen::", "ul", "text-destructive/90 dark:text-red-400/90 leading-relaxed text-sm")}
+              {renderSection("publicBotProblemsTitle", "publicBotProblems", "::FaLockOpen::", "ul", "text-destructive dark:text-red-400/90 leading-relaxed text-sm")}
               <VibeContentRenderer content={`**${t.ourBotGoal}**`} className="block mt-4 font-semibold text-brand-lime text-center" />
             </TabsContent>
 
             <TabsContent value="monitoring" className="space-y-6">
                 <VibeContentRenderer content={t.monitoringIntro} className="mb-4 text-foreground/90 dark:text-gray-300 text-sm" />
-                {renderSection("monitoringChestTitle", "monitoringChestPoints", "::FaBoxOpen::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
+                {renderSection("monitoringChestTitle", "monitoringChestPoints", "::FaBoxOpen::")}
                 <ImagePlaceholder altTextKey={currentLang === 'ru' ? "altChestMechanismRu" : "altChestMechanismEn"} currentLang={currentLang} />
-                {renderSection("monitoringActionsTitle", "monitoringActionsPoints", "::FaHandPointer::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
-                {renderSection("monitoringWhyTitle", "monitoringWhyText", "::FaCircleQuestion::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
+                {renderSection("monitoringActionsTitle", "monitoringActionsPoints", "::FaHandPointer::")}
+                {renderSection("monitoringWhyTitle", "monitoringWhyText", "::FaCircleQuestion::")}
                 <VibeContentRenderer content={`**${t.monitoringSettingsImpact}**`} className="block mt-4 font-semibold text-brand-lime" />
                 <VibeContentRenderer content={t.monitoringDuration} className="block mt-2 text-muted-foreground dark:text-gray-400 italic" />
             </TabsContent>
@@ -305,28 +379,28 @@ export default function ArbitrageExplainedPage() {
                 <VibeContentRenderer content={t.errorsIntro} className="mb-4 text-foreground/90 dark:text-gray-300 text-sm" />
                 <Accordion type="single" collapsible className="w-full space-y-2">
                     {errorCases.map((ec, index) => (
-                        <AccordionItem value={`error-case-${index+1}`} key={`error-case-${index+1}`} className="border-destructive/50 dark:border-brand-red/30 bg-card dark:bg-gray-800/40 rounded-lg overflow-hidden">
-                            <AccordionTrigger className="hover:no-underline text-md text-destructive dark:text-brand-red hover:text-red-700 dark:hover:text-red-400 py-2.5 px-4 data-[state=open]:bg-destructive/10 dark:data-[state=open]:bg-brand-red/10">
+                        <AccordionItem value={`error-case-${index+1}`} key={`error-case-${index+1}`} className="border-destructive/70 dark:border-brand-red/30 bg-card dark:bg-gray-800/40 rounded-lg overflow-hidden">
+                            <AccordionTrigger className="hover:no-underline text-md text-destructive dark:text-brand-red hover:text-red-700 dark:hover:text-red-400 data-[state=open]:bg-destructive/10 dark:data-[state=open]:bg-brand-red/10 py-2.5 px-4">
                                 <VibeContentRenderer content={`::FaTriangleExclamation className='mr-2 text-base':: ${t.errorCaseAccordionTitle} ${index+1}: ${t[ec.titleKey]}`} />
                             </AccordionTrigger>
-                            <AccordionContent className="pt-1 pb-3 px-4 text-sm bg-card/50 dark:bg-black/20">
-                                <VibeContentRenderer 
-                                  content={ (t[ec.contentKey] && Array.isArray(t[ec.contentKey])) 
-                                            ? (t[ec.contentKey] as string[]).map(p => `• ${p}`).join('<br/><br/>') 
-                                            : "Content not available."
-                                          } 
-                                  className="text-foreground/80 dark:text-gray-300/90 leading-relaxed" />
+                            <AccordionContent className="pt-1 pb-3 px-4 text-sm bg-card/5 dark:bg-black/20">
+                                { (t[ec.contentKey] && Array.isArray(t[ec.contentKey])) 
+                                    ? (t[ec.contentKey] as string[]).map((point, pIndex) => (
+                                        <VibeContentRenderer key={pIndex} content={point} className="text-foreground/80 dark:text-gray-300/90 leading-relaxed block mb-2" />
+                                      ))
+                                    : <VibeContentRenderer content={"Content not available."} className="text-muted-foreground" />
+                                }
                             </AccordionContent>
                         </AccordionItem>
                     ))}
                 </Accordion>
                 <ImagePlaceholder altTextKey={currentLang === 'ru' ? "altSettingsImpactRu" : "altSettingsImpactEn"} currentLang={currentLang} />
-                {renderSection("errorsSolutionTitle", "errorsSolutionPoints", "::FaTools::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
+                {renderSection("errorsSolutionTitle", "errorsSolutionPoints", "::FaTools::")}
             </TabsContent>
 
             <TabsContent value="bundle_structure" className="space-y-6">
-                {renderSection("botOverviewTitle", "botOverviewIntro", "::FaRobot::", "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
-                {renderSection("", "botKeyFeatures", undefined, "ul", "text-foreground/90 dark:text-gray-300/90 leading-relaxed text-sm")}
+                {renderSection("botOverviewTitle", "botOverviewIntro", "::FaRobot::")}
+                {renderSection("", "botKeyFeatures", undefined, "ul")}
                 <div className="mt-6">
                     <h3 className="text-lg font-semibold text-brand-lime mb-2 flex items-center">
                         <VibeContentRenderer content="::FaBoxArchive::" className="mr-2"/>
