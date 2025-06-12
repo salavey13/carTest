@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { ScrollArea } from '@/components/ui/scroll-area';
+// import { Slider } from "@/components/ui/slider"; // SLIDERS DITCHED
 import {
   fetchArbitrageOpportunitiesWithSettings,
 } from '@/app/elon/testbase/sandbox_actions';
@@ -51,8 +52,66 @@ const LoadingVoxelPlotFallback = () => { logger.debug("[SandboxPage] Rendering L
 const formatNum = (num: number | undefined, digits = 2) => { if (typeof num === 'undefined') return 'N/A'; return num.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });};
 export interface ProcessedSandboxOpportunity extends ArbitrageOpportunity { x_reward: number; y_ezness: number; z_inv_effort: number; riskScore: number; rawEzness: number; rawEffort: number;}
 
-interface FilterInputRangeProps { /* ... same as before (no changes needed here) ... */ label: string; idPrefix: string; value: [number, number]; onChange: (value: [number, number]) => void; minLimit: number; maxLimit: number; step: number;}
-const FilterInputRange: React.FC<FilterInputRangeProps> = ({ label, idPrefix, value, onChange, minLimit, maxLimit, step }) => { const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => { let newMin = parseFloat(e.target.value); if (isNaN(newMin)) newMin = minLimit; newMin = Math.max(minLimit, Math.min(newMin, value[1])); onChange([newMin, value[1]]); }; const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => { let newMax = parseFloat(e.target.value); if (isNaN(newMax)) newMax = maxLimit; newMax = Math.min(maxLimit, Math.max(newMax, value[0])); onChange([value[0], newMax]); }; return ( <div className="space-y-1.5 mb-3"> <Label className="text-xs font-semibold text-gray-300 flex justify-between items-center"> <span>{label}</span> <span className="text-brand-yellow text-[0.7rem] bg-black/30 px-1.5 py-0.5 rounded"> {value[0].toFixed(2)} – {value[1].toFixed(2)} </span> </Label> <div className="flex gap-2"> <Input id={`${idPrefix}-min`} type="number" value={value[0]} onBlur={handleMinChange} onChange={(e) => onChange([parseFloat(e.target.value) || minLimit, value[1]])} min={minLimit} max={value[1]} step={step} className="input-cyber text-sm h-8 w-1/2 focus:border-brand-pink focus:ring-brand-pink" placeholder={`Min (${minLimit})`} /> <Input id={`${idPrefix}-max`} type="number" value={value[1]} onBlur={handleMaxChange} onChange={(e) => onChange([value[0], parseFloat(e.target.value) || maxLimit])} min={value[0]} max={maxLimit} step={step} className="input-cyber text-sm h-8 w-1/2 focus:border-brand-pink focus:ring-brand-pink" placeholder={`Max (${maxLimit})`} /> </div> </div> );};
+interface FilterInputRangeProps {
+  label: string;
+  idPrefix: string;
+  value: [number, number];
+  onChange: (value: [number, number]) => void;
+  minLimit: number;
+  maxLimit: number;
+  step: number;
+}
+const FilterInputRange: React.FC<FilterInputRangeProps> = ({ label, idPrefix, value, onChange, minLimit, maxLimit, step }) => {
+  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newMin = parseFloat(e.target.value);
+    if (isNaN(newMin)) newMin = minLimit; 
+    newMin = Math.max(minLimit, Math.min(newMin, value[1])); 
+    onChange([newMin, value[1]]);
+  };
+  const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newMax = parseFloat(e.target.value);
+    if (isNaN(newMax)) newMax = maxLimit; 
+    newMax = Math.min(maxLimit, Math.max(newMax, value[0])); 
+    onChange([value[0], newMax]);
+  };
+
+  return (
+    <div className="space-y-1.5 mb-3">
+        <Label className="text-xs font-semibold text-gray-300 flex justify-between items-center">
+            <span>{label}</span>
+            <span className="text-brand-yellow text-[0.7rem] bg-black/30 px-1.5 py-0.5 rounded">
+                {value[0].toFixed(2)} – {value[1].toFixed(2)}
+            </span>
+        </Label>
+        <div className="flex gap-2">
+            <Input
+                id={`${idPrefix}-min`}
+                type="number"
+                value={value[0]} 
+                onBlur={handleMinChange} 
+                onChange={(e) => onChange([parseFloat(e.target.value) || minLimit, value[1]])} 
+                min={minLimit}
+                max={value[1]}
+                step={step}
+                className="input-cyber text-sm h-8 w-1/2 focus:border-brand-pink focus:ring-brand-pink"
+                placeholder={`Min (${minLimit})`}
+            />
+            <Input
+                id={`${idPrefix}-max`}
+                type="number"
+                value={value[1]} 
+                onBlur={handleMaxChange}
+                onChange={(e) => onChange([value[0], parseFloat(e.target.value) || maxLimit])} 
+                min={value[0]}
+                max={maxLimit}
+                step={step}
+                className="input-cyber text-sm h-8 w-1/2 focus:border-brand-pink focus:ring-brand-pink"
+                placeholder={`Max (${maxLimit})`}
+            />
+        </div>
+    </div>
+  );
+};
 
 export default function ArbitrageVizSandboxPage() {
   logger.info("[SandboxPage] Rendering (Input Filters, Tab Control, Orbit Control Mgmt).");
@@ -60,7 +119,7 @@ export default function ArbitrageVizSandboxPage() {
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("visualization"); // <<< State for active tab
+  const [activeTab, setActiveTab] = useState("visualization");
 
   const [rewardFilter, setRewardFilter] = useState<[number, number]>([DEFAULT_ARBITRAGE_SETTINGS.minSpreadPercent - 0.5 < -1 ? -1 : DEFAULT_ARBITRAGE_SETTINGS.minSpreadPercent - 0.5, 5]);
   const [eznessFilter, setEznessFilter] = useState<[number, number]>([0, 1.2]);
@@ -75,68 +134,66 @@ export default function ArbitrageVizSandboxPage() {
   const handleSettingsChange = (field: keyof ArbitrageSettings, value: any) => { setTestSettings(prev => ({ ...prev, [field]: value })); };
   const handleExchangeToggle = (exchangeName: ExchangeName) => { setTestSettings(prev => { const currentEnabledExchanges = prev.enabledExchanges || []; const newEnabledExchanges = currentEnabledExchanges.includes(exchangeName) ? currentEnabledExchanges.filter(ex => ex !== exchangeName) : [...currentEnabledExchanges, exchangeName]; return { ...prev, enabledExchanges: newEnabledExchanges }; }); };
 
-  const LegendWTF = () => ( /* ... Legend component (same as before) ... */ <Card className="mt-6 bg-dark-card/70 border border-brand-yellow/40 p-3"> <CardHeader className="p-2"> <CardTitle className="text-brand-yellow font-orbitron text-lg flex items-center"> <VibeContentRenderer content="::FaCircleQuestion className='mr-2'::" /> WTF is Going On Here? (Legend) </CardTitle> </CardHeader> <CardContent className="text-xs text-gray-300 space-y-1.5"> <p><strong className="text-brand-cyan">Axes:</strong></p> <ul className="list-disc list-inside pl-2"> <li><strong className="text-white">X (Reward):</strong> Profit Percentage (higher is better)</li> <li><strong className="text-white">Y (Ezness):</strong> Composite ease score (liquidity, low fees, 2-leg; higher is better)</li> <li><strong className="text-white">Z (1/Effort):</strong> Inverse effort score (capital, complexity; higher is better/less effort)</li> </ul> <p className="mt-2"><strong className="text-brand-cyan">Voxels (Opportunities):</strong></p> <ul className="list-disc list-inside pl-2"> <li><strong className="text-white">Color (Risk Score = Effort / Ezness):</strong></li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#32CD32] mr-1.5 shrink-0"></div>Low Risk, Good Reward (Alpha!)</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#FFD700] mr-1.5 shrink-0"></div>Moderate Risk/Reward</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#1E90FF] mr-1.5 shrink-0"></div>Good Reward, Manageable Risk</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#FF6347] mr-1.5 shrink-0"></div>High Risk</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#A9A9A9] mr-1.5 shrink-0"></div>Very Low Reward</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#8A2BE2] mr-1.5 shrink-0"></div>Default / Mid-Risk</li> <li><strong className="text-white">Size:</strong> Proportional to Trade Volume (USD)</li> </ul> <p className="mt-2 text-gray-400"><i>Aim for <span className="text-brand-lime">Lime Green</span> voxels in the far positive corner!</i></p> </CardContent> </Card> );
+  const LegendWTF = () => ( <Card className="mt-6 bg-dark-card/80 border border-brand-yellow/50 p-3 shadow-md"> <CardHeader className="p-2 pt-1"> <CardTitle className="text-brand-yellow font-orbitron text-base md:text-lg flex items-center"> <VibeContentRenderer content="::FaCircleQuestion className='mr-2 text-yellow-400'::" /> WTF is Going On Here? (Legend) </CardTitle> </CardHeader> <CardContent className="text-xs text-gray-300 space-y-1.5"> <p><strong className="text-brand-cyan">Axes:</strong></p> <ul className="list-disc list-inside pl-3 space-y-0.5"> <li><strong className="text-red-400">X (Reward):</strong> Profit % <VibeContentRenderer content="::FaArrowRight className='inline ml-1 text-red-400/70'::"/></li> <li><strong className="text-lime-400">Y (Ezness):</strong> Composite ease score <VibeContentRenderer content="::FaArrowUp className='inline ml-1 text-lime-400/70'::"/></li> <li><strong className="text-blue-400">Z (1/Effort):</strong> Inverse effort score <VibeContentRenderer content="::FaExpand className='inline ml-1 text-blue-400/70'::"/></li> </ul> <p className="mt-2"><strong className="text-brand-cyan">Voxels (Cubes represent Opportunities):</strong></p> <ul className="list-disc list-inside pl-3 space-y-0.5"> <li><strong className="text-white">Color (Risk Score = Effort / Ezness):</strong></li> <li className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-[#32CD32] mr-1.5 shrink-0 border border-black/20"></div>Low Risk, Good Reward (Alpha!)</li> <li className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-[#FFD700] mr-1.5 shrink-0 border border-black/20"></div>Moderate Risk/Reward</li> <li className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-[#1E90FF] mr-1.5 shrink-0 border border-black/20"></div>Good Reward, Manageable Risk</li> <li className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-[#FF6347] mr-1.5 shrink-0 border border-black/20"></div>High Risk</li> <li className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-[#A9A9A9] mr-1.5 shrink-0 border border-black/20"></div>Very Low Reward</li> <li className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-[#8A2BE2] mr-1.5 shrink-0 border border-black/20"></div>Default / Mid-Risk</li> <li><strong className="text-white">Size:</strong> Proportional to Trade Volume (USD)</li> </ul> <p className="mt-2 text-gray-400 italic">Aim for <span className="text-brand-lime font-semibold">Lime Green</span> cubes in the far positive corner (high X, Y, Z)!</p> </CardContent> </Card> );
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-purple-900/30 text-foreground p-4 pt-24 pb-12 font-mono">
-      <Card className="max-w-7xl mx-auto bg-black/80 backdrop-blur-lg border-2 border-brand-cyan/60 shadow-2xl shadow-brand-cyan/40">
-        <CardHeader className="text-center border-b border-brand-cyan/40 pb-4"> <VibeContentRenderer content="::FaFlaskVial className='text-5xl text-brand-cyan mx-auto mb-3 filter drop-shadow-[0_0_8px_hsl(var(--brand-cyan-rgb))]'::" /> <CardTitle className="text-3xl font-orbitron text-brand-cyan cyber-text glitch" data-text="ARBITRAGE VOXEL SANDBOX"> ARBITRAGE VOXEL SANDBOX </CardTitle> <CardDescription className="text-sm text-cyan-300/80 font-mono"> Experiment with simulated arbitrage opportunities and visualize the EERR latent space. </CardDescription> </CardHeader>
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-black to-purple-950/50 text-foreground p-4 pt-24 pb-12 font-mono">
+      <Card className="max-w-7xl mx-auto bg-black/85 backdrop-blur-xl border-2 border-brand-cyan/70 shadow-2xl shadow-brand-cyan/40">
+        <CardHeader className="text-center border-b border-brand-cyan/40 pb-4"> <VibeContentRenderer content="::FaFlaskVial className='text-5xl text-brand-cyan mx-auto mb-3 filter drop-shadow-[0_0_10px_hsl(var(--brand-cyan-rgb))]'::" /> <CardTitle className="text-3xl font-orbitron text-brand-cyan cyber-text glitch" data-text="ARBITRAGE VOXEL SANDBOX"> ARBITRAGE VOXEL SANDBOX </CardTitle> <CardDescription className="text-sm text-cyan-300/80 font-mono"> Experiment with simulated arbitrage opportunities and visualize the EERR latent space. </CardDescription> </CardHeader>
         <CardContent className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, ease: "circOut" }} className="lg:col-span-1 space-y-3 p-3 bg-dark-card/60 border border-brand-purple/40 rounded-xl shadow-lg" > 
-            <h3 className="text-lg font-orbitron text-brand-purple mb-3 border-b border-brand-purple/30 pb-1.5"> <VibeContentRenderer content="::FaSliders className='inline mr-1.5'::" /> Simulation Settings </h3> 
+          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, ease: "circOut" }} className="lg:col-span-1 space-y-3 p-3 bg-dark-card/70 border border-brand-purple/50 rounded-xl shadow-lg"> 
+            <h3 className="text-lg font-orbitron text-brand-purple mb-3 border-b border-brand-purple/30 pb-1.5 flex items-center"> <VibeContentRenderer content="::FaSlidersH className='inline mr-2'::" /> Simulation Settings </h3> 
             <div className="space-y-1.5"> <Label htmlFor="minSpread" className="text-xs font-semibold text-gray-300">Min Spread (%)</Label> <Input id="minSpread" type="number" step="0.01" value={testSettings.minSpreadPercent} onChange={(e) => handleSettingsChange('minSpreadPercent', parseFloat(e.target.value) || 0)} className="input-cyber text-sm h-9 border-brand-purple/50 focus:border-brand-purple focus:ring-brand-purple"/> </div> 
             <div className="space-y-1.5"> <Label htmlFor="tradeVolume" className="text-xs font-semibold text-gray-300">Trade Volume (USD)</Label> <Input id="tradeVolume" type="number" step="50" value={testSettings.defaultTradeVolumeUSD} onChange={(e) => handleSettingsChange('defaultTradeVolumeUSD', parseInt(e.target.value, 10) || 0)} className="input-cyber text-sm h-9 border-brand-purple/50 focus:border-brand-purple focus:ring-brand-purple"/> </div> 
             <div className="space-y-2"> <Label className="text-xs font-semibold text-gray-300 block mb-1.5">Enabled Exchanges</Label> <ScrollArea className="h-[150px] border border-brand-purple/30 rounded-md p-1.5 bg-black/30 simple-scrollbar"> <div className="grid grid-cols-1 gap-1 text-xs"> {ALL_POSSIBLE_EXCHANGES_CONST.map(ex => ( <div key={ex} className="flex items-center space-x-1.5 p-1 hover:bg-brand-purple/10 rounded"> <Checkbox id={`ex-${ex}`} checked={testSettings.enabledExchanges?.includes(ex) ?? false} onCheckedChange={() => handleExchangeToggle(ex)} className="border-brand-purple data-[state=checked]:bg-brand-purple scale-90"/> <Label htmlFor={`ex-${ex}`} className="text-gray-300 cursor-pointer flex-1 text-[0.7rem]">{ex}</Label> </div> ))} </div> </ScrollArea> </div> 
             <div className="space-y-1.5"> <Label htmlFor="trackedPairs" className="text-xs font-semibold text-gray-300">Tracked Pairs (CSV)</Label> <Input id="trackedPairs" type="text" value={testSettings.trackedPairs?.join(',') ?? ''} onChange={(e) => handleSettingsChange('trackedPairs', e.target.value.split(',').map(p => p.trim().toUpperCase()).filter(p => p))} className="input-cyber text-sm h-9 border-brand-purple/50 focus:border-brand-purple focus:ring-brand-purple" placeholder="BTC/USDT,ETH/BTC"/> </div> 
-            <Button onClick={handleRunSimulation} disabled={isLoading} className="w-full bg-brand-orange text-black hover:bg-yellow-400 font-orbitron mt-2 py-2 text-sm shadow-md hover:shadow-orange-glow"> {isLoading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-1.5'::" /> : <VibeContentRenderer content="::FaPlay className='mr-1.5'::" />} {isLoading ? "Simulating..." : "Run Simulation"} </Button> 
+            <Button onClick={handleRunSimulation} disabled={isLoading} className="w-full bg-brand-orange text-black hover:bg-yellow-400 font-orbitron mt-2 py-2 text-sm shadow-md hover:shadow-orange-glow"> {isLoading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-1.5'::" /> : <VibeContentRenderer content="::FaPlayCircle className='mr-1.5'::" />} {isLoading ? "Simulating..." : "Run Simulation"} </Button> 
             
-            <h3 className="text-lg font-orbitron text-brand-pink pt-3 mt-3 mb-2 border-t border-brand-purple/30 pb-1.5"> <VibeContentRenderer content="::FaFilter className='inline mr-1.5'::" /> Display Filters </h3>
+            <h3 className="text-lg font-orbitron text-brand-pink pt-3 mt-3 mb-2 border-t border-brand-purple/30 pb-1.5 flex items-center"> <VibeContentRenderer content="::FaFilter className='inline mr-1.5'::" /> Display Filters </h3>
             <FilterInputRange label="Reward Filter (%)" idPrefix="reward" value={rewardFilter} onChange={setRewardFilter} minLimit={-5} maxLimit={10} step={0.1} />
             <FilterInputRange label="Ezness Filter" idPrefix="ezness" value={eznessFilter} onChange={setEznessFilter} minLimit={0} maxLimit={1.5} step={0.01} />
             <FilterInputRange label="Effort Filter" idPrefix="effort" value={effortFilter} onChange={setEffortFilter} minLimit={0} maxLimit={1.5} step={0.01} />
             <FilterInputRange label="Risk Filter" idPrefix="risk" value={riskFilter} onChange={setRiskFilter} minLimit={0} maxLimit={20} step={0.1} />
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1, ease: "circOut" }} className="lg:col-span-3" >
-            <Tabs defaultValue="visualization" className="w-full" onValueChange={setActiveTab}> {/* <<< SET ACTIVE TAB */}
-              <TabsList className="grid w-full grid-cols-3 bg-black/60 border border-brand-blue/50 backdrop-blur-sm"> 
-                <TabsTrigger value="visualization" className="font-orbitron text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-gray-400 hover:data-[state=inactive]:text-gray-200"> <VibeContentRenderer content="::FaChartColumn className='mr-1.5'::"/>Visualization ({filteredAndProcessedOpportunities.length}) </TabsTrigger> 
-                <TabsTrigger value="rawData" className="font-orbitron text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-gray-400 hover:data-[state=inactive]:text-gray-200"> <VibeContentRenderer content="::FaList className='mr-1.5'::"/>Raw Data ({opportunities.length}) </TabsTrigger> 
-                <TabsTrigger value="logs" className="font-orbitron text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-gray-400 hover:data-[state=inactive]:text-gray-200"> <VibeContentRenderer content="::FaTerminal className='mr-1.5'::"/>Logs </TabsTrigger> 
+            <Tabs defaultValue="visualization" className="w-full" onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 bg-black/70 border border-brand-blue/60 backdrop-blur-md shadow-md"> 
+                <TabsTrigger value="visualization" className="font-orbitron text-xs sm:text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-gray-400 hover:data-[state=inactive]:text-gray-100 transition-colors duration-200 py-2"> <VibeContentRenderer content="::FaChartColumn className='mr-1 sm:mr-1.5'::"/>Viz ({filteredAndProcessedOpportunities.length}) </TabsTrigger> 
+                <TabsTrigger value="rawData" className="font-orbitron text-xs sm:text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-gray-400 hover:data-[state=inactive]:text-gray-100 transition-colors duration-200 py-2"> <VibeContentRenderer content="::FaList className='mr-1 sm:mr-1.5'::"/>Data ({opportunities.length}) </TabsTrigger> 
+                <TabsTrigger value="logs" className="font-orbitron text-xs sm:text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-gray-400 hover:data-[state=inactive]:text-gray-100 transition-colors duration-200 py-2"> <VibeContentRenderer content="::FaTerminal className='mr-1 sm:mr-1.5'::"/>Logs </TabsTrigger> 
               </TabsList>
-              <TabsContent value="visualization" className="mt-4 p-1 bg-dark-card/30 border border-brand-blue/30 rounded-lg shadow-inner min-h-[620px]">
+              <TabsContent value="visualization" className="mt-4 p-1 bg-dark-card/40 border border-brand-blue/40 rounded-lg shadow-inner min-h-[620px]">
                 <ArbitrageVoxelPlotWithNoSSR 
                     opportunities={filteredAndProcessedOpportunities} 
-                    isTabActive={activeTab === "visualization"} // <<< PASS ACTIVE TAB STATE
+                    isTabActive={activeTab === "visualization"}
                 />
               </TabsContent>
               <TabsContent value="rawData" className="mt-4 p-1"> 
-                <ScrollArea className="h-[600px] border border-brand-blue/30 rounded-lg bg-dark-card/30 p-3 simple-scrollbar"> 
+                <ScrollArea className="h-[600px] border border-brand-blue/40 rounded-lg bg-dark-card/40 p-3 simple-scrollbar"> 
                   {opportunities.length > 0 ? ( opportunities.map(op => ( 
-                    <Card key={op.id} className="mb-3 bg-dark-bg/70 border-brand-purple/30 text-xs shadow-sm hover:border-brand-purple transition-colors"> 
-                        <CardHeader className="p-2.5"> 
-                            <CardTitle className={cn(
-                                "text-sm font-semibold",
-                                op.profitPercentage > (testSettings.minSpreadPercent + 0.5) ? 'text-brand-lime' : 
-                                op.profitPercentage > testSettings.minSpreadPercent ? 'text-brand-yellow' : 
-                                'text-brand-orange'
-                            )}> 
-                                {op.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsLeftRight className='inline mr-1.5'::"/> : <VibeContentRenderer content="::FaRandom className='inline mr-1.5'::"/>} 
-                                {op.type === '2-leg' ? ` ${op.currencyPair} (${(op as TwoLegArbitrageOpportunity).buyExchange} → ${(op as TwoLegArbitrageOpportunity).sellExchange})` : ` ${op.currencyPair} (${(op as ThreeLegArbitrageOpportunity).exchange})`} 
+                    <Card key={op.id} className="mb-3 bg-dark-bg/80 border-brand-purple/40 text-xs shadow-md hover:border-brand-purple/70 transition-colors duration-150"> 
+                        <CardHeader className="p-3"> 
+                            <CardTitle className={cn( "text-sm font-semibold flex items-center justify-between", op.profitPercentage > (testSettings.minSpreadPercent + 0.5) ? 'text-brand-lime' : op.profitPercentage > testSettings.minSpreadPercent ? 'text-brand-yellow' : 'text-brand-orange' )}> 
+                                <span>
+                                    {op.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsTurnRight className='inline mr-1.5 text-base align-middle'::"/> : <VibeContentRenderer content="::FaShuffle className='inline mr-1.5 text-base align-middle'::"/>} 
+                                    {op.type === '2-leg' ? ` ${(op as TwoLegArbitrageOpportunity).buyExchange} → ${(op as TwoLegArbitrageOpportunity).sellExchange}` : ` ${(op as ThreeLegArbitrageOpportunity).exchange}`}
+                                </span>
+                                <span className="text-xs text-gray-400 font-mono">{op.currencyPair}</span>
                             </CardTitle> 
-                            <CardDescription className="text-gray-400 text-[0.7rem] pt-0.5">ID: {op.id.substring(0,8)}</CardDescription> 
+                            <CardDescription className="text-gray-500 text-[0.65rem] pt-0.5">ID: {op.id.substring(0,8)}...</CardDescription> 
                         </CardHeader> 
-                        <CardContent className="p-2.5 pt-0 space-y-0.5"> 
-                            <p>Spread: <strong className="text-brand-lime font-bold">{formatNum(op.profitPercentage, 3)}%</strong></p> 
-                            <p>Profit (USD): <strong className="text-brand-green font-bold">${formatNum(op.potentialProfitUSD)}</strong> (on ${formatNum(op.tradeVolumeUSD,0)} vol)</p> 
-                            <p className="text-gray-400 text-[0.7rem] break-all">Details: {op.details}</p> 
-                            {op.type === '2-leg' && <p className="text-gray-500 text-[0.65rem]">Net Fee: ${formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)} | Buy: {(op as TwoLegArbitrageOpportunity).buyPrice.toFixed(4)} | Sell: {(op as TwoLegArbitrageOpportunity).sellPrice.toFixed(4)}</p>} 
+                        <CardContent className="p-3 pt-0 space-y-1"> 
+                            <p>Spread: <strong className="text-xl font-bold" style={{color: op.profitPercentage > (testSettings.minSpreadPercent + 0.5) ? 'hsl(var(--brand-lime))' : op.profitPercentage > testSettings.minSpreadPercent ? 'hsl(var(--brand-yellow))' : 'hsl(var(--brand-orange))'}}>{formatNum(op.profitPercentage, 3)}%</strong></p> 
+                            <p>Profit (USD): <strong className="text-lg text-brand-green font-semibold">${formatNum(op.potentialProfitUSD)}</strong> (on ${formatNum(op.tradeVolumeUSD,0)} vol)</p> 
+                            <p className="text-gray-400 text-[0.7rem] break-words leading-snug">Details: {op.details}</p> 
+                            {op.type === '2-leg' && <p className="text-gray-500 text-[0.65rem] font-mono">Net Fee: ${formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)} | Buy: {(op as TwoLegArbitrageOpportunity).buyPrice.toFixed(4)} | Sell: {(op as TwoLegArbitrageOpportunity).sellPrice.toFixed(4)}</p>} 
                         </CardContent> 
                     </Card> 
                   ))) : ( <p className="text-center text-muted-foreground py-12">No opportunities generated with current settings.</p> )} 
                 </ScrollArea> 
               </TabsContent> 
               <TabsContent value="logs" className="mt-4 p-1"> 
-                <ScrollArea className="h-[600px] border border-brand-blue/30 rounded-lg bg-dark-card/30 p-3 simple-scrollbar"> 
+                <ScrollArea className="h-[600px] border border-brand-blue/40 rounded-lg bg-dark-card/40 p-3 simple-scrollbar"> 
                   <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all"> {logs.join('\n')} </pre> 
                 </ScrollArea> 
               </TabsContent>
