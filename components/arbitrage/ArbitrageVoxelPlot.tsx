@@ -4,9 +4,9 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import type { ProcessedSandboxOpportunity } from '@/app/elon/testbase/arbitrage-viz-sandbox/page';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from '@/app/elon/arbitrage_scanner_types';
+import type { TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from '@/app/elon/arbitrage_scanner_types';
 
-logger.debug("[ArbitrageVoxelPlot.tsx] VoxelRebirth. File loaded.");
+logger.debug("[ArbitrageVoxelPlot.tsx] Voxel Rebirth V3. File loaded.");
 
 interface R3FLibs {
   THREE: typeof import('three');
@@ -24,17 +24,14 @@ interface R3FLibs {
 }
 
 const normalizeAndScale = (value: number, minVal: number, maxVal: number, plotScale: number = 10, plotOffset: number = 0): number => {
-  if (maxVal === minVal) {
-    return plotOffset + plotScale / 2;
-  }
+  if (maxVal === minVal) return plotOffset + plotScale / 2;
   if (isNaN(value) || isNaN(minVal) || isNaN(maxVal)) {
     logger.warn(`[normalizeAndScale] NaN input detected: val=${value}, min=${minVal}, max=${maxVal}. Returning default offset.`);
     return plotOffset;
   }
   const clampedValue = Math.max(minVal, Math.min(value, maxVal));
   const normalized = (clampedValue - minVal) / (maxVal - minVal);
-  const result = normalized * plotScale + plotOffset;
-  return result;
+  return normalized * plotScale + plotOffset;
 };
 
 interface VoxelProps {
@@ -90,7 +87,7 @@ const SceneContent: React.FC<SceneContentProps> = ({
 }) => {
   logger.debug(`[SceneContent] Rendering. Opportunities: ${processedOpportunities.length}, PlotActive: ${isPlotActive}`);
   const { THREE, useThree, DreiOrbitControls, DreiBox, DreiText, DreiLine, DreiGrid } = r3fLibs;
-  const { scene } = useThree(); 
+  const { scene } = useThree();
 
   const { minX, maxX, minY, maxY, minZ, maxZ } = useMemo(() => {
     if (processedOpportunities.length === 0) return { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 };
@@ -105,22 +102,15 @@ const SceneContent: React.FC<SceneContentProps> = ({
     if (res.maxX - res.minX < 0.1) res.maxX = res.minX + 0.1;
     if (res.maxY - res.minY < 0.1) res.maxY = res.minY + 0.1;
     if (res.maxZ - res.minZ < 0.1) res.maxZ = res.minZ + 0.1;
-    logger.debug("[SceneContent useMemo Axes] Calculated axes:", res);
     return res;
   }, [processedOpportunities]);
 
-
   useEffect(() => { 
-    try {
-      scene.background = new THREE.Color(0x0A0F1A);
-      logger.debug("[SceneContent] useEffect: Scene background set.");
-    } catch(e) {
-        logger.error("[SceneContent] Error setting background:", e);
-    }
+    scene.background = new THREE.Color(0x0A0F1A);
+    logger.debug("[SceneContent] useEffect: Scene background set.");
   }, [scene, THREE]);
 
   if (!DreiLine || !DreiText || !DreiOrbitControls || !DreiGrid || !DreiBox) {
-      logger.error("[SceneContent] Essential Drei components missing for scene rendering!", r3fLibs);
       return <group><DreiText position={[0,0,0]} color="red" fontSize={0.5}>Error: Essential 3D components missing!</DreiText></group>;
   }
 
@@ -135,12 +125,10 @@ const SceneContent: React.FC<SceneContentProps> = ({
       
       <DreiLine points={[[plotOffset, plotOffset, plotOffset], [plotOffset + plotScale + 1, plotOffset, plotOffset]]} color="#FF5555" lineWidth={1.5} />
       <DreiText position={[plotOffset + plotScale + 1.5, plotOffset, plotOffset]} fontSize={0.25} color="#FFDDDD" anchorX="left">X: Reward</DreiText>
-      
       <DreiLine points={[[plotOffset, plotOffset, plotOffset], [plotOffset, plotOffset + plotScale + 1, plotOffset]]} color="#55FF55" lineWidth={1.5} />
       <DreiText position={[plotOffset - 0.3, plotOffset + plotScale + 1, plotOffset]} fontSize={0.25} color="#DDFFDD" anchorX="right" anchorY="middle">Y: Ezness</DreiText>
-
       <DreiLine points={[[plotOffset, plotOffset, plotOffset], [plotOffset, plotOffset, plotOffset + plotScale + 1]]} color="#5555FF" lineWidth={1.5} />
-      <DreiText position={[plotOffset, plotOffset - 0.3, plotOffset + plotScale + 1]} fontSize={0.25} color="#DDDDFF" anchorX="center" anchorY="top" rotation={[0,0,0]}>Z: 1/Effort</DreiText>
+      <DreiText position={[plotOffset, plotOffset - 0.3, plotOffset + plotScale + 1]} fontSize={0.25} color="#DDDDFF" anchorX="center" anchorY="top">Z: 1/Effort</DreiText>
 
       <DreiBox args={[0.1,0.1,0.1]} position={[0,0,0]}>
           <meshStandardMaterial color="magenta" />
@@ -151,17 +139,14 @@ const SceneContent: React.FC<SceneContentProps> = ({
         const posY = normalizeAndScale(pOp.y_ezness, minY, maxY, plotScale, plotOffset);
         const posZ = normalizeAndScale(pOp.z_inv_effort, minZ, maxZ, plotScale, plotOffset);
         
-        if (index < 10) { 
-            logger.debug(`[VOXEL #${index}] ID:${pOp.id.substring(0,4)} | Raw(R:${pOp.x_reward.toFixed(2)}, E:${pOp.y_ezness.toFixed(2)}, IE:${pOp.z_inv_effort.toFixed(2)}) | Scaled(X:${posX.toFixed(2)}, Y:${posY.toFixed(2)}, Z:${posZ.toFixed(2)}) | Size:${pOp.sizeValue.toFixed(2)} Clr:${pOp.colorValue}`);
-        }
-
+        if (index < 10) { logger.debug(`[VOXEL #${index}] ID:${pOp.id.substring(0,4)} | Raw(R:${pOp.x_reward.toFixed(2)}, E:${pOp.y_ezness.toFixed(2)}, IE:${pOp.z_inv_effort.toFixed(2)}) | Scaled(X:${posX.toFixed(2)}, Y:${posY.toFixed(2)}, Z:${posZ.toFixed(2)}) | Size:${pOp.sizeValue.toFixed(2)} Clr:${pOp.colorValue}`); }
         if (isNaN(posX) || isNaN(posY) || isNaN(posZ) || isNaN(pOp.sizeValue) || pOp.sizeValue <= 0) {
             logger.warn(`[SceneContent] Invalid data for voxel ${pOp.id.substring(0,4)}. Skipping.`, {x:posX, y:posY, z:posZ, size:pOp.sizeValue});
             return ( <DreiBox key={`error-${pOp.id}`} args={[0.1,0.1,0.1]} position={[0, Math.random()*0.1, 0]}> <meshStandardMaterial color="red" emissive="red" /> </DreiBox> );
         }
         return (<Voxel key={pOp.id} opportunity={pOp} onHover={setHoveredOpportunity} position={[posX, posY, posZ]} BoxComponent={DreiBox} castShadow />);
       })}
-      <DreiGrid args={[plotScale, plotScale]} sectionColor={'hsl(var(--brand-purple))'} cellColor={'hsla(var(--brand-purple-hsl), 0.2)'} position={[plotOffset + plotScale/2, plotOffset -0.05 , plotOffset + plotScale/2]} infiniteGrid={false} fadeDistance={plotScale * 2.5} sectionThickness={1} cellThickness={0.5} side={THREE.BackSide}/>
+      <DreiGrid args={[plotScale, plotScale]} sectionColor={'hsl(var(--brand-purple))'} cellColor={'hsla(var(--brand-purple), 0.2)'} position={[plotOffset + plotScale/2, plotOffset -0.05 , plotOffset + plotScale/2]} infiniteGrid={false} fadeDistance={plotScale * 2.5} sectionThickness={1} cellThickness={0.5} side={THREE.BackSide}/>
     </>
   );
 };
@@ -198,38 +183,29 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
     return <div className="p-4 text-brand-yellow animate-pulse min-h-[600px] flex items-center justify-center">Plot: Loading 3D library components...</div>;
   }
   
-  const { Canvas: R3FCanvas, DreiHtml } = libs;
+  const { Canvas: R3FCanvas } = libs;
 
-  if (opportunities.length === 0 && isTabActive) { 
-    return <p className="text-center text-muted-foreground p-8 min-h-[600px] flex items-center justify-center">No opportunities to visualize. Adjust filters or run simulation.</p>;
-  }
   if (!isTabActive) { 
       logger.debug("[ArbitrageVoxelPlot] Tab not active, rendering placeholder instead of Canvas.");
       return <div className="min-h-[600px] bg-gray-900/50 rounded-md flex items-center justify-center"><p className="text-gray-600 text-sm">Visualization Paused (Tab Inactive)</p></div>;
+  }
+
+  if (opportunities.length === 0) {
+    logger.debug("[ArbitrageVoxelPlot] No opportunities to display, rendering placeholder (tab is active).");
+    return <p className="text-center text-muted-foreground p-8 min-h-[600px] flex items-center justify-center">No opportunities to visualize based on current filters. Adjust filters or run simulation.</p>;
   }
   
   logger.debug(`[ArbitrageVoxelPlot] Rendering Canvas. Ops: ${opportunities.length}, TabActive: ${isTabActive}`);
   return (
     <div style={{ height: '600px', width: '100%', background: 'hsl(var(--card-background-rgb, 264 70% 11%))', borderRadius: '8px', position: 'relative', overflow: 'hidden', touchAction: isTabActive ? 'none' : 'auto' }} className="border border-brand-blue/60 shadow-xl shadow-brand-blue/25">
-      {opportunities.length > 0 ? (
-        <R3FCanvas dpr={[1, 1.5]} camera={{ position: [8, 7, 12], fov: 50, near: 0.1, far: 1000 }} shadows gl={{ antialias: true }}>
-          <SceneContent 
-            processedOpportunities={opportunities} 
-            setHoveredOpportunity={setHoveredOpportunity}
-            r3fLibs={libs}
-            isPlotActive={isTabActive}
-            // Passing props for useMemo inside SceneContent
-            minX={useMemo(() => opportunities.length ? Math.min(...opportunities.map(p => p.x_reward),0) : 0, [opportunities])}
-            maxX={useMemo(() => opportunities.length ? Math.max(...opportunities.map(p => p.x_reward),0.1) : 1, [opportunities])}
-            minY={useMemo(() => opportunities.length ? Math.min(...opportunities.map(p => p.y_ezness),0) : 0, [opportunities])}
-            maxY={useMemo(() => opportunities.length ? Math.max(...opportunities.map(p => p.y_ezness),0.1) : 1, [opportunities])}
-            minZ={useMemo(() => opportunities.length ? Math.min(...opportunities.map(p => p.z_inv_effort),0) : 0, [opportunities])}
-            maxZ={useMemo(() => opportunities.length ? Math.max(...opportunities.map(p => p.z_inv_effort),0.1) : 1, [opportunities])}
-          />
-        </R3FCanvas>
-      ) : ( 
-        <div className="w-full h-full flex items-center justify-center bg-gray-800/10"><p className="text-gray-500 italic">No data for current filters to visualize.</p></div>
-      )}
+      <R3FCanvas dpr={[1, 1.5]} camera={{ position: [8, 7, 12], fov: 50, near: 0.1, far: 1000 }} shadows gl={{ antialias: true }}>
+        <SceneContent 
+          processedOpportunities={opportunities} 
+          setHoveredOpportunity={setHoveredOpportunity}
+          r3fLibs={libs}
+          isPlotActive={isTabActive}
+        />
+      </R3FCanvas>
       {isTabActive && hoveredOpportunity && ( <div className="voxel-tooltip-wrapper" style={{ position: 'absolute', top: '10px', left: '10px', pointerEvents: 'none', zIndex: 100, background: 'hsla(var(--card-rgb, 22 8 49) / 0.92)', color: 'hsl(var(--card-foreground, 0 0% 95%))', fontSize: '10px', padding: '7px 9px', borderRadius: '5px', boxShadow: '0 1px 5px rgba(0,0,0,0.6)', maxWidth: '210px', border: '1px solid hsla(var(--brand-purple-hsl), 0.8)', backdropFilter: 'blur(3px)' }} > <p className="font-bold text-brand-cyan text-[11px] mb-1 border-b border-brand-cyan/25 pb-1"> {hoveredOpportunity.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsTurnRight:: " /> : <VibeContentRenderer content="::FaShuffle:: " />} {hoveredOpportunity.type === '2-leg' ? `${(hoveredOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,4)} → ${(hoveredOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,4)}` : (hoveredOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,7)} <span className="text-gray-400 ml-1.5">({hoveredOpportunity.currencyPair.substring(0,8)})</span> </p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{hoveredOpportunity.profitPercentage.toFixed(2)}%</span></p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Profit:</strong> <span className="text-brand-lime">${hoveredOpportunity.potentialProfitUSD.toFixed(2)}</span></p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Volume:</strong> ${hoveredOpportunity.tradeVolumeUSD}</p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Risk:</strong> {hoveredOpportunity.riskScore?.toFixed(2) ?? 'N/A'}</p> <p className="mt-1.5 text-[9px] text-gray-500 opacity-70">ID: {hoveredOpportunity.id.substring(0,10)}...</p> </div> )}
     </div>
   );
