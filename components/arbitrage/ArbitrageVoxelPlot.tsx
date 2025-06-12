@@ -10,7 +10,7 @@ import { debugLogger as logger } from '@/lib/debugLogger'; // Using debugLogger
 // Import ProcessedSandboxOpportunity from the sandbox page directly for strong typing
 import type { ProcessedSandboxOpportunity } from '@/app/elon/testbase/arbitrage-viz-sandbox/page';
 
-logger.debug("[ArbitrageVoxelPlot.tsx] File loaded by browser, component definition is being parsed."); // TOP LEVEL LOG
+logger.debug("[ArbitrageVoxelPlot.tsx] File loaded by browser, component definition is being parsed.");
 
 const normalizeAndScale = (value: number, minVal: number, maxVal: number, scaleFactor: number = 10, offset: number = -5) => {
   if (maxVal === minVal) return offset + scaleFactor / 2;
@@ -163,7 +163,7 @@ const SceneContent: React.FC<SceneContentProps> = ({
 };
 
 const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[] }> = ({ opportunities }) => {
-  logger.info("[ArbitrageVoxelPlot] Component FUNCTION CALLED. Opportunities count:", opportunities.length); // LOG AT THE VERY START
+  logger.info("[ArbitrageVoxelPlot] Component FUNCTION CALLED. Opportunities count:", opportunities.length);
   const [hoveredOpportunity, setHoveredOpportunity] = useState<ProcessedSandboxOpportunity | null>(null);
   const [isClientReady, setIsClientReady] = useState(false);
 
@@ -176,7 +176,6 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
   }, []); 
 
   const { minX, maxX, minY, maxY, minZ, maxZ } = useMemo(() => {
-    // ... (memo logic for axes as before)
     if (opportunities.length === 0) { logger.debug("[ArbitrageVoxelPlot useMemo Axes] No opportunities, returning default axes."); return { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 }; }
     const xs = opportunities.map(p => p.x_reward); const ys = opportunities.map(p => p.y_ezness); const zs = opportunities.map(p => p.z_inv_effort);
     const result = { minX: Math.min(...xs, 0), maxX: Math.max(...xs, 0.1), minY: Math.min(...ys, 0), maxY: Math.max(...ys, 0.1), minZ: Math.min(...zs, 0), maxZ: Math.max(...zs, 0.1) };
@@ -203,7 +202,6 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
           minX={minX} maxX={maxX} minY={minY} maxY={maxY} minZ={minZ} maxZ={maxZ}
         />
       </Canvas>
-      {/* ... Tooltip HTML (same as before) ... */}
       {hoveredOpportunity && ( <div className="voxel-tooltip-wrapper" style={{ position: 'absolute', top: '10px', left: '10px', pointerEvents: 'none', zIndex: 100, background: 'rgba(15, 5, 35, 0.92)', color: '#E8E8E8', fontSize: '10px', padding: '7px 9px', borderRadius: '5px', boxShadow: '0 1px 5px rgba(0,0,0,0.6)', maxWidth: '210px', border: '1px solid hsla(var(--brand-purple), 0.8)', backdropFilter: 'blur(3px)' }} > <p className="font-bold text-brand-cyan text-[11px] mb-1 border-b border-brand-cyan/25 pb-1"> {hoveredOpportunity.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsAltH:: " /> : <VibeContentRenderer content="::FaShareAlt:: " />} {hoveredOpportunity.type === '2-leg' ? `${(hoveredOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,4)} → ${(hoveredOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,4)}` : (hoveredOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,7)} <span className="text-gray-400 ml-1.5">({hoveredOpportunity.currencyPair.substring(0,8)})</span> </p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{hoveredOpportunity.profitPercentage.toFixed(2)}%</span></p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Profit:</strong> <span className="text-brand-lime">${hoveredOpportunity.potentialProfitUSD.toFixed(2)}</span></p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Volume:</strong> ${hoveredOpportunity.tradeVolumeUSD}</p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Risk:</strong> {hoveredOpportunity.riskScore?.toFixed(2) ?? 'N/A'}</p> <p className="mt-1.5 text-[9px] text-gray-500 opacity-70">ID: {hoveredOpportunity.id.substring(0,10)}...</p> </div> )}
     </div>
   );
