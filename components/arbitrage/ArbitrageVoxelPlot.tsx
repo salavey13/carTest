@@ -6,10 +6,11 @@ import { OrbitControls, Box, Text, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from '@/app/elon/arbitrage_scanner_types';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { logger } from '@/lib/logger';
+import { debugLogger as logger } from '@/lib/debugLogger'; // Using debugLogger
 // Import ProcessedSandboxOpportunity from the sandbox page directly for strong typing
 import type { ProcessedSandboxOpportunity } from '@/app/elon/testbase/arbitrage-viz-sandbox/page';
 
+logger.debug("[ArbitrageVoxelPlot.tsx] File loaded by browser, component definition is being parsed."); // TOP LEVEL LOG
 
 const normalizeAndScale = (value: number, minVal: number, maxVal: number, scaleFactor: number = 10, offset: number = -5) => {
   if (maxVal === minVal) return offset + scaleFactor / 2;
@@ -23,12 +24,14 @@ interface VoxelProps extends Omit<ThreeElements['mesh'], 'args'> {
 }
 
 const Voxel: React.FC<VoxelProps> = (props) => {
+  // logger.debug("[Voxel] Component rendering/re-rendering with opportunity:", props.opportunity.id.substring(0,4));
   const meshRef = useRef<THREE.Mesh>(null!);
   const [hovered, setHover] = useState(false);
   
   const { opportunity, onHover, ...restBoxProps } = props; 
 
   useEffect(() => {
+    // logger.debug(`[Voxel ${opportunity.id.substring(0,4)}] Mounted. Size: ${opportunity.sizeValue}, Color: ${opportunity.colorValue}`);
     if (meshRef.current) {
         meshRef.current.rotation.x = Math.random() * 0.05; 
         meshRef.current.rotation.y = Math.random() * 0.05;
@@ -95,12 +98,13 @@ interface SceneContentProps {
 const SceneContent: React.FC<SceneContentProps> = ({
   processedOpportunities, setHoveredOpportunity, minX, maxX, minY, maxY, minZ, maxZ
 }) => {
+  logger.debug("[SceneContent] Component rendering/re-rendering. Opportunities:", processedOpportunities.length);
   const { scene } = useThree();
 
   useEffect(() => {
-    logger.debug("[SceneContent] Mounted or props changed. Opportunities:", processedOpportunities.length);
+    logger.debug("[SceneContent] useEffect: Mounted or props changed. Opportunities:", processedOpportunities.length);
     return () => {
-      logger.debug("[SceneContent] Unmounting.");
+      logger.debug("[SceneContent] useEffect: Unmounting.");
     };
   }, [processedOpportunities, scene]);
 
@@ -159,7 +163,7 @@ const SceneContent: React.FC<SceneContentProps> = ({
 };
 
 const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[] }> = ({ opportunities }) => {
-  logger.debug("[ArbitrageVoxelPlot] Component rendering. Opportunities count:", opportunities.length);
+  logger.info("[ArbitrageVoxelPlot] Component FUNCTION CALLED. Opportunities count:", opportunities.length); // LOG AT THE VERY START
   const [hoveredOpportunity, setHoveredOpportunity] = useState<ProcessedSandboxOpportunity | null>(null);
   const [isClientReady, setIsClientReady] = useState(false);
 
@@ -167,38 +171,29 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
     logger.debug("[ArbitrageVoxelPlot] useEffect for isClientReady. Setting to true.");
     setIsClientReady(true); 
     return () => {
-        logger.debug("[ArbitrageVoxelPlot] Unmounting. isClientReady was:", isClientReady);
+        logger.debug("[ArbitrageVoxelPlot] useEffect for isClientReady: Unmounting. isClientReady was:", isClientReady);
     }
   }, []); 
 
   const { minX, maxX, minY, maxY, minZ, maxZ } = useMemo(() => {
-    if (opportunities.length === 0) {
-      logger.debug("[ArbitrageVoxelPlot useMemo Axes] No opportunities, returning default axes.");
-      return { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 };
-    }
-    const xs = opportunities.map(p => p.x_reward);
-    const ys = opportunities.map(p => p.y_ezness);
-    const zs = opportunities.map(p => p.z_inv_effort);
-    const result = {
-      minX: Math.min(...xs, 0), maxX: Math.max(...xs, 0.1),
-      minY: Math.min(...ys, 0), maxY: Math.max(...ys, 0.1),
-      minZ: Math.min(...zs, 0), maxZ: Math.max(...zs, 0.1)
-    };
-    logger.debug("[ArbitrageVoxelPlot useMemo Axes] Calculated axes:", result);
-    return result;
+    // ... (memo logic for axes as before)
+    if (opportunities.length === 0) { logger.debug("[ArbitrageVoxelPlot useMemo Axes] No opportunities, returning default axes."); return { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 }; }
+    const xs = opportunities.map(p => p.x_reward); const ys = opportunities.map(p => p.y_ezness); const zs = opportunities.map(p => p.z_inv_effort);
+    const result = { minX: Math.min(...xs, 0), maxX: Math.max(...xs, 0.1), minY: Math.min(...ys, 0), maxY: Math.max(...ys, 0.1), minZ: Math.min(...zs, 0), maxZ: Math.max(...zs, 0.1) };
+    logger.debug("[ArbitrageVoxelPlot useMemo Axes] Calculated axes:", result); return result;
   }, [opportunities]);
 
   if (!isClientReady) {
-    logger.debug("[ArbitrageVoxelPlot] Not client ready, rendering placeholder for Canvas.");
-    return <div className="min-h-[600px] flex items-center justify-center bg-gray-800/30 rounded-md"><p className="text-brand-cyan animate-pulse">Initializing 3D Voxel Universe...</p></div>;
+    logger.warn("[ArbitrageVoxelPlot] PRE-RENDER GUARD: Not client ready, rendering placeholder for Canvas.");
+    return <div className="min-h-[600px] flex items-center justify-center bg-gray-800/30 rounded-md"><p className="text-brand-cyan animate-pulse">Waiting for Client Hydration for 3D...</p></div>;
   }
 
   if (opportunities.length === 0) {
-    logger.debug("[ArbitrageVoxelPlot] No opportunities to display, rendering placeholder.");
+    logger.debug("[ArbitrageVoxelPlot] No opportunities to display, rendering placeholder (client is ready).");
     return <p className="text-center text-muted-foreground p-8 min-h-[600px] flex items-center justify-center">No opportunities to visualize based on current filters. Adjust filters or run simulation.</p>;
   }
   
-  logger.debug(`[ArbitrageVoxelPlot] Rendering Canvas with ${opportunities.length} processed opportunities.`);
+  logger.debug(`[ArbitrageVoxelPlot] Client is ready. Rendering Canvas with ${opportunities.length} processed opportunities.`);
   return (
     <div style={{ height: '600px', width: '100%', background: 'rgba(10, 2, 28, 0.9)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }} className="border border-brand-blue/60 shadow-lg shadow-brand-blue/20">
       <Canvas dpr={[1, 1.5]} camera={{ position: [8, 7, 12], fov: 50, near: 0.1, far: 1000 }} shadows >
@@ -208,27 +203,8 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
           minX={minX} maxX={maxX} minY={minY} maxY={maxY} minZ={minZ} maxZ={maxZ}
         />
       </Canvas>
-      {hoveredOpportunity && (
-        <div 
-            className="voxel-tooltip-wrapper" 
-            style={{ 
-                position: 'absolute', top: '10px', left: '10px', pointerEvents: 'none', zIndex: 100,
-                background: 'rgba(15, 5, 35, 0.92)', color: '#E8E8E8', fontSize: '10px',
-                padding: '7px 9px', borderRadius: '5px', boxShadow: '0 1px 5px rgba(0,0,0,0.6)',
-                maxWidth: '210px', border: '1px solid hsla(var(--brand-purple), 0.8)', backdropFilter: 'blur(3px)'
-            }} >
-            <p className="font-bold text-brand-cyan text-[11px] mb-1 border-b border-brand-cyan/25 pb-1">
-                {hoveredOpportunity.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsAltH:: " /> : <VibeContentRenderer content="::FaShareAlt:: " />}
-                {hoveredOpportunity.type === '2-leg' ? `${(hoveredOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,4)} → ${(hoveredOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,4)}` : (hoveredOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,7)}
-                <span className="text-gray-400 ml-1.5">({hoveredOpportunity.currencyPair.substring(0,8)})</span>
-            </p>
-            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{hoveredOpportunity.profitPercentage.toFixed(2)}%</span></p>
-            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Profit:</strong> <span className="text-brand-lime">${hoveredOpportunity.potentialProfitUSD.toFixed(2)}</span></p>
-            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Volume:</strong> ${hoveredOpportunity.tradeVolumeUSD}</p>
-            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Risk:</strong> {hoveredOpportunity.riskScore?.toFixed(2) ?? 'N/A'}</p>
-            <p className="mt-1.5 text-[9px] text-gray-500 opacity-70">ID: {hoveredOpportunity.id.substring(0,10)}...</p>
-        </div>
-      )}
+      {/* ... Tooltip HTML (same as before) ... */}
+      {hoveredOpportunity && ( <div className="voxel-tooltip-wrapper" style={{ position: 'absolute', top: '10px', left: '10px', pointerEvents: 'none', zIndex: 100, background: 'rgba(15, 5, 35, 0.92)', color: '#E8E8E8', fontSize: '10px', padding: '7px 9px', borderRadius: '5px', boxShadow: '0 1px 5px rgba(0,0,0,0.6)', maxWidth: '210px', border: '1px solid hsla(var(--brand-purple), 0.8)', backdropFilter: 'blur(3px)' }} > <p className="font-bold text-brand-cyan text-[11px] mb-1 border-b border-brand-cyan/25 pb-1"> {hoveredOpportunity.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsAltH:: " /> : <VibeContentRenderer content="::FaShareAlt:: " />} {hoveredOpportunity.type === '2-leg' ? `${(hoveredOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,4)} → ${(hoveredOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,4)}` : (hoveredOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,7)} <span className="text-gray-400 ml-1.5">({hoveredOpportunity.currencyPair.substring(0,8)})</span> </p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{hoveredOpportunity.profitPercentage.toFixed(2)}%</span></p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Profit:</strong> <span className="text-brand-lime">${hoveredOpportunity.potentialProfitUSD.toFixed(2)}</span></p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Volume:</strong> ${hoveredOpportunity.tradeVolumeUSD}</p> <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Risk:</strong> {hoveredOpportunity.riskScore?.toFixed(2) ?? 'N/A'}</p> <p className="mt-1.5 text-[9px] text-gray-500 opacity-70">ID: {hoveredOpportunity.id.substring(0,10)}...</p> </div> )}
     </div>
   );
 };
