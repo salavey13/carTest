@@ -162,7 +162,7 @@ export default function ArbitrageVizSandboxPage() {
   }, []);
 
   // --- Legend Component ---
-  const Legend WTF = () => (
+  const LegendWTF = () => (
     <Card className="mt-6 bg-dark-card/70 border border-brand-yellow/40 p-3">
       <CardHeader className="p-2">
         <CardTitle className="text-brand-yellow font-orbitron text-lg flex items-center">
