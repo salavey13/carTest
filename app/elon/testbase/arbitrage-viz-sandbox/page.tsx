@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
-import dynamic from 'next/dynamic'; // <<< СНОВА ИСПОЛЬЗУЕМ DYNAMIC
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,36 +33,39 @@ import { cn } from '@/lib/utils';
 const ArbitrageVoxelPlotWithNoSSR = dynamic(
   () => {
     logger.debug("[SandboxPage] DYNAMIC IMPORT FUNCTION CALLED: Attempting to import '@/components/arbitrage/ArbitrageVoxelPlot'...");
-    // Этот импорт не должен выполняться на сервере во время сборки, если ssr: false
     return import('@/components/arbitrage/ArbitrageVoxelPlot')
       .then((mod) => {
         logger.debug("[SandboxPage] DYNAMIC IMPORT SUCCESS: ArbitrageVoxelPlot module loaded.");
-        return mod; // Возвращаем модуль как есть, Next.js ожидает default export
+        return mod; 
       })
       .catch(err => {
-        logger.error("[SandboxPage] DYNAMIC IMPORT FAILED:", err);
-        // Возвращаем компонент-заглушку в случае ошибки импорта, чтобы страница не падала полностью
-        return () => <div className="text-red-500 p-4">Failed to load 3D Plot component. Error: {String(err)}</div>;
+        logger.error("[SandboxPage] DYNAMIC IMPORT FAILED (this is where 'S' error likely originates):", err);
+        // This fallback will be rendered if the import itself throws.
+        return () => (
+            <div className="text-red-500 p-4 bg-red-900/20 border border-red-700 rounded-md min-h-[400px] flex flex-col items-center justify-center">
+                <VibeContentRenderer content="::FaBomb className='text-4xl mb-2'::" />
+                <p className="font-bold">Failed to load 3D Plot Component.</p>
+                <p className="text-xs mt-1">Error during dynamic import (check console for details, likely the 'S' issue).</p>
+                <pre className="mt-2 text-xs bg-black/30 p-1 max-w-full overflow-auto">{String(err)}</pre>
+            </div>
+        );
       });
   },
   { 
-    ssr: false, // <<< CRUCIAL: Ensures component module is NOT processed during SSR/build for this page
+    ssr: false,
     loading: () => <LoadingVoxelPlotFallback />,
   }
 );
 
 const LoadingVoxelPlotFallback = () => {
   logger.debug("[SandboxPage] Rendering LoadingVoxelPlotFallback for dynamic import.");
-  return ( /* ... fallback UI ... */ <div className="p-4 border border-dashed border-brand-purple rounded-lg min-h-[400px] flex items-center justify-center bg-black/20"> <div className="text-center"> <VibeContentRenderer content="::FaSpinner className='text-5xl text-brand-purple mb-3 mx-auto animate-spin'::" /> <p className="text-lg text-brand-cyan">Loading 3D Voxel Universe...</p> </div> </div> );
+  return ( <div className="p-4 border border-dashed border-brand-purple rounded-lg min-h-[400px] flex items-center justify-center bg-black/20"> <div className="text-center"> <VibeContentRenderer content="::FaSpinner className='text-5xl text-brand-purple mb-3 mx-auto animate-spin'::" /> <p className="text-lg text-brand-cyan">Loading 3D Voxel Universe...</p> </div> </div> );
 };
 
-// ... (остальная часть компонента ArbitrageVizSandboxPage остается такой же, как в предыдущем ответе)
-// ... (ProcessedSandboxOpportunity interface, formatNum, Settings Panel, Filters, Tabs, LegendWTF, FilterSlider etc.)
-// Важно: Logger используется как debugLogger.
-
-// Для краткости, остальная часть файла такая же, как в твоем предыдущем успешном ответе, 
-// где была проблема с 'S', но теперь мы используем next/dynamic более агрессивно.
-// Я вставлю только начало и конец для структуры, подразумевая, что середина идентична.
+const formatNum = (num: number | undefined, digits = 2) => { // This function is fine here
+  if (typeof num === 'undefined') return 'N/A';
+  return num.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+};
 
 export interface ProcessedSandboxOpportunity extends ArbitrageOpportunity {
   x_reward: number; y_ezness: number; z_inv_effort: number;
@@ -75,25 +78,20 @@ export default function ArbitrageVizSandboxPage() {
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  // isClient теперь менее важен, так как next/dynamic должен управлять этим
-  // const [isClient, setIsClient] = useState(false);
-  // useEffect(() => { setIsClient(true); }, []);
-
-
+  
   const [rewardFilter, setRewardFilter] = useState<[number, number]>([0, 2]);
   const [eznessFilter, setEznessFilter] = useState<[number, number]>([0, 1]);
   const [effortFilter, setEffortFilter] = useState<[number, number]>([0, 1]);
   const [riskFilter, setRiskFilter] = useState<[number, number]>([0, 5]);
 
-  // ... (handleSettingsChange, handleExchangeToggle, calculateEERR, filteredAndProcessedOpportunities, handleRunSimulation, useEffect for initial run - ВСЕ ЭТИ ФУНКЦИИ ОСТАЮТСЯ ТАКИМИ ЖЕ)
   const calculateEERR = useCallback((op: ArbitrageOpportunity): ProcessedSandboxOpportunity => { const rewardScore = op.profitPercentage; const rawEzness = (Math.min(op.tradeVolumeUSD, 50000) / 50000) * 0.4 + (1 - Math.min((op as TwoLegArbitrageOpportunity).networkFeeUSD || 0, 50) / 50) * 0.4 + (op.type === '2-leg' ? 0.2 : 0.05); const rawEffort = (Math.min(op.tradeVolumeUSD, 50000) / 50000) * 0.5 + (op.type === '3-leg' ? 0.4 : 0.1) + (((op as TwoLegArbitrageOpportunity).buyFeePercentage || 0) + ((op as TwoLegArbitrageOpportunity).sellFeePercentage || 0)) / 200 * 0.1; const riskScore = parseFloat((rawEffort / (rawEzness > 0.01 ? rawEzness : 0.01)).toFixed(2)); return { ...op, x_reward: rewardScore, y_ezness: rawEzness,  z_inv_effort: 1 / (rawEffort > 0.01 ? rawEffort : 0.01), riskScore: riskScore, rawEzness: rawEzness, rawEffort: rawEffort, }; }, []);
   const filteredAndProcessedOpportunities = useMemo(() => { logger.debug("[SandboxPage] Memoizing filteredAndProcessedOpportunities. Raw opportunities count:", opportunities.length); const processed = opportunities.map(calculateEERR); const filtered = processed.filter(op =>  op.x_reward >= rewardFilter[0] && op.x_reward <= rewardFilter[1] && op.rawEzness >= eznessFilter[0] && op.rawEzness <= eznessFilter[1] && op.rawEffort >= effortFilter[0] && op.rawEffort <= effortFilter[1] && op.riskScore >= riskFilter[0] && op.riskScore <= riskFilter[1] ); logger.debug(`[SandboxPage] Processed: ${processed.length}, Filtered for plot: ${filtered.length}`); return filtered; }, [opportunities, calculateEERR, rewardFilter, eznessFilter, effortFilter, riskFilter]);
   const handleRunSimulation = useCallback(async () => { setIsLoading(true); setLogs(["Initiating sandbox simulation..."]); setOpportunities([]); logger.info("[SandboxPage] Running simulation with settings:", testSettings); try { const result = await fetchArbitrageOpportunitiesWithSettings(testSettings); setOpportunities(result.opportunities); setLogs(prev => [...prev, ...result.logs, `Simulation finished. Raw opportunities: ${result.opportunities.length}.`]); logger.info("[SandboxPage] Simulation result:", result); } catch (error) { logger.error("Error in sandbox simulation (handleRunSimulation):", error); setLogs(prev => [...prev, `CLIENT-SIDE ERROR: ${error instanceof Error ? error.message : String(error)}`]); } setIsLoading(false); }, [testSettings]);
-  useEffect(() => { logger.info("[SandboxPage] Initial mount, running simulation with default settings."); handleRunSimulation(); }, []); // Removed handleRunSimulation from deps for initial run only
+  useEffect(() => { logger.info("[SandboxPage] Initial mount, running simulation with default settings."); handleRunSimulation(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
   const LegendWTF = () => ( <Card className="mt-6 bg-dark-card/70 border border-brand-yellow/40 p-3"> <CardHeader className="p-2"> <CardTitle className="text-brand-yellow font-orbitron text-lg flex items-center"> <VibeContentRenderer content="::FaQuestionCircle className='mr-2'::" /> WTF is Going On Here? (Legend) </CardTitle> </CardHeader> <CardContent className="text-xs text-gray-300 space-y-1.5"> <p><strong className="text-brand-cyan">Axes:</strong></p> <ul className="list-disc list-inside pl-2"> <li><strong className="text-white">X (Reward):</strong> Profit Percentage (higher is better)</li> <li><strong className="text-white">Y (Ezness):</strong> Composite ease score (liquidity, low fees, 2-leg; higher is better)</li> <li><strong className="text-white">Z (1/Effort):</strong> Inverse effort score (capital, complexity; higher is better/less effort)</li> </ul> <p className="mt-2"><strong className="text-brand-cyan">Voxels (Opportunities):</strong></p> <ul className="list-disc list-inside pl-2"> <li><strong className="text-white">Color (Risk Score = Effort / Ezness):</strong></li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#32CD32] mr-1.5 shrink-0"></div>Low Risk, Good Reward (Alpha!)</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#FFD700] mr-1.5 shrink-0"></div>Moderate Risk/Reward</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#1E90FF] mr-1.5 shrink-0"></div>Good Reward, Manageable Risk</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#FF6347] mr-1.5 shrink-0"></div>High Risk</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#A9A9A9] mr-1.5 shrink-0"></div>Very Low Reward</li> <li className="flex items-center"><div className="w-3 h-3 rounded-full bg-[#8A2BE2] mr-1.5 shrink-0"></div>Default / Mid-Risk</li> <li><strong className="text-white">Size:</strong> Proportional to Trade Volume (USD)</li> </ul> <p className="mt-2 text-gray-400"><i>Aim for <span className="text-brand-lime">Lime Green</span> voxels in the far positive corner!</i></p> </CardContent> </Card> );
   const FilterSlider: React.FC<{label: string, value: [number, number], onChange: (value: [number, number]) => void, min: number, max: number, step: number}> = ({label, value, onChange, min, max, step}) => ( <div className="space-y-1.5"> <Label className="text-xs font-semibold text-gray-300 flex justify-between"> <span>{label}</span> <span className="text-brand-yellow">{value[0].toFixed(2)} - {value[1].toFixed(2)}</span> </Label> <Slider value={value} onValueChange={(newValue) => onChange(newValue as [number, number])} min={min} max={max} step={step} className="[&>span:first-child]:h-1.5 [&>span>span]:bg-brand-pink [&>span>span]:h-1.5 [&>span>span]:w-1.5 [&>span>span]:border-2 [&>span>span]:border-background [&>span>span]:scale-150"/> </div> );
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-purple-900/30 text-foreground p-4 pt-24 pb-12 font-mono">
@@ -105,7 +103,6 @@ export default function ArbitrageVizSandboxPage() {
             <Tabs defaultValue="visualization" className="w-full">
               <TabsList className="grid w-full grid-cols-3 bg-black/60 border border-brand-blue/50 backdrop-blur-sm"> <TabsTrigger value="visualization" className="font-orbitron text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow"> <VibeContentRenderer content="::FaChartBar className='mr-1.5'::"/>Visualization ({filteredAndProcessedOpportunities.length}) </TabsTrigger> <TabsTrigger value="rawData" className="font-orbitron text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow"> <VibeContentRenderer content="::FaListAlt className='mr-1.5'::"/>Raw Data ({opportunities.length}) </TabsTrigger> <TabsTrigger value="logs" className="font-orbitron text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow"> <VibeContentRenderer content="::FaTerminal className='mr-1.5'::"/>Logs </TabsTrigger> </TabsList>
               <TabsContent value="visualization" className="mt-4 p-1 bg-dark-card/30 border border-brand-blue/30 rounded-lg shadow-inner min-h-[620px]">
-                {/* Suspense is part of next/dynamic's loading prop, or wrap directly if still using React.lazy for other things */}
                 <ArbitrageVoxelPlotWithNoSSR opportunities={filteredAndProcessedOpportunities} />
               </TabsContent>
               <TabsContent value="rawData" className="mt-4 p-1"> <ScrollArea className="h-[600px] border border-brand-blue/30 rounded-lg bg-dark-card/30 p-3 simple-scrollbar"> {opportunities.length > 0 ? ( opportunities.map(op => ( <Card key={op.id} className="mb-3 bg-dark-bg/70 border-brand-purple/30 text-xs shadow-sm hover:border-brand-purple transition-colors"> <CardHeader className="p-2.5"> <CardTitle className={`text-sm font-semibold ${op.profitPercentage > (testSettings.minSpreadPercent + 0.2) ? 'text-brand-lime' : op.profitPercentage > testSettings.minSpreadPercent ? 'text-brand-yellow' : 'text-brand-orange'}`}> {op.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsLeftRight className='inline mr-1.5'::"/> : <VibeContentRenderer content="::FaRandom className='inline mr-1.5'::"/>} {op.type === '2-leg' ? ` ${op.currencyPair} (${(op as TwoLegArbitrageOpportunity).buyExchange} → ${(op as TwoLegArbitrageOpportunity).sellExchange})` : ` ${op.currencyPair} (${(op as ThreeLegArbitrageOpportunity).exchange})`} </CardTitle> <CardDescription className="text-gray-400 text-[0.7rem] pt-0.5">ID: {op.id.substring(0,8)}</CardDescription> </CardHeader> <CardContent className="p-2.5 pt-0 space-y-0.5"> <p>Spread: <strong className="text-white">{formatNum(op.profitPercentage, 3)}%</strong></p> <p>Profit (USD): <strong className="text-white">${formatNum(op.potentialProfitUSD)}</strong> (on ${formatNum(op.tradeVolumeUSD,0)} vol)</p> <p className="text-gray-400 text-[0.7rem] break-all">Details: {op.details}</p> {op.type === '2-leg' && <p className="text-gray-500 text-[0.65rem]">Net Fee: ${formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)} | Buy: {(op as TwoLegArbitrageOpportunity).buyPrice.toFixed(4)} | Sell: {(op as TwoLegArbitrageOpportunity).sellPrice.toFixed(4)}</p>} </CardContent> </Card> )) ) : ( <p className="text-center text-muted-foreground py-12">No opportunities generated with current settings.</p> )} </ScrollArea> </TabsContent> <TabsContent value="logs" className="mt-4 p-1"> <ScrollArea className="h-[600px] border border-brand-blue/30 rounded-lg bg-dark-card/30 p-3 simple-scrollbar"> <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all"> {logs.join('\n')} </pre> </ScrollArea> </TabsContent>
