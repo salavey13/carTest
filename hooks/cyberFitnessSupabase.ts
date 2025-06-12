@@ -920,3 +920,45 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
 export const TOKEN_ESTIMATION_FACTOR = 4;
 
 export { PERKS_BY_LEVEL };
+
+/**
+ * NEW: Spends KiloVibes for a user for a specific purchase.
+ * This is a transactional function. It will deduct KV and log the transaction.
+ */
+export async function spendKiloVibes(
+  userId: string, 
+  amount: number, 
+  reason: string
+): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  logger.info(`[spendKiloVibes] Attempting to spend ${amount} KV for user ${userId}. Reason: ${reason}`);
+  if (!userId || !amount || amount <= 0) {
+    return { success: false, error: "Invalid user ID or amount provided." };
+  }
+
+  const profileResult = await fetchUserCyberFitnessProfile(userId);
+  if (!profileResult.success || !profileResult.data) {
+    return { success: false, error: "Could not fetch user profile to check balance." };
+  }
+
+  const currentKiloVibes = profileResult.data.kiloVibes;
+  if (currentKiloVibes < amount) {
+    return { success: false, error: `Insufficient KiloVibes. Required: ${amount}, Available: ${currentKiloVibes.toFixed(2)}` };
+  }
+
+  // We use a negative value for the kiloVibes update
+  const updateResult = await updateUserCyberFitnessProfile(userId, { kiloVibes: -amount });
+  
+  if (!updateResult.success) {
+    logger.error(`[spendKiloVibes] Failed to update profile after KV deduction for user ${userId}. Error: ${updateResult.error}`);
+    // Potentially add logic here to refund if something goes wrong after deduction
+    return { success: false, error: "Failed to save KV deduction." };
+  }
+
+  const newBalance = updateResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.kiloVibes;
+  logger.info(`[spendKiloVibes] Successfully spent ${amount} KV for user ${userId}. New balance: ${newBalance?.toFixed(2)}. Reason: ${reason}`);
+
+  // Optional: Log this transaction to a separate table for auditing
+  // await supabaseAdmin.from('kv_transactions').insert({ user_id: userId, amount: -amount, reason: reason });
+
+  return { success: true, newBalance };
+}
