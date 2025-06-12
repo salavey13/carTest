@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { logger } from '@/lib/logger';
+import { debugLogger as logger } from '@/lib/debugLogger';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from "@/components/ui/slider";
 import {
