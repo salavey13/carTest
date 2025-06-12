@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react'; // Suspense is key
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,22 +12,23 @@ import { logger } from '@/lib/logger';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   fetchArbitrageOpportunitiesWithSettings,
-} from '@/app/elon/testbase/sandbox_actions'; // Import from new sandbox_actions
+} from '@/app/elon/testbase/sandbox_actions';
 import type {
   ArbitrageOpportunity,
   ArbitrageSettings,
   ExchangeName,
-  TwoLegArbitrageOpportunity, // Import for type checking
-  ThreeLegArbitrageOpportunity, // Import for type checking
-} from '@/app/elon/arbitrage_scanner_types'; // Adjusted path
+  TwoLegArbitrageOpportunity,
+  ThreeLegArbitrageOpportunity,
+} from '@/app/elon/arbitrage_scanner_types';
 import {
   DEFAULT_ARBITRAGE_SETTINGS,
   ALL_POSSIBLE_EXCHANGES_CONST,
-} from '@/app/elon/arbitrage_scanner_types'; // Adjusted path
+} from '@/app/elon/arbitrage_scanner_types';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 // --- 3D Visualization Component (Lazy Loaded) ---
+// Ensure the path is correct and the component default exports correctly
 const ArbitrageVoxelPlot = React.lazy(() => import('@/components/arbitrage/ArbitrageVoxelPlot'));
 
 const LoadingVoxelPlotFallback = () => (
@@ -39,24 +40,20 @@ const LoadingVoxelPlotFallback = () => (
   </div>
 );
 
-
-// --- Helper to format numbers ---
 const formatNum = (num: number | undefined, digits = 2) => {
   if (typeof num === 'undefined') return 'N/A';
   return num.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 };
-
 
 export default function ArbitrageVizSandboxPage() {
   const [testSettings, setTestSettings] = useState<ArbitrageSettings>({ ...DEFAULT_ARBITRAGE_SETTINGS });
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-
+  const [isClient, setIsClient] = useState(false); // Used to ensure React.lazy works only client-side
 
   useEffect(() => {
-    setIsClient(true); // Set client to true after mount to enable lazy loading
+    setIsClient(true);
   }, []);
 
   const handleSettingsChange = (field: keyof ArbitrageSettings, value: any) => {
@@ -65,9 +62,10 @@ export default function ArbitrageVizSandboxPage() {
 
   const handleExchangeToggle = (exchangeName: ExchangeName) => {
     setTestSettings(prev => {
-      const newEnabledExchanges = prev.enabledExchanges.includes(exchangeName)
-        ? prev.enabledExchanges.filter(ex => ex !== exchangeName)
-        : [...prev.enabledExchanges, exchangeName];
+      const currentEnabledExchanges = prev.enabledExchanges || [];
+      const newEnabledExchanges = currentEnabledExchanges.includes(exchangeName)
+        ? currentEnabledExchanges.filter(ex => ex !== exchangeName)
+        : [...currentEnabledExchanges, exchangeName];
       return { ...prev, enabledExchanges: newEnabledExchanges };
     });
   };
@@ -75,7 +73,7 @@ export default function ArbitrageVizSandboxPage() {
   const handleRunSimulation = useCallback(async () => {
     setIsLoading(true);
     setLogs(["Initiating sandbox simulation..."]);
-    setOpportunities([]); // Clear previous opportunities
+    setOpportunities([]);
     logger.info("[SandboxPage] Running simulation with settings:", testSettings);
     try {
       const result = await fetchArbitrageOpportunitiesWithSettings(testSettings);
@@ -90,11 +88,10 @@ export default function ArbitrageVizSandboxPage() {
   }, [testSettings]);
 
   useEffect(() => {
-    // Run simulation with default settings on initial mount
     logger.info("[SandboxPage] Initial mount, running simulation with default settings.");
     handleRunSimulation();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-purple-900/30 text-foreground p-4 pt-24 pb-12 font-mono">
@@ -109,7 +106,6 @@ export default function ArbitrageVizSandboxPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Settings Panel - Stealing UI from /app/settings/page.tsx */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -120,7 +116,6 @@ export default function ArbitrageVizSandboxPage() {
                 <VibeContentRenderer content="::FaSliders className='inline mr-2'::" />
                 Test Simulation Settings
             </h3>
-            
             <div className="space-y-1.5">
               <Label htmlFor="minSpread" className="text-xs font-semibold text-gray-300">Min Spread (%)</Label>
               <Input
@@ -130,7 +125,6 @@ export default function ArbitrageVizSandboxPage() {
                 className="input-cyber text-sm h-9 border-brand-purple/50 focus:border-brand-purple focus:ring-brand-purple"
               />
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="tradeVolume" className="text-xs font-semibold text-gray-300">Trade Volume (USD)</Label>
               <Input
@@ -140,7 +134,6 @@ export default function ArbitrageVizSandboxPage() {
                 className="input-cyber text-sm h-9 border-brand-purple/50 focus:border-brand-purple focus:ring-brand-purple"
               />
             </div>
-
             <div className="space-y-2">
               <Label className="text-xs font-semibold text-gray-300 block mb-1.5">Enabled Exchanges (Simulation)</Label>
               <ScrollArea className="h-[180px] border border-brand-purple/30 rounded-md p-2 bg-black/30 simple-scrollbar">
@@ -149,7 +142,7 @@ export default function ArbitrageVizSandboxPage() {
                     <div key={ex} className="flex items-center space-x-2 p-1.5 hover:bg-brand-purple/10 rounded">
                       <Checkbox
                         id={`ex-${ex}`}
-                        checked={testSettings.enabledExchanges.includes(ex)}
+                        checked={testSettings.enabledExchanges?.includes(ex) ?? false} // Ensure enabledExchanges is not undefined
                         onCheckedChange={() => handleExchangeToggle(ex)}
                         className="border-brand-purple data-[state=checked]:bg-brand-purple data-[state=checked]:text-black scale-90"
                       />
@@ -159,25 +152,22 @@ export default function ArbitrageVizSandboxPage() {
                 </div>
               </ScrollArea>
             </div>
-            
             <div className="space-y-1.5">
               <Label htmlFor="trackedPairs" className="text-xs font-semibold text-gray-300">Tracked Pairs (comma-separated)</Label>
               <Input
                 id="trackedPairs" type="text"
-                value={testSettings.trackedPairs.join(',')}
+                value={testSettings.trackedPairs?.join(',') ?? ''} // Ensure trackedPairs is not undefined
                 onChange={(e) => handleSettingsChange('trackedPairs', e.target.value.split(',').map(p => p.trim().toUpperCase()).filter(p => p))}
                 className="input-cyber text-sm h-9 border-brand-purple/50 focus:border-brand-purple focus:ring-brand-purple"
                 placeholder="BTC/USDT,ETH/BTC"
               />
             </div>
-
             <Button onClick={handleRunSimulation} disabled={isLoading} className="w-full bg-brand-orange text-black hover:bg-yellow-400 font-orbitron mt-3 py-2.5 text-base shadow-md hover:shadow-orange-glow">
               {isLoading ? <VibeContentRenderer content="::FaCog className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaPlay className='mr-2'::" />}
               {isLoading ? "Simulating..." : "Run Simulation"}
             </Button>
           </motion.div>
 
-          {/* Data Display Area */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -196,15 +186,15 @@ export default function ArbitrageVizSandboxPage() {
                     <VibeContentRenderer content="::FaTerminal className='mr-1.5'::"/>Logs
                 </TabsTrigger>
               </TabsList>
-              
               <TabsContent value="visualization" className="mt-4 p-1 bg-dark-card/30 border border-brand-blue/30 rounded-lg shadow-inner">
-                {isClient && (
+                {isClient ? ( // Only render Suspense and lazy component on the client
                     <Suspense fallback={<LoadingVoxelPlotFallback />}>
                         <ArbitrageVoxelPlot opportunities={opportunities} />
                     </Suspense>
+                ) : (
+                    <LoadingVoxelPlotFallback /> // Render fallback on server or before client mount
                 )}
               </TabsContent>
-
               <TabsContent value="rawData" className="mt-4 p-1">
                 <ScrollArea className="h-[600px] border border-brand-blue/30 rounded-lg bg-dark-card/30 p-3 simple-scrollbar">
                   {opportunities.length > 0 ? (
@@ -230,7 +220,6 @@ export default function ArbitrageVizSandboxPage() {
                   )}
                 </ScrollArea>
               </TabsContent>
-
               <TabsContent value="logs" className="mt-4 p-1">
                 <ScrollArea className="h-[600px] border border-brand-blue/30 rounded-lg bg-dark-card/30 p-3 simple-scrollbar">
                   <pre className="text-xs text-gray-300 whitespace-pre-wrap break-all">
