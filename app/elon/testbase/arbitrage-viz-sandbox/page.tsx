@@ -66,7 +66,7 @@ const LegendWTF: React.FC<{onSimulateTrade: () => void, isSimulateDisabled: bool
             <div className="mt-3 pt-2 border-t border-border dark:border-brand-yellow/20">
                 <Button onClick={onSimulateTrade} disabled={isSimulateDisabled} size="sm" variant="outline" className="text-xs border-brand-yellow/70 text-brand-yellow hover:bg-brand-yellow/10 w-full disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent">
                     <VibeContentRenderer content="::FaDiceD20 className='mr-1.5'::" /> 
-                    {isSimulateDisabled ? "Hover over a cube to simulate" : "Simulate This Trade!"}
+                    {isSimulateDisabled ? "Select a cube to simulate trade" : "Simulate This Trade!"}
                 </Button>
             </div>
         </CardContent> 
@@ -81,7 +81,7 @@ export default function ArbitrageVizSandboxPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("visualization");
-  const [hoveredOpportunity, setHoveredOpportunity] = useState<ProcessedSandboxOpportunity | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<ProcessedSandboxOpportunity | null>(null);
 
   const [rewardFilter, setRewardFilter] = useState<[number, number]>([DEFAULT_ARBITRAGE_SETTINGS.minSpreadPercent - 0.2, 5]);
   const [eznessFilter, setEznessFilter] = useState<[number, number]>([0.1, 1.0]);
@@ -96,21 +96,23 @@ export default function ArbitrageVizSandboxPage() {
   const handleExchangeToggle = (exchangeName: ExchangeName) => { setTestSettings(prev => { const currentEnabledExchanges = prev.enabledExchanges || []; const newEnabledExchanges = currentEnabledExchanges.includes(exchangeName) ? currentEnabledExchanges.filter(ex => ex !== exchangeName) : [...currentEnabledExchanges, exchangeName]; return { ...prev, enabledExchanges: newEnabledExchanges }; }); };
 
   const handleSimulateTrade = useCallback(() => {
-    if (!hoveredOpportunity) return;
-    const { riskScore, potentialProfitUSD } = hoveredOpportunity;
+    if (!selectedOpportunity) {
+        addToast("No opportunity selected!", "warning", { description: "Click a cube in the visualization to select it first."});
+        return;
+    }
+    const { riskScore, potentialProfitUSD } = selectedOpportunity;
     
-    // Simple game logic: higher risk = higher chance of failure
-    const successChance = Math.max(0.1, 1 - (riskScore / 5)); // e.g., risk 2.5 = 50% chance
+    const successChance = Math.max(0.1, 1 - (riskScore / 5)); 
     const roll = Math.random();
     
     if (roll < successChance) {
-      const earnedKV = Math.round(potentialProfitUSD * 10); // Gamified reward
+      const earnedKV = Math.round(potentialProfitUSD * 10);
       addToast(`✅ VIBE TRADE SUCCESS!`, "success", 5000, { description: `You 'earned' ${earnedKV} KiloVibes on this simulated trade!` });
     } else {
-      const lostKV = Math.round(potentialProfitUSD * 5); // Penalty
+      const lostKV = Math.round(potentialProfitUSD * 5);
       addToast(`❌ VIBE TRADE FAILED!`, "error", 5000, { description: `High risk detected! Exchange 'lagged'. You 'lost' ${lostKV} KiloVibes.` });
     }
-  }, [hoveredOpportunity, addToast]);
+  }, [selectedOpportunity, addToast]);
   
   return (
     <div className="min-h-screen bg-page-gradient text-foreground p-4 pt-24 pb-12 font-mono">
@@ -140,7 +142,18 @@ export default function ArbitrageVizSandboxPage() {
                 <InputWithSteppers label="Reward Filter (%)" id="reward-filter" value={rewardFilter[0]} onValueChange={(val) => setRewardFilter([val, rewardFilter[1]])} min={-5} max={rewardFilter[1]} step={0.1} bigStep={1} />
                 <InputWithSteppers label=" " id="reward-filter-max" value={rewardFilter[1]} onValueChange={(val) => setRewardFilter([rewardFilter[0], val])} min={rewardFilter[0]} max={20} step={0.1} bigStep={1} />
             </div>
-            {/* Add more filter inputs as needed */}
+            <div className="space-y-2">
+               <InputWithSteppers label="Ezness Filter" id="ezness-min" value={eznessFilter[0]} onValueChange={(val) => setEznessFilter([val, eznessFilter[1]])} min={0} max={eznessFilter[1]} step={0.05} bigStep={0.2} />
+               <InputWithSteppers label=" " id="ezness-max" value={eznessFilter[1]} onValueChange={(val) => setEznessFilter([eznessFilter[0], val])} min={eznessFilter[0]} max={1.5} step={0.05} bigStep={0.2} />
+            </div>
+             <div className="space-y-2">
+                <InputWithSteppers label="Effort Filter" id="effort-min" value={effortFilter[0]} onValueChange={(val) => setEffortFilter([val, effortFilter[1]])} min={0} max={effortFilter[1]} step={0.05} bigStep={0.2} />
+                <InputWithSteppers label=" " id="effort-max" value={effortFilter[1]} onValueChange={(val) => setEffortFilter([effortFilter[0], val])} min={effortFilter[0]} max={1.5} step={0.05} bigStep={0.2} />
+            </div>
+             <div className="space-y-2">
+                <InputWithSteppers label="Risk Filter" id="risk-min" value={riskFilter[0]} onValueChange={(val) => setRiskFilter([val, riskFilter[1]])} min={0} max={riskFilter[1]} step={0.1} bigStep={1} />
+                <InputWithSteppers label=" " id="risk-max" value={riskFilter[1]} onValueChange={(val) => setRiskFilter([riskFilter[0], val])} min={riskFilter[0]} max={20} step={0.1} bigStep={1} />
+            </div>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1, ease: "circOut" }} className="lg:col-span-3" >
             <Tabs defaultValue="visualization" className="w-full" onValueChange={setActiveTab}>
@@ -150,12 +163,12 @@ export default function ArbitrageVizSandboxPage() {
                 <TabsTrigger value="logs" className="font-orbitron text-xs sm:text-sm data-[state=active]:bg-brand-blue data-[state=active]:text-black data-[state=active]:shadow-blue-glow data-[state=inactive]:text-muted-foreground hover:data-[state=inactive]:text-foreground dark:data-[state=inactive]:text-gray-300 dark:hover:data-[state=inactive]:text-gray-100 transition-colors duration-200 py-2"> <VibeContentRenderer content="::FaAlignLeft className='mr-1 sm:mr-1.5'::"/>Logs </TabsTrigger> 
               </TabsList>
               <TabsContent value="visualization" className="mt-4 p-1 bg-card/50 dark:bg-dark-card/40 border border-border dark:border-brand-blue/40 rounded-lg shadow-inner min-h-[620px]">
-                <ArbitrageVoxelPlotWithNoSSR opportunities={filteredAndProcessedOpportunities} isTabActive={activeTab === "visualization"} onVoxelHover={setHoveredOpportunity} />
+                <ArbitrageVoxelPlotWithNoSSR opportunities={filteredAndProcessedOpportunities} isTabActive={activeTab === "visualization"} onVoxelSelect={setSelectedOpportunity} />
               </TabsContent>
-              <TabsContent value="rawData" className="mt-4 p-1"> <ScrollArea className="h-[600px] border border-border dark:border-brand-blue/40 rounded-lg bg-card/50 dark:bg-dark-card/40 p-3 simple-scrollbar"> {opportunities.length > 0 ? ( opportunities.map(op => ( <Card key={op.id} className="mb-3 bg-card dark:bg-dark-bg/80 border-border dark:border-brand-purple/40 text-xs shadow-md hover:border-brand-purple/70 transition-colors duration-150"> <CardHeader className="p-3"> <CardTitle className={cn( "text-sm font-semibold flex items-center justify-between" )}> <span className={cn("text-primary dark:text-brand-cyan", op.profitPercentage > (testSettings.minSpreadPercent + 0.5) ? 'dark:text-brand-lime' : op.profitPercentage > testSettings.minSpreadPercent ? 'dark:text-brand-yellow' : 'dark:text-brand-orange')}> {op.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsTurnRight className='inline mr-1.5 text-base align-middle'::"/> : <VibeContentRenderer content="::FaShuffle className='inline mr-1.5 text-base align-middle'::"/>} {op.type === '2-leg' ? ` ${(op as TwoLegArbitrageOpportunity).buyExchange} → ${(op as TwoLegArbitrageOpportunity).sellExchange}` : ` ${(op as ThreeLegArbitrageOpportunity).exchange}`} </span> <span className="text-xs text-muted-foreground font-mono">{op.currencyPair}</span> </CardTitle> <CardDescription className="text-muted-foreground text-[0.65rem] pt-0.5">ID: {op.id.substring(0,8)}...</CardDescription> </CardHeader> <CardContent className="p-3 pt-0 space-y-1"> <p className="text-foreground/90">Spread: <strong className="text-xl font-bold" style={{color: op.profitPercentage > (testSettings.minSpreadPercent + 0.7) ? 'hsl(var(--brand-lime))' : op.profitPercentage > testSettings.minSpreadPercent ? 'hsl(var(--brand-yellow))' : 'hsl(var(--brand-orange))'}}>{formatNum(op.profitPercentage, 3)}%</strong></p> <p className="text-foreground/90">Profit (USD): <strong className="text-lg font-semibold" style={{color: op.potentialProfitUSD > 20 ? 'hsl(var(--brand-green))' : op.potentialProfitUSD > 5 ? 'hsl(var(--brand-yellow))' : 'hsl(var(--brand-orange))'}}>${formatNum(op.potentialProfitUSD)}</strong> (on ${formatNum(op.tradeVolumeUSD,0)} vol)</p> <p className="text-muted-foreground text-[0.7rem] break-words leading-snug">Details: {op.details}</p> {op.type === '2-leg' && <p className="text-gray-400 dark:text-gray-500 text-[0.65rem] font-mono">Net Fee: ${formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)} | Buy: {(op as TwoLegArbitrageOpportunity).buyPrice.toFixed(4)} | Sell: {(op as TwoLegArbitrageOpportunity).sellPrice.toFixed(4)}</p>} </CardContent> </Card> ))) : ( <p className="text-center text-muted-foreground py-12">No opportunities generated with current settings.</p> )} </ScrollArea> </TabsContent> 
+              <TabsContent value="rawData" className="mt-4 p-1"> <ScrollArea className="h-[600px] border border-border dark:border-brand-blue/40 rounded-lg bg-card/50 dark:bg-dark-card/40 p-3 simple-scrollbar"> {opportunities.length > 0 ? ( opportunities.map(op => ( <Card key={op.id} className="mb-3 bg-card dark:bg-dark-bg/80 border-border dark:border-brand-purple/40 text-xs shadow-md hover:border-brand-purple/70 transition-colors duration-150"> <CardHeader className="p-3"> <CardTitle className={cn( "text-sm font-semibold flex items-center justify-between" )}> <span className={cn("text-primary dark:text-brand-cyan", op.profitPercentage > (testSettings.minSpreadPercent + 0.5) ? 'dark:text-brand-lime' : op.profitPercentage > testSettings.minSpreadPercent ? 'dark:text-brand-yellow' : 'dark:text-brand-orange')}> {op.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsTurnRight className='inline mr-1.5 text-base align-middle'::"/> : <VibeContentRenderer content="::FaShuffle className='inline mr-1.5 text-base align-middle'::"/>} {op.type === '2-leg' ? ` ${(op as TwoLegArbitrageOpportunity).buyExchange} → ${(op as TwoLegArbitrageOpportunity).sellExchange}` : ` ${(op as ThreeLegArbitrageOpportunity).exchange}`} </span> <span className="text-xs text-muted-foreground font-mono">{op.currencyPair}</span> </CardTitle> <CardDescription className="text-muted-foreground text-[0.65rem] pt-0.5">ID: {op.id.substring(0,8)}...</CardDescription> </CardHeader> <CardContent className="p-3 pt-0 space-y-1"> <p className="text-foreground/90">Spread: <strong className="text-xl font-bold" style={{color: op.profitPercentage > (testSettings.minSpreadPercent + 0.7) ? 'hsl(var(--brand-lime))' : op.profitPercentage > testSettings.minSpreadPercent ? 'hsl(var(--brand-yellow))' : 'hsl(var(--brand-orange))'}}>{formatNum(op.profitPercentage, 3)}%</strong></p> <p className="text-foreground/90">Profit (USD): <strong className="text-lg font-semibold" style={{color: op.potentialProfitUSD > 20 ? 'hsl(var(--brand-green))' : op.potentialProfitUSD > 5 ? 'hsl(var(--brand-yellow))' : 'hsl(var(--brand-orange))'}}>${formatNum(op.potentialProfitUSD)}</strong> (on ${formatNum(op.tradeVolumeUSD,0)} vol)</p> <p className="text-muted-foreground text-[0.7rem] break-words leading-snug">Details: {op.details}</p> {op.type === '2-leg' && <p className="text-gray-400 dark:text-gray-500 text-[0.65rem] font-mono">Net Fee: ${formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)} | Buy: {(op as TwoLegArbitrageOpportunity).buyPrice.toFixed(4)} | Sell: {(op as TwoLegArbitrageOpportunity).sellPrice.toFixed(4)}</p>} </CardContent> </Card> </Card> ))) : ( <p className="text-center text-muted-foreground py-12">No opportunities generated with current settings.</p> )} </ScrollArea> </TabsContent> 
               <TabsContent value="logs" className="mt-4 p-1"> <ScrollArea className="h-[600px] border border-border dark:border-brand-blue/40 rounded-lg bg-card/50 dark:bg-dark-card/40 p-3 simple-scrollbar"> <pre className="text-xs text-muted-foreground dark:text-gray-300 whitespace-pre-wrap break-all"> {logs.join('\n')} </pre> </ScrollArea> </TabsContent>
             </Tabs>
-            <LegendWTF onSimulateTrade={handleSimulateTrade} isSimulateDisabled={!hoveredOpportunity} />
+            <LegendWTF onSimulateTrade={handleSimulateTrade} isSimulateDisabled={!selectedOpportunity} />
           </motion.div>
         </CardContent>
       </Card>
