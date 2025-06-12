@@ -12,76 +12,81 @@ import type { ProcessedSandboxOpportunity } from '@/app/elon/testbase/arbitrage-
 
 
 const normalizeAndScale = (value: number, minVal: number, maxVal: number, scaleFactor: number = 10, offset: number = -5) => {
-  if (maxVal === minVal) return offset + scaleFactor / 2;
+  if (maxVal === minVal) return offset + scaleFactor / 2; // Avoid division by zero, center it
   const normalized = (value - minVal) / (maxVal - minVal);
   return normalized * scaleFactor + offset;
 };
 
-interface VoxelProps extends ThreeElements['mesh'] {
-  opportunity: ProcessedSandboxOpportunity; // Use the imported type
+// --- CORRECTED VoxelProps Interface ---
+interface VoxelProps extends Omit<ThreeElements['mesh'], 'args'> { // Omit 'args' from ThreeElements['mesh']
+  opportunity: ProcessedSandboxOpportunity;
   onHover: (op: ProcessedSandboxOpportunity | null) => void;
+  // args will be implicitly handled by <Box args={...} /> so we don't need to pass it explicitly
+  // If you intend to pass args for the Box directly, it would be:
+  // args?: [number, number, number];
 }
 
 const Voxel: React.FC<VoxelProps> = (props) => {
   const meshRef = useRef<THREE.Mesh>(null!);
   const [hovered, setHover] = useState(false);
   
-  const { opportunity, onHover, ...restBoxProps } = props; // Destructure opportunity and onHover
+  // Destructure props carefully
+  const { opportunity, onHover, ...restBoxProps } = props; 
 
   useEffect(() => {
     // logger.debug(`[Voxel ${opportunity.id.substring(0,4)}] Mounted. Size: ${opportunity.sizeValue}, Color: ${opportunity.colorValue}`);
-    // Optional: Add a small random offset to initial rotation to break uniformity if many voxels overlap
     if (meshRef.current) {
-        meshRef.current.rotation.x = Math.random() * 0.1;
-        meshRef.current.rotation.y = Math.random() * 0.1;
+        meshRef.current.rotation.x = Math.random() * 0.05; // Reduced random rotation
+        meshRef.current.rotation.y = Math.random() * 0.05;
     }
   }, [opportunity.id, opportunity.sizeValue, opportunity.colorValue]);
 
 
-  const handlePointerOver = (event: any) => {
+  const handlePointerOver = (event: React.MouseEvent<THREE.Mesh, MouseEvent>) => { // More specific event type
     event.stopPropagation();
     setHover(true);
     onHover(opportunity);
     if (meshRef.current?.material && (meshRef.current.material as THREE.MeshStandardMaterial).emissive) {
-      (meshRef.current.material as THREE.MeshStandardMaterial).emissive.set('darkorange'); // Brighter hover
+      (meshRef.current.material as THREE.MeshStandardMaterial).emissive.set('darkorange');
     }
   };
 
-  const handlePointerOut = (event: any) => {
+  const handlePointerOut = (event: React.MouseEvent<THREE.Mesh, MouseEvent>) => {
     event.stopPropagation();
     setHover(false);
     onHover(null);
     if (meshRef.current?.material && (meshRef.current.material as THREE.MeshStandardMaterial).emissive) {
-      (meshRef.current.material as THREE.MeshStandardMaterial).emissive.set(0x000000); // Black (no emission)
+      (meshRef.current.material as THREE.MeshStandardMaterial).emissive.set(0x000000);
     }
   };
   
-  const handleClick = (event: any) => {
+  const handleClick = (event: React.MouseEvent<THREE.Mesh, MouseEvent>) => {
     event.stopPropagation();
     onHover(opportunity); 
     logger.debug("[Voxel] Clicked:", opportunity);
   };
 
-  // Ensure sizeValue is a positive number for Box args
   const safeSize = Math.max(0.01, opportunity.sizeValue);
-
 
   return (
     <Box
-      {...restBoxProps} // Spread the rest of the props (like position)
+      {...restBoxProps} // Spread other props like position, castShadow etc.
       ref={meshRef}
-      args={[safeSize, safeSize, safeSize]}
-      onClick={handleClick}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
+      args={[safeSize, safeSize, safeSize]} // Args for the Box geometry
+      onClick={handleClick as any} // Cast to any if types are tricky with event specifics
+      onPointerOver={handlePointerOver as any}
+      onPointerOut={handlePointerOut as any}
       castShadow
       receiveShadow
     >
       <meshStandardMaterial 
         color={opportunity.colorValue} 
-        emissiveIntensity={hovered ? 0.8 : 0} 
-        roughness={0.6} 
-        metalness={0.2}
+        emissive={hovered ? 'darkorange' : 'black'} // Use emissive color string directly
+        emissiveIntensity={hovered ? 0.6 : 0} // Control intensity
+        roughness={0.5} 
+        metalness={0.3}
+        transparent // Enable transparency if opacity is used
+        opacity={hovered ? 1 : 0.85} // Make slightly transparent when not hovered
       />
     </Box>
   );
@@ -96,12 +101,12 @@ interface SceneContentProps {
 const SceneContent: React.FC<SceneContentProps> = ({
   processedOpportunities, setHoveredOpportunity, minX, maxX, minY, maxY, minZ, maxZ
 }) => {
-  const { scene, gl, camera } = useThree(); // gl for renderer, camera for controls target
+  const { scene } = useThree();
 
   useEffect(() => {
     logger.debug("[SceneContent] Mounted or props changed. Opportunities:", processedOpportunities.length);
-    // scene.background = new THREE.Color(0x0A021C); // Dark purple, almost black
-    // scene.fog = new THREE.FogExp2(0x0A021C, 0.05); // Subtle fog
+    // scene.background = new THREE.Color(0x0A021C);
+    // scene.fog = new THREE.Fog(0x0A021C, 10, 40); // Linear fog for depth
     
     return () => {
       logger.debug("[SceneContent] Unmounting.");
@@ -110,36 +115,38 @@ const SceneContent: React.FC<SceneContentProps> = ({
 
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.7} /> {/* Slightly more ambient light */}
       <directionalLight 
-        position={[15, 20, 10]} 
-        intensity={1.5} 
+        position={[15, 20, 15]} // Adjusted position
+        intensity={1.2} 
         castShadow 
-        shadow-mapSize-width={2048} // Higher res shadow map
-        shadow-mapSize-height={2048}
-        shadow-camera-far={50}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={15}
-        shadow-camera-bottom={-15}
+        shadow-mapSize-width={1024} 
+        shadow-mapSize-height={1024}
+        shadow-camera-far={60} // Increased far for larger scenes
+        shadow-camera-left={-20} shadow-camera-right={20}
+        shadow-camera-top={20} shadow-camera-bottom={-20}
       />
-      <pointLight position={[-10, -10, -10]} intensity={0.3} color="#5500ff" /> {/* Purple backlight */}
+      <pointLight position={[-15, -10, -15]} intensity={0.4} color="#6A0DAD" /> {/* Dimmer, different purple backlight */}
       <OrbitControls 
-        makeDefault // Important for multiple OrbitControls or if it's conditional
-        enablePan={true} 
-        enableZoom={true} 
-        enableRotate={true} 
-        minDistance={3} 
-        maxDistance={30}
-        target={[0,0,0]} // Ensure controls target the center of your scene
+        makeDefault 
+        enablePan={true} enableZoom={true} enableRotate={true} 
+        minDistance={2} maxDistance={40} // Adjusted max distance
+        target={[0,0,0]} 
       />
       
-      <axesHelper args={[5.5]} /> {/* Adjusted scale */}
-      <Text position={[6, 0.1, 0]} fontSize={0.2} color="#E0E0E0" anchorX="left">X: Reward</Text>
-      <Text position={[0.1, 6, 0]} fontSize={0.2} color="#E0E0E0" anchorX="left" anchorY="top" rotation={[0,0,Math.PI/2]}>Y: Ezness</Text>
-      <Text position={[0.1, 0, 6]} fontSize={0.2} color="#E0E0E0" rotation={[0, Math.PI/2, 0]} anchorY="bottom" anchorX="left">Z: 1/Effort</Text>
+      {/* Axes Lines using simple Line segments from Drei for clarity */}
+      <line position={[-5, -5, -5]} points={[[0,0,0], [11,0,0]]} color="red" lineWidth={2} /> {/* X axis */}
+      <Text position={[6, -0.3, -5]} fontSize={0.25} color="#E0E0E0" anchorX="center" anchorY="top">X: Reward</Text>
+      
+      <line position={[-5, -5, -5]} points={[[0,0,0], [0,11,0]]} color="green" lineWidth={2} /> {/* Y axis */}
+      <Text position={[-5.3, 6, -5]} fontSize={0.25} color="#E0E0E0" anchorX="right" anchorY="middle" rotation={[0,0,0]}>Y: Ezness</Text>
+
+      <line position={[-5, -5, -5]} points={[[0,0,0], [0,0,11]]} color="blue" lineWidth={2} /> {/* Z axis */}
+      <Text position={[-5, -5.3, 6]} fontSize={0.25} color="#E0E0E0" anchorX="center" anchorY="bottom" rotation={[0,0,0]}>Z: 1/Effort</Text>
+
 
       {processedOpportunities.map((pOp) => {
+        // Ensure positions are numbers
         const posX = normalizeAndScale(pOp.x_reward, minX, maxX, 10, -5);
         const posY = normalizeAndScale(pOp.y_ezness, minY, maxY, 10, -5);
         const posZ = normalizeAndScale(pOp.z_inv_effort, minZ, maxZ, 10, -5);
@@ -154,11 +161,11 @@ const SceneContent: React.FC<SceneContentProps> = ({
                 key={pOp.id}
                 opportunity={pOp}
                 onHover={setHoveredOpportunity}
-                position={[posX, posY, posZ]}
+                position={[posX, posY, posZ]} // Pass position as a prop
             />
         );
       })}
-      <gridHelper args={[10, 10, '#333', '#1a1a1a']} position={[0, -5.05, 0]} />
+      <gridHelper args={[10, 10, '#383838', '#202020']} position={[0, -5.05, 0]} />
     </>
   );
 };
@@ -170,11 +177,12 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
 
   useEffect(() => {
     logger.debug("[ArbitrageVoxelPlot] useEffect for isClientReady. Setting to true.");
-    setIsClientReady(true);
+    setIsClientReady(true); // This ensures Canvas only renders on client
     return () => {
         logger.debug("[ArbitrageVoxelPlot] Unmounting. isClientReady was:", isClientReady);
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // isClientReady should not be in dependencies here
 
   const { minX, maxX, minY, maxY, minZ, maxZ } = useMemo(() => {
     if (opportunities.length === 0) {
@@ -205,8 +213,8 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
   
   logger.debug(`[ArbitrageVoxelPlot] Rendering Canvas with ${opportunities.length} processed opportunities.`);
   return (
-    <div style={{ height: '600px', width: '100%', background: 'rgba(10, 2, 28, 0.85)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }} className="border border-brand-blue/50">
-      <Canvas dpr={[1, 1.5]} camera={{ position: [7, 6, 11], fov: 50, near: 0.1, far: 100 }} shadows >
+    <div style={{ height: '600px', width: '100%', background: 'rgba(10, 2, 28, 0.9)', borderRadius: '8px', position: 'relative', overflow: 'hidden' }} className="border border-brand-blue/60 shadow-lg shadow-brand-blue/20">
+      <Canvas dpr={[1, 1.5]} camera={{ position: [8, 7, 12], fov: 50, near: 0.1, far: 1000 }} shadows >
         <SceneContent 
           processedOpportunities={opportunities} 
           setHoveredOpportunity={setHoveredOpportunity}
@@ -218,20 +226,20 @@ const ArbitrageVoxelPlot: React.FC<{ opportunities: ProcessedSandboxOpportunity[
             className="voxel-tooltip-wrapper" 
             style={{ 
                 position: 'absolute', top: '10px', left: '10px', pointerEvents: 'none', zIndex: 100,
-                background: 'rgba(15, 5, 35, 0.9)', color: '#E0E0E0', fontSize: '10px',
-                padding: '6px 8px', borderRadius: '4px', boxShadow: '0 1px 5px rgba(0,0,0,0.4)',
-                maxWidth: '200px', border: '1px solid hsla(var(--brand-purple), 0.7)', backdropFilter: 'blur(2px)'
+                background: 'rgba(15, 5, 35, 0.92)', color: '#E8E8E8', fontSize: '10px',
+                padding: '7px 9px', borderRadius: '5px', boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
+                maxWidth: '210px', border: '1px solid hsla(var(--brand-purple), 0.8)', backdropFilter: 'blur(3px)'
             }} >
-            <p className="font-bold text-brand-cyan text-[11px] mb-1 border-b border-brand-cyan/20 pb-0.5">
+            <p className="font-bold text-brand-cyan text-[11px] mb-1 border-b border-brand-cyan/25 pb-1">
                 {hoveredOpportunity.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsAltH:: " /> : <VibeContentRenderer content="::FaShareAlt:: " />}
-                {hoveredOpportunity.type === '2-leg' ? `${(hoveredOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,3)}→${(hoveredOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,3)}` : (hoveredOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,6)}
-                <span className="text-gray-400 ml-1">({hoveredOpportunity.currencyPair.substring(0,7)})</span>
+                {hoveredOpportunity.type === '2-leg' ? `${(hoveredOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,4)} → ${(hoveredOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,4)}` : (hoveredOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,7)}
+                <span className="text-gray-400 ml-1.5">({hoveredOpportunity.currencyPair.substring(0,8)})</span>
             </p>
-            <p><strong className="text-gray-400 w-[40px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{hoveredOpportunity.profitPercentage.toFixed(2)}%</span></p>
-            <p><strong className="text-gray-400 w-[40px] inline-block">Profit:</strong> <span className="text-brand-lime">${hoveredOpportunity.potentialProfitUSD.toFixed(2)}</span></p>
-            <p><strong className="text-gray-400 w-[40px] inline-block">Volume:</strong> ${hoveredOpportunity.tradeVolumeUSD}</p>
-            <p><strong className="text-gray-400 w-[40px] inline-block">Risk:</strong> {hoveredOpportunity.riskScore?.toFixed(2) ?? 'N/A'}</p>
-            <p className="mt-1 text-[9px] text-gray-500 opacity-70">ID: {hoveredOpportunity.id.substring(0,8)}</p>
+            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{hoveredOpportunity.profitPercentage.toFixed(2)}%</span></p>
+            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Profit:</strong> <span className="text-brand-lime">${hoveredOpportunity.potentialProfitUSD.toFixed(2)}</span></p>
+            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Volume:</strong> ${hoveredOpportunity.tradeVolumeUSD}</p>
+            <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Risk:</strong> {hoveredOpportunity.riskScore?.toFixed(2) ?? 'N/A'}</p>
+            <p className="mt-1.5 text-[9px] text-gray-500 opacity-70">ID: {hoveredOpportunity.id.substring(0,10)}...</p>
         </div>
       )}
     </div>
