@@ -3,7 +3,7 @@
 import React from 'react';
 import { Button } from "./button";
 import { Input, type InputProps } from "./input";
-import { VibeContentRenderer } from '@/components/VibeContentRenderer'; // Assuming this path
+import { VibeContentRenderer } from '@/components/VibeContentRenderer'; 
 import { cn } from "@/lib/utils";
 
 interface InputWithSteppersProps extends InputProps {
@@ -16,7 +16,7 @@ interface InputWithSteppersProps extends InputProps {
   label?: string;
   id?: string;
   unit?: string;
-  description?: string;
+  description?: string; // Added for descriptions
 }
 
 export const InputWithSteppers: React.FC<InputWithSteppersProps> = ({
@@ -34,7 +34,7 @@ export const InputWithSteppers: React.FC<InputWithSteppersProps> = ({
   ...restInputProps
 }) => {
   const handleStep = (amount: number) => {
-    let newValue = parseFloat((value + amount).toFixed(Math.max(countDecimals(step), countDecimals(amount)) + 1)); // Handle float precision
+    let newValue = parseFloat((value + amount).toFixed(Math.max(countDecimals(step), countDecimals(amount)) + 1)); 
     if (min !== undefined) newValue = Math.max(min, newValue);
     if (max !== undefined) newValue = Math.min(max, newValue);
     onValueChange(newValue);
@@ -51,50 +51,58 @@ export const InputWithSteppers: React.FC<InputWithSteppersProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
-    if (rawValue === "") {
-        // Allow temporarily empty for typing, could reset to min on blur if desired
-        // For now, let parent decide if it's an invalid state / how to handle empty
-        // onValueChange(min !== undefined ? min : 0); // Example: reset to min if empty
-        return; // Or let it be, parent validation will catch it
+    if (rawValue === "" || rawValue === "-") { // Allow empty or just minus for typing
+        // Let onBlur handle final validation / setting default
+        // For direct typing, you might want to allow more flexibility
+        // For now, if it's not a parseable number, it won't update immediately
+        // but onBlur will correct it.
+        // If you want immediate update on every keystroke that forms a valid partial number,
+        // this logic would need to be more complex.
+        // For controlled input, the parent `value` will snap it back if invalid.
+        const numValue = parseFloat(rawValue);
+        if(!isNaN(numValue)) { // If it's a valid start of a number
+            onValueChange(numValue); // Allow partial update
+        } else if (rawValue === "" && min !== undefined) {
+            // onValueChange(min); // Or handle as desired
+        }
+        return;
     }
     let numValue = parseFloat(rawValue);
     if (!isNaN(numValue)) {
-        if (min !== undefined) numValue = Math.max(min, numValue);
-        if (max !== undefined) numValue = Math.min(max, numValue);
+        // No clamping here during typing, allow user to type out of bounds temporarily
+        // Clamping will happen onBlur or if parent re-renders with clamped value
         onValueChange(numValue);
     }
   };
   
-  const handleBlur = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     let numValue = parseFloat(e.target.value);
      if (isNaN(numValue)) {
-        numValue = min !== undefined ? min : 0; // Fallback to min or 0 if invalid on blur
+        numValue = (value !== undefined && !isNaN(value)) ? value : (min !== undefined ? min : 0); 
      }
     if (min !== undefined) numValue = Math.max(min, numValue);
     if (max !== undefined) numValue = Math.min(max, numValue);
-    onValueChange(numValue); // Ensure value is clamped on blur
+    onValueChange(numValue); 
   };
 
-
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       {label && (
-        <Label htmlFor={id || restInputProps.name} className="text-xs font-semibold text-gray-300 flex justify-between items-center">
-          <span>{label} {unit && `(${unit})`}</span>
-          {/* Display current value if not part of a range component */}
+        <Label htmlFor={id || restInputProps.name} className="text-xs font-semibold text-gray-300/80">
+          {label} {unit && <span className="text-gray-500">{`(${unit})`}</span>}
         </Label>
       )}
       <div className="flex items-center space-x-1">
-        <Button variant="outline" size="icon" onClick={() => handleStep(-bigStep)} className="h-8 w-8 border-brand-pink/70 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-50" disabled={min !== undefined && value <= min}>
+        <Button variant="outline" size="xs" onClick={() => handleStep(-bigStep)} className="h-8 w-8 px-1 border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-40" disabled={min !== undefined && value <= min} aria-label={`Decrease ${label} by ${bigStep}`}>
           <VibeContentRenderer content="::FaAngleDoubleLeft::" />
         </Button>
-        <Button variant="outline" size="icon" onClick={() => handleStep(-step)} className="h-8 w-8 border-brand-pink/70 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-50" disabled={min !== undefined && value <= min}>
+        <Button variant="outline" size="xs" onClick={() => handleStep(-step)} className="h-8 w-8 px-1 border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-40" disabled={min !== undefined && value <= min} aria-label={`Decrease ${label} by ${step}`}>
           <VibeContentRenderer content="::FaAngleLeft::" />
         </Button>
         <Input
           id={id || restInputProps.name}
           type="number"
-          value={value}
+          value={value} // Value should be number here
           onChange={handleInputChange}
           onBlur={handleBlur}
           step={step}
@@ -103,14 +111,14 @@ export const InputWithSteppers: React.FC<InputWithSteppersProps> = ({
           className={cn("input-cyber text-sm h-8 text-center focus:border-brand-pink focus:ring-brand-pink", className)}
           {...restInputProps}
         />
-        <Button variant="outline" size="icon" onClick={() => handleStep(step)} className="h-8 w-8 border-brand-pink/70 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-50" disabled={max !== undefined && value >= max}>
+        <Button variant="outline" size="xs" onClick={() => handleStep(step)} className="h-8 w-8 px-1 border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-40" disabled={max !== undefined && value >= max} aria-label={`Increase ${label} by ${step}`}>
           <VibeContentRenderer content="::FaAngleRight::" />
         </Button>
-        <Button variant="outline" size="icon" onClick={() => handleStep(bigStep)} className="h-8 w-8 border-brand-pink/70 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-50" disabled={max !== undefined && value >= max}>
+        <Button variant="outline" size="xs" onClick={() => handleStep(bigStep)} className="h-8 w-8 px-1 border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 disabled:opacity-40" disabled={max !== undefined && value >= max} aria-label={`Increase ${label} by ${bigStep}`}>
           <VibeContentRenderer content="::FaAngleDoubleRight::" />
         </Button>
       </div>
-      {description && <p className="text-xs text-muted-foreground pt-1">{description}</p>}
+      {description && <p className="text-[0.65rem] text-muted-foreground/80 pt-0.5 px-1">{description}</p>}
     </div>
   );
 };
