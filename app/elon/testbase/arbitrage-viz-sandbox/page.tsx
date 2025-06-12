@@ -42,7 +42,7 @@ const LoadingVoxelPlotFallback = () => { logger.debug("[SandboxPage] Rendering L
 const formatNum = (num: number | undefined, digits = 2) => { if (typeof num === 'undefined') return 'N/A'; return num.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });};
 export interface ProcessedSandboxOpportunity extends ArbitrageOpportunity { x_reward: number; y_ezness: number; z_inv_effort: number; riskScore: number; rawEzness: number; rawEffort: number;}
 
-// FilterInputRange is now InputWithSteppers for ranges, or direct Input for single values
+// InputWithSteppers is now InputWithSteppers for ranges, or direct Input for single values
 // We'll use InputWithSteppers directly in the JSX for filters.
 
 export default function ArbitrageVizSandboxPage() {
@@ -92,10 +92,10 @@ export default function ArbitrageVizSandboxPage() {
             <Button onClick={handleRunSimulation} disabled={isLoading} className="w-full bg-brand-orange text-black hover:bg-yellow-400 font-orbitron mt-2 py-2 text-sm shadow-md hover:shadow-orange-glow"> {isLoading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-1.5'::" /> : <VibeContentRenderer content="::FaPlayCircle className='mr-1.5'::" />} {isLoading ? "Simulating..." : "Run Simulation"} </Button> 
             
             <h3 className="text-lg font-orbitron text-brand-pink pt-3 mt-4 mb-3 border-t-2 border-brand-purple/40 pb-1.5 flex items-center"> <VibeContentRenderer content="::FaFilterCircleXmark className='inline mr-1.5'::" /> Display Filters </h3>
-            <FilterInputRange label="Reward Filter" unit="%" idPrefix="reward" value={rewardFilter} onChange={setRewardFilter} minLimit={-5} maxLimit={20} step={0.1} bigStep={1} description="Filter by Net Profit Percentage." />
-            <FilterInputRange label="Ezness Filter" idPrefix="ezness" value={eznessFilter} onChange={setEznessFilter} minLimit={0} maxLimit={1.5} step={0.01} bigStep={0.1} description="Filter by composite 'Ease Score' (0-1.x)." />
-            <FilterInputRange label="Effort Filter" idPrefix="effort" value={effortFilter} onChange={setEffortFilter} minLimit={0} maxLimit={1.5} step={0.01} bigStep={0.1} description="Filter by composite 'Effort Score' (0-1.x)."/>
-            <FilterInputRange label="Risk Filter" idPrefix="risk" value={riskFilter} onChange={setRiskFilter} minLimit={0} maxLimit={20} step={0.1} bigStep={1} description="Filter by 'Risk Score' (Effort/Ezness)."/>
+            <InputWithSteppers label="Reward Filter" unit="%" idPrefix="reward" value={rewardFilter} onChange={setRewardFilter} minLimit={-5} maxLimit={20} step={0.1} bigStep={1} description="Filter by Net Profit Percentage." />
+            <InputWithSteppers label="Ezness Filter" idPrefix="ezness" value={eznessFilter} onChange={setEznessFilter} minLimit={0} maxLimit={1.5} step={0.01} bigStep={0.1} description="Filter by composite 'Ease Score' (0-1.x)." />
+            <InputWithSteppers label="Effort Filter" idPrefix="effort" value={effortFilter} onChange={setEffortFilter} minLimit={0} maxLimit={1.5} step={0.01} bigStep={0.1} description="Filter by composite 'Effort Score' (0-1.x)."/>
+            <InputWithSteppers label="Risk Filter" idPrefix="risk" value={riskFilter} onChange={setRiskFilter} minLimit={0} maxLimit={20} step={0.1} bigStep={1} description="Filter by 'Risk Score' (Effort/Ezness)."/>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1, ease: "circOut" }} className="lg:col-span-3" >
             <Tabs defaultValue="visualization" className="w-full" onValueChange={setActiveTab}>
