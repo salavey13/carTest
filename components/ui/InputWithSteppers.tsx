@@ -45,21 +45,24 @@ export const InputWithSteppers: React.FC<InputWithSteppersProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     if (rawValue === "" || rawValue === "-") {
-      // Allow temporary empty state for typing
-      // The onBlur handler will clamp/validate the final value
-      // This provides a better UX than immediate clamping
-    }
-    const numValue = parseFloat(rawValue);
-    if (!isNaN(numValue)) {
-      onValueChange(numValue); // Update state as user types
+      // Allow user to clear the input or type a negative sign
+      // The onBlur event will handle validation if they leave it empty/invalid
+    } else {
+        const numValue = parseFloat(rawValue);
+        if (!isNaN(numValue)) {
+            // Update immediately as they type, but don't clamp yet for better UX
+            onValueChange(numValue);
+        }
     }
   };
   
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     let numValue = parseFloat(e.target.value);
      if (isNaN(numValue)) {
+        // If they leave it blank or invalid, revert to the last valid value or a default
         numValue = (value !== undefined && !isNaN(value)) ? value : (min !== undefined ? min : 0); 
      }
+    // Clamp the value on blur
     if (min !== undefined) numValue = Math.max(min, numValue);
     if (max !== undefined) numValue = Math.min(max, numValue);
     onValueChange(numValue); 
