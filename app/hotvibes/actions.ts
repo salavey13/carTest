@@ -1,48 +1,142 @@
 "use server";
 
 import { supabaseAdmin } from '@/hooks/supabase'; 
-import { sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
+import { sendTelegramMessage, sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
+import { spendKiloVibes, updateUserCyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
+import { getBaseUrl } from '@/lib/utils';
 
 type User = Database["public"]["Tables"]["users"]["Row"];
-type Invoice = Database["public"]["Tables"]["invoices"]["Row"];
 
 export interface ProtoCardDetails {
   cardId: string; 
   title: string;
   description: string;
   amountXTR: number;
+  amountKV?: number;
   type: string; 
   metadata?: Record<string, any>; 
 }
 
 /**
- * Инициирует покупку "ПротоКарточки": записывает инвойс в БД и отправляет его пользователю в Telegram.
+ * Grants access to a ProtoCard for a user and sends notification.
+ * This is a helper function to be called after a successful transaction (KV or XTR).
  */
-export async function purchaseProtoCardAction( // Renamed to be more descriptive of its role as a server action
-  userId: string, // userId must be passed in from the client-side component after fetching from context
+async function grantProtoCardAccess(
+  userId: string,
+  cardDetails: ProtoCardDetails,
+  paymentMethod: 'XTR' | 'KV',
+  transactionId: string
+): Promise<{success: boolean; error?: string}> {
+    logger.info(`[grantProtoCardAccess] Granting access for user ${userId}, card ${cardDetails.cardId} via ${paymentMethod}`);
+    
+    // Using a DB function to handle the metadata update atomically is safer.
+    // Let's create a plpgsql function for this. For now, we use rpc.
+    const { error: rpcError } = await supabaseAdmin.rpc('grant_protocard_access', {
+        p_user_id: userId,
+        p_card_id: cardDetails.cardId,
+        p_card_details: {
+            type: cardDetails.type,
+            purchased_at: new Date().toISOString(),
+            price: paymentMethod === 'XTR' ? `${cardDetails.amountXTR} XTR` : `${cardDetails.amountKV} KV`,
+            status: "active",
+            transaction_id: transactionId,
+            data: {
+                title: cardDetails.title,
+                description: cardDetails.description,
+                ...(cardDetails.metadata || {}),
+            }
+        }
+    });
+
+    if(rpcError) {
+        logger.error(`[grantProtoCardAccess] RPC grant_protocard_access failed for user ${userId}:`, rpcError);
+        return { success: false, error: "Database error while granting card access." };
+    }
+    
+    logger.info(`[grantProtoCardAccess] Successfully granted ProtoCard ${cardDetails.cardId} to user ${userId} via RPC.`);
+    
+    // Send success notifications
+    const cardTitleForNotification = cardDetails.title || `Карточка ${cardDetails.cardId}`;
+    let userMessage = `✅ Спасибо за покупку ПротоКарточки "${cardTitleForNotification}"! Она добавлена в ваш инвентарь. VIBE ON!`;
+    const baseUrl = getBaseUrl();
+    const pageLink = cardDetails.metadata?.page_link;
+    const demoLinkParam = cardDetails.metadata?.demo_link_param;
+
+    if (pageLink) {
+      userMessage += `\nДоступ открыт: ${baseUrl}${pageLink}`;
+    } else if (demoLinkParam) {
+      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'oneSitePlsBot';
+      const demoUrl = `https://t.me/${botUsername}/app?startapp=${demoLinkParam}`;
+      userMessage += `\nДоступ к демо для миссии: ${demoUrl}`;
+    }
+    
+    await sendTelegramMessage(userMessage, [], undefined, userId, undefined);
+
+    await sendTelegramMessage(
+      `🔔 [${paymentMethod}] Пользователь ${userId} приобрел ПротоКарточку "${cardTitleForNotification}" (ID: ${cardDetails.cardId}). Транзакция: ${transactionId}.`,
+      [], undefined, process.env.ADMIN_CHAT_ID, undefined
+    );
+    
+    return { success: true };
+}
+
+
+/**
+ * Инициирует покупку "ПротоКарточки": 
+ * Сначала пытается списать KiloVibes. Если не хватает, отправляет инвойс в Telegram.
+ */
+export async function purchaseProtoCardAction(
+  userId: string,
   cardDetails: ProtoCardDetails
-): Promise<{ success: boolean; invoiceId?: string; error?: string }> {
-  if (!userId || !cardDetails || !cardDetails.cardId || !cardDetails.title || cardDetails.amountXTR <= 0) {
-    logger.error("[HotVibesActions purchaseProtoCardAction] Invalid parameters", { userId, cardDetails });
-    return { success: false, error: "Неверные параметры для покупки ПротоКарточки." };
+): Promise<{ success: boolean; invoiceId?: string; error?: string; purchaseMethod?: 'KV' | 'XTR' | 'ALREADY_OWNED' | 'INSUFFICIENT_FUNDS' }> {
+  if (!userId || !cardDetails || !cardDetails.cardId || !cardDetails.title) {
+    logger.error("[HotVibesActions purchase] Invalid parameters", { userId, cardDetails });
+    return { success: false, error: "Неверные параметры для покупки." };
   }
 
+  // --- 1. Попытка покупки за KiloVibes ---
+  if (cardDetails.amountKV && cardDetails.amountKV > 0) {
+    logger.info(`[HotVibesActions purchase] Attempting to purchase card ${cardDetails.cardId} for ${cardDetails.amountKV} KV.`);
+    const spendResult = await spendKiloVibes(userId, cardDetails.amountKV, `Purchase ProtoCard: ${cardDetails.cardId}`);
+    
+    if (spendResult.success) {
+      logger.info(`[HotVibesActions purchase] Successfully spent KV for card ${cardDetails.cardId}.`);
+      const grantResult = await grantProtoCardAccess(userId, cardDetails, 'KV', `kv_purchase_${Date.now()}`);
+      
+      if (!grantResult.success) {
+          // IMPORTANT: Implement refund logic for KV if granting access fails
+          await updateUserCyberFitnessProfile(userId, { kiloVibes: cardDetails.amountKV }); // Refund
+          logger.error(`[HotVibesActions purchase] CRITICAL: Spent KV but failed to grant access for card ${cardDetails.cardId}. KV Refunded. Manual check needed.`);
+          return { success: false, error: `KV were spent, but access grant failed. Your KiloVibes have been refunded. Please contact support.`, purchaseMethod: 'KV' };
+      }
+      return { success: true, purchaseMethod: 'KV' };
+
+    } else if (spendResult.error && spendResult.error.includes("Insufficient")) {
+        logger.info(`[HotVibesActions purchase] Insufficient KV for user ${userId}. Falling back to XTR payment.`);
+        // Proceed to XTR payment flow
+    } else {
+        // Some other error occurred while trying to spend KV
+        logger.error(`[HotVibesActions purchase] Error spending KV for user ${userId}:`, spendResult.error);
+        return { success: false, error: `An error occurred with KiloVibe balance: ${spendResult.error}` };
+    }
+  }
+
+  // --- 2. Фолбэк на оплату XTR ---
+  if (!cardDetails.amountXTR || cardDetails.amountXTR <= 0) {
+    logger.warn(`[HotVibesActions purchase] No XTR price provided for card ${cardDetails.cardId}, and KV purchase failed or was not possible. Aborting.`);
+    return { success: false, error: "Недостаточно KiloVibes, и оплата в XTR недоступна.", purchaseMethod: 'INSUFFICIENT_FUNDS' };
+  }
+  
+  logger.info(`[HotVibesActions purchase] Proceeding with XTR payment for card ${cardDetails.cardId}.`);
   const invoicePayload = `protocard_${cardDetails.type}_${cardDetails.cardId}_${userId}_${Date.now()}`;
   const invoiceTypeForDb = `protocard_${cardDetails.type}`;
 
-  logger.info(`[HotVibesActions purchaseProtoCardAction] Preparing ProtoCard. UserID: ${userId}, CardID: ${cardDetails.cardId}, Amount: ${cardDetails.amountXTR} XTR, TypeInDB: ${invoiceTypeForDb}, Payload: ${invoicePayload}`);
-
   try {
-    // Шаг 1: Запись Инвойса в БД
     const dbInvoiceData: Database["public"]["Tables"]["invoices"]["Insert"] = {
-        id: invoicePayload,
-        user_id: userId,
-        type: invoiceTypeForDb,
-        amount: cardDetails.amountXTR,
-        status: 'pending',
-        currency: 'XTR',
+        id: invoicePayload, user_id: userId, type: invoiceTypeForDb,
+        amount: cardDetails.amountXTR, status: 'pending', currency: 'XTR',
         subscription_id: cardDetails.cardId, 
         metadata: {
             card_title: cardDetails.title,
@@ -52,40 +146,30 @@ export async function purchaseProtoCardAction( // Renamed to be more descriptive
         },
     };
     
-    const { data: createdInvoice, error: dbError } = await supabaseAdmin
-        .from('invoices')
-        .insert(dbInvoiceData)
-        .select()
-        .single();
+    const { data: createdInvoice, error: dbError } = await supabaseAdmin.from('invoices').insert(dbInvoiceData).select().single();
 
     if (dbError || !createdInvoice) {
-      logger.error("[HotVibesActions purchaseProtoCardAction] Failed to record ProtoCard invoice in DB:", dbError);
+      logger.error("[HotVibesActions purchase] Failed to record ProtoCard invoice in DB:", dbError);
       return { success: false, error: `Ошибка БД при создании счета: ${dbError?.message || 'Не удалось сохранить счет'}` };
     }
-    logger.info(`[HotVibesActions purchaseProtoCardAction] ProtoCard invoice ${createdInvoice.id} recorded in DB. DB invoice.subscription_id (CardID): ${createdInvoice.subscription_id}`);
+    logger.info(`[HotVibesActions purchase] ProtoCard invoice ${createdInvoice.id} recorded in DB for XTR payment.`);
 
-    // Шаг 2: Отправка Инвойса в Telegram
     const tgInvoiceResult = await tgSendInvoice(
-      userId,
-      cardDetails.title,
-      cardDetails.description,
-      invoicePayload, 
-      cardDetails.amountXTR,
-      0, 
+      userId, cardDetails.title, cardDetails.description,
+      invoicePayload, cardDetails.amountXTR, 0, 
       (cardDetails.metadata?.photo_url as string) || undefined
     );
 
     if (!tgInvoiceResult.success) {
-      logger.error("[HotVibesActions purchaseProtoCardAction] Failed to send ProtoCard invoice via Telegram:", tgInvoiceResult.error);
+      logger.error("[HotVibesActions purchase] Failed to send ProtoCard invoice via Telegram:", tgInvoiceResult.error);
       return { success: false, error: `Ошибка Telegram при отправке счета: ${tgInvoiceResult.error || 'Не удалось отправить счет'}` };
     }
 
-    logger.info(`[HotVibesActions purchaseProtoCardAction] ProtoCard invoice ${invoicePayload} sent to user ${userId} via Telegram successfully.`);
-    return { success: true, invoiceId: createdInvoice.id };
+    logger.info(`[HotVibesActions purchase] ProtoCard invoice ${invoicePayload} sent to user ${userId} via Telegram successfully.`);
+    return { success: true, invoiceId: createdInvoice.id, purchaseMethod: 'XTR' };
 
   } catch (error) {
-    logger.error("[HotVibesActions purchaseProtoCardAction] Critical error:", error);
-    const errorMsg = error instanceof Error ? error.message : "Неизвестная ошибка";
-    return { success: false, error: `Критическая ошибка: ${errorMsg}` };
+    logger.error("[HotVibesActions purchase] Critical error during XTR flow:", error);
+    return { success: false, error: `Критическая ошибка: ${error instanceof Error ? error.message : "Неизвестная ошибка"}` };
   }
 }
