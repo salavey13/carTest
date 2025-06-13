@@ -42,7 +42,6 @@ interface VipLeadDisplayProps {
 
 // Using a more abstract/cool background from Unsplash
 const MODAL_BACKGROUND_FALLBACK_VIP = "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?q=80&w=2071&auto=format&fit=crop";
-const PLACEHOLDER_DEMO_IMAGE_VIP = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/vibe_city_neon_future-2d7a8b9e-a9f9-4b1f-8e4d-9f6a123b4c5d.jpg"; 
 
 const vipPageTranslations = { 
   ru: {
