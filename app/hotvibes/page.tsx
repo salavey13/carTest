@@ -29,9 +29,12 @@ import Link from 'next/link';
 
 export const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 export const ELON_SIMULATOR_ACCESS_PRICE_XTR = 13;
+export const ELON_SIMULATOR_ACCESS_PRICE_KV = 100; // <<< NEW KV PRICE
 export const MISSION_SUPPORT_PRICE_XTR = 13; 
+export const MISSION_SUPPORT_PRICE_KV = 100; // <<< NEW KV PRICE
 export const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
+export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV = 50; // <<< NEW KV PRICE
 export const RUB_TO_XTR_RATE = 1 / 4.2; 
 
 const pageTranslations = {
@@ -46,9 +49,9 @@ const pageTranslations = {
         errorLoadingLeads: "Ошибка загрузки вайбов.",
         errorLoadingProfile: "Не удалось загрузить профиль CyberFitness.",
         lockedMissionRedirect: "Навык для этой миссии еще не открыт. Начинаем экспресс-тренировку...",
-        supportMissionBtnText: `Поддержать за ${MISSION_SUPPORT_PRICE_XTR} XTR`,
-        elonSimulatorAccessBtnText: `Доступ к Рынку Маска за ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR`,
-        pdfGeneratorAccessBtnText: `Доступ к PDF Генератору за ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
+        supportMissionBtnText: `Поддержать за ${MISSION_SUPPORT_PRICE_XTR} XTR / ${MISSION_SUPPORT_PRICE_KV} KV`,
+        elonSimulatorAccessBtnText: `Доступ: ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR / ${ELON_SIMULATOR_ACCESS_PRICE_KV} KV`,
+        pdfGeneratorAccessBtnText: `Доступ: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`,
         supportedText: "Поддержано",
         viewDemoText: "Смотреть Демо",
         goToSimulatorText: "К Симулятору Маска",
@@ -56,6 +59,8 @@ const pageTranslations = {
         filterAll: "Все Вайбы",
         filterSupported: "Мои ПротоКарты",
         backToLobby: "::FaArrowLeft:: К Лобби Вайбов",
+        purchaseSuccessKV: "Успешно! KiloVibes списаны, доступ предоставлен.",
+        purchaseFallbackToXTR: "Недостаточно KiloVibes. Предлагаем оплату в XTR.",
     },
     en: {
         pageTitle: "::FaFire:: HOT VIBES ::FaFire::",
@@ -68,9 +73,9 @@ const pageTranslations = {
         errorLoadingLeads: "Error loading vibes.",
         errorLoadingProfile: "Failed to load CyberFitness profile.",
         lockedMissionRedirect: "Skill for this mission not yet unlocked. Initiating express training...",
-        supportMissionBtnText: `Support for ${MISSION_SUPPORT_PRICE_XTR} XTR`,
-        elonSimulatorAccessBtnText: `Musk Market Access: ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR`,
-        pdfGeneratorAccessBtnText: `PDF Generator Access: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
+        supportMissionBtnText: `Support for ${MISSION_SUPPORT_PRICE_XTR} XTR / ${MISSION_SUPPORT_PRICE_KV} KV`,
+        elonSimulatorAccessBtnText: `Access: ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR / ${ELON_SIMULATOR_ACCESS_PRICE_KV} KV`,
+        pdfGeneratorAccessBtnText: `Access: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`,
         supportedText: "Supported",
         viewDemoText: "View Demo",
         goToSimulatorText: "To Musk Simulator",
@@ -78,6 +83,8 @@ const pageTranslations = {
         filterAll: "All Vibes",
         filterSupported: "My ProtoCards",
         backToLobby: "::FaArrowLeft:: Back to Lobby",
+        purchaseSuccessKV: "Success! KiloVibes spent, access granted.",
+        purchaseFallbackToXTR: "Insufficient KiloVibes. Proceeding with XTR payment.",
     }
 };
 
@@ -139,7 +146,7 @@ const elonSimulatorProtoCardData: HotLeadData = {
     client_name: "CyberVibe Games",
     ai_summary: "Узнай, как твиты и новости влияют на (фантомные) акции Tesla. Почувствуй VIBE нестабильности за XTR!",
     demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/elon_musk_meme_cybertruck_flames.png", 
-    potential_earning: `${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR`,
+    potential_earning: `${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR / ${ELON_SIMULATOR_ACCESS_PRICE_KV} KV`,
     required_quest_id: "none", 
     project_type_guess: "XTR Game/Simulator",
     status: "active_game",
@@ -152,7 +159,7 @@ const personalityPdfGeneratorCardData: HotLeadData = {
     client_name: "PsychoVibe Tools", 
     ai_summary: "Создавай персонализированные PDF-отчеты для психологической расшифровки. Вводи данные, получай результат для AI, генерируй PDF.",
     demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png", 
-    potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`,
+    potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`,
     required_quest_id: "none",
     project_type_guess: "Tool/Utility",
     status: "active_tool",
@@ -187,7 +194,9 @@ function HotVibesClientContent() {
   useEffect(() => {
     const fetchProfile = async () => {
       if (isAuthenticated && dbUser?.user_id) {
-        if (!cyberProfile || (dbUser?.updated_at && cyberProfile?.lastActivityTimestamp && dbUser.updated_at !== cyberProfile.lastActivityTimestamp)) {
+        // We now refresh the profile whenever the dbUser object itself changes,
+        // which happens after a successful purchase via `refreshDbUser`.
+        if (!cyberProfile || (dbUser?.updated_at && cyberProfile?.lastActivityTimestamp && dbUser.updated_at > cyberProfile.lastActivityTimestamp)) {
           logger.info("[HotVibes ProfileEffect] Fetching/Updating CyberFitness profile.");
           const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
           if (profileResult.success && profileResult.data) {
@@ -259,7 +268,7 @@ function HotVibesClientContent() {
                 if (vipResult.success && vipResult.data) {
                     const mappedVip = mapLeadToHotLeadData(vipResult.data as LeadDataFromActions, currentLang);
                     if (mappedVip.client_name === "AlexandraSergeevna" || mappedVip.notes === "/topdf") { 
-                        foundVip = { ...personalityPdfGeneratorCardData, id: mappedVip.id, kwork_gig_title: mappedVip.kwork_gig_title || personalityPdfGeneratorCardData.kwork_gig_title, ai_summary: mappedVip.ai_summary || personalityPdfGeneratorCardData.ai_summary, client_name: mappedVip.client_name, potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR`, notes: mappedVip.notes };
+                        foundVip = { ...personalityPdfGeneratorCardData, id: mappedVip.id, kwork_gig_title: mappedVip.kwork_gig_title || personalityPdfGeneratorCardData.kwork_gig_title, ai_summary: mappedVip.ai_summary || personalityPdfGeneratorCardData.ai_summary, client_name: mappedVip.client_name, potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`, notes: mappedVip.notes };
                     } else {
                         foundVip = mappedVip;
                     }
@@ -283,17 +292,7 @@ function HotVibesClientContent() {
         loadPageDataCore();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialVipCheckDone, appCtxLoading, isAuthenticating, JSON.stringify(dbUser?.metadata?.xtr_protocards), targetVipIdentifier, loadPageDataCore]);
-
-  const handleSelectLeadForVip = (lead: HotLeadData) => {
-    logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top when VIP view is opened
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('lead_identifier', lead.id);
-    window.history.pushState({ ...window.history.state, as: currentUrl.pathname + currentUrl.search, url: currentUrl.pathname + currentUrl.search }, '', currentUrl.pathname + currentUrl.search);
-    
-    setTargetVipIdentifier(lead.id); 
-  };
+  }, [isInitialVipCheckDone, appCtxLoading, isAuthenticating, dbUser, targetVipIdentifier]);
 
   const handleBackToLobby = () => {
     logger.info(`[HotVibes] Returning to lobby view.`);
@@ -312,26 +311,30 @@ function HotVibesClientContent() {
     if (processingCardId) return; 
 
     setProcessingCardId(cardToPurchase.id);
-    let price: number;
+    let priceXTR: number;
+    let priceKV: number;
     let cardType: string;
     let specificMetadata: Record<string, any> = {};
     let cardTitle = cardToPurchase.kwork_gig_title || "ПротоКарточка Доступа";
     let cardDescription = cardToPurchase.ai_summary || "Доступ к эксклюзивному контенту или инструменту.";
 
     if (cardToPurchase.id === ELON_SIMULATOR_CARD_ID) {
-        price = ELON_SIMULATOR_ACCESS_PRICE_XTR;
+        priceXTR = ELON_SIMULATOR_ACCESS_PRICE_XTR;
+        priceKV = ELON_SIMULATOR_ACCESS_PRICE_KV;
         cardType = "simulation_access";
         specificMetadata = { page_link: "/elon", simulator_name: "Рынок Маска" };
         cardTitle = elonSimulatorProtoCardData.kwork_gig_title!;
         cardDescription = elonSimulatorProtoCardData.ai_summary!;
     } else if (cardToPurchase.id === PERSONALITY_REPORT_PDF_CARD_ID || cardToPurchase.notes === "/topdf") {
-        price = PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR;
+        priceXTR = PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR;
+        priceKV = PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV;
         cardType = "tool_access";
         specificMetadata = { page_link: "/topdf", tool_name: "AI Генератор PDF Отчетов" };
         cardTitle = personalityPdfGeneratorCardData.kwork_gig_title!;
         cardDescription = personalityPdfGeneratorCardData.ai_summary!;
     } else { 
-        price = MISSION_SUPPORT_PRICE_XTR;
+        priceXTR = MISSION_SUPPORT_PRICE_XTR;
+        priceKV = MISSION_SUPPORT_PRICE_KV;
         cardType = "mission_support";
         specificMetadata = { 
             associated_lead_id: cardToPurchase.id, 
@@ -344,7 +347,8 @@ function HotVibesClientContent() {
       cardId: cardToPurchase.id, 
       title: cardTitle,
       description: cardDescription,
-      amountXTR: price,
+      amountXTR: priceXTR,
+      amountKV: priceKV, // <<< PASSING THE KV PRICE
       type: cardType,
       metadata: {
           ...specificMetadata,
@@ -354,10 +358,16 @@ function HotVibesClientContent() {
 
     try {
       const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
+
       if (result.success) {
-        addToast("Запрос на ПротоКарточку отправлен! Проверьте Telegram для оплаты счета.", "success");
+        if (result.purchaseMethod === 'KV') {
+          addToast(t.purchaseSuccessKV, "success");
+        } else if (result.purchaseMethod === 'XTR') {
+          addToast(t.purchaseFallbackToXTR, "info", { description: "Проверьте Telegram для оплаты счета." });
+        }
+        // Refresh user data to reflect new card/KV balance
         if(refreshDbUser) {
-            setTimeout(async () => { await refreshDbUser(); }, 7000); 
+            await refreshDbUser();
         }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
@@ -454,6 +464,9 @@ function HotVibesClientContent() {
     return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
   }
 
+  // ... (rest of the component remains the same) ...
+  // ... (No changes to the JSX structure, just the logic that feeds it) ...
+
   if (activeVipLead) { 
     return (
       <div className="relative min-h-screen bg-gradient-to-br from-black via-slate-900 to-purple-900/50 text-foreground overflow-x-hidden py-20 md:py-24">
@@ -518,7 +531,7 @@ function HotVibesClientContent() {
               </CardTitle>
               {cyberProfile && ( 
                 <CardDescription className="font-mono text-center text-xs text-gray-300 dark:text-gray-400">
-                 Агент Ур. {cyberProfile.level} | Показано: {displayedLeads.filter(l => !l.isSpecial || activeFilter === 'supported').length} (Фильтр: {activeFilter === 'all' ? t.filterAll : t.filterSupported})
+                 Агент Ур. {cyberProfile.level} | KV: {cyberProfile.kiloVibes.toFixed(0)} | Показано: {displayedLeads.filter(l => !l.isSpecial || activeFilter === 'supported').length} (Фильтр: {activeFilter === 'all' ? t.filterAll : t.filterSupported})
                 </CardDescription>
               )}
               <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2 justify-center">
