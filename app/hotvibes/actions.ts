@@ -2,8 +2,9 @@
 
 import { supabaseAdmin } from '@/hooks/supabase'; 
 import { sendTelegramMessage, sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
-import { spendKiloVibes, updateUserCyberFitnessProfile, fetchUserCyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
-import { logger } from "@/lib/logger"; // Correct logger
+// MODIFIED: `updateUserCyberFitnessProfile` removed, `addKiloVibes` added for clean refunds.
+import { spendKiloVibes, addKiloVibes, fetchUserCyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
+import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types";
 import { getBaseUrl } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ export interface ProtoCardDetails {
   metadata?: Record<string, any>; 
 }
 
+// This function is correct as it calls the RPC you will be adding. No changes needed.
 async function grantProtoCardAccess(
   userId: string,
   cardDetails: ProtoCardDetails,
@@ -27,6 +29,7 @@ async function grantProtoCardAccess(
 ): Promise<{success: boolean; error?: string}> {
     logger.info(`[grantProtoCardAccess] Granting card '${cardDetails.cardId}' to user ${userId} via ${paymentMethod}.`);
     
+    // This call now relies on the `grant_protocard_access` function you'll add.
     const { error: rpcError } = await supabaseAdmin.rpc('grant_protocard_access', {
         p_user_id: userId,
         p_card_id: cardDetails.cardId,
@@ -98,6 +101,7 @@ export async function purchaseProtoCardAction(
 
   if (cardDetails.amountKV && cardDetails.amountKV > 0) {
     logger.info(`[purchaseProtoCardAction] Attempting KV payment for card ${cardDetails.cardId} (${cardDetails.amountKV} KV).`);
+    // This correctly uses the helper which calls the `adjust_kilovibes` RPC.
     const spendResult = await spendKiloVibes(userId, cardDetails.amountKV, `Purchase ProtoCard: ${cardDetails.cardId}`);
     
     if (spendResult.success) {
@@ -105,9 +109,21 @@ export async function purchaseProtoCardAction(
       const grantResult = await grantProtoCardAccess(userId, cardDetails, 'KV', `kv_purchase_${Date.now()}`);
       
       if (!grantResult.success) {
-          await updateUserCyberFitnessProfile(userId, { kiloVibes: cardDetails.amountKV });
-          logger.error(`[purchaseProtoCardAction] CRITICAL: Spent KV but failed to grant access for card ${cardDetails.cardId}. KV Refunded.`);
-          return { success: false, error: `KV were spent, but access grant failed. Your KiloVibes have been refunded. Please contact support.`, purchaseMethod: 'KV' };
+          // --- CORRECTED REFUND LOGIC ---
+          // Use the new, dedicated addKiloVibes function for a clean refund.
+          // This avoids calling the large updateUserCyberFitnessProfile function.
+          const refundReason = `Refund for failed ProtoCard grant: ${cardDetails.cardId}`;
+          const refundResult = await addKiloVibes(userId, cardDetails.amountKV, refundReason);
+          
+          if (!refundResult.success) {
+            logger.error(`[purchaseProtoCardAction] CRITICAL-CRITICAL: FAILED TO REFUND KV for user ${userId}. Amount: ${cardDetails.amountKV}. Reason: ${refundResult.error}`);
+            // Optionally, send an admin alert about the failed refund
+          } else {
+            logger.info(`[purchaseProtoCardAction] Successfully refunded ${cardDetails.amountKV} KV to user ${userId}.`);
+          }
+
+          logger.error(`[purchaseProtoCardAction] CRITICAL: Spent KV but failed to grant access for card ${cardDetails.cardId}. KV Refund attempted.`);
+          return { success: false, error: `KV were spent, but access grant failed. Your KiloVibes have been refunded. Please contact support if the balance is incorrect.`, purchaseMethod: 'KV' };
       }
       return { success: true, purchaseMethod: 'KV' };
 
