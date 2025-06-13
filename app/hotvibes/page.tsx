@@ -7,15 +7,14 @@ const HotVibesClientContent = dynamic(
   () => import('./HotVibesClientContent'),
   { 
     ssr: false, // This is the key to preventing server-side rendering issues
-    loading: () => <TutorialLoader message="Инициализация VIBE-пространства..." /> 
+    loading: () => <TutorialLoader message="Загрузка Кибер-Пространства..." /> 
   }
 );
 
 // The page component is now a simple server component wrapper.
-// It no longer needs searchParams as the client component will handle it.
 export default function HotVibesPage() {
   return (
-    <Suspense fallback={<TutorialLoader message="Загрузка Кибер-Пространства..." />}>
+    <Suspense fallback={<TutorialLoader message="Инициализация VIBE-пространства..." />}>
       <HotVibesClientContent />
     </Suspense>
   );
