@@ -304,7 +304,7 @@ export default function HotVibesClientContent() {
     logger.info(`[HotVibes] URL params cleaned for lobby view. New path: ${pathname}`);
   };
   
-  const handlePurchaseProtoCard = async (cardToPurchase: HotLeadData) => {
+  const handlePurchaseProtoCard = async (cardToPurchase: HotLeadData, paymentMethodHint?: 'KV' | 'XTR') => {
     if (!isAuthenticated || !dbUser?.user_id) {
       addToast("Сначала авторизуйтесь для покупки ПротоКарточки!", "error");
       return;
@@ -355,7 +355,7 @@ export default function HotVibesClientContent() {
     };
 
     try {
-      const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
+      const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails, paymentMethodHint);
       if (result.success) {
         if (result.purchaseMethod === 'KV') {
           addToast(t.purchaseSuccessKV, "success");
@@ -364,7 +364,7 @@ export default function HotVibesClientContent() {
         }
         if(refreshDbUser) { await refreshDbUser(); }
       } else {
-        addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
+        addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error", {description: `Метод: ${paymentMethodHint || 'auto'}`});
       }
     } catch (error) {
       addToast("Ошибка при запросе на покупку ПротоКарточки.", "error");
@@ -475,10 +475,11 @@ export default function HotVibesClientContent() {
           >
             <VipLeadDisplay 
               lead={activeVipLead} 
+              cyberProfile={cyberProfile}
               currentLang={currentLang}
               isMissionUnlocked={cyberProfile ? (activeVipLead.required_quest_id && activeVipLead.required_quest_id !== "none" ? checkQuestUnlocked(activeVipLead.required_quest_id, cyberProfile.completedQuests || [], QUEST_ORDER) : true) : false}
               onExecuteMission={() => handleExecuteMission(activeVipLead.id, activeVipLead.required_quest_id)}
-              onSupportMission={() => handlePurchaseProtoCard(activeVipLead)} 
+              onSupportMission={(lead, method) => handlePurchaseProtoCard(lead, method)} 
               isSupported={getIsSupported(activeVipLead.id)} 
               isProcessingThisCard={processingCardId === activeVipLead.id}
               translations={t}
