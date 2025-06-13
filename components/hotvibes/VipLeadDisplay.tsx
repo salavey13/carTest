@@ -1,3 +1,4 @@
+// /components/hotvibes/VipLeadDisplay.tsx
 "use client";
 
 import React from 'react';
