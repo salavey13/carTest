@@ -29,12 +29,12 @@ import Link from 'next/link';
 
 export const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 export const ELON_SIMULATOR_ACCESS_PRICE_XTR = 13;
-export const ELON_SIMULATOR_ACCESS_PRICE_KV = 100; // <<< NEW KV PRICE
+export const ELON_SIMULATOR_ACCESS_PRICE_KV = 100;
 export const MISSION_SUPPORT_PRICE_XTR = 13; 
-export const MISSION_SUPPORT_PRICE_KV = 100; // <<< NEW KV PRICE
+export const MISSION_SUPPORT_PRICE_KV = 100;
 export const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
-export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV = 50; // <<< NEW KV PRICE
+export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV = 50;
 export const RUB_TO_XTR_RATE = 1 / 4.2; 
 
 const pageTranslations = {
@@ -190,13 +190,10 @@ function HotVibesClientContent() {
     setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en');
   }, [tgUser?.language_code, platform]);
 
-  // Effect to fetch/update CyberFitness profile
   useEffect(() => {
     const fetchProfile = async () => {
       if (isAuthenticated && dbUser?.user_id) {
-        // We now refresh the profile whenever the dbUser object itself changes,
-        // which happens after a successful purchase via `refreshDbUser`.
-        if (!cyberProfile || (dbUser?.updated_at && cyberProfile?.lastActivityTimestamp && dbUser.updated_at > cyberProfile.lastActivityTimestamp)) {
+        if (!cyberProfile || (dbUser?.updated_at && cyberProfile?.lastActivityTimestamp && new Date(dbUser.updated_at) > new Date(cyberProfile.lastActivityTimestamp))) {
           logger.info("[HotVibes ProfileEffect] Fetching/Updating CyberFitness profile.");
           const profileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
           if (profileResult.success && profileResult.data) {
@@ -207,15 +204,14 @@ function HotVibesClientContent() {
           }
         }
       } else if (!isAuthenticated && cyberProfile) {
-        setCyberProfile(null); // Clear profile if user logs out
+        setCyberProfile(null);
       }
     };
-    if (!appCtxLoading && !isAuthenticating) { // Ensure app context is ready
+    if (!appCtxLoading && !isAuthenticating) {
         fetchProfile();
     }
   }, [isAuthenticated, dbUser, appCtxLoading, isAuthenticating, cyberProfile, addToast, t.errorLoadingProfile]);
 
-  // Effect for initial VIP identification from URL or startParam
   useEffect(() => {
     if (!appCtxLoading && !isAuthenticating && !isInitialVipCheckDone) {
       const leadIdFromUrl = searchParamsHook.get('lead_identifier');
@@ -234,7 +230,6 @@ function HotVibesClientContent() {
     }
   }, [startParamPayload, searchParamsHook, appCtxLoading, isAuthenticating, isInitialVipCheckDone]);
   
-  // Core data loading logic (leads, resolving VIP lead)
   const loadPageDataCore = useCallback(async () => {
     logger.info(`[HotVibes loadPageDataCore] Triggered. TargetVIP_ID: ${targetVipIdentifier}, AppCtxLoading: ${appCtxLoading}, isInitialAuthDone: ${isInitialVipCheckDone}`);
     
@@ -286,13 +281,22 @@ function HotVibesClientContent() {
     setPageLoading(false);
   }, [dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, isInitialVipCheckDone, targetVipIdentifier]); 
 
-  // Effect to run core data loading logic
   useEffect(() => {
     if (isInitialVipCheckDone && !appCtxLoading && !isAuthenticating) { 
         loadPageDataCore();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialVipCheckDone, appCtxLoading, isAuthenticating, dbUser, targetVipIdentifier]);
+  }, [isInitialVipCheckDone, appCtxLoading, isAuthenticating, dbUser, targetVipIdentifier, loadPageDataCore]);
+
+  // <<< FIX: FUNCTION RE-ADDED >>>
+  const handleSelectLeadForVip = useCallback((lead: HotLeadData) => {
+    logger.info(`[HotVibes] Manually selecting lead for VIP display: ${lead.id}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('lead_identifier', lead.id);
+    window.history.pushState({ ...window.history.state, as: currentUrl.pathname + currentUrl.search, url: currentUrl.pathname + currentUrl.search }, '', currentUrl.pathname + currentUrl.search);
+    
+    setTargetVipIdentifier(lead.id); 
+  }, []);
 
   const handleBackToLobby = () => {
     logger.info(`[HotVibes] Returning to lobby view.`);
@@ -348,7 +352,7 @@ function HotVibesClientContent() {
       title: cardTitle,
       description: cardDescription,
       amountXTR: priceXTR,
-      amountKV: priceKV, // <<< PASSING THE KV PRICE
+      amountKV: priceKV,
       type: cardType,
       metadata: {
           ...specificMetadata,
@@ -365,7 +369,6 @@ function HotVibesClientContent() {
         } else if (result.purchaseMethod === 'XTR') {
           addToast(t.purchaseFallbackToXTR, "info", { description: "Проверьте Telegram для оплаты счета." });
         }
-        // Refresh user data to reflect new card/KV balance
         if(refreshDbUser) {
             await refreshDbUser();
         }
@@ -419,7 +422,7 @@ function HotVibesClientContent() {
     }
     addToast(`${t.missionActivated} (Lead: ${leadId.substring(0,6)}..., Quest: ${targetQuestId})`, "success");
     const finalDemoLinkParam = navTarget || leadData?.client_name || leadId; 
-    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&startapp=${finalDemoLinkParam}`); // Removed flow=liveFireMission
+    router.push(`/repo-xml?leadId=${leadId}&questId=${targetQuestId}&startapp=${finalDemoLinkParam}`);
   }, [isAuthenticated, dbUser, cyberProfile, router, t.lockedMissionRedirect, t.missionActivated, addToast, lobbyLeads, activeVipLead, setCyberProfile]);
   
   const getIsSupported = useCallback((cardId: string): boolean => {
@@ -463,9 +466,6 @@ function HotVibesClientContent() {
   if ((appCtxLoading || (isAuthenticated && !cyberProfile && !pageLoading)) && !activeVipLead) { 
     return <TutorialLoader message="Инициализация VIBE-пространства..."/>;
   }
-
-  // ... (rest of the component remains the same) ...
-  // ... (No changes to the JSX structure, just the logic that feeds it) ...
 
   if (activeVipLead) { 
     return (
