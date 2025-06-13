@@ -6,9 +6,8 @@ import type { ProcessedSandboxOpportunity } from '@/app/elon/testbase/arbitrage-
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import type { TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from '@/app/elon/arbitrage_scanner_types';
 
-logger.debug("[ArbitrageVoxelPlot.tsx] V4 (Full Voxel Logic). File loaded.");
+logger.debug("[ArbitrageVoxelPlot.tsx] V5 (Prop Fix). File loaded.");
 
-// --- Dynamically Loaded R3F/Three Libs ---
 type R3FLibs = {
   THREE: typeof import('three');
   Canvas: typeof import('@react-three/fiber').Canvas;
@@ -18,7 +17,9 @@ type R3FLibs = {
   Text: React.FC<any>;
   Line: React.FC<any>;
   Grid: React.FC<any>;
-  // Add any other Drei components you need
+  error?: any;
+  errorMessage?: string;
+  errorStack?: string;
 };
 
 const normalizeAndScale = (value: number, minVal: number, maxVal: number, plotScale: number = 10, plotOffset: number = 0): number => {
@@ -29,7 +30,6 @@ const normalizeAndScale = (value: number, minVal: number, maxVal: number, plotSc
   return normalized * plotScale + plotOffset;
 };
 
-// --- Voxel Component with Hover and Click ---
 interface VoxelProps {
   position: [number, number, number];
   opportunity: ProcessedSandboxOpportunity;
@@ -78,7 +78,6 @@ const Voxel: React.FC<VoxelProps> = ({ opportunity, onHover, onClick, isSelected
   );
 };
 
-// --- Scene Component ---
 interface SceneContentProps {
   opportunities: ProcessedSandboxOpportunity[];
   onHover: (op: ProcessedSandboxOpportunity | null) => void;
@@ -93,7 +92,6 @@ const SceneContent: React.FC<SceneContentProps> = ({ opportunities, onHover, onC
   const { scene } = useThree();
 
   const { minX, maxX, minY, maxY, minZ, maxZ } = useMemo(() => {
-    // ... same axis calculation as before ...
     if (opportunities.length === 0) return { minX: 0, maxX: 1, minY: 0, maxY: 1, minZ: 0, maxZ: 1 };
     const xs = opportunities.map(p => p.x_reward).filter(v => !isNaN(v)); 
     const ys = opportunities.map(p => p.y_ezness).filter(v => !isNaN(v)); 
@@ -111,8 +109,16 @@ const SceneContent: React.FC<SceneContentProps> = ({ opportunities, onHover, onC
 
   useEffect(() => { scene.background = new THREE.Color(0x0A0F1C); }, [scene, THREE]);
 
-  const plotScale = 12; // Slightly larger plot area
+  const plotScale = 12;
   const plotOffset = -plotScale / 2;
+
+  const processedOpportunities = useMemo(() => opportunities.map(pOp => {
+    const posX = normalizeAndScale(pOp.x_reward, minX, maxX, plotScale, plotOffset);
+    const posY = normalizeAndScale(pOp.y_ezness, minY, maxY, plotScale, plotOffset);
+    const posZ = normalizeAndScale(pOp.z_inv_effort, minZ, maxZ, plotScale, plotOffset);
+    if (isNaN(posX) || isNaN(posY) || isNaN(posZ) || isNaN(pOp.sizeValue) || pOp.sizeValue <= 0) return null;
+    return { ...pOp, position: [posX, posY, posZ] as [number, number, number] };
+  }).filter(Boolean) as (ProcessedSandboxOpportunity & { position: [number, number, number] })[], [opportunities, minX, maxX, minY, maxY, minZ, maxZ, plotScale, plotOffset]);
 
   return (
     <>
@@ -129,25 +135,21 @@ const SceneContent: React.FC<SceneContentProps> = ({ opportunities, onHover, onC
       <Line points={[[plotOffset, plotOffset, plotOffset], [plotOffset, plotOffset, plotOffset + plotScale + 1]]} color="#45A6E5" lineWidth={2} />
       <Text position={[plotOffset, plotOffset, plotScale + 1.3]} fontSize={0.25} color="#D4F1F9" anchorX="center" anchorY="middle" rotation-x={-Math.PI / 8}>Z: 1/Effort</Text>
 
-      {processedOpportunities.map((pOp) => {
-        const posX = normalizeAndScale(pOp.x_reward, minX, maxX, plotScale, plotOffset);
-        const posY = normalizeAndScale(pOp.y_ezness, minY, maxY, plotScale, plotOffset);
-        const posZ = normalizeAndScale(pOp.z_inv_effort, minZ, maxZ, plotScale, plotOffset);
-        if (isNaN(posX) || isNaN(posY) || isNaN(posZ) || isNaN(pOp.sizeValue) || pOp.sizeValue <= 0) return null;
-        return (<Voxel key={pOp.id} opportunity={pOp} onHover={onHover} onClick={onClick} isSelected={selectedOpportunity?.id === pOp.id} position={[posX, posY, posZ]} BoxComponent={Box} castShadow />);
-      })}
+      {processedOpportunities.map((pOp) => (
+        <Voxel key={pOp.id} opportunity={pOp} onHover={onHover} onClick={onClick} isSelected={selectedOpportunity?.id === pOp.id} position={pOp.position} BoxComponent={Box} />
+      ))}
       <Grid args={[plotScale, plotScale]} sectionColor={'hsl(var(--brand-purple))'} cellColor={'hsla(var(--brand-purple), 0.2)'} position={[0, plotOffset, 0]} infiniteGrid={false} fadeDistance={plotScale * 3} sectionThickness={1} cellThickness={0.5} side={THREE.BackSide}/>
     </>
   );
 };
 
-// --- Main Component ---
 const ArbitrageVoxelPlot: React.FC<{ 
   opportunities: ProcessedSandboxOpportunity[]; 
   isTabActive: boolean; 
   onVoxelSelect: (op: ProcessedSandboxOpportunity | null) => void;
-}> = ({ opportunities, isTabActive, onVoxelSelect }) => {
-  logger.info(`[ArbitrageVoxelPlot] VoxelRebirth render. Ops: ${opportunities.length}, TabActive: ${isTabActive}`);
+  selectedOpportunity: ProcessedSandboxOpportunity | null; // <<< FIX: ADD PROP
+}> = ({ opportunities, isTabActive, onVoxelSelect, selectedOpportunity }) => { // <<< FIX: DESTRUCTURE PROP
+  logger.info(`[ArbitrageVoxelPlot] VoxelRebirth render. Ops: ${opportunities.length}, TabActive: ${isTabActive}, Selected: ${selectedOpportunity?.id}`);
   const [hoveredOpportunity, setHoveredOpportunity] = useState<ProcessedSandboxOpportunity | null>(null);
   const [libs, setLibs] = useState<R3FLibs | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -159,10 +161,10 @@ const ArbitrageVoxelPlot: React.FC<{
         try { 
             const [THREE_MOD, R3F_MOD, DREI_MOD] = await Promise.all([ import('three'), import('@react-three/fiber'), import('@react-three/drei') ]); 
             logger.info("[ArbitrageVoxelPlot] All R3F/Three dynamic imports SUCCESSFUL."); 
-            setLibs({ THREE: THREE_MOD, Canvas: R3F_MOD.Canvas, useThree: R3F_MOD.useThree, OrbitControls: DREI_MOD.OrbitControls, Box: DREI_MOD.Box, Text: DREI_MOD.Text, Html: DREI_MOD.Html, Line: DREI_MOD.Line, Grid: DREI_MOD.Grid }); 
+            setLibs({ THREE: THREE_MOD, Canvas: R3F_MOD.Canvas, useThree: R3F_MOD.useThree, OrbitControls: DREI_MOD.OrbitControls, Box: DREI_MOD.Box, Text: DREI_MOD.Text, Line: DREI_MOD.Line, Grid: DREI_MOD.Grid }); 
         } catch (err: any) { 
             logger.error("[ArbitrageVoxelPlot] FAILED during ASYNC import stage:", err); 
-            setLibs({ error: err, errorMessage: err.message, errorStack: err.stack } as R3FLibs);
+            setLibs({ error: err, errorMessage: err.message, errorStack: err.stack });
         }
     };
     loadLibs();
@@ -177,7 +179,7 @@ const ArbitrageVoxelPlot: React.FC<{
   }
   
   const { Canvas: R3FCanvas } = libs;
-  const currentlyDisplayedOpportunity = hoveredOpportunity || selectedOpportunity;
+  const currentlyDisplayedOpportunity = hoveredOpportunity || selectedOpportunity; // <<< FIX: THIS LINE NOW WORKS
 
   if (!isTabActive) { 
       return <div className="min-h-[600px] bg-card/10 dark:bg-gray-900/50 rounded-md flex items-center justify-center"><p className="text-muted-foreground italic">Visualization paused</p></div>;
