@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { InputWithSteppers } from '@/components/ui/InputWithSteppers';
 import { Input } from '@/components/ui/input';
 import { useAppToast } from "@/hooks/useAppToast";
+import { useAppContext } from '@/contexts/AppContext';
 import {
   fetchArbitrageOpportunitiesWithSettings,
 } from '@/app/elon/testbase/sandbox_actions';
