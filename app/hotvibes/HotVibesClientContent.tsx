@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useId, useMemo } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,7 +21,7 @@ import { fetchLeadsForDashboard, fetchLeadByIdentifierOrNickname } from '../lead
 import type { LeadRow as LeadDataFromActions } from '../leads/actions';
 import { HotVibeCard, HotLeadData } from '@/components/hotvibes/HotVibeCard'; 
 import { VipLeadDisplay } from '@/components/hotvibes/VipLeadDisplay'; 
-import { logger } from "@/lib/logger"; // Using the correct logger now
+import { logger } from "@/lib/logger";
 import { useAppToast } from '@/hooks/useAppToast';
 import { purchaseProtoCardAction } from './actions'; 
 import type { ProtoCardDetails } from './actions';   
@@ -166,9 +166,10 @@ const personalityPdfGeneratorCardData: HotLeadData = {
     notes: "/topdf" 
 };
 
-export default function HotVibesClientContent({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default function HotVibesClientContent() {
   const router = useRouter();
   const pathname = usePathname(); 
+  const searchParams = useSearchParams();
   const { dbUser, isAuthenticated, user: tgUser, isLoading: appCtxLoading, isAuthenticating, platform, startParamPayload, refreshDbUser } = useAppContext();
   const { addToast } = useAppToast();
   const heroTriggerId = useId().replace(/:/g, "-") + "-hotvibes-hero-trigger";
@@ -186,8 +187,8 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
   const t = pageTranslations[currentLang];
 
   useEffect(() => {
-    setCurrentLang(tgUser?.language_code === 'ru' || platform === 'ios' || platform === 'android' ? 'ru' : 'en');
-  }, [tgUser?.language_code, platform]);
+    setCurrentLang(tgUser?.language_code?.startsWith('ru') ? 'ru' : 'en');
+  }, [tgUser?.language_code]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -213,7 +214,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
 
   useEffect(() => {
     if (!appCtxLoading && !isAuthenticating && !isInitialVipCheckDone) {
-      const leadIdFromUrl = typeof searchParams?.lead_identifier === 'string' ? searchParams.lead_identifier : null;
+      const leadIdFromUrl = searchParams.get('lead_identifier');
       let effectiveId = startParamPayload || leadIdFromUrl;
 
       if (startParamPayload === 'topdf_psycho' || startParamPayload === 'AlexandraSergeevna') {
@@ -230,7 +231,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
   }, [startParamPayload, searchParams, appCtxLoading, isAuthenticating, isInitialVipCheckDone]);
   
   const loadPageDataCore = useCallback(async () => {
-    logger.info(`[HotVibes loadPageDataCore] Triggered. TargetVIP_ID: ${targetVipIdentifier}, AppCtxLoading: ${appCtxLoading}, isInitialAuthDone: ${isInitialVipCheckDone}`);
+    logger.info(`[HotVibes loadPageDataCore] Triggered. TargetVIP_ID: ${targetVipIdentifier}`);
     
     if (appCtxLoading || !isInitialVipCheckDone) {
       logger.info("[HotVibes loadPageDataCore] Skipping: AppContext loading or initial VIP check not done.");
@@ -278,7 +279,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
       setActiveVipLead(null); 
     }
     setPageLoading(false);
-  }, [dbUser, appCtxLoading, isAuthenticating, addToast, t, currentLang, isInitialVipCheckDone, targetVipIdentifier]); 
+  }, [dbUser, appCtxLoading, addToast, t, currentLang, isInitialVipCheckDone, targetVipIdentifier]); 
 
   useEffect(() => {
     if (isInitialVipCheckDone && !appCtxLoading && !isAuthenticating) { 
@@ -292,7 +293,6 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
     const currentUrl = new URL(window.location.href);
     currentUrl.searchParams.set('lead_identifier', lead.id);
     window.history.pushState({ ...window.history.state, as: currentUrl.pathname + currentUrl.search, url: currentUrl.pathname + currentUrl.search }, '', currentUrl.pathname + currentUrl.search);
-    
     setTargetVipIdentifier(lead.id); 
   }, []);
 
@@ -300,7 +300,6 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
     logger.info(`[HotVibes] Returning to lobby view.`);
     setActiveVipLead(null);      
     setTargetVipIdentifier(null); 
-
     router.replace(pathname, { shallow: true }); 
     logger.info(`[HotVibes] URL params cleaned for lobby view. New path: ${pathname}`);
   };
@@ -352,24 +351,18 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
       amountXTR: priceXTR,
       amountKV: priceKV,
       type: cardType,
-      metadata: {
-          ...specificMetadata,
-          photo_url: cardToPurchase.demo_image_url 
-      },
+      metadata: { ...specificMetadata, photo_url: cardToPurchase.demo_image_url },
     };
 
     try {
       const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails);
-
       if (result.success) {
         if (result.purchaseMethod === 'KV') {
           addToast(t.purchaseSuccessKV, "success");
         } else if (result.purchaseMethod === 'XTR') {
           addToast(t.purchaseFallbackToXTR, "info", { description: "Проверьте Telegram для оплаты счета." });
         }
-        if(refreshDbUser) {
-            await refreshDbUser();
-        }
+        if(refreshDbUser) { await refreshDbUser(); }
       } else {
         addToast(result.error || "Не удалось инициировать покупку ПротоКарточки.", "error");
       }
@@ -434,11 +427,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
     const elonCardWithStatus = { ...elonSimulatorProtoCardData, isSpecial: true, isSupported: getIsSupported(ELON_SIMULATOR_CARD_ID) };
     const pdfGenCardWithStatus = { ...personalityPdfGeneratorCardData, isSpecial: true, isSupported: getIsSupported(PERSONALITY_REPORT_PDF_CARD_ID) };
 
-    let currentLobbyLeads = lobbyLeads.map(lead => ({
-        ...lead, 
-        isSpecial: false, 
-        isSupported: getIsSupported(lead.id)
-    }));
+    let currentLobbyLeads = lobbyLeads.map(lead => ({ ...lead, isSpecial: false, isSupported: getIsSupported(lead.id) }));
 
     let filteredForDisplay: Array<HotLeadData & {isSpecial?:boolean, isSupported?:boolean}> = [];
     const specialCardIds = [ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID];
@@ -470,6 +459,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
       <div className="relative min-h-screen bg-gradient-to-br from-black via-slate-900 to-purple-900/50 text-foreground overflow-x-hidden py-20 md:py-24">
         <div className="container mx-auto px-2 sm:px-4 relative z-10">
          <Button 
+            type="button"
             onClick={handleBackToLobby} 
             variant="outline" 
             className="mb-4 text-brand-cyan border-brand-cyan hover:bg-brand-cyan/10 fixed top-[calc(var(--header-height,60px)+10px)] left-4 z-[60] backdrop-blur-sm bg-black/70 hover:text-white hover:border-white transition-all duration-200 ease-in-out shadow-lg"
@@ -534,6 +524,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
               )}
               <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2 justify-center">
                   <Button
+                    type="button"
                     variant={activeFilter === 'all' ? "default" : "outline"}
                     size="xs"
                     onClick={() => setActiveFilter('all')}
@@ -547,6 +538,7 @@ export default function HotVibesClientContent({ searchParams }: { searchParams: 
                     {t.filterAll}
                   </Button>
                   <Button
+                    type="button"
                     variant={activeFilter === 'supported' ? "default" : "outline"}
                     size="xs"
                     onClick={() => setActiveFilter('supported')}
