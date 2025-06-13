@@ -11,7 +11,7 @@ DECLARE
     user_metadata JSONB;
 BEGIN
     -- Select the user's metadata and lock the row for update to prevent race conditions
-    SELECT metadata INTO user_metadata FROM public.users WHERE user_id = p_user_id FOR UPDATE;
+    SELECT metadata INTO user_metadata FROM public.users WHERE id = p_user_id FOR UPDATE;
 
     -- If user not found, raise an exception. The calling code should handle this.
     IF user_metadata IS NULL THEN
@@ -34,7 +34,7 @@ BEGIN
     -- Update the user's metadata column with the new data.
     UPDATE public.users
     SET metadata = user_metadata
-    WHERE user_id = p_user_id;
+    WHERE id = p_user_id;
 
 EXCEPTION
     WHEN OTHERS THEN
