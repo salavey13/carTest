@@ -2,8 +2,8 @@
 
 import { supabaseAdmin } from '@/hooks/supabase'; 
 import { sendTelegramMessage, sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
-// MODIFIED: `updateUserCyberFitnessProfile` removed, `addKiloVibes` added for clean refunds.
-import { spendKiloVibes, addKiloVibes, fetchUserCyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
+// FIXED: Importing from the new server-only actions file.
+import { spendKiloVibes, addKiloVibes } from '@/app/cyberfitness/actions';
 import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types";
 import { getBaseUrl } from '@/lib/utils';
@@ -20,7 +20,6 @@ export interface ProtoCardDetails {
   metadata?: Record<string, any>; 
 }
 
-// This function is correct as it calls the RPC you will be adding. No changes needed.
 async function grantProtoCardAccess(
   userId: string,
   cardDetails: ProtoCardDetails,
@@ -29,7 +28,6 @@ async function grantProtoCardAccess(
 ): Promise<{success: boolean; error?: string}> {
     logger.info(`[grantProtoCardAccess] Granting card '${cardDetails.cardId}' to user ${userId} via ${paymentMethod}.`);
     
-    // This call now relies on the `grant_protocard_access` function you'll add.
     const { error: rpcError } = await supabaseAdmin.rpc('grant_protocard_access', {
         p_user_id: userId,
         p_card_id: cardDetails.cardId,
@@ -80,9 +78,10 @@ async function grantProtoCardAccess(
 
 export async function purchaseProtoCardAction(
   userId: string,
-  cardDetails: ProtoCardDetails
+  cardDetails: ProtoCardDetails,
+  paymentMethodHint?: 'KV' | 'XTR'
 ): Promise<{ success: boolean; invoiceId?: string; error?: string; purchaseMethod?: 'KV' | 'XTR' | 'ALREADY_OWNED' | 'INSUFFICIENT_FUNDS' }> {
-  logger.info(`[purchaseProtoCardAction] Initiating purchase for user ${userId}, card: ${cardDetails.cardId}`);
+  logger.info(`[purchaseProtoCardAction] Initiating purchase for user ${userId}, card: ${cardDetails.cardId}, hint: ${paymentMethodHint || 'none'}`);
 
   if (!userId || !cardDetails || !cardDetails.cardId || !cardDetails.title) {
     logger.error("[purchaseProtoCardAction] Invalid parameters", { userId, cardDetails });
@@ -99,9 +98,10 @@ export async function purchaseProtoCardAction(
       return { success: false, error: "У вас уже есть доступ к этой возможности.", purchaseMethod: 'ALREADY_OWNED' };
   }
 
-  if (cardDetails.amountKV && cardDetails.amountKV > 0) {
+  // --- KV Payment Logic ---
+  const attemptKvPayment = (paymentMethodHint === 'KV' || !paymentMethodHint) && cardDetails.amountKV && cardDetails.amountKV > 0;
+  if (attemptKvPayment) {
     logger.info(`[purchaseProtoCardAction] Attempting KV payment for card ${cardDetails.cardId} (${cardDetails.amountKV} KV).`);
-    // This correctly uses the helper which calls the `adjust_kilovibes` RPC.
     const spendResult = await spendKiloVibes(userId, cardDetails.amountKV, `Purchase ProtoCard: ${cardDetails.cardId}`);
     
     if (spendResult.success) {
@@ -109,24 +109,17 @@ export async function purchaseProtoCardAction(
       const grantResult = await grantProtoCardAccess(userId, cardDetails, 'KV', `kv_purchase_${Date.now()}`);
       
       if (!grantResult.success) {
-          // --- CORRECTED REFUND LOGIC ---
-          // Use the new, dedicated addKiloVibes function for a clean refund.
-          // This avoids calling the large updateUserCyberFitnessProfile function.
           const refundReason = `Refund for failed ProtoCard grant: ${cardDetails.cardId}`;
-          const refundResult = await addKiloVibes(userId, cardDetails.amountKV, refundReason);
-          
-          if (!refundResult.success) {
-            logger.error(`[purchaseProtoCardAction] CRITICAL-CRITICAL: FAILED TO REFUND KV for user ${userId}. Amount: ${cardDetails.amountKV}. Reason: ${refundResult.error}`);
-            // Optionally, send an admin alert about the failed refund
-          } else {
-            logger.info(`[purchaseProtoCardAction] Successfully refunded ${cardDetails.amountKV} KV to user ${userId}.`);
-          }
-
-          logger.error(`[purchaseProtoCardAction] CRITICAL: Spent KV but failed to grant access for card ${cardDetails.cardId}. KV Refund attempted.`);
-          return { success: false, error: `KV were spent, but access grant failed. Your KiloVibes have been refunded. Please contact support if the balance is incorrect.`, purchaseMethod: 'KV' };
+          await addKiloVibes(userId, cardDetails.amountKV, refundReason);
+          logger.error(`[purchaseProtoCardAction] CRITICAL: Spent KV but failed to grant access for card ${cardDetails.cardId}. KV Refunded.`);
+          return { success: false, error: `KV were spent, but access grant failed. Your KiloVibes have been refunded. Please contact support.`, purchaseMethod: 'KV' };
       }
       return { success: true, purchaseMethod: 'KV' };
 
+    } else if (paymentMethodHint === 'KV') {
+        // If user explicitly chose KV and it failed, do NOT fall back to XTR. Return the error directly.
+        logger.warn(`[purchaseProtoCardAction] KV purchase failed for user ${userId} with explicit 'KV' hint. Error: ${spendResult.error}`);
+        return { success: false, error: spendResult.error, purchaseMethod: 'INSUFFICIENT_FUNDS' };
     } else if (spendResult.error && spendResult.error.includes("Insufficient")) {
         logger.warn(`[purchaseProtoCardAction] Insufficient KV for user ${userId}. Falling back to XTR payment.`);
     } else {
@@ -135,52 +128,60 @@ export async function purchaseProtoCardAction(
     }
   }
 
-  if (!cardDetails.amountXTR || cardDetails.amountXTR <= 0) {
-    logger.warn(`[purchaseProtoCardAction] No XTR price, and KV purchase failed. Aborting.`);
-    return { success: false, error: "Недостаточно KiloVibes, и оплата в XTR недоступна.", purchaseMethod: 'INSUFFICIENT_FUNDS' };
+  // --- XTR Payment Logic ---
+  const attemptXtrPayment = paymentMethodHint === 'XTR' || !paymentMethodHint; // Attempt if hint is XTR, or if it's a fallback
+  if(attemptXtrPayment) {
+      if (!cardDetails.amountXTR || cardDetails.amountXTR <= 0) {
+        logger.warn(`[purchaseProtoCardAction] No XTR price, and KV purchase failed or was skipped. Aborting.`);
+        return { success: false, error: "Недостаточно KiloVibes, и оплата в XTR недоступна.", purchaseMethod: 'INSUFFICIENT_FUNDS' };
+      }
+      
+      logger.info(`[purchaseProtoCardAction] Proceeding with XTR payment for card ${cardDetails.cardId}.`);
+      const invoicePayload = `protocard_${cardDetails.type}_${cardDetails.cardId}_${userId}_${Date.now()}`;
+      const invoiceTypeForDb = `protocard_${cardDetails.type}`;
+
+      try {
+        const dbInvoiceData: Database["public"]["Tables"]["invoices"]["Insert"] = {
+            id: invoicePayload, user_id: userId, type: invoiceTypeForDb,
+            amount: cardDetails.amountXTR, status: 'pending', currency: 'XTR',
+            subscription_id: cardDetails.cardId, 
+            metadata: {
+                card_title: cardDetails.title,
+                card_description: cardDetails.description,
+                original_card_type: cardDetails.type, 
+                ...(cardDetails.metadata || {}),
+            },
+        };
+        
+        const { data: createdInvoice, error: dbError } = await supabaseAdmin.from('invoices').insert(dbInvoiceData).select().single();
+
+        if (dbError || !createdInvoice) {
+          logger.error("[purchaseProtoCardAction] DB error creating invoice:", dbError);
+          return { success: false, error: `Ошибка БД при создании счета: ${dbError?.message || 'Не удалось сохранить счет'}` };
+        }
+        logger.info(`[purchaseProtoCardAction] Invoice ${createdInvoice.id} created in DB for XTR payment.`);
+
+        const tgInvoiceResult = await tgSendInvoice(
+          userId, cardDetails.title, cardDetails.description,
+          invoicePayload, cardDetails.amountXTR, 0, 
+          (cardDetails.metadata?.photo_url as string) || undefined
+        );
+
+        if (!tgInvoiceResult.success) {
+          logger.error("[purchaseProtoCardAction] Telegram error sending invoice:", tgInvoiceResult.error);
+          return { success: false, error: `Ошибка Telegram при отправке счета: ${tgInvoiceResult.error || 'Не удалось отправить счет'}` };
+        }
+
+        logger.info(`[purchaseProtoCardAction] Invoice ${invoicePayload} sent to user ${userId} via Telegram.`);
+        return { success: true, invoiceId: createdInvoice.id, purchaseMethod: 'XTR' };
+
+      } catch (error) {
+        logger.error("[purchaseProtoCardAction] Critical error during XTR flow:", error);
+        return { success: false, error: `Критическая ошибка: ${error instanceof Error ? error.message : "Неизвестная ошибка"}` };
+      }
   }
   
-  logger.info(`[purchaseProtoCardAction] Proceeding with XTR payment for card ${cardDetails.cardId}.`);
-  const invoicePayload = `protocard_${cardDetails.type}_${cardDetails.cardId}_${userId}_${Date.now()}`;
-  const invoiceTypeForDb = `protocard_${cardDetails.type}`;
-
-  try {
-    const dbInvoiceData: Database["public"]["Tables"]["invoices"]["Insert"] = {
-        id: invoicePayload, user_id: userId, type: invoiceTypeForDb,
-        amount: cardDetails.amountXTR, status: 'pending', currency: 'XTR',
-        subscription_id: cardDetails.cardId, 
-        metadata: {
-            card_title: cardDetails.title,
-            card_description: cardDetails.description,
-            original_card_type: cardDetails.type, 
-            ...(cardDetails.metadata || {}),
-        },
-    };
-    
-    const { data: createdInvoice, error: dbError } = await supabaseAdmin.from('invoices').insert(dbInvoiceData).select().single();
-
-    if (dbError || !createdInvoice) {
-      logger.error("[purchaseProtoCardAction] DB error creating invoice:", dbError);
-      return { success: false, error: `Ошибка БД при создании счета: ${dbError?.message || 'Не удалось сохранить счет'}` };
-    }
-    logger.info(`[purchaseProtoCardAction] Invoice ${createdInvoice.id} created in DB for XTR payment.`);
-
-    const tgInvoiceResult = await tgSendInvoice(
-      userId, cardDetails.title, cardDetails.description,
-      invoicePayload, cardDetails.amountXTR, 0, 
-      (cardDetails.metadata?.photo_url as string) || undefined
-    );
-
-    if (!tgInvoiceResult.success) {
-      logger.error("[purchaseProtoCardAction] Telegram error sending invoice:", tgInvoiceResult.error);
-      return { success: false, error: `Ошибка Telegram при отправке счета: ${tgInvoiceResult.error || 'Не удалось отправить счет'}` };
-    }
-
-    logger.info(`[purchaseProtoCardAction] Invoice ${invoicePayload} sent to user ${userId} via Telegram.`);
-    return { success: true, invoiceId: createdInvoice.id, purchaseMethod: 'XTR' };
-
-  } catch (error) {
-    logger.error("[purchaseProtoCardAction] Critical error during XTR flow:", error);
-    return { success: false, error: `Критическая ошибка: ${error instanceof Error ? error.message : "Неизвестная ошибка"}` };
-  }
+  // This should only be reached if no payment path was taken, which indicates a logic error.
+  logger.error(`[purchaseProtoCardAction] Reached end of function without a payment path for card ${cardDetails.cardId}`);
+  return { success: false, error: "Не удалось определить метод оплаты." };
 }
