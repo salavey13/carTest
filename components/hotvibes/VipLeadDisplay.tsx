@@ -68,6 +68,7 @@ const vipPageTranslations = {
     purchaseAccess: "Купить Доступ",
     activateGenericLeadAction: "Копировать Оффер & Открыть Заказ",
     activateGenericLeadIcon: "::FaCopy::",
+    supportMissionBtnText: "Поддержать Миссию",
   },
   en: {
     pageTitleBase: "VIP Prototype for",
@@ -103,6 +104,7 @@ const vipPageTranslations = {
     purchaseAccess: "Purchase Access",
     activateGenericLeadAction: "Copy Offer & Open Order",
     activateGenericLeadIcon: "::FaCopy::",
+    supportMissionBtnText: "Support Mission",
   }
 };
 
@@ -165,49 +167,51 @@ export function VipLeadDisplay({
 
   const renderActionButton = () => {
     const buttonBaseClasses = "w-full font-orbitron text-sm sm:text-base py-3 sm:py-3.5 shadow-lg hover:shadow-xl active:scale-95 transition-all";
-    
-    let iconName = "";
-    let buttonText = "";
-    let specificStyling = "";
-    let isDisabled = false;
-    let actionToCall = onExecuteMission; 
+    const isDisabled = isProcessingThisCard || !isAuthenticated;
 
-    if (isSpecialCard) {
-        if (isSupported) { 
-            iconName = isElonCard ? t.goToSimulatorIcon.replace(/::/g, '') : t.goToPdfGeneratorIcon.replace(/::/g, '');
-            buttonText = isElonCard ? t.goToSimulator : t.goToPdfGenerator;
-            specificStyling = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
-            isDisabled = !isAuthenticated; 
-            actionToCall = onExecuteMission; 
-        } else { 
-            iconName = isProcessingThisCard ? "FaSpinner" : t.purchaseAccessIcon.replace(/::/g, '');
-            buttonText = isProcessingThisCard ? "" : t.purchaseAccess;
-            const priceText = isElonCard ? ` ${parentTranslations.elonSimulatorAccessBtnText.split('за ')[1]}` : ` ${parentTranslations.pdfGeneratorAccessBtnText.split('за ')[1]}`;
-            specificStyling = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110";
-            isDisabled = isProcessingThisCard || !isAuthenticated;
-            actionToCall = () => onSupportMission(lead);
-             return ( 
-                 <Button onClick={actionToCall} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
-                    <VibeContentRenderer content={`::${iconName}::`} className={cn("mr-1.5 sm:mr-2", isProcessingThisCard && "animate-spin")} /> {buttonText} {!isProcessingThisCard && priceText}
-                </Button>
-            );
-        }
-    } else { 
-        iconName = t.activateGenericLeadIcon.replace(/::/g, ''); 
-        buttonText = t.activateGenericLeadAction;
-        specificStyling = isMissionUnlocked 
-            ? `bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110` 
-            : "bg-muted text-muted-foreground"; 
-        isDisabled = !isAuthenticated; 
-        actionToCall = handleGenericLeadAction;
+    // --- SUPPORTED (OWNED) STATE ---
+    if (isSupported) {
+        let iconName = isElonCard ? t.goToSimulatorIcon : isPdfGeneratorCard ? t.goToPdfGeneratorIcon : t.executeMissionIcon;
+        let buttonText = isElonCard ? t.goToSimulator : isPdfGeneratorCard ? t.goToPdfGenerator : t.executeMission;
+        return (
+            <Button onClick={onExecuteMission} disabled={!isAuthenticated} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110", !isAuthenticated && "opacity-70 cursor-not-allowed !scale-100")}>
+                <VibeContentRenderer content={iconName} className="mr-1.5 sm:mr-2" /> {buttonText}
+            </Button>
+        );
     }
     
+    // --- NOT SUPPORTED (NOT OWNED) STATE ---
+    const purchaseAction = () => onSupportMission(lead);
+    const priceText = lead.potential_earning || '';
+    
+    // Special Cards (Elon, PDF)
+    if (isSpecialCard) {
+        return (
+            <Button onClick={purchaseAction} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110", isDisabled && "opacity-70 cursor-not-allowed !scale-100")}>
+                <VibeContentRenderer content={isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : t.purchaseAccessIcon} className="mr-1.5 sm:mr-2" /> 
+                {isProcessingThisCard ? "" : `${t.purchaseAccess} (${priceText})`}
+            </Button>
+        );
+    }
+
+    // Generic Mission Cards
+    if (isMissionUnlocked) {
+        return (
+             <Button onClick={purchaseAction} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110", isDisabled && "opacity-70 cursor-not-allowed !scale-100")}>
+                <VibeContentRenderer content={isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaHandHoldingDollar::"} className="mr-1.5 sm:mr-2" /> 
+                {isProcessingThisCard ? "" : `${t.supportMissionBtnText} (${priceText})`}
+            </Button>
+        );
+    }
+
+    // Locked Mission Cards
     return (
-        <Button onClick={actionToCall} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, specificStyling, isDisabled && "opacity-70 cursor-not-allowed !scale-100")} >
-             <VibeContentRenderer content={`::${iconName}::`} className="mr-1.5 sm:mr-2" /> {buttonText}
+        <Button disabled={true} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-muted text-muted-foreground cursor-not-allowed")}>
+            <VibeContentRenderer content={t.skillLockedIcon} className="mr-1.5 sm:mr-2" /> {t.skillLocked}
         </Button>
     );
   };
+
 
   return (
     <Card className={cn(

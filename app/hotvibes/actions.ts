@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from '@/hooks/supabase'; 
 import { sendTelegramMessage, sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
-import { spendKiloVibes, updateUserCyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
+import { spendKiloVibes, updateUserCyberFitnessProfile, fetchUserCyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 import { getBaseUrl } from '@/lib/utils';
@@ -32,7 +32,6 @@ async function grantProtoCardAccess(
     logger.info(`[grantProtoCardAccess] Granting access for user ${userId}, card ${cardDetails.cardId} via ${paymentMethod}`);
     
     // Using a DB function to handle the metadata update atomically is safer.
-    // Let's create a plpgsql function for this. For now, we use rpc.
     const { error: rpcError } = await supabaseAdmin.rpc('grant_protocard_access', {
         p_user_id: userId,
         p_card_id: cardDetails.cardId,
@@ -57,7 +56,6 @@ async function grantProtoCardAccess(
     
     logger.info(`[grantProtoCardAccess] Successfully granted ProtoCard ${cardDetails.cardId} to user ${userId} via RPC.`);
     
-    // Send success notifications
     const cardTitleForNotification = cardDetails.title || `Карточка ${cardDetails.cardId}`;
     let userMessage = `✅ Спасибо за покупку ПротоКарточки "${cardTitleForNotification}"! Она добавлена в ваш инвентарь. VIBE ON!`;
     const baseUrl = getBaseUrl();
@@ -82,10 +80,10 @@ async function grantProtoCardAccess(
     return { success: true };
 }
 
-
 /**
  * Инициирует покупку "ПротоКарточки": 
- * Сначала пытается списать KiloVibes. Если не хватает, отправляет инвойс в Telegram.
+ * Сначала проверяет, не куплена ли уже.
+ * Затем пытается списать KiloVibes. Если не хватает, отправляет инвойс в Telegram.
  */
 export async function purchaseProtoCardAction(
   userId: string,
@@ -94,6 +92,17 @@ export async function purchaseProtoCardAction(
   if (!userId || !cardDetails || !cardDetails.cardId || !cardDetails.title) {
     logger.error("[HotVibesActions purchase] Invalid parameters", { userId, cardDetails });
     return { success: false, error: "Неверные параметры для покупки." };
+  }
+
+  // --- 0. Check if user already owns the card ---
+  const { data: userData, error: userError } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
+  if (userError) {
+      logger.error(`[purchaseProtoCardAction] Failed to fetch user data for pre-check:`, userError);
+      return { success: false, error: "Не удалось проверить ваш профиль." };
+  }
+  if (userData.metadata?.xtr_protocards?.[cardDetails.cardId]?.status === 'active') {
+      logger.info(`[purchaseProtoCardAction] User ${userId} already owns card ${cardDetails.cardId}.`);
+      return { success: false, error: "У вас уже есть доступ к этой возможности.", purchaseMethod: 'ALREADY_OWNED' };
   }
 
   // --- 1. Попытка покупки за KiloVibes ---
@@ -106,7 +115,6 @@ export async function purchaseProtoCardAction(
       const grantResult = await grantProtoCardAccess(userId, cardDetails, 'KV', `kv_purchase_${Date.now()}`);
       
       if (!grantResult.success) {
-          // IMPORTANT: Implement refund logic for KV if granting access fails
           await updateUserCyberFitnessProfile(userId, { kiloVibes: cardDetails.amountKV }); // Refund
           logger.error(`[HotVibesActions purchase] CRITICAL: Spent KV but failed to grant access for card ${cardDetails.cardId}. KV Refunded. Manual check needed.`);
           return { success: false, error: `KV were spent, but access grant failed. Your KiloVibes have been refunded. Please contact support.`, purchaseMethod: 'KV' };
@@ -115,9 +123,7 @@ export async function purchaseProtoCardAction(
 
     } else if (spendResult.error && spendResult.error.includes("Insufficient")) {
         logger.info(`[HotVibesActions purchase] Insufficient KV for user ${userId}. Falling back to XTR payment.`);
-        // Proceed to XTR payment flow
     } else {
-        // Some other error occurred while trying to spend KV
         logger.error(`[HotVibesActions purchase] Error spending KV for user ${userId}:`, spendResult.error);
         return { success: false, error: `An error occurred with KiloVibe balance: ${spendResult.error}` };
     }
