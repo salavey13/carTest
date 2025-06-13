@@ -174,7 +174,7 @@ export function VipLeadDisplay({
         let iconName = isElonCard ? t.goToSimulatorIcon : isPdfGeneratorCard ? t.goToPdfGeneratorIcon : t.executeMissionIcon;
         let buttonText = isElonCard ? t.goToSimulator : isPdfGeneratorCard ? t.goToPdfGenerator : t.executeMission;
         return (
-            <Button onClick={onExecuteMission} disabled={!isAuthenticated} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110", !isAuthenticated && "opacity-70 cursor-not-allowed !scale-100")}>
+            <Button type="button" onClick={onExecuteMission} disabled={!isAuthenticated} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110", !isAuthenticated && "opacity-70 cursor-not-allowed !scale-100")}>
                 <VibeContentRenderer content={iconName} className="mr-1.5 sm:mr-2" /> {buttonText}
             </Button>
         );
@@ -187,7 +187,7 @@ export function VipLeadDisplay({
     // Special Cards (Elon, PDF)
     if (isSpecialCard) {
         return (
-            <Button onClick={purchaseAction} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110", isDisabled && "opacity-70 cursor-not-allowed !scale-100")}>
+            <Button type="button" onClick={purchaseAction} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-orange via-red-500 to-pink-600 text-white hover:brightness-110", isDisabled && "opacity-70 cursor-not-allowed !scale-100")}>
                 <VibeContentRenderer content={isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : t.purchaseAccessIcon} className="mr-1.5 sm:mr-2" /> 
                 {isProcessingThisCard ? "" : `${t.purchaseAccess} (${priceText})`}
             </Button>
@@ -197,7 +197,7 @@ export function VipLeadDisplay({
     // Generic Mission Cards
     if (isMissionUnlocked) {
         return (
-             <Button onClick={purchaseAction} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110", isDisabled && "opacity-70 cursor-not-allowed !scale-100")}>
+             <Button type="button" onClick={purchaseAction} disabled={isDisabled} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-red via-brand-orange to-yellow-500 text-black hover:brightness-110", isDisabled && "opacity-70 cursor-not-allowed !scale-100")}>
                 <VibeContentRenderer content={isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaHandHoldingDollar::"} className="mr-1.5 sm:mr-2" /> 
                 {isProcessingThisCard ? "" : `${t.supportMissionBtnText} (${priceText})`}
             </Button>
@@ -206,7 +206,7 @@ export function VipLeadDisplay({
 
     // Locked Mission Cards
     return (
-        <Button disabled={true} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-muted text-muted-foreground cursor-not-allowed")}>
+        <Button type="button" disabled={true} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-muted text-muted-foreground cursor-not-allowed")}>
             <VibeContentRenderer content={t.skillLockedIcon} className="mr-1.5 sm:mr-2" /> {t.skillLocked}
         </Button>
     );
@@ -282,6 +282,7 @@ export function VipLeadDisplay({
                     <div className="flex items-center gap-1 sm:gap-1.5">
                         {lead.kwork_url && (
                             <Button 
+                                type="button"
                                 variant="outline" 
                                 size="xs" 
                                 className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-blue/50 text-brand-blue hover:bg-brand-blue/10 hover:text-blue-300 focus:ring-brand-blue")} 
@@ -291,7 +292,7 @@ export function VipLeadDisplay({
                                 <FaArrowUpRightFromSquare className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5"/> {t.viewOriginalKwork}
                             </Button>
                         )}
-                        <Button variant="outline" size="xs" className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 hover:text-pink-300 focus:ring-brand-pink")}
+                        <Button type="button" variant="outline" size="xs" className={cn("h-7 sm:h-8 px-2 py-1 text-[0.65rem] sm:text-xs border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10 hover:text-pink-300 focus:ring-brand-pink")}
                                 title={t.copyOffer}
                                 onClick={() => handleCopyToClipboard(lead.ai_generated_proposal_draft, currentLang === 'ru' ? "Предложение скопировано!" : "Proposal copied!")}>
                             <FaCopy className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5"/> {t.copyOffer}
