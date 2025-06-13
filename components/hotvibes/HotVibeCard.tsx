@@ -54,7 +54,7 @@ interface HotVibeCardProps {
   isAuthenticated: boolean;
 }
 
-const PLACEHOLDER_IMAGE_CARD = "https://images.unsplash.com/photo-1599227281402-4b2a8d3c19d7?q=80&w=1964&auto=format&fit=crop"; 
+const PLACEHOLDER_IMAGE_CARD = "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?q=80&w=2071&auto=format&fit=crop"; 
 
 export function HotVibeCard({ 
     lead, 
@@ -98,7 +98,7 @@ export function HotVibeCard({
   };
 
   const renderFooterButton = () => {
-    const buttonBaseClasses = "w-full font-orbitron text-xs py-2 px-2 rounded-md flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105";
+    const buttonBaseClasses = "w-full font-orbitron text-xs py-2 px-2 rounded-lg flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105";
     const isDisabled = isProcessingThisCard || !isAuthenticated;
     const disabledClasses = isDisabled ? "opacity-70 cursor-not-allowed !scale-100" : "";
 
@@ -123,12 +123,13 @@ export function HotVibeCard({
 
     if (isSupported) {
         buttonIconName = isSpecial ? "::FaCaretRight::" : "::FaEye::";
-        buttonText = isSpecial ? translations.goToSimulatorText || "Go To" : translations.viewDemoText || "View Demo";
+        buttonText = isSpecial ? (translations.goToSimulatorText || "Enter") : (translations.viewDemoText || "View");
         buttonAction = () => onViewVip(lead); 
         buttonSpecificClass = "bg-brand-green text-black hover:brightness-110";
     } else {
         buttonIconName = isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaUnlockAlt::";
-        buttonText = `${priceKV} KV / ${priceXTR} XTR`;
+        // Compact button text using icons
+        buttonText = `::FaBolt:: ${priceKV} / ::FaStar:: ${priceXTR}`;
         buttonSpecificClass = "bg-brand-orange text-white hover:brightness-110";
     }
     
@@ -142,8 +143,8 @@ export function HotVibeCard({
         disabled={isDisabled}
         className={cn(buttonBaseClasses, buttonSpecificClass, disabledClasses)}
       >
-        <VibeContentRenderer content={buttonIconName} className={cn("mr-1.5", isProcessingThisCard && "animate-spin")} />
-        {buttonText}
+        <VibeContentRenderer content={buttonIconName} className={cn("text-base", isProcessingThisCard && "animate-spin")} />
+        <VibeContentRenderer content={buttonText} className="ml-1.5 flex items-center gap-1.5" />
       </Button>
     );
   };
