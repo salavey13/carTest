@@ -1,4 +1,3 @@
--- supabase/migrations/02_grant_protocard.sql
 CREATE OR REPLACE FUNCTION grant_protocard_access(
     p_user_id TEXT,
     p_card_id TEXT,
@@ -12,7 +11,8 @@ DECLARE
     user_metadata JSONB;
 BEGIN
     -- Select the user's metadata and lock the row for update to prevent race conditions
-    SELECT metadata INTO user_metadata FROM public.users WHERE id = p_user_id FOR UPDATE;
+    -- CORRECTED: Changed `id` to `user_id`
+    SELECT metadata INTO user_metadata FROM public.users WHERE user_id = p_user_id FOR UPDATE;
 
     -- If user not found, raise an exception. The calling code should handle this.
     IF user_metadata IS NULL THEN
@@ -33,9 +33,10 @@ BEGIN
     );
 
     -- Update the user's metadata column with the new data.
+    -- CORRECTED: Changed `id` to `user_id`
     UPDATE public.users
     SET metadata = user_metadata
-    WHERE id = p_user_id;
+    WHERE user_id = p_user_id;
 
 EXCEPTION
     WHEN OTHERS THEN
