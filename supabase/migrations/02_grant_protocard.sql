@@ -1,3 +1,4 @@
+-- supabase/migrations/02_grant_protocard.sql
 CREATE OR REPLACE FUNCTION grant_protocard_access(
     p_user_id TEXT,
     p_card_id TEXT,
