@@ -1,3 +1,4 @@
+// /components/hotvibes/HotVibeCard.tsx
 "use client";
 
 import React from 'react';
@@ -127,7 +128,7 @@ export function HotVibeCard({
         buttonAction = () => onViewVip(lead); 
         buttonSpecificClass = "bg-brand-green text-black hover:brightness-110";
     } else {
-        buttonIconName = isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaUnlockAlt::";
+        buttonIconName = isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaUnlockKeyhole::";
         // Compact button text using icons
         buttonText = `::FaBolt:: ${priceKV} / ::FaStar:: ${priceXTR}`;
         buttonSpecificClass = "bg-brand-orange text-white hover:brightness-110";
