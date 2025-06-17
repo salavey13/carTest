@@ -1,3 +1,4 @@
+// /components/hotvibes/HotVibeCard.tsx
 "use client";
 
 import React from 'react';
@@ -10,7 +11,16 @@ import {
     CardFooter, 
 } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID } from '@/app/hotvibes/page';
+import { 
+    ELON_SIMULATOR_CARD_ID, 
+    PERSONALITY_REPORT_PDF_CARD_ID,
+    ELON_SIMULATOR_ACCESS_PRICE_KV,
+    PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV,
+    MISSION_SUPPORT_PRICE_KV,
+    ELON_SIMULATOR_ACCESS_PRICE_XTR,
+    PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR,
+    MISSION_SUPPORT_PRICE_XTR
+} from '@/app/hotvibes/HotVibesClientContent';
 
 export interface HotLeadData {
   id: string;
@@ -45,7 +55,7 @@ interface HotVibeCardProps {
   isAuthenticated: boolean;
 }
 
-const PLACEHOLDER_IMAGE_CARD = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png"; 
+const PLACEHOLDER_IMAGE_CARD = "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?q=80&w=2071&auto=format&fit=crop"; 
 
 export function HotVibeCard({ 
     lead, 
@@ -64,34 +74,22 @@ export function HotVibeCard({
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
   const isPdfGeneratorCard = lead.id === PERSONALITY_REPORT_PDF_CARD_ID;
 
-  let cardGradientClass = "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900"; 
-  let titleTextColorClass = "text-slate-100 group-hover:text-brand-cyan";
-  let earningTextColorClass = "text-brand-lime";
-  let buttonTextColorClass = "text-black"; 
-  let contentBgClass = "bg-slate-800"; // Solid background for content area
-
+  let cardClass = "border-slate-700 bg-slate-800";
+  let titleClass = "text-slate-100 group-hover:text-brand-cyan";
+  
   if (isSpecial || isElonSimulatorCard || isPdfGeneratorCard) {
-    cardGradientClass = "bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-600";
-    titleTextColorClass = "text-white group-hover:text-yellow-200";
-    earningTextColorClass = "text-yellow-300 font-bold"; 
-    contentBgClass = "bg-yellow-700"; // Solid color
+    cardClass = "border-amber-500/50 bg-gradient-to-br from-yellow-500 via-amber-600 to-orange-700";
+    titleClass = "text-white group-hover:text-yellow-200";
   } else if (isSupported) {
-    cardGradientClass = "bg-gradient-to-br from-green-500 via-emerald-500 to-teal-600";
-    titleTextColorClass = "text-white group-hover:text-lime-200";
-    earningTextColorClass = "text-lime-300";
-    contentBgClass = "bg-emerald-700"; // Solid color
+    cardClass = "border-emerald-500/50 bg-gradient-to-br from-green-600 via-emerald-600 to-teal-700";
+    titleClass = "text-white group-hover:text-lime-200";
   } else if (isMissionUnlocked) {
-     cardGradientClass = "bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700";
-     titleTextColorClass = "text-white group-hover:text-indigo-200";
-     earningTextColorClass = "text-indigo-300";
-     contentBgClass = "bg-indigo-700"; // Solid color
+     cardClass = "border-indigo-500/50 bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-800";
+     titleClass = "text-white group-hover:text-indigo-200";
   } else { // Locked
-    cardGradientClass = "bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900";
-    titleTextColorClass = "text-gray-300 group-hover:text-gray-100";
-    earningTextColorClass = "text-gray-400";
-    contentBgClass = "bg-gray-800"; // Solid color
+    cardClass = "border-gray-600 bg-gray-800";
+    titleClass = "text-gray-300 group-hover:text-gray-100";
   }
-  titleTextColorClass = `${titleTextColorClass} !text-gray-50`;
 
   const handleCardClick = (event: React.MouseEvent) => {
     if ((event.target as HTMLElement).closest('button, a')) {
@@ -101,78 +99,53 @@ export function HotVibeCard({
   };
 
   const renderFooterButton = () => {
-    const buttonBaseClasses = "w-full font-orbitron text-[0.65rem] sm:text-xs py-2 px-1.5 sm:px-2 rounded-md flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105 min-h-fit";
-    let isDisabled = false;
-    if (isElonSimulatorCard || isPdfGeneratorCard) {
-        if (isSupported) { 
-            isDisabled = !isAuthenticated;
-        } else { 
-            isDisabled = isProcessingThisCard || !isAuthenticated;
-        }
-    } else { 
-        if (isSupported) { 
-             isDisabled = !isAuthenticated; 
-        } else { 
-            isDisabled = isProcessingThisCard || !isAuthenticated;
-        }
-    }
+    const buttonBaseClasses = "w-full font-orbitron text-xs py-2 px-2 rounded-lg flex items-center justify-center text-center leading-tight transition-all duration-200 ease-in-out transform group-hover:scale-105";
+    const isDisabled = isProcessingThisCard || !isAuthenticated;
     const disabledClasses = isDisabled ? "opacity-70 cursor-not-allowed !scale-100" : "";
 
-    let buttonTextKey = ""; 
-    let buttonIconName = ""; 
-    let buttonAction = () => onSupportMission(lead); 
-    let buttonSpecificClass = "bg-gradient-to-r from-brand-orange via-red-500 to-pink-500 text-white hover:brightness-110";
+    let buttonIconName = "";
+    let buttonAction = () => onSupportMission(lead);
+    let buttonSpecificClass = "";
+    let buttonText = "";
+
+    let priceKV: number;
+    let priceXTR: number;
 
     if (isElonSimulatorCard) {
-      if (isSupported) {
-        buttonTextKey = "goToSimulatorText";
-        buttonIconName = "FaGamepad";
-        buttonAction = () => onViewVip(lead); 
-        buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 text-black hover:brightness-110";
-      } else {
-        buttonTextKey = "elonSimulatorAccessBtnText";
-        buttonIconName = isProcessingThisCard ? "FaSpinner" : "FaHandHoldingDollar";
-        buttonSpecificClass = "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600 text-black hover:brightness-110";
-      }
+        priceKV = ELON_SIMULATOR_ACCESS_PRICE_KV;
+        priceXTR = ELON_SIMULATOR_ACCESS_PRICE_XTR;
     } else if (isPdfGeneratorCard) {
-        if (isSupported) {
-            buttonTextKey = "goToPdfGeneratorText";
-            buttonIconName = "FaFilePdf";
-            buttonAction = () => onViewVip(lead); 
-            buttonSpecificClass = "bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 text-white hover:brightness-110";
-        } else {
-            buttonTextKey = "pdfGeneratorAccessBtnText";
-            buttonIconName = isProcessingThisCard ? "FaSpinner" : "FaHandHoldingDollar";
-            buttonSpecificClass = "bg-gradient-to-r from-cyan-500 via-blue-600 to-purple-600 text-white hover:brightness-110";
-        }
-    } else { 
-      if (isSupported) {
-        buttonTextKey = "supportedText"; 
-        buttonIconName = "FaEye";
+        priceKV = PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV;
+        priceXTR = PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR;
+    } else {
+        priceKV = MISSION_SUPPORT_PRICE_KV;
+        priceXTR = MISSION_SUPPORT_PRICE_XTR;
+    }
+
+    if (isSupported) {
+        buttonIconName = isSpecial ? "::FaCaretRight::" : "::FaEye::";
+        buttonText = isSpecial ? (translations.goToSimulatorText || "Enter") : (translations.viewDemoText || "View");
         buttonAction = () => onViewVip(lead); 
-        buttonSpecificClass = "bg-gradient-to-r from-brand-green via-lime-500 to-emerald-600 text-black hover:brightness-110";
-      } else {
-        buttonTextKey = "supportMissionBtnText";
-        buttonIconName = isProcessingThisCard ? "FaSpinner" : "FaHandHoldingDollar";
-      }
+        buttonSpecificClass = "bg-brand-green text-black hover:brightness-110";
+    } else {
+        buttonIconName = isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaUnlockKeyhole::";
+        // Compact button text using icons
+        buttonText = `::FaBolt:: ${priceKV} / ::FaStar:: ${priceXTR}`;
+        buttonSpecificClass = "bg-brand-orange text-white hover:brightness-110";
     }
     
-    let fullButtonText = translations[buttonTextKey] || buttonTextKey;
-    if (buttonTextKey === "supportedText" && !isElonSimulatorCard && !isPdfGeneratorCard) {
-        fullButtonText = `${translations.supportedText} (${translations.viewDemoText})`;
-    }
-    if (isProcessingThisCard && (isElonSimulatorCard || isPdfGeneratorCard || !isSupported)) {
-        fullButtonText = ""; 
+    if (isProcessingThisCard) {
+        buttonText = "";
     }
 
     return (
       <Button 
         onClick={buttonAction}
         disabled={isDisabled}
-        className={cn(buttonBaseClasses, buttonSpecificClass, buttonTextColorClass, disabledClasses)}
+        className={cn(buttonBaseClasses, buttonSpecificClass, disabledClasses)}
       >
-        <VibeContentRenderer content={`::${buttonIconName}::`} className={cn("mr-1 sm:mr-1.5 text-xs", isProcessingThisCard && (isElonSimulatorCard || isPdfGeneratorCard || !isSupported) && "animate-spin")} />
-        {fullButtonText}
+        <VibeContentRenderer content={buttonIconName} className={cn("text-base", isProcessingThisCard && "animate-spin")} />
+        <VibeContentRenderer content={buttonText} className="ml-1.5 flex items-center gap-1.5" />
       </Button>
     );
   };
@@ -181,15 +154,15 @@ export function HotVibeCard({
     <Card 
       onClick={handleCardClick}
       className={cn(
-        "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl transition-all duration-300 ease-in-out aspect-[3/4] sm:aspect-[4/5]",
-        cardGradientClass, 
-        "cursor-pointer", 
+        "hot-vibe-card group relative flex flex-col overflow-hidden rounded-xl transition-all duration-300 ease-in-out border",
+        cardClass, 
+        "cursor-pointer shadow-lg",
         (isMissionUnlocked || isSpecial || isSupported) 
-          ? "hover:scale-[1.03] hover:-translate-y-0.5" 
+          ? "hover:scale-[1.03] hover:shadow-xl hover:-translate-y-1" 
           : "opacity-80 hover:opacity-100"
       )}
     >
-        <div className="relative aspect-[1/1] w-full overflow-hidden"> 
+        <div className="relative aspect-square w-full overflow-hidden"> 
           <Image
             src={imageToDisplayOnCard}
             alt={lead.kwork_gig_title || 'Hot Vibe Lead'}
@@ -199,33 +172,26 @@ export function HotVibeCard({
             onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE_CARD; }}
           />
           <div className={cn(
-              "absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent group-hover:from-black/60"
+              "absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent group-hover:from-black/70"
           )} />
-          {(lead.status === 'client_responded_positive' || lead.status === 'interested') && !isElonSimulatorCard && !isPdfGeneratorCard && (
-            <div className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full animate-pulse flex items-center gap-1">
-              HOT <VibeContentRenderer content="::FaFireAlt::" className="w-2.5 h-2.5" />
+          {(lead.status === 'client_responded_positive' || lead.status === 'interested') && !isSpecial && (
+            <div className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full animate-pulse">
+              HOT
             </div>
           )}
           {isSupported && (
-             <div className="absolute top-1.5 left-1.5 bg-brand-green/80 text-black text-[0.55rem] font-orbitron uppercase px-2 py-1 rounded-full flex items-center gap-1">
-                <VibeContentRenderer content="::FaCheckCircle::" className="w-3 h-3" /> 
-                <span className="leading-none">
-                    {isElonSimulatorCard || isPdfGeneratorCard ? (currentLang === 'ru' ? "Доступен" : "Access") : (currentLang === 'ru' ? "Поддержано" : "Supported")}
-                </span>
+             <div className="absolute top-1.5 left-1.5 bg-brand-green/90 text-black text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full">
+                {isSpecial ? (currentLang === 'ru' ? "Доступ" : "Access") : (currentLang === 'ru' ? "Поддержка" : "Supported")}
               </div>
           )}
         </div>
 
-        <CardContent className={cn(
-            "flex flex-1 flex-col justify-between p-2.5 sm:p-3 text-center space-y-1.5",
-            contentBgClass 
-            )}
-        >
-          <div className="min-h-[3.5em] sm:min-h-[4em]"> 
+        <CardContent className="flex flex-1 flex-col justify-between p-2.5 space-y-2">
+          <div className="flex-grow">
             <h3 
               className={cn(
-                "font-orbitron text-sm sm:text-base font-bold leading-tight transition-colors line-clamp-2", 
-                titleTextColorClass 
+                "font-orbitron text-sm font-bold leading-tight transition-colors line-clamp-2", 
+                titleClass
               )} 
               title={lead.kwork_gig_title || "Untitled Gig"}
             >
@@ -234,8 +200,7 @@ export function HotVibeCard({
             {lead.ai_summary && (
               <p 
                 className={cn(
-                    "mt-1 text-[0.6rem] sm:text-[0.7rem] leading-snug line-clamp-2", 
-                     "text-gray-300 group-hover:text-gray-200" 
+                    "mt-1 text-xs leading-snug line-clamp-2 text-slate-300 group-hover:text-slate-200"
                 )} 
                 title={lead.ai_summary}
               >
@@ -243,16 +208,9 @@ export function HotVibeCard({
               </p>
             )}
           </div>
-          <div className="text-[0.7rem] sm:text-xs font-orbitron font-semibold">
-            {lead.potential_earning && 
-                <span className={cn(earningTextColorClass, "text-gray-50")}> 
-                    {lead.potential_earning}
-                </span>
-            }
-          </div>
         </CardContent>
         
-        <CardFooter className={cn("p-2 sm:p-2.5 pt-0 mt-auto", contentBgClass, "rounded-b-xl")}> 
+        <CardFooter className="p-2 pt-0 mt-auto"> 
             {renderFooterButton()}
         </CardFooter>
     </Card>

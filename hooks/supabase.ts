@@ -1,7 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
-import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types.ts"; 
 
@@ -77,10 +76,10 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
 
 export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     if (!userId) {
-        debugLogger.warn("fetchUserData called with empty userId");
+        logger.warn("fetchUserData called with empty userId");
         return null;
     }
-    debugLogger.log(`Fetching user data for userId: ${userId}`);
+    logger.info(`Fetching user data for userId: ${userId}`);
     if (!supabaseAdmin) { 
         logger.error("[SupabaseHook] fetchUserData: Admin client unavailable.");
         return null;
@@ -98,7 +97,7 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
             return null;
         }
 
-        debugLogger.log(`[SupabaseHook] Fetched user data for ${userId}:`, data ? 'User found' : 'User not found');
+        logger.info(`[SupabaseHook] Fetched user data for ${userId}: ${data ? 'User found' : 'User not found'}`);
         return data;
     } catch (catchError) {
         logger.error(`[SupabaseHook] Exception in fetchUserData for ${userId}:`, catchError);
@@ -108,7 +107,7 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
 
 export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: DbUser['role']; status?: DbUser['status']; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
      if (!userId) {
-        debugLogger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
+        logger.error("[SupabaseHook] createOrUpdateUser called with empty userId");
         return null;
     }
      if (!supabaseAdmin) {
@@ -116,7 +115,7 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
          return null;
      }
 
-    debugLogger.log("[SupabaseHook] Attempting to create or update user:", { userId, username: userInfo.username });
+    logger.info("[SupabaseHook] Attempting to create or update user:", { userId, username: userInfo.username });
 
     try {
         const userData: Partial<DbUser> = { 
@@ -156,7 +155,7 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
             throw new Error("Failed to get user data after upsert.");
         }
 
-        debugLogger.log(`[SupabaseHook] User ${userId} upserted successfully.`);
+        logger.info(`[SupabaseHook] User ${userId} upserted successfully.`);
         return data;
     } catch (catchError) {
         logger.error(`[SupabaseHook] Exception in createOrUpdateUser for ${userId}:`, catchError);
@@ -178,7 +177,7 @@ export async function updateUserMetadata(
     return { success: false, error: "Database admin client is not available." };
   }
 
-  debugLogger.log(`[SupabaseHook updateUserMetadata] Updating metadata for user ${userId} using supabaseAdmin. New metadata:`, metadata);
+  logger.info(`[SupabaseHook updateUserMetadata] Updating metadata for user ${userId} using supabaseAdmin.`);
   try {
     const { data, error } = await supabaseAdmin
       .from("users") 
@@ -197,7 +196,7 @@ export async function updateUserMetadata(
         return { success: false, error: `User ${userId} not found after metadata update attempt.` };
     }
 
-    debugLogger.log(`[SupabaseHook updateUserMetadata] Successfully updated metadata for user ${userId} with supabaseAdmin.`);
+    logger.info(`[SupabaseHook updateUserMetadata] Successfully updated metadata for user ${userId} with supabaseAdmin.`);
     return { success: true, data };
   } catch (catchError) {
     logger.error(`[SupabaseHook updateUserMetadata] Exception for user ${userId} (using supabaseAdmin):`, catchError);
@@ -440,7 +439,7 @@ export const fetchArticles = async (): Promise<{ success: boolean; data?: DbArti
       .order("title", { ascending: true }); 
 
     if (error) throw error;
-    debugLogger.log(`Fetched ${data?.length || 0} articles.`);
+    logger.info(`Fetched ${data?.length || 0} articles.`);
     return { success: true, data: data || [] };
   } catch (error) {
     logger.error("Error fetching articles:", error);
@@ -460,7 +459,7 @@ export const fetchArticleSections = async (articleId: string): Promise<{ success
       .order("section_order", { ascending: true }); 
 
     if (error) throw error;
-    debugLogger.log(`Fetched ${data?.length || 0} sections for article ${articleId}.`);
+    logger.info(`Fetched ${data?.length || 0} sections for article ${articleId}.`);
     return { success: true, data: data || [] };
   } catch (error) {
     logger.error(`Error fetching sections for article ${articleId}:`, error);
@@ -479,7 +478,7 @@ export const saveTestProgress = async (userId: string, progress: any): Promise<{
             .eq("user_id", userId); 
 
         if (error) throw error;
-        debugLogger.log(`Saved test progress for user ${userId}.`);
+        logger.info(`Saved test progress for user ${userId}.`);
         return { success: true };
     } catch (error) {
         logger.error(`Exception saving test progress for user ${userId}:`, error);
@@ -504,7 +503,7 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
             throw error;
         }
 
-        debugLogger.log(`Loaded test progress for user ${userId}.`);
+        logger.info(`Loaded test progress for user ${userId}.`);
         return { success: true, data: data?.test_progress ?? null };
     } catch (error) {
         logger.error(`Exception loading test progress for user ${userId}:`, error);
@@ -519,7 +518,7 @@ export const updateUserSubscription = async (
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Attempting to update subscription-related info for user ${userId}. New subscription_id: ${subscriptionId}`);
+    logger.info(`Attempting to update subscription-related info for user ${userId}. New subscription_id: ${subscriptionId}`);
     try {
         const updatePayload: Partial<DbUser> = { 
             updated_at: new Date().toISOString(),
@@ -540,7 +539,7 @@ export const updateUserSubscription = async (
         }
          if (!data) return { success: false, error: `User ${userId} not found after update attempt.` };
 
-        debugLogger.log(`Successfully updated user ${userId} subscription_id to ${data.subscription_id}.`);
+        logger.info(`Successfully updated user ${userId} subscription_id to ${data.subscription_id}.`);
         return { success: true, data };
     } catch (error) {
         logger.error(`Exception in updateUserSubscription for user ${userId}:`, error);
@@ -554,7 +553,7 @@ export const getUserSubscription = async (
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Fetching subscription_id for user ${userId} from users table.`);
+    logger.info(`Fetching subscription_id for user ${userId} from users table.`);
     try {
         const { data: userData, error: userError } = await supabaseAdmin
             .from("users")
@@ -568,7 +567,7 @@ export const getUserSubscription = async (
         }
         
         const subIdFromDb = userData?.subscription_id; 
-        debugLogger.log(`User ${userId} current subscription_id from DB: ${subIdFromDb}`);
+        logger.info(`User ${userId} current subscription_id from DB: ${subIdFromDb}`);
         return { success: true, data: subIdFromDb ?? null };
 
     } catch (error) {
@@ -622,7 +621,7 @@ export const createInvoice = async (
         }
         if (!data) return { success: false, error: "Invoice creation returned no data." };
 
-        debugLogger.log(`Invoice ${id} created successfully for user ${userId}.`);
+        logger.info(`Invoice ${id} created successfully for user ${userId}.`);
         return { success: true, data };
     } catch (error) {
         const castError = error as any;
@@ -658,7 +657,7 @@ export const updateInvoiceStatus = async (
         }
         if (!data) return { success: false, error: "Invoice not found after update attempt." };
 
-        debugLogger.log(`Invoice ${invoiceId} status updated to ${status}.`);
+         logger.info(`Invoice ${invoiceId} status updated to ${status}.`);
         return { success: true, data };
     } catch (error) {
         logger.error(`Error updating invoice ${invoiceId} status to ${status}:`, error);
@@ -684,7 +683,7 @@ export const getInvoiceById = async (invoiceId: string): Promise<{ success: bool
             return { success: false, error: `Invoice ${invoiceId} not found.` };
         }
 
-        debugLogger.log(`Fetched invoice ${invoiceId}.`);
+        logger.info(`Fetched invoice ${invoiceId}.`);
         return { success: true, data };
     } catch (error) {
         logger.error(`Error fetching invoice ${invoiceId}:`, error);
@@ -707,7 +706,7 @@ export const getUserInvoices = async (userId: string): Promise<{ success: boolea
 
         if (error) throw error;
 
-        debugLogger.log(`Fetched ${data?.length || 0} invoices for user ${userId}.`);
+        logger.info(`Fetched ${data?.length || 0} invoices for user ${userId}.`);
         return { success: true, data: data || [] };
     } catch (error) {
         logger.error(`Error fetching invoices for user ${userId}:`, error);
@@ -761,7 +760,7 @@ export const createRental = async (
             throw error;
         }
         if (!data) return { success: false, error: "Rental creation returned no data." };
-        debugLogger.log(`Rental created successfully for user ${userId}, car ${carId}. ID: ${data.rental_id}`);
+        logger.info(`Rental created successfully for user ${userId}, car ${carId}. ID: ${data.rental_id}`);
         return { success: true, data };
     } catch (error) {
         logger.error(`Error creating rental for user ${userId}, car ${carId}:`, error);
@@ -795,7 +794,7 @@ export const getUserRentals = async (userId: string): Promise<{ success: boolean
             cars: undefined, 
         }));
 
-        debugLogger.log(`Fetched ${formattedData.length} rentals for user ${userId}.`);
+        logger.info(`Fetched ${formattedData.length} rentals for user ${userId}.`);
         return { success: true, data: formattedData };
     } catch (error) {
         logger.error(`Error fetching rentals for user ${userId}:`, error);
@@ -826,7 +825,7 @@ export const updateRentalPaymentStatus = async (
         }
          if (!data) return { success: false, error: "Rental not found after update attempt." };
 
-         debugLogger.log(`Rental ${rentalId} payment status updated to ${paymentStatus}.`);
+         logger.info(`Rental ${rentalId} payment status updated to ${paymentStatus}.`);
         return { success: true, data };
     } catch (error) {
         logger.error(`Error updating rental ${rentalId} payment status to ${paymentStatus}:`, error);
@@ -846,7 +845,7 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
         const finalFileName = fileName || `${crypto.randomUUID()}.${fileExt}`;
         const filePath = `${finalFileName}`; 
 
-        debugLogger.log(`Uploading file '${file.name}' to bucket '${bucketName}' as '${filePath}'...`);
+        logger.info(`Uploading file '${file.name}' to bucket '${bucketName}' as '${filePath}'...`);
 
         const { error: uploadError } = await supabaseAdmin.storage
             .from(bucketName)
@@ -941,7 +940,7 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
 
         if (error) {
              if (error.code === '23505') { 
-                 debugLogger.warn(`User ${userId} already has a result for car ${carId}. Ignoring duplicate.`);
+                 logger.warn(`User ${userId} already has a result for car ${carId}. Ignoring duplicate.`);
                  return { success: true };
              }
              if (error.code === '23503') {
@@ -949,7 +948,7 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
              }
              throw error;
         }
-        debugLogger.log(`Saved user result for user ${userId}, car ${carId}.`);
+        logger.info(`Saved user result for user ${userId}, car ${carId}.`);
         return { success: true };
     } catch (error) {
         logger.error(`Error saving user result for ${userId}:`, error);
@@ -969,7 +968,7 @@ export const getUserResults = async (userId: string): Promise<{ success: boolean
             .order("created_at", { ascending: false });
 
         if (error) throw error;
-        debugLogger.log(`Fetched ${data?.length || 0} results for user ${userId}.`);
+        logger.info(`Fetched ${data?.length || 0} results for user ${userId}.`);
         return { success: true, data: data || [] };
     } catch (error) {
         logger.error(`Error fetching user results for ${userId}:`, error);
