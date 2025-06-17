@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { handleWebhookUpdate, sendTelegramMessage } from "@/app/actions"; // Assuming sendTelegramMessage is also in actions
-import { updateInvoiceStatus, getInvoiceById, updateUserSubscription } from '../actions'; // Assuming these actions exist for payments
+import { sendTelegramMessage } from "@/app/actions";
+import { handleWebhookProxy } from "@/app/webhook-handlers/proxy"; // Import your main proxy handler
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const BOT_USERNAME = "oneSitePlsBot";
+const BOT_USERNAME = "oneSitePlsBot"; // Or your actual bot username
 
 // --- Minibot Helper Functions ---
 function extractCodeBlocks(fileContent: string): string[] {
@@ -22,56 +22,24 @@ function getFirstLine(codeBlock: string): string {
   return lines.length > 0 ? lines[0] : "Untitled Snippet";
 }
 
-// --- Main Webhook Handler (Smart Dispatcher) ---
-
+// --- Main Webhook Handler (Master Dispatcher) ---
 export async function POST(request: Request) {
   try {
     const update = await request.json();
-    logger.info("[Webhook Dispatcher] Received update:", update);
+    logger.info("[Master Webhook] Received update:", Object.keys(update));
 
-    // --- DISPATCHER LOGIC ---
+    // --- MASTER DISPATCHER LOGIC ---
 
-    // 1. Handle Pre-Checkout Queries (for payments)
-    if (update?.pre_checkout_query) {
-      logger.info(`[Webhook Dispatcher] Handling pre-checkout query: ${update.pre_checkout_query.id}`);
-      // The original code passed this to the general handler. We do the same for consistency.
-      await handleWebhookUpdate(update);
+    // Route 1: Handle payment-related updates via the dedicated proxy handler
+    if (update.pre_checkout_query || update.message?.successful_payment) {
+      logger.info("[Master Webhook] Routing to Payment Proxy Handler...");
+      await handleWebhookProxy(update);
       return NextResponse.json({ ok: true });
     }
     
-    // 2. Handle Successful Payments (with complete logic)
-    else if (update?.message?.successful_payment) {
-      const payment = update.message.successful_payment;
-      const user = update.message.from;
-      logger.info(`[Webhook Dispatcher] Handling successful payment for invoice: ${payment.invoice_payload}`);
-      
-      try {
-        // STEP 1: Update the invoice status in your database
-        // await updateInvoiceStatus(payment.invoice_payload, 'paid');
-
-        // STEP 2: Check if this was a subscription and update user permissions
-        // const invoice = await getInvoiceById(payment.invoice_payload);
-        // if (invoice?.metadata?.type === 'subscription') {
-        //   await updateUserSubscription(user.id.toString(), invoice.metadata.subscription_id);
-        //   logger.info(`Subscription for user ${user.id} updated.`);
-        // }
-        
-        // This is where your actual, specific payment handling logic goes.
-        // The above lines are functional examples based on your original comments.
-        // For now, we will pass it to the main handler as the original code did.
-        await handleWebhookUpdate(update);
-
-      } catch (error) {
-        logger.error("[Webhook Dispatcher] Critical error processing successful payment:", error);
-        // Optionally, send a message to an admin chat about the failure
-      }
-      
-      return NextResponse.json({ ok: true });
-    }
-
-    // 3. Handle Minibot File Uploads
-    else if (update?.message?.document) {
-      logger.info("[Webhook Dispatcher] Handling document upload (Minibot logic).");
+    // Route 2: Handle Minibot file uploads directly
+    else if (update.message?.document) {
+      logger.info("[Master Webhook] Routing to Minibot File Handler...");
       const { document, chat } = update.message;
       const fileId = document.file_id;
       const chatId = chat.id;
@@ -107,15 +75,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // 4. Fallback for all other message types
+    // Route 3: Fallback for other message types (e.g., commands, text messages)
+    // This can be expanded later if needed. For now, we can log it and acknowledge.
     else {
-      logger.info("[Webhook Dispatcher] Update did not match specific handlers, passing to general handler.");
-      await handleWebhookUpdate(update);
+      logger.info("[Master Webhook] Received unhandled update type, ignoring.", { keys: Object.keys(update.message || {}) });
+      // If you have a generic text message handler, you could call it here.
+      // For example: await handleTextMessage(update);
       return NextResponse.json({ ok: true });
     }
 
   } catch (error) {
-    logger.error("Critical error in top-level webhook dispatcher:", error);
+    logger.error("Critical error in Master Webhook dispatcher:", error);
+    // Return 200 to Telegram to prevent it from re-sending the failed update.
     return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 200 });
   }
 }

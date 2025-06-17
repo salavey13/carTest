@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/fetch-crypto-prices",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ],
   "routes": [
