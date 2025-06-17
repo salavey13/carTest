@@ -920,3 +920,44 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
 export const TOKEN_ESTIMATION_FACTOR = 4;
 
 export { PERKS_BY_LEVEL };
+
+/**
+ * NEW: Spends KiloVibes for a user for a specific purchase.
+ * This is a transactional function. It will deduct KV and log the transaction.
+ * THIS IS NOW REFACTORED TO USE THE DATABASE FUNCTION.
+ */
+export async function spendKiloVibes(
+  userId: string, 
+  amount: number, 
+  reason: string
+): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  logger.info(`[spendKiloVibes] Calling DB function to spend ${amount} KV for user ${userId}. Reason: ${reason}`);
+  if (!userId || !amount || amount <= 0) {
+    return { success: false, error: "Invalid user ID or amount provided." };
+  }
+
+  // Use a negative adjustment for spending
+  const adjustment = -Math.abs(amount);
+
+  const { data, error } = await supabaseAdmin.rpc('adjust_kilovibes', {
+      p_user_id: userId,
+      p_kv_adjustment: adjustment,
+  });
+
+  if (error) {
+    logger.error(`[spendKiloVibes] RPC call failed for user ${userId}:`, error);
+    return { success: false, error: "Database transaction failed." };
+  }
+  
+  const result = data[0];
+
+  if (!result.success) {
+    logger.warn(`[spendKiloVibes] DB function returned failure for user ${userId}: ${result.message}`);
+    // The message from the DB function is now the error message
+    return { success: false, error: result.message };
+  }
+
+  logger.info(`[spendKiloVibes] Successfully spent ${amount} KV for user ${userId}. New balance: ${result.new_balance.toFixed(2)}. Reason: ${reason}`);
+
+  return { success: true, newBalance: result.new_balance };
+}

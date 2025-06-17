@@ -1,6 +1,3 @@
-// Убираем "use server" с уровня модуля, так как экспортируется объект, а не async функция
-// "use server"; 
-
 import type { WebhookHandler } from "./types";
 import { supabaseAdmin, updateUserMetadata } from '@/hooks/supabase';
 import { sendTelegramMessage } from "@/app/actions";
@@ -12,9 +9,9 @@ type UserMetadata = Database["public"]["Tables"]["users"]["Row"]["metadata"];
 interface UserProtoCard {
   type: string;                 
   purchased_at: string;         
-  price_xtr: number;            
+  price: string; // Changed to string to accommodate "13 XTR" or "100 KV"         
   status: "active" | "redeemed" | "voided"; 
-  invoice_id: string;           
+  transaction_id: string; // Changed from invoice_id to be more generic         
   data?: Record<string, any>;   
 }
 
@@ -24,6 +21,7 @@ interface UserMetadataWithProtoCards extends UserMetadata {
   };
 }
 
+// THIS HANDLER IS NOW ONLY FOR XTR PAYMENTS. KV purchases are handled directly.
 export const protocardPurchaseHandler: WebhookHandler = {
   canHandle: (invoice, payload) => {
     const typeMatch = invoice.type?.startsWith('protocard_');
@@ -33,27 +31,52 @@ export const protocardPurchaseHandler: WebhookHandler = {
   },
 
   handle: async (invoice, userId, userData, totalAmountXTR, supabase, telegramToken, adminChatId, baseUrl) => {
-    logger.info(`[ProtoCardHandler] Processing ProtoCard purchase. UserID: ${userId}, InvoiceID: ${invoice.id}, Amount: ${totalAmountXTR} XTR.`);
+    logger.info(`[ProtoCardHandler] Processing XTR-based ProtoCard purchase. UserID: ${userId}, InvoiceID: ${invoice.id}, Amount: ${totalAmountXTR} XTR.`);
     
     const cardId = invoice.subscription_id; 
     const cardMetadataFromInvoice = invoice.metadata;
 
     if (!cardId) {
-      logger.error(`[ProtoCardHandler] Critical: cardId (from invoice.subscription_id) is missing for invoice ${invoice.id}. Cannot update user metadata.`);
+      logger.error(`[ProtoCardHandler] Critical: cardId (from invoice.subscription_id) is missing for invoice ${invoice.id}.`);
+      // User is already notified by the payment system, but admin needs to know.
       await sendTelegramMessage(
-        `🚨 ОШИБКА ОБРАБОТКИ ПРОТОКАРТЫ для ${userData.username || userId}! ID карточки не найден в инвойсе ${invoice.id}. Свяжитесь с поддержкой.`,
-        [], undefined, userId, undefined
-      );
-      await sendTelegramMessage(
-        `🚫 КРИТИЧЕСКАЯ ОШИБКА: ID карточки (invoice.subscription_id) не найден в инвойсе ${invoice.id} для пользователя ${userId}.`,
+        `🚫 КРИТИЧЕСКАЯ ОШИБКА: ID карточки (invoice.subscription_id) не найден в инвойсе ${invoice.id} для пользователя ${userId}. Платеж прошел!`,
         [], undefined, adminChatId, undefined
       );
       return; 
     }
 
-    logger.debug(`[ProtoCardHandler] Extracted cardId: ${cardId}. Card metadata from invoice:`, cardMetadataFromInvoice);
-
     try {
+      // Step 1: Grant Access. This function encapsulates updating the user metadata.
+      const grantResult = await supabaseAdmin.rpc('grant_protocard_access', {
+          p_user_id: userId,
+          p_card_id: cardId,
+          p_card_details: { // Constructing the card details based on invoice
+            type: cardMetadataFromInvoice?.original_card_type || invoice.type?.replace('protocard_', '') || 'unknown',
+            purchased_at: new Date().toISOString(),
+            price: `${totalAmountXTR} XTR`,
+            status: "active",
+            transaction_id: invoice.id,
+            data: {
+              title: cardMetadataFromInvoice?.card_title || "ПротоКарточка",
+              description: cardMetadataFromInvoice?.card_description || "Доступ или поддержка",
+              ...(cardMetadataFromInvoice || {}), // Add all other metadata from invoice
+            }
+          }
+      });
+      
+      if (grantResult.error) {
+          logger.error(`[ProtoCardHandler] RPC grant_protocard_access failed for user ${userId}, card ${cardId}:`, grantResult.error);
+          await sendTelegramMessage(
+            `⚠️ Произошла ошибка при добавлении ПротоКарточки в ваш профиль после оплаты. Пожалуйста, свяжитесь с поддержкой, указав ID транзакции: ${invoice.id}`,
+            [], undefined, userId, undefined
+          );
+          return;
+      }
+      
+      logger.info(`[ProtoCardHandler] User ${userId} metadata updated successfully via RPC with ProtoCard ${cardId}.`);
+
+      // Step 2: Mark invoice as paid
       const { error: updateInvoiceError } = await supabaseAdmin
         .from("invoices")
         .update({ status: "paid", updated_at: new Date().toISOString() })
@@ -61,76 +84,35 @@ export const protocardPurchaseHandler: WebhookHandler = {
         .neq("status", "paid"); 
 
       if (updateInvoiceError) {
-        logger.error(`[ProtoCardHandler] Error marking invoice ${invoice.id} as paid:`, updateInvoiceError);
-      } else {
-        logger.info(`[ProtoCardHandler] Invoice ${invoice.id} marked as paid or was already paid.`);
+        logger.error(`[ProtoCardHandler] Error marking invoice ${invoice.id} as paid (but access was granted):`, updateInvoiceError);
+        // Don't stop here, user already has access.
       }
 
-      const currentUserMetadata = (userData.metadata || {}) as UserMetadataWithProtoCards;
-      const existingProtoCards = currentUserMetadata.xtr_protocards || {};
-
-      const newProtoCardEntry: UserProtoCard = {
-        type: cardMetadataFromInvoice?.original_card_type || invoice.type?.replace('protocard_', '') || 'unknown',
-        purchased_at: new Date().toISOString(),
-        price_xtr: totalAmountXTR, 
-        status: "active",
-        invoice_id: invoice.id,
-        data: {
-            title: cardMetadataFromInvoice?.card_title || "ПротоКарточка",
-            description: cardMetadataFromInvoice?.card_description || "Доступ или поддержка",
-            ...(cardMetadataFromInvoice?.associated_lead_id && { lead_id: cardMetadataFromInvoice.associated_lead_id }),
-            ...(cardMetadataFromInvoice?.lead_title && { lead_title: cardMetadataFromInvoice.lead_title }),
-            ...(cardMetadataFromInvoice?.demo_link_param && { demo_link_param: cardMetadataFromInvoice.demo_link_param }),
-            ...(cardMetadataFromInvoice?.simulator_page && { page_link: cardMetadataFromInvoice.simulator_page }),
-        }
-      };
-      if (Object.keys(newProtoCardEntry.data || {}).length === 0) {
-          delete newProtoCardEntry.data;
-      }
-
-      const updatedProtoCards = {
-        ...existingProtoCards,
-        [cardId]: newProtoCardEntry,
-      };
-
-      const finalMetadataUpdate: UserMetadataWithProtoCards = {
-        ...currentUserMetadata,
-        xtr_protocards: updatedProtoCards,
-      };
-      
-      const metadataUpdateResult = await updateUserMetadata(userId, finalMetadataUpdate);
-
-      if (!metadataUpdateResult.success) {
-        logger.error(`[ProtoCardHandler] Failed to update user ${userId} metadata with ProtoCard ${cardId}:`, metadataUpdateResult.error);
-        await sendTelegramMessage(
-          `⚠️ Произошла ошибка при добавлении ПротоКарточки в ваш профиль. Пожалуйста, свяжитесь с поддержкой, указав ID транзакции: ${invoice.id}`,
-          [], undefined, userId, undefined
-        );
-        return;
-      }
-      logger.info(`[ProtoCardHandler] User ${userId} metadata updated successfully with ProtoCard ${cardId}.`);
-
+      // Step 3: Notify user and admin
       const cardTitleForNotification = cardMetadataFromInvoice?.card_title || `Карточка ${cardId}`;
       let userMessage = `✅ Спасибо за покупку ПротоКарточки "${cardTitleForNotification}"! Она добавлена в ваш инвентарь. VIBE ON!`;
-      if (newProtoCardEntry.data?.page_link) {
-        userMessage += `\nДоступ к симулятору: ${baseUrl}${newProtoCardEntry.data.page_link}`;
-      } else if (newProtoCardEntry.data?.lead_id && newProtoCardEntry.data?.demo_link_param) {
-        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'webAnyBot'; // Получаем имя бота из env
-        const demoUrl = `https://t.me/${botUsername}/app?startapp=${newProtoCardEntry.data.demo_link_param}`;
-        userMessage += `\nДоступ к демо для миссии "${newProtoCardEntry.data.lead_title || newProtoCardEntry.data.lead_id}": ${demoUrl}`;
+      const pageLink = cardMetadataFromInvoice?.page_link || (cardMetadataFromInvoice?.data as any)?.page_link;
+      const demoLinkParam = cardMetadataFromInvoice?.demo_link_param || (cardMetadataFromInvoice?.data as any)?.demo_link_param;
+
+      if (pageLink) {
+        userMessage += `\nДоступ открыт: ${baseUrl}${pageLink}`;
+      } else if (demoLinkParam) {
+        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'webAnyBot';
+        const demoUrl = `https://t.me/${botUsername}/app?startapp=${demoLinkParam}`;
+        userMessage += `\nДоступ к демо для миссии: ${demoUrl}`;
       }
 
       await sendTelegramMessage(userMessage, [], undefined, userId, undefined);
 
       await sendTelegramMessage(
-        `🔔 Пользователь ${userData.username || userId} (${userId}) приобрел ПротоКарточку "${cardTitleForNotification}" (ID: ${cardId}) за ${totalAmountXTR} XTR. Инвойс: ${invoice.id}.`,
+        `🔔 [XTR] Пользователь ${userData.username || userId} (${userId}) приобрел ПротоКарточку "${cardTitleForNotification}" (ID: ${cardId}) за ${totalAmountXTR} XTR. Инвойс: ${invoice.id}.`,
         [], undefined, adminChatId, undefined
       );
 
     } catch (error) {
-      logger.error(`[ProtoCardHandler] Critical error processing ProtoCard purchase for user ${userId}, card ${cardId}:`, error);
+      logger.error(`[ProtoCardHandler] Critical error processing XTR purchase for user ${userId}, card ${cardId}:`, error);
       await sendTelegramMessage( 
-        `🚨 КРИТИЧЕСКАЯ ОШИБКА при обработке ПротоКарточки! User: ${userId}, CardID: ${cardId}, Invoice: ${invoice.id}. Ошибка: ${error instanceof Error ? error.message : String(error)}`,
+        `🚨 КРИТИЧЕСКАЯ ОШИБКА при обработке XTR платежа! User: ${userId}, CardID: ${cardId}, Invoice: ${invoice.id}. Ошибка: ${error instanceof Error ? error.message : String(error)}`,
         [], undefined, adminChatId, undefined
       );
     }
