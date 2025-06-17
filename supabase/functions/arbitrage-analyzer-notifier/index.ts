@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const log = (message: string, data?: any) => {
-  console.log(`[${new Date().toISOString()}] ${message}`, data || '');
+  console.log(`[analyzer-notifier] ${new Date().toISOString()}: ${message}`, data || '');
 };
 
 // --- Helper Functions ---
@@ -25,64 +25,56 @@ async function sendTelegramNotification(botToken: string, chatId: string, messag
       log(`Successfully sent Telegram message to ${chatId}`);
     }
   } catch (e) {
-    log(`Failed to send Telegram message to ${chatId}: ${e.message}`);
+    log(`Failed to send Telegram message to ${chatId}:`, e.message);
   }
 }
 
 // --- Main Handler ---
 serve(async (req: Request) => {
-  // 1. --- Auth & Environment ---
+  // 1. --- Authorization Check ---
   const CRON_SECRET = Deno.env.get('CRON_SECRET');
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    log('Unauthorized attempt to trigger function.');
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
-
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
   
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !TELEGRAM_BOT_TOKEN) {
-    log('Missing critical environment variables.');
-    return new Response(JSON.stringify({ error: 'Function configuration error.' }), { status: 500 });
-  }
-
-  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  log('Analyzer & Notifier Function Invoked.');
-
+  log('Function invoked securely.');
   try {
-    // 2. --- Fetch all users with active arbitrage scanning enabled ---
-    // (This assumes you have a flag in the `arbitrage_user_settings` table, or you can just fetch all)
-    const { data: users, error: userError } = await supabaseAdmin
-      .from('arbitrage_user_settings')
-      .select('user_id, settings');
-      // .eq('settings->>is_scan_active', 'true'); // Example of how to filter for active users
+    // 2. --- Environment and Supabase Client ---
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')!;
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    if (userError) throw userError;
-    if (!users || users.length === 0) {
-        log('No users found with arbitrage settings. Exiting.');
-        return new Response(JSON.stringify({ message: 'No active users to scan for.' }), { status: 200 });
-    }
+    // 3. --- Fetch users and opportunities concurrently ---
+    const [usersRes, opportunitiesRes] = await Promise.all([
+        supabaseAdmin.from('arbitrage_user_settings').select('user_id, settings'),
+        supabaseAdmin.from('arbitrage_opportunities').select('*')
+    ]);
+
+    if (usersRes.error) throw usersRes.error;
+    if (opportunitiesRes.error) throw opportunitiesRes.error;
     
-    log(`Found ${users.length} user(s) to process.`);
+    const users = usersRes.data || [];
+    const opportunities = opportunitiesRes.data || [];
 
-    // 3. --- Fetch all available arbitrage opportunities from the view ---
-    const { data: opportunities, error: oppError } = await supabaseAdmin
-      .from('arbitrage_opportunities')
-      .select('*');
-
-    if (oppError) throw oppError;
-    if (!opportunities || opportunities.length === 0) {
-        log('No arbitrage opportunities found in the view. Exiting.');
-        return new Response(JSON.stringify({ message: 'No current arbitrage opportunities.' }), { status: 200 });
+    if (users.length === 0 || opportunities.length === 0) {
+        log('No active users or opportunities found. Exiting.');
+        return new Response(JSON.stringify({ message: 'No active users or opportunities.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-
-    log(`Found ${opportunities.length} potential opportunities to analyze.`);
+    log(`Analyzing ${opportunities.length} opportunities for ${users.length} users.`);
 
     // 4. --- Process opportunities for each user ---
     for (const user of users) {
       const userId = user.user_id;
       const settings = user.settings;
+
+      // Validate settings object
+      if (!settings || !settings.trackedPairs || !settings.enabledExchanges) {
+        log(`User ${userId} has invalid or incomplete settings. Skipping.`);
+        continue;
+      }
 
       // Filter opportunities based on this user's settings
       const userOpportunities = opportunities.filter(op => {
@@ -122,10 +114,10 @@ _Please verify before trading_
       }
     }
     
-    return new Response(JSON.stringify({ success: true, message: `Processed ${users.length} users and ${opportunities.length} opportunities.` }), { status: 200 });
+    return new Response(JSON.stringify({ success: true, message: `Processed ${users.length} users.` }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    log('Error in Analyzer & Notifier:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    log('Critical error in edge function:', error.message);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 });
