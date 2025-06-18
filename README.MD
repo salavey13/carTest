@@ -6,6 +6,7 @@
 [![Supabase](https://img.shields.io/badge/Supabase-^2-3ECF8E?logo=supabase&logoColor=white)](https://supabase.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-^3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot%20%26%20Mini%20App-blue?logo=telegram)](https://t.me/oneSitePlsBot)
+![Cybervibe: WTF Certified](https://img.shields.io/badge/cybervibe-WTF%20Certified-%23efefef?style=for-the-badge&labelColor=232323&color=ff69b4)
 
 **Build, Validate, and Launch Secure Web Apps at Lightspeed with AI & Telegram – Contribute Without a Local Setup!**
 
