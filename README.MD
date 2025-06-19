@@ -8,6 +8,114 @@
 [![Telegram](https://img.shields.io/badge/Telegram-Bot%20%26%20Mini%20App-blue?logo=telegram)](https://t.me/oneSitePlsBot)
 ![Cybervibe: WTF Certified](https://img.shields.io/badge/cybervibe-WTF%20Certified-%23efefef?style=for-the-badge&labelColor=232323&color=ff69b4)
 
+<!-- XYUINITY ON TOP -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/910a623e-1c9d-4630-a8b4-7c361565dc97" width="220" alt="Xuinity logo"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7e7c6300-02dc-4314-be55-41005bfb247a" width="400" alt="CYBERWTF VIBE TRIBE emblem"/>
+</p>
+
+# 🧬 Welcome to CYBERVIBE STUDIO /repo-xml 🧬
+
+> **CYBERWTF VIBE TRIBE:**  
+> If you’re reading this, you’re not lost. You’re exactly where the next level starts.  
+>  
+> This is not a regular dev page. This is your portal to the **SUPERVIBE ENGINE**:  
+> - AI-powered  
+> - Gamified  
+> - 100% WTF  
+> - Built for devs, dreamers, and reality remixers
+
+---
+
+## 🚦 QUICKSTART TL;DR
+
+1. **Scroll.**  
+   Let your brain catch up—yes, it’s a lot.
+
+2. **Click “Extract Files”.**  
+   Instantly fetch source code from this repo to remix, patch, or build on.
+
+3. **Drop your AI request or idea.**  
+   Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.
+
+4. **AI + YOU = PR**  
+   The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.
+
+5. **Level Up.**  
+   Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile).  
+   See your progress, unlock achievements, and flex with the VIBE TRIBE.
+
+---
+
+## 🌀 WHAT EVEN IS THIS?
+
+- **/repo-xml** = AI-powered remix lab for this project.
+- **SUPERVIBE ENGINE:**  
+  Recursive workflow:  
+  - Extract context  
+  - Feed to AI  
+  - Build, patch, merge  
+  - Repeat
+- **No install, no gatekeeping, just instant hacking and learning.**
+
+> **You’re not just using a tool.  
+> You’re co-piloting an AI-powered, cyberpunk, recursive dev studio.  
+> You’re not asking “how do I code this?”  
+> You’re asking “how do I LEVEL UP?”**
+
+---
+
+## 🏆 BADGES, LEVELS, & QUESTS
+
+- Every PR, code fetch, or AI action = progress
+- Quests like “Fix a broken image”, “Ship an idea”, “Remix the matrix”, “Inception Swap”
+- Your **CyberFitness Profile** evolves:  
+  - Level up  
+  - Unlock perks  
+  - Collect badges  
+  - See your “Cognitive OS Version” change as you grow
+
+[See the full VIBE LEVEL chart here →](#)
+
+---
+
+## 🤖 FAQ (“WTF is going on?”)
+
+**Q:** Why does this look like a game?  
+**A:** Because learning, shipping, and leveling up should feel like one.
+
+**Q:** Why is there a DNA helix and neon everywhere?  
+**A:** Because you’re hacking the code of your DEV DNA—and it should look awesome.
+
+**Q:** Why is this better than a regular code editor?  
+**A:** No setup, no fear, no gatekeeping. Just create, remix, and WIN.
+
+**Q:** What if I break something?  
+**A:** You can’t. Everything is sandboxed, safe, and tracked. Every PR is reviewed before merging.
+
+**Q:** “I still don’t get it.”  
+**A:** Scroll back up. Click something. You’ll get it once you vibe.
+
+---
+
+## 🔥 JOIN THE TRIBE
+
+- [CYBERVIBE Sandbox (this page)](https://github.com/salavey13/carTest/app/repo-xml)
+- [Telegram entrypoint](https://t.me/oneSitePlsBot)
+- [CYBERFITNESS Engine (Gamified)](https://t.me/oneSitePlsBot/app)
+- [Full achievement history, perks, and code](https://github.com/salavey13/carTest/blob/main/hooks/cyberFitnessSupabase.ts)
+
+---
+
+<p align="center" style="font-size:1.2em">
+  <b>Ready?</b>  
+  <br />
+  <i>Let’s f*cking go. Welcome to CYBERVIBE.</i>
+</p>
+
 **Build, Validate, and Launch Secure Web Apps at Lightspeed with AI & Telegram – Contribute Without a Local Setup!**
 
 oneSitePls is more than a framework; it's a **new approach to development**, built on the **VIBE methodology**. Developed by Pavel Solovyov ([@salavey13](https://github.com/salavey13)), it streamlines web development by deeply integrating AI (Gemini, Coze) and using **Telegram** as the central hub for contribution and project interaction.
