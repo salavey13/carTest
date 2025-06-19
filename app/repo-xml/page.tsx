@@ -185,123 +185,72 @@ const translations = {
     philosophyTitle: "Your Vibe Path: Level Up & the Autonomy Slider (Andrej Karpathy + Salavey13)",
     philosophyVideoTitle: "🎥 Watch: Vibe Level System (Salavey13) + Karpathy's 'Software is Changing (Again)'",
     philosophyCore: `
-<strong>Andrej Karpathy</strong> calls it the "automation slider": from full human control to full agent autonomy. <br/>
-<strong>CyberVibe Studio</strong> lets you move the slider yourself—step-by-step, never forced, always in the loop.<br/>
-Each level = more AI power, more trust, more speed. Verification gets easier. You learn to <em>orchestrate</em> the bots, not just prompt them.<br/>
-<b>This is how you become Iron Man, not just a passenger.</b>
+<strong>The Goal (inspired by Andrej Karpathy): Build an Iron Man suit, not just an autonomous robot.</strong><br/>
+You are Tony Stark. The AI is your suit. You are always in the loop, augmented, and in control.<br/>
+Your core task is to make the <strong>Generation-Verification loop</strong> as fast as possible. The AI generates, but you, the human, are the verifier. A good GUI (like visual diffs) is crucial because it uses your brain's "vision GPU" to make verification instant.<br/>
+<b>To go fast, we keep the AI on a leash.</b> Small, incremental, auditable changes are better than a 10,000-line PR you can't review.
 `,
     philosophyLvl0_1: `
 <div style="background:#f8fafc;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.0 → 1 <FaBolt className="inline text-yellow-500" /> (Full Auto, "One-Click Fix")</b><br/>
 <span>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">100% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">0% human</span><br/>
-Broken image? Paste link → Upload replacement. <b>PR is auto-created.</b> You simply review & merge.<br/>
-<i>Karpathy: “Let the agent do it, but keep it small, safe, and auditable.”</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">100% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">0% human</span><br/>
+Fix a broken image. Paste link → Upload replacement. <b>PR is auto-created.</b> You simply review the final result and merge. The agent handles everything.
 </span>
 </div>
 `,
     philosophyLvl1_2: `
 <div style="background:#e0e7ef;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.1 → 2 <FaToolbox className="inline text-blue-600" /> (Prompt+File, "Vibe Request")</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">80% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">20% human</span><br/>
-Describe a tiny change (text/button) + pick 1 file. AI does the work, you check the diff.<br/>
-<i>Partial autonomy: You’re the final editor.</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">80% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">20% human</span><br/>
+Describe a tiny change (text/button) + pick 1 file. The AI does the coding, you check the diff. Your input is the idea; the agent does the work.
 </div>
 `,
     philosophyLvl2_3: `
 <div style="background:#f1f5f9;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.2 → 3 <FaCode className="inline text-pink-600" /> (Multi-File, "Prompt Orchestra")</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">60% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">40% human</span><br/>
-Bigger refactor? Select 2-5 files, describe the change, AI proposes, you verify and merge.<br/>
-<i>Human-in-the-loop, but AI does the heavy lifting.</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">60% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">40% human</span><br/>
+Bigger refactor? Select 2-5 files, describe the change. You provide more context and the verification becomes more important. You are the orchestrator.
 </div>
 `,
     philosophyLvl3_4: `
 <div style="background:#f8fafc;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.3 → 4 <FaBug className="inline text-red-600" /> (Debug/Logs, "AI as Rubber Duck")</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">50% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">50% human</span><br/>
-Build fails? Copy error/log, feed it with code to AI. AI suggests fix, you approve.<br/>
-<i>Trust grows as verification gets easier.</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">50% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">50% human</span><br/>
+Build fails? Copy the error/log, feed it with code to the AI. This is a true partnership. You provide the problem, AI suggests a fix, you approve.
 </div>
 `,
     philosophyLvl4_5: `
 <div style="background:#e0e7ef;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.4 → 5 <FaLink className="inline text-green-600" /> (Proactive / Icon Hunt)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">40% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">60% human</span><br/>
-You teach the agent new tricks: find icons, fix warnings, hunt for issues before they break things.<br/>
-<i>You and the AI start to co-pilot.</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">40% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">60% human</span><br/>
+You're now leading. You teach the agent new tricks: find icons, fix warnings proactively. You're not just reacting, you're guiding the system's evolution.
 </div>
 `,
     philosophyLvl5_6: `
 <div style="background:#f1f5f9;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.5 → 6 <FaMicrophone className="inline text-fuchsia-600" />/<FaVideo className="inline text-blue-400" /> (Multimodal Inputs)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">Variable</span>: Audio, video, images, text — AI can handle all, you pick what feels best.<br/>
-<i>Full spectrum orchestration.</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">Variable</span>. You choose the input method that's fastest for you. You're fully in command of the workflow.
 </div>
 `,
     philosophyLvl6_7: `
 <div style="background:#f8fafc;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Lv.6 → 7 <FaDatabase className="inline text-cyan-600" /> (Data/SQL, "AI DB Assistant")</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">50% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">50% human</span><br/>
-Let AI generate SQL, migrations, or data scripts. You check logic, paste where needed, or let it update your DB code.<br/>
-<i>The agent can propose, but only you approve the merge!</i>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">50% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">50% human</span><br/>
+Let AI generate SQL or data scripts. The agent proposes, but only you, the master of the data, approve the merge. High stakes, high trust.
 </div>
 `,
     philosophyLvl8_10: `
 <div style="background:#e0e7ef;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Lv.8-10+ <FaServer className="inline text-green-700" />/<FaRocket className="inline text-orange-500" /> (Independence, "Your Own Stack")</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">70% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">30% human</span><br/>
-Deploy your own CyberVibe. Plug in your own API keys, bot tokens, custom XTRs. Run the full workflow—agent proposes, you verify, system can even auto-merge with your blessing.<br/>
-<i>You’re running your own AI-powered studio, but still in control.</i>
-</div>
-`,
-    philosophyLvl11: `
-<div style="background:#f1f5f9;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Lv.11 <FaMagnifyingGlass className="inline text-yellow-600" /> (Code Scanner)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">60% agent</span> <span style="color:#64748b;">→</span> <span style="color:#0ea5e9;">40% human</span><br/>
-You see like the agent: instant find missing imports, typos, logic bugs. Human and agent both on audit, visual and code diff.<br/>
-<i>Visual GUI + AI: Karpathy’s dream realized.</i>
-</div>
-`,
-    philosophyLvl12: `
-<div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Lv.12 <FaMemory className="inline text-purple-400" /> (Context Commander)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">Variable – max context</span><br/>
-AI can handle massive context windows (65k+ tokens). You steer high-level refactors, agent keeps context, you keep vision.<br/>
-<i>Symbiosis: context, code, and intent are orchestrated by both sides.</i>
-</div>
-`,
-    philosophyLvl13: `
-<div style="background:#e0e7ef;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Lv.13 <FaKeyboard className="inline text-pink-400" /> (Vibe Channeler)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">Variable – deep prompt engineering</span><br/>
-You write, dictate, or vibe prompts at pro level. AI listens, proposes, you review, merge. Workflow is flow, not friction.<br/>
-<i>Your brain, AI’s hands—the slider is wherever you want.</i>
-</div>
-`,
-    philosophyLvl14: `
-<div style="background:#f8fafc;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Lv.14 <FaBriefcase className="inline text-cyan-700" /> (Efficiency Ninja)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">Variable – multi-task orchestration</span><br/>
-You batch small and big tasks in one AI run. Agent proposes, you verify, ship in record time.<br/>
-<i>Ultimate synthesis of batching, review, and automation.</i>
-</div>
-`,
-    philosophyLvl15: `
-<div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Lv.15 <FaMagnifyingGlassChart className="inline text-yellow-400" />/<FaBrain className="inline text-green-400" /> (Log Whisperer, AI Auditor)</b><br/>
-🟢 <b>Automation Slider:</b> <span style="color:#0ea5e9;">Variable – AI audits reality</span><br/>
-You and the AI don’t just read logs, you interrogate them. See the gap between plan and reality, root causes pop out.<br/>
-<i>Ultimate human+agent audit loop.</i>
+<b>Lv.8-10+ <FaServer className="inline text-green-700" />/<FaRocket className="inline text-orange-500" /> (Full Independence)</b><br/>
+🟢 <b>Autonomy Slider:</b> <span style="color:#0ea5e9;">You are the system architect.</span><br/>
+Deploy your own CyberVibe. Plug in your own keys, bots, and XTRs. You now control the entire system, not just the prompts. You are running your own AI-powered studio.
 </div>
 `,
     philosophyEnd: `
 <div style="background:#fff;color:#0f172a;padding:14px 18px;border-radius:16px;margin-top:18px;font-weight:bold;">
-Every level = one more notch on your <b>automation slider</b>.<br/>
-Start with full auto (even auto-merge via GitHub Actions 🤖), then add more human review and orchestration as you grow.<br/>
-<b>Karpathy + CyberVibe: The future is not "full agent" or "full human"—it's <span style="color:#22c55e">collab, audit, remix, and always leveling up.</span></b>
-<br/>
-<span style="color:#f59e42;">Watch <a href="#philosophy-steps" class="underline">Salavey13’s explainer</a> and <a href="https://m.youtube.com/watch?v=LCEmiRjPEtQ" target="_blank" class="underline">Andrej Karpathy’s “Software is Changing (Again)”</a> back-to-back. You’re living the future!</span>
+Every level is a new notch on your <b>autonomy slider</b>. You start by trusting the agent with small, verifiable tasks. Then bigger ones. Eventually, you and the agent are true co-pilots in your Iron Man suit.<br/>
+<b>The future isn't "full auto"—it's <span style="color:#22c55e">human + agent, in a fast, verifiable loop. Always learning. Always leveling up.</span></b>
 </div>
 `,
     stepsTitle: "Краткий Гайд:",
@@ -341,117 +290,73 @@ Start with full auto (even auto-merge via GitHub Actions 🤖), then add more hu
     quote2: "Вайбкодинг? 'Ага, он могёт.' От идеи видео до геймифицированного приложения. Превращение видения в интерактивную реальность. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(I do vibe <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     quote3: "Монетизация: 'Продавай результаты, а не просто кирки.' Автоматизированные, в 10 раз дешевле решения. Вот настоящий продукт. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>('Fucking ez' <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     ctaHotChickQuote: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
-    philosophyTitle: "Твой путь вайба: Автономия и слайдер Карпати (Karpathy + Salavey13)",
-    philosophyVideoTitle: "🎥 Смотри: Уровневая система (Salavey13) + Карпати «Software is Changing (Again)»",
+    philosophyTitle: "Твой Путь Вайба: Слайдер Автономии (Karpathy + Salavey13)",
+    philosophyVideoTitle: "🎥 Смотри: Система Уровней (Salavey13) + Карпати 'Software is Changing (Again)'",
     philosophyCore: `
-<strong>Andrej Karpathy</strong> называет это "слайдером автоматизации": от полного контроля человека до полной автономии агента.<br/>
-<strong>CyberVibe Studio</strong> даёт тебе этот слайдер в руки — шаг за шагом, без принуждения, всегда с тобой в петле.<br/>
-Каждый новый уровень — это больше AI, больше доверия, больше скорости. Ты учишься не только промптить, а <em>оркестрировать</em> агентов.<br/>
-<b>Так ты становишься не пассажиром, а пилотом в Iron Man suit.</b>
+<strong>Цель (по Карпати): Построить костюм Железного Человека, а не автономного робота.</strong><br/>
+Ты — Тони Старк. AI — твой костюм. Ты всегда в центре, усилен и всё контролируешь.<br/>
+Твоя главная задача — ускорить цикл <strong>«Генерация → Верификация»</strong>. AI предлагает, но проверяешь ТЫ. Хороший GUI (визуальный дифф) решает, потому что он использует «GPU для зрения» в твоей голове и делает проверку мгновенной.<br/>
+<b>Чтобы двигаться быстро, мы держим AI на коротком поводке.</b> Маленькие, понятные, проверяемые изменения лучше, чем PR на 10,000 строк, который ты не сможешь проверить.
 `,
     philosophyLvl0_1: `
 <div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.0 → 1 <FaBolt className="inline text-yellow-400" /> (Полный автомат, "Один клик — фикс")</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">100% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">0% человек</span><br/>
-Битая картинка? Вставь ссылку — загрузи замену. <b>PR — самосоздан.</b> Ты просто проверяешь.<br/>
-<i>Карпати: “Дай агенту делать простое, но всё под контролем и прозрачно.”</i>
+<b>Лв.0 → 1 <FaBolt className="inline text-yellow-400" /> (Полный автомат, "Фикс в один клик")</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">100% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">0% человек</span><br/>
+Починить битую картинку. Вставил ссылку → Загрузил новую. <b>PR создается сам.</b> Ты просто смотришь на результат и мёржишь. Агент делает всё. <strong>ЛЮБОЙ</strong> может это прямо сейчас.
 </div>
 `,
     philosophyLvl1_2: `
 <div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.1 → 2 <FaToolbox className="inline text-blue-400" /> (Промпт + Файл, "Вайб-запрос")</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">80% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">20% человек</span><br/>
-Пиши идею для правки + выбери 1 файл. AI делает, ты утверждаешь.<br/>
-<i>Частичная автономия: финальное слово за тобой.</i>
+<b>Лв.1 → 2 <FaToolbox className="inline text-blue-400" /> (Промпт + 1 Файл)</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">80% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">20% человек</span><br/>
+Опиши простую правку (текст/кнопка) + выбери 1 файл. <strong>Ты сказал — AI сделал.</strong> Ты проверяешь дифф.
 </div>
 `,
     philosophyLvl2_3: `
 <div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.2 → 3 <FaCode className="inline text-pink-400" /> (Мульти-файл, "Оркестр промптов")</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">60% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">40% человек</span><br/>
-Рефакторинг? 2-5 файлов, твой промпт, AI предлагает, ты проверяешь.<br/>
-<i>AI берет на себя рутину, ты держишь руку на пульсе.</i>
+<b>Лв.2 → 3 <FaCode className="inline text-pink-400" /> (Мульти-файл, "Оркестр")</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">60% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">40% человек</span><br/>
+Рефакторинг? 2-5 файлов, твой промпт. Ты даешь больше контекста, и твоя проверка становится важнее. Ты — дирижер.
 </div>
 `,
     philosophyLvl3_4: `
 <div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.3 → 4 <FaBug className="inline text-red-400" /> (Дебаг/логи, "AI — твоя уточка")</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">50% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">50% человек</span><br/>
-Падение билда? Копируй ошибку, кидай логи в AI. AI предлагает фикс, ты финалишь.<br/>
-<i>С каждым циклом доверие растёт.</i>
+<b>Лв.3 → 4 <FaBug className="inline text-red-400" /> (Дебаг/Логи)</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">50% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">50% человек</span><br/>
+Сборка упала? Копируй ошибку, логи, кидай в AI с кодом. Это настоящее партнерство. Ты даешь проблему, AI предлагает решение, ты утверждаешь.
 </div>
 `,
     philosophyLvl4_5: `
 <div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.4 → 5 <FaLink className="inline text-green-400" /> (Проактивно/Охота за иконками)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">40% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">60% человек</span><br/>
-Ты сам учишь агента: ищешь иконки, ловишь баги до того, как они аукнутся. <br/>
-<i>AI — твой ко-пилот, а не просто исполнитель.</i>
+<b>Лв.4 → 5 <FaLink className="inline text-green-400" /> (Проактивность/Охота за иконками)</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">40% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">60% человек</span><br/>
+Теперь ты ведешь. Учишь агента новым трюкам: ищешь иконки, чинишь ворнинги проактивно. Ты не реагируешь, а направляешь эволюцию системы.
 </div>
 `,
     philosophyLvl5_6: `
 <div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.5 → 6 <FaMicrophone className="inline text-fuchsia-400" />/<FaVideo className="inline text-blue-400" /> (Мультимодальные входы)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">Вариативно</span>: аудио, видео, картинки, текст — AI справится, ты выбираешь канал.<br/>
-<i>Оркестрация на максималках.</i>
+<b>Лв.5 → 6 <FaMicrophone className="inline text-fuchsia-400" />/<FaVideo className="inline text-blue-400" /> (Мультимодал)</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">Вариативно.</span> Ты выбираешь способ ввода, который для тебя быстрее. Ты полностью командуешь процессом.
 </div>
 `,
     philosophyLvl6_7: `
 <div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
 <b>Лв.6 → 7 <FaDatabase className="inline text-cyan-300" /> (Данные/SQL)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">50% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">50% человек</span><br/>
-AI генерит SQL, миграции, скрипты. Ты проверяешь и применяешь. Агент может предложить, но финальное решение — за тобой!
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">50% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">50% человек</span><br/>
+AI генерит SQL. Агент предлагает, но только ты, хозяин данных, одобряешь мерж. Высокие ставки, высокое доверие.
 </div>
 `,
     philosophyLvl8_10: `
 <div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.8-10+ <FaServer className="inline text-green-400" />/<FaRocket className="inline text-orange-400" /> (Своя студия, "Full Stack")</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">70% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">30% человек</span><br/>
-Разворачиваешь свой CyberVibe. Кастомные токены, ключи, плагины. Агент может делать всё — даже авто-мержить через GitHub Action — но твой контроль всегда выше!
-</div>
-`,
-    philosophyLvl11: `
-<div style="background:#f8fafc;color:#0f172a;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.11 <FaMagnifyingGlass className="inline text-yellow-500" /> (Сканер кода)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">60% агент</span> <span style="color:#64748b;">→</span> <span style="color:#22d3ee;">40% человек</span><br/>
-Видишь как агент: моментально ловишь ошибки, импорты, баги. Графические диффы и AI — мечта Карпати реализована!
-</div>
-`,
-    philosophyLvl12: `
-<div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.12 <FaMemory className="inline text-purple-400" /> (Командир контекста)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">Максимальный контекст</span><br/>
-AI держит тысячи строк кода в памяти. Ты задаёшь направление, агент помогает со структурой. Чистая синергия.
-</div>
-`,
-    philosophyLvl13: `
-<div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.13 <FaKeyboard className="inline text-pink-400" /> (Ченнелер вайба)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">Гибко — глубокие промпты</span><br/>
-Ты диктуешь или пишешь промпты как профи. AI слушает, предлагает, ты проверяешь. Всё в потоке, без фрикций.
-</div>
-`,
-    philosophyLvl14: `
-<div style="background:#18181b;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.14 <FaBriefcase className="inline text-cyan-300" /> (Ниндзя эффективности)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">Гибко — оркестрация задач</span><br/>
-Несколько задач в одном запросе — агент предлагает всё сразу, ты верифицируешь и пушишь за раз.
-</div>
-`,
-    philosophyLvl15: `
-<div style="background:#262833;color:#f1f5f9;padding:12px 16px;border-radius:12px;margin-bottom:8px;">
-<b>Лв.15 <FaMagnifyingGlassChart className="inline text-yellow-400" />/<FaBrain className="inline text-green-400" /> (Лог-Висперер, AI-Аудитор)</b><br/>
-🟢 <b>Слайдер:</b> <span style="color:#22d3ee;">AI проверяет реальность</span><br/>
-Ты и AI не просто читаете логи — вы их допрашиваете. Разницу между планом и реальностью видно сразу. Абсолютный аудит.
+<b>Лв.8-10+ <FaServer className="inline text-green-400" />/<FaRocket className="inline text-orange-400" /> (Полная Независимость)</b><br/>
+🟢 <b>Слайдер автономии:</b> <span style="color:#22d3ee;">Ты — архитектор системы.</span><br/>
+Разворачиваешь свой CyberVibe. Свои ключи, боты, XTR-ы. Ты контролируешь всю систему, а не только промпты. Ты управляешь своей AI-студией.
 </div>
 `,
     philosophyEnd: `
 <div style="background:#18181b;color:#f1f5f9;padding:14px 18px;border-radius:16px;margin-top:18px;font-weight:bold;">
-На каждом уровне ты двигаешь <b>слайдер автономии</b>.<br/>
-Сначала всё автоматом (даже авто-мерж через GitHub Actions 🤖), потом всё больше контроля и оркестрации.<br/>
-<b>Карпати + CyberVibe: Будущее — не “только агент” или “только человек”, а <span style="color:#22c55e">сотрудничество, аудит, ремикс и бесконечный левел-ап.</span></b>
-<br/>
-<span style="color:#f59e42;">Смотри <a href="#philosophy-steps" class="underline">разбор системы Salavey13</a> и <a href="https://m.youtube.com/watch?v=LCEmiRjPEtQ" target="_blank" class="underline">доклад Карпати “Software is Changing (Again)”</a> — ты уже живёшь в будущем!</span>
+Каждый уровень — это новая отметка на твоём <b>слайдере автономии</b>. Ты начинаешь доверять агенту мелкие, проверяемые задачи. Потом — крупнее. В итоге вы — настоящие ко-пилоты в твоём костюме Железного Человека.<br/>
+<b>Когда ты освоил шаг, предыдущий кажется тебе «для дебилов». Это и есть эволюция. Добро пожаловать, Нео.</b>
 </div>
 `,
     stepsTitle: "Краткий Гайд:",
@@ -758,8 +663,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                      <hr className="border-border my-3"/>
                                     <h4 className="text-lg font-semibold text-brand-cyan pt-1">Level Progression (Your Autonomy Slider):</h4>
                                     <div className="list-none space-y-2 p-0 text-sm md:text-base not-prose">
-                                        {[t.philosophyLvl0_1, t.philosophyLvl1_2, t.philosophyLvl2_3, t.philosophyLvl3_4, t.philosophyLvl4_5, t.philosophyLvl5_6, t.philosophyLvl6_7, t.philosophyLvl8_10, t.philosophyLvl11, t.philosophyLvl12, t.philosophyLvl13, t.philosophyLvl14, t.philosophyLvl15].map((levelContent, index) => (
-                                            <div key={`lvl-${index}`}><VibeContentRenderer content={levelContent} /></div>
+                                        {[t.philosophyLvl0_1, t.philosophyLvl1_2, t.philosophyLvl2_3, t.philosophyLvl3_4, t.philosophyLvl4_5, t.philosophyLvl5_6, t.philosophyLvl6_7, t.philosophyLvl8_10].map((levelContent, index) => (
+                                            <div key={`std-lvl-${index}`}><VibeContentRenderer content={levelContent} /></div>
                                         ))}
                                     </div>
                                     <hr className="border-border my-3"/>
