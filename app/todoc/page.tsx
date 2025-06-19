@@ -165,7 +165,7 @@ export default function ToDocPage() {
                     </Button>
                 </div>
                  <div className="text-center text-xs text-muted-foreground/80 pt-4 border-t border-border/30">
-                     <p><VibeContentRenderer content="::FaInfoCircle::" /> Этот инструмент симулирует добавление колонтитула. Реальная обработка DOC/DOCX требует сложных серверных библиотек.</p>
+                     <p><VibeContentRenderer content="::FaCircleInfo::" /> Этот инструмент использует серверную библиотеку для модификации `.docx` файлов. Файлы старого формата `.doc` требуют установки серверного конвертера (например, `unoconv`) и не поддерживаются напрямую.</p>
                 </div>
             </div>
         </div>
