@@ -17,8 +17,7 @@ import {
     SectionType,
     TextRun,
     HeadingLevel,
-    TabStopType,
-    TabStopPosition
+    ImageRun
 } from 'docx';
 
 interface DocDetails {
@@ -28,24 +27,25 @@ interface DocDetails {
     utv?: string;
     docCode: string;
     lit: string;
-    list: string;
-    listov: string;
+    // list and listov are now handled dynamically
     orgName: string;
     docTitle: string;
 }
 
 /**
- * Parses a line of markdown text into an array of TextRun objects for docx.
- * Handles **bold** and *italic*.
+ * Parses a line of markdown text into an array of docx objects (TextRun, ImageRun).
+ * Handles **bold**, *italic*, and ![alt](src) for images.
  * @param text The line of text to parse.
- * @returns An array of TextRun objects.
+ * @returns A promise that resolves to an array of TextRun and ImageRun objects.
  */
-const createTextRuns = (text: string): TextRun[] => {
-    const runs: TextRun[] = [];
-    // Regex to capture **bold** or *italic* text
-    const markdownRegex = /(\*\*|`)(.*?)\1|(\*)(.*?)\*/g;
+const createRunsFromMarkdownLine = async (text: string): Promise<(TextRun | ImageRun)[]> => {
+    const runs: (TextRun | ImageRun)[] = [];
+    // Regex to capture **bold**, *italic*, or ![alt](src)
+    const markdownRegex = /(\*\*|`)(.*?)\1|(\*)(.*?)\*|!\[(.*?)\]\((.*?)\)/g;
     let lastIndex = 0;
     let match;
+
+    const promises: Promise<void>[] = [];
 
     while ((match = markdownRegex.exec(text)) !== null) {
         // Add preceding normal text
@@ -53,12 +53,26 @@ const createTextRuns = (text: string): TextRun[] => {
             runs.push(new TextRun(text.substring(lastIndex, match.index)));
         }
 
-        const [fullMatch, boldOrCodeDelim, boldOrCodeText, italicDelim, italicText] = match;
-        
-        if (boldOrCodeDelim === '**') {
-            runs.push(new TextRun({ text: boldOrCodeText, bold: true }));
+        const [fullMatch, boldDelim, boldText, italicDelim, italicText, imgAlt, imgUrl] = match;
+
+        if (boldDelim === '**') {
+            runs.push(new TextRun({ text: boldText, bold: true }));
         } else if (italicDelim === '*') {
             runs.push(new TextRun({ text: italicText, italics: true }));
+        } else if (imgUrl) {
+            const promise = fetch(imgUrl)
+                .then(res => res.arrayBuffer())
+                .then(buffer => {
+                    runs.push(new ImageRun({
+                        data: buffer,
+                        transformation: { width: 400, height: 300 }, // Default size, can be adjusted
+                        altText: { title: imgAlt || 'image' },
+                    }));
+                }).catch(err => {
+                    logger.error(`Failed to fetch image from URL: ${imgUrl}`, err);
+                    runs.push(new TextRun({ text: `[Failed to load image: ${imgAlt || imgUrl}]`, color: "FF0000" }));
+                });
+            promises.push(promise);
         }
         
         lastIndex = markdownRegex.lastIndex;
@@ -69,64 +83,45 @@ const createTextRuns = (text: string): TextRun[] => {
         runs.push(new TextRun(text.substring(lastIndex)));
     }
 
+    await Promise.all(promises);
     return runs;
 };
 
-
 /**
  * Parses a markdown string into an array of docx Paragraph objects.
- * Supports headings, bullet points, horizontal rules, and inline bold/italic.
+ * Supports headings, bullet points, horizontal rules, images, and inline bold/italic.
  * @param markdown The full markdown text.
- * @returns An array of Paragraphs for use in a docx Document.
+ * @returns A promise resolving to an array of Paragraphs.
  */
-const parseMarkdownToDocxObjects = (markdown: string): Paragraph[] => {
+const parseMarkdownToDocxObjects = async (markdown: string): Promise<Paragraph[]> => {
     const paragraphs: Paragraph[] = [];
     const lines = markdown.split('\n');
 
     for (const line of lines) {
-        // Headings
+        const children = await createRunsFromMarkdownLine(line);
+
         if (line.startsWith('### ')) {
-            paragraphs.push(new Paragraph({ children: createTextRuns(line.substring(4)), heading: HeadingLevel.HEADING_3 }));
-            continue;
-        }
-        if (line.startsWith('## ')) {
-            paragraphs.push(new Paragraph({ children: createTextRuns(line.substring(3)), heading: HeadingLevel.HEADING_2 }));
-            continue;
-        }
-        if (line.startsWith('# ')) {
-            paragraphs.push(new Paragraph({ children: createTextRuns(line.substring(2)), heading: HeadingLevel.HEADING_1 }));
-            continue;
-        }
-        // Horizontal Rule
-        if (line.match(/^(\*|-|_){3,}$/)) {
+            paragraphs.push(new Paragraph({ children: await createRunsFromMarkdownLine(line.substring(4)), heading: HeadingLevel.HEADING_3 }));
+        } else if (line.startsWith('## ')) {
+            paragraphs.push(new Paragraph({ children: await createRunsFromMarkdownLine(line.substring(3)), heading: HeadingLevel.HEADING_2 }));
+        } else if (line.startsWith('# ')) {
+            paragraphs.push(new Paragraph({ children: await createRunsFromMarkdownLine(line.substring(2)), heading: HeadingLevel.HEADING_1 }));
+        } else if (line.match(/^(\*|-|_){3,}$/)) {
             paragraphs.push(new Paragraph({ border: { bottom: { color: "auto", space: 1, style: "single", size: 6 } } }));
-            continue;
+        } else if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+            paragraphs.push(new Paragraph({ children: await createRunsFromMarkdownLine(line.trim().substring(2)), bullet: { level: 0 } }));
+        } else if (line.trim() === '' && paragraphs[paragraphs.length - 1]?.getTextRun(0)?.text.includes('![')) {
+             // Avoid adding extra space after an image-only line
         }
-        // Bullet points
-        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
-            paragraphs.push(new Paragraph({ children: createTextRuns(line.trim().substring(2)), bullet: { level: 0 } }));
-            continue;
+        else {
+            paragraphs.push(new Paragraph({ children }));
         }
-        // Empty line
-        if (line.trim() === '') {
-            paragraphs.push(new Paragraph(""));
-            continue;
-        }
-        // Normal paragraph
-        paragraphs.push(new Paragraph({ children: createTextRuns(line) }));
     }
 
     return paragraphs;
 };
 
 
-/**
- * Generates a new DOCX document from user-provided markdown text and adds a GOST-style footer.
- *
- * @param mainContent The main text content of the document in Markdown format.
- * @param docDetails An object with details to fill in the title block.
- * @returns A promise that resolves with the Uint8Array of the generated .docx file.
- */
 export async function generateDocxWithColontitul(
     mainContent: string,
     docDetails: DocDetails
@@ -178,8 +173,9 @@ export async function generateDocxWithColontitul(
                             verticalAlign: VerticalAlign.CENTER
                         }),
                         createCell(docDetails.lit, colWidths[6], allBorders, [new Paragraph({ text: docDetails.lit, alignment: AlignmentType.CENTER, style: "p-large" })]),
-                        createCell(docDetails.list, colWidths[7], allBorders, [new Paragraph({ text: docDetails.list, alignment: AlignmentType.CENTER, style: "p-large" })]),
-                        createCell(docDetails.listov, colWidths[8], allBorders, [new Paragraph({ text: docDetails.listov, alignment: AlignmentType.CENTER, style: "p-large" })]),
+                        // Dynamic Page Numbers
+                        createCell("", colWidths[7], allBorders, [new Paragraph({ children: [new TextRun(PageNumber.CURRENT)], alignment: AlignmentType.CENTER, style: "p-large" })]),
+                        createCell("", colWidths[8], allBorders, [new Paragraph({ children: [new TextRun(PageNumber.TOTAL_PAGES)], alignment: AlignmentType.CENTER, style: "p-large" })]),
                     ]
                 }),
                 new TableRow({
@@ -216,7 +212,7 @@ export async function generateDocxWithColontitul(
             sections: [{
                 properties: { type: SectionType.NEXT_PAGE },
                 footers: { default: footer },
-                children: parseMarkdownToDocxObjects(mainContent),
+                children: await parseMarkdownToDocxObjects(mainContent),
             }],
         });
 
