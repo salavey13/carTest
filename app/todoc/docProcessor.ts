@@ -1,6 +1,7 @@
 "use server";
 
 import { logger } from '@/lib/logger';
+import { debugLogger } from '@/lib/debugLogger';
 import { 
     Document, 
     Packer, 
@@ -42,25 +43,24 @@ type ContentItem =
     | { type: 'paragraph'; runs: TextItem[]; style?: string } 
     | { type: 'heading'; level: HeadingLevel; runs: TextItem[] }
     | { type: 'list_item'; level: number; runs: TextItem[] }
-    | { type: 'table', rows: { cells: { runs: TextItem[] }[] }[] }
+    | { type: 'table', rows: { cells: { content: ContentItem[] }[] }[] }
     | { type: 'image'; data: IImageOptions };
 
-
 const ensureArray = (node: any): any[] => {
-    if (!node) return [];
+    if (node === undefined || node === null) return [];
     return Array.isArray(node) ? node : [node];
 };
 
 /**
  * Extracts structured content (text, formatting, images, lists, tables, hyperlinks) from a DOCX file buffer.
- * This is a more robust, recursive parser.
+ * This is a more robust, recursive parser with enhanced debugging.
  * @param docxBuffer The buffer of the uploaded .docx file.
  * @returns A promise that resolves to an array of structured content items.
  */
 async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<ContentItem[]> {
+    debugLogger.info('[DOCX_PARSER] Starting content extraction...');
     const zip = await JSZip.loadAsync(docxBuffer);
-    const contentItems: ContentItem[] = [];
-
+    
     // --- Relationship and Image Mapping ---
     const relsContent = await zip.file("word/_rels/document.xml.rels")?.async("string");
     const relsParser = new XMLParser({ ignoreAttributes: false, preserveOrder: true });
@@ -70,18 +70,24 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
 
     const relationshipNodes = rels[0]?.Relationships?.[0]?.Relationship;
     if (relationshipNodes) {
+        debugLogger.debug(`[DOCX_PARSER] Found ${ensureArray(relationshipNodes).length} relationships.`);
         for (const rel of ensureArray(relationshipNodes)) {
             const relAttrs = rel[':@'];
             if (relAttrs["@_Type"].includes("image")) {
-                const imageFile = zip.file(`word/${relAttrs["@_Target"]}`);
+                const imagePath = `word/${relAttrs["@_Target"]}`;
+                const imageFile = zip.file(imagePath);
                 if (imageFile) {
                     const buffer = await imageFile.async("nodebuffer");
                     imageRelMap.set(relAttrs["@_Id"], buffer);
+                    debugLogger.debug(`[DOCX_PARSER] Mapped Image: ${relAttrs["@_Id"]} -> ${imagePath} (${buffer.byteLength} bytes)`);
                 }
             } else if (relAttrs["@_Type"].includes("hyperlink")) {
                 linkRelMap.set(relAttrs["@_Id"], relAttrs["@_Target"]);
+                debugLogger.debug(`[DOCX_PARSER] Mapped Hyperlink: ${relAttrs["@_Id"]} -> ${relAttrs["@_Target"]}`);
             }
         }
+    } else {
+        debugLogger.warn('[DOCX_PARSER] No relationships found in document.xml.rels.');
     }
     
     // --- Main Document Parsing ---
@@ -92,7 +98,28 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
     const docXml = xmlParser.parse(contentXml);
     const body = docXml.find((n:any) => n["w:document"])?.["w:document"]?.find((n:any) => n["w:body"])?.["w:body"];
 
-    const parseParagraphContent = (pNode: any): ContentItem => {
+    const parseRuns = (runContainer: any[]): TextItem[] => {
+        const runs: TextItem[] = [];
+        for (const node of ensureArray(runContainer)) {
+             if (node["w:r"]) { // Standard run
+                const runChildren = ensureArray(node["w:r"]);
+                const rPr = runChildren.find((n: any) => n["w:rPr"])?.["w:rPr"];
+                const rPrChildren = ensureArray(rPr);
+                const text = runChildren.find((n: any) => n["w:t"])?.["w:t"]?.[0]?.["#text"] || '';
+                if(text) runs.push({ text, bold: !!rPrChildren.some((n:any)=>n["w:b"]), italics: !!rPrChildren.some((n:any)=>n["w:i"]) });
+             } else if (node["w:hyperlink"]) { // Hyperlink run
+                 const hyperlinkChildren = ensureArray(node["w:hyperlink"]);
+                 const rId = hyperlinkChildren[0]?.[':@']?.['@_r:id'];
+                 const url = linkRelMap.get(rId);
+                 const linkRun = ensureArray(hyperlinkChildren[0]?.['w:r']);
+                 const text = linkRun[0]?.['w:r']?.find((n: any) => n['w:t'])?.['w:t'][0]['#text'];
+                 if(text) runs.push({text, bold: false, italics: false, hyperlink: url });
+             }
+        }
+        return runs;
+    }
+
+    const parseParagraph = (pNode: any): ContentItem | null => {
         const pPrNode = pNode["w:p"]?.find((n: any) => n["w:pPr"]);
         let bulletLevel: number | undefined;
         let headingLevel: HeadingLevel | undefined;
@@ -116,66 +143,46 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
             }
         }
         
-        const runs: TextItem[] = [];
-        const contentNodes = ensureArray(pNode["w:p"]);
+        const runs: TextItem[] = parseRuns(pNode["w:p"]);
+        if (runs.length === 0) return null; // Ignore paragraphs without text runs
 
-        for (const node of contentNodes) {
-             if (node["w:r"]) { // Standard run
-                const runChildren = ensureArray(node["w:r"]);
-                const rPr = runChildren.find((n: any) => n["w:rPr"])?.["w:rPr"];
-                const rPrChildren = ensureArray(rPr);
-                const text = runChildren.find((n: any) => n["w:t"])?.["w:t"]?.[0]?.["#text"] || '';
-                if(text) runs.push({ text, bold: !!rPrChildren.some((n:any)=>n["w:b"]), italics: !!rPrChildren.some((n:any)=>n["w:i"]) });
-             } else if (node["w:hyperlink"]) { // Hyperlink run
-                 const hyperlinkChildren = ensureArray(node["w:hyperlink"]);
-                 const rId = hyperlinkChildren[0]?.[':@']?.['@_r:id'];
-                 const url = linkRelMap.get(rId);
-                 const linkRun = ensureArray(hyperlinkChildren[0]?.['w:r']);
-                 const linkRunChildren = ensureArray(linkRun[0]?.['w:r']);
-                 const rPr = linkRunChildren.find((n: any) => n['w:rPr'])?.['w:rPr'];
-                 const rPrChildren = ensureArray(rPr);
-                 const text = linkRunChildren.find((n: any) => n['w:t'])?.['w:t'][0]['#text'];
-                 if(text) runs.push({text, bold: !!rPrChildren.some((n:any)=>n["w:b"]), italics: !!rPrChildren.some((n:any)=>n["w:i"]), hyperlink: url });
-             }
-        }
-        
         if (headingLevel) return { type: 'heading', level: headingLevel, runs };
         if (bulletLevel !== undefined) return { type: 'list_item', level: bulletLevel, runs };
         return { type: 'paragraph', runs, style };
-    };
-    
-    if (body) {
-        for (const element of ensureArray(body)) {
+    }
+
+    const parseBodyContent = (elements: any[]): ContentItem[] => {
+        const items: ContentItem[] = [];
+        for (const element of ensureArray(elements)) {
             if (element["w:p"]) {
-                contentItems.push(parseParagraphContent(element));
+                 const parsedP = parseParagraph(element);
+                 if (parsedP) items.push(parsedP);
             } else if (element["w:tbl"]) {
-                const tableRows: { cells: { runs: TextItem[] }[] }[] = [];
-                const trNodes = ensureArray(element["w:tbl"]).filter((n: any) => n["w:tr"]);
-                for (const trNode of trNodes) {
-                    const tableCells: { runs: TextItem[] }[] = [];
-                    const tcNodes = ensureArray(trNode["w:tr"]).filter((n: any) => n["w:tc"]);
-                    for (const tcNode of tcNodes) {
-                         const cellParagraphs = ensureArray(tcNode["w:tc"]).filter((n:any) => n["w:p"]);
-                         const cellRuns: TextItem[] = [];
-                         for (const p of cellParagraphs) {
-                             const parsedP = parseParagraphContent(p);
-                             if ('runs' in parsedP) {
-                                cellRuns.push(...parsedP.runs);
-                                if (p !== cellParagraphs[cellParagraphs.length -1]) cellRuns.push({text: '\n'});
-                             }
-                         }
-                         tableCells.push({ runs: cellRuns });
-                    }
-                    tableRows.push({ cells: tableCells });
-                }
-                contentItems.push({ type: 'table', rows: tableRows });
+                 debugLogger.debug('[DOCX_PARSER] Found a table <w:tbl>. Parsing rows...');
+                 const tableRows: { cells: { content: ContentItem[] }[] }[] = [];
+                 const trNodes = ensureArray(element["w:tbl"]).filter((n: any) => n["w:tr"]);
+                 for (const trNode of trNodes) {
+                     const tableCells: { content: ContentItem[] }[] = [];
+                     const tcNodes = ensureArray(trNode["w:tr"]).filter((n: any) => n["w:tc"]);
+                     for (const tcNode of tcNodes) {
+                         const cellContentElements = ensureArray(tcNode["w:tc"]);
+                         debugLogger.debug(`[DOCX_PARSER] Parsing table cell with ${cellContentElements.length} elements.`);
+                         tableCells.push({ content: parseBodyContent(cellContentElements) });
+                     }
+                     tableRows.push({ cells: tableCells });
+                 }
+                 items.push({ type: 'table', rows: tableRows });
             }
         }
+        return items;
     }
     
-    return contentItems;
+    if (body) {
+        return parseBodyContent(body);
+    }
+    
+    return [];
 }
-
 
 export async function generateDocxWithColontitul(
     docxBuffer: Buffer,
@@ -185,44 +192,49 @@ export async function generateDocxWithColontitul(
 
     try {
         const content = await extractStructuredContentFromDocx(docxBuffer);
+        debugLogger.info(`[docProcessor] Extracted ${content.length} top-level content items.`, content);
 
-        const docChildren: (Paragraph | Table)[] = [];
-        for (const item of content) {
-            switch (item.type) {
-                case 'paragraph':
-                case 'heading':
-                case 'list_item':
-                    const runs = item.runs.map(run => {
-                        if (run.hyperlink) {
-                            return new ExternalHyperlink({
-                                children: [new TextRun({ text: run.text, style: "Hyperlink" })],
-                                link: run.hyperlink,
-                            });
-                        }
-                        return new TextRun({ text: run.text, bold: run.bold, italics: run.italics });
-                    });
-                    
-                    docChildren.push(new Paragraph({
-                        children: runs,
-                        heading: item.type === 'heading' ? item.level : undefined,
-                        bullet: item.type === 'list_item' ? { level: item.level } : undefined,
-                        style: item.type === 'paragraph' ? item.style : undefined,
-                    }));
-                    break;
-                case 'image':
-                    docChildren.push(new Paragraph({ children: [new ImageRun(item.data)], alignment: AlignmentType.CENTER }));
-                    break;
-                case 'table':
-                    docChildren.push(new Table({
-                        rows: item.rows.map(row => new TableRow({
-                            children: row.cells.map(cell => new TableCell({
-                                children: [new Paragraph({ children: cell.runs.map(run => new TextRun({text: run.text, bold: run.bold, italics: run.italics})) })]
+        const buildParagraphsFromContent = (items: ContentItem[]): (Paragraph | Table)[] => {
+            const children: (Paragraph | Table)[] = [];
+            for (const item of items) {
+                switch (item.type) {
+                    case 'paragraph':
+                    case 'heading':
+                    case 'list_item':
+                        const runs = item.runs.map(run => {
+                            if (run.hyperlink) {
+                                return new ExternalHyperlink({
+                                    children: [new TextRun({ text: run.text, style: "Hyperlink" })],
+                                    link: run.hyperlink,
+                                });
+                            }
+                            return new TextRun({ text: run.text, bold: run.bold, italics: run.italics });
+                        });
+                        children.push(new Paragraph({
+                            children: runs,
+                            heading: item.type === 'heading' ? item.level : undefined,
+                            bullet: item.type === 'list_item' ? { level: item.level } : undefined,
+                            style: item.type === 'paragraph' ? item.style : undefined,
+                        }));
+                        break;
+                    case 'image':
+                        children.push(new Paragraph({ children: [new ImageRun(item.data)], alignment: AlignmentType.CENTER }));
+                        break;
+                    case 'table':
+                        children.push(new Table({
+                            rows: item.rows.map(row => new TableRow({
+                                children: row.cells.map(cell => new TableCell({
+                                    children: buildParagraphsFromContent(cell.content) as Paragraph[]
+                                }))
                             }))
-                        }))
-                    }));
-                    break;
+                        }));
+                        break;
+                }
             }
+            return children;
         }
+
+        const docChildren = buildParagraphsFromContent(content);
 
         const createCell = (text: string = '', width: number, borders: any, children?: any[]) => new TableCell({
             children: children || [new Paragraph({ text, style: "p-small", alignment: AlignmentType.CENTER })],
