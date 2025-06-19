@@ -1,4 +1,3 @@
-// /components/hotvibes/VipLeadDisplay.tsx
 "use client";
 
 import React from 'react';
@@ -18,12 +17,15 @@ import { toast } from 'sonner';
 import { 
     ELON_SIMULATOR_CARD_ID, 
     PERSONALITY_REPORT_PDF_CARD_ID,
+    DOCX_GENERATOR_CARD_ID,
     ELON_SIMULATOR_ACCESS_PRICE_KV,
     PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV,
     MISSION_SUPPORT_PRICE_KV,
     ELON_SIMULATOR_ACCESS_PRICE_XTR,
     PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR,
-    MISSION_SUPPORT_PRICE_XTR
+    MISSION_SUPPORT_PRICE_XTR,
+    DOCX_GENERATOR_ACCESS_PRICE_KV,
+    DOCX_GENERATOR_ACCESS_PRICE_XTR,
 } from '@/app/hotvibes/HotVibesClientContent';
 import { useAppContext } from '@/contexts/AppContext';
 import { CyberFitnessProfile } from '@/hooks/cyberFitnessSupabase';
@@ -38,10 +40,9 @@ interface VipLeadDisplayProps {
   isSupported: boolean; 
   isProcessingThisCard: boolean; 
   translations: Record<string, any>; 
-  isAuthenticated: boolean; 
+  isAuthenticated: boolean;   
 }
 
-// Using a more abstract/cool background from Unsplash
 const MODAL_BACKGROUND_FALLBACK_VIP = "https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?q=80&w=2071&auto=format&fit=crop";
 
 const vipPageTranslations = { 
@@ -49,6 +50,7 @@ const vipPageTranslations = {
     pageTitleBase: "VIP-Доступ:",
     elonPageTitle: "Симулятор 'Рынка Маска'",
     pdfGenPageTitle: "Генератор PDF: Расшифровка Личности",
+    docxGenPageTitle: "DOCX Генератор с Колонтитулом",
     missionBriefing: "Брифинг Миссии",
     budget: "Потенциал", 
     taskType: "Тип Задачи", 
@@ -69,6 +71,7 @@ const vipPageTranslations = {
     pageTitleBase: "VIP Access:",
     elonPageTitle: "Musk Market Simulator",
     pdfGenPageTitle: "PDF Generator: Personality Insights",
+    docxGenPageTitle: "DOCX Generator w/ Title Block",
     missionBriefing: "Mission Briefing",
     budget: "Potential", 
     taskType: "Task Type", 
@@ -102,7 +105,8 @@ export function VipLeadDisplay({
   const { openLink } = useAppContext();
   const isElonCard = lead.id === ELON_SIMULATOR_CARD_ID;
   const isPdfGeneratorCard = lead.id === PERSONALITY_REPORT_PDF_CARD_ID;
-  const isSpecialCard = isElonCard || isPdfGeneratorCard;
+  const isDocxGeneratorCard = lead.id === DOCX_GENERATOR_CARD_ID;
+  const isSpecialCard = isElonCard || isPdfGeneratorCard || isDocxGeneratorCard;
 
   const imageForHeroArea = lead.demo_image_url || MODAL_BACKGROUND_FALLBACK_VIP;
 
@@ -117,13 +121,14 @@ export function VipLeadDisplay({
   let pageTitle = `${t.pageTitleBase} ${lead.kwork_gig_title || (currentLang === 'ru' ? 'Миссия' : 'Mission')}`;
   if (isElonCard) pageTitle = t.elonPageTitle;
   if (isPdfGeneratorCard) pageTitle = t.pdfGenPageTitle;
+  if (isDocxGeneratorCard) pageTitle = t.docxGenPageTitle;
 
   const renderActionButtons = () => {
     const buttonBaseClasses = "w-full font-orbitron text-sm sm:text-base py-3 shadow-lg hover:shadow-xl active:scale-95 transition-all duration-200 ease-in-out flex items-center justify-center gap-2 rounded-lg";
     
     // --- STATE 1: ALREADY OWNED ---
     if (isSupported) {
-        let iconName = isElonCard ? "::FaGamepad::" : isPdfGeneratorCard ? "::FaFilePdf::" : "::FaRocket::";
+        let iconName = isElonCard ? "::FaGamepad::" : isPdfGeneratorCard ? "::FaFilePdf::" : isDocxGeneratorCard ? "::FaFileWord::" : "::FaRocket::";
         return (
             <Button type="button" onClick={onExecuteMission} disabled={!isAuthenticated || isProcessingThisCard} variant="default" size="lg" className={cn(buttonBaseClasses, "bg-gradient-to-r from-brand-green to-emerald-500 text-black hover:brightness-110", (!isAuthenticated || isProcessingThisCard) && "opacity-70 cursor-not-allowed")}>
                 <VibeContentRenderer content={isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : iconName} />
@@ -142,6 +147,9 @@ export function VipLeadDisplay({
     } else if (isPdfGeneratorCard) {
         priceKV = PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV;
         priceXTR = PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR;
+    } else if (isDocxGeneratorCard) {
+        priceKV = DOCX_GENERATOR_ACCESS_PRICE_KV;
+        priceXTR = DOCX_GENERATOR_ACCESS_PRICE_XTR;
     } else {
         priceKV = MISSION_SUPPORT_PRICE_KV;
         priceXTR = MISSION_SUPPORT_PRICE_XTR;
