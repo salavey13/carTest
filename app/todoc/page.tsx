@@ -1,50 +1,38 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { processAndSendDocumentAction } from '@/app/todoc/actions';
+import { generateAndSendDocumentAction } from '@/app/todoc/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 
 export default function ToDocPage() {
     const { user, isAuthenticated, isLoading: appContextLoading } = useAppContext();
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [statusMessage, setStatusMessage] = useState<string>('Выберите .doc или .docx файл для обработки.');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // State for all configurable fields
+    const [docContent, setDocContent] = useState('Здесь будет основной текст вашего документа.\n\nКаждая новая строка будет новым параграфом.');
+    const [docCode, setDocCode] = useState('РК.ТТ-761.102 ПЗ');
+    const [docTitle, setDocTitle] = useState('РЕФЕРАТ');
+    const [razrab, setRazrab] = useState('Иванов И.И.');
+    const [prov, setProv] = useState('Петров П.П.');
+    const [nkontr, setNkontr] = useState('Сидоров С.С.');
+    const [utv, setUtv] = useState('Смирнов А.А.');
+    const [lit, setLit] = useState('У');
+    const [list, setList] = useState('3');
+    const [listov, setListov] = useState('33');
+    const [orgName, setOrgName] = useState('ВНУ им. В. Даля\nКафедра ТТ\nГруппа ТТ-761');
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) {
-            setSelectedFile(null);
-            setStatusMessage('Файл не выбран. Пожалуйста, попробуйте снова.');
-            return;
-        }
-
-        if (!file.name.endsWith('.docx') && !file.name.endsWith('.doc')) {
-            toast.error('Неверный тип файла. Принимаются только .doc и .docx файлы.');
-            setSelectedFile(null);
-            if (event.target) event.target.value = "";
-            return;
-        }
-        
-        setSelectedFile(file);
-        setStatusMessage(`Выбран файл: ${file.name}`);
-    };
-
-    const triggerFileSelect = useCallback(() => {
-        if (!isLoading) {
-            fileInputRef.current?.click();
-        }
-    }, [isLoading]);
-
-    const handleProcessAndSend = async () => {
-        if (!selectedFile) {
-            toast.error('Пожалуйста, сначала выберите файл.');
+    const handleGenerateAndSend = async () => {
+        if (!docContent.trim()) {
+            toast.error('Основной текст документа не может быть пустым.');
             return;
         }
         if (!user?.id) {
@@ -53,29 +41,25 @@ export default function ToDocPage() {
         }
 
         setIsLoading(true);
-        setStatusMessage('Загрузка и обработка документа...');
-        toast.loading('Обработка файла...', { id: 'doc-processing-toast' });
+        toast.loading('Генерация DOCX файла...', { id: 'doc-processing-toast' });
+
+        const payload = {
+            docContent,
+            docDetails: { docCode, docTitle, razrab, prov, nkontr, utv, lit, list, listov, orgName }
+        };
 
         try {
-            const formData = new FormData();
-            formData.append('document', selectedFile);
-
-            const result = await processAndSendDocumentAction(formData, String(user.id));
+            const result = await generateAndSendDocumentAction(payload, String(user.id));
 
             if (result.success) {
-                toast.success(result.message || 'Документ успешно обработан и отправлен в Telegram!', { id: 'doc-processing-toast' });
-                setStatusMessage('Готово! Проверьте свой чат в Telegram.');
-                setSelectedFile(null);
-                if(fileInputRef.current) fileInputRef.current.value = "";
+                toast.success(result.message || 'Документ успешно сгенерирован и отправлен в Telegram!', { id: 'doc-processing-toast' });
             } else {
                 toast.error(result.error || 'Произошла неизвестная ошибка.', { id: 'doc-processing-toast', duration: 8000 });
-                setStatusMessage(`Ошибка: ${result.error}`);
             }
         } catch (error) {
             logger.error('[ToDocPage] Error calling action:', error);
             const errorMessage = error instanceof Error ? error.message : 'Непредвиденная ошибка на клиенте.';
             toast.error(errorMessage, { id: 'doc-processing-toast', duration: 8000 });
-            setStatusMessage(`Критическая ошибка: ${errorMessage}`);
         } finally {
             setIsLoading(false);
         }
@@ -106,55 +90,59 @@ export default function ToDocPage() {
     }
 
     return (
-        <div className={cn("min-h-screen flex flex-col items-center justify-center pt-10 sm:pt-12 pb-10", "bg-gradient-to-br from-gray-900 via-blue-900/50 to-gray-900 text-foreground px-4 font-sans")}>
+        <div className={cn("min-h-screen flex flex-col items-center justify-center pt-24 sm:pt-12 pb-10", "bg-gradient-to-br from-gray-900 via-blue-900/50 to-gray-900 text-foreground px-4 font-sans")}>
             <Toaster position="bottom-center" richColors theme="dark" toastOptions={{ className: '!font-mono !shadow-lg' }} />
-            <div className="w-full max-w-lg mx-auto p-6 md:p-8 space-y-8 bg-card rounded-xl shadow-xl border border-border/50">
+            <div className="w-full max-w-3xl mx-auto p-6 md:p-8 space-y-8 bg-card rounded-xl shadow-xl border border-border/50">
                 <div className="text-center">
                     <VibeContentRenderer content="::FaFileWord className='text-5xl text-brand-blue mx-auto mb-4'::" />
-                    <h1 className="text-3xl font-orbitron font-bold text-foreground">DOCX Колонтитул-Инжектор</h1>
-                    <p className="text-muted-foreground mt-2">Загрузите `.doc` или `.docx` файл, чтобы добавить стандартный колонтитул (основную надпись).</p>
+                    <h1 className="text-3xl font-orbitron font-bold text-foreground">DOCX Генератор с Колонтитулом</h1>
+                    <p className="text-muted-foreground mt-2">Введите текст документа и настройте данные для колонтитула (основной надписи).</p>
                 </div>
 
-                <div className="space-y-4">
-                    <div
-                      onClick={triggerFileSelect}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') triggerFileSelect(); }}
-                      role="button"
-                      tabIndex={0}
-                      className={cn(
-                        "w-full flex flex-col items-center justify-center px-6 py-10 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
-                        "border-input-border hover:border-brand-blue text-muted-foreground hover:text-brand-blue",
-                        isLoading ? "opacity-50 cursor-not-allowed animate-pulse" : "hover:bg-brand-blue/10",
-                        selectedFile ? "border-green-500 hover:border-green-400 text-green-400" : ""
-                      )}
-                    >
-                        <VibeContentRenderer content={selectedFile ? "::FaCheckCircle className='text-3xl mb-3'::" : "::FaUpload className='text-3xl mb-3'::"} />
-                        <span className="font-semibold text-center">{statusMessage}</span>
-                        <input
-                            id="doc-file-upload"
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            onChange={handleFileChange}
-                            className="sr-only"
+                <div className="space-y-6">
+                    <div>
+                        <Label htmlFor="docContent" className="text-lg font-semibold">Основной текст документа</Label>
+                        <Textarea
+                            id="docContent"
+                            value={docContent}
+                            onChange={(e) => setDocContent(e.target.value)}
+                            placeholder="Вставьте сюда текст вашего документа..."
+                            rows={10}
+                            className="w-full mt-2 input-cyber simple-scrollbar"
                             disabled={isLoading}
                         />
                     </div>
 
+                    <div className="border-t border-border/50 pt-6">
+                      <h3 className="text-lg font-semibold mb-4">Настройки колонтитула</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div><Label htmlFor="docCode">Код документа</Label><Input id="docCode" value={docCode} onChange={e => setDocCode(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="docTitle">Название документа</Label><Input id="docTitle" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="razrab">Разработал</Label><Input id="razrab" value={razrab} onChange={e => setRazrab(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="prov">Проверил</Label><Input id="prov" value={prov} onChange={e => setProv(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="nkontr">Н. контроль</Label><Input id="nkontr" value={nkontr} onChange={e => setNkontr(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="utv">Утвердил</Label><Input id="utv" value={utv} onChange={e => setUtv(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="lit">Лит.</Label><Input id="lit" value={lit} onChange={e => setLit(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="list">Лист</Label><Input id="list" value={list} onChange={e => setList(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div><Label htmlFor="listov">Листов</Label><Input id="listov" value={listov} onChange={e => setListov(e.target.value)} className="input-cyber mt-1"/></div>
+                        <div className="sm:col-span-2 md:col-span-3">
+                            <Label htmlFor="orgName">Организация (каждая строка с новой строки)</Label>
+                            <Textarea id="orgName" value={orgName} onChange={e => setOrgName(e.target.value)} className="input-cyber mt-1" rows={3}/>
+                        </div>
+                      </div>
+                    </div>
+
                     <Button 
-                        onClick={handleProcessAndSend} 
-                        disabled={isLoading || !selectedFile}
+                        onClick={handleGenerateAndSend} 
+                        disabled={isLoading}
                         size="lg" 
                         className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg shadow-md hover:opacity-90 transition-opacity"
                     >
                         {isLoading 
-                            ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Обработка...</> 
-                            : <><VibeContentRenderer content="::FaWandMagicSparkles className='mr-2'::"/> Обработать и отправить в Telegram</>
+                            ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Генерация...</> 
+                            : <><VibeContentRenderer content="::FaPooStorm className='mr-2'::"/> Сгенерировать и отправить в Telegram</>
                         }
                     </Button>
-                </div>
-                 <div className="text-center text-xs text-muted-foreground/80 pt-4 border-t border-border/30">
-                     <p><VibeContentRenderer content="::FaCircleInfo::" /> Этот инструмент использует серверную библиотеку для модификации `.docx` файлов. Файлы старого формата `.doc` требуют установки серверного конвертера (например, `unoconv`) и не поддерживаются напрямую.</p>
                 </div>
             </div>
         </div>
