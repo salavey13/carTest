@@ -14,7 +14,11 @@ import {
     VerticalAlign,
     convertInchesToTwip,
     AlignmentType,
-    SectionType
+    SectionType,
+    TextRun,
+    HeadingLevel,
+    TabStopType,
+    TabStopPosition
 } from 'docx';
 
 interface DocDetails {
@@ -31,10 +35,95 @@ interface DocDetails {
 }
 
 /**
- * Generates a new DOCX document from user-provided text and adds a GOST-style footer.
- * This function creates a document from scratch, which is the correct way to use the 'docx' library.
+ * Parses a line of markdown text into an array of TextRun objects for docx.
+ * Handles **bold** and *italic*.
+ * @param text The line of text to parse.
+ * @returns An array of TextRun objects.
+ */
+const createTextRuns = (text: string): TextRun[] => {
+    const runs: TextRun[] = [];
+    // Regex to capture **bold** or *italic* text
+    const markdownRegex = /(\*\*|`)(.*?)\1|(\*)(.*?)\*/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = markdownRegex.exec(text)) !== null) {
+        // Add preceding normal text
+        if (match.index > lastIndex) {
+            runs.push(new TextRun(text.substring(lastIndex, match.index)));
+        }
+
+        const [fullMatch, boldOrCodeDelim, boldOrCodeText, italicDelim, italicText] = match;
+        
+        if (boldOrCodeDelim === '**') {
+            runs.push(new TextRun({ text: boldOrCodeText, bold: true }));
+        } else if (italicDelim === '*') {
+            runs.push(new TextRun({ text: italicText, italics: true }));
+        }
+        
+        lastIndex = markdownRegex.lastIndex;
+    }
+
+    // Add any remaining normal text
+    if (lastIndex < text.length) {
+        runs.push(new TextRun(text.substring(lastIndex)));
+    }
+
+    return runs;
+};
+
+
+/**
+ * Parses a markdown string into an array of docx Paragraph objects.
+ * Supports headings, bullet points, horizontal rules, and inline bold/italic.
+ * @param markdown The full markdown text.
+ * @returns An array of Paragraphs for use in a docx Document.
+ */
+const parseMarkdownToDocxObjects = (markdown: string): Paragraph[] => {
+    const paragraphs: Paragraph[] = [];
+    const lines = markdown.split('\n');
+
+    for (const line of lines) {
+        // Headings
+        if (line.startsWith('### ')) {
+            paragraphs.push(new Paragraph({ children: createTextRuns(line.substring(4)), heading: HeadingLevel.HEADING_3 }));
+            continue;
+        }
+        if (line.startsWith('## ')) {
+            paragraphs.push(new Paragraph({ children: createTextRuns(line.substring(3)), heading: HeadingLevel.HEADING_2 }));
+            continue;
+        }
+        if (line.startsWith('# ')) {
+            paragraphs.push(new Paragraph({ children: createTextRuns(line.substring(2)), heading: HeadingLevel.HEADING_1 }));
+            continue;
+        }
+        // Horizontal Rule
+        if (line.match(/^(\*|-|_){3,}$/)) {
+            paragraphs.push(new Paragraph({ border: { bottom: { color: "auto", space: 1, style: "single", size: 6 } } }));
+            continue;
+        }
+        // Bullet points
+        if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+            paragraphs.push(new Paragraph({ children: createTextRuns(line.trim().substring(2)), bullet: { level: 0 } }));
+            continue;
+        }
+        // Empty line
+        if (line.trim() === '') {
+            paragraphs.push(new Paragraph(""));
+            continue;
+        }
+        // Normal paragraph
+        paragraphs.push(new Paragraph({ children: createTextRuns(line) }));
+    }
+
+    return paragraphs;
+};
+
+
+/**
+ * Generates a new DOCX document from user-provided markdown text and adds a GOST-style footer.
  *
- * @param mainContent The main text content of the document, with newlines separating paragraphs.
+ * @param mainContent The main text content of the document in Markdown format.
  * @param docDetails An object with details to fill in the title block.
  * @returns A promise that resolves with the Uint8Array of the generated .docx file.
  */
@@ -55,8 +144,7 @@ export async function generateDocxWithColontitul(
         const noBorders = { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } };
         const allBorders = { top: { style: BorderStyle.SINGLE, size: 1, color: "000000" }, bottom: { style: BorderStyle.SINGLE, size: 1, color: "000000" }, left: { style: BorderStyle.SINGLE, size: 1, color: "000000" }, right: { style: BorderStyle.SINGLE, size: 1, color: "000000" } };
         
-        // Define widths in DXA (1/20th of a point). Using a helper for consistency.
-        const colWidths = [700, 1400, 1000, 1000, 1000, 2900, 850, 850, 850].map(w => convertInchesToTwip(w / 1000)); // Example conversion, adjust as needed
+        const colWidths = [700, 1400, 1000, 1000, 1000, 2900, 850, 850, 850].map(w => convertInchesToTwip(w / 1000));
 
         const table = new Table({
             width: { size: convertInchesToTwip(7.28), type: WidthType.DXA }, // 185mm
@@ -128,7 +216,7 @@ export async function generateDocxWithColontitul(
             sections: [{
                 properties: { type: SectionType.NEXT_PAGE },
                 footers: { default: footer },
-                children: mainContent.split('\n').map(text => new Paragraph({ text })),
+                children: parseMarkdownToDocxObjects(mainContent),
             }],
         });
 
