@@ -3,13 +3,8 @@
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import { generateDocxWithColontitul } from './docProcessor';
-import { supabaseAdmin } from '@/hooks/supabase';
-import JSZip from 'jszip';
-import { XMLParser } from 'fast-xml-parser';
-import { v4 as uuidv4 } from 'uuid';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const DOCX_MEDIA_BUCKET = 'docx-media'; // Define a bucket for temporary media
 
 interface TelegramApiResponse {
   ok: boolean;
@@ -71,77 +66,44 @@ async function sendTelegramDocument(
   }
 }
 
-export async function extractDataFromDocxAction(formData: FormData): Promise<{ success: boolean; text?: string; imageUrls?: string[]; error?: string; }> {
-    const file = formData.get("document") as File | null;
-    if (!file) return { success: false, error: "No file provided." };
-    if (!file.name.endsWith('.docx')) return { success: false, error: "Only .docx files are supported for data extraction." };
-
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const zip = await JSZip.loadAsync(arrayBuffer);
-        
-        // 1. Extract Text
-        const contentXml = await zip.file("word/document.xml")?.async("string");
-        if (!contentXml) return { success: false, error: "word/document.xml not found in the DOCX file." };
-        
-        const xmlParser = new XMLParser({ ignoreAttributes: false, allowBooleanAttributes: true });
-        const jsonObj = xmlParser.parse(contentXml);
-        const paragraphs = jsonObj['w:document']['w:body']['w:p'];
-        const textContent = (Array.isArray(paragraphs) ? paragraphs : [paragraphs])
-            .map((p: any) => {
-                if (!p || !p['w:r']) return '';
-                const runs = Array.isArray(p['w:r']) ? p['w:r'] : [p['w:r']];
-                return runs.map((r: any) => (r && r['w:t']) ? (typeof r['w:t'] === 'object' ? r['w:t']['#text'] || '' : r['w:t']) : '').join('');
-            }).join('\n');
-
-        // 2. Extract, Upload, and Get URLs for Images
-        const mediaFolder = zip.folder("word/media");
-        const imageUrls: string[] = [];
-        if (mediaFolder) {
-            const imagePromises = mediaFolder.file(/.*\.(jpeg|jpg|png|gif)$/).map(async (imageFile) => {
-                const imageBuffer = await imageFile.async("nodebuffer");
-                const fileName = `${uuidv4()}-${imageFile.name}`;
-                const { data, error } = await supabaseAdmin.storage.from(DOCX_MEDIA_BUCKET).upload(fileName, imageBuffer, {
-                    contentType: `image/${imageFile.name.split('.').pop()}`,
-                    upsert: true
-                });
-                if (error) {
-                    logger.error(`Failed to upload ${imageFile.name} to Supabase:`, error);
-                    return null;
-                }
-                const { data: { publicUrl } } = supabaseAdmin.storage.from(DOCX_MEDIA_BUCKET).getPublicUrl(data.path);
-                return publicUrl;
-            });
-            const results = await Promise.all(imagePromises);
-            imageUrls.push(...results.filter((url): url is string => url !== null));
-        }
-        
-        return { success: true, text: textContent, imageUrls };
-    } catch(e) {
-        logger.error("Failed to extract data from DOCX:", e);
-        return { success: false, error: "Could not parse the DOCX file. It might be corrupted." };
-    }
-}
-
-
-export async function generateAndSendDocumentAction(
-    payload: { docContent: string, docDetails: DocDetailsPayload },
+export async function processAndSendDocumentAction(
+    formData: FormData,
     chatId: string
-): Promise<{ success:boolean; message?: string; error?: string }> {
-    debugLogger.log(`[generateAndSendDocumentAction] Initiated for Chat ID: ${chatId}`);
+): Promise<{ success: boolean; message?: string; error?: string }> {
+    debugLogger.log(`[processAndSendDocumentAction] Initiated for Chat ID: ${chatId}`);
 
-    if (!chatId) return { success: false, error: "User chat ID not provided." };
-    if (!payload.docContent.trim()) return { success: false, error: "Document content cannot be empty." };
+    if (!chatId) {
+        return { success: false, error: "User chat ID not provided." };
+    }
+    
+    const file = formData.get("document") as File | null;
+    if (!file) {
+        return { success: false, error: "Document file not provided." };
+    }
+     if (!file.name.endsWith('.docx')) {
+        return { success: false, error: "Only .docx files are supported." };
+    }
 
     try {
-        const { docContent, docDetails } = payload;
+        const docDetails: DocDetailsPayload = {
+            docCode: formData.get('docCode') as string || '',
+            docTitle: formData.get('docTitle') as string || '',
+            razrab: formData.get('razrab') as string || '',
+            prov: formData.get('prov') as string || '',
+            nkontr: formData.get('nkontr') as string || '',
+            utv: formData.get('utv') as string || '',
+            lit: formData.get('lit') as string || '',
+            orgName: formData.get('orgName') as string || '',
+        };
+
+        const fileBuffer = Buffer.from(await file.arrayBuffer());
         
-        const generatedDocBytes = await generateDocxWithColontitul(docContent, docDetails);
+        const generatedDocBytes = await generateDocxWithColontitul(fileBuffer, docDetails);
         
         const safeFileName = docDetails.docCode.replace(/[^a-zA-Z0-9-]/g, '_') || 'document';
         const newFileName = `${safeFileName}.docx`;
         
-        const caption = `📄 Ваш сгенерированный документ готов: *${escapeTelegramMarkdownV2(newFileName)}*\n\nВ него был добавлен настроенный вами колонтитул \\(основная надпись\\)\\.`;
+        const caption = `📄 Ваш обработанный документ готов: *${escapeTelegramMarkdownV2(newFileName)}*\n\nВ него был добавлен настроенный вами колонтитул и сохранены все изображения и текст\\.`;
         
         const blob = new Blob([generatedDocBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
@@ -154,7 +116,7 @@ export async function generateAndSendDocumentAction(
         }
 
     } catch (error: any) {
-        logger.error('[generateAndSendDocumentAction] Critical error during document generation or sending:', error);
+        logger.error('[processAndSendDocumentAction] Critical error during document generation or sending:', error);
         const errorMsg = error instanceof Error ? error.message : 'Unexpected server error during document processing.';
         return { success: false, error: errorMsg };
     }
