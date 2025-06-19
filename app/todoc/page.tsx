@@ -13,12 +13,32 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 
+const initialDocContent = `> **КИБЕРВАЙБ: ВСТРЕЧАЙ БУДУЩЕЕ, ПОКА ОСТАЛЬНЫЕ ПРОСПАЛИ**
+
+> Сделано на телефоне. Без компа. Без "серьёзных" IDE. Просто Telegram, нейросети и вайб.
+> 
+> Ты читаешь это — значит, ты в шаге от самого крутого апгрейда за последние 10 лет.
+
+---
+
+### НАСТАЛО ВРЕМЯ. ЧТО ЭТО?
+- CYBERVIBE STUDIO — твоя кибер-лаборатория, где ИИ реально помогает, а не просто болтает.
+- Всё работает прямо с телефона:
+- Грабь код
+- Стучи в ИИ идею или баг в пару кликов
+- Получай PR с готовым решением
+- AI сам находит галлюцинации (иконки, баги, ошибки) и чинит их
+- Геймификация
+- За каждый шаг — левел-ап, новые перки, ачивки, профит
+- Всё как в игре, только ты реально строишь будущее.
+`;
+
 export default function ToDocPage() {
     const { user, isAuthenticated, isLoading: appContextLoading } = useAppContext();
     const [isLoading, setIsLoading] = useState(false);
     
-    // State for all configurable fields
-    const [docContent, setDocContent] = useState('Здесь будет основной текст вашего документа.\n\nКаждая новая строка будет новым параграфом.');
+    // State for all configurable fields, now with updated defaults
+    const [docContent, setDocContent] = useState(initialDocContent);
     const [docCode, setDocCode] = useState('РК.ТТ-761.102 ПЗ');
     const [docTitle, setDocTitle] = useState('РЕФЕРАТ');
     const [razrab, setRazrab] = useState('Иванов И.И.');
@@ -107,7 +127,7 @@ export default function ToDocPage() {
                             value={docContent}
                             onChange={(e) => setDocContent(e.target.value)}
                             placeholder="Вставьте сюда текст вашего документа..."
-                            rows={10}
+                            rows={15}
                             className="w-full mt-2 input-cyber simple-scrollbar"
                             disabled={isLoading}
                         />
@@ -140,7 +160,7 @@ export default function ToDocPage() {
                     >
                         {isLoading 
                             ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Генерация...</> 
-                            : <><VibeContentRenderer content="::FaPooStorm className='mr-2'::"/> Сгенерировать и отправить в Telegram</>
+                            : <><VibeContentRenderer content="::FaPaperPlane className='mr-2'::"/> Сгенерировать и отправить в TG</>
                         }
                     </Button>
                 </div>
