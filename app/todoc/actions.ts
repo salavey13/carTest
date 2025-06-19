@@ -100,8 +100,8 @@ export async function processAndSendDocumentAction(
         
         const generatedDocBytes = await generateDocxWithColontitul(fileBuffer, docDetails);
         
-        const safeFileName = docDetails.docCode.replace(/[^a-zA-Z0-9-]/g, '_') || 'document';
-        const newFileName = `${safeFileName}.docx`;
+        const originalFileNameWithoutExt = file.name.replace(/\.docx$/, '');
+        const newFileName = `PROCESSED_${originalFileNameWithoutExt}.docx`;
         
         const caption = `📄 Ваш обработанный документ готов: *${escapeTelegramMarkdownV2(newFileName)}*\n\nВ него был добавлен настроенный вами колонтитул и сохранены все изображения и текст\\.`;
         
