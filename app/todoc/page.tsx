@@ -1,4 +1,3 @@
-// /app/todoc/page.tsx
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
@@ -10,9 +9,6 @@ import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-
-const MAX_FILE_SIZE_MB = 10;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export default function ToDocPage() {
     const { user, isAuthenticated, isLoading: appContextLoading } = useAppContext();
@@ -26,13 +22,6 @@ export default function ToDocPage() {
         if (!file) {
             setSelectedFile(null);
             setStatusMessage('Файл не выбран. Пожалуйста, попробуйте снова.');
-            return;
-        }
-
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-            toast.error(`Файл слишком большой. Максимальный размер: ${MAX_FILE_SIZE_MB}MB.`);
-            setSelectedFile(null);
-            if (event.target) event.target.value = "";
             return;
         }
 
@@ -141,7 +130,6 @@ export default function ToDocPage() {
                     >
                         <VibeContentRenderer content={selectedFile ? "::FaCheckCircle className='text-3xl mb-3'::" : "::FaUpload className='text-3xl mb-3'::"} />
                         <span className="font-semibold text-center">{statusMessage}</span>
-                        {!selectedFile && <span className="text-xs mt-1">(Макс. {MAX_FILE_SIZE_MB}MB)</span>}
                         <input
                             id="doc-file-upload"
                             ref={fileInputRef}
@@ -161,7 +149,7 @@ export default function ToDocPage() {
                     >
                         {isLoading 
                             ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Обработка...</> 
-                            : <><VibeContentRenderer content="::FaWandmagicsparkles className='mr-2'::"/> Обработать и отправить в Telegram</>
+                            : <><VibeContentRenderer content="::FaWandMagicSparkles className='mr-2'::"/> Обработать и отправить в Telegram</>
                         }
                     </Button>
                 </div>
