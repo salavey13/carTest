@@ -1,3 +1,4 @@
+// /app/todoc/page.tsx
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
@@ -160,7 +161,7 @@ export default function ToDocPage() {
                     >
                         {isLoading 
                             ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Обработка...</> 
-                            : <><VibeContentRenderer content="::FaMagicWandSparkles className='mr-2'::"/> Обработать и отправить в Telegram</>
+                            : <><VibeContentRenderer content="::FaWandmagicsparkles className='mr-2'::"/> Обработать и отправить в Telegram</>
                         }
                     </Button>
                 </div>
