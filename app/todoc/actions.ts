@@ -30,6 +30,17 @@ function escapeTelegramMarkdownV2(text: string): string {
     return text.replace(charsToEscape, (char) => `\\${char}`);
 }
 
+const translitMap: { [key: string]: string } = {
+    'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'yo', 'ж':'zh',
+    'з':'z', 'и':'i', 'й':'y', 'к':'k', 'л':'l', 'м':'m', 'н':'n', 'о':'o',
+    'п':'p', 'р':'r', 'с':'s', 'т':'t', 'у':'u', 'ф':'f', 'х':'h', 'ц':'ts',
+    'ч':'ch', 'ш':'sh', 'щ':'shch', 'ъ':'', 'ы':'y', 'ь':'', 'э':'e', 'ю':'yu', 'я':'ya'
+};
+
+function transliterate(text: string): string {
+    return text.toLowerCase().split('').map(char => translitMap[char] || char).join('');
+}
+
 
 async function sendTelegramDocument( 
   chatId: string,
@@ -100,8 +111,9 @@ export async function processAndSendDocumentAction(
         
         const generatedDocBytes = await generateDocxWithColontitul(fileBuffer, docDetails);
         
+        const transliteratedTitle = transliterate(docDetails.docTitle).replace(/[^a-z0-9-]/g, '_');
         const originalFileNameWithoutExt = file.name.replace(/\.docx$/, '');
-        const newFileName = `PROCESSED_${originalFileNameWithoutExt}.docx`;
+        const newFileName = `PROCESSED_${transliteratedTitle || originalFileNameWithoutExt}.docx`;
         
         const caption = `📄 Ваш обработанный документ готов: *${escapeTelegramMarkdownV2(newFileName)}*\n\nВ него был добавлен настроенный вами колонтитул и сохранены все изображения и текст\\.`;
         
