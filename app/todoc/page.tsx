@@ -1,3 +1,4 @@
+// /app/todoc/page.tsx
 "use client";
 
 import React, { useState, useRef } from 'react';
@@ -116,7 +117,6 @@ export default function ToDocPage() {
                         </div>
                     </div>
 
-
                     <div className="border-t border-border/50 pt-6">
                       <h3 className="text-lg font-semibold mb-4">2. Настройте данные колонтитула</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -132,13 +132,13 @@ export default function ToDocPage() {
                             <Textarea id="orgName" value={orgName} onChange={e => setOrgName(e.target.value)} className="input-cyber mt-1" rows={3}/>
                         </div>
                       </div>
-                       <p className="text-xs text-muted-foreground mt-4"><VibeContentRenderer content="::FaInfoCircle::"/> Поля "Лист" и "Листов" заполняются автоматически самим Word'ом.</p>
+                       <p className="text-xs text-muted-foreground mt-4"><VibeContentRenderer content="::FaCircleInfo::"/> Поля "Лист" и "Листов" заполняются автоматически самим Word'ом.</p>
                     </div>
 
                     <Button onClick={handleProcessAndSend} disabled={isLoading || !selectedFile} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg">
                         {isLoading 
                             ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Обработка...</> 
-                            : <><VibeContentRenderer content="::FaPaperPlane className='mr-2'::"/> 3. Сгенерировать и отправить в TG</>
+                            : <><VibeContentRenderer content="::FaPlane className='mr-2'::"/> 3. Сгенерировать и отправить в TG</>
                         }
                     </Button>
                 </div>
