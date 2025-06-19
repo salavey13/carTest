@@ -20,6 +20,7 @@ import {
     PageNumber,
     IImageOptions,
     HeadingLevel,
+    ExternalHyperlink
 } from 'docx';
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
@@ -36,15 +37,18 @@ interface DocDetails {
 }
 
 // Represents a piece of structured content extracted from the original DOCX
-type TextItem = { text: string; bold?: boolean; italics?: boolean };
+type TextItem = { text: string; bold?: boolean; italics?: boolean; hyperlink?: string };
 type ContentItem = 
     | { type: 'paragraph'; runs: TextItem[]; style?: string } 
     | { type: 'heading'; level: HeadingLevel; runs: TextItem[] }
     | { type: 'list_item'; level: number; runs: TextItem[] }
+    | { type: 'table', rows: { cells: { runs: TextItem[] }[] }[] }
     | { type: 'image'; data: IImageOptions };
 
+
 /**
- * Extracts structured content (text with formatting, images, lists, headings) from a DOCX file buffer.
+ * Extracts structured content (text, formatting, images, lists, tables, hyperlinks) from a DOCX file buffer.
+ * This is a more robust, recursive parser.
  * @param docxBuffer The buffer of the uploaded .docx file.
  * @returns A promise that resolves to an array of structured content items.
  */
@@ -52,23 +56,29 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
     const zip = await JSZip.loadAsync(docxBuffer);
     const contentItems: ContentItem[] = [];
 
+    // --- Relationship and Image Mapping ---
     const relsContent = await zip.file("word/_rels/document.xml.rels")?.async("string");
-    const relsParser = new XMLParser({ ignoreAttributes: false });
+    const relsParser = new XMLParser({ ignoreAttributes: false, preserveOrder: true });
     const rels = relsParser.parse(relsContent || "");
     const imageRelMap = new Map<string, Buffer>();
-    if (rels.Relationships && rels.Relationships.Relationship) {
-        const relationships = Array.isArray(rels.Relationships.Relationship) ? rels.Relationships.Relationship : [rels.Relationships.Relationship];
-        for (const rel of relationships) {
-            if (rel["@_Type"].includes("image")) {
-                const imageFile = zip.file(`word/${rel["@_Target"]}`);
+    const linkRelMap = new Map<string, string>();
+
+    if (rels[0]?.Relationships?.[0]?.Relationship) {
+        for (const rel of rels[0].Relationships[0].Relationship) {
+            const relAttrs = rel[':@'];
+            if (relAttrs["@_Type"].includes("image")) {
+                const imageFile = zip.file(`word/${relAttrs["@_Target"]}`);
                 if (imageFile) {
                     const buffer = await imageFile.async("nodebuffer");
-                    imageRelMap.set(rel["@_Id"], buffer);
+                    imageRelMap.set(relAttrs["@_Id"], buffer);
                 }
+            } else if (relAttrs["@_Type"].includes("hyperlink")) {
+                linkRelMap.set(relAttrs["@_Id"], relAttrs["@_Target"]);
             }
         }
     }
     
+    // --- Main Document Parsing ---
     const contentXml = await zip.file("word/document.xml")?.async("string");
     if (!contentXml) throw new Error("word/document.xml not found.");
 
@@ -76,70 +86,74 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
     const docXml = xmlParser.parse(contentXml);
     const body = docXml.find((n:any) => n["w:document"])?.["w:document"]?.find((n:any) => n["w:body"])?.["w:body"];
 
+    const parseParagraphContent = (pNode: any): ContentItem => {
+        const pPrNode = pNode["w:p"]?.find((n: any) => n["w:pPr"]);
+        let bulletLevel: number | undefined;
+        let headingLevel: HeadingLevel | undefined;
+        let style: string | undefined;
+
+        if (pPrNode?.["w:pPr"]) {
+            const styleNode = pPrNode["w:pPr"].find((n: any) => n["w:pStyle"]);
+            const styleVal = styleNode?.["w:pStyle"]?.[0]?.[':@']?.["@_w:val"];
+            if(styleVal) {
+                if(styleVal.startsWith("Heading")) headingLevel = styleVal.replace('Heading', 'HEADING_');
+                else if (styleVal.toLowerCase().includes("quote")) style = 'Quote';
+            }
+
+            const numPrNode = pPrNode["w:pPr"].find((n: any) => n["w:numPr"]);
+            if (numPrNode) {
+                const level = numPrNode["w:numPr"]?.[0]?.["w:ilvl"]?.[0]?.[':@']?.["@_w:val"];
+                bulletLevel = level !== undefined ? parseInt(level, 10) : 0;
+            }
+        }
+        
+        const runs: TextItem[] = [];
+        const contentNodes = pNode["w:p"] || [];
+
+        for (const node of contentNodes) {
+             if (node["w:r"]) { // Standard run
+                const rPr = node["w:r"].find((n: any) => n["w:rPr"])?.["w:rPr"];
+                const text = node["w:r"].find((n: any) => n["w:t"])?.["w:t"]?.[0]?.["#text"] || '';
+                if(text) runs.push({ text, bold: !!rPr?.some((n:any)=>n["w:b"]), italics: !!rPr?.some((n:any)=>n["w:i"]) });
+             } else if (node["w:hyperlink"]) { // Hyperlink run
+                 const rId = node["w:hyperlink"][0][':@']['@_r:id'];
+                 const url = linkRelMap.get(rId);
+                 const linkRun = node["w:hyperlink"][0]['w:r'][0];
+                 const rPr = linkRun['w:rPr'];
+                 const text = linkRun['w:t'][0]['#text'];
+                 if(text) runs.push({text, bold: !!rPr?.['w:b'], italics: !!rPr?.['w:i'], hyperlink: url });
+             }
+        }
+        
+        if (headingLevel) return { type: 'heading', level: headingLevel, runs };
+        if (bulletLevel !== undefined) return { type: 'list_item', level: bulletLevel, runs };
+        return { type: 'paragraph', runs, style };
+    };
+    
     if (body) {
         for (const element of body) {
             if (element["w:p"]) {
-                const pPrNode = element["w:p"].find((n: any) => n["w:pPr"]);
-                const pPr = pPrNode ? pPrNode["w:pPr"] : null;
-
-                let headingLevel: HeadingLevel | undefined;
-                let bulletLevel: number | undefined;
-                let style: string | undefined;
-
-                if (pPr) {
-                    const styleNode = pPr.find((n: any) => n["w:pStyle"]);
-                    const styleVal = styleNode?.["w:pStyle"]?.[0]?.["@_w:val"];
-                    if (styleVal) {
-                        if (styleVal.startsWith("Heading")) headingLevel = styleVal.replace("Heading", `HEADING_`);
-                        else if (styleVal.toLowerCase().includes("quote")) style = 'Quote';
+                contentItems.push(parseParagraphContent(element));
+            } else if (element["w:tbl"]) {
+                const tableRows: { cells: { runs: TextItem[] }[] }[] = [];
+                const trNodes = element["w:tbl"].filter((n: any) => n["w:tr"]);
+                for (const trNode of trNodes) {
+                    const tableCells: { runs: TextItem[] }[] = [];
+                    const tcNodes = trNode["w:tr"].filter((n: any) => n["w:tc"]);
+                    for (const tcNode of tcNodes) {
+                         const cellParagraphs = tcNode["w:tc"].filter((n:any) => n["w:p"]);
+                         const cellRuns: TextItem[] = [];
+                         for (const p of cellParagraphs) {
+                             const parsedP = parseParagraphContent(p);
+                             cellRuns.push(...parsedP.runs);
+                             // Add newline if it's not the last paragraph in the cell
+                             if (p !== cellParagraphs[cellParagraphs.length -1]) cellRuns.push({text: '\n'});
+                         }
+                         tableCells.push({ runs: cellRuns });
                     }
-
-                    const numPrNode = pPr.find((n: any) => n["w:numPr"]);
-                    if (numPrNode) {
-                        const levelNode = numPrNode["w:numPr"]?.find((n: any) => n["w:ilvl"]);
-                        // FIX: Added safe navigation to prevent crash
-                        const level = levelNode?.["w:ilvl"]?.[0]?.["@_w:val"];
-                        bulletLevel = level !== undefined ? parseInt(level, 10) : 0;
-                    }
+                    tableRows.push({ cells: tableCells });
                 }
-                
-                const runs: TextItem[] = [];
-                const runNodes = element["w:p"].filter((n: any) => n["w:r"]);
-
-                for (const rNode of runNodes) {
-                    const rPrNode = rNode["w:r"].find((n: any) => n["w:rPr"]);
-                    const rPr = rPrNode ? rPrNode["w:rPr"] : null;
-                    const isBold = !!rPr?.some((n: any) => n["w:b"]);
-                    const isItalic = !!rPr?.some((n: any) => n["w:i"]);
-                    
-                    for (const child of rNode["w:r"]) {
-                        // FIX: Safely access text content, defaulting to empty string
-                        const textContent = child["w:t"]?.[0]?.["#text"] || '';
-                        if (textContent) {
-                            runs.push({ text: textContent, bold: isBold, italics: isItalic });
-                        }
-
-                        if (child["w:drawing"]) {
-                             const blip = child["w:drawing"]?.[0]?.["wp:inline"]?.[0]?.["a:graphic"]?.[0]?.["a:graphicData"]?.[0]?.["pic:pic"]?.[0]?.["pic:blipFill"]?.[0]?.["a:blip"]?.[0];
-                             const rId = blip?.["@_r:embed"];
-                             if (rId && imageRelMap.has(rId)) {
-                                 contentItems.push({
-                                     type: 'image',
-                                     data: { data: imageRelMap.get(rId)!, transformation: { width: 500, height: 300 } }
-                                 });
-                             }
-                        }
-                    }
-                }
-
-                if (runs.length > 0) {
-                     if (headingLevel) contentItems.push({ type: 'heading', level: headingLevel, runs });
-                     else if (bulletLevel !== undefined) contentItems.push({ type: 'list_item', level: bulletLevel, runs });
-                     else contentItems.push({ type: 'paragraph', runs, style });
-                } else if (runNodes.length === 0) {
-                    // Handle empty paragraphs to preserve line breaks
-                    contentItems.push({ type: 'paragraph', runs: [{ text: '' }] });
-                }
+                contentItems.push({ type: 'table', rows: tableRows });
             }
         }
     }
@@ -157,22 +171,43 @@ export async function generateDocxWithColontitul(
     try {
         const content = await extractStructuredContentFromDocx(docxBuffer);
 
-        const docChildren: Paragraph[] = content.map(item => {
-            if (item.type === 'image') {
-                return new Paragraph({ children: [new ImageRun(item.data)], alignment: AlignmentType.CENTER });
-            }
-            const runs = item.runs.map(run => new TextRun({ text: run.text, bold: run.bold, italics: run.italics }));
-
+        const docChildren: (Paragraph | Table)[] = [];
+        for (const item of content) {
             switch (item.type) {
-                case 'heading':
-                    return new Paragraph({ children: runs, heading: item.level });
-                case 'list_item':
-                    return new Paragraph({ children: runs, bullet: { level: item.level } });
                 case 'paragraph':
-                default:
-                    return new Paragraph({ children: runs, style: item.style });
+                case 'heading':
+                case 'list_item':
+                    const runs = item.runs.map(run => {
+                        if (run.hyperlink) {
+                            return new ExternalHyperlink({
+                                children: [new TextRun({ text: run.text, style: "Hyperlink" })],
+                                link: run.hyperlink,
+                            });
+                        }
+                        return new TextRun({ text: run.text, bold: run.bold, italics: run.italics });
+                    });
+                    
+                    docChildren.push(new Paragraph({
+                        children: runs,
+                        heading: item.type === 'heading' ? item.level : undefined,
+                        bullet: item.type === 'list_item' ? { level: item.level } : undefined,
+                        style: item.type === 'paragraph' ? item.style : undefined,
+                    }));
+                    break;
+                case 'image':
+                    docChildren.push(new Paragraph({ children: [new ImageRun(item.data)], alignment: AlignmentType.CENTER }));
+                    break;
+                case 'table':
+                    docChildren.push(new Table({
+                        rows: item.rows.map(row => new TableRow({
+                            children: row.cells.map(cell => new TableCell({
+                                children: [new Paragraph({ children: cell.runs.map(run => new TextRun({text: run.text, bold: run.bold, italics: run.italics})) })]
+                            }))
+                        }))
+                    }));
+                    break;
             }
-        });
+        }
 
         const createCell = (text: string = '', width: number, borders: any, children?: any[]) => new TableCell({
             children: children || [new Paragraph({ text, style: "p-small", alignment: AlignmentType.CENTER })],
