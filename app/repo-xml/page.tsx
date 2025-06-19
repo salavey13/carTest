@@ -26,8 +26,145 @@ import {
 import Link from "next/link";
 import { motion } from 'framer-motion';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
-import * as repoUtils from "@/lib/repoUtils";
-import { cn } from "@/lib/utils";
+
+
+const CYBERWTF_BADGE = "https://github.com/user-attachments/assets/7e7c6300-02dc-4314-be55-41005bfb247a";
+const XUINITY_EMBLEM = "https://github.com/user-attachments/assets/910a623e-1c9d-4630-a8b4-7c361565dc97";
+
+const onboardingBlocks = {
+  en: {
+    title: "🧬 Welcome to CYBERVIBE STUDIO /repo-xml 🧬",
+    badge: "CYBERWTF VIBE TRIBE",
+    intro: `If you’re reading this, you’re not lost. You’re exactly where the next level starts.
+This is not a regular dev page. This is your portal to the SUPERVIBE ENGINE:
+- AI-powered
+- Gamified
+- 100% WTF
+- Built for devs, dreamers, and reality remixers`,
+    tldr: [
+      "**Scroll.** Let your brain catch up—yes, it’s a lot.",
+      "**Click “Extract Files”.** Instantly fetch source code to remix, patch, or build on.",
+      "**Drop your AI request or idea.** Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.",
+      "**AI + YOU = PR** The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.",
+      "**Level Up.** Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile). See your progress, unlock achievements, and flex with the VIBE TRIBE."
+    ],
+    whatisit: `/repo-xml = AI-powered remix lab for this project.
+SUPERVIBE ENGINE: Recursive workflow: Extract context → Feed to AI → Build, patch, merge → Repeat
+No install, no gatekeeping, just instant hacking and learning.`,
+    youare: `You’re not just using a tool.  
+You’re co-piloting an AI-powered, cyberpunk, recursive dev studio.  
+You’re not asking “how do I code this?”  
+You’re asking “how do I LEVEL UP?”`,
+    levels: `🏆 **BADGES, LEVELS, & QUESTS**
+- Every PR, code fetch, or AI action = progress
+- Quests like “Fix a broken image”, “Ship an idea”, “Remix the matrix”, “Inception Swap”
+- Your CyberFitness Profile evolves: Level up, unlock perks, collect badges, and see your “Cognitive OS Version” change as you grow.`,
+    faq: [
+      { q: "Why does this look like a game?", a: "Because learning, shipping, and leveling up should feel like one." },
+      { q: "Why is there a DNA helix and neon everywhere?", a: "Because you’re hacking the code of your DEV DNA—and it should look awesome." },
+      { q: "Why is this better than a regular code editor?", a: "No setup, no fear, no gatekeeping. Just create, remix, and WIN." },
+      { q: "What if I break something?", a: "You can’t. Everything is sandboxed, safe, and tracked. Every PR is reviewed before merging." },
+      { q: `"I still don’t get it."`, a: "Scroll back up. Click something. You’ll get it once you vibe." },
+    ],
+    tribe: [
+      { label: "CYBERVIBE Sandbox (this page)", url: "https://github.com/salavey13/carTest/app/repo-xml" },
+      { label: "Telegram entrypoint", url: "https://t.me/oneSitePlsBot" },
+      { label: "CYBERFITNESS Engine (Gamified)", url: "https://t.me/oneSitePlsBot/app" },
+      { label: "Full achievement history, perks, and code", url: "https://github.com/salavey13/carTest/blob/main/hooks/cyberFitnessSupabase.ts" },
+    ],
+    ready: "Ready? Let’s f*cking go. Welcome to CYBERVIBE."
+  },
+  ru: {
+    title: "🧬 Добро пожаловать в CYBERVIBE STUDIO /repo-xml 🧬",
+    badge: "CYBERWTF VIBE TRIBE",
+    intro: `Если ты это читаешь – ты не потерялся. Ты именно там, где начинается следующий уровень.
+Это не обычная страница для разработчиков. Это твой портал в SUPERVIBE ENGINE:
+- ИИ внутри
+- Геймифицировано
+- 100% WTF
+- Для кодеров, мечтателей и всех, кто хочет создавать без барьеров`,
+    tldr: [
+      "**Прокрути вниз.** Пусть мозг привыкнет – да, тут много нового.",
+      "**Жми “Извлечь файлы”.** Мгновенно получи исходники этого репозитория для экспериментов, фиксов и апгрейдов.",
+      "**Опиши свою идею или вопрос для ИИ.** Просто напиши: “Добавь темную тему”, “Исправь ошибку”, “Сделай по-киберпанковски”.",
+      "**ИИ + ТЫ = PR** Бот сгенерирует код, объяснит, и даст сразу создать Pull Request — без локальной сборки, без гита-колдунства.",
+      "**Прокачка!** Любое действие открывает новые перки, квесты и фичи (всё записывается в твой профиль CyberFitness). Следи за прогрессом, собирай ачивки, и становись частью VIBE TRIBE."
+    ],
+    whatisit: `/repo-xml = лаборатория ремиксов на базе ИИ для этого проекта.
+SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай контекст → Кидай в ИИ → Собирай, чини, мержи → Повтори
+Без установки, без барьеров, мгновенный старт и обучение.`,
+    youare: `Ты не просто пользуешься тулзой.  
+Ты ко-пилотируешь ИИ-киберпанк студию, где каждое действие — новый левел.  
+Тут не спрашивают “как это закодить”,  
+тут спрашивают “как ПРОКАЧАТЬСЯ?”`,
+    levels: `🏆 **АЧИВКИ, УРОВНИ И КВЕСТЫ**
+- Любой PR, файл или запрос к ИИ = прогресс
+- Квесты: “Почини картинку”, “Запусти идею”, “Ремиксуй матрицу”, “Inception Swap” и другие
+- Твой CyberFitness профиль растет: Новый уровень, перки, ачивки, и “Cognitive OS Version” — как у персонажа.`,
+    faq: [
+      { q: "Почему это похоже на игру?", a: "Потому что учиться, пилить и прокачиваться — должно быть весело." },
+      { q: "Зачем ДНК и неон?", a: "Ты реально меняешь свой кодовый ДНК, и пусть это будет красиво." },
+      { q: "Это лучше обычного редактора?", a: "Да — не нужно ничего ставить, бояться и разбираться. Просто создавай, ремиксуй и выигрывай." },
+      { q: "А если я что-то сломаю?", a: "Не бойся — всё работает в песочнице, ничего не сломать. Каждый PR проходит ревью." },
+      { q: "Всё равно не понял(а)!", a: "Пролистай вверх. Кликни. Попробуй. Ты поймешь, когда начнешь вайбить." },
+    ],
+    tribe: [
+      { label: "CYBERVIBE Sandbox (эта страница)", url: "https://github.com/salavey13/carTest/app/repo-xml" },
+      { label: "Вход в Telegram", url: "https://t.me/oneSitePlsBot" },
+      { label: "CYBERFITNESS Engine (Геймифицировано)", url: "https://t.me/oneSitePlsBot/app" },
+      { label: "Вся история ачивок, перков и кода", url: "https://github.com/salavey13/carTest/blob/main/hooks/cyberFitnessSupabase.ts" },
+    ],
+    ready: "Готов(а)? Погнали! Добро пожаловать в CYBERVIBE."
+  }
+};
+
+function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
+  const t = onboardingBlocks[lang];
+  return (
+    <Card className="max-w-3xl mx-auto mb-10 bg-black/90 border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
+      <div className="flex flex-col items-center py-6">
+        <img src={XUINITY_EMBLEM} alt="Xuinity emblem" className="w-28 mb-2 drop-shadow-glow" />
+        <img src={CYBERWTF_BADGE} alt="CYBERWTF badge" className="w-52 mb-2 drop-shadow-glow" />
+      </div>
+      <CardHeader>
+        <CardTitle className="text-2xl md:text-3xl font-bold text-center text-fuchsia-400 font-orbitron">{t.title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-base md:text-lg text-gray-200">
+        <div className="whitespace-pre-line">{t.intro}</div>
+        <div className="bg-gradient-to-r from-green-400/10 via-pink-400/10 to-purple-800/20 border-l-4 border-pink-500 rounded p-4 my-2 text-lg font-bold shadow-inner">
+          <div className="mb-1">🚦 <span className="text-pink-300 font-extrabold">TL;DR / Быстрый старт:</span></div>
+          <ul className="list-disc ml-7 space-y-1">
+            {t.tldr.map((l, i) => <li key={i} dangerouslySetInnerHTML={{ __html: l }} />)}
+          </ul>
+        </div>
+        <div>
+          <b>🌀 {lang === "en" ? "What even is this?" : "Что это вообще?"}</b>
+          <div className="whitespace-pre-line mt-2">{t.whatisit}</div>
+        </div>
+        <div className="italic text-pink-300 whitespace-pre-line">{t.youare}</div>
+        <div className="mt-3 whitespace-pre-line">{t.levels}</div>
+        <details className="mt-3 bg-slate-900/80 rounded p-3 border-l-4 border-fuchsia-600">
+          <summary className="font-bold cursor-pointer">{lang === "en" ? "FAQ (Still lost? Read this!)" : "FAQ (Всё ещё WTF? Читай это!)"}</summary>
+          <ul className="mt-2 space-y-1">
+            {t.faq.map((f, i) => (
+              <li key={i}><b>{f.q}</b><br /><span>{f.a}</span></li>
+            ))}
+          </ul>
+        </details>
+        <div className="mt-4">
+          <b>🔥 {lang === "en" ? "Join the Tribe:" : "Присоединяйся к Tribe:"}</b>
+          <ul className="mt-1 space-y-1">
+            {t.tribe.map((l, i) => (
+              <li key={i}><a href={l.url} target="_blank" rel="noopener noreferrer" className="text-fuchsia-400 underline hover:text-pink-400">{l.label}</a></li>
+            ))}
+          </ul>
+        </div>
+        <p className="text-center mt-6 text-2xl font-bold text-pink-400">{t.ready}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 // --- I18N Translations ---
 const translations = {
@@ -327,6 +464,10 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     >
                         {sectionsCollapsed ? <FaAnglesUp className="w-5 h-5" /> : <FaAnglesDown className="w-5 h-5" />}
                     </button>
+
+                    
+        {/* === NEW: Xuinity + CYBERWTF badge and onboarding block === */}
+        <LangOnboardingBlock lang={lang} />
 
                     {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
