@@ -46,6 +46,11 @@ type ContentItem =
     | { type: 'image'; data: IImageOptions };
 
 
+const ensureArray = (node: any): any[] => {
+    if (!node) return [];
+    return Array.isArray(node) ? node : [node];
+};
+
 /**
  * Extracts structured content (text, formatting, images, lists, tables, hyperlinks) from a DOCX file buffer.
  * This is a more robust, recursive parser.
@@ -63,8 +68,9 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
     const imageRelMap = new Map<string, Buffer>();
     const linkRelMap = new Map<string, string>();
 
-    if (rels[0]?.Relationships?.[0]?.Relationship) {
-        for (const rel of rels[0].Relationships[0].Relationship) {
+    const relationshipNodes = rels[0]?.Relationships?.[0]?.Relationship;
+    if (relationshipNodes) {
+        for (const rel of ensureArray(relationshipNodes)) {
             const relAttrs = rel[':@'];
             if (relAttrs["@_Type"].includes("image")) {
                 const imageFile = zip.file(`word/${relAttrs["@_Target"]}`);
@@ -93,35 +99,43 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
         let style: string | undefined;
 
         if (pPrNode?.["w:pPr"]) {
-            const styleNode = pPrNode["w:pPr"].find((n: any) => n["w:pStyle"]);
+            const pPrChildren = ensureArray(pPrNode["w:pPr"]);
+            const styleNode = pPrChildren.find((n: any) => n["w:pStyle"]);
             const styleVal = styleNode?.["w:pStyle"]?.[0]?.[':@']?.["@_w:val"];
             if(styleVal) {
-                if(styleVal.startsWith("Heading")) headingLevel = styleVal.replace('Heading', 'HEADING_');
+                if(styleVal.startsWith("Heading")) headingLevel = styleVal.replace('Heading', 'HEADING_') as HeadingLevel;
                 else if (styleVal.toLowerCase().includes("quote")) style = 'Quote';
             }
 
-            const numPrNode = pPrNode["w:pPr"].find((n: any) => n["w:numPr"]);
+            const numPrNode = pPrChildren.find((n: any) => n["w:numPr"]);
             if (numPrNode) {
-                const level = numPrNode["w:numPr"]?.[0]?.["w:ilvl"]?.[0]?.[':@']?.["@_w:val"];
+                const numPrChildren = ensureArray(numPrNode["w:numPr"]);
+                const levelNode = numPrChildren.find((n: any) => n["w:ilvl"]);
+                const level = levelNode?.["w:ilvl"]?.[0]?.[':@']?.["@_w:val"];
                 bulletLevel = level !== undefined ? parseInt(level, 10) : 0;
             }
         }
         
         const runs: TextItem[] = [];
-        const contentNodes = pNode["w:p"] || [];
+        const contentNodes = ensureArray(pNode["w:p"]);
 
         for (const node of contentNodes) {
              if (node["w:r"]) { // Standard run
-                const rPr = node["w:r"].find((n: any) => n["w:rPr"])?.["w:rPr"];
-                const text = node["w:r"].find((n: any) => n["w:t"])?.["w:t"]?.[0]?.["#text"] || '';
-                if(text) runs.push({ text, bold: !!rPr?.some((n:any)=>n["w:b"]), italics: !!rPr?.some((n:any)=>n["w:i"]) });
+                const runChildren = ensureArray(node["w:r"]);
+                const rPr = runChildren.find((n: any) => n["w:rPr"])?.["w:rPr"];
+                const rPrChildren = ensureArray(rPr);
+                const text = runChildren.find((n: any) => n["w:t"])?.["w:t"]?.[0]?.["#text"] || '';
+                if(text) runs.push({ text, bold: !!rPrChildren.some((n:any)=>n["w:b"]), italics: !!rPrChildren.some((n:any)=>n["w:i"]) });
              } else if (node["w:hyperlink"]) { // Hyperlink run
-                 const rId = node["w:hyperlink"][0][':@']['@_r:id'];
+                 const hyperlinkChildren = ensureArray(node["w:hyperlink"]);
+                 const rId = hyperlinkChildren[0]?.[':@']?.['@_r:id'];
                  const url = linkRelMap.get(rId);
-                 const linkRun = node["w:hyperlink"][0]['w:r'][0];
-                 const rPr = linkRun['w:rPr'];
-                 const text = linkRun['w:t'][0]['#text'];
-                 if(text) runs.push({text, bold: !!rPr?.['w:b'], italics: !!rPr?.['w:i'], hyperlink: url });
+                 const linkRun = ensureArray(hyperlinkChildren[0]?.['w:r']);
+                 const linkRunChildren = ensureArray(linkRun[0]?.['w:r']);
+                 const rPr = linkRunChildren.find((n: any) => n['w:rPr'])?.['w:rPr'];
+                 const rPrChildren = ensureArray(rPr);
+                 const text = linkRunChildren.find((n: any) => n['w:t'])?.['w:t'][0]['#text'];
+                 if(text) runs.push({text, bold: !!rPrChildren.some((n:any)=>n["w:b"]), italics: !!rPrChildren.some((n:any)=>n["w:i"]), hyperlink: url });
              }
         }
         
@@ -131,23 +145,24 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
     };
     
     if (body) {
-        for (const element of body) {
+        for (const element of ensureArray(body)) {
             if (element["w:p"]) {
                 contentItems.push(parseParagraphContent(element));
             } else if (element["w:tbl"]) {
                 const tableRows: { cells: { runs: TextItem[] }[] }[] = [];
-                const trNodes = element["w:tbl"].filter((n: any) => n["w:tr"]);
+                const trNodes = ensureArray(element["w:tbl"]).filter((n: any) => n["w:tr"]);
                 for (const trNode of trNodes) {
                     const tableCells: { runs: TextItem[] }[] = [];
-                    const tcNodes = trNode["w:tr"].filter((n: any) => n["w:tc"]);
+                    const tcNodes = ensureArray(trNode["w:tr"]).filter((n: any) => n["w:tc"]);
                     for (const tcNode of tcNodes) {
-                         const cellParagraphs = tcNode["w:tc"].filter((n:any) => n["w:p"]);
+                         const cellParagraphs = ensureArray(tcNode["w:tc"]).filter((n:any) => n["w:p"]);
                          const cellRuns: TextItem[] = [];
                          for (const p of cellParagraphs) {
                              const parsedP = parseParagraphContent(p);
-                             cellRuns.push(...parsedP.runs);
-                             // Add newline if it's not the last paragraph in the cell
-                             if (p !== cellParagraphs[cellParagraphs.length -1]) cellRuns.push({text: '\n'});
+                             if ('runs' in parsedP) {
+                                cellRuns.push(...parsedP.runs);
+                                if (p !== cellParagraphs[cellParagraphs.length -1]) cellRuns.push({text: '\n'});
+                             }
                          }
                          tableCells.push({ runs: cellRuns });
                     }
