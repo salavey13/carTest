@@ -132,12 +132,13 @@ export default function ToDocPage() {
                             <Textarea id="orgName" value={orgName} onChange={e => setOrgName(e.target.value)} className="input-cyber mt-1" rows={3}/>
                         </div>
                       </div>
+                       <p className="text-xs text-muted-foreground mt-4"><VibeContentRenderer content="::FaInfoCircle::"/> Поля "Лист" и "Листов" заполняются автоматически самим Word'ом.</p>
                     </div>
 
                     <Button onClick={handleProcessAndSend} disabled={isLoading || !selectedFile} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg">
                         {isLoading 
                             ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Обработка...</> 
-                            : <><VibeContentRenderer content="::FaPoo className='mr-2'::"/> 3. Сгенерировать и отправить в TG</>
+                            : <><VibeContentRenderer content="::FaPaperPlane className='mr-2'::"/> 3. Сгенерировать и отправить в TG</>
                         }
                     </Button>
                 </div>
