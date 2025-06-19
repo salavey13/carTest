@@ -180,8 +180,8 @@ const docxGeneratorCardData: HotLeadData = {
     id: DOCX_GENERATOR_CARD_ID,
     kwork_gig_title: "DOCX Генератор с Колонтитулом",
     client_name: "CyberVibe Tools",
-    ai_summary: "Загружайте DOCX, сохраняйте форматирование и картинки, добавляйте ГОСТ-колонтитул и получайте готовый документ в Telegram.",
-    demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/todoc_hero_v1.png",
+    ai_summary: "От идеи до покупки за день, прямо с телефона. Загрузи DOCX, и система сама разберет его, сохранит текст, картинки, списки и форматирование, добавит ГОСТ-колонтитул и отправит результат в Telegram. Это — следующий шаг эволюции, и он уже здесь.",
+    demo_image_url: "https://images.unsplash.com/photo-1583521214690-73421a1829a9?q=80&w=2070&auto=format&fit=crop",
     potential_earning: `${DOCX_GENERATOR_ACCESS_PRICE_XTR} XTR / ${DOCX_GENERATOR_ACCESS_PRICE_KV} KV`,
     required_quest_id: "none",
     project_type_guess: "Tool/Utility",
@@ -243,6 +243,9 @@ export default function HotVibesClientContent() {
       if (startParamPayload === 'topdf_psycho' || startParamPayload === 'AlexandraSergeevna') {
         effectiveId = PERSONALITY_REPORT_PDF_CARD_ID; 
         logger.info(`[HotVibes InitialIdEffect] 'topdf_psycho' or 'AlexandraSergeevna' startParam detected, targeting PDF Generator card.`);
+      } else if (startParamPayload === 'todoc') {
+          effectiveId = DOCX_GENERATOR_CARD_ID;
+          logger.info(`[HotVibes InitialIdEffect] 'todoc' startParam detected, targeting DOCX Generator card.`);
       }
       
       if (effectiveId) {
@@ -362,7 +365,7 @@ export default function HotVibesClientContent() {
         priceXTR = DOCX_GENERATOR_ACCESS_PRICE_XTR;
         priceKV = DOCX_GENERATOR_ACCESS_PRICE_KV;
         cardType = "tool_access";
-        specificMetadata = { page_link: "/todoc", tool_name: "DOCX Генератор с Колонтитулом" };
+        specificMetadata = { page_link: "/todoc", tool_name: "DOCX Генератор с Колонтитулом", demo_link_param: 'todoc' };
         cardTitle = docxGeneratorCardData.kwork_gig_title!;
         cardDescription = docxGeneratorCardData.ai_summary!;
     } else { 

@@ -1,4 +1,3 @@
-// /components/hotvibes/HotVibeCard.tsx
 "use client";
 
 import React from 'react';
@@ -14,12 +13,15 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { 
     ELON_SIMULATOR_CARD_ID, 
     PERSONALITY_REPORT_PDF_CARD_ID,
+    DOCX_GENERATOR_CARD_ID,
     ELON_SIMULATOR_ACCESS_PRICE_KV,
     PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV,
     MISSION_SUPPORT_PRICE_KV,
     ELON_SIMULATOR_ACCESS_PRICE_XTR,
     PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR,
-    MISSION_SUPPORT_PRICE_XTR
+    MISSION_SUPPORT_PRICE_XTR,
+    DOCX_GENERATOR_ACCESS_PRICE_KV,
+    DOCX_GENERATOR_ACCESS_PRICE_XTR
 } from '@/app/hotvibes/HotVibesClientContent';
 
 export interface HotLeadData {
@@ -73,11 +75,12 @@ export function HotVibeCard({
   const imageToDisplayOnCard = lead.demo_image_url || PLACEHOLDER_IMAGE_CARD;
   const isElonSimulatorCard = lead.id === ELON_SIMULATOR_CARD_ID;
   const isPdfGeneratorCard = lead.id === PERSONALITY_REPORT_PDF_CARD_ID;
+  const isDocxGeneratorCard = lead.id === DOCX_GENERATOR_CARD_ID;
 
   let cardClass = "border-slate-700 bg-slate-800";
   let titleClass = "text-slate-100 group-hover:text-brand-cyan";
   
-  if (isSpecial || isElonSimulatorCard || isPdfGeneratorCard) {
+  if (isSpecial || isElonSimulatorCard || isPdfGeneratorCard || isDocxGeneratorCard) {
     cardClass = "border-amber-500/50 bg-gradient-to-br from-yellow-500 via-amber-600 to-orange-700";
     titleClass = "text-white group-hover:text-yellow-200";
   } else if (isSupported) {
@@ -117,19 +120,25 @@ export function HotVibeCard({
     } else if (isPdfGeneratorCard) {
         priceKV = PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV;
         priceXTR = PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR;
+    } else if (isDocxGeneratorCard) {
+        priceKV = DOCX_GENERATOR_ACCESS_PRICE_KV;
+        priceXTR = DOCX_GENERATOR_ACCESS_PRICE_XTR;
     } else {
         priceKV = MISSION_SUPPORT_PRICE_KV;
         priceXTR = MISSION_SUPPORT_PRICE_XTR;
     }
 
     if (isSupported) {
-        buttonIconName = isSpecial ? "::FaCaretRight::" : "::FaEye::";
-        buttonText = isSpecial ? (translations.goToSimulatorText || "Enter") : (translations.viewDemoText || "View");
         buttonAction = () => onViewVip(lead); 
         buttonSpecificClass = "bg-brand-green text-black hover:brightness-110";
+
+        if (isElonSimulatorCard) { buttonText = translations.goToSimulatorText; buttonIconName = "::FaGamepad::"; }
+        else if (isPdfGeneratorCard) { buttonText = translations.goToPdfGeneratorText; buttonIconName = "::FaFilePdf::"; }
+        else if (isDocxGeneratorCard) { buttonText = translations.goToDocxGeneratorText; buttonIconName = "::FaFileWord::"; }
+        else { buttonText = translations.viewDemoText; buttonIconName = "::FaEye::"; }
+        
     } else {
         buttonIconName = isProcessingThisCard ? "::FaSpinner className='animate-spin'::" : "::FaUnlockKeyhole::";
-        // Compact button text using icons
         buttonText = `::FaBolt:: ${priceKV} / ::FaStar:: ${priceXTR}`;
         buttonSpecificClass = "bg-brand-orange text-white hover:brightness-110";
     }
