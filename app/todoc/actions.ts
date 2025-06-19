@@ -2,7 +2,7 @@
 
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
-import { addColontitulToDocx } from './docProcessor';
+import { generateDocxWithColontitul } from './docProcessor';
 
 // Re-using Telegram logic structure from the provided example
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -12,6 +12,19 @@ interface TelegramApiResponse {
   result?: any;
   description?: string;
   error_code?: number;
+}
+
+interface DocDetailsPayload {
+    razrab?: string;
+    prov?: string;
+    nkontr?: string;
+    utv?: string;
+    docCode: string;
+    lit: string;
+    list: string;
+    listov: string;
+    orgName: string;
+    docTitle: string;
 }
 
 // A generic function to send a document to Telegram
@@ -65,65 +78,41 @@ async function sendTelegramDocument(
   }
 }
 
-export async function processAndSendDocumentAction(
-    formData: FormData,
+export async function generateAndSendDocumentAction(
+    payload: { docContent: string, docDetails: DocDetailsPayload },
     chatId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-    debugLogger.log(`[processAndSendDocumentAction] Initiated for Chat ID: ${chatId}`);
+    debugLogger.log(`[generateAndSendDocumentAction] Initiated for Chat ID: ${chatId}`);
 
     if (!chatId) {
         return { success: false, error: "User chat ID not provided." };
     }
-
-    const file = formData.get("document") as File | null;
-    if (!file) {
-        return { success: false, error: "No document file provided." };
-    }
-
-    // Basic validation
-    if (file.size > 10 * 1024 * 1024) { // 10 MB limit
-        return { success: false, error: "File size exceeds 10MB limit." };
-    }
-    if (!file.name.endsWith('.docx') && !file.name.endsWith('.doc')) {
-        return { success: false, error: "Invalid file type. Please upload a .doc or .docx file." };
-    }
     
-    try {
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
+    if (!payload.docContent.trim()) {
+        return { success: false, error: "Document content cannot be empty." };
+    }
 
-        // These are placeholder details that could be filled in by the user on the page in a future version.
-        const docDetails = {
-            docCode: "РК.ТТ-761.102 ПЗ",
-            razrab: "Иванов И.И.",
-            prov: "Петров П.П.",
-            nkontr: "Сидоров С.С.",
-            utv: "Смирнов А.А.",
-            docTitle: "РЕФЕРАТ",
-            lit: "У",
-            list: "3",
-            listov: "33",
-            orgName: "ВНУ им. В. Даля\nКафедра ТТ\nГруппа ТТ-761"
-        };
+    try {
+        const { docContent, docDetails } = payload;
         
-        const modifiedDocBytes = await addColontitulToDocx(fileBuffer, file.name, docDetails);
+        const generatedDocBytes = await generateDocxWithColontitul(docContent, docDetails);
         
-        const originalFileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-        const newFileName = `PROCESSED_${originalFileNameWithoutExt}.docx`; // Always output .docx
+        const newFileName = `${docDetails.docCode.replace(/[^a-zA-Z0-9-]/g, '_') || 'document'}.docx`;
         
-        const caption = `📄 Ваш обработанный документ готов: *${newFileName}*\n\nВ него был добавлен стандартный колонтитул (основная надпись) согласно ГОСТ\\.`;
+        const caption = `📄 Ваш сгенерированный документ готов: *${newFileName}*\n\nВ него был добавлен настроенный вами колонтитул (основная надпись)\\.`;
         
-        const blob = new Blob([modifiedDocBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const blob = new Blob([generatedDocBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
         const sendResult = await sendTelegramDocument(chatId, blob, newFileName, caption);
 
         if (sendResult.success) {
-            return { success: true, message: `Документ "${newFileName}" успешно обработан и отправлен.` };
+            return { success: true, message: `Документ "${newFileName}" успешно сгенерирован и отправлен.` };
         } else {
             return { success: false, error: `Не удалось отправить документ: ${sendResult.error}` };
         }
 
     } catch (error: any) {
-        logger.error('[processAndSendDocumentAction] Critical error during document processing or sending:', error);
+        logger.error('[generateAndSendDocumentAction] Critical error during document generation or sending:', error);
         const errorMsg = error instanceof Error ? error.message : 'Unexpected server error during document processing.';
         return { success: false, error: errorMsg };
     }
