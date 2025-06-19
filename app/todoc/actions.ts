@@ -89,12 +89,6 @@ export async function processAndSendDocumentAction(
     }
     
     try {
-        // In a real app with .doc support, you would first convert .doc to .docx
-        // using a tool like LibreOffice/unoconv on the server.
-        if (file.name.endsWith('.doc')) {
-            logger.warn(`[processAndSendDocumentAction] Received a .doc file. Real implementation would require conversion to .docx first. Proceeding with simulation.`);
-        }
-
         const fileBuffer = Buffer.from(await file.arrayBuffer());
 
         // These are placeholder details that could be filled in by the user on the page in a future version.
@@ -104,13 +98,14 @@ export async function processAndSendDocumentAction(
             prov: "Петров П.П.",
             nkontr: "Сидоров С.С.",
             utv: "Смирнов А.А.",
+            docTitle: "РЕФЕРАТ",
             lit: "У",
             list: "3",
             listov: "33",
-            orgName: "ВНУ им. В. Даля"
+            orgName: "ВНУ им. В. Даля\nКафедра ТТ\nГруппа ТТ-761"
         };
         
-        const modifiedDocBytes = await addColontitulToDocx(fileBuffer, docDetails);
+        const modifiedDocBytes = await addColontitulToDocx(fileBuffer, file.name, docDetails);
         
         const originalFileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
         const newFileName = `PROCESSED_${originalFileNameWithoutExt}.docx`; // Always output .docx
