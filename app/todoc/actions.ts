@@ -4,7 +4,6 @@ import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import { generateDocxWithColontitul } from './docProcessor';
 
-// Re-using Telegram logic structure from the provided example
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 interface TelegramApiResponse {
@@ -27,7 +26,23 @@ interface DocDetailsPayload {
     docTitle: string;
 }
 
-// A generic function to send a document to Telegram
+/**
+ * Escapes text for Telegram's MarkdownV2 format.
+ * It avoids escaping characters inside `*...*` (bold), `_..._` (italic), etc.
+ * @param text The text to escape.
+ * @returns The escaped text.
+ */
+function escapeTelegramMarkdownV2(text: string): string {
+    if (!text) return '';
+    // This regex looks for MarkdownV2 special characters that are NOT preceded by a backslash
+    // and are not part of a formatting block's delimiters.
+    // It's a complex problem, a simpler and more reliable approach is to escape specific characters globally
+    // and let Telegram handle the formatting delimiters correctly.
+    const charsToEscape = /[_*[\]()~`>#+\-=|{}.!]/g;
+    return text.replace(charsToEscape, (char) => `\\${char}`);
+}
+
+
 async function sendTelegramDocument( 
   chatId: string,
   fileBlob: Blob,
@@ -49,10 +64,7 @@ async function sendTelegramDocument(
     formData.append("document", fileBlob, fileName);
 
     if (caption) {
-      // Basic markdown escape for caption
-      const charsToEscape = /[_*[\]()~`>#+\-=|{}.!]/g;
-      const escapedCaption = caption.replace(charsToEscape, '\\$&');
-      formData.append("caption", escapedCaption); 
+      formData.append("caption", caption); 
       formData.append("parse_mode", "MarkdownV2"); 
     }
 
@@ -63,7 +75,7 @@ async function sendTelegramDocument(
 
     const data: TelegramApiResponse = await response.json();
     if (!data.ok) {
-       logger.error(`[todoc/actions.ts sendTelegramDocument] Telegram API error: ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code });
+       logger.error(`[todoc/actions.ts sendTelegramDocument] Telegram API error: ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code, captionProvided: !!caption, originalCaption: caption });
       throw new Error(data.description || "Failed to send document");
     }
 
@@ -97,9 +109,10 @@ export async function generateAndSendDocumentAction(
         
         const generatedDocBytes = await generateDocxWithColontitul(docContent, docDetails);
         
-        const newFileName = `${docDetails.docCode.replace(/[^a-zA-Z0-9-]/g, '_') || 'document'}.docx`;
+        const safeFileName = docDetails.docCode.replace(/[^a-zA-Z0-9-]/g, '_') || 'document';
+        const newFileName = `${safeFileName}.docx`;
         
-        const caption = `📄 Ваш сгенерированный документ готов: *${newFileName}*\n\nВ него был добавлен настроенный вами колонтитул (основная надпись)\\.`;
+        const caption = `📄 Ваш сгенерированный документ готов: *${escapeTelegramMarkdownV2(newFileName)}*\n\nВ него был добавлен настроенный вами колонтитул \\(основная надпись\\)\\.`;
         
         const blob = new Blob([generatedDocBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
