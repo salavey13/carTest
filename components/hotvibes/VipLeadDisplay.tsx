@@ -239,7 +239,22 @@ export function VipLeadDisplay({
       {/* --- CONTENT SECTION --- */}
       <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 font-mono">
         
-        {!isSpecialCard && (
+        {isSpecialCard ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                <div className="flex flex-col">
+                    <span className="text-xs text-slate-400 uppercase tracking-wider">Цена</span>
+                    <span className="font-semibold text-brand-lime mt-1">{lead.potential_earning || '-'}</span>
+                </div>
+                 <div className="flex flex-col">
+                    <span className="text-xs text-slate-400 uppercase tracking-wider">{t.taskType}</span>
+                    <span className="font-semibold text-white mt-1">{lead.project_type_guess || '-'}</span>
+                </div>
+                 <div className="flex flex-col">
+                    <span className="text-xs text-slate-400 uppercase tracking-wider">{t.requiredSkill}</span>
+                    <span className="font-semibold text-brand-orange mt-1">{lead.required_quest_id !== 'none' ? lead.required_quest_id : 'None'}</span>
+                </div>
+            </div>
+        ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div className="flex flex-col">
                     <span className="text-xs text-slate-400 uppercase tracking-wider">{t.budget}</span>
