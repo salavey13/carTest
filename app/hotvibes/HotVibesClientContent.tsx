@@ -32,9 +32,15 @@ export const ELON_SIMULATOR_ACCESS_PRICE_XTR = 13;
 export const ELON_SIMULATOR_ACCESS_PRICE_KV = 100;
 export const MISSION_SUPPORT_PRICE_XTR = 13; 
 export const MISSION_SUPPORT_PRICE_KV = 100;
+
 export const PERSONALITY_REPORT_PDF_CARD_ID = "personality_pdf_generator_v1";
 export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR = 7;
 export const PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV = 50;
+
+export const DOCX_GENERATOR_CARD_ID = "docx_generator_v1";
+export const DOCX_GENERATOR_ACCESS_PRICE_XTR = 7;
+export const DOCX_GENERATOR_ACCESS_PRICE_KV = 50;
+
 export const RUB_TO_XTR_RATE = 1 / 4.2; 
 
 const pageTranslations = {
@@ -52,10 +58,12 @@ const pageTranslations = {
         supportMissionBtnText: `Поддержать за ${MISSION_SUPPORT_PRICE_XTR} XTR / ${MISSION_SUPPORT_PRICE_KV} KV`,
         elonSimulatorAccessBtnText: `Доступ: ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR / ${ELON_SIMULATOR_ACCESS_PRICE_KV} KV`,
         pdfGeneratorAccessBtnText: `Доступ: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`,
+        docxGeneratorAccessBtnText: `Доступ: ${DOCX_GENERATOR_ACCESS_PRICE_XTR} XTR / ${DOCX_GENERATOR_ACCESS_PRICE_KV} KV`,
         supportedText: "Поддержано",
         viewDemoText: "Смотреть Демо",
         goToSimulatorText: "К Симулятору Маска",
         goToPdfGeneratorText: "К PDF Генератору",
+        goToDocxGeneratorText: "К DOCX Генератору",
         filterAll: "Все Вайбы",
         filterSupported: "Мои ПротоКарты",
         backToLobby: "::FaArrowLeft:: К Лобби Вайбов",
@@ -76,10 +84,12 @@ const pageTranslations = {
         supportMissionBtnText: `Support for ${MISSION_SUPPORT_PRICE_XTR} XTR / ${MISSION_SUPPORT_PRICE_KV} KV`,
         elonSimulatorAccessBtnText: `Access: ${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR / ${ELON_SIMULATOR_ACCESS_PRICE_KV} KV`,
         pdfGeneratorAccessBtnText: `Access: ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`,
+        docxGeneratorAccessBtnText: `Access: ${DOCX_GENERATOR_ACCESS_PRICE_XTR} XTR / ${DOCX_GENERATOR_ACCESS_PRICE_KV} KV`,
         supportedText: "Supported",
         viewDemoText: "View Demo",
         goToSimulatorText: "To Musk Simulator",
         goToPdfGeneratorText: "To PDF Generator",
+        goToDocxGeneratorText: "To DOCX Generator",
         filterAll: "All Vibes",
         filterSupported: "My ProtoCards",
         backToLobby: "::FaArrowLeft:: Back to Lobby",
@@ -144,8 +154,8 @@ const elonSimulatorProtoCardData: HotLeadData = {
     id: ELON_SIMULATOR_CARD_ID,
     kwork_gig_title: "Симулятор 'Рынка Маска'",
     client_name: "CyberVibe Games",
-    ai_summary: "Узнай, как твиты и новости влияют на (фантомные) акции Tesla. Почувствуй VIBE нестабильности за XTR!",
-    demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/elon_musk_meme_cybertruck_flames.png", 
+    ai_summary: "Играй на (фантомных) акциях Tesla, реагируй на твиты Маска, следи за новостями и ищи арбитражные возможности между биржами. Почувствуй VIBE нестабильности за XTR!",
+    demo_image_url: "https://images.unsplash.com/photo-1639322537228-f710d846310a?q=80&w=1932&auto=format&fit=crop", 
     potential_earning: `${ELON_SIMULATOR_ACCESS_PRICE_XTR} XTR / ${ELON_SIMULATOR_ACCESS_PRICE_KV} KV`,
     required_quest_id: "none", 
     project_type_guess: "XTR Game/Simulator",
@@ -157,13 +167,26 @@ const personalityPdfGeneratorCardData: HotLeadData = {
     id: PERSONALITY_REPORT_PDF_CARD_ID,
     kwork_gig_title: "Генератор PDF: Расшифровка Личности",
     client_name: "PsychoVibe Tools", 
-    ai_summary: "Создавай персонализированные PDF-отчеты для психологической расшифровки. Вводи данные, получай результат для AI, генерируй PDF.",
-    demo_image_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/page-specific-assets/topdf_hero_psycho_v3_wide.png", 
+    ai_summary: "Пройди опрос и получи детальный психологический портрет в формате PDF. Узнай свои сильные стороны и зоны роста с помощью AI.",
+    demo_image_url: "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?q=80&w=1974&auto=format&fit=crop", 
     potential_earning: `${PERSONALITY_REPORT_PDF_ACCESS_PRICE_XTR} XTR / ${PERSONALITY_REPORT_PDF_ACCESS_PRICE_KV} KV`,
     required_quest_id: "none",
     project_type_guess: "Tool/Utility",
     status: "active_tool",
     notes: "/topdf" 
+};
+
+const docxGeneratorCardData: HotLeadData = {
+    id: DOCX_GENERATOR_CARD_ID,
+    kwork_gig_title: "DOCX Генератор с Колонтитулом",
+    client_name: "CyberVibe Tools",
+    ai_summary: "От идеи до покупки за день, прямо с телефона. Загрузи DOCX, и система сама разберет его, сохранит текст, картинки, списки и форматирование, добавит ГОСТ-колонтитул и отправит результат в Telegram. Это — следующий шаг эволюции, и он уже здесь.",
+    demo_image_url: "https://images.unsplash.com/photo-1583521214690-73421a1829a9?q=80&w=2070&auto=format&fit=crop",
+    potential_earning: `${DOCX_GENERATOR_ACCESS_PRICE_XTR} XTR / ${DOCX_GENERATOR_ACCESS_PRICE_KV} KV`,
+    required_quest_id: "none",
+    project_type_guess: "Tool/Utility",
+    status: "active_tool",
+    notes: "/todoc"
 };
 
 export default function HotVibesClientContent() {
@@ -220,6 +243,9 @@ export default function HotVibesClientContent() {
       if (startParamPayload === 'topdf_psycho' || startParamPayload === 'AlexandraSergeevna') {
         effectiveId = PERSONALITY_REPORT_PDF_CARD_ID; 
         logger.info(`[HotVibes InitialIdEffect] 'topdf_psycho' or 'AlexandraSergeevna' startParam detected, targeting PDF Generator card.`);
+      } else if (startParamPayload === 'todoc') {
+          effectiveId = DOCX_GENERATOR_CARD_ID;
+          logger.info(`[HotVibes InitialIdEffect] 'todoc' startParam detected, targeting DOCX Generator card.`);
       }
       
       if (effectiveId) {
@@ -256,6 +282,8 @@ export default function HotVibesClientContent() {
             foundVip = elonSimulatorProtoCardData;
         } else if (targetVipIdentifier === PERSONALITY_REPORT_PDF_CARD_ID) {
             foundVip = personalityPdfGeneratorCardData;
+        } else if (targetVipIdentifier === DOCX_GENERATOR_CARD_ID) {
+            foundVip = docxGeneratorCardData;
         } else {
             foundVip = allFetchedLeads.find(l => l.id === targetVipIdentifier || l.client_name === targetVipIdentifier) || null;
             if (!foundVip) {
@@ -333,6 +361,13 @@ export default function HotVibesClientContent() {
         specificMetadata = { page_link: "/topdf", tool_name: "AI Генератор PDF Отчетов" };
         cardTitle = personalityPdfGeneratorCardData.kwork_gig_title!;
         cardDescription = personalityPdfGeneratorCardData.ai_summary!;
+    } else if (cardToPurchase.id === DOCX_GENERATOR_CARD_ID) {
+        priceXTR = DOCX_GENERATOR_ACCESS_PRICE_XTR;
+        priceKV = DOCX_GENERATOR_ACCESS_PRICE_KV;
+        cardType = "tool_access";
+        specificMetadata = { page_link: "/todoc", tool_name: "DOCX Генератор с Колонтитулом", demo_link_param: 'todoc' };
+        cardTitle = docxGeneratorCardData.kwork_gig_title!;
+        cardDescription = docxGeneratorCardData.ai_summary!;
     } else { 
         priceXTR = MISSION_SUPPORT_PRICE_XTR;
         priceKV = MISSION_SUPPORT_PRICE_KV;
@@ -383,6 +418,7 @@ export default function HotVibesClientContent() {
 
     if (leadId === PERSONALITY_REPORT_PDF_CARD_ID) navTarget = "/topdf";
     else if (leadId === ELON_SIMULATOR_CARD_ID) navTarget = "/elon";
+    else if (leadId === DOCX_GENERATOR_CARD_ID) navTarget = "/todoc";
     
     if (typeof navTarget === 'string' && navTarget.startsWith('/')) {
         logger.info(`[HotVibes ExecuteMission] Navigating directly to internal path: ${navTarget} for lead ${leadId}`);
@@ -426,14 +462,16 @@ export default function HotVibesClientContent() {
   const displayedLeads = useMemo(() => {
     const elonCardWithStatus = { ...elonSimulatorProtoCardData, isSpecial: true, isSupported: getIsSupported(ELON_SIMULATOR_CARD_ID) };
     const pdfGenCardWithStatus = { ...personalityPdfGeneratorCardData, isSpecial: true, isSupported: getIsSupported(PERSONALITY_REPORT_PDF_CARD_ID) };
+    const docxGenCardWithStatus = { ...docxGeneratorCardData, isSpecial: true, isSupported: getIsSupported(DOCX_GENERATOR_CARD_ID) };
 
     let currentLobbyLeads = lobbyLeads.map(lead => ({ ...lead, isSpecial: false, isSupported: getIsSupported(lead.id) }));
 
     let filteredForDisplay: Array<HotLeadData & {isSpecial?:boolean, isSupported?:boolean}> = [];
-    const specialCardIds = [ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID];
+    const specialCardIds = [ELON_SIMULATOR_CARD_ID, PERSONALITY_REPORT_PDF_CARD_ID, DOCX_GENERATOR_CARD_ID];
 
     if (activeFilter === 'supported') {
         filteredForDisplay = currentLobbyLeads.filter(l => l.isSupported && !specialCardIds.includes(l.id));
+        if (docxGenCardWithStatus.isSupported) filteredForDisplay.unshift(docxGenCardWithStatus);
         if (pdfGenCardWithStatus.isSupported) filteredForDisplay.unshift(pdfGenCardWithStatus);
         if (elonCardWithStatus.isSupported) filteredForDisplay.unshift(elonCardWithStatus);
     } else { 
@@ -442,7 +480,7 @@ export default function HotVibesClientContent() {
             : isAuthenticated ? [] : currentLobbyLeads;
         
         const lobbyWithoutSpecial = baseFilteredLobby.filter(l => !specialCardIds.includes(l.id));
-        filteredForDisplay = [elonCardWithStatus, pdfGenCardWithStatus, ...lobbyWithoutSpecial];
+        filteredForDisplay = [elonCardWithStatus, pdfGenCardWithStatus, docxGenCardWithStatus, ...lobbyWithoutSpecial];
     }
     
     logger.info(`[HotVibes displayedLeads] Memo re-calc. Filter: ${activeFilter}, Lobby size: ${lobbyLeads.length}, Output count: ${filteredForDisplay.length}`);
