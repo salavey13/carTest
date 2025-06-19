@@ -41,7 +41,6 @@ function transliterate(text: string): string {
     return text.toLowerCase().split('').map(char => translitMap[char] || char).join('');
 }
 
-
 async function sendTelegramDocument( 
   chatId: string,
   fileBlob: Blob,
@@ -77,59 +76,72 @@ async function sendTelegramDocument(
   }
 }
 
+async function processDocument(formData: FormData): Promise<{ docBytes: Uint8Array, fileName: string }> {
+    const file = formData.get("document") as File | null;
+    if (!file) {
+        throw new Error("Document file not provided.");
+    }
+    if (!file.name.endsWith('.docx')) {
+        throw new Error("Only .docx files are supported.");
+    }
+
+    const docDetails: DocDetailsPayload = {
+        docCode: formData.get('docCode') as string || '',
+        docTitle: formData.get('docTitle') as string || '',
+        razrab: formData.get('razrab') as string || '',
+        prov: formData.get('prov') as string || '',
+        nkontr: formData.get('nkontr') as string || '',
+        utv: formData.get('utv') as string || '',
+        lit: formData.get('lit') as string || '',
+        orgName: formData.get('orgName') as string || '',
+    };
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const generatedDocBytes = await generateDocxWithColontitul(fileBuffer, docDetails);
+    
+    const transliteratedTitle = transliterate(docDetails.docTitle).replace(/[^a-z0-9-]/g, '_');
+    const originalFileNameWithoutExt = file.name.replace(/\.docx$/, '');
+    const newFileName = `PROCESSED_${transliteratedTitle || originalFileNameWithoutExt}.docx`;
+
+    return { docBytes: generatedDocBytes, fileName: newFileName };
+}
+
 export async function processAndSendDocumentAction(
     formData: FormData,
     chatId: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
     debugLogger.log(`[processAndSendDocumentAction] Initiated for Chat ID: ${chatId}`);
-
-    if (!chatId) {
-        return { success: false, error: "User chat ID not provided." };
-    }
-    
-    const file = formData.get("document") as File | null;
-    if (!file) {
-        return { success: false, error: "Document file not provided." };
-    }
-     if (!file.name.endsWith('.docx')) {
-        return { success: false, error: "Only .docx files are supported." };
-    }
+    if (!chatId) return { success: false, error: "User chat ID not provided." };
 
     try {
-        const docDetails: DocDetailsPayload = {
-            docCode: formData.get('docCode') as string || '',
-            docTitle: formData.get('docTitle') as string || '',
-            razrab: formData.get('razrab') as string || '',
-            prov: formData.get('prov') as string || '',
-            nkontr: formData.get('nkontr') as string || '',
-            utv: formData.get('utv') as string || '',
-            lit: formData.get('lit') as string || '',
-            orgName: formData.get('orgName') as string || '',
-        };
-
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
-        
-        const generatedDocBytes = await generateDocxWithColontitul(fileBuffer, docDetails);
-        
-        const transliteratedTitle = transliterate(docDetails.docTitle).replace(/[^a-z0-9-]/g, '_');
-        const originalFileNameWithoutExt = file.name.replace(/\.docx$/, '');
-        const newFileName = `PROCESSED_${transliteratedTitle || originalFileNameWithoutExt}.docx`;
-        
-        const caption = `📄 Ваш обработанный документ готов: *${escapeTelegramMarkdownV2(newFileName)}*\n\nВ него был добавлен настроенный вами колонтитул и сохранены все изображения и текст\\.`;
-        
-        const blob = new Blob([generatedDocBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-        const sendResult = await sendTelegramDocument(chatId, blob, newFileName, caption);
+        const { docBytes, fileName } = await processDocument(formData);
+        const caption = `📄 Ваш обработанный документ готов: *${escapeTelegramMarkdownV2(fileName)}*\n\nВ него был добавлен настроенный вами колонтитул и сохранены все изображения и текст\\.`;
+        const blob = new Blob([docBytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const sendResult = await sendTelegramDocument(chatId, blob, fileName, caption);
 
         if (sendResult.success) {
-            return { success: true, message: `Документ "${newFileName}" успешно сгенерирован и отправлен.` };
+            return { success: true, message: `Документ "${fileName}" успешно сгенерирован и отправлен.` };
         } else {
             return { success: false, error: `Не удалось отправить документ: ${sendResult.error}` };
         }
 
     } catch (error: any) {
-        logger.error('[processAndSendDocumentAction] Critical error during document generation or sending:', error);
-        const errorMsg = error instanceof Error ? error.message : 'Unexpected server error during document processing.';
-        return { success: false, error: errorMsg };
+        logger.error('[processAndSendDocumentAction] Critical error:', error);
+        return { success: false, error: error.message || 'Unexpected server error.' };
+    }
+}
+
+
+export async function generateAndReturnDocxAction(
+    formData: FormData
+): Promise<{ success: boolean; fileContent?: string; fileName?: string; error?: string }> {
+    debugLogger.log(`[generateAndReturnDocxAction] Initiated for download.`);
+    try {
+        const { docBytes, fileName } = await processDocument(formData);
+        const base64Content = Buffer.from(docBytes).toString('base64');
+        return { success: true, fileContent: base64Content, fileName };
+    } catch (error: any) {
+        logger.error('[generateAndReturnDocxAction] Critical error:', error);
+        return { success: false, error: error.message || 'Unexpected server error.' };
     }
 }

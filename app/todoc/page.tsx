@@ -1,9 +1,8 @@
-// /app/todoc/page.tsx
 "use client";
 
 import React, { useState, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { processAndSendDocumentAction } from '@/app/todoc/actions';
+import { processAndSendDocumentAction, generateAndReturnDocxAction } from '@/app/todoc/actions';
 import { logger } from '@/lib/logger';
 import { Toaster, toast } from 'sonner';
 import { cn } from "@/lib/utils";
@@ -13,6 +12,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
+import { saveAs } from 'file-saver';
+
+// Helper to download blob from base64
+const downloadBlob = (base64Data: string, fileName: string, contentType: string) => {
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: contentType });
+    saveAs(blob, fileName);
+};
+
 
 export default function ToDocPage() {
     const { user, isAuthenticated, isLoading: appContextLoading } = useAppContext();
@@ -47,21 +60,9 @@ export default function ToDocPage() {
         setSelectedFile(file);
     };
 
-    const handleProcessAndSend = async () => {
-        if (!selectedFile) {
-            toast.error('Пожалуйста, выберите .docx файл для обработки.');
-            return;
-        }
-        if (!user?.id) {
-            toast.error('Информация о пользователе недоступна. Убедитесь, что вы авторизованы через Telegram.');
-            return;
-        }
-
-        setIsLoading(true);
-        toast.loading('Обработка DOCX файла... Это может занять некоторое время.', { id: 'doc-processing-toast' });
-
+    const createFormData = (): FormData => {
         const formData = new FormData();
-        formData.append('document', selectedFile);
+        if(selectedFile) formData.append('document', selectedFile);
         formData.append('docCode', docCode);
         formData.append('docTitle', docTitle);
         formData.append('razrab', razrab);
@@ -70,23 +71,52 @@ export default function ToDocPage() {
         formData.append('utv', utv);
         formData.append('lit', lit);
         formData.append('orgName', orgName);
-        
-        try {
-            const result = await processAndSendDocumentAction(formData, String(user.id));
+        return formData;
+    }
 
-            if (result.success) {
-                toast.success(result.message || 'Документ успешно обработан и отправлен в Telegram!', { id: 'doc-processing-toast' });
-            } else {
-                toast.error(result.error || 'Произошла неизвестная ошибка.', { id: 'doc-processing-toast', duration: 8000 });
-            }
+    const handleProcessAndSend = async () => {
+        if (!selectedFile) { toast.error('Пожалуйста, выберите .docx файл.'); return; }
+        if (!user?.id) { toast.error('Необходима авторизация через Telegram.'); return; }
+
+        setIsLoading(true);
+        const toastId = "doc-processing-send";
+        toast.loading('Обработка и отправка в Telegram...', { id: toastId });
+
+        try {
+            const result = await processAndSendDocumentAction(createFormData(), String(user.id));
+            if (result.success) toast.success(result.message || 'Документ успешно отправлен!', { id: toastId });
+            else toast.error(result.error || 'Произошла ошибка.', { id: toastId, duration: 8000 });
         } catch (error) {
-            logger.error('[ToDocPage] Error calling action:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Непредвиденная ошибка на клиенте.';
-            toast.error(errorMessage, { id: 'doc-processing-toast', duration: 8000 });
+            logger.error('[ToDocPage Send] Error:', error);
+            toast.error(error instanceof Error ? error.message : 'Непредвиденная ошибка.', { id: toastId, duration: 8000 });
         } finally {
             setIsLoading(false);
         }
     };
+
+    const handleProcessAndDownload = async () => {
+        if (!selectedFile) { toast.error('Пожалуйста, выберите .docx файл.'); return; }
+
+        setIsLoading(true);
+        const toastId = "doc-processing-download";
+        toast.loading('Генерация документа для скачивания...', { id: toastId });
+        
+        try {
+            const result = await generateAndReturnDocxAction(createFormData());
+            if (result.success && result.fileContent && result.fileName) {
+                downloadBlob(result.fileContent, result.fileName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                toast.success('Загрузка началась!', { id: toastId });
+            } else {
+                 toast.error(result.error || 'Произошла ошибка.', { id: toastId, duration: 8000 });
+            }
+        } catch (error) {
+            logger.error('[ToDocPage Download] Error:', error);
+            toast.error(error instanceof Error ? error.message : 'Непредвиденная ошибка.', { id: toastId, duration: 8000 });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
 
     if (appContextLoading) return ( <div className="flex flex-col justify-center items-center min-h-screen"><VibeContentRenderer content="::FaSpinner className='animate-spin text-brand-purple text-4xl'::" /><span className="mt-4">Загрузка...</span></div> );
     if (!isAuthenticated) return ( <div className="min-h-screen flex flex-col items-center justify-center text-center p-6"><VibeContentRenderer content="::FaLock className='text-7xl text-brand-red mb-6'::" /> <h1 className="text-3xl font-bold mb-4">Доступ закрыт</h1> <p className="mb-8">Пожалуйста, авторизуйтесь через Telegram.</p> <Link href="/"><Button variant="outline">На главную</Button></Link> </div> );
@@ -117,30 +147,44 @@ export default function ToDocPage() {
                         </div>
                     </div>
 
-                    <div className="border-t border-border/50 pt-6">
-                      <h3 className="text-lg font-semibold mb-4">2. Настройте данные колонтитула</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <div><Label htmlFor="docCode">Код документа</Label><Input id="docCode" value={docCode} onChange={e => setDocCode(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div><Label htmlFor="docTitle">Название документа</Label><Input id="docTitle" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div><Label htmlFor="razrab">Разработал</Label><Input id="razrab" value={razrab} onChange={e => setRazrab(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div><Label htmlFor="prov">Проверил</Label><Input id="prov" value={prov} onChange={e => setProv(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div><Label htmlFor="nkontr">Н. контроль</Label><Input id="nkontr" value={nkontr} onChange={e => setNkontr(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div><Label htmlFor="utv">Утвердил</Label><Input id="utv" value={utv} onChange={e => setUtv(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div><Label htmlFor="lit">Лит.</Label><Input id="lit" value={lit} onChange={e => setLit(e.target.value)} className="input-cyber mt-1"/></div>
-                        <div className="sm:col-span-2 md:col-span-3">
-                            <Label htmlFor="orgName">Организация (каждая строка с новой строки)</Label>
-                            <Textarea id="orgName" value={orgName} onChange={e => setOrgName(e.target.value)} className="input-cyber mt-1" rows={3}/>
-                        </div>
-                      </div>
-                       <p className="text-xs text-muted-foreground mt-4"><VibeContentRenderer content="::FaCircleInfo::"/> Поля "Лист" и "Листов" заполняются автоматически самим Word'ом.</p>
-                    </div>
 
-                    <Button onClick={handleProcessAndSend} disabled={isLoading || !selectedFile} size="lg" className="w-full bg-brand-gradient-purple-blue text-white font-semibold py-3 text-lg">
-                        {isLoading 
-                            ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> Обработка...</> 
-                            : <><VibeContentRenderer content="::FaPlane className='mr-2'::"/> 3. Сгенерировать и отправить в TG</>
-                        }
-                    </Button>
+                    <details className="border-t border-border/50 pt-6 group">
+                        <summary className="text-lg font-semibold list-none cursor-pointer flex items-center justify-between hover:text-brand-cyan transition-colors">
+                            <span><VibeContentRenderer content="::FaSliders::"/> 2. Настройте данные колонтитула (опционально)</span>
+                            <VibeContentRenderer content="::FaChevronDown className='transition-transform group-open:rotate-180'::" />
+                        </summary>
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <div><Label htmlFor="docCode">Код документа</Label><Input id="docCode" value={docCode} onChange={e => setDocCode(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div><Label htmlFor="docTitle">Название документа</Label><Input id="docTitle" value={docTitle} onChange={e => setDocTitle(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div><Label htmlFor="razrab">Разработал</Label><Input id="razrab" value={razrab} onChange={e => setRazrab(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div><Label htmlFor="prov">Проверил</Label><Input id="prov" value={prov} onChange={e => setProv(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div><Label htmlFor="nkontr">Н. контроль</Label><Input id="nkontr" value={nkontr} onChange={e => setNkontr(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div><Label htmlFor="utv">Утвердил</Label><Input id="utv" value={utv} onChange={e => setUtv(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div><Label htmlFor="lit">Лит.</Label><Input id="lit" value={lit} onChange={e => setLit(e.target.value)} className="input-cyber mt-1"/></div>
+                            <div className="sm:col-span-2 md:col-span-3">
+                                <Label htmlFor="orgName">Организация (каждая строка с новой строки)</Label>
+                                <Textarea id="orgName" value={orgName} onChange={e => setOrgName(e.target.value)} className="input-cyber mt-1" rows={3}/>
+                            </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-4"><VibeContentRenderer content="::FaCircleInfo::"/> Поля "Лист" и "Листов" заполняются автоматически самим Word'ом.</p>
+                    </details>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border/50">
+                        <Button onClick={handleProcessAndDownload} disabled={isLoading || !selectedFile} variant="outline" className="flex-1">
+                            {isLoading 
+                                ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/>
+                                : <VibeContentRenderer content="::FaDownload className='mr-2'::"/>
+                            }
+                            Сгенерировать и Скачать
+                        </Button>
+                        <Button onClick={handleProcessAndSend} disabled={isLoading || !selectedFile} className="flex-1 bg-brand-gradient-purple-blue text-white">
+                            {isLoading 
+                                ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::"/> 
+                                : <VibeContentRenderer content="::FaPlane className='mr-2'::"/>
+                            }
+                            Отправить в TG
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>
