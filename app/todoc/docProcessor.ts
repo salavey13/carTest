@@ -43,7 +43,6 @@ type ContentItem =
     | { type: 'list_item'; level: number; runs: TextItem[] }
     | { type: 'image'; data: IImageOptions };
 
-
 /**
  * Extracts structured content (text with formatting, images, lists, headings) from a DOCX file buffer.
  * @param docxBuffer The buffer of the uploaded .docx file.
@@ -97,8 +96,10 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
 
                     const numPrNode = pPr.find((n: any) => n["w:numPr"]);
                     if (numPrNode) {
-                        const levelNode = numPrNode["w:numPr"].find((n: any) => n["w:ilvl"]);
-                        bulletLevel = levelNode ? parseInt(levelNode["w:ilvl"][0]["@_w:val"], 10) : 0;
+                        const levelNode = numPrNode["w:numPr"]?.find((n: any) => n["w:ilvl"]);
+                        // FIX: Added safe navigation to prevent crash
+                        const level = levelNode?.["w:ilvl"]?.[0]?.["@_w:val"];
+                        bulletLevel = level !== undefined ? parseInt(level, 10) : 0;
                     }
                 }
                 
@@ -112,9 +113,12 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
                     const isItalic = !!rPr?.some((n: any) => n["w:i"]);
                     
                     for (const child of rNode["w:r"]) {
-                        if (child["w:t"] && child["w:t"][0]?.["#text"]) {
-                            runs.push({ text: child["w:t"][0]["#text"], bold: isBold, italics: isItalic });
+                        // FIX: Safely access text content, defaulting to empty string
+                        const textContent = child["w:t"]?.[0]?.["#text"] || '';
+                        if (textContent) {
+                            runs.push({ text: textContent, bold: isBold, italics: isItalic });
                         }
+
                         if (child["w:drawing"]) {
                              const blip = child["w:drawing"]?.[0]?.["wp:inline"]?.[0]?.["a:graphic"]?.[0]?.["a:graphicData"]?.[0]?.["pic:pic"]?.[0]?.["pic:blipFill"]?.[0]?.["a:blip"]?.[0];
                              const rId = blip?.["@_r:embed"];
@@ -132,6 +136,9 @@ async function extractStructuredContentFromDocx(docxBuffer: Buffer): Promise<Con
                      if (headingLevel) contentItems.push({ type: 'heading', level: headingLevel, runs });
                      else if (bulletLevel !== undefined) contentItems.push({ type: 'list_item', level: bulletLevel, runs });
                      else contentItems.push({ type: 'paragraph', runs, style });
+                } else if (runNodes.length === 0) {
+                    // Handle empty paragraphs to preserve line breaks
+                    contentItems.push({ type: 'paragraph', runs: [{ text: '' }] });
                 }
             }
         }
