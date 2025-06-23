@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const log = (message: string, data?: any) => console.log(`[fetch-market-data] ${new Date().toISOString()}: ${message}`, data || '');
 
@@ -16,7 +16,7 @@ interface MarketData {
 
 const SYMBOLS_TO_MONITOR = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
-// --- Data Fetching Functions for Deno Runtime ---
+// --- Data Fetching Functions ---
 async function fetchBinanceData(): Promise<MarketData[]> {
     const results: MarketData[] = [];
     for (const symbol of SYMBOLS_TO_MONITOR) {
@@ -73,10 +73,8 @@ async function fetchBybitData(): Promise<MarketData[]> {
     return results;
 }
 
-
 // --- Main Server Logic ---
-serve(async (req) => {
-  // 1. --- Authorization Check ---
+Deno.serve(async (req) => {
   const CRON_SECRET = Deno.env.get('CRON_SECRET');
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -90,7 +88,6 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // 2. --- Fetch Data ---
     log("Starting data fetch from exchanges...");
     const [binanceData, bybitData] = await Promise.all([fetchBinanceData(), fetchBybitData()]);
     const allMarketData = [...binanceData, ...bybitData];
@@ -100,7 +97,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, message: 'No data fetched, nothing to insert.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
-    // 3. --- Insert Data ---
     const { error } = await supabaseAdmin.from('market_data').insert(allMarketData);
     if (error) {
         log('Supabase insert error:', error);
