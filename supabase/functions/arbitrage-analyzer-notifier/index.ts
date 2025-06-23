@@ -1,8 +1,8 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const log = (message: string, data?: any) => {
-  console.log(`[analyzer-notifier] ${new Date().toISOString()}: ${message}`, data || '');
+  console.log(`[arbitrage-analyzer-notifier] ${new Date().toISOString()}: ${message}`, data || '');
 };
 
 const NOTIFICATION_COOLDOWN_MINUTES = 60; // Cooldown period of 1 hour
@@ -29,7 +29,7 @@ async function sendTelegramNotification(botToken: string, chatId: string, messag
 }
 
 // --- Main Handler ---
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const CRON_SECRET = Deno.env.get('CRON_SECRET');
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
