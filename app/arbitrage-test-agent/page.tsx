@@ -1,34 +1,31 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, Suspense, useEffect } from 'react';
+import React, { useState, useCallback, Suspense, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { supabaseAdmin } from '@/hooks/supabase';
-import { triggerMarketDataFetch, triggerCentralAnalyzer } from './actions';
+import { supabaseAdmin } from '@/hooks/supabase'; // Direct read-only for admin pages is acceptable
+import { triggerMarketDataFetch, triggerCentralAnalyzer } from './actions'; // <-- Corrected import path
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useAppContext } from '@/contexts/AppContext';
-import { logger } from '@/lib/logger';
 
-// Refined DataTable component for better presentation
+// Refined DataTable component with better styling
 const DataTable: React.FC<{ data: any[] }> = ({ data }) => {
   if (!data || data.length === 0) {
     return <p className="text-gray-500 italic text-sm p-4">No data to display. Trigger a fetch or check logs for errors.</p>;
   }
   const headers = Object.keys(data[0]);
 
-  // Function to format numbers to a reasonable precision
   const formatValue = (value: any) => {
     if (typeof value === 'number') {
-      // Avoid scientific notation for very small or large numbers in this context
       if (Math.abs(value) < 0.0001 && value !== 0) return value.toFixed(8);
       return Number(value.toFixed(4));
     }
     if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-        return new Date(value).toLocaleString();
+        return new Date(value).toLocaleString('ru-RU');
     }
     return value;
   };
@@ -36,18 +33,18 @@ const DataTable: React.FC<{ data: any[] }> = ({ data }) => {
   return (
     <div className="overflow-x-auto simple-scrollbar">
       <table className="min-w-full text-xs text-left">
-        <thead className="bg-gray-700/50 sticky top-0 backdrop-blur-sm">
+        <thead className="bg-gray-900/50 sticky top-0 backdrop-blur-sm z-10">
           <tr>
             {headers.map(header => (
-              <th key={header} className="p-2.5 font-semibold text-gray-300 uppercase tracking-wider">{header.replace(/_/g, ' ')}</th>
+              <th key={header} className="p-2.5 font-semibold text-brand-lime/80 uppercase tracking-wider">{header.replace(/_/g, ' ')}</th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-700/50">
+        <tbody className="divide-y divide-gray-800">
           {data.map((row, rowIndex) => (
-            <tr key={rowIndex} className="hover:bg-gray-800/60 transition-colors">
+            <tr key={rowIndex} className="hover:bg-brand-purple/10 transition-colors">
               {headers.map(header => (
-                <td key={header} className="p-2.5 text-gray-400 whitespace-nowrap">
+                <td key={header} className="p-2.5 text-gray-300 whitespace-nowrap">
                   {String(formatValue(row[header]))}
                 </td>
               ))}
@@ -59,6 +56,7 @@ const DataTable: React.FC<{ data: any[] }> = ({ data }) => {
   );
 };
 
+
 const ArbitrageTestAgentPage = () => {
   const { isAdmin, isLoading: isAuthLoading } = useAppContext();
   const [triggerStates, setTriggerStates] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
@@ -68,7 +66,7 @@ const ArbitrageTestAgentPage = () => {
 
   const addLog = useCallback((message: string) => {
     const timestamp = `[${new Date().toLocaleTimeString('ru-RU', { hour12: false })}]`;
-    setLogs(prev => [`${timestamp} ${message}`, ...prev].slice(0, 100)); // Keep last 100 logs
+    setLogs(prev => [`${timestamp} ${message}`, ...prev].slice(0, 100));
   }, []);
 
   const handleTrigger = useCallback(async (actionName: string, actionFn: () => Promise<any>) => {
@@ -92,7 +90,6 @@ const ArbitrageTestAgentPage = () => {
       setTriggerStates(prev => ({ ...prev, [actionName]: 'error' }));
     }
     
-    // Reset state after 3 seconds for visual feedback
     setTimeout(() => setTriggerStates(prev => ({ ...prev, [actionName]: 'idle' })), 3000);
   }, [addLog]);
 
@@ -108,7 +105,7 @@ const ArbitrageTestAgentPage = () => {
         const { data, error } = await supabaseAdmin
             .from(tableName)
             .select('*')
-            .limit(50) // Increased limit
+            .limit(50)
             .order(orderByColumn, { ascending: false });
         
         if (error) {
@@ -132,43 +129,47 @@ const ArbitrageTestAgentPage = () => {
 
   const getButtonContent = (actionName: string, icon: string, text: string) => {
     const state = triggerStates[actionName];
-    if (state === 'loading') return <VibeContentRenderer content="::FaSpinner className='animate-spin'::" />;
-    if (state === 'success') return <VibeContentRenderer content="::FaCheckCircle::" />;
-    if (state === 'error') return <VibeContentRenderer content="::FaTriangleExclamation::" />; // Corrected icon
-    return <><VibeContentRenderer content={icon} className="mr-2" /> {text}</>;
+    // FIX: Render text alongside the icon in all states
+    const iconComponent = 
+      state === 'loading' ? <VibeContentRenderer content="::FaSpinner className='animate-spin'::" /> :
+      state === 'success' ? <VibeContentRenderer content="::FaCheckCircle::" /> :
+      state === 'error' ? <VibeContentRenderer content="::FaTriangleExclamation::" /> :
+      <VibeContentRenderer content={icon} />;
+    
+    return <span className="flex items-center justify-center gap-2">{iconComponent} {text}</span>;
   };
 
   if (isAuthLoading) {
-     return <div className="flex h-screen items-center justify-center bg-gray-900 text-brand-cyan"><VibeContentRenderer content="::FaSpinner className='animate-spin text-4xl'::" /><span className="ml-4 text-xl">Loading Auth...</span></div>;
+     return <div className="flex h-screen items-center justify-center bg-gray-950 text-brand-cyan"><VibeContentRenderer content="::FaSpinner className='animate-spin text-4xl'::" /><span className="ml-4 text-xl">Loading Auth...</span></div>;
   }
   if (!isAdmin) {
-     return <div className="flex h-screen items-center justify-center bg-gray-900 text-brand-red font-orbitron text-3xl"><VibeContentRenderer content="::FaUserShield className='mr-4'::" />ACCESS DENIED</div>;
+     return <div className="flex h-screen items-center justify-center bg-gray-950 text-brand-red font-orbitron text-3xl"><VibeContentRenderer content="::FaUserShield className='mr-4'::" />ACCESS DENIED</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-4 pt-24 font-mono">
-      <Card className="max-w-7xl mx-auto bg-black/60 border-2 border-brand-purple/50 shadow-2xl shadow-brand-purple/30 backdrop-blur-md">
+    <div className="min-h-screen bg-gray-950 text-gray-200 p-4 pt-24 font-mono bg-grid-pattern">
+      <Card className="max-w-7xl mx-auto bg-black/70 border-2 border-brand-purple/50 shadow-2xl shadow-brand-purple/40 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-4xl font-orbitron text-brand-purple flex items-center cyber-text glitch" data-text="ALPHA ENGINE COMMAND DECK">
-            <VibeContentRenderer content="::FaTerminal className='mr-4'::" /> ALPHA ENGINE COMMAND DECK
+            <VibeContentRenderer content="::FaTerminal className='mr-4 text-5xl'::" /> ALPHA ENGINE COMMAND DECK
           </CardTitle>
-          <CardDescription className="text-purple-300/80">Manual control and diagnostics for the Arbitrage Engine.</CardDescription>
+          <CardDescription className="text-purple-300/80 mt-1">Manual control and diagnostics for the Arbitrage Engine.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Controls Section */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700 shadow-inner">
+            <Card className="bg-gray-800/60 border border-gray-700 shadow-inner">
               <CardHeader><CardTitle className="text-xl font-orbitron text-brand-cyan">Engine Triggers</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full bg-cyan-600 hover:bg-cyan-500 text-black font-semibold" onClick={() => handleTrigger('Market Data Fetch', triggerMarketDataFetch)} disabled={triggerStates['Market Data Fetch'] === 'loading'}>
+                <Button className="w-full bg-cyan-600 hover:bg-cyan-500 text-black font-semibold shadow-md hover:shadow-cyan-glow transition-all" onClick={() => handleTrigger('Market Data Fetch', triggerMarketDataFetch)} disabled={triggerStates['Market Data Fetch'] === 'loading'}>
                   {getButtonContent('Market Data Fetch', '::FaSatelliteDish::', 'Trigger Market Data Fetch')}
                 </Button>
-                <Button className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold" onClick={() => handleTrigger('Central Analyzer', triggerCentralAnalyzer)} disabled={triggerStates['Central Analyzer'] === 'loading'}>
+                <Button className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-md hover:shadow-purple-glow transition-all" onClick={() => handleTrigger('Central Analyzer', triggerCentralAnalyzer)} disabled={triggerStates['Central Analyzer'] === 'loading'}>
                   {getButtonContent('Central Analyzer', '::FaBrain::', 'Trigger Central Analyzer')}
                 </Button>
               </CardContent>
             </Card>
-            <Card className="bg-gray-800/50 border-gray-700 shadow-inner">
+            <Card className="bg-gray-800/60 border border-gray-700 shadow-inner">
               <CardHeader><CardTitle className="text-xl font-orbitron text-brand-orange">Data Viewer</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button variant="outline" className="border-orange-500 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300" onClick={() => fetchRawData('market_data')} disabled={triggerStates.fetchRawData === 'loading'}>View Market Data</Button>
@@ -179,11 +180,11 @@ const ArbitrageTestAgentPage = () => {
 
           {/* Logs & Data Section */}
           <div className="lg:col-span-3">
-            <Card className="bg-black/40 border-gray-700 h-full">
+            <Card className="bg-black/50 border-gray-700 h-full">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-                <TabsList className="grid w-full grid-cols-2 bg-black/50 border-b border-gray-700">
-                  <TabsTrigger value="logs" className="data-[state=active]:bg-brand-yellow data-[state=active]:text-black">Live Log</TabsTrigger>
-                  <TabsTrigger value="data" className="data-[state=active]:bg-brand-yellow data-[state=active]:text-black">Raw Data</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 bg-black/60 border-b border-gray-700">
+                  <TabsTrigger value="logs" className="data-[state=active]:bg-brand-yellow data-[state=active]:text-black text-gray-400 font-semibold">Live Log</TabsTrigger>
+                  <TabsTrigger value="data" className="data-[state=active]:bg-brand-yellow data-[state=active]:text-black text-gray-400 font-semibold">Raw Data</TabsTrigger>
                 </TabsList>
                 <TabsContent value="logs" className="flex-grow p-1">
                   <div className="bg-black p-3 rounded-b-md h-[450px] overflow-y-auto simple-scrollbar flex flex-col-reverse">
@@ -221,10 +222,10 @@ const ArbitrageTestAgentPage = () => {
   );
 };
 
+// Wrapper for Suspense, as per best practices
 export default function ArbitrageTestAgentPageWrapper() {
-  // Suspense boundary for client components that use searchParams
   return (
-    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-gray-900 text-white">Loading Command Deck...</div>}>
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-gray-950 text-white">Loading Command Deck...</div>}>
       <ArbitrageTestAgentPage />
     </Suspense>
   );
