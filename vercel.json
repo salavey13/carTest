@@ -1,9 +1,31 @@
 {
+  "functions": {
+    "app/api/fetch-crypto-prices/route.ts": {
+      "memory": 1024,
+      "maxDuration": 25
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/fetch-crypto-prices",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "routes": [
     {
       "src": "/api/search",
       "methods": ["POST"],
       "dest": "/api/search"
+    },
+    {
+      "src": "/api/telegramWebhook",
+      "methods": ["POST"],
+      "dest": "/api/telegramWebhook/route"
+    },
+    {
+      "src": "/api/fetch-crypto-prices",
+      "methods": ["GET", "POST"],
+      "dest": "/api/fetch-crypto-prices/route"
     }
   ]
 }
