@@ -2,47 +2,33 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const log = (message: string, data?: any) => {
-  console.log(`[arbitrage-analyzer-notifier] ${new Date().toISOString()}: ${message}`, data || '');
+  console.log(`[analyzer-notifier] ${new Date().toISOString()}: ${message}`, data || '');
 };
 
 const NOTIFICATION_COOLDOWN_MINUTES = 60; // Cooldown period of 1 hour
 
-// --- Helper Functions ---
-async function sendTelegramNotification(botToken: string, chatId: string, message: string) {
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    try {
-        const escapedMessage = message.replace(/([_{}\[\]()~>#+\-=|.!])/g, '\\$1');
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text: escapedMessage, parse_mode: 'MarkdownV2' }),
-        });
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ description: "Unknown Telegram API error" }));
-            log(`Error sending Telegram message to ${chatId}: ${response.status} - ${errorData.description}`);
-        } else {
-            log(`Successfully sent Telegram message to ${chatId}`);
-        }
-    } catch (e) {
-        log(`Failed to send Telegram message to ${chatId}:`, e.message);
-    }
-}
-
-// --- Main Handler ---
+// Main Handler
 Deno.serve(async (req: Request) => {
   const CRON_SECRET = Deno.env.get('CRON_SECRET');
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
   
   log('Function invoked securely.');
   try {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')!;
+    // NEW: The endpoint for our secure notification relay on Vercel
+    const VERCEL_NOTIFICATION_API_ENDPOINT = Deno.env.get('VERCEL_NOTIFICATION_API_ENDPOINT')!;
+    
+    if (!VERCEL_NOTIFICATION_API_ENDPOINT) {
+        throw new Error("VERCEL_NOTIFICATION_API_ENDPOINT is not set in environment variables.");
+    }
+
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Fetch all users with arbitrage settings and all opportunities from the view
     const [usersRes, opportunitiesRes] = await Promise.all([
         supabaseAdmin.from('arbitrage_user_settings').select('user_id, settings'),
         supabaseAdmin.from('arbitrage_opportunities').select('*')
@@ -66,6 +52,7 @@ Deno.serve(async (req: Request) => {
 
       if (!settings?.trackedPairs || !settings.enabledExchanges) continue;
 
+      // Filter opportunities based on this specific user's settings
       const userOpportunities = opportunities.filter(op => {
         const profit = Math.max(op.potential_profit_pct_a_to_b, op.potential_profit_pct_b_to_a);
         return profit >= settings.minSpreadPercent &&
@@ -82,10 +69,9 @@ Deno.serve(async (req: Request) => {
         const sellExchange = isAtoB ? op.exchange_b : op.exchange_a;
         const profit = isAtoB ? op.potential_profit_pct_a_to_b : op.potential_profit_pct_b_to_a;
         
-        // ** THE NEW DEBOUNCE LOGIC STARTS HERE **
         const opportunitySignature = `${op.symbol}:${buyExchange}->${sellExchange}`;
         
-        // 1. Check if a notification is on cooldown for this signature and user
+        // 1. Check cooldown
         const { data: existingNotification, error: checkError } = await supabaseAdmin
             .from('notified_opportunities')
             .select('cooldown_expires_at')
@@ -95,20 +81,29 @@ Deno.serve(async (req: Request) => {
 
         if (checkError) {
             log(`Error checking cooldown for user ${userId}, signature ${opportunitySignature}`, checkError);
-            continue; // Skip this one on error
+            continue;
         }
 
         if (existingNotification && new Date(existingNotification.cooldown_expires_at) > new Date()) {
             log(`Cooldown active for ${opportunitySignature} for user ${userId}. Skipping notification.`);
-            continue; // Cooldown is active, so we skip.
+            continue;
         }
 
-        // 2. If not on cooldown, send the notification
-        log(`Cooldown clear. Sending notification for ${opportunitySignature} to user ${userId}.`);
+        // 2. If not on cooldown, trigger the Vercel notification API
+        log(`Cooldown clear. Triggering notification API for ${opportunitySignature} to user ${userId}.`);
         const tgMessage = `🚀 Arbitrage Alert: *${profit.toFixed(2)}%* spread on *${op.symbol}*\n\n- Buy on: *${buyExchange}*\n- Sell on: *${sellExchange}*`;
-        await sendTelegramNotification(TELEGRAM_BOT_TOKEN, userId, tgMessage);
         
-        // 3. Update the cooldown timer in the database
+        // Asynchronously call our new, secure Vercel endpoint
+        fetch(VERCEL_NOTIFICATION_API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${CRON_SECRET}`
+            },
+            body: JSON.stringify({ chatId: userId, message: tgMessage })
+        }).catch(e => log("Error triggering notification API (fire-and-forget)", e.message));
+
+        // 3. Update the cooldown timer immediately
         const cooldownExpires = new Date(new Date().getTime() + NOTIFICATION_COOLDOWN_MINUTES * 60000).toISOString();
         const { error: upsertError } = await supabaseAdmin
             .from('notified_opportunities')
@@ -117,7 +112,7 @@ Deno.serve(async (req: Request) => {
                 opportunity_signature: opportunitySignature,
                 last_notified_at: new Date().toISOString(),
                 cooldown_expires_at: cooldownExpires
-            }, { onConflict: 'user_id,opportunity_signature' }); // Use the unique index for upsert
+            }, { onConflict: 'user_id,opportunity_signature' });
 
         if (upsertError) {
             log(`Error setting cooldown for ${opportunitySignature}`, upsertError);
