@@ -3,21 +3,20 @@
 import Link from "next/link";
 import { LayoutGrid, X, Search, Globe } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import UserInfo from "@/components/user-info"; // Assuming this component exists and is styled
+import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { 
-    QUEST_ORDER, 
-    fetchUserCyberFitnessProfile, 
-    isQuestUnlocked as checkQuestUnlockedFromHook, // Renamed for clarity
-    CyberFitnessProfile 
+import {
+    QUEST_ORDER,
+    fetchUserCyberFitnessProfile,
+    isQuestUnlocked as checkQuestUnlockedFromHook,
+    CyberFitnessProfile
 } from '@/hooks/cyberFitnessSupabase';
-import * as Fa6Icons from "react-icons/fa6"; // Import all Fa6Icons
-// iconNameMap is NOT needed here if VibeContentRenderer handles ::FaName:: syntax
+import * as Fa6Icons from "react-icons/fa6";
 
 interface PageInfo {
   path: string;
@@ -92,6 +91,7 @@ const allPages: PageInfo[] = [
 
   // Admin Zone
   { path: "/admin", name: "Admin Panel", icon: "FaUserShield", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
+  { path: "/arbitrage-test-agent", name: "Alpha Engine Deck", icon: "FaTerminal", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 }, // <-- NEWLY ADDED
   { path: "/advice-upload", name: "Upload Advice", icon: "FaUpload", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: "FaCarOn", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
@@ -99,7 +99,7 @@ const allPages: PageInfo[] = [
 
 const groupOrder = ["Vibe HQ", "Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 
-const groupIcons: Record<string, string> = { // Using string for icon names
+const groupIcons: Record<string, string> = {
     "Vibe HQ": "FaCrosshairs",
     "Core Vibe": "FaBolt",
     "GTA Vibe Missions": "FaGamepad",
@@ -128,7 +128,7 @@ const translations: Record<string, Record<string, string>> = {
     "Vibe Schematics": "Vibe Schematics", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Veritasium Insights": "Veritasium Insights", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo", "XLSX-2-PDF Converter": "XLSX-2-PDF Converter",
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
-    "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin",
+    "Admin Panel": "Admin Panel", "Alpha Engine Deck": "Alpha Engine Deck", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin", // <-- NEWLY ADDED
     "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot", "Missions": "Missions",
     "Vibe HQ": "Vibe HQ", "Core Vibe": "Core Vibe", "GTA Vibe Missions": "GTA Vibe Missions", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
@@ -140,7 +140,7 @@ const translations: Record<string, Record<string, string>> = {
     "Vibe Schematics": "Схемы Вайба", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Veritasium Insights": "Озарения Veritasium", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности", "XLSX-2-PDF Converter": "XLSX-2-PDF Конвертер",
     "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
-    "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT",
+    "Admin Panel": "Админ Панель", "Alpha Engine Deck": "Пульт Альфа-Движка", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT", // <-- NEWLY ADDED
     "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "🔥", "Missions": "Миссии",
     "Vibe HQ": "Vibe HQ", "Core Vibe": "Ядро Вайба", "GTA Vibe Missions": "GTA Vibe Миссии", "CyberFitness": "КиберФитнес", "Content & Tools": "Контент и Тулзы", "Misc": "Разное", "Admin Zone": "Зона Админа"
   }
@@ -188,7 +188,6 @@ const tileItemVariants = {
 
 const MotionLink = motion(Link);
 
-// Simplified RenderIconFromPage trusting VibeContentRenderer
 const RenderIconFromPage = React.memo(({ icon, className }: { icon?: string; className?: string }) => {
   if (!icon) return null;
   const iconString = icon.startsWith("::") && icon.endsWith("::") ? icon : `::${icon}::`;
@@ -308,28 +307,25 @@ export default function Header() {
       .filter(page =>
         (page.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
         (page.path || '').toLowerCase().includes(lowerSearchTerm) ||
-        (t(page.group || 'Misc') || '').toLowerCase().includes(lowerSearchTerm) // Added fallback for page.group
+        (t(page.group || 'Misc') || '').toLowerCase().includes(lowerSearchTerm)
       );
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
       if (groupName === "Admin Zone" && !isAdmin && !appContextLoading) return;
-      // Always initialize groups mentioned in groupOrder to maintain order
       groups[groupName] = [];
     });
-     // If "Misc" is not in groupOrder but pages might fall into it
+    
     if (!groups["Misc"]) {
         groups["Misc"] = [];
     }
 
-
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (!groups[groupName]) groups[groupName] = []; // Should be covered by above, but as a safeguard
+      if (!groups[groupName]) groups[groupName] = [];
       groups[groupName].push(page);
     });
     
-    // Ensure "Start Training" is correctly placed if visible
     const startTrainingPageInfo = allPages.find(p => p.path === "/start-training");
     if (startTrainingPageInfo) {
         const userCanSeeStartTraining = (!startTrainingPageInfo.isAdminOnly || isAdmin) &&
@@ -347,7 +343,6 @@ export default function Header() {
         }
     }
     
-    // Sort groups like "GTA Vibe Missions" by their original order in allPages
     if (groups["GTA Vibe Missions"]) {
         groups["GTA Vibe Missions"].sort((a, b) => {
             const aIndex = allPages.findIndex(p => p.path === a.path);
@@ -355,6 +350,16 @@ export default function Header() {
             return aIndex - bIndex;
         });
     }
+
+    // Sort Admin Zone pages
+    if (groups["Admin Zone"]) {
+        groups["Admin Zone"].sort((a, b) => {
+            const aIndex = allPages.filter(p => p.group === "Admin Zone").findIndex(p => p.path === a.path);
+            const bIndex = allPages.filter(p => p.group === "Admin Zone").findIndex(p => p.path === b.path);
+            return aIndex - bIndex;
+        });
+    }
+
     return groups;
   }, [searchTerm, isAdmin, t, appContextLoading, cyberProfile, profileLoading, dbUser?.role]);
 
@@ -451,7 +456,7 @@ export default function Header() {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null;
 
-                  const groupIconString = groupIcons[groupName]; // This is now a string like "FaCrosshairs"
+                  const groupIconString = groupIcons[groupName];
                   
                   return (
                     <div key={groupName}>
