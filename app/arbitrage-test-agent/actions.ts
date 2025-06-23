@@ -2,6 +2,15 @@
 
 import { logger } from "@/lib/logger";
 
+export async function getVercelCronSecret(): Promise<{ secret_snippet: string | null }> {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+        return { secret_snippet: null };
+    }
+    // Return only a snippet for security, NOT the whole key
+    return { secret_snippet: secret.substring(0, 4) + '...' + secret.substring(secret.length - 4) };
+}
+
 /**
  * Securely triggers the Supabase Edge Function to fetch fresh market data.
  * This is the "Hunter-Gatherer" drone.
