@@ -19,10 +19,12 @@ async function triggerEdgeFunction(functionName: string): Promise<{ success: boo
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        // Key to get past Supabase's main gate
-        'apikey': anonKey,
-        // OUR OWN custom header for our internal check. NOT 'Authorization'.
-        'X-Custom-Auth-Secret': customSecret,
+        // This is the standard Supabase client header. It gets us past the first gate.
+        'apikey': anonKey, 
+        // THIS IS THE FIX. We are now putting our OWN secret inside the standard 'Authorization' header.
+        // The Supabase gateway will see "Bearer" and pass it to the function.
+        // Our function will then check if the token part matches our CRON_SECRET.
+        'Authorization': `Bearer ${customSecret}`, 
         'Content-Type': 'application/json'
       },
     });
