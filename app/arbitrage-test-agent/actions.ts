@@ -1,8 +1,8 @@
-// /app/arbitrage-test-agent/actions.ts
 "use server";
 
 import { logger } from "@/lib/logger";
 
+// Centralized function to trigger any edge function with the new auth strategy
 async function triggerEdgeFunction(functionName: string): Promise<{ success: boolean; data?: any; error?: string }> {
   const endpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/${functionName}`;
   
@@ -19,12 +19,15 @@ async function triggerEdgeFunction(functionName: string): Promise<{ success: boo
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        // This is the standard Supabase client header. It gets us past the first gate.
-        'apikey': anonKey, 
-        // THIS IS THE FIX. We are now putting our OWN secret inside the standard 'Authorization' header.
-        // The Supabase gateway will see "Bearer" and pass it to the function.
-        // Our function will then check if the token part matches our CRON_SECRET.
-        'Authorization': `Bearer ${customSecret}`, 
+        // Header 1: The standard public key for the main Supabase gateway
+        'apikey': anonKey,
+        
+        // Header 2: The standard Authorization header to keep the JWT parser happy
+        'Authorization': `Bearer ${anonKey}`,
+        
+        // Header 3: Our OWN custom secret handshake, completely separate
+        'X-Vibe-Auth-Secret': customSecret,
+        
         'Content-Type': 'application/json'
       },
     });

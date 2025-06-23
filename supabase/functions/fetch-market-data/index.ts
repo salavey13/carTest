@@ -3,7 +3,6 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const log = (message: string, data?: any) => console.log(`[fetch-market-data] ${new Date().toISOString()}: ${message}`, data || '');
 
-// Define the data structure for type safety
 interface MarketData {
   exchange: string;
   symbol: string;
@@ -16,7 +15,6 @@ interface MarketData {
 
 const SYMBOLS_TO_MONITOR = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
-// --- Data Fetching Functions ---
 async function fetchBinanceData(): Promise<MarketData[]> {
     const results: MarketData[] = [];
     for (const symbol of SYMBOLS_TO_MONITOR) {
@@ -73,16 +71,17 @@ async function fetchBybitData(): Promise<MarketData[]> {
     return results;
 }
 
-// --- Main Server Logic ---
-Deno.serve(async (req) => {
-  const CRON_SECRET = Deno.env.get('CRON_SECRET');
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    log('Unauthorized attempt to trigger function.');
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+Deno.serve(async (req: Request) => {
+  const CUSTOM_AUTH_SECRET = Deno.env.get('CRON_SECRET')!;
+  const receivedSecret = req.headers.get('X-Vibe-Auth-Secret');
+
+  if (receivedSecret !== CUSTOM_AUTH_SECRET) {
+    log('Unauthorized: Missing or incorrect X-Vibe-Auth-Secret header.');
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid secret.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
   log('Function invoked securely.');
+  
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -107,6 +106,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success: true, count: allMarketData.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
     log('Critical error in edge function:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 });
