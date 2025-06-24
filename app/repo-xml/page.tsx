@@ -26,7 +26,7 @@ import Link from "next/link";
 import { motion } from 'framer-motion';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 
-const CYBERWTF_BADGE = "https://github.com/user-attachments/assets/7e7c6300-02dc-4314-be55-41005bfb247a";
+const CYBERWTF_BADGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png";
 const XUINITY_EMBLEM = "https://github.com/user-attachments/assets/910a623e-1c9d-4630-a8b4-7c361565dc97";
 
 const onboardingBlocks = {
@@ -119,13 +119,15 @@ SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай ко
 function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
   const t = onboardingBlocks[lang];
   return (
-    <Card className="max-w-3xl mx-auto mb-10 bg-black/90 border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
-      <div className="flex flex-col items-center py-6">
-        <img src={XUINITY_EMBLEM} alt="Xuinity emblem" className="w-28 mb-2 drop-shadow-glow" />
-        <img src={CYBERWTF_BADGE} alt="CYBERWTF badge" className="w-52 mb-2 drop-shadow-glow" />
+    <Card className="relative z-10 w-full max-w-3xl mx-auto mb-10 bg-black/90 border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
+      <div className="flex flex-col items-center py-6 px-4">
+        <img 
+          src={CYBERWTF_BADGE} 
+          alt="CYBERWTF badge" 
+          className="w-full max-w-[420px] mb-2 drop-shadow-glow" />
       </div>
-      <CardHeader>
-        <CardTitle className="text-2xl md:text-3xl font-bold text-center text-fuchsia-400 font-orbitron">{t.title}</CardTitle>
+      <CardHeader className="pt-0">
+        <CardTitle className="text-2xl md:text-3xl font-bold text-center text-fuchsia-400 font-orbitron px-4">{t.title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-base md:text-lg text-gray-200">
         <div className="whitespace-pre-line">{t.intro}</div>
@@ -422,6 +424,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [lang, setLang] = useState<keyof typeof translations>('en');
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
+    const [isDesktop, setIsDesktop] = useState(false);
     
     // State for sections visibility
     const [isIntroVisible, setIsIntroVisible] = useState(true);
@@ -430,6 +433,16 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
     const [isCtaVisible, setIsCtaVisible] = useState(true); 
     const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(min-width: 768px)'); // md breakpoint
+        const handleResize = () => setIsDesktop(mediaQuery.matches);
+        
+        handleResize(); // Set initial state on client
+        mediaQuery.addEventListener('change', handleResize);
+        
+        return () => mediaQuery.removeEventListener('change', handleResize);
+    }, []);
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -557,8 +570,21 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
        return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto">
+                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-x-hidden">
                     
+                    <motion.img
+                        src={XUINITY_EMBLEM}
+                        alt="CyberVibe Mascot"
+                        className="fixed top-0 h-screen w-auto object-contain pointer-events-none"
+                        initial={isDesktop ? { x: "100%", opacity: 0 } : { opacity: 0 }}
+                        animate={
+                            isDesktop
+                            ? { x: "50%", right: 0, opacity: 0.2, width: 'auto' }
+                            : { x: "-50%", left: "50%", opacity: 0.1, width: "100%" }
+                        }
+                        transition={{ duration: 1.5, ease: "circOut" }}
+                    />
+
                     <button
                         onClick={toggleAllSections}
                         className="fixed top-20 left-4 sm:left-6 text-slate-300 hover:text-white z-50 p-2 rounded-full bg-dark-card/70 hover:bg-dark-card/90 backdrop-blur-sm shadow-lg border border-slate-700 hover:border-slate-500 transition-all"
@@ -569,8 +595,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     </button>
 
                     
-        {/* === NEW: Xuinity + CYBERWTF badge and onboarding block === */}
-        <LangOnboardingBlock lang={lang} />
+                    <LangOnboardingBlock lang={lang} />
 
                     {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
