@@ -20,7 +20,7 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots, FaTrophy
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -53,10 +53,10 @@ No install, no gatekeeping, just instant hacking and learning.`,
 You’re co-piloting an AI-powered, cyberpunk, recursive dev studio.  
 You’re not asking “how do I code this?”  
 You’re asking “how do I LEVEL UP?”`,
-    levels: `🏆 <strong>BADGES, LEVELS, & QUESTS</strong>
-- Every PR, code fetch, or AI action = progress
+    levels: `- Every PR, code fetch, or AI action = progress
 - Quests like “Fix a broken image”, “Ship an idea”, “Remix the matrix”, “Inception Swap”
 - Your CyberFitness Profile evolves: Level up, unlock perks, collect badges, and see your “Cognitive OS Version” change as you grow.`,
+    levelsTitle: "🏆 BADGES, LEVELS, & QUESTS",
     faq: [
       { q: "Why does this look like a game?", a: "Because learning, shipping, and leveling up should feel like one." },
       { q: "Why is there a DNA helix and neon everywhere?", a: "Because you’re hacking the code of your DEV DNA—and it should look awesome." },
@@ -95,10 +95,10 @@ SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай ко
 Ты ко-пилотируешь ИИ-киберпанк студию, где каждое действие — новый левел.  
 Тут не спрашивают “как это закодить”,  
 тут спрашивают “как ПРОКАЧАТЬСЯ?”`,
-    levels: `🏆 <strong>АЧИВКИ, УРОВНИ И КВЕСТЫ</strong>
-- Любой PR, файл или запрос к ИИ = прогресс
+    levels: `- Любой PR, файл или запрос к ИИ = прогресс
 - Квесты: “Почини картинку”, “Запусти идею”, “Ремиксуй матрицу”, “Inception Swap” и другие
 - Твой CyberFitness профиль растет: Новый уровень, перки, ачивки, и “Cognitive OS Version” — как у персонажа.`,
+    levelsTitle: "🏆 АЧИВКИ, УРОВНИ И КВЕСТЫ",
     faq: [
       { q: "Почему это похоже на игру?", a: "Потому что учиться, пилить и прокачиваться — должно быть весело." },
       { q: "Зачем ДНК и неон?", a: "Ты реально меняешь свой кодовый ДНК, и пусть это будет красиво." },
@@ -119,7 +119,7 @@ SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай ко
 function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
   const t = onboardingBlocks[lang];
   return (
-    <Card className="relative z-10 w-full max-w-3xl mx-auto mb-10 bg-black/90 border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
+    <Card className="relative z-10 w-full max-w-3xl mx-auto mb-10 bg-black/60 backdrop-blur-md border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
       <div className="flex flex-col items-center py-6 px-4">
         <img 
           src={CYBERWTF_BADGE} 
@@ -142,7 +142,12 @@ function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
           <div className="whitespace-pre-line mt-2">{t.whatisit}</div>
         </div>
         <div className="italic text-pink-300 whitespace-pre-line">{t.youare}</div>
-        <div className="mt-3 whitespace-pre-line">{t.levels}</div>
+        
+        <div className="mt-4 p-4 rounded-lg bg-gradient-to-br from-fuchsia-900/40 to-purple-900/60 border border-fuchsia-500/50 shadow-inner">
+          <h3 className="font-bold text-xl mb-2 text-fuchsia-300 flex items-center gap-2"><VibeContentRenderer content={t.levelsTitle}/></h3>
+          <div className="whitespace-pre-line text-gray-300"><VibeContentRenderer content={t.levels} /></div>
+        </div>
+
         <details className="mt-3 bg-slate-900/80 rounded p-3 border-l-4 border-fuchsia-600">
           <summary className="font-bold cursor-pointer">{lang === "en" ? "FAQ (Still lost? Read this!)" : "FAQ (Всё ещё WTF? Читай это!)"}</summary>
           <ul className="mt-2 space-y-1">
@@ -270,6 +275,7 @@ Every level is a new notch on your <b>autonomy slider</b>. You start by trusting
     ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
     navGrabber: "Grabber <FaDownload/>",
     navAssistant: "Assistant <FaRobot/>",
+    navOnboarding: "Welcome <FaUserAstronaut/>",
     navIntro: "Intro <FaCircleInfo/>",
     navCyberVibe: "Vibe Loop <FaUpLong/>",
     collapseAll: "Collapse All Sections",
@@ -376,6 +382,7 @@ AI генерит SQL. Агент предлагает, но только ты, 
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
     navGrabber: "Граббер <FaDownload/>",
     navAssistant: "Ассистент <FaRobot/>",
+    navOnboarding: "Велком <FaUserAstronaut/>",
     navIntro: "Интро <FaCircleInfo/>",
     navCyberVibe: "Петля Вайба <FaUpLong/>",
     collapseAll: "Свернуть Все Секции",
@@ -426,6 +433,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     
     // State for sections visibility
+    const [isOnboardingVisible, setIsOnboardingVisible] = useState(false);
     const [isIntroVisible, setIsIntroVisible] = useState(true);
     const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
     const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
@@ -467,16 +475,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     useEffect(() => {
         if (!t) return; // Don't run if translations are not loaded
         const newVisibility = !sectionsCollapsed;
+        // Onboarding is handled by details/summary, not this global toggle
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        
-        
-            setIsCtaVisible(newVisibility);
-        
-        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
-    }, [sectionsCollapsed, t, showComponents, isCtaVisible]); 
+        setIsCtaVisible(newVisibility);
+        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}.`);
+    }, [sectionsCollapsed, t]); 
 
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
@@ -487,6 +493,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
         const scroll = (element: HTMLElement) => {
              try {
+                if (id === 'onboarding' && element.tagName === 'DETAILS' && !element.hasAttribute('open')) {
+                    element.setAttribute('open', '');
+                }
                 const elementTop = element.getBoundingClientRect().top + window.scrollY;
                 const offsetTop = elementTop - headerOffset;
                 window.scrollTo({ top: offsetTop, behavior: 'smooth' });
@@ -537,6 +546,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
      }
 
     const userName = user?.first_name || 'Vibe Master';
+    const navTitleOnboarding = memoizedGetPlainText(t.navOnboarding);
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
@@ -580,8 +590,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         {sectionsCollapsed ? <FaAnglesUp className="w-5 h-5" /> : <FaAnglesDown className="w-5 h-5" />}
                     </button>
 
+                    <details id="onboarding" className="w-full max-w-3xl mb-10 transition-all duration-300 ease-in-out group" onToggle={(e) => setIsOnboardingVisible((e.target as HTMLDetailsElement).open)}>
+                        <summary className="text-xl font-bold text-fuchsia-400 p-4 cursor-pointer list-none flex justify-between items-center bg-dark-card/80 border border-fuchsia-700/50 rounded-lg shadow-lg backdrop-blur-sm hover:bg-fuchsia-900/50 group-open:rounded-b-none">
+                            <VibeContentRenderer content={t.title} />
+                            <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform duration-300">▼</span>
+                        </summary>
+                        <LangOnboardingBlock lang={lang} />
+                    </details>
                     
-                    <LangOnboardingBlock lang={lang} />
 
                     {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
@@ -769,8 +785,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     )}
 
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
-                         <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
-                         <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
+                         {isOnboardingVisible && <button onClick={() => scrollToSectionNav("onboarding")} className="p-2 bg-fuchsia-600/80 backdrop-blur-sm rounded-full hover:bg-fuchsia-600/70 transition shadow-md" title={navTitleOnboarding} aria-label={navTitleOnboarding || "Scroll to Welcome"} > <FaUserAstronaut className="text-lg text-white" /> </button>}
+                         {isIntroVisible && <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>}
+                         {isCyberVibeVisible && <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>}
                          {showComponents && ( /* Navigation for components is always available if showComponents is true, regardless of sectionsCollapsed */
                             <>
                                 <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
