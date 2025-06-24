@@ -20,13 +20,13 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots, FaTrophy
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 
-const CYBERWTF_BADGE = "https://github.com/user-attachments/assets/7e7c6300-02dc-4314-be55-41005bfb247a";
+const CYBERWTF_BADGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png";
 const XUINITY_EMBLEM = "https://github.com/user-attachments/assets/910a623e-1c9d-4630-a8b4-7c361565dc97";
 
 const onboardingBlocks = {
@@ -40,11 +40,11 @@ This is not a regular dev page. This is your portal to the SUPERVIBE ENGINE:
 - 100% WTF
 - Built for devs, dreamers, and reality remixers`,
     tldr: [
-      "**Scroll.** Let your brain catch up—yes, it’s a lot.",
-      "**Click “Extract Files”.** Instantly fetch source code to remix, patch, or build on.",
-      "**Drop your AI request or idea.** Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.",
-      "**AI + YOU = PR** The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.",
-      "**Level Up.** Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile). See your progress, unlock achievements, and flex with the VIBE TRIBE."
+      "<strong>Scroll.</strong> Let your brain catch up—yes, it’s a lot.",
+      "<strong>Click “Extract Files”.</strong> Instantly fetch source code to remix, patch, or build on.",
+      "<strong>Drop your AI request or idea.</strong> Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.",
+      "<strong>AI + YOU = PR</strong> The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.",
+      "<strong>Level Up.</strong> Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile). See your progress, unlock achievements, and flex with the VIBE TRIBE."
     ],
     whatisit: `/repo-xml = AI-powered remix lab for this project.
 SUPERVIBE ENGINE: Recursive workflow: Extract context → Feed to AI → Build, patch, merge → Repeat
@@ -53,10 +53,10 @@ No install, no gatekeeping, just instant hacking and learning.`,
 You’re co-piloting an AI-powered, cyberpunk, recursive dev studio.  
 You’re not asking “how do I code this?”  
 You’re asking “how do I LEVEL UP?”`,
-    levels: `🏆 **BADGES, LEVELS, & QUESTS**
-- Every PR, code fetch, or AI action = progress
+    levels: `- Every PR, code fetch, or AI action = progress
 - Quests like “Fix a broken image”, “Ship an idea”, “Remix the matrix”, “Inception Swap”
 - Your CyberFitness Profile evolves: Level up, unlock perks, collect badges, and see your “Cognitive OS Version” change as you grow.`,
+    levelsTitle: "🏆 BADGES, LEVELS, & QUESTS",
     faq: [
       { q: "Why does this look like a game?", a: "Because learning, shipping, and leveling up should feel like one." },
       { q: "Why is there a DNA helix and neon everywhere?", a: "Because you’re hacking the code of your DEV DNA—and it should look awesome." },
@@ -82,11 +82,11 @@ You’re asking “how do I LEVEL UP?”`,
 - 100% WTF
 - Для кодеров, мечтателей и всех, кто хочет создавать без барьеров`,
     tldr: [
-      "**Прокрути вниз.** Пусть мозг привыкнет – да, тут много нового.",
-      "**Жми “Извлечь файлы”.** Мгновенно получи исходники этого репозитория для экспериментов, фиксов и апгрейдов.",
-      "**Опиши свою идею или вопрос для ИИ.** Просто напиши: “Добавь темную тему”, “Исправь ошибку”, “Сделай по-киберпанковски”.",
-      "**ИИ + ТЫ = PR** Бот сгенерирует код, объяснит, и даст сразу создать Pull Request — без локальной сборки, без гита-колдунства.",
-      "**Прокачка!** Любое действие открывает новые перки, квесты и фичи (всё записывается в твой профиль CyberFitness). Следи за прогрессом, собирай ачивки, и становись частью VIBE TRIBE."
+      "<strong>Прокрути вниз.</strong> Пусть мозг привыкнет – да, тут много нового.",
+      "<strong>Жми “Извлечь файлы”.</strong> Мгновенно получи исходники этого репозитория для экспериментов, фиксов и апгрейдов.",
+      "<strong>Опиши свою идею или вопрос для ИИ.</strong> Просто напиши: “Добавь темную тему”, “Исправь ошибку”, “Сделай по-киберпанковски”.",
+      "<strong>ИИ + ТЫ = PR</strong> Бот сгенерирует код, объяснит, и даст сразу создать Pull Request — без локальной сборки, без гита-колдунства.",
+      "<strong>Прокачка!</strong> Любое действие открывает новые перки, квесты и фичи (всё записывается в твой профиль CyberFitness). Следи за прогрессом, собирай ачивки, и становись частью VIBE TRIBE."
     ],
     whatisit: `/repo-xml = лаборатория ремиксов на базе ИИ для этого проекта.
 SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай контекст → Кидай в ИИ → Собирай, чини, мержи → Повтори
@@ -95,10 +95,10 @@ SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай ко
 Ты ко-пилотируешь ИИ-киберпанк студию, где каждое действие — новый левел.  
 Тут не спрашивают “как это закодить”,  
 тут спрашивают “как ПРОКАЧАТЬСЯ?”`,
-    levels: `🏆 **АЧИВКИ, УРОВНИ И КВЕСТЫ**
-- Любой PR, файл или запрос к ИИ = прогресс
+    levels: `- Любой PR, файл или запрос к ИИ = прогресс
 - Квесты: “Почини картинку”, “Запусти идею”, “Ремиксуй матрицу”, “Inception Swap” и другие
 - Твой CyberFitness профиль растет: Новый уровень, перки, ачивки, и “Cognitive OS Version” — как у персонажа.`,
+    levelsTitle: "🏆 АЧИВКИ, УРОВНИ И КВЕСТЫ",
     faq: [
       { q: "Почему это похоже на игру?", a: "Потому что учиться, пилить и прокачиваться — должно быть весело." },
       { q: "Зачем ДНК и неон?", a: "Ты реально меняешь свой кодовый ДНК, и пусть это будет красиво." },
@@ -119,20 +119,22 @@ SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай ко
 function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
   const t = onboardingBlocks[lang];
   return (
-    <Card className="max-w-3xl mx-auto mb-10 bg-black/90 border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
-      <div className="flex flex-col items-center py-6">
-        <img src={XUINITY_EMBLEM} alt="Xuinity emblem" className="w-28 mb-2 drop-shadow-glow" />
-        <img src={CYBERWTF_BADGE} alt="CYBERWTF badge" className="w-52 mb-2 drop-shadow-glow" />
+    <Card className="relative z-10 w-full max-w-3xl mx-auto mb-10 bg-black/60 backdrop-blur-md border border-fuchsia-600 shadow-2xl rounded-3xl p-0 overflow-hidden">
+      <div className="flex flex-col items-center py-6 px-4">
+        <img 
+          src={CYBERWTF_BADGE} 
+          alt="CYBERWTF badge" 
+          className="w-full max-w-[420px] mb-2 drop-shadow-glow" />
       </div>
-      <CardHeader>
-        <CardTitle className="text-2xl md:text-3xl font-bold text-center text-fuchsia-400 font-orbitron">{t.title}</CardTitle>
+      <CardHeader className="pt-0">
+        <CardTitle className="text-2xl md:text-3xl font-bold text-center text-fuchsia-400 font-orbitron px-4">{t.title}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-base md:text-lg text-gray-200">
         <div className="whitespace-pre-line">{t.intro}</div>
         <div className="bg-gradient-to-r from-green-400/10 via-pink-400/10 to-purple-800/20 border-l-4 border-pink-500 rounded p-4 my-2 text-lg font-bold shadow-inner">
           <div className="mb-1">🚦 <span className="text-pink-300 font-extrabold">TL;DR / Быстрый старт:</span></div>
           <ul className="list-disc ml-7 space-y-1">
-            {t.tldr.map((l, i) => <li key={i} dangerouslySetInnerHTML={{ __html: l }} />)}
+            {t.tldr.map((l, i) => <li key={i}><VibeContentRenderer content={l} /></li>)}
           </ul>
         </div>
         <div>
@@ -140,7 +142,12 @@ function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
           <div className="whitespace-pre-line mt-2">{t.whatisit}</div>
         </div>
         <div className="italic text-pink-300 whitespace-pre-line">{t.youare}</div>
-        <div className="mt-3 whitespace-pre-line">{t.levels}</div>
+        
+        <div className="mt-4 p-4 rounded-lg bg-gradient-to-br from-fuchsia-900/40 to-purple-900/60 border border-fuchsia-500/50 shadow-inner">
+          <h3 className="font-bold text-xl mb-2 text-fuchsia-300 flex items-center gap-2"><VibeContentRenderer content={t.levelsTitle}/></h3>
+          <div className="whitespace-pre-line text-gray-300"><VibeContentRenderer content={t.levels} /></div>
+        </div>
+
         <details className="mt-3 bg-slate-900/80 rounded p-3 border-l-4 border-fuchsia-600">
           <summary className="font-bold cursor-pointer">{lang === "en" ? "FAQ (Still lost? Read this!)" : "FAQ (Всё ещё WTF? Читай это!)"}</summary>
           <ul className="mt-2 space-y-1">
@@ -268,6 +275,7 @@ Every level is a new notch on your <b>autonomy slider</b>. You start by trusting
     ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
     navGrabber: "Grabber <FaDownload/>",
     navAssistant: "Assistant <FaRobot/>",
+    navOnboarding: "Welcome <FaUserAstronaut/>",
     navIntro: "Intro <FaCircleInfo/>",
     navCyberVibe: "Vibe Loop <FaUpLong/>",
     collapseAll: "Collapse All Sections",
@@ -374,6 +382,7 @@ AI генерит SQL. Агент предлагает, но только ты, 
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
     navGrabber: "Граббер <FaDownload/>",
     navAssistant: "Ассистент <FaRobot/>",
+    navOnboarding: "Велком <FaUserAstronaut/>",
     navIntro: "Интро <FaCircleInfo/>",
     navCyberVibe: "Петля Вайба <FaUpLong/>",
     collapseAll: "Свернуть Все Секции",
@@ -424,6 +433,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     
     // State for sections visibility
+    const [isOnboardingVisible, setIsOnboardingVisible] = useState(false);
     const [isIntroVisible, setIsIntroVisible] = useState(true);
     const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
     const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
@@ -465,16 +475,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     useEffect(() => {
         if (!t) return; // Don't run if translations are not loaded
         const newVisibility = !sectionsCollapsed;
+        // Onboarding is handled by details/summary, not this global toggle
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        
-        
-            setIsCtaVisible(newVisibility);
-        
-        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
-    }, [sectionsCollapsed, t, showComponents, isCtaVisible]); 
+        setIsCtaVisible(newVisibility);
+        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}.`);
+    }, [sectionsCollapsed, t]); 
 
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
@@ -485,6 +493,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
         const scroll = (element: HTMLElement) => {
              try {
+                if (id === 'onboarding' && element.tagName === 'DETAILS' && !element.hasAttribute('open')) {
+                    element.setAttribute('open', '');
+                }
                 const elementTop = element.getBoundingClientRect().top + window.scrollY;
                 const offsetTop = elementTop - headerOffset;
                 window.scrollTo({ top: offsetTop, behavior: 'smooth' });
@@ -535,6 +546,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
      }
 
     const userName = user?.first_name || 'Vibe Master';
+    const navTitleOnboarding = memoizedGetPlainText(t.navOnboarding);
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
@@ -557,8 +569,18 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
        return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto">
+                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-x-hidden">
                     
+                    <motion.img
+                        src={XUINITY_EMBLEM}
+                        alt="CyberVibe Mascot"
+                        className="fixed top-0 right-0 h-screen w-auto object-contain pointer-events-none"
+                        style={{ transform: 'translateX(50%)' }}
+                        initial={{ x: "100%", opacity: 0 }}
+                        animate={{ x: "50%", opacity: 0.15 }}
+                        transition={{ duration: 1.5, ease: "circOut" }}
+                    />
+
                     <button
                         onClick={toggleAllSections}
                         className="fixed top-20 left-4 sm:left-6 text-slate-300 hover:text-white z-50 p-2 rounded-full bg-dark-card/70 hover:bg-dark-card/90 backdrop-blur-sm shadow-lg border border-slate-700 hover:border-slate-500 transition-all"
@@ -568,9 +590,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         {sectionsCollapsed ? <FaAnglesUp className="w-5 h-5" /> : <FaAnglesDown className="w-5 h-5" />}
                     </button>
 
+                    <details id="onboarding" className="w-full max-w-3xl mb-10 transition-all duration-300 ease-in-out group" onToggle={(e) => setIsOnboardingVisible((e.target as HTMLDetailsElement).open)}>
+                        <summary className="text-xl font-bold text-fuchsia-400 p-4 cursor-pointer list-none flex justify-between items-center bg-dark-card/80 border border-fuchsia-700/50 rounded-lg shadow-lg backdrop-blur-sm hover:bg-fuchsia-900/50 group-open:rounded-b-none">
+                            <VibeContentRenderer content={t.title} />
+                            <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform duration-300">▼</span>
+                        </summary>
+                        <LangOnboardingBlock lang={lang} />
+                    </details>
                     
-        {/* === NEW: Xuinity + CYBERWTF badge and onboarding block === */}
-        <LangOnboardingBlock lang={lang} />
 
                     {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
@@ -758,8 +785,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     )}
 
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
-                         <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
-                         <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
+                         {isOnboardingVisible && <button onClick={() => scrollToSectionNav("onboarding")} className="p-2 bg-fuchsia-600/80 backdrop-blur-sm rounded-full hover:bg-fuchsia-600/70 transition shadow-md" title={navTitleOnboarding} aria-label={navTitleOnboarding || "Scroll to Welcome"} > <FaUserAstronaut className="text-lg text-white" /> </button>}
+                         {isIntroVisible && <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>}
+                         {isCyberVibeVisible && <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>}
                          {showComponents && ( /* Navigation for components is always available if showComponents is true, regardless of sectionsCollapsed */
                             <>
                                 <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
