@@ -1,21 +1,17 @@
 "use client";
 
 import React, { Suspense, useState, useEffect, useMemo } from "react";
-import { useSearchParams } from 'next/navigation';
 import { RepoXmlPageProvider, useRepoXmlPageContext } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
-
-// UI Components
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { motion } from 'framer-motion';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
 import AICodeAssistant from "@/components/AICodeAssistant";
 import AutomationBuddy from "@/components/AutomationBuddy";
 
-// Extracted Content - NO MORE SKIPS
-import { translations, onboardingContent, CYBERWTF_BADGE_URL } from './content';
+// Extracted Content
+import { translations, onboardingContent } from './content';
 
 // Onboarding Component (Self-contained & Clean)
 const OnboardingBlock: React.FC<{ lang: "en" | "ru" }> = ({ lang }) => {
@@ -48,7 +44,7 @@ const OnboardingBlock: React.FC<{ lang: "en" | "ru" }> = ({ lang }) => {
 };
 
 // Philosophy Component (Self-contained & Clean)
-const PhilosophyBlock: React.FC<{ t: typeof translations.ru }> = ({ t }) => (
+const PhilosophyBlock: React.FC<{ t: (typeof translations.ru) }> = ({ t }) => (
     <div className="px-2 sm:px-4 py-2 space-y-4 text-sm prose prose-sm prose-invert max-w-none">
         <VibeContentRenderer content={t.philosophyCore} />
         <hr className="border-border my-3"/>
@@ -81,22 +77,16 @@ function ActualPageContent() {
         <div className="min-h-screen bg-dark-bg p-2 sm:p-4 pt-20 md:pt-24 text-light-text flex flex-col items-center relative overflow-x-hidden">
             <main className="w-full max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
                 
-                {/* Left Column: Onboarding & Philosophy, now collapsible */}
-                <motion.div 
-                    initial={{ opacity: 0, x: -20 }} 
-                    animate={{ opacity: 1, x: 0 }} 
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    className="flex flex-col gap-4"
-                >
+                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
                     <Accordion type="single" collapsible defaultValue="item-1" className="w-full bg-dark-card/60 border border-border rounded-xl shadow-lg">
                         <AccordionItem value="item-1" className="border-b border-fuchsia-800/50">
-                            <AccordionTrigger className="text-lg font-bold text-fuchsia-400 hover:no-underline px-4">
+                            <AccordionTrigger className="text-lg font-bold text-fuchsia-400 hover:no-underline px-4 text-left">
                                 <VibeContentRenderer content={onboardingContent[lang].title} />
                             </AccordionTrigger>
                             <AccordionContent><OnboardingBlock lang={lang} /></AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="item-2" className="border-none">
-                            <AccordionTrigger className="text-lg font-bold text-brand-green hover:no-underline px-4">
+                            <AccordionTrigger className="text-lg font-bold text-brand-green hover:no-underline px-4 text-left">
                                 <VibeContentRenderer content={t.philosophyTitle} />
                             </AccordionTrigger>
                             <AccordionContent><PhilosophyBlock t={t} /></AccordionContent>
@@ -104,7 +94,6 @@ function ActualPageContent() {
                     </Accordion>
                 </motion.div>
 
-                {/* Right Column: Core Tools, now more prominent */}
                 <div className="flex flex-col gap-4 md:gap-6">
                     <motion.section id="extractor" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
                         <RepoTxtFetcher ref={fetcherRef} />
