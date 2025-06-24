@@ -40,11 +40,11 @@ This is not a regular dev page. This is your portal to the SUPERVIBE ENGINE:
 - 100% WTF
 - Built for devs, dreamers, and reality remixers`,
     tldr: [
-      "**Scroll.** Let your brain catch up—yes, it’s a lot.",
-      "**Click “Extract Files”.** Instantly fetch source code to remix, patch, or build on.",
-      "**Drop your AI request or idea.** Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.",
-      "**AI + YOU = PR** The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.",
-      "**Level Up.** Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile). See your progress, unlock achievements, and flex with the VIBE TRIBE."
+      "<strong>Scroll.</strong> Let your brain catch up—yes, it’s a lot.",
+      "<strong>Click “Extract Files”.</strong> Instantly fetch source code to remix, patch, or build on.",
+      "<strong>Drop your AI request or idea.</strong> Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.",
+      "<strong>AI + YOU = PR</strong> The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.",
+      "<strong>Level Up.</strong> Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile). See your progress, unlock achievements, and flex with the VIBE TRIBE."
     ],
     whatisit: `/repo-xml = AI-powered remix lab for this project.
 SUPERVIBE ENGINE: Recursive workflow: Extract context → Feed to AI → Build, patch, merge → Repeat
@@ -53,7 +53,7 @@ No install, no gatekeeping, just instant hacking and learning.`,
 You’re co-piloting an AI-powered, cyberpunk, recursive dev studio.  
 You’re not asking “how do I code this?”  
 You’re asking “how do I LEVEL UP?”`,
-    levels: `🏆 **BADGES, LEVELS, & QUESTS**
+    levels: `🏆 <strong>BADGES, LEVELS, & QUESTS</strong>
 - Every PR, code fetch, or AI action = progress
 - Quests like “Fix a broken image”, “Ship an idea”, “Remix the matrix”, “Inception Swap”
 - Your CyberFitness Profile evolves: Level up, unlock perks, collect badges, and see your “Cognitive OS Version” change as you grow.`,
@@ -82,11 +82,11 @@ You’re asking “how do I LEVEL UP?”`,
 - 100% WTF
 - Для кодеров, мечтателей и всех, кто хочет создавать без барьеров`,
     tldr: [
-      "**Прокрути вниз.** Пусть мозг привыкнет – да, тут много нового.",
-      "**Жми “Извлечь файлы”.** Мгновенно получи исходники этого репозитория для экспериментов, фиксов и апгрейдов.",
-      "**Опиши свою идею или вопрос для ИИ.** Просто напиши: “Добавь темную тему”, “Исправь ошибку”, “Сделай по-киберпанковски”.",
-      "**ИИ + ТЫ = PR** Бот сгенерирует код, объяснит, и даст сразу создать Pull Request — без локальной сборки, без гита-колдунства.",
-      "**Прокачка!** Любое действие открывает новые перки, квесты и фичи (всё записывается в твой профиль CyberFitness). Следи за прогрессом, собирай ачивки, и становись частью VIBE TRIBE."
+      "<strong>Прокрути вниз.</strong> Пусть мозг привыкнет – да, тут много нового.",
+      "<strong>Жми “Извлечь файлы”.</strong> Мгновенно получи исходники этого репозитория для экспериментов, фиксов и апгрейдов.",
+      "<strong>Опиши свою идею или вопрос для ИИ.</strong> Просто напиши: “Добавь темную тему”, “Исправь ошибку”, “Сделай по-киберпанковски”.",
+      "<strong>ИИ + ТЫ = PR</strong> Бот сгенерирует код, объяснит, и даст сразу создать Pull Request — без локальной сборки, без гита-колдунства.",
+      "<strong>Прокачка!</strong> Любое действие открывает новые перки, квесты и фичи (всё записывается в твой профиль CyberFitness). Следи за прогрессом, собирай ачивки, и становись частью VIBE TRIBE."
     ],
     whatisit: `/repo-xml = лаборатория ремиксов на базе ИИ для этого проекта.
 SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай контекст → Кидай в ИИ → Собирай, чини, мержи → Повтори
@@ -95,7 +95,7 @@ SUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай ко
 Ты ко-пилотируешь ИИ-киберпанк студию, где каждое действие — новый левел.  
 Тут не спрашивают “как это закодить”,  
 тут спрашивают “как ПРОКАЧАТЬСЯ?”`,
-    levels: `🏆 **АЧИВКИ, УРОВНИ И КВЕСТЫ**
+    levels: `🏆 <strong>АЧИВКИ, УРОВНИ И КВЕСТЫ</strong>
 - Любой PR, файл или запрос к ИИ = прогресс
 - Квесты: “Почини картинку”, “Запусти идею”, “Ремиксуй матрицу”, “Inception Swap” и другие
 - Твой CyberFitness профиль растет: Новый уровень, перки, ачивки, и “Cognitive OS Version” — как у персонажа.`,
@@ -134,7 +134,7 @@ function LangOnboardingBlock({ lang }: { lang: "en" | "ru" }) {
         <div className="bg-gradient-to-r from-green-400/10 via-pink-400/10 to-purple-800/20 border-l-4 border-pink-500 rounded p-4 my-2 text-lg font-bold shadow-inner">
           <div className="mb-1">🚦 <span className="text-pink-300 font-extrabold">TL;DR / Быстрый старт:</span></div>
           <ul className="list-disc ml-7 space-y-1">
-            {t.tldr.map((l, i) => <li key={i} dangerouslySetInnerHTML={{ __html: l }} />)}
+            {t.tldr.map((l, i) => <li key={i}><VibeContentRenderer content={l} /></li>)}
           </ul>
         </div>
         <div>
@@ -424,7 +424,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [lang, setLang] = useState<keyof typeof translations>('en');
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-    const [isDesktop, setIsDesktop] = useState(false);
     
     // State for sections visibility
     const [isIntroVisible, setIsIntroVisible] = useState(true);
@@ -433,16 +432,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
     const [isCtaVisible, setIsCtaVisible] = useState(true); 
     const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
-
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(min-width: 768px)'); // md breakpoint
-        const handleResize = () => setIsDesktop(mediaQuery.matches);
-        
-        handleResize(); // Set initial state on client
-        mediaQuery.addEventListener('change', handleResize);
-        
-        return () => mediaQuery.removeEventListener('change', handleResize);
-    }, []);
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -575,13 +564,10 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     <motion.img
                         src={XUINITY_EMBLEM}
                         alt="CyberVibe Mascot"
-                        className="fixed top-0 h-screen w-auto object-contain pointer-events-none"
-                        initial={isDesktop ? { x: "100%", opacity: 0 } : { opacity: 0 }}
-                        animate={
-                            isDesktop
-                            ? { x: "50%", right: 0, opacity: 0.2, width: 'auto' }
-                            : { x: "-50%", left: "50%", opacity: 0.1, width: "100%" }
-                        }
+                        className="fixed top-0 right-0 h-screen w-auto object-contain pointer-events-none"
+                        style={{ transform: 'translateX(50%)' }}
+                        initial={{ x: "100%", opacity: 0 }}
+                        animate={{ x: "50%", opacity: 0.15 }}
                         transition={{ duration: 1.5, ease: "circOut" }}
                     />
 
