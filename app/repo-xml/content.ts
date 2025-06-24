@@ -1,11 +1,9 @@
 /**
- * @file The content repository for the SUPERVIBE STUDIO.
- * This module contains all user-facing text, translations, and philosophical tenets.
- * It is the single source of truth for the "Vibe" of the page.
- * Last Edited By: The Architect
+ * @file The content repository and Vibe manifest for the SUPERVIBE STUDIO.
+ * This is the single source of truth for all user-facing text and philosophical tenets.
+ * Last Overhauled By: The Architect
  */
 
-// --- Constants ---
 export const CYBERWTF_BADGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png";
 export const XUINITY_EMBLEM_URL = "https://github.com/user-attachments/assets/910a623e-1c9d-4630-a8b4-7c361565dc97";
 
@@ -70,7 +68,6 @@ export const onboardingContent = {
     ready: "Готов(а)? Погнали! Добро пожаловать в CYBERVIBE."
   }
 };
-
 
 // --- Core Page Translations ---
 export const translations = {
