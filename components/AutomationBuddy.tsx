@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRepoXmlPageContext, WorkflowStep } from "@/contexts/RepoXmlPageContext";
-import { debugLogger as logger } from '@/lib/debugLogger';
-import useInactivityTimer from "@/hooks/useInactivityTimer";
-
-// Subcomponents
+import { FaExclamation, FaSpinner } from "react-icons/fa6";
 import { FloatingActionButton } from "./stickyChat_components/FloatingActionButton";
 import { SpeechBubble } from "./stickyChat_components/SpeechBubble";
 import { CharacterDisplay } from "./stickyChat_components/CharacterDisplay";
 import { SuggestionList } from "./stickyChat_components/SuggestionList";
+import { useRepoXmlPageContext, WorkflowStep } from "@/contexts/RepoXmlPageContext";
+import { debugLogger as logger } from '@/lib/debugLogger';
+import useInactivityTimer from "@/hooks/useInactivityTimer";
 import VibeContentRenderer from './VibeContentRenderer';
 
 // --- Constants & Types ---
@@ -20,154 +19,100 @@ const BUDDY_ALT_TEXT = "Automation Buddy";
 interface Suggestion { id: string; text: string; action?: () => any; icon?: React.ReactNode; disabled?: boolean; tooltip?: string; }
 
 // --- Animation Variants ---
-const containerVariants = { hidden: { opacity: 0, x: 300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08 } }, exit: { opacity: 0, x: 300, transition: { duration: 0.3 } } };
-const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } } };
+const containerVariants = { hidden: { opacity: 0, x: 300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: 300, transition: { duration: 0.3 } }, };
+const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
 const fabVariants = { hidden: { scale: 0, opacity: 0, rotate: 45 }, visible: { scale: 1, opacity: 1, rotate: 0, transition: { type: "spring", stiffness: 260, damping: 20 } }, exit: { scale: 0, opacity: 0, rotate: -45, transition: { duration: 0.2 } } };
 const notificationVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1, transition: { type: "spring", stiffness: 500, damping: 30 } }, exit: { scale: 0, opacity: 0 } };
 
+// --- Main Component ---
 const AutomationBuddy: React.FC = () => {
-    const [isMounted, setIsMounted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const hasOpenedDueToInactivityRef = useRef(false);
-    const [hasNewSuggestions, setHasNewSuggestions] = useState(false);
-    const previousSuggestionIds = useRef<Set<string>>(new Set());
     
+    // Using the context directly for state and triggers
     const context = useRepoXmlPageContext();
     const { getXuinityMessage, ...triggers } = context;
 
-    // Inactivity timer to prompt the user
     useInactivityTimer(INACTIVITY_TIMEOUT_MS, () => {
-        if (isMounted && !isOpen && !hasOpenedDueToInactivityRef.current && context.showComponents) {
-            logger.log("[AutomationBuddy] Inactivity detected, auto-opening.");
+        if (!isOpen && !hasOpenedDueToInactivityRef.current && context.showComponents) {
             setIsOpen(true);
             hasOpenedDueToInactivityRef.current = true;
-            setHasNewSuggestions(false);
         }
     }, undefined, "AutomationBuddy");
     
     const activeMessage = useMemo(() => {
-        if (!isMounted) return "Загрузка...";
-        return typeof getXuinityMessage === 'function' ? getXuinityMessage() : "Анализ ситуации...";
-    }, [isMounted, getXuinityMessage]);
+        return typeof getXuinityMessage === 'function' ? getXuinityMessage() : "Analyzing...";
+    }, [getXuinityMessage]);
 
     const suggestions = useMemo((): Suggestion[] => {
-        const suggestionsList: Suggestion[] = [];
-        if (!isMounted || !triggers.triggerFetch) return [];
-
+        if (!triggers.triggerFetch) return []; // Context not ready
+        
         const {
             currentStep, fetchStatus, repoUrlEntered, filesFetched, selectedFetcherFiles, kworkInputHasContent,
             aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading,
-            loadingPrs, targetBranchName, manualBranchName, isParsing, currentAiRequestId, imageReplaceTask
+            loadingPrs, targetBranchName, manualBranchName, isParsing, imageReplaceTask
         } = triggers;
 
         const isAnyLoading = fetchStatus === 'loading' || fetchStatus === 'retrying' || assistantLoading || isParsing || aiActionLoading || loadingPrs;
-        const effectiveBranch = manualBranchName?.trim() || targetBranchName || 'default';
-        const createOrUpdateActionText = targetBranchName ? `Обновить Ветку '${targetBranchName}'` : "Создать PR";
-
-        // This function encapsulates adding a suggestion to the list with all checks
-        const add = (id: string, text: string, action: (() => any) | undefined, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
-            if (condition) {
-                const finalDisabled = disabled || isAnyLoading; // Global loading state check
-                suggestionsList.push({ id, text, action: action || (() => {}), icon, disabled: finalDisabled, tooltip });
-            }
-        };
-
+        const suggestionsList: Suggestion[] = [];
+        
         if (imageReplaceTask) {
-            add('img-task-active', "Задача: Замена Картинки", undefined, <VibeContentRenderer content="::FaImages::" />, true, true, "Автоматический процесс замены изображения активен.");
-            return suggestionsList;
+             suggestionsList.push({ id: 'img-task-active', text: "Задача: Замена Картинки", icon: <VibeContentRenderer content="::FaImages::" />, disabled: true, tooltip: "Авто-процесс активен." });
+             return suggestionsList;
         }
 
         switch (currentStep) {
             case 'idle':
             case 'ready_to_fetch':
-                add('fetch', `Извлечь Файлы (${effectiveBranch})`, triggers.triggerFetch, <VibeContentRenderer content="::FaDownload::" />, repoUrlEntered);
+                if(repoUrlEntered) suggestionsList.push({ id: 'fetch', text: `Извлечь Файлы`, action: triggers.triggerFetch, icon: <VibeContentRenderer content="::FaDownload::" /> });
                 break;
             case 'fetch_failed':
-                add('retry-fetch', "Ошибка! Попробовать Снова?", triggers.triggerFetch, <VibeContentRenderer content="::FaArrowRotateRight className='text-red-400'::" />);
+                suggestionsList.push({ id: 'retry-fetch', text: "Ошибка! Попробовать Снова?", action: () => triggers.triggerFetch(true), icon: <VibeContentRenderer content="::FaArrowRotateRight className='text-red-400'::" /> });
                 break;
             case 'files_fetched':
             case 'files_fetched_highlights':
-                add('select-highlighted', "Выбрать Связанные", triggers.triggerSelectHighlighted, <VibeContentRenderer content="::FaHighlighter::" />);
-                add('add-selected', `В Контекст (${selectedFetcherFiles.size})`, triggers.triggerAddSelectedToKwork, <VibeContentRenderer content="::FaPlus::" />, selectedFetcherFiles.size > 0);
-                add('copy-kwork', "Скопировать Запрос", triggers.triggerCopyKwork, <VibeContentRenderer content="::FaCopy::" />, kworkInputHasContent);
+                if (triggers.primaryHighlightedPath) suggestionsList.push({ id: 'select-highlighted', text: "Выбрать Связанные", action: triggers.triggerSelectHighlighted, icon: <VibeContentRenderer content="::FaHighlighter::" /> });
+                if (selectedFetcherFiles.size > 0) suggestionsList.push({ id: 'add-selected', text: `В Контекст (${selectedFetcherFiles.size})`, action: triggers.triggerAddSelectedToKwork, icon: <VibeContentRenderer content="::FaPlus::" /> });
+                if (!kworkInputHasContent) suggestionsList.push({ id: 'goto-kwork-empty', text: "Написать Запрос AI?", action: () => triggers.scrollToSection('kwork-input-section'), icon: <VibeContentRenderer content="::FaKeyboard::" /> });
                 break;
             case 'files_selected':
             case 'request_written':
-                add('add-selected', `В Контекст (${selectedFetcherFiles.size})`, triggers.triggerAddSelectedToKwork, <VibeContentRenderer content="::FaPlus::" />, selectedFetcherFiles.size > 0);
-                add('copy-kwork', "Скопировать Запрос", triggers.triggerCopyKwork, <VibeContentRenderer content="::FaCopy::" />, kworkInputHasContent);
+                if (selectedFetcherFiles.size > 0) suggestionsList.push({ id: 'add-selected', text: `В Контекст (${selectedFetcherFiles.size})`, action: triggers.triggerAddSelectedToKwork, icon: <VibeContentRenderer content="::FaPlus::" /> });
+                if (kworkInputHasContent) suggestionsList.push({ id: 'copy-kwork', text: "Скопировать Запрос", action: triggers.triggerCopyKwork, icon: <VibeContentRenderer content="::FaCopy::" /> });
                 break;
             case 'request_copied':
             case 'response_pasted':
-                add('parse-response', "➡️ Разобрать Ответ", triggers.triggerParseResponse, <VibeContentRenderer content="::FaWandMagicSparkles::" />, aiResponseHasContent);
+                 if (aiResponseHasContent) suggestionsList.push({ id: 'parse-response', text: "➡️ Разобрать Ответ", action: triggers.triggerParseResponse, icon: <VibeContentRenderer content="::FaWandMagicSparkles::" /> });
                 break;
             case 'pr_ready':
-                add('create-pr', createOrUpdateActionText, triggers.triggerCreateOrUpdatePR, <VibeContentRenderer content={targetBranchName ? "::FaCodeBranch::" : "::FaGithub::"} />, selectedAssistantFiles.size > 0);
-                add('select-all-parsed', "Выбрать Все", triggers.triggerSelectAllParsed, <VibeContentRenderer content="::FaListCheck::" />, filesParsed);
+                const actionText = targetBranchName ? `Обновить Ветку` : "Создать PR";
+                const actionIcon = targetBranchName ? "::FaCodeBranch::" : "::FaGithub::";
+                if (filesParsed) suggestionsList.push({ id: 'create-pr', text: actionText, action: triggers.triggerCreateOrUpdatePR, icon: <VibeContentRenderer content={actionIcon} />, disabled: selectedAssistantFiles.size === 0 });
+                if (filesParsed) suggestionsList.push({ id: 'select-all-parsed', text: "Выбрать Все", action: triggers.triggerSelectAllParsed, icon: <VibeContentRenderer content="::FaListCheck::" /> });
                 break;
+            default: break;
         }
 
         if (isAnyLoading) {
-            let loadingText = "Обработка...";
-            if (fetchStatus === 'loading' || fetchStatus === 'retrying') loadingText = "Загрузка...";
-            if (isParsing) loadingText = "Разбор ответа...";
-            if (aiActionLoading) loadingText = `Жду AI...`;
-            add('loading-indicator', loadingText, undefined, <VibeContentRenderer content="::FaSpinner className='animate-spin'::" />, true, true);
+            suggestionsList.unshift({ id: 'loading', text: 'Обработка...', icon: <VibeContentRenderer content="::FaSpinner className='animate-spin'::" />, disabled: true });
         }
-
+        
         return suggestionsList;
-    }, [isMounted, getXuinityMessage, triggers]);
+    }, [getXuinityMessage, triggers]);
     
-    // --- Lifecycle & Handlers ---
-    useEffect(() => { setIsMounted(true); }, []);
-    
-    useEffect(() => {
-        if (!isMounted || isOpen) {
-            if(isOpen) setHasNewSuggestions(false);
-            return;
-        }
-        const currentIds = new Set(suggestions.map(s => s.id));
-        const prevIds = previousSuggestionIds.current;
-        const hasMeaningfulChange = suggestions.length !== prevIds.size || ![...currentIds].every(id => prevIds.has(id));
-        if (hasMeaningfulChange && !suggestions.every(s => s.id.includes('loading'))) {
-            setHasNewSuggestions(true);
-        }
-        previousSuggestionIds.current = currentIds;
-    }, [isMounted, suggestions, isOpen]);
-
-    const handleSuggestionClick = (suggestion: Suggestion) => {
-        if (suggestion.disabled || !suggestion.action) return;
-        suggestion.action();
-        if (!suggestion.id.includes('toggle-settings')) {
-            setIsOpen(false);
-        }
-    };
-    
-    const handleFabClick = () => {
-        const newIsOpenState = !isOpen;
-        setIsOpen(newIsOpenState);
-        if (newIsOpenState) {
-            hasOpenedDueToInactivityRef.current = true;
-            setHasNewSuggestions(false);
-        } else {
-            requestAnimationFrame(() => document.body.focus());
-        }
-    };
-
+    const handleFabClick = () => { setIsOpen(prev => !prev); hasOpenedDueToInactivityRef.current = true; };
     const handleOverlayClick = () => setIsOpen(false);
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
-
-    // The component render logic
-    if (!isMounted || !context.showComponents) return null;
 
     return (
         <AnimatePresence>
             {isOpen ? (
-                <motion.div key="buddy-dialog-overlay" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-2 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={handleOverlayClick} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <motion.div variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="relative p-2 sm:p-4 w-full max-w-xs sm:max-w-sm flex flex-col items-center sm:items-end bg-transparent" onClick={handleDialogClick}>
+                <motion.div key="buddy-overlay" className="fixed inset-0 z-50 flex items-end justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={handleOverlayClick} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <motion.div variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="relative p-2 sm:p-4 w-full max-w-xs sm:max-w-sm flex flex-col items-center bg-transparent" onClick={handleDialogClick}>
                         <SpeechBubble message={activeMessage} variants={childVariants} bubblePosition="right" />
-                        <div className="flex flex-col-reverse sm:flex-row items-center sm:items-end w-full gap-2 sm:gap-4 mt-2">
+                        <div className="flex flex-col-reverse sm:flex-row items-center sm:items-end w-full gap-2 mt-2">
                             <div className="flex-grow w-full">
-                                <SuggestionList suggestions={suggestions} onSuggestionClick={handleSuggestionClick} listVariants={childVariants} itemVariants={childVariants} className="items-stretch sm:items-end" />
+                                <SuggestionList suggestions={suggestions} onSuggestionClick={(s) => { if(s.action) s.action(); setIsOpen(false); }} listVariants={childVariants} itemVariants={childVariants} className="items-stretch sm:items-end" />
                             </div>
                             <CharacterDisplay characterImageUrl={BUDDY_IMAGE_URL} characterAltText={BUDDY_ALT_TEXT} githubProfile={null} variants={childVariants} />
                         </div>
@@ -182,13 +127,6 @@ const AutomationBuddy: React.FC = () => {
                             className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl rounded-full"
                             aria-label="Открыть Automation Buddy"
                          />
-                         <AnimatePresence>
-                             {hasNewSuggestions && (
-                                 <motion.div key="buddy-notification" variants={notificationVariants} initial="hidden" animate="visible" exit="exit" className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center border-2 border-gray-900 shadow-md">
-                                     <VibeContentRenderer content="::FaExclamation::" className="text-white text-xs" />
-                                 </motion.div>
-                             )}
-                         </AnimatePresence>
                     </motion.div>
                 </div>
             )}
