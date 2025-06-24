@@ -11,7 +11,7 @@ import AICodeAssistant from "@/components/AICodeAssistant";
 import AutomationBuddy from "@/components/AutomationBuddy";
 
 // Extracted Content
-import { translations, onboardingContent } from './content';
+import { translations, onboardingContent, CYBERWTF_BADGE_URL } from './content';
 
 // Onboarding Component (Self-contained & Clean)
 const OnboardingBlock: React.FC<{ lang: "en" | "ru" }> = ({ lang }) => {
