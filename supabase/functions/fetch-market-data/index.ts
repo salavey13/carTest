@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { HmacSha256 } from 'https://deno.land/std@0.168.0/hash/sha256.ts';
+import { HmacSha256 } from 'https://deno.land/std@0.177.0/hash/sha256.ts';
 
 const log = (message: string, data?: any) => console.log(`[fetch-market-data] ${new Date().toISOString()}: ${message}`, data || '');
 
