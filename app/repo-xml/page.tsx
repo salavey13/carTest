@@ -11,10 +11,8 @@ import RepoTxtFetcher from "@/components/RepoTxtFetcher";
 import AICodeAssistant from "@/components/AICodeAssistant";
 import AutomationBuddy from "@/components/AutomationBuddy";
 
-// Extracted Content
 import { translations, onboardingContent, CYBERWTF_BADGE_URL } from './content';
 
-// Onboarding Component (Self-contained & Clean)
 const OnboardingBlock: React.FC<{ lang: "en" | "ru" }> = ({ lang }) => {
   const t = onboardingContent[lang];
   return (
@@ -44,7 +42,6 @@ const OnboardingBlock: React.FC<{ lang: "en" | "ru" }> = ({ lang }) => {
   );
 };
 
-// Philosophy Component (Self-contained & Clean)
 const PhilosophyBlock: React.FC<{ t: (typeof translations.ru) }> = ({ t }) => (
     <div className="px-2 sm:px-4 py-2 space-y-4 text-sm prose prose-sm prose-invert max-w-none">
         <VibeContentRenderer content={t.philosophyCore} />
@@ -60,7 +57,6 @@ const PhilosophyBlock: React.FC<{ t: (typeof translations.ru) }> = ({ t }) => (
     </div>
 );
 
-// The main page component, now accepting props to re-enable automation flow.
 function ActualPageContent({ initialPath, initialIdea }: { initialPath: string | null; initialIdea: string | null; }) {
     const { user } = useAppContext();
     const { fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef } = useRepoXmlPageContext();
@@ -116,7 +112,6 @@ function ActualPageContent({ initialPath, initialIdea }: { initialPath: string |
     );
 }
 
-// Wrapper component to safely use the useSearchParams hook inside Suspense.
 function RepoXmlPageInternalContent() {
   const searchParams = useSearchParams();
   const path = searchParams.get('path');

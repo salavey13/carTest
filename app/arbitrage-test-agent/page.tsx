@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { supabaseAdmin } from '@/hooks/supabase'; // Direct read-only for admin pages is acceptable
-import { triggerMarketDataFetch, triggerCentralAnalyzer } from './actions'; // <-- Corrected import path
+import { triggerMarketDataFetch, triggerCentralAnalyzer } from './actions';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,7 +55,6 @@ const DataTable: React.FC<{ data: any[] }> = ({ data }) => {
     </div>
   );
 };
-
 
 const ArbitrageTestAgentPage = () => {
   const { isAdmin, isLoading: isAuthLoading } = useAppContext();
@@ -129,14 +128,13 @@ const ArbitrageTestAgentPage = () => {
 
   const getButtonContent = (actionName: string, icon: string, text: string) => {
     const state = triggerStates[actionName];
-    // FIX: Render text alongside the icon in all states
     const iconComponent = 
       state === 'loading' ? <VibeContentRenderer content="::FaSpinner className='animate-spin'::" /> :
       state === 'success' ? <VibeContentRenderer content="::FaCheckCircle::" /> :
       state === 'error' ? <VibeContentRenderer content="::FaTriangleExclamation::" /> :
       <VibeContentRenderer content={icon} />;
     
-    return <span className="flex items-center justify-center gap-2">{iconComponent} {text}</span>;
+    return <span className="flex items-center justify-center gap-2">{iconComponent}{text}</span>;
   };
 
   if (isAuthLoading) {
