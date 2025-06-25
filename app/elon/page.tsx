@@ -25,7 +25,6 @@ import type {
   ArbitrageSettings,
 } from './arbitrage_scanner_types';
 
-
 interface TeslaStockData {
   price: number;
   change: number;
@@ -157,13 +156,13 @@ const formatNum = (num: number | undefined, digits = 2) => {
 
 export default function ElonPage() {
   const { dbUser, isAuthenticated, isLoading: appContextLoading, user: tgUser } = useAppContext();
-  const [currentLang, setCurrentLang] = useState<'ru' | 'en'>('en'); // Default to 'en' or a sensible fallback
+  const [currentLang, setCurrentLang] = useState<'ru' | 'en'>('en'); 
 
   useEffect(() => {
-    let langToSet: 'ru' | 'en' = 'en'; // Default to 'en'
-    if (dbUser?.language_code) { // Prioritize dbUser's language code
+    let langToSet: 'ru' | 'en' = 'en'; 
+    if (dbUser?.language_code) { 
         langToSet = dbUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
-    } else if (tgUser?.language_code) { // Fallback to Telegram user's language code
+    } else if (tgUser?.language_code) { 
         langToSet = tgUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
     }
     setCurrentLang(langToSet);
@@ -180,7 +179,6 @@ export default function ElonPage() {
     return text;
   }, [currentLang]);
 
-
   const [stockData, setStockData] = useState<TeslaStockData | null>(null);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
@@ -191,7 +189,6 @@ export default function ElonPage() {
   const [isLoadingArbitrageScan, setIsLoadingArbitrageScan] = useState(false);
   const [currentArbitrageSettings, setCurrentArbitrageSettings] = useState<ArbitrageSettings | null>(null);
   const [isLoadingArbitrageSettings, setIsLoadingArbitrageSettings] = useState(false);
-
 
   useEffect(() => {
     if (dbUser && dbUser.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active') {
@@ -230,7 +227,6 @@ export default function ElonPage() {
     setIsLoadingArbitrageSettings(false);
   }, [dbUser?.user_id, isAuthenticated, t]);
 
-
   useEffect(() => {
     if (hasAccess) {
       fetchStockPrice();
@@ -267,7 +263,6 @@ export default function ElonPage() {
     }
     setIsLoadingArbitrageScan(false);
   }, [dbUser?.user_id, currentArbitrageSettings, t]);
-
 
   const handlePurchaseAccess = async () => {
     if (!isAuthenticated || !dbUser?.user_id) {
@@ -446,21 +441,20 @@ export default function ElonPage() {
                                 disabled={isLoadingArbitrageScan || !currentArbitrageSettings || isLoadingArbitrageSettings}
                                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-orbitron py-3 text-lg rounded-md shadow-lg hover:shadow-cyan-500/50 transition-all"
                             >
-                                {isLoadingArbitrageScan ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaSearchDollar className='mr-2'::" /> }
+                                {isLoadingArbitrageScan ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaMagnifyingGlassDollar className='mr-2'::" /> }
                                 {isLoadingArbitrageScan ? t("scanningButton") : t("scanForAlphaButton")}
                             </Button>
 
                             {currentArbitrageSettings && !isLoadingArbitrageSettings && (
                                 <div className="p-3 bg-gray-800/50 border border-purple-600/50 rounded-lg text-xs">
-                                    <h4 className="text-sm font-orbitron text-gray-700 dark:text-purple-300 mb-1">{t("currentScannerSettingsTitle")}</h4>
-                                    <p className="text-gray-600 dark:text-gray-400">{t("minSpreadLabel")} <span className="text-gray-800 dark:text-brand-yellow">{currentArbitrageSettings.minSpreadPercent}%</span> | {t("tradeVolumeLabel")} <span className="text-gray-800 dark:text-brand-yellow">${currentArbitrageSettings.defaultTradeVolumeUSD}</span></p>
-                                    <p className="text-gray-600 dark:text-gray-400">{t("exchangesLabel")} <span className="text-gray-800 dark:text-brand-yellow">{currentArbitrageSettings.enabledExchanges.join(', ') || t("noValue")}</span></p>
-                                    <p className="text-gray-600 dark:text-gray-400">{t("pairsLabel")} <span className="text-gray-800 dark:text-brand-yellow">{currentArbitrageSettings.trackedPairs.join(', ') || t("noValue")}</span></p>
+                                    <h4 className="text-sm font-orbitron text-purple-300 mb-1">{t("currentScannerSettingsTitle")}</h4>
+                                    <p className="text-gray-400">{t("minSpreadLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.minSpreadPercent}%</span> | {t("tradeVolumeLabel")} <span className="text-brand-yellow">${currentArbitrageSettings.defaultTradeVolumeUSD}</span></p>
+                                    <p className="text-gray-400">{t("exchangesLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.enabledExchanges.join(', ') || t("noValue")}</span></p>
+                                    <p className="text-gray-400">{t("pairsLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.trackedPairs.join(', ') || t("noValue")}</span></p>
                                     <Link href="/settings" className="text-brand-cyan hover:underline mt-1 block">{t("changeSettingsLink")}</Link>
                                 </div>
                             )}
                             {isLoadingArbitrageSettings && <p className="text-center text-purple-400"><VibeContentRenderer content="::FaSpinner className='animate-spin'::" /> {t("loadingSettings")}</p>}
-
 
                             {arbitrageOpportunities.length > 0 && (
                             <div className="mt-6 space-y-4">
@@ -484,27 +478,27 @@ export default function ElonPage() {
                                         </span>
                                         <span className="text-xl font-bold">{formatNum(op.profitPercentage, 3)}%</span>
                                         </CardTitle>
-                                        <CardDescription className="text-xs text-gray-600 dark:text-gray-400">
+                                        <CardDescription className="text-xs text-gray-400">
                                         Profit: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum(op.potentialProfitUSD)} (on <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum(op.tradeVolumeUSD,0)} vol)
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="text-sm space-y-1">
-                                        <p className="font-mono text-gray-800 dark:text-gray-300 text-xs md:text-sm">{(op as any).details}</p>
+                                        <p className="font-mono text-gray-300 text-xs md:text-sm">{(op as any).details}</p>
                                         {op.type === '2-leg' && (
                                             <>
-                                                <p className="text-gray-700 dark:text-gray-300"><VibeContentRenderer content="::FaArrowRightFromBracket className='inline mr-1 text-blue-600 dark:text-blue-400'::" /> Buy: <strong>{(op as TwoLegArbitrageOpportunity).buyExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).buyPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).buyFeePercentage,3)}%)</p>
-                                                <p className="text-gray-700 dark:text-gray-300"><VibeContentRenderer content="::FaArrowRightToBracket className='inline mr-1 text-teal-600 dark:text-teal-400'::" /> Sell: <strong>{(op as TwoLegArbitrageOpportunity).sellExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).sellPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).sellFeePercentage,3)}%)</p>
-                                                <p className="text-xs text-gray-600 dark:text-gray-500">Network Fee: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)}</p>
+                                                <p className="text-gray-300"><VibeContentRenderer content="::FaArrowRightFromBracket className='inline mr-1 text-blue-400'::" /> Buy: <strong>{(op as TwoLegArbitrageOpportunity).buyExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).buyPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).buyFeePercentage,3)}%)</p>
+                                                <p className="text-gray-300"><VibeContentRenderer content="::FaArrowRightToBracket className='inline mr-1 text-teal-400'::" /> Sell: <strong>{(op as TwoLegArbitrageOpportunity).sellExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).sellPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).sellFeePercentage,3)}%)</p>
+                                                <p className="text-xs text-gray-500">Network Fee: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)}</p>
                                             </>
                                         )}
                                         {op.type === '3-leg' && (
-                                            <div className="text-xs text-gray-700 dark:text-gray-400 space-y-0.5">
+                                            <div className="text-xs text-gray-400 space-y-0.5">
                                                 {(op as ThreeLegArbitrageOpportunity).legs.map((leg, i) => (
                                                     <p key={i}><VibeContentRenderer content="::FaRepeat className='inline mr-1'::" /> Leg {i+1}: {leg.action.toUpperCase()} {leg.asset} on {leg.pair} @ ~${formatNum(leg.price, leg.pair.includes('BTC') ? 5 : 2)} (Fee: {formatNum(leg.feeApplied*100,3)}%)</p>
                                                 ))}
                                             </div>
                                         )}
-                                        <p className="text-xs text-gray-600 dark:text-gray-500 pt-1">Identified: {new Date(op.timestamp).toLocaleString()}</p>
+                                        <p className="text-xs text-gray-500 pt-1">Identified: {new Date(op.timestamp).toLocaleString()}</p>
                                     </CardContent>
                                     </Card>
                                 </motion.div>

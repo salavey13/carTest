@@ -15,9 +15,9 @@ interface MarketData {
 
 const SYMBOLS_TO_MONITOR = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
-// --- Hardened Data Fetching Functions ---
-async function fetchBinanceData(): Promise<MarketData[]> {
+async function fetchBinanceData(): Promise<{data: MarketData[], errors: string[]}> {
     const results: MarketData[] = [];
+    const errors: string[] = [];
     for (const symbol of SYMBOLS_TO_MONITOR) {
         try {
             const [tickerRes, volumeRes] = await Promise.all([
@@ -26,77 +26,77 @@ async function fetchBinanceData(): Promise<MarketData[]> {
             ]);
 
             if (tickerRes.code || volumeRes.code || !tickerRes.bidPrice || !tickerRes.askPrice || !volumeRes.lastPrice || !volumeRes.volume) {
-                log(`Binance API error or incomplete data for ${symbol}`, { tickerRes, volumeRes });
+                const errorMsg = `Binance API error for ${symbol}: ${tickerRes.msg || volumeRes.msg || 'Incomplete data'}`;
+                log(errorMsg, { tickerRes, volumeRes });
+                errors.push(errorMsg);
                 continue;
             }
 
-            // --- DATA VALIDATION ---
             const bid_price = parseFloat(tickerRes.bidPrice);
             const ask_price = parseFloat(tickerRes.askPrice);
             const last_price = parseFloat(volumeRes.lastPrice);
             const volume = parseFloat(volumeRes.volume);
 
             if (isNaN(bid_price) || isNaN(ask_price) || isNaN(last_price) || isNaN(volume)) {
-                log(`Binance data validation failed (NaN) for ${symbol}`, { tickerRes, volumeRes });
+                 const errorMsg = `Binance data validation failed (NaN) for ${symbol}`;
+                 log(errorMsg, { tickerRes, volumeRes });
+                 errors.push(errorMsg);
                 continue;
             }
 
             results.push({
-                exchange: 'binance',
-                symbol,
-                bid_price,
-                ask_price,
-                last_price,
-                volume,
-                timestamp: new Date().toISOString()
+                exchange: 'binance', symbol, bid_price, ask_price, last_price, volume, timestamp: new Date().toISOString()
             });
         } catch (e) {
-            log(`Failed to fetch or parse Binance data for ${symbol}`, e.message);
+            const errorMsg = `Failed to fetch/parse Binance data for ${symbol}: ${e.message}`;
+            log(errorMsg);
+            errors.push(errorMsg);
         }
     }
-    return results;
+    return { data: results, errors };
 }
 
-async function fetchBybitData(): Promise<MarketData[]> {
+async function fetchBybitData(): Promise<{data: MarketData[], errors: string[]}> {
     const results: MarketData[] = [];
+    const errors: string[] = [];
     for (const symbol of SYMBOLS_TO_MONITOR) {
         try {
             const response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${symbol}`);
+            if (!response.ok) {
+                throw new Error(`Bybit API returned non-OK status: ${response.status}`);
+            }
             const data = await response.json();
             const ticker = data?.result?.list?.[0];
 
             if (ticker && ticker.bid1Price && ticker.ask1Price && ticker.lastPrice && ticker.volume24h) {
-                // --- DATA VALIDATION ---
                 const bid_price = parseFloat(ticker.bid1Price);
                 const ask_price = parseFloat(ticker.ask1Price);
                 const last_price = parseFloat(ticker.lastPrice);
                 const volume = parseFloat(ticker.volume24h);
 
                 if (isNaN(bid_price) || isNaN(ask_price) || isNaN(last_price) || isNaN(volume)) {
-                    log(`Bybit data validation failed (NaN) for ${symbol}`, { ticker });
+                    const errorMsg = `Bybit data validation failed (NaN) for ${symbol}`;
+                    log(errorMsg, { ticker });
+                    errors.push(errorMsg);
                     continue;
                 }
-
                 results.push({
-                    exchange: 'bybit',
-                    symbol,
-                    bid_price,
-                    ask_price,
-                    last_price,
-                    volume,
-                    timestamp: new Date().toISOString()
+                    exchange: 'bybit', symbol, bid_price, ask_price, last_price, volume, timestamp: new Date().toISOString()
                 });
             } else {
-                 log(`Bybit API error or incomplete data for ${symbol}`, { ticker });
+                 const errorMsg = `Bybit API error or incomplete data for ${symbol}: ${data?.retMsg || 'Unknown structure'}`;
+                 log(errorMsg, { responseData: data });
+                 errors.push(errorMsg);
             }
         } catch (e) {
-            log(`Failed to fetch or parse Bybit data for ${symbol}`, e.message);
+            const errorMsg = `Failed to fetch/parse Bybit data for ${symbol}: ${e.message}`;
+            log(errorMsg);
+            errors.push(errorMsg);
         }
     }
-    return results;
+    return { data: results, errors };
 }
 
-// --- Main Server Logic (Auth part is now correct) ---
 Deno.serve(async (req: Request) => {
   const CUSTOM_AUTH_SECRET = Deno.env.get('CRON_SECRET')!;
   const receivedSecret = req.headers.get('X-Vibe-Auth-Secret');
@@ -114,22 +114,33 @@ Deno.serve(async (req: Request) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     log("Starting data fetch from exchanges...");
-    const [binanceData, bybitData] = await Promise.all([fetchBinanceData(), fetchBybitData()]);
+    const [{ data: binanceData, errors: binanceErrors }, { data: bybitData, errors: bybitErrors }] = await Promise.all([fetchBinanceData(), fetchBybitData()]);
+    
     const allMarketData = [...binanceData, ...bybitData];
-    log(`Fetched ${allMarketData.length} total valid records.`);
+    const allErrors = [...binanceErrors, ...bybitErrors];
 
-    if (allMarketData.length === 0) {
-      return new Response(JSON.stringify({ success: true, message: 'No valid data fetched, nothing to insert.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    log(`Fetched ${allMarketData.length} total valid records. Encountered ${allErrors.length} errors.`);
+
+    if (allMarketData.length > 0) {
+        const { error } = await supabaseAdmin.from('market_data').insert(allMarketData);
+        if (error) {
+            log('Supabase insert error:', error);
+            allErrors.push(`Supabase insert failed: ${error.message}`);
+        } else {
+            log("Data successfully inserted into Supabase.");
+        }
     }
 
-    const { error } = await supabaseAdmin.from('market_data').insert(allMarketData);
-    if (error) {
-        log('Supabase insert error:', error);
-        throw error;
+    if (allErrors.length > 0) {
+        // CRITICAL: Even if some data was inserted, we return an error if any part of the process failed.
+        // This prevents the frontend from thinking everything is fine when it's not.
+        const errorMessage = `Data fetch completed with errors: ${allErrors.join('; ')}`;
+        log(`RETURNING ERROR: ${errorMessage}`);
+        return new Response(JSON.stringify({ error: errorMessage, insertedCount: allMarketData.length }), { status: 502, headers: { 'Content-Type': 'application/json' } });
     }
 
-    log("Data successfully inserted into Supabase.");
-    return new Response(JSON.stringify({ success: true, count: allMarketData.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ success: true, count: allMarketData.length, message: "All data fetched and inserted successfully." }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
   } catch (error) {
     log('Critical error in edge function:', error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
