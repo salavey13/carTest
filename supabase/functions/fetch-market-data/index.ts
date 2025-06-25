@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { HmacSha256 } from 'https://deno.land/std@0.168.0/hash/sha256.ts';
 
 const log = (message: string, data?: any) => console.log(`[fetch-market-data] ${new Date().toISOString()}: ${message}`, data || '');
 
@@ -15,17 +16,21 @@ interface MarketData {
 
 const SYMBOLS_TO_MONITOR = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
-async function fetchBinanceData(): Promise<{data: MarketData[], errors: string[]}> {
+// --- Authenticated Data Fetching Functions ---
+
+async function fetchBinanceData(apiKey: string, apiSecret: string): Promise<{data: MarketData[], errors: string[]}> {
     const results: MarketData[] = [];
     const errors: string[] = [];
     for (const symbol of SYMBOLS_TO_MONITOR) {
         try {
+            // Public endpoints on Binance often work with just the API key in the header for higher rate limits.
+            // No signature is needed for these specific public ticker endpoints.
             const [tickerRes, volumeRes] = await Promise.all([
-                fetch(`https://api.binance.com/api/v3/ticker/bookTicker?symbol=${symbol}`).then(res => res.json()),
-                fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`).then(res => res.json())
+                fetch(`https://api.binance.com/api/v3/ticker/bookTicker?symbol=${symbol}`, { headers: { 'X-MBX-APIKEY': apiKey } }).then(res => res.json()),
+                fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`, { headers: { 'X-MBX-APIKEY': apiKey } }).then(res => res.json())
             ]);
 
-            if (tickerRes.code || volumeRes.code || !tickerRes.bidPrice || !tickerRes.askPrice || !volumeRes.lastPrice || !volumeRes.volume) {
+            if (tickerRes.code || volumeRes.code) {
                 const errorMsg = `Binance API error for ${symbol}: ${tickerRes.msg || volumeRes.msg || 'Incomplete data'}`;
                 log(errorMsg, { tickerRes, volumeRes });
                 errors.push(errorMsg);
@@ -56,17 +61,45 @@ async function fetchBinanceData(): Promise<{data: MarketData[], errors: string[]
     return { data: results, errors };
 }
 
-async function fetchBybitData(): Promise<{data: MarketData[], errors: string[]}> {
+async function fetchBybitData(apiKey: string, apiSecret: string): Promise<{data: MarketData[], errors: string[]}> {
     const results: MarketData[] = [];
     const errors: string[] = [];
+    const host = "https://api.bybit.com";
+
     for (const symbol of SYMBOLS_TO_MONITOR) {
         try {
-            const response = await fetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${symbol}`);
+            const timestamp = Date.now().toString();
+            const recvWindow = "5000";
+            const path = "/v5/market/tickers";
+            const queryString = `category=spot&symbol=${symbol}`;
+            
+            // Signature generation for Bybit
+            const toSign = timestamp + apiKey + recvWindow + queryString;
+            const signature = new HmacSha256(apiSecret).update(toSign).hex();
+
+            const response = await fetch(`${host}${path}?${queryString}`, {
+                headers: {
+                    'X-BAPI-API-KEY': apiKey,
+                    'X-BAPI-TIMESTAMP': timestamp,
+                    'X-BAPI-RECV-WINDOW': recvWindow,
+                    'X-BAPI-SIGN': signature
+                }
+            });
+            
             if (!response.ok) {
-                throw new Error(`Bybit API returned non-OK status: ${response.status}`);
+                const errorBody = await response.text();
+                throw new Error(`Bybit API returned non-OK status: ${response.status}. Body: ${errorBody}`);
             }
+
             const data = await response.json();
             const ticker = data?.result?.list?.[0];
+
+            if (data.retCode !== 0) {
+                 const errorMsg = `Bybit API returned error for ${symbol}: ${data.retMsg}`;
+                 log(errorMsg, { responseData: data });
+                 errors.push(errorMsg);
+                 continue;
+            }
 
             if (ticker && ticker.bid1Price && ticker.ask1Price && ticker.lastPrice && ticker.volume24h) {
                 const bid_price = parseFloat(ticker.bid1Price);
@@ -109,12 +142,25 @@ Deno.serve(async (req: Request) => {
   log('Function invoked securely.');
   
   try {
+    // Retrieve personal API keys from environment variables
+    const BINANCE_API_KEY = Deno.env.get('PERSONAL_BINANCE_API_KEY');
+    const BINANCE_API_SECRET = Deno.env.get('PERSONAL_BINANCE_API_SECRET');
+    const BYBIT_API_KEY = Deno.env.get('PERSONAL_BYBIT_API_KEY');
+    const BYBIT_API_SECRET = Deno.env.get('PERSONAL_BYBIT_API_SECRET');
+
+    if (!BYBIT_API_KEY || !BYBIT_API_SECRET || !BINANCE_API_KEY || !BINANCE_API_SECRET) {
+        throw new Error("One or more personal API keys are not set in environment variables.");
+    }
+    
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    log("Starting data fetch from exchanges...");
-    const [{ data: binanceData, errors: binanceErrors }, { data: bybitData, errors: bybitErrors }] = await Promise.all([fetchBinanceData(), fetchBybitData()]);
+    log("Starting authenticated data fetch from exchanges...");
+    const [{ data: binanceData, errors: binanceErrors }, { data: bybitData, errors: bybitErrors }] = await Promise.all([
+        fetchBinanceData(BINANCE_API_KEY, BINANCE_API_SECRET), 
+        fetchBybitData(BYBIT_API_KEY, BYBIT_API_SECRET)
+    ]);
     
     const allMarketData = [...binanceData, ...bybitData];
     const allErrors = [...binanceErrors, ...bybitErrors];
@@ -132,8 +178,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (allErrors.length > 0) {
-        // CRITICAL: Even if some data was inserted, we return an error if any part of the process failed.
-        // This prevents the frontend from thinking everything is fine when it's not.
         const errorMessage = `Data fetch completed with errors: ${allErrors.join('; ')}`;
         log(`RETURNING ERROR: ${errorMessage}`);
         return new Response(JSON.stringify({ error: errorMessage, insertedCount: allMarketData.length }), { status: 502, headers: { 'Content-Type': 'application/json' } });
