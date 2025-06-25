@@ -4,8 +4,8 @@ import React, { useState, useCallback, Suspense, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { supabaseAdmin } from '@/hooks/supabase'; // Direct read-only for admin pages is acceptable
-import { triggerMarketDataFetch, triggerCentralAnalyzer } from './actions'; // <-- Corrected import path
+import { supabaseAdmin } from '@/hooks/supabase';
+import { triggerMarketDataFetch, triggerCentralAnalyzer, runFullSimulation } from './actions';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,9 +56,8 @@ const DataTable: React.FC<{ data: any[] }> = ({ data }) => {
   );
 };
 
-
 const ArbitrageTestAgentPage = () => {
-  const { isAdmin, isLoading: isAuthLoading } = useAppContext();
+  const { isAdmin, isLoading: isAuthLoading, dbUser } = useAppContext();
   const [triggerStates, setTriggerStates] = useState<Record<string, 'idle' | 'loading' | 'success' | 'error'>>({});
   const [logs, setLogs] = useState<string[]>([]);
   const [rawData, setRawData] = useState<any[] | null>(null);
@@ -92,6 +91,14 @@ const ArbitrageTestAgentPage = () => {
     
     setTimeout(() => setTriggerStates(prev => ({ ...prev, [actionName]: 'idle' })), 3000);
   }, [addLog]);
+
+  const handleFullSimTrigger = useCallback(() => {
+    if (!dbUser?.user_id) {
+        toast.error("User ID not available. Cannot run simulation.");
+        return;
+    }
+    handleTrigger('Full Simulation', () => runFullSimulation(dbUser.user_id));
+  }, [dbUser, handleTrigger]);
 
   const fetchRawData = async (tableName: string) => {
     setTriggerStates(prev => ({ ...prev, fetchRawData: 'loading' }));
@@ -129,14 +136,13 @@ const ArbitrageTestAgentPage = () => {
 
   const getButtonContent = (actionName: string, icon: string, text: string) => {
     const state = triggerStates[actionName];
-    // FIX: Render text alongside the icon in all states
     const iconComponent = 
       state === 'loading' ? <VibeContentRenderer content="::FaSpinner className='animate-spin'::" /> :
       state === 'success' ? <VibeContentRenderer content="::FaCheckCircle::" /> :
       state === 'error' ? <VibeContentRenderer content="::FaTriangleExclamation::" /> :
       <VibeContentRenderer content={icon} />;
     
-    return <span className="flex items-center justify-center gap-2">{iconComponent} {text}</span>;
+    return <span className="flex items-center justify-center gap-2">{iconComponent}{text}</span>;
   };
 
   if (isAuthLoading) {
@@ -159,13 +165,21 @@ const ArbitrageTestAgentPage = () => {
           {/* Controls Section */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="bg-gray-800/60 border border-gray-700 shadow-inner">
-              <CardHeader><CardTitle className="text-xl font-orbitron text-brand-cyan">Engine Triggers</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-xl font-orbitron text-brand-cyan">Edge Function Triggers</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <Button className="w-full bg-cyan-600 hover:bg-cyan-500 text-black font-semibold shadow-md hover:shadow-cyan-glow transition-all" onClick={() => handleTrigger('Market Data Fetch', triggerMarketDataFetch)} disabled={triggerStates['Market Data Fetch'] === 'loading'}>
                   {getButtonContent('Market Data Fetch', '::FaSatelliteDish::', 'Trigger Market Data Fetch')}
                 </Button>
                 <Button className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold shadow-md hover:shadow-purple-glow transition-all" onClick={() => handleTrigger('Central Analyzer', triggerCentralAnalyzer)} disabled={triggerStates['Central Analyzer'] === 'loading'}>
                   {getButtonContent('Central Analyzer', '::FaBrain::', 'Trigger Central Analyzer')}
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="bg-gray-800/60 border border-gray-700 shadow-inner">
+              <CardHeader><CardTitle className="text-xl font-orbitron text-brand-green">Local Simulation</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-1 gap-2">
+                <Button className="w-full bg-green-600 hover:bg-green-500 text-black font-semibold shadow-md hover:shadow-green-glow transition-all" onClick={handleFullSimTrigger} disabled={triggerStates['Full Simulation'] === 'loading'}>
+                  {getButtonContent('Full Simulation', '::FaFlaskVial::', 'Simulate & Analyze')}
                 </Button>
               </CardContent>
             </Card>
