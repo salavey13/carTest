@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useState, useEffect, useMemo } from "react";
+import { useSearchParams } from 'next/navigation';
 import { RepoXmlPageProvider, useRepoXmlPageContext } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -59,11 +60,10 @@ const PhilosophyBlock: React.FC<{ t: (typeof translations.ru) }> = ({ t }) => (
     </div>
 );
 
-
-// The main page component, now lean and focused on layout.
-function ActualPageContent() {
+// The main page component, now accepting props to re-enable automation flow.
+function ActualPageContent({ initialPath, initialIdea }: { initialPath: string | null; initialIdea: string | null; }) {
     const { user } = useAppContext();
-    const { fetcherRef, assistantRef } = useRepoXmlPageContext();
+    const { fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef } = useRepoXmlPageContext();
     const [lang, setLang] = useState<'ru' | 'en'>('ru');
     const t = useMemo(() => translations[lang], [lang]);
 
@@ -96,10 +96,18 @@ function ActualPageContent() {
 
                 <div className="flex flex-col gap-4 md:gap-6">
                     <motion.section id="extractor" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
-                        <RepoTxtFetcher ref={fetcherRef} />
+                        <RepoTxtFetcher 
+                            ref={fetcherRef} 
+                            highlightedPathProp={initialPath} 
+                            ideaProp={initialIdea} 
+                        />
                     </motion.section>
                     <motion.section id="executor" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.5 }}>
-                        <AICodeAssistant ref={assistantRef} />
+                        <AICodeAssistant 
+                            ref={assistantRef}
+                            kworkInputRefPassed={kworkInputRef}
+                            aiResponseInputRefPassed={aiResponseInputRef}
+                        />
                     </motion.section>
                 </div>
             </main>
@@ -108,11 +116,19 @@ function ActualPageContent() {
     );
 }
 
+// Wrapper component to safely use the useSearchParams hook inside Suspense.
+function RepoXmlPageInternalContent() {
+  const searchParams = useSearchParams();
+  const path = searchParams.get('path');
+  const idea = searchParams.get('idea');
+  return <ActualPageContent initialPath={path} initialIdea={idea} />;
+}
+
 export default function RepoXmlPage() {
     return (
         <Suspense fallback={<div className="flex h-screen items-center justify-center bg-dark-bg text-brand-green">Initializing Studio...</div>}>
             <RepoXmlPageProvider>
-                <ActualPageContent />
+                <RepoXmlPageInternalContent />
             </RepoXmlPageProvider>
         </Suspense>
     );
