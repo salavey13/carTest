@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabaseAdmin } from "@/hooks/supabase”
+import { supabaseAdmin } from '@/hooks/supabase';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 
