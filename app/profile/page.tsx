@@ -52,29 +52,25 @@ export default function ProfilePage() {
   // Header height shrinks from MAX to MIN.
   const headerHeight = useTransform(scrollY, scrollRange, [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT]);
 
-  // --- AVATAR TRANSFORMS ---
+  // --- AVATAR TRANSFORMS (VERTICAL ONLY) ---
   const avatarSize = useTransform(scrollY, scrollRange, [AVATAR_MAX_SIZE, AVATAR_MIN_SIZE]);
   const avatarTranslateY = useTransform(scrollY, scrollRange, [
     HEADER_MAX_HEIGHT / 2 - AVATAR_MAX_SIZE / 2, // Centered vertically in expanded header
     (HEADER_MIN_HEIGHT - AVATAR_MIN_SIZE) / 2     // Centered vertically in collapsed header
   ]);
-  const avatarLeft = useTransform(scrollY, scrollRange, ["50%", "24px"]); // from center to 24px from left edge
-  const avatarTranslateX = useTransform(scrollY, scrollRange, ["-50%", "0%"]); // from centered to non-translated
 
-  // --- NAME & STATUS TRANSFORMS ---
+  // --- NAME & STATUS TRANSFORMS (VERTICAL ONLY) ---
   const nameTranslateY = useTransform(scrollY, scrollRange, [
     HEADER_MAX_HEIGHT / 2 + AVATAR_MAX_SIZE / 2 + 8, // Below avatar
-    (HEADER_MIN_HEIGHT - 28) / 2                      // Vertically centered in collapsed
+    (HEADER_MIN_HEIGHT + AVATAR_MIN_SIZE) / 2 + 5  // Below collapsed avatar
   ]);
-  const nameScale = useTransform(scrollY, scrollRange, [1, 0.9], { clamp: true });
-  const nameLeft = useTransform(scrollY, scrollRange, ["50%", `${24 + AVATAR_MIN_SIZE + 12}px`]); // To the right of the collapsed avatar
-  const nameTranslateX = useTransform(scrollY, scrollRange, ["-50%", "0%"]);
-  const nameAlignItems = useTransform(scrollY, scrollRange, ["center", "flex-start"]);
-
+  const nameScale = useTransform(scrollY, scrollRange, [1.2, 1], { clamp: true });
 
   // Opacity for elements that fade in/out for a clean transition.
   const expandedHeaderOpacity = useTransform(scrollY, [0, scrollRange[1] * 0.75], [1, 0]);
   const collapsedHeaderOpacity = useTransform(scrollY, [scrollRange[1] * 0.5, scrollRange[1]], [0, 1]);
+  const nameInCollapsedHeaderOpacity = useTransform(scrollY, [scrollRange[1] * 0.8, scrollRange[1]], [0, 1]);
+
 
   return (
     <div
@@ -102,12 +98,10 @@ export default function ProfilePage() {
 
         {/* --- Floating Animated Elements --- */}
         
-        {/* Layer 2: The Animated Window (Avatar) */}
+        {/* Layer 2: The Animated Window (Avatar). Its horizontal position is now fixed to the center. */}
         <motion.div
-          className="absolute top-0"
+          className="absolute top-0 left-1/2 -translate-x-1/2"
           style={{
-            left: avatarLeft,
-            translateX: avatarTranslateX,
             translateY: avatarTranslateY,
             width: avatarSize,
             height: avatarSize,
@@ -122,18 +116,16 @@ export default function ProfilePage() {
           />
         </motion.div>
 
-        {/* Name and Status */}
+        {/* Name and Status - This component now handles two states */}
         <motion.div
-          className="absolute top-0 flex flex-col"
+          className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center"
           style={{
-            left: nameLeft,
-            translateX: nameTranslateX,
             translateY: nameTranslateY,
             scale: nameScale,
-            alignItems: nameAlignItems,
           }}
         >
           <h1 className="text-2xl font-bold text-white whitespace-nowrap">Ronald Copper</h1>
+           {/* The "online" status fades out as the header collapses */}
           <motion.p style={{ opacity: expandedHeaderOpacity }} className="text-sm text-white/80">
             online
           </motion.p>
@@ -155,9 +147,14 @@ export default function ProfilePage() {
           style={{ opacity: collapsedHeaderOpacity }}
           className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 h-full"
         >
-          <button className="p-2 text-white/90 rounded-full hover:bg-white/10 transition-colors">
-            <VibeContentRenderer content="::FaArrowLeft::" className="text-2xl" />
-          </button>
+            {/* This is a placeholder for horizontal spacing to keep title centered */}
+          <div className="w-10 h-10"></div>
+          
+           {/* This is the Title that appears ONLY in the collapsed state */}
+          <motion.div style={{ opacity: nameInCollapsedHeaderOpacity }}>
+            <h1 className="text-xl font-bold text-white">Ronald Copper</h1>
+          </motion.div>
+
           <button className="p-2 text-white/90 rounded-full hover:bg-white/10 transition-colors">
             <VibeContentRenderer content="::FaEllipsisVertical::" className="text-2xl" />
           </button>
