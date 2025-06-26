@@ -1,16 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { HmacSha256 } from 'https://deno.land/std/hash/sha256.ts';
+// THE FIX: Reverting to the known-good version of the Deno standard library hash module.
+import { HmacSha256 } from 'https://deno.land/std@0.177.0/hash/sha256.ts';
 
 const log = (message: string, data?: any) => console.log(`[bybit-test] ${new Date().toISOString()}: ${message}`, data || '');
 
 Deno.serve(async (req: Request) => {
-  // Use our standard custom secret auth
   const CUSTOM_AUTH_SECRET = Deno.env.get('CRON_SECRET');
   const receivedSecret = req.headers.get('X-Vibe-Auth-Secret');
 
   if (receivedSecret !== CUSTOM_AUTH_SECRET) {
     log('Unauthorized access attempt.');
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized: Invalid secret.' }), { status: 401 });
   }
 
   log('Function invoked. Testing Bybit connection...');
@@ -29,7 +29,7 @@ Deno.serve(async (req: Request) => {
     const queryString = `category=spot&symbol=${symbol}`;
     
     const timestamp = Date.now().toString();
-    const recvWindow = "10000"; // Increased recv_window for testing
+    const recvWindow = "10000";
     
     const toSign = timestamp + apiKey + recvWindow + queryString;
     const signature = new HmacSha256(apiSecret).update(toSign).hex();
