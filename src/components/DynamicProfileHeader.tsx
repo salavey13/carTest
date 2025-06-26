@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 
-// --- CONFIGURATION FOR THE SCROLL ANIMATION ENGINE ---
+// Configuration constants for the animation engine
 const AVATAR_MAX_SCROLL = 200;
-const AVATAR_INITIAL_SIZE = 96; // w-24, h-24
+const AVATAR_INITIAL_SIZE = 96;
 const AVATAR_FINAL_SCALE = 0.5;
-const AVATAR_MAX_BLUR = 8; // blur-lg
+const AVATAR_MAX_BLUR = 8;
 
 interface ActionButtonProps {
   icon: string;
@@ -30,6 +30,7 @@ interface DynamicProfileHeaderProps {
   backgroundUrl: string;
 }
 
+// This component is self-contained and manages its own complex animation logic.
 const DynamicProfileHeader: React.FC<DynamicProfileHeaderProps> = ({ name, status, avatarUrl, backgroundUrl }) => {
   const [scrollY, setScrollY] = useState(0);
 
@@ -58,7 +59,9 @@ const DynamicProfileHeader: React.FC<DynamicProfileHeaderProps> = ({ name, statu
             height: `${AVATAR_INITIAL_SIZE}px`,
             transform: `scale(${avatarScale})`,
             filter: `blur(${avatarBlur}px)`,
-            willChange: 'transform, filter', // --- JITTER FIX DEPLOYED ---
+            // --- JITTER OBLITERATION ---
+            // This property commands the browser to use hardware acceleration for these changes.
+            willChange: 'transform, filter',
             transition: 'transform 10ms linear, filter 10ms linear',
           }}
         >
@@ -69,7 +72,6 @@ const DynamicProfileHeader: React.FC<DynamicProfileHeaderProps> = ({ name, statu
           />
         </div>
         
-        {/* Content positioned at the bottom of the header */}
         <div className="flex flex-col items-center text-center mt-auto" style={{ paddingTop: `${AVATAR_INITIAL_SIZE / 2}px` }}>
           <h1 className="text-3xl font-bold">{name}</h1>
           <p className="text-sm text-gray-300">{status}</p>
