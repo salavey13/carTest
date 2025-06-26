@@ -6,7 +6,6 @@ import VibeContentRenderer from '@/components/VibeContentRenderer';
 import Image from 'next/image';
 
 // --- CONSTANTS ---
-// These define the start and end states of our animation.
 const HEADER_MAX_HEIGHT = 280;
 const HEADER_MIN_HEIGHT = 90;
 const AVATAR_MAX_SIZE = 120;
@@ -38,51 +37,49 @@ const InfoSection = ({ title, content }: { title: string, content: string }) => 
 export default function ProfilePage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // useScroll tracks the scroll position within the specified container.
   const { scrollY } = useScroll({
     container: scrollContainerRef,
   });
 
-  // The input range for our animations: from 0 scroll to the point where the header is fully collapsed.
   const scrollRange = [0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT];
 
   // --- TRANSFORMERS ---
-  // Each `useTransform` maps the scrollY value to a specific CSS property.
 
-  // Header height shrinks from MAX to MIN.
+  // Header height animation is necessary for layout push, but other animations are optimized.
   const headerHeight = useTransform(scrollY, scrollRange, [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT]);
 
-  // --- AVATAR TRANSFORMS (VERTICAL ONLY) ---
-  const avatarSize = useTransform(scrollY, scrollRange, [AVATAR_MAX_SIZE, AVATAR_MIN_SIZE]);
+  // --- AVATAR TRANSFORMS ---
+  // THE FIX: Animate `scale` instead of `width`/`height` for performance.
+  const avatarScale = useTransform(scrollY, scrollRange, [1, AVATAR_MIN_SIZE / AVATAR_MAX_SIZE]);
   const avatarTranslateY = useTransform(scrollY, scrollRange, [
     HEADER_MAX_HEIGHT / 2 - AVATAR_MAX_SIZE / 2, // Centered vertically in expanded header
     (HEADER_MIN_HEIGHT - AVATAR_MIN_SIZE) / 2     // Centered vertically in collapsed header
   ]);
 
-  // --- NAME & STATUS TRANSFORMS (VERTICAL ONLY) ---
+  // --- NAME & STATUS TRANSFORMS ---
   const nameTranslateY = useTransform(scrollY, scrollRange, [
-    HEADER_MAX_HEIGHT / 2 + AVATAR_MAX_SIZE / 2 + 8, // Below avatar
-    (HEADER_MIN_HEIGHT + AVATAR_MIN_SIZE) / 2 + 5  // Below collapsed avatar
+    HEADER_MAX_HEIGHT / 2 + AVATAR_MAX_SIZE / 2 + 8, // Below expanded avatar
+    (HEADER_MIN_HEIGHT + AVATAR_MIN_SIZE) / 2 + 5      // Below collapsed avatar
   ]);
   const nameScale = useTransform(scrollY, scrollRange, [1.2, 1], { clamp: true });
 
-  // Opacity for elements that fade in/out for a clean transition.
+  // --- OPACITY TRANSFORMS ---
   const expandedHeaderOpacity = useTransform(scrollY, [0, scrollRange[1] * 0.75], [1, 0]);
   const collapsedHeaderOpacity = useTransform(scrollY, [scrollRange[1] * 0.5, scrollRange[1]], [0, 1]);
   const nameInCollapsedHeaderOpacity = useTransform(scrollY, [scrollRange[1] * 0.8, scrollRange[1]], [0, 1]);
 
+  // THE FIX: Hinting the browser to use hardware acceleration for these transforms.
+  const motionStyle = { willChange: 'transform, opacity' } as const;
 
   return (
     <div
       ref={scrollContainerRef}
       className="h-screen w-full overflow-y-auto overflow-x-hidden bg-background text-foreground simple-scrollbar"
     >
-      {/* Animated Header: Positioned sticky to stay at the top. */}
       <motion.header
-        style={{ height: headerHeight }}
+        style={{ height: headerHeight, ...motionStyle }}
         className="sticky top-0 left-0 right-0 z-10"
       >
-        {/* Layer 1: The Static World. This is the main background image. It does NOT animate. */}
         <div className="absolute inset-0 overflow-hidden">
             <Image
                 src={USER_IMAGE_URL}
@@ -91,24 +88,23 @@ export default function ProfilePage() {
                 className="object-cover"
                 priority
             />
-            {/* A subtle gradient overlay to make text more readable */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-black/10" />
         </div>
 
-
         {/* --- Floating Animated Elements --- */}
         
-        {/* Layer 2: The Animated Window (Avatar). Its horizontal position is now fixed to the center. */}
         <motion.div
           className="absolute top-0 left-1/2 -translate-x-1/2"
           style={{
             translateY: avatarTranslateY,
-            width: avatarSize,
-            height: avatarSize,
+            scale: avatarScale,
+            width: AVATAR_MAX_SIZE, // Fixed size, we scale the div
+            height: AVATAR_MAX_SIZE,
+            ...motionStyle,
           }}
         >
           <Image
-            src={USER_IMAGE_URL} // Crucially, uses the SAME image source
+            src={USER_IMAGE_URL}
             alt="Ronald Copper"
             fill
             className="rounded-full border-2 border-white object-cover"
@@ -116,24 +112,22 @@ export default function ProfilePage() {
           />
         </motion.div>
 
-        {/* Name and Status - This component now handles two states */}
         <motion.div
           className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center"
           style={{
             translateY: nameTranslateY,
             scale: nameScale,
+            ...motionStyle,
           }}
         >
           <h1 className="text-2xl font-bold text-white whitespace-nowrap">Ronald Copper</h1>
-           {/* The "online" status fades out as the header collapses */}
-          <motion.p style={{ opacity: expandedHeaderOpacity }} className="text-sm text-white/80">
+          <motion.p style={{ opacity: expandedHeaderOpacity, ...motionStyle }} className="text-sm text-white/80">
             online
           </motion.p>
         </motion.div>
         
-        {/* Expanded Header Action Buttons */}
         <motion.div
-          style={{ opacity: expandedHeaderOpacity }}
+          style={{ opacity: expandedHeaderOpacity, ...motionStyle }}
           className="absolute bottom-5 left-0 right-0 flex justify-evenly items-center"
         >
           <ActionButton icon="::FaCommentDots::" label="Message" />
@@ -142,19 +136,14 @@ export default function ProfilePage() {
           <ActionButton icon="::FaVideo::" label="Video" />
         </motion.div>
 
-        {/* Collapsed Header Top Bar */}
         <motion.div
-          style={{ opacity: collapsedHeaderOpacity }}
+          style={{ opacity: collapsedHeaderOpacity, ...motionStyle }}
           className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 h-full"
         >
-            {/* This is a placeholder for horizontal spacing to keep title centered */}
           <div className="w-10 h-10"></div>
-          
-           {/* This is the Title that appears ONLY in the collapsed state */}
-          <motion.div style={{ opacity: nameInCollapsedHeaderOpacity }}>
+          <motion.div style={{ opacity: nameInCollapsedHeaderOpacity, ...motionStyle }}>
             <h1 className="text-xl font-bold text-white">Ronald Copper</h1>
           </motion.div>
-
           <button className="p-2 text-white/90 rounded-full hover:bg-white/10 transition-colors">
             <VibeContentRenderer content="::FaEllipsisVertical::" className="text-2xl" />
           </button>
@@ -166,7 +155,6 @@ export default function ProfilePage() {
         <InfoSection title="Bio" content="25 y.o, CS streamer, San Francisco" />
         <InfoSection title="Username" content="@ronald_copper" />
         <InfoSection title="Notifications" content="On" />
-        {/* Dummy content to make the page scrollable */}
         <div className="h-40 bg-card border border-border rounded-lg p-4">
           <p className="text-muted-foreground">Recent Media</p>
         </div>
