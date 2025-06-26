@@ -4,19 +4,16 @@ import React from 'react';
 import DynamicProfileHeader from '@/components/DynamicProfileHeader';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 
+// This is the main page component. It is now a simple, clean container.
+// It has no header, no footer, and no navigation. It just deploys the necessary components.
 export default function ProfilePage() {
   return (
+    // This top-level div is the single scrolling container for the entire page.
     <div className="min-h-screen bg-gray-900 font-sans">
-      {/* 
-        The component call is updated with the new asset URLs.
-        The component itself required ZERO changes. This is peak efficiency.
-      */}
       <DynamicProfileHeader
         name="Original Gangster 420"
         status="online"
-        // ASSET SWAP: Avatar updated to match Telegram profile from intel.
-        avatarUrl="https://i.pravatar.cc/150?u=ronald_copper_tg_profile" 
-        // ASSET SWAP: Background locked to the cosmic desert image.
+        avatarUrl="https://i.pravatar.cc/150?u=ronald_copper_tg_profile"
         backgroundUrl="/cosmic-desert.jpg"
       />
 
@@ -36,7 +33,7 @@ export default function ProfilePage() {
         </div>
       </div>
       
-      {/* The tactical Cat Button remains on station. */}
+      {/* The only remaining persistent UI element, as previously approved. */}
       <div className="fixed bottom-5 right-5 z-50">
         <button
           className="bg-purple-600 hover:bg-purple-500 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-purple-400 transform hover:scale-110 transition-transform duration-300"
