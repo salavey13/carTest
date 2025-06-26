@@ -115,7 +115,7 @@ const ArbitrageLiveScannerPage = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <Button onClick={handleFetch} disabled={isLoading} className="w-full bg-brand-orange text-black font-bold text-lg hover:bg-orange-400 shadow-lg hover:shadow-orange-glow">
-            {isLoading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaBroadcastTower className='mr-2'::" />}
+            {isLoading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaSearchDollar className='mr-2'::" />}
             {isLoading ? "SEEKING ALPHA..." : "SEEK ALPHA NOW"}
           </Button>
 
