@@ -1,10 +1,27 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
-// THE FIX: Reverting to the known-good version of the Deno standard library hash module.
-import { HmacSha256 } from 'https://deno.land/std@0.177.0/hash/sha256.ts';
 
-const log = (message: string, data?: any) => console.log(`[fetch-market-data-v4] ${new Date().toISOString()}: ${message}`, data || '');
+// NO MORE EXTERNAL HASH IMPORT. WE GO NATIVE.
 
+const log = (message: string, data?: any) => console.log(`[fetch-market-data-v5] ${new Date().toISOString()}: ${message}`, data || '');
+
+// --- NATIVE CRYPTO HELPER ---
+async function createHmacSha256Signature(secret: string, payload: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  // Convert ArrayBuffer to hex string
+  return Array.from(new Uint8Array(signatureBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+
+// --- Interface & Constants ---
 interface MarketData {
   exchange: string;
   symbol: string;
@@ -14,14 +31,12 @@ interface MarketData {
   volume: number;
   timestamp: string;
 }
-
 const SYMBOLS_TO_MONITOR = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
 // --- Hardened & Authenticated Fetching Functions ---
 async function fetchBinanceData(apiKey: string): Promise<{data: MarketData[], errors: string[]}> {
     const results: MarketData[] = [];
     const errors: string[] = [];
-    // If no binance key, just return empty.
     if (!apiKey) return { data: [], errors: ["Binance API Key not provided."] };
     
     for (const symbol of SYMBOLS_TO_MONITOR) {
@@ -62,7 +77,9 @@ async function fetchBybitData(apiKey: string, apiSecret: string): Promise<{data:
             const path = "/v5/market/tickers";
             const queryString = `category=spot&symbol=${symbol}`;
             const toSign = timestamp + apiKey + recvWindow + queryString;
-            const signature = new HmacSha256(apiSecret).update(toSign).hex();
+            // USING THE NATIVE CRYPTO HELPER
+            const signature = await createHmacSha256Signature(apiSecret, toSign);
+
             const response = await fetch(`${host}${path}?${queryString}`, {
                 headers: { 'X-BAPI-API-KEY': apiKey, 'X-BAPI-TIMESTAMP': timestamp, 'X-BAPI-RECV-WINDOW': recvWindow, 'X-BAPI-SIGN': signature }
             });
@@ -93,6 +110,7 @@ async function fetchBybitData(apiKey: string, apiSecret: string): Promise<{data:
     return { data: results, errors };
 }
 
+// --- Main Server Logic ---
 Deno.serve(async (req: Request) => {
   const CUSTOM_AUTH_SECRET = Deno.env.get('CRON_SECRET');
   const receivedSecret = req.headers.get('X-Vibe-Auth-Secret');
@@ -115,14 +133,10 @@ Deno.serve(async (req: Request) => {
     if (BINANCE_API_KEY && BINANCE_API_SECRET) {
       log("Binance keys found. Adding to fetch queue.");
       fetchPromises.push(fetchBinanceData(BINANCE_API_KEY));
-    } else {
-      log("Binance keys not provided. Skipping Binance fetch.");
     }
     if (BYBIT_API_KEY && BYBIT_API_SECRET) {
       log("Bybit keys found. Adding to fetch queue.");
       fetchPromises.push(fetchBybitData(BYBIT_API_KEY, BYBIT_API_SECRET));
-    } else {
-      log("Bybit keys not provided. Skipping Bybit fetch.");
     }
     
     if (fetchPromises.length === 0) {
@@ -144,7 +158,7 @@ Deno.serve(async (req: Request) => {
 
     if (allErrors.length > 0) {
         const errorMessage = `Data fetch completed with errors: ${allErrors.join('; ')}`;
-        return new Response(JSON.stringify({ success: false, error: errorMessage, insertedCount: allMarketData.length }), { status: 200 });
+        return new Response(JSON.stringify({ success: false, error: errorMessage, insertedCount: allMarketData.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ success: true, count: allMarketData.length, message: "All data fetched and inserted successfully." }), { status: 200 });
