@@ -111,7 +111,7 @@ async function fetchBybitData(apiKey: string, apiSecret: string): Promise<{data:
     return { data: results, errors };
 }
 
-// --- Main Server Logic ---
+
 Deno.serve(async (req: Request) => {
   const CUSTOM_AUTH_SECRET = Deno.env.get('CRON_SECRET');
   const receivedSecret = req.headers.get('X-Vibe-Auth-Secret');
@@ -124,27 +124,37 @@ Deno.serve(async (req: Request) => {
   log('Function invoked securely.');
   
   try {
+    // --- KEY RETRIEVAL & TASK DEFINITION ---
     const BINANCE_API_KEY = Deno.env.get('PERSONAL_BINANCE_API_KEY');
     const BINANCE_API_SECRET = Deno.env.get('PERSONAL_BINANCE_API_SECRET');
     const BYBIT_API_KEY = Deno.env.get('PERSONAL_BYBIT_API_KEY');
     const BYBIT_API_SECRET = Deno.env.get('PERSONAL_BYBIT_API_SECRET');
+    
+    const fetchPromises = [];
 
-    if (!BYBIT_API_KEY || !BYBIT_API_SECRET || !BINANCE_API_KEY || !BINANCE_API_SECRET) {
-        throw new Error("One or more personal API keys are not set in environment variables.");
+    if (BINANCE_API_KEY && BINANCE_API_SECRET) {
+      log("Binance keys found. Adding to fetch queue.");
+      fetchPromises.push(fetchBinanceData(BINANCE_API_KEY, BINANCE_API_SECRET));
+    } else {
+      log("Binance keys not found. Skipping Binance fetch.");
+    }
+
+    if (BYBIT_API_KEY && BYBIT_API_SECRET) {
+      log("Bybit keys found. Adding to fetch queue.");
+      fetchPromises.push(fetchBybitData(BYBIT_API_KEY, BYBIT_API_SECRET));
+    } else {
+      log("Bybit keys not found. Skipping Bybit fetch.");
     }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    log("Starting authenticated data fetch from exchanges...");
-    const [{ data: binanceData, errors: binanceErrors }, { data: bybitData, errors: bybitErrors }] = await Promise.all([
-        fetchBinanceData(BINANCE_API_KEY, BINANCE_API_SECRET), 
-        fetchBybitData(BYBIT_API_KEY, BYBIT_API_SECRET)
-    ]);
+    log(`Starting data fetch for ${fetchPromises.length} configured exchanges...`);
+    const results = await Promise.all(fetchPromises);
     
-    const allMarketData = [...binanceData, ...bybitData];
-    const allErrors = [...binanceErrors, ...bybitErrors];
+    const allMarketData = results.flatMap(res => res.data);
+    const allErrors = results.flatMap(res => res.errors);
 
     log(`Fetched ${allMarketData.length} total valid records. Encountered ${allErrors.length} errors.`);
 
@@ -160,9 +170,6 @@ Deno.serve(async (req: Request) => {
 
     if (allErrors.length > 0) {
         const errorMessage = `Data fetch completed with errors: ${allErrors.join('; ')}`;
-        log(`RETURNING ERROR: ${errorMessage}`);
-        // We still return a 200 here, but with an error message in the body,
-        // so the Vercel function doesn't see a 5xx and think the whole thing failed.
         return new Response(JSON.stringify({ success: false, error: errorMessage, insertedCount: allMarketData.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
@@ -170,6 +177,6 @@ Deno.serve(async (req: Request) => {
 
   } catch (error) {
     log('Critical error in edge function:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 });
