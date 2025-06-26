@@ -11,12 +11,15 @@ const HEADER_MAX_HEIGHT = 280;
 const HEADER_MIN_HEIGHT = 90;
 const AVATAR_MAX_SIZE = 120;
 const AVATAR_MIN_SIZE = 44;
+// This is the key to the illusion. The same image is used for the header background and the avatar.
+const USER_IMAGE_URL = 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop';
+
 
 // --- SUB-COMPONENTS ---
 
 const ActionButton = ({ icon, label }: { icon: string; label: string }) => (
   <div className="flex flex-col items-center gap-1.5 w-16">
-    <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
+    <div className="w-12 h-12 bg-black/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/10">
         <VibeContentRenderer content={icon} className="text-white/90 text-2xl" />
     </div>
     <span className="text-white text-xs font-medium">{label}</span>
@@ -40,7 +43,7 @@ export default function ProfilePage() {
     container: scrollContainerRef,
   });
 
-  // This is the input range for our animations: from 0 scroll to the point where the header is fully collapsed.
+  // The input range for our animations: from 0 scroll to the point where the header is fully collapsed.
   const scrollRange = [0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT];
 
   // --- TRANSFORMERS ---
@@ -55,7 +58,6 @@ export default function ProfilePage() {
     HEADER_MAX_HEIGHT / 2 - AVATAR_MAX_SIZE / 2, // Centered vertically in expanded header
     (HEADER_MIN_HEIGHT - AVATAR_MIN_SIZE) / 2     // Centered vertically in collapsed header
   ]);
-  // THE FIX: Animate `left` and `translateX` properties directly, removing `window` dependency.
   const avatarLeft = useTransform(scrollY, scrollRange, ["50%", "24px"]); // from center to 24px from left edge
   const avatarTranslateX = useTransform(scrollY, scrollRange, ["-50%", "0%"]); // from centered to non-translated
 
@@ -64,10 +66,11 @@ export default function ProfilePage() {
     HEADER_MAX_HEIGHT / 2 + AVATAR_MAX_SIZE / 2 + 8, // Below avatar
     (HEADER_MIN_HEIGHT - 28) / 2                      // Vertically centered in collapsed
   ]);
-  const nameScale = useTransform(scrollY, scrollRange, [1.2, 1]);
-  // THE FIX: The same principle as the avatar is applied to the name container.
+  const nameScale = useTransform(scrollY, scrollRange, [1, 0.9], { clamp: true });
   const nameLeft = useTransform(scrollY, scrollRange, ["50%", `${24 + AVATAR_MIN_SIZE + 12}px`]); // To the right of the collapsed avatar
   const nameTranslateX = useTransform(scrollY, scrollRange, ["-50%", "0%"]);
+  const nameAlignItems = useTransform(scrollY, scrollRange, ["center", "flex-start"]);
+
 
   // Opacity for elements that fade in/out for a clean transition.
   const expandedHeaderOpacity = useTransform(scrollY, [0, scrollRange[1] * 0.75], [1, 0]);
@@ -83,11 +86,23 @@ export default function ProfilePage() {
         style={{ height: headerHeight }}
         className="sticky top-0 left-0 right-0 z-10"
       >
-        <div className="absolute inset-0 bg-[#4a2c82]" />
+        {/* Layer 1: The Static World. This is the main background image. It does NOT animate. */}
+        <div className="absolute inset-0 overflow-hidden">
+            <Image
+                src={USER_IMAGE_URL}
+                alt="Header background"
+                fill
+                className="object-cover"
+                priority
+            />
+            {/* A subtle gradient overlay to make text more readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-black/10" />
+        </div>
+
 
         {/* --- Floating Animated Elements --- */}
         
-        {/* Avatar */}
+        {/* Layer 2: The Animated Window (Avatar) */}
         <motion.div
           className="absolute top-0"
           style={{
@@ -99,23 +114,23 @@ export default function ProfilePage() {
           }}
         >
           <Image
-            src="https://i.pravatar.cc/300?u=ronaldcopper"
+            src={USER_IMAGE_URL} // Crucially, uses the SAME image source
             alt="Ronald Copper"
-            width={AVATAR_MAX_SIZE}
-            height={AVATAR_MAX_SIZE}
-            className="rounded-full border-2 border-white object-cover w-full h-full"
+            fill
+            className="rounded-full border-2 border-white object-cover"
             priority
           />
         </motion.div>
 
         {/* Name and Status */}
         <motion.div
-          className="absolute top-0 flex flex-col items-center"
+          className="absolute top-0 flex flex-col"
           style={{
             left: nameLeft,
             translateX: nameTranslateX,
             translateY: nameTranslateY,
             scale: nameScale,
+            alignItems: nameAlignItems,
           }}
         >
           <h1 className="text-2xl font-bold text-white whitespace-nowrap">Ronald Copper</h1>
