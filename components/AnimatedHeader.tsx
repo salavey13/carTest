@@ -109,13 +109,18 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const avatarTargetX = fixedHeaderUsernamePosition.x - initialAvatarRect.width / 2 //Approx target for calculations
 
+    const [containerOpacity, setContainerOpacity] = useState(1); //Начальное значение
+
+    
     useEffect(() => {
         const newNicknameSize = initialUsernameSize * Math.max(0.3, (1 - transitionProgress)); // Minimum size
         setNicknameSize(newNicknameSize);
 
         const newNicknameOpacity = Math.max(0.3, (1 - transitionProgress));
         setNicknameOpacity(newNicknameOpacity);
-    }, [transitionProgress]);
+  
+        setContainerOpacity(Math.max(0, 1 - transitionProgress)); // Пример вычисления - затухание контейнера вместе с переходом
+      }, [transitionProgress]);
 
 
     const cameraCutoutStyle = {
@@ -166,7 +171,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                         width: 70,
                         height: 70,
                         position: 'relative',
-                        opacity: `${avatarOpacity}`,
+                        opacity: `${containerOpacity}`,
                         marginBottom: '5px',
                     }}
                     className="transition-all duration-300 ease-in-out avatar-container"
