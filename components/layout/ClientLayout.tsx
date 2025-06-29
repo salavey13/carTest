@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react"; 
-import { Suspense, useEffect, useRef, useCallback } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation'; 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
