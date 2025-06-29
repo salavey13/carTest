@@ -1,6 +1,6 @@
 // /components/AnimatedHeader.tsx
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is correct
 
 const FloatingIcon = ({ startPosition, iconContent, avatarCenter, transitionProgress, isLocked, index }) => {
@@ -44,6 +44,21 @@ function AnimatedHeader({ avatarUrl, username }) {
     const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 }); // Store fixed header username position
     const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(16); // Store fixed header font size
     const [initialAvatarRect, setInitialAvatarRect] = useState({left: 0, top: 0, width: 0, height: 0});
+    const fixedHeaderUsernameRef = useRef(null); // Ref для username в fixed header
+
+
+    const setFixedHeaderUsernameElement = useCallback((node) => {
+        if (node) {
+            fixedHeaderUsernameRef.current = node;
+            const rect = node.getBoundingClientRect();
+            setFixedHeaderUsernamePosition({
+                x: rect.left,
+                y: rect.top,
+            });
+            setFixedHeaderFontSize(parseFloat(window.getComputedStyle(node).fontSize));
+        }
+    }, []);
+
 
 
     useEffect(() => {
@@ -52,11 +67,8 @@ function AnimatedHeader({ avatarUrl, username }) {
             setIsFixedHeaderVisible(window.scrollY > triggerOffset);
         };
 
-        const updatePositions = () => {
+        const updateAvatarPosition = () => {
             const avatarRect = document.querySelector('.avatar-container')?.getBoundingClientRect();
-
-            const fixedUsernameRect = document.querySelector('.fixed-header-username')?.getBoundingClientRect();
-
             if (avatarRect) {
                 setAvatarCenter({
                     x: avatarRect.left + avatarRect.width / 2,
@@ -69,27 +81,18 @@ function AnimatedHeader({ avatarUrl, username }) {
                     height: avatarRect.height
                 });
             }
-
-            if (fixedUsernameRect) {
-                setFixedHeaderUsernamePosition({
-                    x: fixedUsernameRect.left,
-                    y: fixedUsernameRect.top,
-                });
-                setFixedHeaderFontSize(parseFloat(window.getComputedStyle(fixedUsernameRect).fontSize)); // Get actual font size
-
-            }
-
-
         };
 
-        window.addEventListener('scroll', handleScroll);
-        window.addEventListener('resize', updatePositions);
 
-        updatePositions();
+
+        window.addEventListener('scroll', handleScroll);
+        window.addEventListener('resize', updateAvatarPosition);
+
+        updateAvatarPosition();
 
         return () => {
             window.removeEventListener('scroll', handleScroll);
-            window.removeEventListener('resize', updatePositions);
+            window.removeEventListener('resize', updateAvatarPosition);
         };
     }, []);
 
@@ -111,16 +114,16 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const [containerOpacity, setContainerOpacity] = useState(1); //Начальное значение
 
-    
+
     useEffect(() => {
         const newNicknameSize = initialUsernameSize * Math.max(0.3, (1 - transitionProgress)); // Minimum size
         setNicknameSize(newNicknameSize);
 
         const newNicknameOpacity = Math.max(0.3, (1 - transitionProgress));
         setNicknameOpacity(newNicknameOpacity);
-  
+
         setContainerOpacity(Math.max(0, 1 - transitionProgress)); // Пример вычисления - затухание контейнера вместе с переходом
-      }, [transitionProgress]);
+    }, [transitionProgress]);
 
 
     const cameraCutoutStyle = {
@@ -150,7 +153,7 @@ function AnimatedHeader({ avatarUrl, username }) {
         return {
             id: index,
             startPosition: { x, y },
-            isLocked: isLocked,
+            isLocked:isLocked,
         };
     });
 
@@ -224,7 +227,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                 }}
             >
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
-                <span className="text-sm font-semibold fixed-header-username" style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span> {/* Added class and font style */}
+                <span className="text-sm font-semibold fixed-header-username" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span> {/* Added ref and font style */}
             </div>
         </div>
     );
