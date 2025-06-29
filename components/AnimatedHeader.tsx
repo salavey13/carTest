@@ -39,13 +39,13 @@ function AnimatedHeader({ avatarUrl, username }) {
     const headerRef = useRef(null);
     const [isFixedHeaderVisible, setIsFixedHeaderVisible] = useState(false);
     const [avatarCenter, setAvatarCenter] = useState({ x: 0, y: 0 });
-    const [nicknameSize, setNicknameSize] = useState(16);
+    const [nicknameSize, setNicknameSize] = useState(24); //Increased initial size
     const [nicknameOpacity, setNicknameOpacity] = useState(1);
-    const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 }); // Store fixed header username position
-    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(16); // Store fixed header font size
+    const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 });
+    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(14); //Target
     const [initialAvatarRect, setInitialAvatarRect] = useState({left: 0, top: 0, width: 0, height: 0});
-    const fixedHeaderUsernameRef = useRef(null); // Ref для username в fixed header
-
+    const fixedHeaderUsernameRef = useRef(null);
+    const [initialHeaderScale, setInitialHeaderScale] = useState(1.3); // Zoom initial header
 
     const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
@@ -98,11 +98,13 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const triggerOffset = 50;
     const transitionProgress = Math.min(1, Math.max(0, scrollPosition / triggerOffset));
-    const avatarSize = 70 * (1 - transitionProgress);
-    const blurAmount = 10 * (1 - transitionProgress); //Reverse Blur
+    const avatarSize = 70 * (initialHeaderScale - (initialHeaderScale - 1) * (1 - transitionProgress)); // Scale down from scaled up size
+    const blurAmount = 10 * (transitionProgress); // Correct
     const cameraCutoutSize = 30 * transitionProgress;
-    const initialUsernameSize = 16;
-    const usernameSize = initialUsernameSize * (Math.max(0.3, (1 - transitionProgress))); // Ensure not zero
+    const initialUsernameSize = 24;
+    const targetUsernameSize = fixedHeaderFontSize
+
+    const usernameSize = initialUsernameSize * (1 - transitionProgress) + (transitionProgress * targetUsernameSize); // Interpolate size
     const usernameLeftStart = initialAvatarRect.left + initialAvatarRect.width / 2;
 
     const usernameLeft = usernameLeftStart + (fixedHeaderUsernamePosition.x - usernameLeftStart) * transitionProgress;
@@ -116,12 +118,7 @@ function AnimatedHeader({ avatarUrl, username }) {
 
 
     useEffect(() => {
-        const newNicknameSize = initialUsernameSize * Math.max(0.3, (1 - transitionProgress)); // Minimum size
-        setNicknameSize(newNicknameSize);
-
-        const newNicknameOpacity = Math.max(0.3, (1 - transitionProgress));
-        setNicknameOpacity(newNicknameOpacity);
-
+         //No need to calc sizes here - it's inline styling now
         setContainerOpacity(Math.max(0, 1 - transitionProgress)); // Пример вычисления - затухание контейнера вместе с переходом
     }, [transitionProgress]);
 
@@ -153,7 +150,7 @@ function AnimatedHeader({ avatarUrl, username }) {
         return {
             id: index,
             startPosition: { x, y },
-            isLocked:isLocked,
+            isLocked: isLocked,
         };
     });
 
@@ -166,6 +163,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                 className={`relative w-full h-24 bg-gray-100 flex flex-col items-center justify-center transition-all duration-300 ease-in-out overflow-hidden`}
                 style={{
                     opacity: isFixedHeaderVisible ? (1 - transitionProgress) : 1,
+                    transform: `scale(${initialHeaderScale - (initialHeaderScale - 1) * transitionProgress})`, // Scale down from scaled up size
+                    transformOrigin: 'top center'
                 }}
             >
                 {/* Avatar Area - transitions into cutout */}
@@ -208,12 +207,12 @@ function AnimatedHeader({ avatarUrl, username }) {
 
                 {/* Username Area */}
                 <span style={{
-                    fontSize: `${nicknameSize}px`,
+                    fontSize: `${usernameSize}px`, //Interpolated size
                     opacity: nicknameOpacity,
+                    fontWeight: 'bold',
                     transition: 'font-size 0.3s ease-in-out, opacity 0.3s ease-in-out, left 0.3s ease-in-out',
                     position: 'relative', // Needed for left positioning
-                    left: `${(fixedHeaderUsernamePosition.x > 0) ? (usernameLeft - avatarCenterX) : 0}px`, // Move left
-
+                    left: `${(fixedHeaderUsernamePosition.x > 0) ? (usernameLeft - avatarCenterX + initialAvatarRect.width / 2) : 0}px`, // Move left + correct
                 }} className=" transition-all duration-300 ease-in-out">{username}</span>
             </div>
 
