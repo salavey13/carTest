@@ -93,7 +93,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { startParamPayload, isLoading: isAppLoading, isAuthenticating } = useAppContext();
+  const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true); // New state
 
+  
   useEffect(() => {
     if (!isAppLoading && !isAuthenticating && startParamPayload) {
       const lowerStartParam = startParamPayload.toLowerCase();
@@ -139,9 +141,23 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const showBottomNav = isExactMatch || isStartsWithMatch;
   logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
 
+  
+  useEffect(() => {
+    if (pathname === "/profile" || pathname === "/repo-xml") { // Check if the current route is '/profile'
+      setShowHeaderAndFooter(false); // Disable header and footer
+    } else {
+      setShowHeaderAndFooter(true); // Enable for all other paths
+    }
+  }, [pathname]); // Update state whenever pathname changes
+
+
+
+
+
+
   return (
     <>
-      <Header />
+      {showHeaderAndFooter && <Header />}
       <main className={`flex-1 ${showBottomNav ? 'pb-20 sm:pb-0' : ''}`}> 
         {children}
       </main>
@@ -149,7 +165,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<LoadingChatButtonFallback />}>
         <StickyChatButton />
       </Suspense>
-      <Footer />
+      {showHeaderAndFooter && <Footer />}
     </>
   );
 }
