@@ -130,18 +130,19 @@ function AnimatedHeader({ avatarUrl, username }) {
                 </motion.span>
             </motion.div>
 
-            {/* Fixed Header */}
-            <motion.div
-                className="fixed top-0 left-0 w-full h-16 bg-gray-800 text-white flex items-center p-4"
-                style={{
-                    opacity: useTransform(scrollYProgress, [0, triggerOffset/1000], [0, 1], {clamp: true}),
-                    pointerEvents: useTransform(scrollYProgress, [0, triggerOffset/1000], [0, 1], {clamp: true}).interpolate(op => op === 0 ? 'none' : 'auto'),
-                    zIndex: 100
-                }}
-            >
-                <VibeContentRenderer content="::FaUser className='mr-2'::" />
-                <span className="text-sm font-semibold" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span>
-            </motion.div>
+                    {/* Fixed Header */}
+        <motion.div
+            className="fixed top-0 left-0 w-full h-16 bg-gray-800 text-white flex items-center p-4"
+            style={{
+                opacity: useTransform(scrollYProgress, [0, triggerOffset/1000], [0, 1], {clamp: true}),
+                zIndex: 100
+            }}
+            pointerEvents={useTransform(scrollYProgress, [0, triggerOffset/1000], [0, 1], {clamp: true})}
+        >
+            <VibeContentRenderer content="::FaUser className='mr-2'::" />
+            <span className="text-sm font-semibold" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span>
+        </motion.div>
+
 
             {/* Filler Section */}
             <div style={{
