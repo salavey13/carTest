@@ -41,10 +41,10 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     // Camera Cutout Styles
     const cameraCutoutStyle = useMemo(() => ({
-        width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`).get(),
-        height: useTransform(cameraCutoutSize, (size) => `${size * 0.4}px`).get(),
+        width: `${20 + (cameraCutoutSize.get() * 1.5)}px`, // Sane Camera Size
+        height: `${cameraCutoutSize.get() * 0.4}px`,
         backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
-        borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + size}px`).get(),
+        borderRadius: `${15 + cameraCutoutSize.get()}px`,
         position: 'absolute',
         top: '50%',
         left: '50%',
@@ -60,10 +60,10 @@ function AnimatedHeader({ avatarUrl, username }) {
                 top: '50%',
                 left: '50%',
                 transform: `translate(-50%, -50%)`, // Directly to center
-
                 opacity: useTransform(transitionProgress, [0,1], [1,0])
             }}
         >
+
             <VibeContentRenderer content={::FaStar className="${transitionProgress.get() < 0.5 ? 'text-purple-500 text-sm' : 'text-yellow-400 text-base'}" ::} />
         </motion.div>
     ));
@@ -80,7 +80,9 @@ function AnimatedHeader({ avatarUrl, username }) {
         }
     }, []);
 
-    const pointerEvents = useTransform(scrollYProgress, [0, triggerOffset/1000], [0, 1], {clamp: true});
+    //Pointer events for fixed header
+    const pointerEvents = useTransform(transitionProgress, [0, 1], ["none", "auto"]);
+
 
     return (
         <div className="w-full">
@@ -93,7 +95,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                     backgroundColor: rgba(200,200,200,${useTransform(transitionProgress, [0, 1], [1, 0]).get()}),
                     opacity: useTransform(transitionProgress, [0, 1], [1, 0])
                 }}
-                pointerEvents={pointerEvents.get() > 0.5 ? 'auto' : 'none'}
+                pointerEvents={pointerEvents}
             >
                 {/* Avatar */}
                 <div
@@ -110,7 +112,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                             height: avatarSize,
                             borderRadius: '50%',
                             overflow: 'hidden',
-                            filter: blur(${blurAmount}px),
+                            filter: blur(${blurAmount.get()}px),
                         }}
                         className="absolute top-0 left-0"
                     >
@@ -137,10 +139,10 @@ function AnimatedHeader({ avatarUrl, username }) {
             <motion.div
                 className="fixed top-0 left-0 w-full h-16 bg-gray-800 text-white flex items-center p-4"
                 style={{
-                    opacity: useTransform(scrollYProgress, [0, triggerOffset/1000], [0, 1], {clamp: true}),
+                    opacity: useTransform(transitionProgress, [0, triggerOffset/1000], [0, 1], {clamp: true}),
                     zIndex: 100
                 }}
-                pointerEvents={pointerEvents.get() > 0.5 ? 'auto' : 'none'}
+                pointerEvents={pointerEvents}
             >
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
                 <span className="text-sm font-semibold" ref={setFixedHeaderUsernameElement} style={{fontSize:${fixedHeaderFontSize}px, fontFamily: 'sans-serif'}}>{username}</span>
