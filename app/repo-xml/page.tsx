@@ -74,7 +74,7 @@ function ActualPageContent({ initialPath, initialIdea }: { initialPath: string |
             <main className="w-full max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
                 
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, delay: 0.1 }}>
-                    <Accordion type="single" collapsible defaultValue="item-1" className="w-full bg-dark-card/60 border border-border rounded-xl shadow-lg">
+                    <Accordion type="single" collapsible  className="w-full bg-dark-card/60 border border-border rounded-xl shadow-lg">
                         <AccordionItem value="item-1" className="border-b border-fuchsia-800/50">
                             <AccordionTrigger className="text-lg font-bold text-fuchsia-400 hover:no-underline px-4 text-left">
                                 <VibeContentRenderer content={onboardingContent[lang].title} />
