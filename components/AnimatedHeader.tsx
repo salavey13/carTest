@@ -3,13 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is correct
 
-const FloatingIcon = ({ startPosition, iconContent, avatarCenter, transitionProgress, isLocked, index }) => {
-    const controlPointX = startPosition.x * 0.3;
-    const controlPointY = startPosition.y * 0.3;
-
-    const translateX = (1 - transitionProgress) * startPosition.x + transitionProgress * controlPointX;
-    const translateY = (1 - transitionProgress) * startPosition.y + transitionProgress * controlPointY;
-
+const FloatingIcon = ({ startPosition, iconContent, transitionProgress, isLocked, initialAvatarRect }) => {
+    const translateX = startPosition.x * (1 - transitionProgress);
+    const translateY = startPosition.y * (1 - transitionProgress);
     const opacity = 1 - transitionProgress;
 
     let colorClass = isLocked ? 'text-purple-800' : 'text-yellow-500';
@@ -38,14 +34,16 @@ function AnimatedHeader({ avatarUrl, username }) {
     const [scrollPosition, setScrollPosition] = useState(0);
     const headerRef = useRef(null);
     const [isFixedHeaderVisible, setIsFixedHeaderVisible] = useState(false);
-    const [avatarCenter, setAvatarCenter] = useState({ x: 0, y: 0 });
-    const [nicknameSize, setNicknameSize] = useState(24); //Increased initial size
+    const [nicknameSize, setNicknameSize] = useState(24);
     const [nicknameOpacity, setNicknameOpacity] = useState(1);
     const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 });
-    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(14); //Target
+    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(14);
     const [initialAvatarRect, setInitialAvatarRect] = useState({left: 0, top: 0, width: 0, height: 0});
     const fixedHeaderUsernameRef = useRef(null);
-    const [initialHeaderScale, setInitialHeaderScale] = useState(1.3); // Zoom initial header
+    const [initialHeaderScale, setInitialHeaderScale] = useState(1.3);
+    const [mainHeaderHeight, setMainHeaderHeight] = useState(150);
+    const [headerScale, setHeaderScale] = useState(1); // For scaling the initial header.
+
 
     const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
@@ -55,11 +53,10 @@ function AnimatedHeader({ avatarUrl, username }) {
                 x: rect.left,
                 y: rect.top,
             });
+
             setFixedHeaderFontSize(parseFloat(window.getComputedStyle(node).fontSize));
         }
     }, []);
-
-
 
     useEffect(() => {
         const handleScroll = () => {
@@ -67,13 +64,9 @@ function AnimatedHeader({ avatarUrl, username }) {
             setIsFixedHeaderVisible(window.scrollY > triggerOffset);
         };
 
-        const updateAvatarPosition = () => {
+       const updateAvatarPosition = () => {
             const avatarRect = document.querySelector('.avatar-container')?.getBoundingClientRect();
             if (avatarRect) {
-                setAvatarCenter({
-                    x: avatarRect.left + avatarRect.width / 2,
-                    y: avatarRect.top + avatarRect.height / 2,
-                });
                 setInitialAvatarRect({
                     left: avatarRect.left,
                     top: avatarRect.top,
@@ -82,8 +75,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                 });
             }
         };
-
-
 
         window.addEventListener('scroll', handleScroll);
         window.addEventListener('resize', updateAvatarPosition);
@@ -98,52 +89,57 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const triggerOffset = 50;
     const transitionProgress = Math.min(1, Math.max(0, scrollPosition / triggerOffset));
-    const avatarSize = 70 * (initialHeaderScale - (initialHeaderScale - 1) * (1 - transitionProgress)); // Scale down from scaled up size
-    const blurAmount = 10 * (transitionProgress); // Correct
+    const avatarSize = 70 * (initialHeaderScale - (initialHeaderScale - 1) * (1 - transitionProgress));
+    const blurAmount = 10 * (transitionProgress);
     const cameraCutoutSize = 30 * transitionProgress;
     const initialUsernameSize = 24;
     const targetUsernameSize = fixedHeaderFontSize
 
-    const usernameSize = initialUsernameSize * (1 - transitionProgress) + (transitionProgress * targetUsernameSize); // Interpolate size
+    const usernameSize = initialUsernameSize * (1 - transitionProgress) + (transitionProgress * targetUsernameSize);
     const usernameLeftStart = initialAvatarRect.left + initialAvatarRect.width / 2;
+    const iconOffset = 20; // Approximate width of the icon in the fixed header
+    const usernameLeftTarget = fixedHeaderUsernamePosition.x - initialAvatarRect.width / 2 + iconOffset;
 
-    const usernameLeft = usernameLeftStart + (fixedHeaderUsernamePosition.x - usernameLeftStart) * transitionProgress;
+    const usernameLeft = usernameLeftStart + (usernameLeftTarget - usernameLeftStart) * transitionProgress;
 
-    const avatarCenterX = initialAvatarRect.left + initialAvatarRect.width / 2;
+    const avatarCenterX = initialAvatarRect.left + initialAvatarRect.width / 2; // Initial Avatar Center
     const avatarCenterY = initialAvatarRect.top + initialAvatarRect.height / 2;
 
-    const avatarTargetX = fixedHeaderUsernamePosition.x - initialAvatarRect.width / 2 //Approx target for calculations
+    const avatarTargetX = fixedHeaderUsernamePosition.x + initialAvatarRect.width / 2  // Destination Avatar Center
 
-    const [containerOpacity, setContainerOpacity] = useState(1); //Начальное значение
+    const [containerOpacity, setContainerOpacity] = useState(1);
 
 
     useEffect(() => {
-         //No need to calc sizes here - it's inline styling now
-        setContainerOpacity(Math.max(0, 1 - transitionProgress)); // Пример вычисления - затухание контейнера вместе с переходом
+        setContainerOpacity(Math.max(0, 1 - transitionProgress));
+        setHeaderScale(1 - transitionProgress); // Scale down header
     }, [transitionProgress]);
 
 
     const cameraCutoutStyle = {
         width: `${50 + (cameraCutoutSize * 1.5)}px`,
-        height: `${cameraCutoutSize * 0.4}px`, // Narrower
-        backgroundColor: 'rgba(0,0,0,${transitionProgress})', // Visible and opacity based on progress
+        height: `${cameraCutoutSize * 0.4}px`,
+        backgroundColor: `rgba(0,0,0,${transitionProgress})`,
         borderRadius: `${15 + cameraCutoutSize}px`,
         position: 'absolute',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
         transition: 'all 0.3s ease-in-out',
-        filter: `blur(${blurAmount}px)`, // Reverse Blur
-        opacity: `${transitionProgress}` // Added opacity
+        filter: `blur(${blurAmount}px)`,
+        opacity: `${transitionProgress}`
     };
 
     const numIcons = 13;
     const floatingIcons = Array.from({ length: numIcons }, (_, index) => {
-        const angle = Math.random() * 2 * Math.PI;
-        const distance = 30 + Math.random() * 20;
+          const angle = (index / numIcons) * Math.PI * 2; // Spread more evenly around circle
+        let distance = 30 + Math.random() * 20;
 
-        const x = Math.cos(angle) * distance;
-        const y = Math.sin(angle) * distance;
+        // Restrict to bottom and side areas
+        const adjustedAngle = angle * 0.6 + Math.PI/2 + Math.PI/4; // More to bottom
+        const x = Math.cos(adjustedAngle) * distance * 1.5; // Wider spread
+        const y = Math.sin(adjustedAngle) * distance;
+
 
         const isLocked = index % 2 === 0;
 
@@ -160,11 +156,17 @@ function AnimatedHeader({ avatarUrl, username }) {
             {/* Relative positioned element (Transition Header) */}
             <div
                 ref={headerRef}
-                className={`relative w-full h-24 bg-gray-100 flex flex-col items-center justify-center transition-all duration-300 ease-in-out overflow-hidden`}
+                className={`fixed top-0 left-0 w-full flex flex-col items-center justify-center transition-all duration-300 ease-in-out overflow-hidden`}
                 style={{
-                    opacity: isFixedHeaderVisible ? (1 - transitionProgress) : 1,
-                    transform: `scale(${initialHeaderScale - (initialHeaderScale - 1) * transitionProgress})`, // Scale down from scaled up size
-                    transformOrigin: 'top center'
+                    height: `${mainHeaderHeight}px`,
+                    backgroundColor: 'rgba(200,200,200,${(1 - transitionProgress)})',
+                   // transform: `scale(${headerScale})`,
+                    transformOrigin: 'top center',
+                    zIndex: 50, // Below fixed header
+                    transform: `scale(${1 - transitionProgress})`, // Scale Down
+                    opacity: `${1 - transitionProgress}` // Fade Out
+
+
                 }}
             >
                 {/* Avatar Area - transitions into cutout */}
@@ -183,10 +185,9 @@ function AnimatedHeader({ avatarUrl, username }) {
                         <FloatingIcon
                             key={icon.id}
                             startPosition={icon.startPosition}
-                            avatarCenter={{x:avatarCenterX, y: avatarCenterY}} //Corrected center
                             transitionProgress={transitionProgress}
                             isLocked={icon.isLocked}
-                            index={index}
+                            initialAvatarRect={initialAvatarRect}
                         />
                     ))}
 
@@ -207,12 +208,13 @@ function AnimatedHeader({ avatarUrl, username }) {
 
                 {/* Username Area */}
                 <span style={{
-                    fontSize: `${usernameSize}px`, //Interpolated size
+                    fontSize: `${usernameSize}px`,
                     opacity: nicknameOpacity,
                     fontWeight: 'bold',
                     transition: 'font-size 0.3s ease-in-out, opacity 0.3s ease-in-out, left 0.3s ease-in-out',
                     position: 'relative', // Needed for left positioning
-                    left: `${(fixedHeaderUsernamePosition.x > 0) ? (usernameLeft - avatarCenterX + initialAvatarRect.width / 2) : 0}px`, // Move left + correct
+                    left: `${usernameLeft}px`,
+
                 }} className=" transition-all duration-300 ease-in-out">{username}</span>
             </div>
 
@@ -220,7 +222,7 @@ function AnimatedHeader({ avatarUrl, username }) {
             <div
                 className={`fixed top-0 left-0 w-full h-16 bg-gray-800 text-white flex items-center p-4 transition-opacity duration-300`}
                 style={{
-                    opacity: isFixedHeaderVisible ? transitionProgress : 0,
+                    opacity: isFixedHeaderVisible ? 1 : 0, // Always show
                     pointerEvents: isFixedHeaderVisible ? 'auto' : 'none',
                     zIndex: 100,
                 }}
@@ -228,6 +230,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
                 <span className="text-sm font-semibold fixed-header-username" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span> {/* Added ref and font style */}
             </div>
+           <div style={{ height: `${mainHeaderHeight * (1 - transitionProgress)}px` }} />  {/*Adjusted filler size based on headerScale*/}
+
         </div>
     );
 }
