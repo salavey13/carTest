@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is correct
 
-const FloatingIcon = ({ startPosition, iconContent, transitionProgress, isLocked, initialAvatarRect }) => {
+const FloatingIcon = ({ startPosition, iconContent, transitionProgress, isLocked }) => {
     const translateX = startPosition.x * (1 - transitionProgress);
     const translateY = startPosition.y * (1 - transitionProgress);
     const opacity = 1 - transitionProgress;
@@ -53,7 +53,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                 x: rect.left,
                 y: rect.top,
             });
-
             setFixedHeaderFontSize(parseFloat(window.getComputedStyle(node).fontSize));
         }
     }, []);
@@ -97,6 +96,7 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const usernameSize = initialUsernameSize * (1 - transitionProgress) + (transitionProgress * targetUsernameSize);
     const usernameLeftStart = initialAvatarRect.left + initialAvatarRect.width / 2;
+
     const iconOffset = 20; // Approximate width of the icon in the fixed header
     const usernameLeftTarget = fixedHeaderUsernamePosition.x - initialAvatarRect.width / 2 + iconOffset;
 
@@ -112,7 +112,6 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     useEffect(() => {
         setContainerOpacity(Math.max(0, 1 - transitionProgress));
-        setHeaderScale(1 - transitionProgress); // Scale down header
     }, [transitionProgress]);
 
 
@@ -132,7 +131,7 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const numIcons = 13;
     const floatingIcons = Array.from({ length: numIcons }, (_, index) => {
-          const angle = (index / numIcons) * Math.PI * 2; // Spread more evenly around circle
+        const angle = (index / numIcons) * Math.PI * 2; // Spread more evenly around circle
         let distance = 30 + Math.random() * 20;
 
         // Restrict to bottom and side areas
@@ -163,7 +162,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                    // transform: `scale(${headerScale})`,
                     transformOrigin: 'top center',
                     zIndex: 50, // Below fixed header
-                    transform: `scale(${1 - transitionProgress})`, // Scale Down
                     opacity: `${1 - transitionProgress}` // Fade Out
 
 
@@ -187,7 +185,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                             startPosition={icon.startPosition}
                             transitionProgress={transitionProgress}
                             isLocked={icon.isLocked}
-                            initialAvatarRect={initialAvatarRect}
                         />
                     ))}
 
@@ -230,7 +227,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
                 <span className="text-sm font-semibold fixed-header-username" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span> {/* Added ref and font style */}
             </div>
-           <div style={{ height: `${mainHeaderHeight * (1 - transitionProgress)}px` }} />  {/*Adjusted filler size based on headerScale*/}
+           <div style={{ height: `${mainHeaderHeight}px` }} />
 
         </div>
     );
