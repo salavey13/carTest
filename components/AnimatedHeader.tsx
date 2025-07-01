@@ -54,10 +54,10 @@ function AnimatedHeader({ avatarUrl, username }) {
     const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]); // Position on top
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 4, 5]);
+    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 0]); // Stick to the bottom
 
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
-    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 42]);// Initial size= 48; final size = 42
+    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 16]);// Initial size= 48; final size = 16
     // Camera Cutout Size
     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
     const cameraX = screenWidth / 2;
@@ -130,14 +130,13 @@ function AnimatedHeader({ avatarUrl, username }) {
                             fontSize: usernameFontSize,
                             fontWeight: 'bold',
                             position: 'absolute',
-                            top: '50%',
+                            bottom: 0,
                             left: '50%',
                             x: usernameXPosition,
-                            y: usernameYPosition,
                             whiteSpace: 'nowrap',
-                             transform: 'translate(-50%, -50%)',
-
-color: 'white',
+                             transform: 'translate(-50%, 0%)',
+                             color: 'white',
+                              marginBottom: '15px',
 
                         }}
                     >
