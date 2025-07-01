@@ -48,22 +48,19 @@ function AnimatedHeader({ avatarUrl, username }) {
     const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]);
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize * 1.1, 0]); // Lower position
+    const usernameBottom = useTransform(transitionProgress, [0, 1], [10, 0]); // dynamic
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
-    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 16]); // Reduced end-size!
-
+    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 16]); // Adjusted to correct size issue
     const shouldShowFixedHeader = useTransform(transitionProgress,
         [0.85, 1],
         [0, 1],
         {clamp: true}
     );
-
-    const headerHeight = useTransform(transitionProgress, [0, 1], [initialHeaderHeight, 50]);
-
+   const headerHeight = useTransform(transitionProgress, [0, 1], [initialHeaderHeight, 50]);
     return (
         <div className="w-full">
-
             {/* Transitioning Header */}
+
             <motion.div
                 className="fixed top-0 left-0 w-full flex flex-col items-center overflow-hidden"
                 style={{
@@ -88,18 +85,17 @@ function AnimatedHeader({ avatarUrl, username }) {
                     }}
                     className="relative mb-5"
                 >
-                   <motion.span
+                    <motion.span
                         style={{
                             fontSize: usernameFontSize,
                             fontWeight: 'bold',
                             position: 'absolute',
-                            bottom: 0,
+                            bottom: usernameBottom,
                             left: '50%',
                             x: usernameXPosition,
                             whiteSpace: 'nowrap',
                              transform: 'translate(-50%, 0%)',
                              color: 'white',
-                             marginBottom: 10, // Better spacing.
                         }}
                     >
                         {username}
