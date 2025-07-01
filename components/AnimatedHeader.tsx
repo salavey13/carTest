@@ -57,7 +57,7 @@ function AnimatedHeader({ avatarUrl, username }) {
     const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 4, 5]);
 
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
-
+    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 42]);// Initial size= 48; final size = 42
     // Camera Cutout Size
     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
     const cameraX = screenWidth / 2;
@@ -93,7 +93,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                     zIndex: 50,
                     padding: '1rem',
                     background: 'linear-gradient(to bottom, rgba(150, 80, 250,1) 0%, rgba(200, 100, 255, 1) 100%)', // Purple Gradient
-
                 }}
                 pointerEvents={pointerEvents}
             >
@@ -128,7 +127,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                     />
                    <motion.span
                         style={{
-                            fontSize: 24,
+                            fontSize: usernameFontSize,
                             fontWeight: 'bold',
                             position: 'absolute',
                             top: '50%',
@@ -137,6 +136,9 @@ function AnimatedHeader({ avatarUrl, username }) {
                             y: usernameYPosition,
                             whiteSpace: 'nowrap',
                              transform: 'translate(-50%, -50%)',
+
+color: 'white',
+
                         }}
                     >
                         {username}
@@ -156,8 +158,9 @@ function AnimatedHeader({ avatarUrl, username }) {
 
             {/* Fixed Header */}
             <motion.div
-                className="fixed top-0 left-0 w-full h-16 bg-gray-800 text-white flex items-center p-4"
+                className="fixed top-0 left-0 w-full h-16 text-white flex items-center p-4"
                 style={{
+                   background: 'linear-gradient(to bottom, rgba(150, 80, 250,1) 0%, rgba(200, 100, 255, 1) 100%)',
                     opacity: shouldShowFixedHeader,
                     zIndex: 100
                 }}
