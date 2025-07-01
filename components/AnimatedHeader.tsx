@@ -11,6 +11,8 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
     const xOffset = Math.cos(angle) * distance;
     const yOffset = Math.sin(angle) * distance;
 
+    const speedFactor = 1.5 + Math.random() * 0.75; // Increased speed
+
     return (
         <motion.div
             style={{
@@ -18,8 +20,8 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
                 top: '50%',
                 left: '50%',
                 x: useTransform(transitionProgress, [0, 1], [xOffset, 0]),
-                y: useTransform(transitionProgress, [0, 1], [yOffset, 0]), // Fly to Camera
-                opacity: useTransform(transitionProgress, [0, 1], [1, 0])
+                y: useTransform(transitionProgress, [0, 1], [yOffset, -cameraY * 2]), // Fly to Camera
+                transition: `all ${0.25 / speedFactor}s ease-in-out`, // Faster transition
             }}
         >
             <VibeContentRenderer content={`::FaStar className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
@@ -52,8 +54,7 @@ function AnimatedHeader({ avatarUrl, username }) {
     const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]); // Position on top
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 4, 0]);
-    const usernameOpacity = useTransform(transitionProgress, [0, 1], [1, 0]);
+    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 4, 5]);
 
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
 
@@ -91,7 +92,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                     height: headerHeight,
                     zIndex: 50,
                     padding: '1rem',
-                    backgroundColor: `rgba(150, 80, 250,1})`, // Purple Background, full Opacity
+                    background: 'linear-gradient(to bottom, rgba(150, 80, 250,1) 0%, rgba(200, 100, 255, 1) 100%)', // Purple Gradient
+
                 }}
                 pointerEvents={pointerEvents}
             >
@@ -118,9 +120,9 @@ function AnimatedHeader({ avatarUrl, username }) {
                             backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
                             borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
                             position: 'absolute',
-                            top: '50%',
+                            top:  0, // Center Vertically
                             left: '50%',
-                            transform: 'translate(-50%, -50%)',
+                            transform: 'translate(-50%, 0%)',
                             zIndex: 1000,
                         }}
                     />
@@ -133,17 +135,13 @@ function AnimatedHeader({ avatarUrl, username }) {
                             left: '50%',
                             x: usernameXPosition,
                             y: usernameYPosition,
-                            opacity: usernameOpacity,
-                            zIndex: 100,
                             whiteSpace: 'nowrap',
                              transform: 'translate(-50%, -50%)',
                         }}
                     >
                         {username}
-                    </motion.span
-
-
-                 {[...Array(13)].map((_, index) => (
+                    </motion.span>
+                  {[...Array(13)].map((_, index) => (
                     <FloatingIcon
                       key={index}
                       transitionProgress={transitionProgress}
@@ -174,7 +172,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                 height: initialHeaderHeight,
                 position: 'relative'
             }}>
-                <div>{username}</div>
+                <div></div> {/* Removed username */}
             </div>
         </div>
     );
