@@ -30,9 +30,6 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
 };
 
 function AnimatedHeader({ avatarUrl, username }) {
-    const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 });
-    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(14);
-    const fixedHeaderUsernameRef = useRef(null);
 
     const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 500; // Default width
     const initialAvatarSize = screenWidth * 0.60; // 60% of screen width
@@ -55,29 +52,13 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     // Username Position and Fade Animation
     const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 0]); // Stick to the bottom
-
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
     const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 16]);// Initial size= 48; final size = 16
-    // Camera Cutout Size
-    const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
-    const cameraX = screenWidth / 2;
-    const cameraY = 20; // Distance from top of container
-    const setFixedHeaderUsernameElement = useCallback((node) => {
-        if (node) {
-            fixedHeaderUsernameRef.current = node;
-            const rect = node.getBoundingClientRect();
-            setFixedHeaderUsernamePosition({
-                x: rect.left,
-                y: rect.top,
-            });
-            setFixedHeaderFontSize(parseFloat(window.getComputedStyle(node).fontSize));
-        }
-    }, []);
 
     const pointerEvents = useTransform(transitionProgress, [0, 1], ["none", "auto"]);
 
     const shouldShowFixedHeader = useTransform(transitionProgress,
-        [0.9, 1], // Start fading in at 90% progress
+        [0.85, 1], // Appear earlier
         [0, 1], // Opacity values
         {clamp: true}
     );
@@ -111,20 +92,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                     }}
                     className="relative mb-5"
                 >
-                    {/* Camera Cutout (New Approach) */}
-                    <motion.div
-                        style={{
-                            width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
-                            height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
-                            backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
-                            borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
-                            position: 'absolute',
-                            top:  0, // Center Vertically
-                            left: '50%',
-                            transform: 'translate(-50%, 0%)',
-                            zIndex: 1000,
-                        }}
-                    />
                    <motion.span
                         style={{
                             fontSize: usernameFontSize,
@@ -147,8 +114,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                       key={index}
                       transitionProgress={transitionProgress}
                       index={index}
-                      cameraX={cameraX}
-                      cameraY={cameraY}
+                      cameraX={screenWidth / 2}
+                      cameraY={20}
                       initialAvatarSize = {initialAvatarSize}
                     />
                   ))}
@@ -166,7 +133,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                 pointerEvents={pointerEvents}
             >
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
-                <span className="text-sm font-semibold" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span>
+                <span className="text-sm font-semibold" style={{fontSize:`16px`}}>{username}</span>
             </motion.div>
 
             {/* Filler Section */}
