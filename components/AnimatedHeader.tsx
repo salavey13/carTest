@@ -40,43 +40,43 @@ function AnimatedHeader({ avatarUrl, username }) {
     const usernameLeft = useTransform(usernameSize, (size) => `calc(50% - ${size / 2}px)`);
 
     // Camera Cutout Styles
-     const cameraCutoutStyle = useMemo(() => ({
-        width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
-        height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
+     const cameraCutoutStyle = ({
+        width: `${20 + (cameraCutoutSize.get() * 1.5)}px`, // Sane Camera Size
+        height: `${cameraCutoutSize.get() * 0.4}px`,
         backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
-        borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
+        borderRadius: `${15 + cameraCutoutSize.get()}px`,
         position: 'absolute',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        opacity: transitionProgress
-    }), [transitionProgress, cameraCutoutSize]);
+        opacity: transitionProgress.get()
+    });
 
     // Memoize Floating Icon
-    const FloatingIcon = React.memo(() => (
+    const FloatingIcon = () => (
         <motion.div
             style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
                 transform: `translate(-50%, -50%)`, // Directly to center
-
                 opacity: useTransform(transitionProgress, [0,1], [1,0])
             }}
         >
+
             <VibeContentRenderer content={::FaStar className="${transitionProgress.get() < 0.5 ? 'text-purple-500 text-sm' : 'text-yellow-400 text-base'}" ::} />
         </motion.div>
-    ));
+    );
 
     const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
             fixedHeaderUsernameRef.current = node;
             const rect = node.getBoundingClientRect();
-            setFixedHeaderUsernamePosition({
+             setFixedHeaderUsernamePosition({
                 x: rect.left,
                 y: rect.top,
             });
-            setFixedHeaderFontSize(parseFloat(window.getComputedStyle(node).fontSize));
+             setFixedHeaderFontSize(parseFloat(window.getComputedStyle(node).fontSize));
         }
     }, []);
 
