@@ -7,7 +7,7 @@ import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is
 
 const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvatarSize }) => {
     const angle = (index / 13) * Math.PI * 2;
-    const distance = 60 + Math.random() * 40; // Jittered distance
+    const distance = 80 + Math.random() * 62; // Jittered distance
     const xOffset = Math.cos(angle) * distance;
     const yOffset = Math.sin(angle) * distance;
 
@@ -22,7 +22,7 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
                 opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
-            <VibeContentRenderer content={`::FaStar className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
+            <VibeContentRenderer content={`::FaUserNinja className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
         </motion.div>
     );
 };
@@ -53,7 +53,7 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     // Username Position and Fade Animation
     const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 2 + 20, 5]);
-    const usernameOpacity = useTransform(transitionProgress, [0, 1], [1, 0]);
+    const usernameOpacity = useTransform(transitionProgress, [0, 0.7], [1, 0]);
 
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
 
@@ -91,7 +91,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                     height: headerHeight,
                     zIndex: 50,
                     padding: '1rem',
-                    backgroundColor: `rgba(150, 80, 250,${useTransform(transitionProgress, [0, 1], [1, 0]).get()})`,
+                    backgroundColor: `rgba(150, 80, 250,1})`, // Purple Background, full Opacity
                     opacity: useTransform(transitionProgress, [0, 1], [1, 0])
                 }}
                 pointerEvents={pointerEvents}
@@ -102,7 +102,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                         width: avatarSize,
                         height: avatarSize,
                         borderRadius: useTransform(avatarSize, (size) => `${size / 2}px`),
-                        overflow: 'hidden',
+                        overflow: 'visible', //USERNAME VISIBILITY
                         y: avatarYPosition,
                         position: 'relative',
                         backgroundImage: `url(${avatarUrl})`,
@@ -141,7 +141,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                 >
                     {username}
                 </motion.span>
-                    {[...Array(13)].map((_, index) => (
+                  {
+                    [...Array(13)].map((_, index) => (
                     <FloatingIcon
                       key={index}
                       transitionProgress={transitionProgress}
