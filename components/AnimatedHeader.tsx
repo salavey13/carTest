@@ -11,17 +11,16 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
     const xOffset = Math.cos(angle) * distance;
     const yOffset = Math.sin(angle) * distance;
 
-    const xStart = cameraX + xOffset;
-    const yStart = cameraY + yOffset;
-
+    const xTarget = cameraX + xOffset;
+    const yTarget = cameraY + yOffset;
     return (
         <motion.div
             style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                x: useTransform(transitionProgress, [0, 1], [xStart - (initialAvatarSize/2), 0]),
-                y: useTransform(transitionProgress, [0, 1], [yStart - initialAvatarSize / 2, 0]), // Fly to Camera
+                x: useTransform(transitionProgress, [0, 1], [xOffset, 0]),
+                y: useTransform(transitionProgress, [0, 1], [yOffset, 0]), // Fly to Camera
                 opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
@@ -43,10 +42,6 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const { scrollYProgress } = useScroll();
 
-    // Sample Unsplash Avatar
-    const testAvatar = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-06-19-06-12-49-822_org.adblockplus.browser-82de09f3-e75d-4c69-b919-b3dfb51aea81.jpg";
-
-    // Calculate Transition Progress (0 to 1 within the triggerOffset)
     const transitionProgress = useTransform(
         scrollYProgress,
         [0, triggerOffset / 1000],
@@ -55,20 +50,19 @@ function AnimatedHeader({ avatarUrl, username }) {
     );
 
     // Avatar Size and Position Animation
-
     const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
-    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, -((initialAvatarSize - 50)/2)]); // Position above
+    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]); // Position on top
 
     // Username Position and Fade Animation
-     const usernameOpacity = useTransform(transitionProgress, [0, 0.7], [1, 0]);
-     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -initialAvatarSize / 2]);
-     const usernameYPosition = useTransform(transitionProgress, [0, 1], [0, 0]);
+    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize + 20, 5]);
+
+    const usernameOpacity = useTransform(transitionProgress, [0, 0.7], [1, 0]);
+    const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 30]); // to the left
 
     // Camera Cutout Size
     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
     const cameraX = screenWidth / 2;
     const cameraY = 20; // Distance from top of container
-
      const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
             fixedHeaderUsernameRef.current = node;
@@ -97,7 +91,7 @@ function AnimatedHeader({ avatarUrl, username }) {
             <motion.div
                 className="fixed top-0 left-0 w-full flex flex-col items-center overflow-hidden"
                 style={{
-                    height: headerHeight,
+                    height: initialHeaderHeight,
                     zIndex: 50,
                     backgroundColor: `rgba(150, 80, 250,${useTransform(transitionProgress, [0, 1], [1, 0]).get()})`, // Purple Background
                     opacity: useTransform(transitionProgress, [0, 1], [1, 0])
@@ -112,38 +106,38 @@ function AnimatedHeader({ avatarUrl, username }) {
                         borderRadius: useTransform(avatarSize, (size) => `${size / 2}px`), // Maintain circle shape
                         overflow: 'hidden',
                         y: avatarYPosition,
-                        position: 'relative',
-                        backgroundImage: `url(${testAvatar})`,
+                        position: 'absolute', // Stick to Top
+                        backgroundImage: `url(${avatarUrl})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                     }}
                     className="relative mb-5"
                 >
-                 {/* Camera Cutout (Fixed to Top) */}
-                  <motion.div
-                    style={{
-                        width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
-                        height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
-                        backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
-                        borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        x: '-50%',
-                        zIndex: 1000,
-                    }}
-                >   </motion.div>
-                  {[...Array(13)].map((_, index) => (
+                    {/* Camera Cutout (New Approach) */}
+                     <motion.div
+                            style={{
+                                width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
+                                height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
+                                backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
+                                borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                zIndex: 1000,
+                            }}
+                        />
+                   {[...Array(13)].map((_, index) => (
                     <FloatingIcon
                       key={index}
                       transitionProgress={transitionProgress}
-                    index={index}
+                      index={index}
                       cameraX={cameraX}
                       cameraY={cameraY}
                       initialAvatarSize = {initialAvatarSize}
                     />
                   ))}
-                 {/* Nickname */}
+                    {/* Nickname */}
                 <motion.span
                     style={{
                         fontSize: 24,
@@ -160,8 +154,9 @@ function AnimatedHeader({ avatarUrl, username }) {
                 >
                     {username}
                 </motion.span>
-
+               
                 </motion.div>
+               
             </motion.div>
 
             {/* Fixed Header */}
