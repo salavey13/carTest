@@ -1,17 +1,16 @@
 // /components/AnimatedHeader.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React from 'react';
 import { motion, useTransform, useScroll } from 'framer-motion';
-import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is correct
+import { VibeContentRenderer } from './VibeContentRenderer';
 
 const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvatarSize }) => {
     const angle = (index / 13) * Math.PI * 2;
-    const distance = 80 + Math.random() * 62; // Jittered distance
+    const distance = 80 + Math.random() * 62;
     const xOffset = Math.cos(angle) * distance;
     const yOffset = Math.sin(angle) * distance;
-
-    const speedFactor = 1.5 + Math.random() * 0.75; // Increased speed
+    const speedFactor = 1.5 + Math.random() * 0.75;
 
     return (
         <motion.div
@@ -20,8 +19,8 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
                 top: '50%',
                 left: '50%',
                 x: useTransform(transitionProgress, [0, 1], [xOffset, 0]),
-                y: useTransform(transitionProgress, [0, 1], [yOffset, -cameraY * 2]), // Fly to Camera
-                transition: `all ${0.25 / speedFactor}s ease-in-out`, // Faster transition
+                y: useTransform(transitionProgress, [0, 1], [yOffset, -cameraY * 2]),
+                transition: `all ${0.25 / speedFactor}s ease-in-out`,
             }}
         >
             <VibeContentRenderer content={`::FaStar className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
@@ -30,12 +29,10 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
 };
 
 function AnimatedHeader({ avatarUrl, username }) {
-
-    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 500; // Default width
-    const initialAvatarSize = screenWidth * 0.60; // 60% of screen width
+    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 500;
+    const initialAvatarSize = screenWidth * 0.60;
     const initialHeaderHeight = initialAvatarSize;
-
-    const triggerOffset = initialHeaderHeight * 0.75; //  75% of header height
+    const triggerOffset = initialHeaderHeight * 0.75;
 
     const { scrollYProgress } = useScroll();
 
@@ -47,25 +44,25 @@ function AnimatedHeader({ avatarUrl, username }) {
     );
 
     // Avatar Size and Position Animation
-    const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
-    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]); // Position on top
+    const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]);
+    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]);
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 0]); // Stick to the bottom
+    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize * 1.1, 0]); // Lower position
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
-    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 16]);// Initial size= 48; final size = 16
-
-    const pointerEvents = useTransform(transitionProgress, [0, 1], ["none", "auto"]);
+    const usernameFontSize = useTransform(transitionProgress, [0, 1], [48, 16]); // Reduced end-size!
 
     const shouldShowFixedHeader = useTransform(transitionProgress,
-        [0.85, 1], // Appear earlier
-        [0, 1], // Opacity values
+        [0.85, 1],
+        [0, 1],
         {clamp: true}
     );
+
     const headerHeight = useTransform(transitionProgress, [0, 1], [initialHeaderHeight, 50]);
 
     return (
         <div className="w-full">
+
             {/* Transitioning Header */}
             <motion.div
                 className="fixed top-0 left-0 w-full flex flex-col items-center overflow-hidden"
@@ -73,9 +70,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                     height: headerHeight,
                     zIndex: 50,
                     padding: '1rem',
-                    background: 'linear-gradient(to bottom, rgba(150, 80, 250,1) 0%, rgba(200, 100, 255, 1) 100%)', // Purple Gradient
+                    background: 'linear-gradient(to bottom, rgba(150, 80, 250,1) 0%, rgba(200, 100, 255, 1) 100%)',
                 }}
-                pointerEvents={pointerEvents}
             >
                 {/* Avatar */}
                 <motion.div
@@ -83,7 +79,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                         width: avatarSize,
                         height: avatarSize,
                         borderRadius: useTransform(avatarSize, (size) => `${size / 2}px`),
-                        overflow: 'visible', //USERNAME VISIBILITY
+                        overflow: 'visible',
                         y: avatarYPosition,
                         position: 'relative',
                         backgroundImage: `url(${avatarUrl})`,
@@ -103,8 +99,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                             whiteSpace: 'nowrap',
                              transform: 'translate(-50%, 0%)',
                              color: 'white',
-                              marginBottom: '15px',
-
+                             marginBottom: 10, // Better spacing.
                         }}
                     >
                         {username}
@@ -130,7 +125,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                     opacity: shouldShowFixedHeader,
                     zIndex: 100
                 }}
-                pointerEvents={pointerEvents}
             >
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
                 <span className="text-sm font-semibold" style={{fontSize:`16px`}}>{username}</span>
