@@ -7,7 +7,7 @@ import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is
 
 const FloatingIcon = ({ transitionProgress, index }) => {
     const angle = (index / 13) * Math.PI * 2;
-    const distance = 30;
+    const distance = 20 + Math.random() * 10; // Jittered distance
     const xOffset = Math.cos(angle) * distance;
     const yOffset = Math.sin(angle) * distance;
 
@@ -48,14 +48,13 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     // Avatar Size and Position Animation
     const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
-    const avatarYPosition = useTransform(avatarSize, (size) => (initialAvatarSize - size) / 2); // Center vertically
+    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, (initialAvatarSize - 50) / 2]); // Shrink Avatar Yposition
 
     // Username Position and Fade Animation
     const usernameYPosition = useTransform(avatarSize, (size) => size + 10); // Positioned below avatar
     const usernameOpacity = useTransform(transitionProgress, [0, 0.5], [1, 0]); // Fade out halfway
 
     // Camera Cutout Size and Blur Animation
-
     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
     const cameraBlurAmount = useTransform(transitionProgress, [0, 1], [0, 0]);
 
@@ -79,13 +78,15 @@ function AnimatedHeader({ avatarUrl, username }) {
         {clamp: true}
     );
 
+    const headerHeight = useTransform(avatarSize, size => `${size}px`);
+
     return (
         <div className="w-full">
             {/* Transitioning Header */}
             <motion.div
                 className="fixed top-0 left-0 w-full flex flex-col items-center overflow-hidden"
                 style={{
-                    height: initialHeaderHeight,
+                    height: headerHeight,
                     zIndex: 50,
                     backgroundColor: `rgba(200,200,200,${useTransform(transitionProgress, [0, 1], [1, 0]).get()})`,
                     opacity: useTransform(transitionProgress, [0, 1], [1, 0])
@@ -99,7 +100,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                         height: avatarSize,
                         borderRadius: useTransform(avatarSize, (size) => `${size / 2}px`), // Maintain circle shape
                         overflow: 'hidden',
-                        filter: `blur(${0}px)`, //Removed Blurr
                         y: avatarYPosition,
                          position: 'relative',
                     }}
@@ -125,7 +125,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                     {username}
                 </motion.span>
 
-                 {/* Camera Cutout (Fixed to Top) */}
+                {/* Camera Cutout (Fixed to Top) */}
                 <motion.div
                     style={{
                         width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
@@ -136,7 +136,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                         top: 0,
                         left: '50%',
                         transform: 'translate(-50%, 0)', // Fixed to Top-Center
-                        filter: `blur(${cameraBlurAmount.get()}px)`,
                         zIndex: 1000,
                     }}
                 ></motion.div>
