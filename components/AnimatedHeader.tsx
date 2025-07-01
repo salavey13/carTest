@@ -5,14 +5,19 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, useTransform, useScroll } from 'framer-motion';
 import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is correct
 
-const FloatingIcon = ({ transitionProgress }) => {
+const FloatingIcon = ({ transitionProgress, index }) => {
+    const angle = (index / 13) * Math.PI * 2;
+    const distance = 30;
+    const xOffset = Math.cos(angle) * distance;
+    const yOffset = Math.sin(angle) * distance;
+
     return (
         <motion.div
             style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                transform: 'translate(-50%, -50%)',
+                transform: `translate(calc(-50% + ${xOffset}px), calc(-50% + ${yOffset}px))`,
                 opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
@@ -50,12 +55,12 @@ function AnimatedHeader({ avatarUrl, username }) {
     const usernameOpacity = useTransform(transitionProgress, [0, 0.5], [1, 0]); // Fade out halfway
 
     // Camera Cutout Size and Blur Animation
+
     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
-    const cameraBlurAmount = useTransform(transitionProgress, [0, 1], [10, 0]);
+    const cameraBlurAmount = useTransform(transitionProgress, [0, 1], [0, 0]);
 
      const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
-
             fixedHeaderUsernameRef.current = node;
             const rect = node.getBoundingClientRect();
              setFixedHeaderUsernamePosition({
@@ -68,16 +73,11 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     const pointerEvents = useTransform(transitionProgress, [0, 1], ["none", "auto"]);
 
-    const numIcons = 13;
-     const renderIcons = () => {
-        const icons = [];
-
-         for (let i = 0; i < numIcons; i++) {
-             icons.push(<FloatingIcon key={i} transitionProgress={transitionProgress} />);
-         }
-
-         return icons;
-    };
+    const shouldShowFixedHeader = useTransform(transitionProgress,
+        [0.9, 1], // Start fading in at 90% progress
+        [0, 1], // Opacity values
+        {clamp: true}
+    );
 
     return (
         <div className="w-full">
@@ -99,13 +99,15 @@ function AnimatedHeader({ avatarUrl, username }) {
                         height: avatarSize,
                         borderRadius: useTransform(avatarSize, (size) => `${size / 2}px`), // Maintain circle shape
                         overflow: 'hidden',
-                        filter: `blur(${cameraBlurAmount.get()}px)`,
+                        filter: `blur(${0}px)`, //Removed Blurr
                         y: avatarYPosition,
+                         position: 'relative',
                     }}
                     className="relative mb-5"
                 >
-
-                  {renderIcons()}
+                     {[...Array(13)].map((_, index) => (
+                        <FloatingIcon key={index} transitionProgress={transitionProgress} index={index} />
+                    ))}
 
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 </motion.div>
@@ -123,7 +125,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                     {username}
                 </motion.span>
 
-                {/* Camera Cutout (Fixed to Top) */}
+                 {/* Camera Cutout (Fixed to Top) */}
                 <motion.div
                     style={{
                         width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
@@ -134,7 +136,8 @@ function AnimatedHeader({ avatarUrl, username }) {
                         top: 0,
                         left: '50%',
                         transform: 'translate(-50%, 0)', // Fixed to Top-Center
-                        filter: `blur(${cameraBlurAmount.get()}px)`
+                        filter: `blur(${cameraBlurAmount.get()}px)`,
+                        zIndex: 1000,
                     }}
                 ></motion.div>
             </motion.div>
@@ -143,7 +146,7 @@ function AnimatedHeader({ avatarUrl, username }) {
             <motion.div
                 className="fixed top-0 left-0 w-full h-16 bg-gray-800 text-white flex items-center p-4"
                 style={{
-                    opacity: useTransform(transitionProgress, [0, triggerOffset/1000], [0, 1], {clamp: true}),
+                    opacity: shouldShowFixedHeader,
                     zIndex: 100
                 }}
                 pointerEvents={pointerEvents}
