@@ -21,7 +21,7 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
                 top: '50%',
                 left: '50%',
                 x: useTransform(transitionProgress, [0, 1], [xStart - (initialAvatarSize/2), 0]),
-                y: useTransform(transitionProgress, [0, 1], [yStart - (initialAvatarSize/2), 0]),
+                y: useTransform(transitionProgress, [0, 1], [yStart - initialAvatarSize / 2, 0]), // Fly to Camera
                 opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
@@ -44,7 +44,7 @@ function AnimatedHeader({ avatarUrl, username }) {
     const { scrollYProgress } = useScroll();
 
     // Sample Unsplash Avatar
-    const testAvatar = "https://images.unsplash.com/photo-1639149888905-7c5564997a15?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+    const testAvatar = "https://images.unsplash.com/photo-1506744038136-46273834b3ee?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
     // Calculate Transition Progress (0 to 1 within the triggerOffset)
     const transitionProgress = useTransform(
@@ -54,20 +54,27 @@ function AnimatedHeader({ avatarUrl, username }) {
         { clamp: true }
     );
 
-    // Avatar Size and Position Animation
+     const halfProgress = useTransform(
+        scrollYProgress,
+        [0, triggerOffset / 1000],
+        [0, 2],
 
-    const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
-    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, -((initialAvatarSize - 50)/2)]); // Position above
+        { clamp: true }
+    );
+
+    // Avatar Size and Position Animation
+    const avatarSize = useTransform(halfProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
+    const avatarYPosition = useTransform(halfProgress, [0, 1], [0, -((initialAvatarSize - 50)/2)]); // Position above
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [5, 0]);
+    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize-50, 5]);
      const usernameOpacity = useTransform(transitionProgress, [0, 1], [1, 0]);
      const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -initialAvatarSize / 4]);
 
     // Camera Cutout Size
-     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
-     const cameraX = screenWidth / 2;
-     const cameraY = 20; // Distance from top of container
+    const cameraCutoutSize = useTransform(halfProgress, [0, 1], [0, 20]);
+    const cameraX = screenWidth / 2;
+    const cameraY = 20; // Distance from top of container
 
      const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
@@ -119,6 +126,19 @@ function AnimatedHeader({ avatarUrl, username }) {
                     }}
                     className="relative mb-5"
                 >
+                <motion.div
+                    style={{
+                        width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
+                        height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
+                        backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
+                        borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
+                        position: 'absolute',
+                        top: 0,
+                        left: '50%',
+                        x: '-50%',
+                        zIndex: 1000,
+                    }}
+                >   </motion.div>
                   {[...Array(13)].map((_, index) => (
                     <FloatingIcon
                       key={index}
@@ -145,20 +165,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                 >
                     {username}
                 </motion.span>
-                {/* Camera Cutout (Fixed to Top)*/}
-                <motion.div
-                    style={{
-                        width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
-                        height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
-                        backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
-                        borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
-                        position: 'absolute',
-                        top: 0,
-                        left: '50%',
-                        x: '-50%',
-                        zIndex: 1000,
-                    }}
-                >   </motion.div>
+             
               
                 </motion.div>
 
