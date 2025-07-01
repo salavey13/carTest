@@ -22,7 +22,7 @@ const FloatingIcon = ({ transitionProgress, index, cameraX, cameraY, initialAvat
                 opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
-            <VibeContentRenderer content={`::FaUserNinja className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
+            <VibeContentRenderer content={`::FaStar className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
         </motion.div>
     );
 };
@@ -52,7 +52,7 @@ function AnimatedHeader({ avatarUrl, username }) {
     const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, 0]); // Position on top
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 2 + 20, 5]);
+    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 4, 0]);
     const usernameOpacity = useTransform(transitionProgress, [0, 0.7], [1, 0]);
 
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
@@ -125,24 +125,24 @@ function AnimatedHeader({ avatarUrl, username }) {
                             zIndex: 1000,
                         }}
                     />
-                      <motion.span
-                    style={{
-                        fontSize: 24,
-                        fontWeight: 'bold',
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        x: usernameXPosition,
-                        y: usernameYPosition,
-                        opacity: usernameOpacity,
-                        zIndex: 100,
-                         transform: 'translate(-50%, -50%)',
-                    }}
-                >
-                    {username}
-                </motion.span>
-                  {
-                    [...Array(13)].map((_, index) => (
+                   <motion.span
+                        style={{
+                            fontSize: 24,
+                            fontWeight: 'bold',
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            x: usernameXPosition,
+                            y: usernameYPosition,
+                            opacity: usernameOpacity,
+                            zIndex: 100,
+                            whiteSpace: 'nowrap',
+                             transform: 'translate(-50%, -50%)',
+                        }}
+                    >
+                        {username}
+                    </motion.span>
+                 {[...Array(13)].map((_, index) => (
                     <FloatingIcon
                       key={index}
                       transitionProgress={transitionProgress}
