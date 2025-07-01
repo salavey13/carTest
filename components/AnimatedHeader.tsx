@@ -39,12 +39,12 @@ function AnimatedHeader({ avatarUrl, username }) {
     const initialAvatarSize = screenWidth * 0.69; // 69% of screen width
     const initialHeaderHeight = initialAvatarSize;
 
-    const triggerOffset = initialHeaderHeight * 0.55; //  55% of header height
+    const triggerOffset = initialHeaderHeight * 0.65; //  55% of header height
 
     const { scrollYProgress } = useScroll();
 
     // Sample Unsplash Avatar
-    const testAvatar = "https://images.unsplash.com/photo-1506744038136-46273834b3ee?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+    const testAvatar = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Screenshot_2025-06-19-06-12-49-822_org.adblockplus.browser-82de09f3-e75d-4c69-b919-b3dfb51aea81.jpg";
 
     // Calculate Transition Progress (0 to 1 within the triggerOffset)
     const transitionProgress = useTransform(
@@ -54,25 +54,18 @@ function AnimatedHeader({ avatarUrl, username }) {
         { clamp: true }
     );
 
-     const halfProgress = useTransform(
-        scrollYProgress,
-        [0, triggerOffset / 1000],
-        [0, 2],
-
-        { clamp: true }
-    );
-
     // Avatar Size and Position Animation
-    const avatarSize = useTransform(halfProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
-    const avatarYPosition = useTransform(halfProgress, [0, 1], [0, -((initialAvatarSize - 50)/2)]); // Position above
+
+    const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
+    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, -((initialAvatarSize - 50)/2)]); // Position above
 
     // Username Position and Fade Animation
-    const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize-50, 5]);
-     const usernameOpacity = useTransform(transitionProgress, [0, 1], [1, 0]);
-     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -initialAvatarSize / 4]);
+     const usernameOpacity = useTransform(transitionProgress, [0, 0.7], [1, 0]);
+     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -initialAvatarSize / 2]);
+     const usernameYPosition = useTransform(transitionProgress, [0, 1], [0, 0]);
 
     // Camera Cutout Size
-    const cameraCutoutSize = useTransform(halfProgress, [0, 1], [0, 20]);
+    const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
     const cameraX = screenWidth / 2;
     const cameraY = 20; // Distance from top of container
 
@@ -126,14 +119,15 @@ function AnimatedHeader({ avatarUrl, username }) {
                     }}
                     className="relative mb-5"
                 >
-                <motion.div
+                 {/* Camera Cutout (Fixed to Top) */}
+                  <motion.div
                     style={{
                         width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
                         height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
                         backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
                         borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
                         position: 'absolute',
-                        top: 0,
+                        top: '50%',
                         left: '50%',
                         x: '-50%',
                         zIndex: 1000,
@@ -143,7 +137,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                     <FloatingIcon
                       key={index}
                       transitionProgress={transitionProgress}
-                      index={index}
+                    index={index}
                       cameraX={cameraX}
                       cameraY={cameraY}
                       initialAvatarSize = {initialAvatarSize}
@@ -155,21 +149,19 @@ function AnimatedHeader({ avatarUrl, username }) {
                         fontSize: 24,
                         fontWeight: 'bold',
                         position: 'absolute',
-                        top: 0,
+                        top: '50%',
                         left: '50%',
                          x: usernameXPosition,
                         y: usernameYPosition,
                         opacity: usernameOpacity,
                         zIndex: 100,
+                         transform: 'translate(-50%, -50%)',
                     }}
                 >
                     {username}
                 </motion.span>
-             
-              
-                </motion.div>
 
-           
+                </motion.div>
             </motion.div>
 
             {/* Fixed Header */}
