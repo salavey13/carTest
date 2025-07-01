@@ -53,7 +53,7 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     // Username Position and Fade Animation
     const usernameYPosition = useTransform(transitionProgress, [0, 1], [initialAvatarSize / 4, 0]);
-    const usernameOpacity = useTransform(transitionProgress, [0, 0.7], [1, 0]);
+    const usernameOpacity = useTransform(transitionProgress, [0, 1], [1, 0]);
 
     const usernameXPosition = useTransform(transitionProgress, [0, 1], [0, -screenWidth/2 + 40]);
 
@@ -92,7 +92,6 @@ function AnimatedHeader({ avatarUrl, username }) {
                     zIndex: 50,
                     padding: '1rem',
                     backgroundColor: `rgba(150, 80, 250,1})`, // Purple Background, full Opacity
-                    opacity: useTransform(transitionProgress, [0, 1], [1, 0])
                 }}
                 pointerEvents={pointerEvents}
             >
@@ -141,7 +140,9 @@ function AnimatedHeader({ avatarUrl, username }) {
                         }}
                     >
                         {username}
-                    </motion.span>
+                    </motion.span
+
+
                  {[...Array(13)].map((_, index) => (
                     <FloatingIcon
                       key={index}
