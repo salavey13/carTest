@@ -5,71 +5,57 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, useTransform, useScroll } from 'framer-motion';
 import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is correct
 
-
-function AnimatedHeader({ avatarUrl, username }) {
-    const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 });
-    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(14);
-    const fixedHeaderUsernameRef = useRef(null);
-    const mainHeaderHeight = 150;
-    const triggerOffset = 50;
-
-    const { scrollYProgress } = useScroll();
-
-    // Calculate Transition Progress
-    const transitionProgress = useTransform(
-        scrollYProgress,
-        [0, triggerOffset / 1000], // Normalize to the trigger offset
-        [0, 1],
-        { clamp: true }
-    );
-
-    // Avatar Size Animation
-    const avatarSize = useTransform(transitionProgress, [0, 1], [70, 50]);
-
-    // Avatar Blur Animation
-    const blurAmount = useTransform(transitionProgress, [0, 1], [0, 10]);
-
-    // Camera Cutout Size Animation
-    const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
-
-    // Nickname Size Animation
-    const initialUsernameSize = 24;
-    const targetUsernameSize = fixedHeaderFontSize;
-    const usernameSize = useTransform(transitionProgress, [0, 1], [initialUsernameSize, targetUsernameSize]);
-
-    const usernameLeft = useTransform(usernameSize, (size) => `calc(50% - ${size / 2}px)`);
-
-    // Camera Cutout Styles
-     const cameraCutoutStyle = ({
-        width: `${20 + (cameraCutoutSize.get() * 1.5)}px`, // Sane Camera Size
-        height: `${cameraCutoutSize.get() * 0.4}px`,
-        backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
-        borderRadius: `${15 + cameraCutoutSize.get()}px`,
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        opacity: transitionProgress.get()
-    });
-
-    // Memoize Floating Icon
-    const FloatingIcon = () => (
+const FloatingIcon = ({ transitionProgress }) => {
+    return (
         <motion.div
             style={{
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                transform: `translate(-50%, -50%)`, // Directly to center
-                opacity: useTransform(transitionProgress, [0,1], [1,0])
+                transform: 'translate(-50%, -50%)',
+                opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
-
-            <VibeContentRenderer content={::FaStar className="${transitionProgress.get() < 0.5 ? 'text-purple-500 text-sm' : 'text-yellow-400 text-base'}" ::} />
+            <VibeContentRenderer content={`::FaStar className="${transitionProgress.get() < 0.5 ? 'text-purple-500 text-sm' : 'text-yellow-400 text-base'}" ::`} />
         </motion.div>
     );
+};
 
-    const setFixedHeaderUsernameElement = useCallback((node) => {
+function AnimatedHeader({ avatarUrl, username }) {
+    const [fixedHeaderUsernamePosition, setFixedHeaderUsernamePosition] = useState({ x: 0, y: 0 });
+    const [fixedHeaderFontSize, setFixedHeaderFontSize] = useState(14);
+    const fixedHeaderUsernameRef = useRef(null);
+
+    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 500; // Default width
+    const initialAvatarSize = screenWidth * 0.69; // 69% of screen width
+    const initialHeaderHeight = initialAvatarSize;
+
+    const triggerOffset = initialHeaderHeight / 2; // Half of header height
+    const { scrollYProgress } = useScroll();
+
+    // Calculate Transition Progress (0 to 1 within the triggerOffset)
+    const transitionProgress = useTransform(
+        scrollYProgress,
+        [0, triggerOffset / 1000],
+        [0, 1],
+        { clamp: true }
+    );
+
+    // Avatar Size and Position Animation
+    const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
+    const avatarYPosition = useTransform(avatarSize, (size) => (initialAvatarSize - size) / 2); // Center vertically
+
+    // Username Position and Fade Animation
+    const usernameYPosition = useTransform(avatarSize, (size) => size + 10); // Positioned below avatar
+    const usernameOpacity = useTransform(transitionProgress, [0, 0.5], [1, 0]); // Fade out halfway
+
+    // Camera Cutout Size and Blur Animation
+    const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
+    const cameraBlurAmount = useTransform(transitionProgress, [0, 1], [10, 0]);
+
+     const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
+
             fixedHeaderUsernameRef.current = node;
             const rect = node.getBoundingClientRect();
              setFixedHeaderUsernamePosition({
@@ -80,9 +66,18 @@ function AnimatedHeader({ avatarUrl, username }) {
         }
     }, []);
 
-    //Pointer events for fixed header
     const pointerEvents = useTransform(transitionProgress, [0, 1], ["none", "auto"]);
 
+    const numIcons = 13;
+     const renderIcons = () => {
+        const icons = [];
+
+         for (let i = 0; i < numIcons; i++) {
+             icons.push(<FloatingIcon key={i} transitionProgress={transitionProgress} />);
+         }
+
+         return icons;
+    };
 
     return (
         <div className="w-full">
@@ -90,49 +85,58 @@ function AnimatedHeader({ avatarUrl, username }) {
             <motion.div
                 className="fixed top-0 left-0 w-full flex flex-col items-center overflow-hidden"
                 style={{
-                    height: mainHeaderHeight,
+                    height: initialHeaderHeight,
                     zIndex: 50,
-                    backgroundColor: rgba(200,200,200,${useTransform(transitionProgress, [0, 1], [1, 0]).get()}),
+                    backgroundColor: `rgba(200,200,200,${useTransform(transitionProgress, [0, 1], [1, 0]).get()})`,
                     opacity: useTransform(transitionProgress, [0, 1], [1, 0])
                 }}
                 pointerEvents={pointerEvents}
             >
                 {/* Avatar */}
-                <div
-                    className="relative mb-5"
+                <motion.div
                     style={{
-                        width: 70,
-                        height: 70,
+                        width: avatarSize,
+                        height: avatarSize,
+                        borderRadius: useTransform(avatarSize, (size) => `${size / 2}px`), // Maintain circle shape
+                        overflow: 'hidden',
+                        filter: `blur(${cameraBlurAmount.get()}px)`,
+                        y: avatarYPosition,
                     }}
+                    className="relative mb-5"
                 >
-                    <FloatingIcon />
-                    <motion.div
-                        style={{
-                            width: avatarSize,
-                            height: avatarSize,
-                            borderRadius: '50%',
-                            overflow: 'hidden',
-                            filter: blur(${blurAmount.get()}px),
-                        }}
-                        className="absolute top-0 left-0"
-                    >
-                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    </motion.div>
-                    <motion.div style={cameraCutoutStyle}></motion.div>
-                </div>
+
+                  {renderIcons()}
+
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                </motion.div>
 
                 {/* Nickname */}
                 <motion.span
                     style={{
-                        fontSize: usernameSize,
+                        fontSize: 24,
                         fontWeight: 'bold',
-                        position: 'absolute',
-                        left: usernameLeft,
-                        top: 80
+                        position: 'relative',
+                        y: usernameYPosition,
+                        opacity: usernameOpacity,
                     }}
                 >
                     {username}
                 </motion.span>
+
+                {/* Camera Cutout (Fixed to Top) */}
+                <motion.div
+                    style={{
+                        width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
+                        height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
+                        backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
+                        borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
+                        position: 'absolute',
+                        top: 0,
+                        left: '50%',
+                        transform: 'translate(-50%, 0)', // Fixed to Top-Center
+                        filter: `blur(${cameraBlurAmount.get()}px)`
+                    }}
+                ></motion.div>
             </motion.div>
 
             {/* Fixed Header */}
@@ -145,15 +149,15 @@ function AnimatedHeader({ avatarUrl, username }) {
                 pointerEvents={pointerEvents}
             >
                 <VibeContentRenderer content="::FaUser className='mr-2'::" />
-                <span className="text-sm font-semibold" ref={setFixedHeaderUsernameElement} style={{fontSize:${fixedHeaderFontSize}px, fontFamily: 'sans-serif'}}>{username}</span>
+                <span className="text-sm font-semibold" ref={setFixedHeaderUsernameElement} style={{fontSize:`${fixedHeaderFontSize}px`, fontFamily: 'sans-serif'}}>{username}</span>
             </motion.div>
 
             {/* Filler Section */}
             <div style={{
-                height: mainHeaderHeight,
+                height: initialHeaderHeight,
                 position: 'relative'
             }}>
-                <div style = {{height:${initialUsernameSize * (1-transitionProgress.get()) + targetUsernameSize * transitionProgress.get()},overflow: 'hidden'}}>{username}</div>
+                <div>{username}</div>
             </div>
         </div>
     );
