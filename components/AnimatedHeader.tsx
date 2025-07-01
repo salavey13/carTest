@@ -7,7 +7,7 @@ import { VibeContentRenderer } from './VibeContentRenderer'; // Assuming path is
 
 const FloatingIcon = ({ transitionProgress, index }) => {
     const angle = (index / 13) * Math.PI * 2;
-    const distance = 20 + Math.random() * 10; // Jittered distance
+    const distance = 45 + Math.random() * 30; // Jittered distance
     const xOffset = Math.cos(angle) * distance;
     const yOffset = Math.sin(angle) * distance;
 
@@ -21,7 +21,7 @@ const FloatingIcon = ({ transitionProgress, index }) => {
                 opacity: useTransform(transitionProgress, [0, 1], [1, 0])
             }}
         >
-            <VibeContentRenderer content={`::FaStar className="${transitionProgress.get() < 0.5 ? 'text-purple-500 text-sm' : 'text-yellow-400 text-base'}" ::`} />
+            <VibeContentRenderer content={`::FaStar className="${index % 2 === 0 ? 'text-purple-900 text-sm' : 'text-pink-400 text-base'}" ::`} />
         </motion.div>
     );
 };
@@ -35,7 +35,8 @@ function AnimatedHeader({ avatarUrl, username }) {
     const initialAvatarSize = screenWidth * 0.69; // 69% of screen width
     const initialHeaderHeight = initialAvatarSize;
 
-    const triggerOffset = initialHeaderHeight / 2; // Half of header height
+    const triggerOffset = initialHeaderHeight * 0.55; //  55% of header height
+
     const { scrollYProgress } = useScroll();
 
     // Calculate Transition Progress (0 to 1 within the triggerOffset)
@@ -48,15 +49,15 @@ function AnimatedHeader({ avatarUrl, username }) {
 
     // Avatar Size and Position Animation
     const avatarSize = useTransform(transitionProgress, [0, 1], [initialAvatarSize, 50]); // Size reduces to 50px
-    const avatarYPosition = useTransform(transitionProgress, [0, 1], [0, (initialAvatarSize - 50) / 2]); // Shrink Avatar Yposition
+    const avatarYPosition = useTransform(avatarSize, (size) => (initialAvatarSize - size) / 2);
 
     // Username Position and Fade Animation
     const usernameYPosition = useTransform(avatarSize, (size) => size + 10); // Positioned below avatar
     const usernameOpacity = useTransform(transitionProgress, [0, 0.5], [1, 0]); // Fade out halfway
 
     // Camera Cutout Size and Blur Animation
+
     const cameraCutoutSize = useTransform(transitionProgress, [0, 1], [0, 20]);
-    const cameraBlurAmount = useTransform(transitionProgress, [0, 1], [0, 0]);
 
      const setFixedHeaderUsernameElement = useCallback((node) => {
         if (node) {
@@ -88,7 +89,7 @@ function AnimatedHeader({ avatarUrl, username }) {
                 style={{
                     height: headerHeight,
                     zIndex: 50,
-                    backgroundColor: `rgba(200,200,200,${useTransform(transitionProgress, [0, 1], [1, 0]).get()})`,
+                    backgroundColor: `rgba(150, 80, 250,${useTransform(transitionProgress, [0, 1], [1, 0]).get()})`, // Purple Background
                     opacity: useTransform(transitionProgress, [0, 1], [1, 0])
                 }}
                 pointerEvents={pointerEvents}
@@ -102,43 +103,46 @@ function AnimatedHeader({ avatarUrl, username }) {
                         overflow: 'hidden',
                         y: avatarYPosition,
                          position: 'relative',
+                         backgroundImage: `url(${avatarUrl})`,
+                          backgroundSize: 'cover',
+                           backgroundPosition: 'center',
                     }}
                     className="relative mb-5"
                 >
                      {[...Array(13)].map((_, index) => (
                         <FloatingIcon key={index} transitionProgress={transitionProgress} index={index} />
                     ))}
-
-                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                 </motion.div>
 
-                {/* Nickname */}
+                 {/* Nickname */}
                 <motion.span
                     style={{
                         fontSize: 24,
                         fontWeight: 'bold',
-                        position: 'relative',
+                        position: 'absolute',
                         y: usernameYPosition,
                         opacity: usernameOpacity,
+                        top: '50%',  // Position username and camera
+                         left: '50%',
+                          transform: 'translate(-50%, -50%)',
                     }}
                 >
                     {username}
                 </motion.span>
-
                 {/* Camera Cutout (Fixed to Top) */}
-                <motion.div
+                  <motion.div
                     style={{
                         width: useTransform(cameraCutoutSize, (size) => `${20 + (size * 1.5)}px`), // Sane Camera Size
                         height: useTransform(cameraCutoutSize, (size) => `${cameraCutoutSize.get() * 0.4}px`),
                         backgroundColor: `rgba(0,0,0,${transitionProgress.get()})`,
                         borderRadius: useTransform(cameraCutoutSize, (size) => `${15 + cameraCutoutSize.get()}px`),
                         position: 'absolute',
-                        top: 0,
-                        left: '50%',
-                        transform: 'translate(-50%, 0)', // Fixed to Top-Center
+                        top: '50%',  // Position username and camera
+                         left: '50%',
+                          transform: 'translate(-50%, -50%)',
                         zIndex: 1000,
                     }}
-                ></motion.div>
+                >   </motion.div>
             </motion.div>
 
             {/* Fixed Header */}
