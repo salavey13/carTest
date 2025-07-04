@@ -17,7 +17,7 @@ export async function handleCommand(update: any) {
  const userId = update.message?.from?.id;
  const username = update.message?.from?.username;
 
- logger.info([Command Handler] Received command: ${text}, Chat ID: ${chatId}, User ID: ${userId});
+ logger.info(`[Command Handler] Received command: ${text}, Chat ID: ${chatId}, User ID: ${userId}`);
 
  if (!text || !chatId || !userId) {
   logger.warn("[Command Handler] Missing text, chatId, or userId. Ignoring.");
