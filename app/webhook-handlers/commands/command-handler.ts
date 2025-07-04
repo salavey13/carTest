@@ -44,7 +44,7 @@ export async function handleCommand(update: any) {
   await profileCommand(chatId, userId, username);
  }
   else {
-  logger.warn([Command Handler] Unknown command: ${text}. Ignoring.);
+  logger.warn(`[Command Handler] Unknown command: ${text}. Ignoring.`);
   // Optionally send a "command not found" message to the user.
  }
 }
