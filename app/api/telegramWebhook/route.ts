@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       }
 
       const filePath = fileInfo.result.file_path;
-      const fileUrl = https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath};
+      const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
       const fileContentResponse = await fetch(fileUrl);
       const fileContent = await fileContentResponse.text();
 
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
         return `${index + 1}. \`${cleanFileName}\``;
       }).join('\n');
 
-      const responseText = ok, now go to t.me/${BOT_USERNAME}/app and paste your file there;)\n\nParsed files:\n${fileList};
+      const responseText = `ok, now go to t.me/${BOT_USERNAME}/app and paste your file there;)\n\nParsed files:\n${fileList}`;
       await sendTelegramMessage(responseText, [], undefined, chatId.toString());
 
       return NextResponse.json({ ok: true });
