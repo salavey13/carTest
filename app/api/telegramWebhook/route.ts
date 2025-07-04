@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       const fileId = document.file_id;
       const chatId = chat.id;
 
-      const fileInfoResponse = await fetch(https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId});
+      const fileInfoResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getFile?file_id=${fileId}`);
       const fileInfo = await fileInfoResponse.json();
 
       if (!fileInfo.ok) {
