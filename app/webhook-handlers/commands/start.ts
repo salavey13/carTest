@@ -67,7 +67,7 @@ async function askQuestion(chatId: number, userId: number) {
       if (error) {
         logger.error(`[Start Command] Error updating Supabase for user ${userId}: ${error.message}`);
       } else {
-        logger.info([`Start Command] Supabase updated successfully for user ${userId}: ${data}`);
+        logger.info(`[Start Command] Supabase updated successfully for user ${userId}: ${data}`);
       }
     } catch (supabaseError: any) {
       logger.error(`[Start Command] Error importing or using Supabase: ${supabaseError.message}`);
