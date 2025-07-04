@@ -9,7 +9,7 @@ const BOT_USERNAME = "oneSitePlsBot";
 
 // --- Minibot Helper Functions ---
 function extractCodeBlocks(fileContent: string): string[] {
-  const codeBlockRegex = /\`\`\`(?:\w*\n)?([\s\S]*?)\`\`\`/g;
+  const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
   const blocks: string[] = [];
   let match;
   while ((match = codeBlockRegex.exec(fileContent)) !== null) {
@@ -61,13 +61,13 @@ export async function POST(request: Request) {
 
       const codeBlocks = extractCodeBlocks(fileContent);
       if (codeBlocks.length === 0) {
-        await sendTelegramMessage("File received, but I couldn't find any code blocks marked with \`\`\`.", [], undefined, chatId.toString());
+        await sendTelegramMessage("File received, but I couldn't find any code blocks marked with ```.", [], undefined, chatId.toString());
         return NextResponse.json({ ok: true });
       }
       
       const fileList = codeBlocks.map((block, index) => {
         const cleanFileName = getFirstLine(block).replace(/^\/\/\s×|\/\×\s×|\×?\/\s×|#\s×/, '').trim();
-        return ${index + 1}. \${cleanFileName}\``;
+        return `${index + 1}. \`${cleanFileName}\``;
       }).join('\n');
 
       const responseText = ok, now go to t.me/${BOT_USERNAME}/app and paste your file there;)\n\nParsed files:\n${fileList};
