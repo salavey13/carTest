@@ -44,7 +44,7 @@ async function askQuestion(chatId: number, userId: number) {
   } else {
     // Survey Complete
     const answers = state.answers;
-    const summary = `Спасибо за участие в опросе!\nВаши ответы:\n${answers.map((a, i) => ${questions[i]}: ${a}`).join("\n")};
+    const summary = `Спасибо за участие в опросе!\nВаши ответы:\n${answers.map((a, i) => ${questions[i]}: ${a}).join("\n")}`;
     await sendTelegramMessage(summary, [], undefined, chatId.toString());
     userStates.delete(userId); // Clean up state
     logger.info(`[Start Command] Survey complete for user ${userId}.`);
