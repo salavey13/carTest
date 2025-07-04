@@ -44,7 +44,12 @@ async function askQuestion(chatId: number, userId: number) {
   } else {
     // Survey Complete
     const answers = state.answers;
-    const summary = `Спасибо за участие в опросе!\nВаши ответы:\n${answers.map((a, i) => \`${questions[i]}: ${a}\`).join("\\n")}`;
+    //const summary = `Спасибо за участие в опросе!\nВаши ответы:\n${answers.map((a, i) => \`${questions[i]}: ${a}\`).join("\\n")}`;
+    const summary = "\u0421\u043f\u0430\u0441\u0438\u0431\u043e \u0437\u0430 \u0443\u0447\u0430\u0441\u0442\u0438\u0435 \u0432 \u043e\u043f\u0440\u043e\u0441\u0435!" +
+  "\u000A" + // Unicode escape for newline (\n)
+  "\u0412\u0430\u0448\u0438 \u043e\u0442\u0432\u0435\u0442\u044b:" +
+  "\u000A" +  // Unicode escape for newline (\n)
+  answers.map((a, i) => questions[i] + ": " + a).join("\u000A"); // Newline inside the join
     await sendTelegramMessage(summary, [], undefined, chatId.toString());
     userStates.delete(userId); // Clean up state
     logger.info(`[Start Command] Survey complete for user ${userId}.`);
