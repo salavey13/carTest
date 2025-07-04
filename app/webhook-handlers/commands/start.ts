@@ -17,7 +17,7 @@ interface UserState {
 const userStates: Map<number, UserState> = new Map();
 
 export async function startCommand(chatId: number, userId: number, username:string) {
-  logger.info([Start Command] User ${userId} (${username}) started the bot.);
+  logger.info(`[Start Command] User ${userId} (${username}) started the bot.`);
   userStates.set(userId, { questionIndex: 0, answers: [] });
 
   const greeting = "Здравствуйте! Спасибо, что решили воспользоваться нашим сервисом.\nДля улучшения качества работы сервиса, пожалуйста, пройдите небольшой опрос из 5 вопросов.";
@@ -29,7 +29,7 @@ export async function startCommand(chatId: number, userId: number, username:stri
 async function askQuestion(chatId: number, userId: number) {
   const state = userStates.get(userId);
   if (!state) {
-    logger.error([Start Command] No state found for user ${userId}.);
+    logger.error(`[Start Command] No state found for user ${userId}.`);
     return;
   }
 
@@ -38,16 +38,16 @@ async function askQuestion(chatId: number, userId: number) {
   if (questionIndex < questions.length) {
     const question = questions[questionIndex];
     const keyboard = [
-      [{ text: "Да", callback_data: q${questionIndex + 1}_yes }, { text: "Нет", callback_data: q${questionIndex + 1}_no }],
+      [{ text: "Да", callback_data: `q${questionIndex + 1}_yes` }, { text: "Нет", callback_data: `q${questionIndex + 1}_no` }],
     ];
     await sendTelegramMessage(question, keyboard, undefined, chatId.toString());
   } else {
     // Survey Complete
     const answers = state.answers;
-    const summary = Спасибо за участие в опросе!\nВаши ответы:\n${answers.map((a, i) => ${questions[i]}: ${a}).join("\n")};
+    const summary = `Спасибо за участие в опросе!\nВаши ответы:\n${answers.map((a, i) => ${questions[i]}: ${a}`).join("\n")};
     await sendTelegramMessage(summary, [], undefined, chatId.toString());
     userStates.delete(userId); // Clean up state
-    logger.info([Start Command] Survey complete for user ${userId}.);
+    logger.info(`[Start Command] Survey complete for user ${userId}.`);
 
     // OPTIONAL: Update Supabase
     try {
@@ -60,12 +60,12 @@ async function askQuestion(chatId: number, userId: number) {
 
 
       if (error) {
-        logger.error([Start Command] Error updating Supabase for user ${userId}: ${error.message});
+        logger.error(`[Start Command] Error updating Supabase for user ${userId}: ${error.message}`);
       } else {
-        logger.info([Start Command] Supabase updated successfully for user ${userId}: ${data});
+        logger.info([`Start Command] Supabase updated successfully for user ${userId}: ${data}`);
       }
     } catch (supabaseError: any) {
-      logger.error([Start Command] Error importing or using Supabase: ${supabaseError.message});
+      logger.error(`[Start Command] Error importing or using Supabase: ${supabaseError.message}`);
     }
   }
 }
@@ -74,7 +74,7 @@ async function askQuestion(chatId: number, userId: number) {
 export async function handleAnswer(chatId: number, userId: number, data: string) {
   const state = userStates.get(userId);
   if (!state) {
-    logger.warn([Start Command] No state found for user ${userId} when handling answer.);
+    logger.warn(`[Start Command] No state found for user ${userId} when handling answer.`);
     return;
   }
 
