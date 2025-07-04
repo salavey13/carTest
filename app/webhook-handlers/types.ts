@@ -1,5 +1,75 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
+export interface TelegramUpdate {
+  update_id: number;
+  message?: {
+    message_id: number;
+    from: {
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      last_name: string;
+      username: string;
+      language_code: string;
+    };
+    chat: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      username: string;
+      type: string;
+    };
+    date: number;
+    text: string;
+    entities?: any[];  // Adjust as needed
+    document?: { // For file uploads
+      file_name: string;
+      mime_type: string;
+      file_id: string;
+      file_unique_id: string;
+      file_size: number;
+    };
+  };
+  edited_message?: any; // Define types as needed
+  channel_post?: any;
+  edited_channel_post?: any;
+  inline_query?: any;
+  chosen_inline_result?: any;
+  callback_query?: {
+        id: string;
+        from: {
+            id: number;
+            is_bot: boolean;
+            first_name: string;
+            last_name: string;
+            username: string;
+            language_code: string;
+        };
+        message: {
+            message_id: number;
+            chat: {
+                id: number;
+                first_name: string;
+                last_name: string;
+                username: string;
+                type: string;
+            };
+            date: number;
+            text: string;
+        };
+        chat_instance: string;
+        data: string;
+    };
+
+  shipping_query?: any;
+  pre_checkout_query?: any;
+  poll?: any;
+  poll_answer?: any;
+  my_chat_member?: any;
+  chat_member?: any;
+  chat_join_request?: any;
+}
+
 // Define a more specific type for the invoice object if possible
 // For now, using 'any' for flexibility but consider refining this
 interface InvoiceData {
