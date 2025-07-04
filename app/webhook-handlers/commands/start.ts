@@ -80,12 +80,12 @@ export async function handleAnswer(chatId: number, userId: number, data: string)
 
   const questionIndex = state.questionIndex;
 
-  if (data === q${questionIndex + 1}_yes) {
+  if (data === `q${questionIndex + 1}_yes`) {
     state.answers.push("Да");
-  } else if (data === q${questionIndex + 1}_no) {
+  } else if (data === `q${questionIndex + 1}_no`) {
     state.answers.push("Нет");
   } else {
-    logger.warn([Start Command] Unknown callback data: ${data});
+    logger.warn(`[Start Command] Unknown callback data: ${data}`);
     return;
   }
 
