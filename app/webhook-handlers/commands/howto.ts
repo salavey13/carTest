@@ -248,7 +248,7 @@ async function getHowtoContent(): Promise<string> {
 export async function howtoCommand(chatId: number, userId: number, username?: string) {
   // Add a "Canary" log to prove this new version is running
   logger.info(`[HOWTO_V3_RUNNING] User ${userId} triggered.`);
-  await sendTelegramMessage(String(chatId), "📚 Готовлю для тебя священный свиток... (v3_attempt)");
+  await sendTelegramMessage("📚 Готовлю для тебя священный свиток... (v3_attempt)", undedined, String(chatId));
 
   try {
     const howtoMarkdown = await getHowtoContent();
