@@ -275,6 +275,6 @@ export async function howtoCommand(chatId: number, userId: number, username?: st
 
   } catch (error) {
     logger.error("[Howto Command] V3: Top-level handler error:", error);
-    await sendTelegramMessage("🚨 Не удалось создать свиток. Попробуй позже.", [], undefined, chatId: String(chatId));
+    await sendTelegramMessage("🚨 Не удалось создать свиток. Попробуй позже.", [], undefined, String(chatId));
   }
 }
