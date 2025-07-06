@@ -3,7 +3,6 @@ import { logger } from "@/lib/logger";
 import { fetchArbitrageOpportunities } from "@/app/elon/arbitrage_scanner_actions";
 import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from "@/app/elon/arbitrage_scanner_types";
 
-// Хелпер для красивого форматирования
 function formatOpportunity(op: ArbitrageOpportunity): string {
     const profit = `${op.profitPercentage.toFixed(3)}% ($${op.potentialProfitUSD.toFixed(2)})`;
     if (op.type === '2-leg') {
@@ -36,7 +35,7 @@ export async function rageCommand(chatId: number, userId: number) {
         const messageLines = top3.map(op => formatOpportunity(op));
         const finalMessage = "🏆 *Топ-3 Горячих Возможностей:*\n\n" + messageLines.join('\n\n');
 
-        await sendTelegramMessage(finalMessage, [], undefined, chatId.toString());
+        await sendTelegramMessage(finalMessage, [], undefined, chatId.toString(), undefined, "Markdown");
 
     } catch (error) {
         logger.error("[Rage Command] Error fetching arbitrage opportunities:", error);
