@@ -1,7 +1,9 @@
+// /app/webhook-handlers/commands/howto.ts
 import { sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
-import { logger } from "@/lib/logger";
-import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions'; // Используем наш PDF генератор
 
+import { logger } from "@/lib/logger";
+// CHANGE THE IMPORT
+import { generateHowtoPdf } from '@/app/topdf/actions'; 
 // Псевдо-функция для получения контента гайда. В реальности тут может быть чтение из файла.
 async function getHowtoContent(): Promise<string> {
     // В идеале этот текст надо вынести в отдельный файл/модуль
@@ -238,27 +240,29 @@ async function getHowtoContent(): Promise<string> {
 `;
 }
 
-export async function howtoCommand(chatId: number, userId: number) {
-  logger.info(`[Howto Command] User ${userId} triggered the /howto command.`);
-  await sendTelegramMessage("📚 Готовлю для тебя священный свиток с гайдом... Это может занять несколько секунд.", [], undefined, chatId.toString());
+
+
+
+export async function howtoCommand(chatId: number, userId: number, username?: string) {
+  logger.info(`[Howto Command] User ${userId} triggered.`);
+  await sendTelegramMessage("📚 Готовлю для тебя священный свиток... (v_clean_build)", [], undefined, String(chatId));
 
   try {
-      const howtoMarkdown = await getHowtoContent();
-      const result = await generatePdfFromMarkdownAndSend(
-          howtoMarkdown,
-          String(chatId),
-          "CyberVibe_Guide"
-      );
+    const howtoMarkdown = await getHowtoContent();
+    
+    // Call the NEW function
+    const result = await generateHowtoPdf({
+        markdownContent: howtoMarkdown,
+        chatId: String(chatId),
+        userId: String(userId),
+        username: username
+    });
 
-      if (!result.success) {
-          throw new Error(result.error || "Неизвестная ошибка генерации PDF.");
-      }
-      
-      // Сообщение об успехе уже отправляется внутри generatePdfFromMarkdownAndSend
-      logger.info(`[Howto Command] Successfully sent PDF guide to user ${userId}.`);
-
+    if (!result.success) {
+      await sendTelegramMessage(`🚨 Ошибка создания свитка. Попробуй позже.`, [], undefined, String(chatId));
+    }
   } catch (error) {
-      logger.error("[Howto Command] Error generating or sending PDF:", error);
-      await sendTelegramMessage("🚨 Не удалось создать свиток. Магия не сработала. Попробуй позже.", [], undefined, chatId.toString());
+    logger.error("[Howto Command] Top-level handler error:", error);
+    await sendTelegramMessage("🚨 Критический сбой. Вызываю кибер-шаманов.", [], undefined, String(chatId));
   }
 }
