@@ -1,3 +1,4 @@
+// /app/topdf/actions.ts
 "use server";
 
 import { logger } from '@/lib/logger';
@@ -235,4 +236,38 @@ export async function notifyAdminAction(
         logger.error(`[topdf/actions notifyAdminAction] Exception sending support request:`, e);
         return { success: false, error: e.message || "Server error sending support request." };
     }
+}
+
+
+export async function generateHowtoPdf(params: {
+  markdownContent: string;
+  chatId: string;
+  userId: string; // We accept it to be explicit.
+  username?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  
+  const { markdownContent, chatId, userId, username } = params;
+  logger.info(`[generateHowtoPdf] Starting for UserID: ${userId}`);
+
+  try {
+    // We call the ORIGINAL, UNTOUCHED function.
+    // We only pass the parameters it actually expects according to its signature.
+    const result = await generatePdfFromMarkdownAndSend(
+      markdownContent,
+      chatId,
+      "CyberVibe_Guide",
+      username // Pass username if it's available, it's an optional param.
+    );
+
+    if (!result.success) {
+      throw new Error(result.error || "generatePdfFromMarkdownAndSend failed internally.");
+    }
+    
+    return { success: true };
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Unknown error in generateHowtoPdf';
+    logger.error(`[generateHowtoPdf] FAILED for UserID: ${userId}`, { error: errorMessage });
+    return { success: false, error: errorMessage };
+  }
 }
