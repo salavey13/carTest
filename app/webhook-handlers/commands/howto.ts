@@ -245,25 +245,31 @@ async function getHowtoContent(): Promise<string> {
  
 
 
+
+
 export async function howtoCommand(chatId: number, userId: number, username?: string) {
-  // Add a "Canary" log to prove this new version is running
-  logger.info(`[HOWTO_V3_RUNNING] User ${userId} triggered.`);
-  await sendTelegramMessage("📚 Готовлю для тебя священный свиток... (v3_attempt)", undedined, String(chatId));
+  logger.info(`[HOWTO_V5_LAWFUL] User ${userId} triggered.`);
+  
+  // LAWFUL CALL #1
+  await sendTelegramMessage(
+      "📚 Готовлю для тебя священный свиток... (v5_lawful)", // 1. message
+      [],               // 2. buttons
+      undefined,        // 3. imageUrl
+      String(chatId)    // 4. chatId
+  );
 
   try {
     const howtoMarkdown = await getHowtoContent();
     
-    // Call the original function but pass the extra info
+    // This call was already correct in the last version, we keep it.
     const result = await generatePdfFromMarkdownAndSend(
         howtoMarkdown,
         String(chatId),
         "CyberVibe_Guide",
-        username, // Pass username, it's an optional string
-        undefined, // userAge
-        undefined, // userGender
-        undefined, // heroImageUrl
-        // This is the Hail Mary pass. We are assuming the buggy function on the server
-        // has a final optional parameter for userId.
+        username,
+        undefined, 
+        undefined, 
+        undefined, 
         String(userId) 
     );
 
@@ -271,10 +277,17 @@ export async function howtoCommand(chatId: number, userId: number, username?: st
       throw new Error(result.error || "Unknown PDF generation error.");
     }
     
-    logger.info(`[Howto Command] V3: PDF guide sent successfully to user ${userId}.`);
+    logger.info(`[Howto Command] V5: PDF guide sent successfully to user ${userId}.`);
 
   } catch (error) {
-    logger.error("[Howto Command] V3: Top-level handler error:", error);
-    await sendTelegramMessage("🚨 Не удалось создать свиток. Попробуй позже.", [], undefined, String(chatId));
+    logger.error("[Howto Command] V5: Top-level handler error:", error);
+    
+    // LAWFUL CALL #2
+    await sendTelegramMessage(
+        "🚨 Не удалось создать свиток. Попробуй позже.", // 1. message
+        [],               // 2. buttons
+        undefined,        // 3. imageUrl
+        String(chatId)    // 4. chatId
+    );
   }
 }
