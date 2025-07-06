@@ -1,7 +1,7 @@
+// /app/topdf/pdfGenerator.ts
 "use server";
 
 import { logger } from '@/lib/logger';
-import { debugLogger } from '@/lib/debugLogger';
 import path from 'path'; 
 import fs from 'fs';   
 
@@ -28,7 +28,7 @@ async function drawMarkdownWrappedText(
     
     for (const line of lines) {
         if (currentY < pageMargins + lineHeight) { 
-            debugLogger.warn("[PDF Gen drawMarkdownWrappedText] Content potentially overflowing page for this line segment. Stopping text draw for this line and subsequent ones in this call.");
+            logger.warn("[PDF Gen drawMarkdownWrappedText] Content potentially overflowing page for this line segment. Stopping text draw for this line and subsequent ones in this call.");
             return currentY; 
         }
 
@@ -62,7 +62,7 @@ async function drawMarkdownWrappedText(
                 textWidth = effectiveFont.widthOfTextAtSize(sanitizedTestSegment, effectiveSize);
 
                 if (currentX + textWidth > maxWidth && currentLineSegment) {
-                    if (currentY < pageMargins + lineHeight) { debugLogger.warn("[PDF Gen drawMarkdownWrappedText] Overflow during word wrap."); return currentY; }
+                    if (currentY < pageMargins + lineHeight) { logger.warn("[PDF Gen drawMarkdownWrappedText] Overflow during word wrap."); return currentY; }
                     page.drawText(currentLineSegment.replace(/[^\x00-\uFFFF]/g, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
                     currentY -= lineHeight * (effectiveSize / baseFontSize);
                     currentLineSegment = word; 
@@ -76,7 +76,7 @@ async function drawMarkdownWrappedText(
             }
         }
         if (currentLineSegment) { 
-            if (currentY < pageMargins + lineHeight) { debugLogger.warn("[PDF Gen drawMarkdownWrappedText] Overflow at end of line."); return currentY; }
+            if (currentY < pageMargins + lineHeight) { logger.warn("[PDF Gen drawMarkdownWrappedText] Overflow at end of line."); return currentY; }
              try {
                 page.drawText(currentLineSegment.replace(/[^\x00-\uFFFF]/g, "?"), { x: currentX, y: currentY, font: effectiveFont, size: effectiveSize, color });
             } catch (e: any) {
@@ -96,7 +96,7 @@ async function generatePdfFromContentInternal(
     userGender?: string,
     heroImageUrl?: string 
 ): Promise<Uint8Array> {
-    debugLogger.log(`[PDF Gen Internal] Initiated. User: ${userName || 'N/A'}`);
+    logger.log(`[PDF Gen Internal] Initiated. User: ${userName || 'N/A'}`);
     
     const PDFDocumentClass = pdfLibModule.PDFDocument;
     const fontkitInstanceToUse = fontkitModule.default || fontkitModule;
