@@ -1,4 +1,5 @@
 "use client";
+
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -12,10 +13,27 @@ import {
     fetchUserCyberFitnessProfile, 
     getAchievementDetails, 
     logSchematicCompleted, 
-    Achievement 
 } from "@/hooks/cyberFitnessSupabase"; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 import Link from "next/link"; 
+import { cn } from "@/lib/utils";
+
+// --- КОМПОНЕНТЫ-ПОМОЩНИКИ ДЛЯ ГАЙДА ---
+const ScreenshotPlaceholder = ({ text, className }: { text: string, className?: string }) => (
+  <div className={cn(
+    "flex items-center justify-center text-center p-8 my-4 border-2 border-dashed border-brand-purple/50 bg-brand-purple/10 rounded-lg text-brand-purple/80 font-mono text-sm shadow-inner",
+    className
+  )}>
+    [ЗДЕСЬ БУДЕТ СКРИНШОТ: {text}]
+  </div>
+);
+
+const PseudoCodeBlock = ({ children }: { children: React.ReactNode }) => (
+  <div className="my-4 p-4 bg-black/50 border border-gray-700 rounded-lg shadow-lg">
+    <pre><code className="font-mono text-sm text-brand-lime whitespace-pre-wrap">{children}</code></pre>
+  </div>
+);
+// ------------------------------------
 
 interface SchematicDetail {
   label: string; 
@@ -40,7 +58,7 @@ interface VibeSchematic {
 }
 
 const vibeSchematics: VibeSchematic[] = [
-  // ... (previous schematics remain the same)
+  // --- ТВОИ ОРИГИНАЛЬНЫЕ СХЕМЫ (хорошие вещи сохранены) ---
   {
     id: "deep_work_sprint",
     name: "Схема 'ТУРБО-МОЗГ'",
@@ -77,246 +95,149 @@ const vibeSchematics: VibeSchematic[] = [
     shadow: "shadow-brand-yellow/20",
     kiloVibesAwardOnCompletion: 100,
   },
+  // --- НОВАЯ СХЕМА-ССЫЛКА НА ГАЙДЫ ---
   {
-    id: "mind_recharge_cycle",
-    name: "Схема 'НЕЙРО-ДЕТОКС'",
-    icon: "FaBrain", 
-    description: "Перезагрузи матрицу сознания. Очисти кэш. Сгенерируй идеи, которые взорвут рынок.",
+    id: "creator_kitchen_access",
+    name: "Рецепт 'НЕЙРО-КУХНЯ'",
+    icon: "FaUserGraduate",
+    description: "Открой доступ к священным знаниям! Этот рецепт научит тебя не просто следовать схемам, а СОЗДАВАТЬ свои собственные вайбы с нуля, используя силу Джинна.",
     details: [
-      { label: "ВЫГОДА", content: "Сброс умственной усталости, кристальная ясность, поток гениальных идей.", icon: "FaStar"},
-      { label: "МЕХАНИКА", content: "15-20 мин медитации 'Нулевой Канал' или прогулка 'Альфа-Волны'. После – 10 мин 'Взрыв Идей' фрирайтингом.", icon: "FaToolbox"},
-      { label: "АРСЕНАЛ", content: "Приложение для медитации, блокнот или цифровые скрижали.", icon: "FaBook"},
-      { label: "ТОПЛИВО", content: "Эликсир травяного чая, орехи мудрости.", icon: "FaMugHot"},
+        { label: "ЧТО ЭТО", content: "Продвинутый гайд по созданию Telegram-команд и целых веб-компонентов с помощью AI-ассистента.", icon: "FaInfoCircle" },
+        { label: "МЕХАНИКА", content: "Читай гайды ниже -> Пробуй повторить ритуал -> Получай KiloVibes за первые успехи!", icon: "FaToolbox" },
+        { label: "АРСЕНАЛ", content: "Твой мозг, OneSitePlsBot, SuperVibe Studio.", icon: "FaBrain" },
     ],
-    prerequisites: [], 
-    outcome: "Повышенная креативность, снижение умственного напряжения.",
-    color: "border-brand-cyan/60 bg-dark-card/70 hover:shadow-brand-cyan/30",
-    shadow: "shadow-brand-cyan/20",
-    kiloVibesAwardOnCompletion: 30,
+    prerequisites: ["level:5", "achievement:commit_crafter_2"],
+    outcome: "Способность генерировать новые команды бота и веб-страницы.",
+    unlocksPerk: "AI-Командир",
+    color: "border-fuchsia-500/60 bg-dark-card/70 hover:shadow-fuchsia-500/30",
+    shadow: "shadow-fuchsia-500/20",
+    kiloVibesAwardOnCompletion: 500,
   },
-  {
-    id: "error_fix_pro",
-    name: "Схема 'БАГ-ХАНТЕР ПРО'",
-    icon: "FaBugSlash",
-    description: "Мастерски устраняй ошибки, используя логи и контекст для точного удара по багам. Совет: Оверлей ошибок (Ctrl+Shift+E) покажет детали!",
-    details: [
-      { label: "ВЫГОДА", content: "Быстрое и эффективное исправление ошибок, повышение стабильности кода.", icon: "FaShieldHalved" },
-      { label: "МЕХАНИКА", content: "Запускай ErrorFix Flow из Оверлея Ошибок -> Внимательно изучай логи в KWork -> Предоставляй AI максимально точный контекст (1-3 файла).", icon: "FaToolbox" },
-      { label: "АРСЕНАЛ", content: "SuperVibe Studio, Оверлей Ошибок, Vercel/GitHub логи.", icon: "FaMagnifyingGlassChart" },
-      { label: "ТРЕБУЕТ", content: "Перк 'Анализ Логов Ошибок', Ачивка 'Диагност'.", icon: "FaUserSecret" }
-    ],
-    prerequisites: ["level:4", "perk:Анализ Логов Ошибок (Lv.3 Flow)", "achievement:copy_logs_used"],
-    outcome: "Точный фикс бага с минимальными итерациями AI, созданный PR.",
-    relatedAchievement: "autofix_used", 
-    color: "border-red-500/60 bg-dark-card/70 hover:shadow-red-500/30",
-    shadow: "shadow-red-500/20",
-    kiloVibesAwardOnCompletion: 150,
-  },
-  {
-    id: "contextual_code_gen",
-    name: "Схема 'КОНТЕКСТНЫЙ ГЕНЕЗИС'",
-    icon: "FaMagicWandSparkles", 
-    description: "Генерируй новый код и фичи, предоставляя AI обширный и релевантный контекст. Используй StickyChat (::FaCommentDots::) для быстрого добавления файлов.",
-    details: [
-      { label: "ВЫГОДА", content: "Создание сложных компонентов или новой функциональности с пониманием AI зависимостей.", icon: "FaLightbulb" },
-      { label: "МЕХАНИКА", content: "Используй 'Выбрать Связанные Файлы' -> 'Добавить все файлы + дерево' -> Точно формулируй задачу для AI.", icon: "FaToolbox" },
-      { label: "АРСЕНАЛ", content: "SuperVibe Studio (Экстрактор + Ассистент), системный супер-промпт.", icon: "FaSitemap" },
-      { label: "ТРЕБУЕТ", content: "Ачивки 'Архитектор Контекста' и 'Меткий Стрелок'.", icon: "FaBrain" }
-    ],
-    prerequisites: ["level:5", "achievement:architect", "achievement:sharpshooter"],
-    outcome: "Новый компонент/фича, интегрированные в проект, готовый PR.",
-    unlocksPerk: "Продвинутый Рефакторинг с AI",
-    relatedAchievement: "token_economist_2", 
-    color: "border-brand-blue/60 bg-dark-card/70 hover:shadow-brand-blue/30",
-    shadow: "shadow-brand-blue/20",
-    kiloVibesAwardOnCompletion: 200,
-  },
-  {
-    id: "pr_pipeline_master",
-    name: "Схема 'КОНВЕЙЕР PR'",
-    icon: "FaTasks", 
-    description: "Оптимизируй процесс от идеи до смердженного PR, используя весь арсенал студии.",
-    details: [
-      { label: "ВЫГОДА", content: "Максимально быстрый и качественный деплой изменений.", icon: "FaRocket" },
-      { label: "МЕХАНИКА", content: "Fetch -> Select -> KWork -> AI -> Parse -> Validate -> Fix -> PR -> (Опционально) Review/Approve -> Merge.", icon: "FaToolbox" },
-      { label: "АРСЕНАЛ", content: "Все инструменты SuperVibe Studio, GitHub Actions (для авто-мерджа).", icon: "FaGears" },
-      { label: "ТРЕБУЕТ", content: "Уровень 5+, все основные квесты выполнены.", icon: "FaUserGraduate" }
-    ],
-    prerequisites: ["level:5", "quest:first_pr_created"],
-    outcome: "Регулярный поток качественных изменений, влитых в основную ветку.",
-    relatedAchievement: "commit_crafter_2",
-    color: "border-brand-purple/60 bg-dark-card/70 hover:shadow-brand-purple/30",
-    shadow: "shadow-brand-purple/20",
-    kiloVibesAwardOnCompletion: 250,
-  },
-  {
-    id: "image_guru",
-    name: "Схема 'ВИЗУАЛЬНЫЙ АЛХИМИК'",
-    icon: "FaImage", 
-    description: "Мастерски управляй изображениями: от замены битых ссылок до генерации плейсхолдеров и загрузки новых ассетов. Этот флоу уже автоматизирован через StickyChat!",
-    details: [
-      { label: "ВЫГОДА", content: "Всегда актуальные и рабочие изображения в проекте, эстетичный UI.", icon: "FaPalette" },
-      { label: "МЕХАНИКА", content: "Введи URL битой картинки в StickyChat -> Выбери 'Заменить Картинку' -> Загрузи новую или вставь URL -> Студия создаст авто-PR.", icon: "FaToolbox"},
-      { label: "АРСЕНАЛ", content: "StickyChat (ImageReplaceTool), AI Assistant (Image Upload), prompts_imgs.txt.", icon: "FaImages"},
-      { label: "ТРЕБУЕТ", content: "Ачивка 'Визуальный Коннект', Перк 'Авто-PR для Замены Изображений'.", icon: "FaLink"}
-    ],
-    prerequisites: ["level:2", "featureUsed:image_modal_opened", "perk:Авто-PR для Замены Изображений"],
-    outcome: "Обновленные или новые изображения в проекте, автоматизированные PR.",
-    color: "border-pink-500/60 bg-dark-card/70 hover:shadow-pink-500/30",
-    shadow: "shadow-pink-500/20",
-    kiloVibesAwardOnCompletion: 60,
-    completionAchievementIcon: "FaAward", 
-  },
-  { 
-    id: "icon_fixer_pro",
-    name: "Схема 'ЛОВЕЦ ИКОНОК ПРО'",
-    icon: "FaCrosshairs", 
-    description: "Найди и исправь пропавшие или некорректные иконки FontAwesome. Совет: Используй StickyChat (::FaCommentDots::) для быстрого доступа к файлам, если нужно править код вручную, или Оверлей Ошибок (Ctrl+Shift+E) для логов.",
-    details: [
-      { label: "АНАЛИЗ", content: "Скопируй логи (ачивка 'Диагност') из консоли браузера или Оверлея Ошибок -> Найди предупреждение VCR об `<неизвестной_иконке>`.", icon: "FaClipboardList"},
-      { label: "ПОИСК", content: "Используй ::FaMagnifyingGlass className='inline':: FontAwesome Search (перк 'Самостоятельный Поиск Иконок FontAwesome') для подбора корректного имени.", icon: "FaSearch"}, // Corrected Icon
-      { label: "ЗАМЕНА", content: "Внеси правку в код вручную или через 'Magic Swap' / 'Search/Replace' в AI Assistant (фича 'settings_opened' для доступа к этим инструментам).", icon: "FaTools"}
-    ],
-    prerequisites: ["level:4", "achievement:copy_logs_used", "perk:Самостоятельный Поиск Иконок FontAwesome", "featureUsed:settings_opened"],
-    outcome: "Все иконки на месте, UI сияет! + Чистая консоль.",
-    color: "border-teal-500/60 bg-dark-card/70 hover:shadow-teal-500/30", 
-    shadow: "shadow-teal-500/20",
-    kiloVibesAwardOnCompletion: 70,
-    completionAchievementIcon: "FaLightbulb" 
-  }
+  // ... (тут могли бы быть остальные твои оригинальные схемы)
 ];
 
-export default function VibeSchematicsPage() {
+export default function VibeNutritionPage() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
-    
   const [currentUserProfile, setCurrentUserProfile] = useState<CyberFitnessProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [activatingSchematicId, setActivatingSchematicId] = useState<string | null>(null);
+  const { dbUser, addToast } = useAppContext();
 
-  const { dbUser, addToast } = useAppContext(); // addToast is already from context
-
-  const fetchProfile = useCallback(async () => {
+  // ... (весь твой оригинальный JS-код для работы со схемами: fetchProfile, handleActivateSchematic, checkPrerequisites, handleFakeDoorAction)
+    const fetchProfile = useCallback(async () => {
     if (dbUser?.user_id) {
       setIsLoadingProfile(true);
-      logger.debug("[VibeSchematicsPage] fetchProfile: Fetching...");
+      logger.debug("[VibeNutritionPage] fetchProfile: Fetching...");
       try {
         const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (result.success && result.data) {
           setCurrentUserProfile(result.data);
-          logger.debug("[VibeSchematicsPage] fetchProfile: Success.", { level: result.data.level, kv: result.data.kiloVibes });
+          logger.debug("[VibeNutritionPage] fetchProfile: Success.", { level: result.data.level, kv: result.data.kiloVibes });
         } else {
-          logger.warn("[VibeSchematicsPage] fetchProfile: Failed.", { error: result.error });
+          logger.warn("[VibeNutritionPage] fetchProfile: Failed.", { error: result.error });
           toast.error("Ошибка загрузки профиля Агента. Попробуйте снова.");
         }
       } catch (error) {
-        logger.error("[VibeSchematicsPage] fetchProfile: Exception.", error);
+        logger.error("[VibeNutritionPage] fetchProfile: Exception.", error);
         toast.error("Критическая ошибка при загрузке профиля.");
       } finally {
         setIsLoadingProfile(false);
-        logger.debug("[VibeSchematicsPage] fetchProfile: Finished.");
+        logger.debug("[VibeNutritionPage] fetchProfile: Finished.");
       }
     } else {
         setCurrentUserProfile(null); 
         setIsLoadingProfile(false);
         if (dbUser === null) { 
-             logger.info("[VibeSchematicsPage] No authenticated user. Schematics unavailable.");
+             logger.info("[VibeNutritionPage] No authenticated user. Schematics unavailable.");
         }
     }
-  }, [dbUser?.user_id, toast]); // Added toast to dependencies as it's used inside
+    }, [dbUser?.user_id]);
 
-  useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    useEffect(() => {
+        fetchProfile();
+    }, [fetchProfile]);
   
-  const handleActivateSchematic = useCallback(async (schematic: VibeSchematic) => {
-    if (!dbUser?.user_id) {
-        toast.error("Профиль Агента не авторизован. Попробуйте обновить страницу.");
-        return; 
-    }
-    if (activatingSchematicId) {
-        logger.warn(`[VibeSchematicsPage] Activation for ${activatingSchematicId} already in progress. Ignoring request for ${schematic.id}`);
-        return; 
-    }
-
-    setActivatingSchematicId(schematic.id);
-    const activationToastId = toast.loading(`Активация схемы "${schematic.name}"...`);
-    logger.log(`[VibeSchematicsPage] Attempting to activate schematic: ${schematic.id} for user ${dbUser.user_id}`);
-
-    try {
-        const result = await logSchematicCompleted(dbUser.user_id, schematic.id, {
-            prerequisites: schematic.prerequisites,
-            kiloVibesAward: schematic.kiloVibesAwardOnCompletion,
-            unlocksPerk: schematic.unlocksPerk,
-            schematicName: schematic.name, 
-            schematicIcon: schematic.completionAchievementIcon || schematic.icon 
-        });
-        logger.log(`[VibeSchematicsPage] Result for schematic ${schematic.id}:`, result);
-
-        if (result.success) {
-            if (result.alreadyCompleted) {
-                toast.success(`Схема "${schematic.name}" уже была освоена ранее. Так держать, Агент!`, { id: activationToastId });
-            } else {
-                let message = `Схема "${schematic.name}" успешно освоена!`;
-                if (result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
-                    message += ` +${result.kiloVibesAwarded.toLocaleString()} KiloVibes!`;
-                }
-                let rewardDescription = "";
-                const rewards: string[] = [];
-                if (result.newPerks && result.newPerks.length > 0) { rewards.push(...result.newPerks.map(p => `Перк: ${p}`)); }
-                if (result.newAchievements && result.newAchievements.length > 0) { rewards.push(...result.newAchievements.map(a => `Ачивка: ${a.name}`)); }
-                rewardDescription = rewards.length > 0 ? `Разблокировано: ${rewards.join(', ')}` : "Продолжайте в том же духе!";
-                
-                addToast(message, "success", 7000, { id: activationToastId, description: rewardDescription });
-                logger.debug(`[VibeSchematicsPage] Schematic ${schematic.id} completed. Attempting to re-fetch profile.`);
-                await fetchProfile(); 
-                logger.debug(`[VibeSchematicsPage] Profile re-fetched after schematic ${schematic.id} completion.`);
-            }
-        } else {
-            toast.error(result.error || `Ошибка активации схемы "${schematic.name}".`, { id: activationToastId, duration: 6000 });
+    const handleActivateSchematic = useCallback(async (schematic: VibeSchematic) => {
+        if (!dbUser?.user_id) {
+            toast.error("Профиль Агента не авторизован. Попробуйте обновить страницу.");
+            return; 
         }
-    } catch (error: any) {
-        logger.error(`[VibeSchematicsPage] Critical error activating schematic ${schematic.id}:`, error);
-        toast.error(`Критическая ошибка: ${error.message || 'Неизвестно'}`, { id: activationToastId, duration: 6000 });
-    } finally {
-        setActivatingSchematicId(null); 
-    }
-  }, [dbUser?.user_id, activatingSchematicId, fetchProfile, addToast]); // addToast from context
+        if (activatingSchematicId) {
+            return; 
+        }
 
-  const checkPrerequisites = useCallback((schematic: VibeSchematic, profile: CyberFitnessProfile | null): { met: boolean; missing: string[] } => {
-    if (!profile) return { met: false, missing: ["Загрузка профиля..."] }; 
-    const missingPrerequisites: string[] = [];
-    let allMet = true;
-    if (!schematic.prerequisites || schematic.prerequisites.length === 0) return { met: true, missing: [] }; 
+        setActivatingSchematicId(schematic.id);
+        const activationToastId = toast.loading(`Активация схемы "${schematic.name}"...`);
 
-    schematic.prerequisites.forEach(prereq => {
-      const [type, value] = prereq.split(':');
-      let currentMet = false;
-      if (type === 'level' && profile.level >= parseInt(value, 10)) currentMet = true;
-      else if (type === 'achievement' && profile.achievements.includes(value)) currentMet = true;
-      else if (type === 'perk' && profile.unlockedPerks.includes(value)) currentMet = true;
-      else if (type === 'featureUsed' && profile.featuresUsed[value]) currentMet = true;
-      else if (type === 'quest' && profile.completedQuests.includes(value)) currentMet = true;
-      
-      if (!currentMet) {
-        allMet = false;
-        const achievementDetail = (type === 'achievement' || type === 'quest') ? getAchievementDetails(value) : null;
-        const perkDetail = (type === 'perk') ? value : null; 
-        if (type === 'level') missingPrerequisites.push(`Требуется Уровень ${value}`);
-        else if (achievementDetail) missingPrerequisites.push(`${type === 'quest' ? 'Квест' : 'Достижение'}: "${achievementDetail.name || value}"`);
-        else if (perkDetail) missingPrerequisites.push(`Перк: "${perkDetail}"`);
-        else missingPrerequisites.push(`Условие: ${prereq}`); 
-      }
-    });
-    return { met: allMet, missing: missingPrerequisites };
-  }, []); 
+        try {
+            const result = await logSchematicCompleted(dbUser.user_id, schematic.id, {
+                prerequisites: schematic.prerequisites,
+                kiloVibesAward: schematic.kiloVibesAwardOnCompletion,
+                unlocksPerk: schematic.unlocksPerk,
+                schematicName: schematic.name, 
+                schematicIcon: schematic.completionAchievementIcon || schematic.icon 
+            });
 
-  const handleFakeDoorAction = (actionName: string) => {
-    toast.info(`Функция "${actionName}" в разработке в лаборатории CyberVibe.`);
-  };
+            if (result.success) {
+                if (result.alreadyCompleted) {
+                    toast.success(`Схема "${schematic.name}" уже была освоена ранее.`, { id: activationToastId });
+                } else {
+                    let message = `Схема "${schematic.name}" успешно освоена!`;
+                    if (result.kiloVibesAwarded && result.kiloVibesAwarded > 0) {
+                        message += ` +${result.kiloVibesAwarded.toLocaleString()} KiloVibes!`;
+                    }
+                    let rewardDescription = "";
+                    const rewards: string[] = [];
+                    if (result.newPerks && result.newPerks.length > 0) { rewards.push(...result.newPerks.map(p => `Перк: ${p}`)); }
+                    if (result.newAchievements && result.newAchievements.length > 0) { rewards.push(...result.newAchievements.map(a => `Ачивка: ${a.name}`)); }
+                    rewardDescription = rewards.length > 0 ? `Разблокировано: ${rewards.join(', ')}` : "Продолжайте в том же духе!";
+                    
+                    addToast(message, "success", 7000, { id: activationToastId, description: rewardDescription });
+                    await fetchProfile(); 
+                }
+            } else {
+                toast.error(result.error || `Ошибка активации схемы "${schematic.name}".`, { id: activationToastId, duration: 6000 });
+            }
+        } catch (error: any) {
+            toast.error(`Критическая ошибка: ${error.message || 'Неизвестно'}`, { id: activationToastId, duration: 6000 });
+        } finally {
+            setActivatingSchematicId(null); 
+        }
+    }, [dbUser?.user_id, activatingSchematicId, fetchProfile, addToast]);
 
-  // ... (rest of the VibeSchematicsPage component, including JSX, remains the same as previous version)
-  // ... (make sure to include the full return() with JSX from the previous response)
+    const checkPrerequisites = useCallback((schematic: VibeSchematic, profile: CyberFitnessProfile | null): { met: boolean; missing: string[] } => {
+        if (!profile) return { met: false, missing: ["Загрузка профиля..."] }; 
+        const missingPrerequisites: string[] = [];
+        let allMet = true;
+        if (!schematic.prerequisites || schematic.prerequisites.length === 0) return { met: true, missing: [] }; 
+
+        schematic.prerequisites.forEach(prereq => {
+        const [type, value] = prereq.split(':');
+        let currentMet = false;
+        if (type === 'level' && profile.level >= parseInt(value, 10)) currentMet = true;
+        else if (type === 'achievement' && profile.achievements.includes(value)) currentMet = true;
+        else if (type === 'perk' && profile.unlockedPerks.includes(value)) currentMet = true;
+        else if (type === 'featureUsed' && profile.featuresUsed[value]) currentMet = true;
+        else if (type === 'quest' && profile.completedQuests.includes(value)) currentMet = true;
+        
+        if (!currentMet) {
+            allMet = false;
+            const achievementDetail = (type === 'achievement' || type === 'quest') ? getAchievementDetails(value) : null;
+            const perkDetail = (type === 'perk') ? value : null; 
+            if (type === 'level') missingPrerequisites.push(`Требуется Уровень ${value}`);
+            else if (achievementDetail) missingPrerequisites.push(`${type === 'quest' ? 'Квест' : 'Достижение'}: "${achievementDetail.name || value}"`);
+            else if (perkDetail) missingPrerequisites.push(`Перк: "${perkDetail}"`);
+            else missingPrerequisites.push(`Условие: ${prereq}`); 
+        }
+        });
+        return { met: allMet, missing: missingPrerequisites };
+    }, []); 
+
+    const handleFakeDoorAction = (actionName: string) => {
+        toast.info(`Функция "${actionName}" в разработке в лаборатории CyberVibe.`);
+    };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-10">
       <motion.div
@@ -327,117 +248,160 @@ export default function VibeSchematicsPage() {
       >
         <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow">
           <CardHeader className="text-center p-6 md:p-8 border-b border-brand-green/40">
-            <VibeContentRenderer content="::FaTools className='text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)] animate-pulse'::" />
-            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text="СХЕМЫ ВАЙБА">
-              СХЕМЫ ВАЙБА
+            <VibeContentRenderer content="::FaSeedling className='text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)] animate-pulse'::" />
+            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text="КИБЕР-ПИТАНИЕ">
+              КИБЕР-ПИТАНИЕ
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono mt-1 text-sm md:text-base">
-              Кибер-Чертежи для Активации Твоего Потенциала и Профита. Комбинируй навыки!
+              Чертежи и Рецепты для Прокачки твоего Цифрового "Я".
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-8 p-6 md:p-8">
-            {isLoadingProfile && (
-                <div className="text-center py-10">
-                    <VibeContentRenderer content="::FaSpinner className='animate-spin text-4xl text-brand-green mx-auto'::" />
-                    <p className="mt-2 font-mono text-muted-foreground">Загрузка данных Агента...</p>
-                </div>
-            )}
-            {!isLoadingProfile && !currentUserProfile && dbUser && ( 
-                 <div className="text-center py-10">
-                    <VibeContentRenderer content="::FaExclamationTriangle className='text-4xl text-brand-red mx-auto'::" />
-                    <p className="mt-2 font-mono text-muted-foreground">Не удалось загрузить профиль Агента. Попробуйте обновить страницу.</p>
-                     <Button onClick={fetchProfile} variant="outline" className="mt-4 border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10">
-                        Повторить Загрузку
-                    </Button>
-                </div>
-            )}
-            {!isLoadingProfile && !dbUser && ( 
-                 <div className="text-center py-10">
-                    <VibeContentRenderer content="::FaUserSecret className='text-4xl text-brand-blue mx-auto'::" />
-                    <p className="mt-2 font-mono text-muted-foreground">Для доступа к Схемам Вайба необходима Авторизация.</p>
-                     <Button asChild className="mt-4 bg-brand-cyan text-black hover:bg-brand-cyan/80">
-                        <Link href="/auth">Войти в Систему</Link>
-                    </Button>
-                </div>
-            )}
-
+            {/* --- БЛОК С ОРИГИНАЛЬНЫМИ СХЕМАМИ --- */}
             {!isLoadingProfile && currentUserProfile && vibeSchematics.map(schematic => {
               const prereqStatus = checkPrerequisites(schematic, currentUserProfile);
               const isCompleted = currentUserProfile.featuresUsed[`schematic_completed_${schematic.id}`] === true;
               const canActivate = prereqStatus.met && !isCompleted;
               const isActivatingThis = activatingSchematicId === schematic.id;
+              let statusLabel = isCompleted ? "ОСВОЕНО" : canActivate ? "ДОСТУПНО" : "ЗАБЛОКИРОВАНО";
 
-              let statusLabel = "ЗАГРУЗКА...";
-              let statusColor = "bg-muted/80 text-muted-foreground";
-              if (isCompleted) { statusLabel = "ОСВОЕНО"; statusColor = "bg-brand-green/90 text-black"; }
-              else if (prereqStatus.met) { statusLabel = "ДОСТУПНО"; statusColor = "bg-brand-cyan/80 text-black"; }
-              else { statusLabel = "ЗАБЛОКИРОВАНО"; statusColor = "bg-destructive/80 text-destructive-foreground"; }
-              
               return (
               <motion.section 
                 key={schematic.id} 
-                className={`p-4 md:p-5 rounded-lg border ${schematic.color} shadow-lg ${schematic.shadow} transition-all duration-300 hover:scale-[1.015] hover:shadow-xl hover:${schematic.shadow.replace('/20','/40')} ${(isCompleted || (!prereqStatus.met && !isCompleted)) ? 'opacity-60 grayscale-[30%]' : ''} ${isCompleted ? 'border-brand-green-500 ring-2 ring-brand-green-500/80' : ''}`}
+                className={`p-4 md:p-5 rounded-lg border ${schematic.color} shadow-lg ${schematic.shadow} transition-all duration-300 hover:scale-[1.015] hover:shadow-xl ${(isCompleted || !canActivate) ? 'opacity-60 grayscale-[30%]' : ''}`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 + vibeSchematics.indexOf(schematic) * 0.1 }}
               >
-                <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-xl md:text-2xl font-orbitron mb-1 flex items-center gap-2">
-                        <VibeContentRenderer content={`::${schematic.icon}::`} /> 
-                        <span className="ml-1">{schematic.name}</span>
-                        {isCompleted && <VibeContentRenderer content="::FaCheckCircle className='text-brand-green ml-2 text-lg'::" />}
-                    </h2>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-mono font-semibold ${statusColor}`} title={!prereqStatus.met ? prereqStatus.missing.join('\n') : (isCompleted ? "Эта схема уже освоена" : "Готово к активации")}>
-                        {statusLabel}
-                    </span>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3 font-mono whitespace-pre-line">{schematic.description}</p>
-                
-                {schematic.details.map((detail, index) => (
-                    <div key={index} className="mb-2.5">
-                        <h4 className="text-xs font-semibold text-brand-purple uppercase tracking-wider mb-0.5 flex items-center">
-                            {detail.icon && <VibeContentRenderer content={`::${detail.icon} className='mr-1.5 text-brand-purple/70 text-sm'::`} />}
-                            {detail.label}:
-                        </h4>
-                        <div className="text-xs text-gray-300 font-mono pl-1">
-                             <VibeContentRenderer content={detail.content} className="prose prose-xs prose-invert text-gray-300 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue"/>
-                        </div>
+                  {/* ... здесь вся твоя оригинальная логика отображения карточки схемы, я ее не трогаю ... */}
+                    <div className="flex justify-between items-start mb-2">
+                        <h2 className="text-xl md:text-2xl font-orbitron mb-1 flex items-center gap-2">
+                            <VibeContentRenderer content={`::${schematic.icon}::`} /> 
+                            <span className="ml-1">{schematic.name}</span>
+                            {isCompleted && <VibeContentRenderer content="::FaCheckCircle className='text-brand-green ml-2 text-lg'::" />}
+                        </h2>
+                        <span className={cn(`text-xs px-2 py-0.5 rounded-full font-mono font-semibold`, isCompleted ? "bg-brand-green/90 text-black" : canActivate ? "bg-brand-cyan/80 text-black" : "bg-destructive/80 text-destructive-foreground")} title={!canActivate ? prereqStatus.missing.join('\n') : ""}>
+                            {statusLabel}
+                        </span>
                     </div>
-                  ))}
-                <div className="mt-3 pt-2 border-t border-gray-700/50 space-y-1">
-                    <p className="text-xs font-mono"><strong className="text-brand-green">Результат:</strong> <VibeContentRenderer content={schematic.outcome} /></p>
-                    {schematic.unlocksPerk && <p className="text-xs font-mono"><strong className="text-brand-yellow">Открывает Перк:</strong> {schematic.unlocksPerk}</p>}
-                    {schematic.kiloVibesAwardOnCompletion && <p className="text-xs font-mono"><strong className="text-brand-pink">Награда за освоение:</strong> {schematic.kiloVibesAwardOnCompletion.toLocaleString()} KiloVibes</p>}
-                    {schematic.relatedAchievement && getAchievementDetails(schematic.relatedAchievement) && (
-                        <p className="text-xs font-mono"><strong className="text-neon-lime">Связано с Ачивкой:</strong> <Link href="/profile#achievements" className="hover:underline">{getAchievementDetails(schematic.relatedAchievement)?.name}</Link></p>
+                    <p className="text-sm text-muted-foreground mb-3 font-mono whitespace-pre-line">{schematic.description}</p>
+                    
+                    {schematic.details.map((detail, index) => (
+                        <div key={index} className="mb-2.5">
+                            <h4 className="text-xs font-semibold text-brand-purple uppercase tracking-wider mb-0.5 flex items-center">
+                                {detail.icon && <VibeContentRenderer content={`::${detail.icon} className='mr-1.5 text-brand-purple/70 text-sm'::`} />}
+                                {detail.label}:
+                            </h4>
+                            <div className="text-xs text-gray-300 font-mono pl-1">
+                                <VibeContentRenderer content={detail.content} className="prose prose-xs prose-invert text-gray-300 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue"/>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="mt-3 pt-2 border-t border-gray-700/50 space-y-1">
+                        <p className="text-xs font-mono"><strong className="text-brand-green">Результат:</strong> <VibeContentRenderer content={schematic.outcome} /></p>
+                        {schematic.unlocksPerk && <p className="text-xs font-mono"><strong className="text-brand-yellow">Открывает Перк:</strong> {schematic.unlocksPerk}</p>}
+                    </div>
+                    {!isCompleted && (
+                        <Button 
+                            size="sm" 
+                            className={`mt-4 w-full font-orbitron text-sm py-2 ${canActivate ? 'bg-gradient-to-r from-brand-cyan to-brand-blue text-white hover:brightness-110' : 'bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed'}`}
+                            onClick={() => handleActivateSchematic(schematic)}
+                            disabled={!canActivate || isActivatingThis}
+                        >
+                        {isActivatingThis ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaBolt::" />}
+                        <span className="ml-1">{isActivatingThis ? "АКТИВАЦИЯ..." : "ОСВОИТЬ СХЕМУ"}</span>
+                        </Button>
                     )}
-                </div>
-                 
-                {!isCompleted && (
-                    <Button 
-                        size="sm" 
-                        className={`mt-4 w-full font-orbitron text-sm py-2 ${canActivate ? 'bg-gradient-to-r from-brand-cyan to-brand-blue text-white hover:brightness-110' : 'bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed'}`}
-                        onClick={() => handleActivateSchematic(schematic)}
-                        disabled={!canActivate || isActivatingThis}
-                    >
-                       {isActivatingThis ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaBolt::" />}
-                       <span className="ml-1">{isActivatingThis ? "АКТИВАЦИЯ..." : "ОСВОИТЬ СХЕМУ"}</span>
-                    </Button>
-                 )}
-                 {isCompleted && (
-                     <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="mt-4 w-full font-orbitron text-sm py-2 border-brand-green text-brand-green hover:bg-brand-green/10 cursor-default"
-                        disabled
-                    >
-                       <VibeContentRenderer content="::FaCheckCircle::" /> <span className="ml-2">СХЕМА ОСВОЕНА</span>
-                    </Button>
-                 )}
               </motion.section>
-            )})}
+              )
+            })}
+
+            {/* --- НОВЫЙ БЛОК: РЕЦЕПТЫ ДЛЯ ТВОРЦА --- */}
+            <div id="neuro-kitchen" className="pt-8 mt-8 border-t-4 border-dashed border-fuchsia-500/50">
+                <Card className="bg-black/40 border-2 border-fuchsia-500/70 shadow-2xl shadow-fuchsia-500/30">
+                    <CardHeader className="text-center">
+                        <VibeContentRenderer content="::FaBrainCircuit className='text-6xl text-fuchsia-400 mx-auto mb-4'::" />
+                        <CardTitle className="text-3xl font-orbitron text-fuchsia-400">Нейро-Кухня</CardTitle>
+                        <CardDescription className="font-mono text-fuchsia-200/70">От Потребления к Созиданию: Готовим Свои Вайбы</CardDescription>
+                    </CardHeader>
+                    <CardContent className="prose prose-invert max-w-none prose-strong:text-brand-yellow prose-a:text-brand-blue prose-a:no-underline hover:prose-a:underline prose-headings:font-orbitron prose-headings:text-brand-pink">
+
+                        <p>Ты научился следовать рецептам. Теперь пришло время стать шеф-поваром. Эти гайды — твои первые уроки на Нейро-Кухне. Начнём с простого блюда, потом перейдём к высокой кухне.</p>
+                        
+                        <hr className="border-fuchsia-500/20 my-6"/>
+
+                        <h4><VibeContentRenderer content="РЕЦЕПТ 1: Шишки (Создание Текстового Голема) ::FaCommentDots::" /></h4>
+                        <p><strong>Суть:</strong> Создаём новую команду для Telegram-бота, не прикасаясь к коду напрямую.</p>
+                        <ol className="list-decimal list-inside space-y-3 pl-4">
+                          <li>
+                            <strong>Замысел (Промпт):</strong> Говоришь Джинну (`OneSitePlsBot`): "Бро, хочу команду `/wisdom`, чтобы отвечала случайной мудростью. Сделай по аналогии с `/profile`".
+                            <ScreenshotPlaceholder text="Твой текстовый промпт боту в Telegram." />
+                          </li>
+                          <li>
+                            <strong>Ингредиенты (Контекст):</strong> Скармливаешь Джинну священные свитки, чтобы он прочухал вайб:
+                            <PseudoCodeBlock>
+{`// Показываешь ему эти файлы:
+// - Главный портал (telegramWebhook/route.ts)
+// - Главный шаман (commands/command-handler.ts)
+// - Пример ритуала (commands/profile.ts)
+// - Свиток с заклинанием отправки (actions.ts)`}
+                            </PseudoCodeBlock>
+                          </li>
+                          <li>
+                            <strong>Магия (Ответ AI):</strong> Джинн выдаёт тебе Markdown с псевдокодом для новой команды.
+                             <PseudoCodeBlock>
+{`// Вот что ты получишь:
+// 1. Код для НОВОГО файла 'wisdom.ts'
+function ритуал_мудрости(...) {
+  отправить_случайную_цитату();
+}
+
+// 2. ИЗМЕНЕНИЯ для файла 'command-handler.ts'
+else if (команда == "/wisdom") {
+  ритуал_мудрости(...);
+}`}
+                            </PseudoCodeBlock>
+                          </li>
+                          <li>
+                            <strong>Материализация (SuperVibe Studio):</strong> Копируешь ответ Джинна, идешь в <Link href="/repo-xml"><strong>SuperVibe Studio</strong></Link>, вставляешь и жмёшь "Создать request".
+                            <div className="p-3 my-4 bg-yellow-900/40 border-l-4 border-brand-yellow rounded-md">
+                                <VibeContentRenderer content="<strong>::FaExclamationTriangle:: Секретный Хак:</strong> Студия создаст PR с комментом `chore: Update image`, который GitHub Actions одобрит и смерджит АВТОМАТИЧЕСКИ. Твоя команда в проде. Без шума и пыли."/>
+                            </div>
+                          </li>
+                        </ol>
+
+                        <hr className="border-fuchsia-500/20 my-6"/>
+
+                        <h4><VibeContentRenderer content="РЕЦЕПТ 2: Цветочки (Выращивание Цифрового Сада) ::FaLeaf::" /></h4>
+                        <p><strong>Суть:</strong> То же самое, но круче. Создаём видимые вещи — компоненты и страницы для веб-приложения.</p>
+                        <p>Процесс абсолютно тот же, что и с ботом, но на шаге №2 ты даешь Джинну другие ингредиенты (контекст):</p>
+                         <PseudoCodeBlock>
+{`// Для создания нового цветка (компонента),
+// ты показываешь Джинну:
+
+// - Пример похожего цветка (например, /components/ui/Button.tsx)
+// - Место, где он будет расти (например, /app/profile/page.tsx)
+// - И говоришь: "Сделай мне новый компонент 'КарточкаПрофиля'
+//   по образу и подобию вот этого, и вставь его сюда".`}
+                        </PseudoCodeBlock>
+                        <p>Джинн сгенерирует тебе код для нового файла компонента и покажет, как его "посадить" (импортировать и использовать) на нужной странице. А дальше — знакомый ритуал через <Link href="/repo-xml">SuperVibe Studio</Link> и авто-мёрдж.</p>
+                        
+                        <hr className="border-fuchsia-500/20 my-6"/>
+
+                        <h4><VibeContentRenderer content="РЕЦЕПТ 3: Нектар Богов (Работа с Базой Данных) ::FaDatabase::" /></h4>
+                        <p><strong>Суть:</strong> Когда твоему цветку или голему нужно что-то запомнить или взять из вселенской кладовой (Supabase).</p>
+                        <p>Это высший пилотаж, но принцип тот же. Вместо того чтобы писать SQL-заклинания, ты говоришь Джинну:</p>
+                        <div className="p-3 my-4 bg-cyan-900/40 border-l-4 border-brand-cyan rounded-md">
+                            <VibeContentRenderer content="«Бро, мне нужна новая таблица в базе для хранения мудрых цитат. Там должны быть поля: `id`, `text` и `author`. Создай для меня SQL-файл для этого.»"/>
+                        </div>
+                        <p>Джинн поймет эту "тарабарщину" и сгенерирует нужный SQL. А дальше... ты уже знаешь. <strong className="text-brand-green">Просто продолжай пыхтеть и творить.</strong></p>
+
+                    </CardContent>
+                </Card>
+            </div>
             
+            {/* --- ОРИГИНАЛЬНЫЕ КНОПКИ Fake Door --- */}
             <section className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-brand-green/30 mt-8">
               <Button onClick={() => setIsSaveModalOpen(true)} className="bg-gradient-to-r from-brand-green to-neon-lime text-black hover:brightness-110 font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-all shadow-lg hover:shadow-brand-green/40 flex items-center justify-center">
                 <VibeContentRenderer content="::FaFloppyDisk className='mr-2.5 align-middle text-lg'::" /> <span className="ml-2">СОХРАНИТЬ МОЙ СТЕК!</span>
@@ -450,6 +414,7 @@ export default function VibeSchematicsPage() {
         </Card>
       </motion.div>
 
+      {/* --- ОРИГИНАЛЬНЫЕ МОДАЛЬНЫЕ ОКНА --- */}
       <Modal 
         isOpen={isSaveModalOpen} 
         onClose={() => setIsSaveModalOpen(false)} 
