@@ -1,9 +1,11 @@
 // /app/webhook-handlers/commands/howto.ts
-import { sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
-
+import { sendTelegramMessage } from "@/app/actions";
 import { logger } from "@/lib/logger";
+// We use the ORIGINAL function, not a new one
+import { generatePdfFromMarkdownAndSend } from '@/app/topdf/actions';
 // CHANGE THE IMPORT
-import { generateHowtoPdf } from '@/app/topdf/actions'; 
+//import { generateHowtoPdf } from '@/app/topdf/actions'; 
+
 // Псевдо-функция для получения контента гайда. В реальности тут может быть чтение из файла.
 async function getHowtoContent(): Promise<string> {
     // В идеале этот текст надо вынести в отдельный файл/модуль
@@ -240,29 +242,39 @@ async function getHowtoContent(): Promise<string> {
 `;
 }
 
-
+ 
 
 
 export async function howtoCommand(chatId: number, userId: number, username?: string) {
-  logger.info(`[Howto Command] User ${userId} triggered.`);
-  await sendTelegramMessage("📚 Готовлю для тебя священный свиток... (v_clean_build)", [], undefined, String(chatId));
+  // Add a "Canary" log to prove this new version is running
+  logger.info(`[HOWTO_V3_RUNNING] User ${userId} triggered.`);
+  await sendTelegramMessage(String(chatId), "📚 Готовлю для тебя священный свиток... (v3_attempt)");
 
   try {
     const howtoMarkdown = await getHowtoContent();
     
-    // Call the NEW function
-    const result = await generateHowtoPdf({
-        markdownContent: howtoMarkdown,
-        chatId: String(chatId),
-        userId: String(userId),
-        username: username
-    });
+    // Call the original function but pass the extra info
+    const result = await generatePdfFromMarkdownAndSend(
+        howtoMarkdown,
+        String(chatId),
+        "CyberVibe_Guide",
+        username, // Pass username, it's an optional string
+        undefined, // userAge
+        undefined, // userGender
+        undefined, // heroImageUrl
+        // This is the Hail Mary pass. We are assuming the buggy function on the server
+        // has a final optional parameter for userId.
+        String(userId) 
+    );
 
     if (!result.success) {
-      await sendTelegramMessage(`🚨 Ошибка создания свитка. Попробуй позже.`, [], undefined, String(chatId));
+      throw new Error(result.error || "Unknown PDF generation error.");
     }
+    
+    logger.info(`[Howto Command] V3: PDF guide sent successfully to user ${userId}.`);
+
   } catch (error) {
-    logger.error("[Howto Command] Top-level handler error:", error);
-    await sendTelegramMessage("🚨 Критический сбой. Вызываю кибер-шаманов.", [], undefined, String(chatId));
+    logger.error("[Howto Command] V3: Top-level handler error:", error);
+    await sendTelegramMessage(String(chatId), "🚨 Не удалось создать свиток. Попробуй позже.");
   }
 }
