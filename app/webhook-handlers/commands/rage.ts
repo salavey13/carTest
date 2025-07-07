@@ -1,44 +1,80 @@
-import { sendTelegramMessage } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { fetchArbitrageOpportunities } from "@/app/elon/arbitrage_scanner_actions";
-import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from "@/app/elon/arbitrage_scanner_types";
+import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity } from "@/app/elon/arbitrage_scanner_types";
+import { sendComplexMessage } from "../actions/sendComplexMessage"; // Import our new action
 
-function formatOpportunity(op: ArbitrageOpportunity): string {
+// Creates a deep link to an exchange for a specific trading pair
+function createExchangeLink(exchange: string, pair: string): string {
+    const formattedPair = pair.replace('/', '_'); // e.g., BTC/USDT -> BTC_USDT
+    switch (exchange.toLowerCase()) {
+        case 'binance':
+            return `https://www.binance.com/en/trade/${formattedPair}`;
+        case 'bybit':
+            return `https://www.bybit.com/en/trade/spot/${pair.replace('/', '')}`; // Bybit uses BTCUSDT format
+        case 'kucoin':
+            return `https://www.kucoin.com/trade/${pair.replace('/', '-')}`; // KuCoin uses BTC-USDT format
+        // Add other exchanges as needed
+        default:
+            return `https://www.google.com/search?q=${exchange}+${pair}`;
+    }
+}
+
+function formatOpportunity(op: ArbitrageOpportunity): { text: string; buttons: any[] } {
     const profit = `${op.profitPercentage.toFixed(3)}% ($${op.potentialProfitUSD.toFixed(2)})`;
+    let text = "";
+    let buttons = [];
+
     if (op.type === '2-leg') {
         const twoLegOp = op as TwoLegArbitrageOpportunity;
-        return `*2-Leg:* ${twoLegOp.currencyPair}\n` +
+        text = `*2-Leg:* ${twoLegOp.currencyPair}\n` +
                `  - Покупка: *${twoLegOp.buyExchange}* @ ${twoLegOp.buyPrice.toFixed(4)}\n` +
                `  - Продажа: *${twoLegOp.sellExchange}* @ ${twoLegOp.sellPrice.toFixed(4)}\n` +
                `  - 🔥 *Профит: ${profit}*`;
+        buttons = [
+            { text: `Buy on ${twoLegOp.buyExchange}`, url: createExchangeLink(twoLegOp.buyExchange, twoLegOp.currencyPair) },
+            { text: `Sell on ${twoLegOp.sellExchange}`, url: createExchangeLink(twoLegOp.sellExchange, twoLegOp.currencyPair) }
+        ];
+    } else { // 3-leg
+        text = `*3-Leg:* ${op.currencyPair} на *${op.exchange}*\n` +
+               `  - 🔥 *Профит: ${profit}*`;
+        // For 3-leg, one button to the exchange is sufficient
+        buttons = [{ text: `Go to ${op.exchange}`, url: createExchangeLink(op.exchange, op.legs[0].pair) }];
     }
-    const threeLegOp = op as ThreeLegArbitrageOpportunity;
-    return `*3-Leg:* ${threeLegOp.currencyPair} на *${threeLegOp.exchange}*\n` +
-           `  - 🔥 *Профит: ${profit}*`;
+
+    return { text, buttons };
 }
 
 export async function rageCommand(chatId: number, userId: number) {
-    logger.info(`[Rage Command] User ${userId} triggered the /rage command.`);
-    await sendTelegramMessage("⚡️ *Режим Ярости Активирован!* Ищу арбитражные возможности в симуляторе...", [], undefined, chatId.toString());
+    logger.info(`[Rage Command V2] User ${userId} triggered /rage.`);
+    
+    // Send an initial "thinking" message
+    await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], "lightning storm");
 
     try {
         const { opportunities } = await fetchArbitrageOpportunities(String(userId));
 
         if (!opportunities || opportunities.length === 0) {
-            await sendTelegramMessage("🧘‍♂️ Рынок спокоен. Значимых возможностей не найдено. Попробуй позже.", [], undefined, chatId.toString());
+            await sendComplexMessage(chatId, "🧘‍♂️ Рынок спокоен. Значимых возможностей не найдено. Попробуй позже.", [], "zen");
             return;
         }
 
         const sortedOps = opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage);
-        const top3 = sortedOps.slice(0, 3);
+        const topOp = sortedOps[0];
 
-        const messageLines = top3.map(op => formatOpportunity(op));
-        const finalMessage = "🏆 *Топ-3 Горячих Возможностей:*\n\n" + messageLines.join('\n\n');
+        const { text, buttons } = formatOpportunity(topOp);
 
-        await sendTelegramMessage(finalMessage, [], undefined, chatId.toString(), undefined, "Markdown");
+        const finalMessage = "🏆 *Найден Топ-Сигнал:*\n\n" + text;
+
+        // Send the top opportunity with actionable buttons
+        await sendComplexMessage(
+            chatId, 
+            finalMessage, 
+            [buttons], // Pass the buttons in a 2D array
+            "gold treasure"
+        );
 
     } catch (error) {
-        logger.error("[Rage Command] Error fetching arbitrage opportunities:", error);
-        await sendTelegramMessage("🚨 Ошибка при сканировании рынка. Попробуйте позже или проверьте логи.", [], undefined, chatId.toString());
+        logger.error("[Rage Command V2] Error fetching arbitrage opportunities:", error);
+        await sendComplexMessage(chatId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась. Попробуйте позже.", [], "explosion");
     }
 }
