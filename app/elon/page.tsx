@@ -13,17 +13,16 @@ import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-
-import {
-  fetchArbitrageOpportunities,
-  getArbitrageScannerSettings as fetchArbitrageSettings
-} from './arbitrage_scanner_actions';
 import type {
   ArbitrageOpportunity,
   TwoLegArbitrageOpportunity,
   ThreeLegArbitrageOpportunity,
   ArbitrageSettings,
 } from './arbitrage_scanner_types';
+import {
+  fetchArbitrageOpportunities,
+  getArbitrageScannerSettings as fetchArbitrageSettings
+} from './arbitrage_scanner_actions';
 
 interface TeslaStockData {
   price: number;
@@ -37,7 +36,6 @@ interface TeslaStockData {
 const ELON_SIMULATOR_CARD_ID = "elon_simulator_access_v1";
 const SIMULATOR_ACCESS_PRICE_XTR = 13;
 
-// Translations Object
 const pageTranslations: Record<string, Record<string, any>> = {
   ru: {
     accessDeniedTitle: "Доступ к 'Рынку Маска & Arbitrage Alpha Seeker' Закрыт!",
@@ -46,7 +44,8 @@ const pageTranslations: Record<string, Record<string, any>> = {
     processingButton: "Обработка...",
     authNeededForPurchase: "Для покупки нужна авторизация через Telegram.",
     muskMarketTab: "Рынок Маска",
-    arbitrageSeekerTab: "Arbitrage Seeker",
+    arbitrageHubTab: "Арбитраж-Хаб",
+    educationTab: "Обучение",
     muskMarketTitle: "Рынок Маска: TSLA & Russian Vibe Edition",
     muskMarketDescription: "Симулятор влияния твитов, новостей и \"особого русского вайба\" на фантомные акции Tesla.",
     simulatedPriceLabel: "Симулированная цена TSLA:",
@@ -64,30 +63,8 @@ const pageTranslations: Record<string, Record<string, any>> = {
         { titleKey: "Волчий Вайб №5: ПОДГОТОВКА РЕШАЕТ!", textKey: "Белфорт писал скрипты часами. Ты – изучай 'историю твитов Маска' (предыдущие NewsFlash в симуляторе), смотри на 'тренд'. Не кликай наобум! Думай, Агент!", icon: "::FaScroll::" }
     ],
     backToHotVibes: "Назад в Лобби Горячих Вайбов",
-    arbitrageSeekerTitle: "Arbitrage Alpha Seeker",
-    arbitrageSeekerSubtitle: "Simulated crypto-arbitrage opportunity scanner. Access settings via <Link href=\"/settings\" class=\"underline text-brand-yellow hover:text-yellow-300\">System Config</Link>.",
-    scanForAlphaButton: "Scan for Alpha (Simulated)",
-    scanningButton: "Scanning Markets...",
-    currentScannerSettingsTitle: "Текущие настройки сканера:",
-    minSpreadLabel: "Мин. спред:",
-    tradeVolumeLabel: "Объем сделки:",
-    exchangesLabel: "Биржи:",
-    pairsLabel: "Пары:",
-    noValue: "Нет",
-    changeSettingsLink: "Изменить настройки...",
-    loadingSettings: "Загрузка настроек сканера...",
-    potentialAlphaTitle: "Potential Alpha",
-    noOpportunitiesFound: "No significant arbitrage opportunities found in the latest simulation.",
-    scanLogsTitle: "Scan Logs",
-    scanLogsPlaceholder: "Scan logs will appear here...",
-    disclaimer: "::FaTriangleExclamation className='inline mr-1 text-yellow-500':: **Disclaimer:** This is a SIMULATION. Not real trades.",
     loadingVibeOs: "Загрузка VIBE OS...",
     errorSimulatingTesla: "Ошибка симуляции цены Tesla.",
-    errorLoadingArbitrageSettings: "Error loading arbitrage settings.",
-    errorDuringArbitrageScan: "Error during arbitrage scan.",
-    userOrSettingsNotAvailable: "User or arbitrage settings not available for scan.",
-    arbitrageScanCompleteSuccess: "Arbitrage Scan complete! Found {count} potential opportunities.",
-    arbitrageScanCompleteInfo: "Arbitrage Scan complete. No significant opportunities found.",
     authErrorForPurchase: "Сначала авторизуйтесь для покупки доступа!",
     accessRequestSent: "Запрос на доступ отправлен! Проверьте Telegram для оплаты счета.",
     failedToInitiatePurchase: "Не удалось инициировать покупку доступа.",
@@ -100,7 +77,8 @@ const pageTranslations: Record<string, Record<string, any>> = {
     processingButton: "Processing...",
     authNeededForPurchase: "Authorization via Telegram is required for purchase.",
     muskMarketTab: "Musk Market",
-    arbitrageSeekerTab: "Arbitrage Seeker",
+    arbitrageHubTab: "Arbitrage Hub",
+    educationTab: "Education",
     muskMarketTitle: "Musk Market: TSLA & Russian Vibe Edition",
     muskMarketDescription: "Simulator of tweets, news, and 'special Russian vibe' influence on phantom Tesla stocks.",
     simulatedPriceLabel: "Simulated TSLA Price:",
@@ -118,30 +96,8 @@ const pageTranslations: Record<string, Record<string, any>> = {
         { titleKey: "Wolf Vibe #5: PREPARATION IS KEY!", textKey: "Belfort wrote scripts for hours. You – study 'Musk's tweet history' (previous NewsFlashes in the simulator), look at the 'trend'. Don't click randomly! Think, Agent!", icon: "::FaScroll::" }
     ],
     backToHotVibes: "Back to Hot Vibes Lobby",
-    arbitrageSeekerTitle: "Arbitrage Alpha Seeker",
-    arbitrageSeekerSubtitle: "Simulated crypto-arbitrage opportunity scanner. Access settings via <Link href=\"/settings\" class=\"underline text-brand-yellow hover:text-yellow-300\">System Config</Link>.",
-    scanForAlphaButton: "Scan for Alpha (Simulated)",
-    scanningButton: "Scanning Markets...",
-    currentScannerSettingsTitle: "Current Scanner Settings:",
-    minSpreadLabel: "Min. Spread:",
-    tradeVolumeLabel: "Trade Volume:",
-    exchangesLabel: "Exchanges:",
-    pairsLabel: "Pairs:",
-    noValue: "None",
-    changeSettingsLink: "Change settings...",
-    loadingSettings: "Loading scanner settings...",
-    potentialAlphaTitle: "Potential Alpha",
-    noOpportunitiesFound: "No significant arbitrage opportunities found in the latest simulation.",
-    scanLogsTitle: "Scan Logs",
-    scanLogsPlaceholder: "Scan logs will appear here...",
-    disclaimer: "::FaTriangleExclamation className='inline mr-1 text-yellow-500':: **Disclaimer:** This is a SIMULATION. Not real trades.",
     loadingVibeOs: "Loading VIBE OS...",
     errorSimulatingTesla: "Error simulating Tesla price.",
-    errorLoadingArbitrageSettings: "Error loading arbitrage settings.",
-    errorDuringArbitrageScan: "Error during arbitrage scan.",
-    userOrSettingsNotAvailable: "User or arbitrage settings not available for scan.",
-    arbitrageScanCompleteSuccess: "Arbitrage Scan complete! Found {count} potential opportunities.",
-    arbitrageScanCompleteInfo: "Arbitrage Scan complete. No significant opportunities found.",
     authErrorForPurchase: "Please log in first to purchase access!",
     accessRequestSent: "Access request sent! Check Telegram to pay the invoice.",
     failedToInitiatePurchase: "Failed to initiate access purchase.",
@@ -156,17 +112,16 @@ const formatNum = (num: number | undefined, digits = 2) => {
 
 export default function ElonPage() {
   const { dbUser, isAuthenticated, isLoading: appContextLoading, user: tgUser } = useAppContext();
-  const [currentLang, setCurrentLang] = useState<'ru' | 'en'>('en'); 
+  const [currentLang, setCurrentLang] = useState<'ru' | 'en'>('en');
 
   useEffect(() => {
-    let langToSet: 'ru' | 'en' = 'en'; 
-    if (dbUser?.language_code) { 
+    let langToSet: 'ru' | 'en' = 'en';
+    if (dbUser?.language_code) {
         langToSet = dbUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
-    } else if (tgUser?.language_code) { 
+    } else if (tgUser?.language_code) {
         langToSet = tgUser.language_code.toLowerCase().startsWith('ru') ? 'ru' : 'en';
     }
     setCurrentLang(langToSet);
-    logger.info(`[ElonPage] Language set to: ${langToSet} (dbUser lang: ${dbUser?.language_code}, tgUser lang: ${tgUser?.language_code})`);
   }, [dbUser?.language_code, tgUser?.language_code]);
 
   const t = useCallback((key: string, params?: Record<string, string | number>) => {
@@ -183,12 +138,6 @@ export default function ElonPage() {
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
-
-  const [arbitrageOpportunities, setArbitrageOpportunities] = useState<ArbitrageOpportunity[]>([]);
-  const [arbitrageScanLogs, setArbitrageScanLogs] = useState<string[]>([]);
-  const [isLoadingArbitrageScan, setIsLoadingArbitrageScan] = useState(false);
-  const [currentArbitrageSettings, setCurrentArbitrageSettings] = useState<ArbitrageSettings | null>(null);
-  const [isLoadingArbitrageSettings, setIsLoadingArbitrageSettings] = useState(false);
 
   useEffect(() => {
     if (dbUser && dbUser.metadata?.xtr_protocards?.[ELON_SIMULATOR_CARD_ID]?.status === 'active') {
@@ -210,60 +159,6 @@ export default function ElonPage() {
     setIsLoadingPrice(false);
   }, [t]);
 
-  const loadArbitrageSettings = useCallback(async () => {
-    if (!dbUser?.user_id || !isAuthenticated) return;
-    setIsLoadingArbitrageSettings(true);
-    try {
-      const result = await fetchArbitrageSettings(dbUser.user_id);
-      if (result.success && result.data) {
-        setCurrentArbitrageSettings(result.data);
-      } else {
-        toast.error(t("errorLoadingArbitrageSettings") + (result.error || "Unknown error"));
-      }
-    } catch (error) {
-      toast.error(t("errorLoadingArbitrageSettings"));
-      logger.error("ElonPage: Error loading arbitrage settings", error);
-    }
-    setIsLoadingArbitrageSettings(false);
-  }, [dbUser?.user_id, isAuthenticated, t]);
-
-  useEffect(() => {
-    if (hasAccess) {
-      fetchStockPrice();
-      if (isAuthenticated && dbUser?.user_id && !currentArbitrageSettings) {
-        loadArbitrageSettings();
-      }
-    }
-  }, [fetchStockPrice, hasAccess, isAuthenticated, dbUser?.user_id, loadArbitrageSettings, currentArbitrageSettings]);
-
-  const handleArbitrageScan = useCallback(async () => {
-    if (!dbUser?.user_id || !currentArbitrageSettings) {
-      toast.info(t("userOrSettingsNotAvailable"));
-      return;
-    }
-    setIsLoadingArbitrageScan(true);
-    setArbitrageScanLogs([`[${new Date().toLocaleTimeString()}] Initiating arbitrage scan...`]);
-    setArbitrageOpportunities([]);
-    try {
-      const result = await fetchArbitrageOpportunities(dbUser.user_id);
-      setArbitrageOpportunities(result.opportunities);
-      setArbitrageScanLogs(prevLogs => [...prevLogs, ...result.logs, `[${new Date().toLocaleTimeString()}] Scan finished.`]);
-      if (result.opportunities.length > 0) {
-        toast.success(t("arbitrageScanCompleteSuccess", {count: result.opportunities.length}));
-      } else {
-        toast.info(t("arbitrageScanCompleteInfo"));
-      }
-      if (result.settings) {
-        setCurrentArbitrageSettings(result.settings);
-      }
-    } catch (error) {
-      toast.error(t("errorDuringArbitrageScan"));
-      logger.error("ElonPage: Error scanning for arbitrage", error);
-      setArbitrageScanLogs(prevLogs => [...prevLogs, `[${new Date().toLocaleTimeString()}] Error during scan: ${String(error)}`]);
-    }
-    setIsLoadingArbitrageScan(false);
-  }, [dbUser?.user_id, currentArbitrageSettings, t]);
-
   const handlePurchaseAccess = async () => {
     if (!isAuthenticated || !dbUser?.user_id) {
       toast.error(t("authErrorForPurchase"));
@@ -278,7 +173,6 @@ export default function ElonPage() {
       type: "simulation_access", 
       metadata: { page_link: "/elon", simulator_name: "Рынок Маска TSLA & Arbitrage Edition" }
     };
-
     try {
       const result = await purchaseProtoCardAction(dbUser.user_id, cardDetails); 
       if (result.success) {
@@ -293,6 +187,12 @@ export default function ElonPage() {
     setIsPurchasing(false);
   };
 
+  useEffect(() => {
+    if (hasAccess) {
+      fetchStockPrice();
+    }
+  }, [hasAccess, fetchStockPrice]);
+
   if (appContextLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-black text-brand-cyan"><VibeContentRenderer content="::FaSpinner className='animate-spin text-4xl'::" /> {t("loadingVibeOs")}</div>;
   }
@@ -303,15 +203,8 @@ export default function ElonPage() {
         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
           <VibeContentRenderer content="::FaRocket className='text-7xl text-brand-orange mb-6 animate-pulse'::" />
           <h1 className="text-4xl font-orbitron font-bold text-brand-yellow mb-4">{t("accessDeniedTitle")}</h1>
-          <p className="text-lg text-gray-300 mb-8 max-w-md">
-            {t("accessDeniedDescription")}
-          </p>
-          <Button
-            onClick={handlePurchaseAccess}
-            disabled={isPurchasing || !isAuthenticated}
-            size="lg"
-            className="bg-brand-orange text-black font-orbitron font-bold py-3 px-8 rounded-lg text-lg hover:bg-yellow-400 transition-colors shadow-lg hover:shadow-yellow-500/50"
-          >
+          <p className="text-lg text-gray-300 mb-8 max-w-md">{t("accessDeniedDescription")}</p>
+          <Button onClick={handlePurchaseAccess} disabled={isPurchasing || !isAuthenticated} size="lg" className="bg-brand-orange text-black font-orbitron font-bold py-3 px-8 rounded-lg text-lg hover:bg-yellow-400 transition-colors shadow-lg hover:shadow-yellow-500/50">
             {isPurchasing ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : ''} 
             {isPurchasing ? t("processingButton") : t("purchaseAccessButton", {price: SIMULATOR_ACCESS_PRICE_XTR})}
           </Button>
@@ -323,15 +216,52 @@ export default function ElonPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-indigo-900 to-black text-white p-4 pt-24">
-        <Tabs defaultValue="musk_market" className="max-w-4xl mx-auto">
-            <TabsList className="grid w-full grid-cols-2 bg-black/70 border-2 border-brand-purple shadow-lg shadow-brand-purple/30 backdrop-blur-sm mb-6">
-                <TabsTrigger value="musk_market" className="font-orbitron text-sm data-[state=active]:bg-brand-purple data-[state=active]:text-black data-[state=active]:shadow-purple-glow">
+        <Tabs defaultValue="hub" className="max-w-4xl mx-auto">
+            <TabsList className="grid w-full grid-cols-3 bg-black/70 border-2 border-brand-purple shadow-lg shadow-brand-purple/30 backdrop-blur-sm mb-6">
+                <TabsTrigger value="hub" className="font-orbitron text-sm data-[state=active]:bg-brand-orange data-[state=active]:text-black">
+                    <VibeContentRenderer content="::FaHubspot className='mr-2'::"/> {t("arbitrageHubTab")}
+                </TabsTrigger>
+                <TabsTrigger value="musk_market" className="font-orbitron text-sm data-[state=active]:bg-brand-purple data-[state=active]:text-black">
                     <VibeContentRenderer content="::FaChartLine className='mr-2'::"/> {t("muskMarketTab")}
                 </TabsTrigger>
-                <TabsTrigger value="arbitrage_seeker" className="font-orbitron text-sm data-[state=active]:bg-brand-cyan data-[state=active]:text-black data-[state=active]:shadow-cyan-glow">
-                    <VibeContentRenderer content="::FaRobot className='mr-2'::"/> {t("arbitrageSeekerTab")}
+                <TabsTrigger value="education" className="font-orbitron text-sm data-[state=active]:bg-brand-cyan data-[state=active]:text-black">
+                    <VibeContentRenderer content="::FaGraduationCap className='mr-2'::"/> {t("educationTab")}
                 </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="hub">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                    <Card className="bg-black/70 border-2 border-brand-orange shadow-2xl shadow-brand-orange/40 backdrop-blur-md">
+                    <CardHeader className="text-center">
+                        <CardTitle className="text-4xl font-orbitron text-brand-orange glitch" data-text="Arbitrage Hub">Arbitrage Hub</CardTitle>
+                        <CardDescription className="text-orange-300/80">Your command center for seeking Alpha.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Link href="/arbitrage-live-scanner" passHref>
+                        <Card className="p-4 text-center bg-gray-800/60 border border-brand-lime/50 hover:bg-gray-800 hover:border-brand-lime transition-all cursor-pointer">
+                            <VibeContentRenderer content="::FaBroadcastTower className='text-4xl text-brand-lime mx-auto mb-2'::" />
+                            <h3 className="font-orbitron font-bold text-lg text-brand-lime">Live Seeker</h3>
+                            <p className="text-xs text-gray-400">Run a real-time, client-side scan for opportunities using your keys.</p>
+                        </Card>
+                        </Link>
+                        <Link href="/arbitrage-test-agent" passHref>
+                        <Card className="p-4 text-center bg-gray-800/60 border border-brand-purple/50 hover:bg-gray-800 hover:border-brand-purple transition-all cursor-pointer">
+                            <VibeContentRenderer content="::FaTerminal className='text-4xl text-brand-purple mx-auto mb-2'::" />
+                            <h3 className="font-orbitron font-bold text-lg text-brand-purple">Command Deck</h3>
+                            <p className="text-xs text-gray-400">Manually trigger server-side functions and view raw DB data. (Admin)</p>
+                        </Card>
+                        </Link>
+                        <Link href="/elon/testbase/arbitrage-viz-sandbox" passHref>
+                        <Card className="p-4 text-center bg-gray-800/60 border border-brand-cyan/50 hover:bg-gray-800 hover:border-brand-cyan transition-all cursor-pointer md:col-span-2">
+                            <VibeContentRenderer content="::FaCubesStacked className='text-4xl text-brand-cyan mx-auto mb-2'::" />
+                            <h3 className="font-orbitron font-bold text-lg text-brand-cyan">Voxel Sandbox</h3>
+                            <p className="text-xs text-gray-400">Visualize simulated arbitrage data in a 3D latent space.</p>
+                        </Card>
+                        </Link>
+                    </CardContent>
+                    </Card>
+                </motion.div>
+            </TabsContent>
 
             <TabsContent value="musk_market">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -343,27 +273,16 @@ export default function ElonPage() {
                         <CardTitle className="text-3xl sm:text-4xl font-orbitron font-bold text-brand-orange glitch" data-text={t("muskMarketTitle")}>
                             {t("muskMarketTitle")}
                         </CardTitle>
-                        <CardDescription className="text-sm sm:text-md text-purple-300 font-mono mt-2">
-                           {t("muskMarketDescription")}
-                        </CardDescription>
+                        <CardDescription className="text-sm sm:text-md text-purple-300 font-mono mt-2">{t("muskMarketDescription")}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                         {stockData && (
-                            <motion.div
-                            key={`${stockData.price}-${stockData.newsFlash}`} 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-center p-4 sm:p-6 bg-gray-800/60 rounded-lg border border-purple-500/60 shadow-inner"
-                            >
+                            <motion.div key={`${stockData.price}-${stockData.newsFlash}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center p-4 sm:p-6 bg-gray-800/60 rounded-lg border border-purple-500/60 shadow-inner">
                             <p className="text-xs sm:text-sm text-gray-400 font-mono">{t("simulatedPriceLabel")}</p>
-                            <p className={`text-5xl sm:text-6xl font-orbitron font-bold my-1 sm:my-2 ${
-                                stockData.trend === 'up' ? 'text-green-400' : stockData.trend === 'down' ? 'text-red-400' : 'text-gray-200'
-                            }`}>
+                            <p className={`text-5xl sm:text-6xl font-orbitron font-bold my-1 sm:my-2 ${stockData.trend === 'up' ? 'text-green-400' : stockData.trend === 'down' ? 'text-red-400' : 'text-gray-200'}`}>
                                 ${stockData.price.toFixed(2)}
                             </p>
-                            <p className={`text-md sm:text-lg font-mono ${
-                                stockData.change >= 0 ? 'text-green-500' : 'text-red-500'
-                            }`}>
+                            <p className={`text-md sm:text-lg font-mono ${stockData.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                                 {stockData.change >= 0 ? '+' : ''}{stockData.change.toFixed(2)} ({stockData.changePercent.toFixed(2)}%)
                                 {stockData.trend === 'up' && <VibeContentRenderer content="::FaArrowTrendUp::" />}
                                 {stockData.trend === 'down' && <VibeContentRenderer content="::FaArrowTrendDown::" />}
@@ -376,38 +295,24 @@ export default function ElonPage() {
                             )}
                             </motion.div>
                         )}
-                        <Button
-                            onClick={fetchStockPrice}
-                            disabled={isLoadingPrice}
-                            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-orbitron py-3 text-lg rounded-md shadow-lg hover:shadow-purple-500/50 transition-all"
-                        >
+                        <Button onClick={fetchStockPrice} disabled={isLoadingPrice} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-orbitron py-3 text-lg rounded-md shadow-lg hover:shadow-purple-500/50 transition-all">
                             {isLoadingPrice ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaDiceD6::" /> }
                             {isLoadingPrice ? t("updatingVibeButton") : t("updateVibeButton")}
                         </Button>
-                        
                         <div className="space-y-3 text-xs sm:text-sm text-gray-300/90 font-mono p-3 sm:p-4 bg-black/40 rounded-md border border-gray-700/80">
                             <h3 className="text-lg sm:text-xl font-orbitron text-brand-cyan mb-2 sm:mb-3">{t("marketMechanicsTitle")}</h3>
                             <VibeContentRenderer content={t("marketMechanicsInfo")}/>
                             <VibeContentRenderer content={t("marketMechanicsVibes")}/>
                         </div>
-
                         <div className="mt-6 space-y-4">
                             <h3 className="text-2xl font-orbitron text-brand-pink text-center glitch" data-text={t("wolfAdvicesTitle")}>{t("wolfAdvicesTitle")}</h3>
                             {t("jordanBelfortAdvices").map((advice: any, index: number) => (
-                                <motion.div 
-                                    key={index}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.2 + index * 0.1 }}
-                                    className="p-3 bg-gray-800/50 border border-pink-500/30 rounded-lg shadow-sm"
-                                >
+                                <motion.div key={index} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + index * 0.1 }} className="p-3 bg-gray-800/50 border border-pink-500/30 rounded-lg shadow-sm">
                                     <h4 className="text-md font-orbitron text-pink-400 mb-1 flex items-center">
                                         <VibeContentRenderer content={`${advice.icon} `} className="mr-2 text-lg" /> 
                                         <VibeContentRenderer content={advice.titleKey} />
                                     </h4>
-                                    <p className="text-xs text-gray-300/90">
-                                        <VibeContentRenderer content={advice.textKey} />
-                                    </p>
+                                    <p className="text-xs text-gray-300/90"><VibeContentRenderer content={advice.textKey} /></p>
                                 </motion.div>
                             ))}
                         </div>
@@ -420,127 +325,34 @@ export default function ElonPage() {
                     </Card>
                 </motion.div>
             </TabsContent>
-
-            <TabsContent value="arbitrage_seeker">
-                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    <Card className="bg-black/60 border-2 border-brand-blue shadow-2xl shadow-brand-blue/30 backdrop-blur-sm">
-                        <CardHeader className="text-center">
-                            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 150 }}>
-                            <VibeContentRenderer content="::FaRobot className='text-6xl text-brand-cyan mx-auto mb-4 filter drop-shadow-[0_0_8px_hsl(var(--brand-cyan-rgb))]'::" />
-                            </motion.div>
-                            <CardTitle className="text-3xl sm:text-4xl font-orbitron font-bold text-brand-cyan glitch" data-text={t("arbitrageSeekerTitle")}>
-                                {t("arbitrageSeekerTitle")} <span className="text-sm align-super text-yellow-400">(Simulation)</span>
-                            </CardTitle>
-                            <CardDescription className="text-sm sm:text-md text-blue-300 font-mono mt-2">
-                                <VibeContentRenderer content={t("arbitrageSeekerSubtitle")} />
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <Button
-                                onClick={handleArbitrageScan}
-                                disabled={isLoadingArbitrageScan || !currentArbitrageSettings || isLoadingArbitrageSettings}
-                                className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-orbitron py-3 text-lg rounded-md shadow-lg hover:shadow-cyan-500/50 transition-all"
-                            >
-                                {isLoadingArbitrageScan ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaMagnifyingGlassDollar className='mr-2'::" /> }
-                                {isLoadingArbitrageScan ? t("scanningButton") : t("scanForAlphaButton")}
-                            </Button>
-
-                            {currentArbitrageSettings && !isLoadingArbitrageSettings && (
-                                <div className="p-3 bg-gray-800/50 border border-purple-600/50 rounded-lg text-xs">
-                                    <h4 className="text-sm font-orbitron text-purple-300 mb-1">{t("currentScannerSettingsTitle")}</h4>
-                                    <p className="text-gray-400">{t("minSpreadLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.minSpreadPercent}%</span> | {t("tradeVolumeLabel")} <span className="text-brand-yellow">${currentArbitrageSettings.defaultTradeVolumeUSD}</span></p>
-                                    <p className="text-gray-400">{t("exchangesLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.enabledExchanges.join(', ') || t("noValue")}</span></p>
-                                    <p className="text-gray-400">{t("pairsLabel")} <span className="text-brand-yellow">{currentArbitrageSettings.trackedPairs.join(', ') || t("noValue")}</span></p>
-                                    <Link href="/settings" className="text-brand-cyan hover:underline mt-1 block">{t("changeSettingsLink")}</Link>
-                                </div>
-                            )}
-                            {isLoadingArbitrageSettings && <p className="text-center text-purple-400"><VibeContentRenderer content="::FaSpinner className='animate-spin'::" /> {t("loadingSettings")}</p>}
-
-                            {arbitrageOpportunities.length > 0 && (
-                            <div className="mt-6 space-y-4">
-                                <h3 className="text-2xl font-orbitron text-brand-orange text-center glitch" data-text={t("potentialAlphaTitle")}>{t("potentialAlphaTitle")}</h3>
-                                <AnimatePresence>
-                                {arbitrageOpportunities.map((op) => (
-                                <motion.div
-                                    key={op.id}
-                                    layout
-                                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-                                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                                >
-                                    <Card className={`bg-gray-800/80 border ${op.profitPercentage > (currentArbitrageSettings?.minSpreadPercent || 0) + 0.5 ? 'border-green-500 shadow-green-500/30' : 'border-yellow-500 shadow-yellow-500/30'} hover:shadow-lg transition-shadow`}>
-                                    <CardHeader>
-                                        <CardTitle className={`flex items-center justify-between text-lg ${op.profitPercentage > (currentArbitrageSettings?.minSpreadPercent || 0) + 0.2 ? 'text-green-400' : 'text-yellow-400'}`}>
-                                        <span className="flex items-center">
-                                            {op.type === '2-leg' ? <VibeContentRenderer content="::FaRightLeft className='inline mr-2 text-xl'::" /> : <VibeContentRenderer content="::FaBolt className='inline mr-2 text-xl'::" />}
-                                            {op.type === '2-leg' ? `Inter-Exchange: ${op.currencyPair}` : `Triangular: ${op.currencyPair} (${(op as ThreeLegArbitrageOpportunity).exchange})`}
-                                        </span>
-                                        <span className="text-xl font-bold">{formatNum(op.profitPercentage, 3)}%</span>
-                                        </CardTitle>
-                                        <CardDescription className="text-xs text-gray-400">
-                                        Profit: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum(op.potentialProfitUSD)} (on <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum(op.tradeVolumeUSD,0)} vol)
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="text-sm space-y-1">
-                                        <p className="font-mono text-gray-300 text-xs md:text-sm">{(op as any).details}</p>
-                                        {op.type === '2-leg' && (
-                                            <>
-                                                <p className="text-gray-300"><VibeContentRenderer content="::FaArrowRightFromBracket className='inline mr-1 text-blue-400'::" /> Buy: <strong>{(op as TwoLegArbitrageOpportunity).buyExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).buyPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).buyFeePercentage,3)}%)</p>
-                                                <p className="text-gray-300"><VibeContentRenderer content="::FaArrowRightToBracket className='inline mr-1 text-teal-400'::" /> Sell: <strong>{(op as TwoLegArbitrageOpportunity).sellExchange}</strong> @ ${formatNum((op as TwoLegArbitrageOpportunity).sellPrice, 4)} (Fee: {formatNum((op as TwoLegArbitrageOpportunity).sellFeePercentage,3)}%)</p>
-                                                <p className="text-xs text-gray-500">Network Fee: <VibeContentRenderer content="::FaDollarSign className='inline'::" />{formatNum((op as TwoLegArbitrageOpportunity).networkFeeUSD)}</p>
-                                            </>
-                                        )}
-                                        {op.type === '3-leg' && (
-                                            <div className="text-xs text-gray-400 space-y-0.5">
-                                                {(op as ThreeLegArbitrageOpportunity).legs.map((leg, i) => (
-                                                    <p key={i}><VibeContentRenderer content="::FaRepeat className='inline mr-1'::" /> Leg {i+1}: {leg.action.toUpperCase()} {leg.asset} on {leg.pair} @ ~${formatNum(leg.price, leg.pair.includes('BTC') ? 5 : 2)} (Fee: {formatNum(leg.feeApplied*100,3)}%)</p>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-gray-500 pt-1">Identified: {new Date(op.timestamp).toLocaleString()}</p>
-                                    </CardContent>
-                                    </Card>
-                                </motion.div>
-                                ))}
-                                </AnimatePresence>
-                            </div>
-                            )}
-                            {(arbitrageOpportunities.length === 0 && !isLoadingArbitrageScan && arbitrageScanLogs.length > 1 && currentArbitrageSettings) && ( 
-                                <div className="text-center py-8 text-gray-500">
-                                    <VibeContentRenderer content="::FaCoffee className='text-4xl mb-2 mx-auto'::" />
-                                    <p>{t("noOpportunitiesFound")}</p>
-                                </div>
-                            )}
-
-                            {(arbitrageScanLogs.length > 0 || isLoadingArbitrageScan) && (
-                            <Card className="mt-6 bg-gray-800/50 border border-gray-700">
-                                <CardHeader>
-                                <CardTitle className="text-lg font-orbitron text-gray-400 flex items-center"><VibeContentRenderer content="::FaClipboardList className='mr-2'::" />{t("scanLogsTitle")}</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                <Textarea
-                                    readOnly
-                                    value={arbitrageScanLogs.join('\n')}
-                                    className="h-40 font-mono text-xs bg-black/50 border-gray-600 text-gray-300 resize-y simple-scrollbar"
-                                    placeholder={t("scanLogsPlaceholder")}
-                                />
-                                </CardContent>
-                            </Card>
-                            )}
-                            
-                            <div className="mt-6 p-4 bg-black/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300/80 space-y-1">
-                                <VibeContentRenderer content={t("disclaimer")} />
-                            </div>
-                             <Link href="/hotvibes" className="block text-center mt-8">
-                                <Button variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10">
-                                    <VibeContentRenderer content="::FaArrowLeft::" /> {t("backToHotVibes")}
-                                </Button>
-                            </Link>
-                        </CardContent>
-                    </Card>
-                </motion.div>
+            
+            <TabsContent value="education">
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                 <Card className="bg-black/70 border-2 border-brand-cyan shadow-2xl shadow-brand-cyan/40 backdrop-blur-md">
+                  <CardHeader className="text-center">
+                     <CardTitle className="text-4xl font-orbitron text-brand-cyan glitch" data-text="Education">Education</CardTitle>
+                     <CardDescription className="text-cyan-300/80">Level up your understanding of the Vibe.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Link href="/arbitrage-explained" passHref>
+                        <Card className="p-4 text-center bg-gray-800/60 border border-brand-blue/50 hover:bg-gray-800 hover:border-brand-blue transition-all cursor-pointer">
+                          <VibeContentRenderer content="::FaGraduationCap className='text-4xl text-brand-blue mx-auto mb-2'::" />
+                          <h3 className="font-orbitron font-bold text-lg text-brand-blue">Arbitrage School</h3>
+                          <p className="text-xs text-gray-400">The fundamentals of arbitrage, scanner logic, and common pitfalls.</p>
+                        </Card>
+                      </Link>
+                       <Link href="/arbitrage-notdummies" passHref>
+                        <Card className="p-4 text-center bg-gray-800/60 border border-brand-purple/50 hover:bg-gray-800 hover:border-brand-purple transition-all cursor-pointer">
+                          <VibeContentRenderer content="::FaBrain className='text-4xl text-brand-purple mx-auto mb-2'::" />
+                          <h3 className="font-orbitron font-bold text-lg text-brand-purple">Deep Dive</h3>
+                          <p className="text-xs text-gray-400">Explore the metaphysics: latent spaces, E.E.R. models, and scientific analogies.</p>
+                        </Card>
+                      </Link>
+                  </CardContent>
+                 </Card>
+               </motion.div>
             </TabsContent>
+
         </Tabs>
     </div>
   );
