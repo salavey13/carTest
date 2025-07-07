@@ -1,41 +1,49 @@
+import { sendTelegramMessage } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
-import { sendComplexMessage } from "../actions/sendComplexMessage"; // Import our new action
 
+/**
+ * Handles the /howto command by sending a message with navigation buttons
+ * to the relevant guide pages.
+ * @param chatId The chat ID to send the message to.
+ * @param userId The ID of the user who triggered the command.
+ */
 export async function howtoCommand(chatId: number, userId: number) {
-  logger.info(`[HOWTO_V7_RICH] User ${userId} triggered /howto command.`);
+  logger.info(`[HOWTO_V7_INTERACTIVE] User ${userId} triggered /howto command.`);
 
   const baseUrl = getBaseUrl();
-  const message = "Агент, вот твои основные инструктажи. Выбери нужный раздел, чтобы погрузиться в Vibe:";
-  
-  // The button structure is now a 2D array, as expected by the Telegram API
+
+  const message = "Агент, вот твои основные **интерактивные инструктажи**. Выбери нужный раздел, чтобы погрузиться в Vibe и начать свою первую миссию:";
+
+  // Using a 2x2 grid for better mobile experience
   const buttons = [
-    [ { text: "📜 Нейро-Кухня (Создание)", url: `${baseUrl}/nutrition` } ],
-    [ { text: "🇯🇲 Гайд Растодева (Основы)", url: `${baseUrl}/rastabot` } ],
-    [ { text: "🧠 Арбитраж: Deep Dive", url: `${baseUrl}/arbitrage-notdummies` } ]
+    [ // Row 1
+      { text: "🚀 Миссия 1: Замена Картинки", url: `${baseUrl}/tutorials/image-swap` },
+      { text: "💣 Миссия 2: Разминирование Иконок", url: `${baseUrl}/tutorials/icon-swap` },
+    ],
+    [ // Row 2
+      { text: "🧠 Нейро-Кухня (Создание)", url: `${baseUrl}/nutrition` },
+      { text: "🇯🇲 Гайд Растодева (Основы)", url: `${baseUrl}/rastabot` },
+    ]
   ];
 
   try {
-    // Send the message with buttons AND a cool image
-    const result = await sendComplexMessage(
-      chatId,
+    await sendTelegramMessage(
       message,
       buttons,
-      "library ancient scroll" // Image query for Unsplash
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250624_022941_951-e1a38f36-963e-4251-8d26-72eb98b98b9a.png", // Your awesome image
+      String(chatId),
+      undefined,
+      'Markdown' // Explicitly set parse_mode
     );
-
-    if (!result.success) {
-      throw new Error(result.error || "Unknown error sending message with buttons.");
-    }
     
-    logger.info(`[HOWTO_V7_RICH] Rich guide sent successfully to user ${userId}.`);
+    logger.info(`[HOWTO_V7_INTERACTIVE] Interactive guide sent successfully to user ${userId}.`);
 
   } catch (error) {
-    logger.error("[HOWTO_V7_RICH] Failed to send rich guide:", error);
-    // Fallback message if something goes wrong
-    await sendComplexMessage(
-        chatId,
-        "🚨 Не удалось отправить инструктаж. Сервера, возможно, на перезарядке. Попробуй позже."
+    logger.error("[HOWTO_V7_INTERACTIVE] Failed to send interactive guide:", error);
+    await sendTelegramMessage(
+        "🚨 Не удалось отправить инструктаж. Попробуй позже.",
+        [], undefined, String(chatId)
     );
   }
 }
