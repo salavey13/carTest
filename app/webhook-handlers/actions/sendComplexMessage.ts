@@ -36,8 +36,8 @@ export async function sendComplexMessage(
   text: string,
   buttons: InlineButton[][] = [],
   imageQuery?: string,
-  messageId?: number // ID of the message to edit
-): Promise<{ success: boolean; error?: string; data?: any }> { 
+  messageId?: number
+): Promise<{ success: boolean; error?: string; data?: any }> {
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured." };
   }
@@ -82,6 +82,11 @@ export async function sendComplexMessage(
     const data = await response.json();
 
     if (!data.ok) {
+      // Don't log "message is not modified" as an error, it's a common case.
+      if (data.description.includes('message is not modified')) {
+          logger.info(`[sendComplexMessage] Message not modified for chat ${chatId}.`);
+          return { success: false, error: data.description };
+      }
       logger.error(`Telegram API error (${endpoint}): ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code, payload });
       throw new Error(data.description || `Failed to ${endpoint}`);
     }
@@ -108,6 +113,7 @@ export async function deleteTelegramMessage(chatId: number, messageId: number): 
         });
         const data = await response.json();
         if (!data.ok) {
+            // It's not a critical error if the message is already deleted.
             logger.warn(`[DeleteMessage] Failed to delete message ${messageId} for chat ${chatId}. Reason: ${data.description}`);
             return false;
         }
