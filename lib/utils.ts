@@ -1,4 +1,3 @@
-// /lib/utils.ts
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { logger } from "./logger"; // Import logger for warnings
@@ -14,38 +13,28 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 /**
- * Determines the base URL for the application.
- * Prefers VERCEL_URL (includes deployment-specific URLs),
- * then NEXT_PUBLIC_APP_URL (manually set base URL),
- * and falls back to a hardcoded default for local development.
- * @returns The application's base URL string (e.g., "https://myapp.vercel.app").
+ * Determines the base URL for the application with a reliable production-first approach.
+ * @returns The application's base URL string.
  */
 export function getBaseUrl(): string {
-  // 1. Vercel deployment URL (most reliable for Vercel deployments)
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+  // 1. Production URL (from Vercel's non-preview environment variable)
+  if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+    return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
 
-  // 2. Manually configured public URL (useful for custom domains or non-Vercel)
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    // Ensure it starts with http:// or https://
-    if (!process.env.NEXT_PUBLIC_APP_URL.startsWith('http')) {
-        logger.warn(`NEXT_PUBLIC_APP_URL (${process.env.NEXT_PUBLIC_APP_URL}) should include protocol (http:// or https://). Assuming https.`);
-        return `https://${process.env.NEXT_PUBLIC_APP_URL.replace(/^.*:\/\//, '')}`; // Add https if missing
-    }
-    return process.env.NEXT_PUBLIC_APP_URL;
-  }
-
+  // 2. Fallback to a hardcoded production URL (Your suggestion, very reliable)
+  const productionUrl = "https://v0-car-test.vercel.app";
+  
   // 3. Fallback for local development
-  const defaultLocalUrl = "http://localhost:3000";
-  // Only log warning if explicitly not in production (safer default)
   if (process.env.NODE_ENV !== 'production') {
-     logger.warn(`VERCEL_URL and NEXT_PUBLIC_APP_URL are not set. Falling back to default ${defaultLocalUrl}. Ensure NEXT_PUBLIC_APP_URL is set for production builds outside Vercel.`);
+     const localUrl = "http://localhost:3000";
+     logger.info(`Not in production, using local URL: ${localUrl}`);
+     return localUrl;
   }
-  return defaultLocalUrl;
-
-  // Original fallback - less safe as it might expose internal Vercel URLs if NEXT_PUBLIC_APP_URL isn't set
-  // return "https://v0-car-test.vercel.app";
+  
+  // If in production but NEXT_PUBLIC_VERCEL_URL is not set, use the hardcoded URL.
+  logger.warn(`Using hardcoded production URL: ${productionUrl}. Consider setting NEXT_PUBLIC_VERCEL_URL.`);
+  return productionUrl;
 }
 
 /**
