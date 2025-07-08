@@ -8,7 +8,8 @@ import { offerCommand } from "./offer";
 import { howtoCommand } from "./howto";
 import { ctxCommand } from "./ctx";
 import { profileCommand } from "./profile";
-import { sendTelegramMessage } from "@/app/actions"; // We need this for the default case
+import { helpCommand } from "./help";
+import { sendTelegramMessage } from "@/app/actions";
 
 /**
  * The main router for all incoming updates from the Telegram webhook.
@@ -30,6 +31,7 @@ export async function handleCommand(update: any) {
     // Create a command map for clean routing
     const commandMap: { [key: string]: Function } = {
       "/start": () => startCommand(chatId, userId, username),
+      "/help": () => helpCommand(chatId, userId),
       "/rage": () => rageCommand(chatId, userId),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
@@ -47,7 +49,7 @@ export async function handleCommand(update: any) {
     } else {
       logger.warn(`[Command Handler] Unknown command: '${text}' from User ID: ${userId}.`);
       await sendTelegramMessage(
-        "Неизвестная команда, Агент. Проверь список доступных команд или начни с /start.",
+        "Неизвестная команда, Агент. Используй /help, чтобы увидеть список доступных директив.",
         [], undefined, String(chatId)
       );
     }

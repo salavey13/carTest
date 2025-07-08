@@ -43,31 +43,27 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, messag
 };
 
 export async function startCommand(chatId: number, userId: number, username?: string, callbackQuery?: any) {
-  logger.info(`[StartCommand V2] Triggered by user ${userId}. Is callback: ${!!callbackQuery}.`);
+  logger.info(`[StartCommand V3] Triggered by user ${userId}. Is callback: ${!!callbackQuery}.`);
   const userIdStr = String(userId);
 
   if (!callbackQuery) {
     // === NEW LOGIC FOR /start: Always reset and start fresh ===
-    logger.info(`[StartCommand V2] Received /start command. Performing full reset for user ${userIdStr}.`);
+    logger.info(`[StartCommand V3] Received /start command. Performing full reset for user ${userIdStr}.`);
 
-    // 1. Find and delete the old survey message, if it exists
     const { data: existingState } = await supabaseAdmin.from("user_survey_state").select('message_id').eq('user_id', userIdStr).maybeSingle();
     if (existingState?.message_id) {
         await deleteTelegramMessage(chatId, existingState.message_id);
     }
     
-    // 2. Clean up database records for a fresh start
     await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
     await supabaseAdmin.from("user_surveys").delete().eq('user_id', userIdStr);
 
-    // 3. Create a new state and send a new message
     const questionData = surveyQuestions[0];
     const text = questionData.question;
     const buttons = [questionData.answers.map(a => ({ ...a, callback_data: `survey_${questionData.step}_${a.callback_data}` }))];
 
     const result = await sendComplexMessage(chatId, text, buttons);
     
-    // 4. Save the new state with the new message_id
     if (result.success && result.data?.result?.message_id) {
         const newMessageId = result.data.result.message_id;
         await supabaseAdmin
