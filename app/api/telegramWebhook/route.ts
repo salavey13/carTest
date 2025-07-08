@@ -75,14 +75,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-     // Route 3: Handle interactive commands (text messages and button clicks)
-     else if (update.message?.text || update.callback_query) {
-      logger.info("[Master Webhook] Routing to Command Handler...");
+    // Route 3: Handle text messages
+    else if (update.message?.text) {
+      logger.info("[Master Webhook] Routing TEXT to Command Handler...");
       await handleCommand(update);
       return NextResponse.json({ ok: true });
     }
 
-    // Route 4: Fallback for other message types
+    // Route 4: Handle button clicks (callback queries)
+    else if (update.callback_query) {
+      logger.info("[Master Webhook] Routing CALLBACK to Command Handler...");
+      await handleCommand(update);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Route 5: Fallback for other message types
     else {
       logger.info("[Master Webhook] Received unhandled update type, ignoring.", { keys: Object.keys(update || {}) });
       return NextResponse.json({ ok: true });
