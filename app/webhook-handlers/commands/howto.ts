@@ -2,8 +2,8 @@ import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 
-export async function howtoCommand(chatId: number, userId: number) {
-  logger.info(`[HOWTO_V10_FINAL] User ${userId} triggered /howto command.`);
+export async function howtoCommand(chatId: number, userId: number, messageId?: number) {
+  logger.info(`[HOWTO] User ${userId} triggered /howto. MessageID: ${messageId || 'N/A'}`);
 
   const baseUrl = getBaseUrl();
 
@@ -29,20 +29,19 @@ export async function howtoCommand(chatId: number, userId: number) {
       chatId,
       message,
       buttons,
-      "library, futuristic, neon" // Image query for Unsplash
+      // Only fetch a new image if we are sending a new message, not editing.
+      messageId ? undefined : "library, futuristic, neon",
+      messageId // Pass the messageId to edit the existing message.
     );
     
     if (!result.success) {
-      throw new Error(result.error || "Unknown error sending message.");
+      throw new Error(result.error || "Unknown error sending/editing message.");
     }
     
-    logger.info(`[HOWTO_V10_FINAL] Interactive guide sent successfully to user ${userId}.`);
+    logger.info(`[HOWTO] Guide ${messageId ? 'edited' : 'sent'} successfully for user ${userId}.`);
 
   } catch (error) {
-    logger.error("[HOWTO_V10_FINAL] Failed to send interactive guide:", error);
-    await sendComplexMessage(
-        chatId,
-        "🚨 Не удалось отправить инструктаж. Сервера, возможно, на перезарядке. Попробуй позже."
-    );
+    logger.error("[HOWTO] Failed to send/edit interactive guide:", error);
+    // Avoid sending an error message if the primary action failed, as it might also fail.
   }
 }
