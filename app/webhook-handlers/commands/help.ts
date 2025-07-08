@@ -1,4 +1,4 @@
-import { sendTelegramMessage } from "@/app/actions";
+import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 
 export async function helpCommand(chatId: number, userId: number) {
@@ -19,5 +19,5 @@ export async function helpCommand(chatId: number, userId: number) {
     `\`/rage\` - Запустить симуляцию арбитражного сканера.\n` +
     `\`/offer\` - (В разработке) Сгенерировать коммерческое предложение.`;
 
-  await sendTelegramMessage(helpText, [], undefined, String(chatId), undefined, "Markdown");
+  await sendComplexMessage(chatId, helpText, []);
 }
