@@ -23,12 +23,15 @@ export async function handleCommand(update: any) {
     const chatId: number = update.message.chat.id;
     const userId: number = update.message.from.id;
     const username: string | undefined = update.message.from.username;
+    const parts = text.split(' ');
+    const command = parts[0].toLowerCase(); // Get the base command
+    const args = parts.slice(1);
 
-    logger.info(`[Command Handler] Received text command: '${text}' from User ID: ${userId}`);
+    logger.info(`[Command Handler] Received text command: '${command}' with args: [${args.join(', ')}] from User ID: ${userId}`);
 
     // Create a command map for clean routing
     const commandMap: { [key: string]: Function } = {
-      "/start": () => startCommand(chatId, userId, username),
+      "/start": () => startCommand(chatId, userId, username, undefined, args.includes('reset')),
       "/rage": () => rageCommand(chatId, userId),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
@@ -38,8 +41,7 @@ export async function handleCommand(update: any) {
       "/ctx": () => ctxCommand(chatId, userId),
       "/profile": () => profileCommand(chatId, userId, username),
     };
-
-    const command = text.split(' ')[0].toLowerCase(); // Get the base command
+    
     const commandFunction = commandMap[command];
 
     if (commandFunction) {
@@ -47,7 +49,7 @@ export async function handleCommand(update: any) {
     } else {
       logger.warn(`[Command Handler] Unknown command: '${text}' from User ID: ${userId}.`);
       await sendTelegramMessage(
-        "Неизвестная команда, Агент. Проверь список доступных команд или начни с /start.",
+        "Неизвестная команда, Агент. Проверь список доступных команд или начни с /start. Чтобы сбросить опрос, используй /start reset.",
         [], undefined, String(chatId)
       );
     }
@@ -76,14 +78,13 @@ export async function handleCommand(update: any) {
         logger.error(`[Command Handler] Failed to answer callback query:`, e);
     }
     
-
     // Route callbacks based on a prefix system
     if (data.startsWith("survey_")) {
       // This is a callback from our /start survey
       await startCommand(chatId, userId, username, callbackQuery);
     } else if (data === "request_howto") {
       // This is a callback from the final message of the /start survey
-      await handleStartCallback(chatId, userId, data);
+      await handleStartCallback(chatId, userId, callbackQuery);
     } 
     // ... Add more 'else if' blocks here for other callback types in the future ...
     else {
