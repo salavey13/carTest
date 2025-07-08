@@ -4,46 +4,40 @@ import { logger } from "@/lib/logger";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY;
+const DEFAULT_FALLBACK_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250624_022941_951-e1a38f36-963e-4251-8d26-72eb98b98b9a.png";
 
-interface InlineButton {
+export interface InlineButton {
   text: string;
   url?: string;
   callback_data?: string;
 }
 
-// Fetches a random image from Unsplash based on a query
-async function getRandomUnsplashImage(query: string): Promise<string | null> {
+async function getRandomUnsplashImage(query: string): Promise<string> {
   if (!UNSPLASH_ACCESS_KEY) {
-    logger.warn("[Unsplash] Access key is not configured. Skipping image fetch.");
-    return null;
+    logger.warn("[Unsplash] Access key not configured. Using default fallback image.");
+    return DEFAULT_FALLBACK_IMAGE;
   }
   try {
     const response = await fetch(`https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`);
     if (!response.ok) {
-      logger.error("[Unsplash] Failed to fetch image", { status: response.status, text: await response.text() });
-      return null;
+      logger.error("[Unsplash] Failed to fetch image, using fallback", { status: response.status, text: await response.text() });
+      return DEFAULT_FALLBACK_IMAGE;
     }
     const data = await response.json();
-    // Use a high-quality but not full-size version for speed
-    return data.urls?.regular || null;
+    return data.urls?.regular || DEFAULT_FALLBACK_IMAGE;
   } catch (error) {
-    logger.error("[Unsplash] Error fetching random image:", error);
-    return null;
+    logger.error("[Unsplash] Error fetching random image, using fallback:", error);
+    return DEFAULT_FALLBACK_IMAGE;
   }
 }
 
-/**
- * Sends a rich Telegram message, potentially with a photo and an inline keyboard.
- * Handles both sendPhoto and sendMessage endpoints.
- */
 export async function sendComplexMessage(
   chatId: string | number,
-  caption: string,
+  text: string,
   buttons: InlineButton[][] = [],
-  imageQuery?: string // e.g., "library", "code", "rage"
+  imageQuery?: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!TELEGRAM_BOT_TOKEN) {
-    logger.error("TELEGRAM_BOT_TOKEN is not configured.");
     return { success: false, error: "Telegram bot token not configured." };
   }
 
@@ -65,9 +59,9 @@ export async function sendComplexMessage(
   
   if (imageUrl) {
     payload.photo = imageUrl;
-    payload.caption = caption;
+    payload.caption = text;
   } else {
-    payload.text = caption;
+    payload.text = text;
   }
 
   try {

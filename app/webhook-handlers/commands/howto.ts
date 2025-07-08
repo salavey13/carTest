@@ -1,57 +1,48 @@
-import { sendTelegramMessage } from "@/app/actions";
+import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 
-/**
- * Handles the /howto command by sending an interactive message with buttons
- * linking to the core guide and tutorial pages on the web app.
- * @param chatId The chat ID to send the message to.
- * @param userId The ID of the user who triggered the command.
- */
 export async function howtoCommand(chatId: number, userId: number) {
-  logger.info(`[HOWTO_V9_INTERACTIVE] User ${userId} triggered /howto command.`);
+  logger.info(`[HOWTO_V10_FINAL] User ${userId} triggered /howto command.`);
 
   const baseUrl = getBaseUrl();
-  const howtoImageUrl = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250624_022941_951-e1a38f36-963e-4251-8d26-72eb98b98b9a.png"; // Your image URL
 
-  const message = "Агент, вот твои **интерактивные инструктажи**. Выбери нужный раздел, чтобы погрузиться в Vibe и начать свою первую миссию:";
+  const message = "Агент, вот твои основные **интерактивные инструктажи**. Выбери нужный раздел, чтобы погрузиться в Vibe и начать свою первую миссию:";
 
-  // A more comprehensive and structured button layout
   const buttons = [
-    [ // Row 1: Core Guides
-      { text: "🧠 Нейро-Кухня (Создание)", url: `${baseUrl}/nutrition` },
+    [
+      { text: "🚀 Миссии (Начать здесь!)", url: `${baseUrl}/start-training` },
       { text: "🇯🇲 Гайд Растодева (Основы)", url: `${baseUrl}/rastabot` },
     ],
-    [ // Row 2: Training & Deep Dives
-      { text: "🚀 VIBE Тренировка (Миссии)", url: `${baseUrl}/start-training` },
+    [
+      { text: "🧠 Нейро-Кухня (Создание)", url: `${baseUrl}/nutrition` },
       { text: "💸 Арбитраж: Deep Dive", url: `${baseUrl}/arbitrage-notdummies` },
     ],
-    [ // Row 3: Direct Action Link
-      { text: "🛠️ В SUPERVIBE Studio", url: `${baseUrl}/repo-xml` }
-    ]
+    [
+      { text: "🛠️ В SUPERVIBE Studio", url: `${baseUrl}/repo-xml` },
+      { text: "✨ Гайд по Стилю", url: `${baseUrl}/style-guide` },
+    ],
   ];
 
   try {
-    const result = await sendTelegramMessage(
+    const result = await sendComplexMessage(
+      chatId,
       message,
       buttons,
-      howtoImageUrl, // The image URL you provided
-      String(chatId),
-      undefined,
-      'Markdown'
+      "library, futuristic, neon" // Image query for Unsplash
     );
     
     if (!result.success) {
-      throw new Error(result.error || "Unknown error sending message with buttons.");
+      throw new Error(result.error || "Unknown error sending message.");
     }
     
-    logger.info(`[HOWTO_V9_INTERACTIVE] Interactive guide sent successfully to user ${userId}.`);
+    logger.info(`[HOWTO_V10_FINAL] Interactive guide sent successfully to user ${userId}.`);
 
   } catch (error) {
-    logger.error("[HOWTO_V9_INTERACTIVE] Failed to send interactive guide:", error);
-    await sendTelegramMessage(
-        "🚨 Не удалось отправить инструктаж. Сервера, возможно, на перезарядке. Попробуй позже.",
-        [], undefined, String(chatId)
+    logger.error("[HOWTO_V10_FINAL] Failed to send interactive guide:", error);
+    await sendComplexMessage(
+        chatId,
+        "🚨 Не удалось отправить инструктаж. Сервера, возможно, на перезарядке. Попробуй позже."
     );
   }
 }
