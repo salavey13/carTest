@@ -35,14 +35,16 @@ export async function sendComplexMessage(
   chatId: string | number,
   text: string,
   buttons: InlineButton[][] = [],
-  imageQuery?: string
-): Promise<{ success: boolean; error?: string }> {
+  imageQuery?: string,
+  messageId?: number // 👈 New: ID of the message to edit
+): Promise<{ success: boolean; error?: string; data?: any }> { // 👈 New: Return full API data
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured." };
   }
 
+  // Only fetch an image for new messages, as we can't add a photo to an existing message.
   let imageUrl: string | null = null;
-  if (imageQuery) {
+  if (imageQuery && !messageId) {
     imageUrl = await getRandomUnsplashImage(imageQuery);
   }
 
@@ -55,13 +57,22 @@ export async function sendComplexMessage(
     payload.reply_markup = { inline_keyboard: buttons };
   }
 
-  const endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-  
-  if (imageUrl) {
-    payload.photo = imageUrl;
-    payload.caption = text;
-  } else {
+  let endpoint: string;
+
+  if (messageId) {
+    // We are EDITING a message
+    endpoint = 'editMessageText';
+    payload.message_id = messageId;
     payload.text = text;
+  } else {
+    // We are SENDING a new message
+    endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
+    if (imageUrl) {
+      payload.photo = imageUrl;
+      payload.caption = text;
+    } else {
+      payload.text = text;
+    }
   }
 
   try {
@@ -78,8 +89,8 @@ export async function sendComplexMessage(
       throw new Error(data.description || `Failed to ${endpoint}`);
     }
 
-    logger.info(`Successfully sent complex message via ${endpoint} to chat ${chatId}.`);
-    return { success: true };
+    logger.info(`Successfully performed ${endpoint} for chat ${chatId}.`);
+    return { success: true, data }; // Return the full data object on success
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
     logger.error(`Error in sendComplexMessage for chat ${chatId}:`, errorMessage);
