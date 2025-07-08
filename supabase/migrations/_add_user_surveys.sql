@@ -3,6 +3,7 @@ CREATE TABLE public.user_survey_state (
     user_id TEXT PRIMARY KEY,
     current_step INT NOT NULL DEFAULT 1,
     answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+    message_id BIGINT, -- The ID of the message being edited for the survey
     last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_user
         FOREIGN KEY(user_id) 

@@ -23,7 +23,6 @@ function getFirstLine(codeBlock: string): string {
   return lines.length > 0 ? lines[0] : "Untitled Snippet";
 }
 
-
 export async function POST(request: Request) {
   try {
     const update = await request.json();
@@ -76,8 +75,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-     // Route 3: Handle text messages and commands
-     else if (update.message?.text) {
+     // Route 3: Handle interactive commands (text messages and button clicks)
+     else if (update.message?.text || update.callback_query) {
       logger.info("[Master Webhook] Routing to Command Handler...");
       await handleCommand(update);
       return NextResponse.json({ ok: true });
