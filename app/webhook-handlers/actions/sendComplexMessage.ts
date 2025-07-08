@@ -36,13 +36,12 @@ export async function sendComplexMessage(
   text: string,
   buttons: InlineButton[][] = [],
   imageQuery?: string,
-  messageId?: number // 👈 New: ID of the message to edit
-): Promise<{ success: boolean; error?: string; data?: any }> { // 👈 New: Return full API data
+  messageId?: number // ID of the message to edit
+): Promise<{ success: boolean; error?: string; data?: any }> { 
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured." };
   }
 
-  // Only fetch an image for new messages, as we can't add a photo to an existing message.
   let imageUrl: string | null = null;
   if (imageQuery && !messageId) {
     imageUrl = await getRandomUnsplashImage(imageQuery);
@@ -60,12 +59,10 @@ export async function sendComplexMessage(
   let endpoint: string;
 
   if (messageId) {
-    // We are EDITING a message
     endpoint = 'editMessageText';
     payload.message_id = messageId;
     payload.text = text;
   } else {
-    // We are SENDING a new message
     endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
     if (imageUrl) {
       payload.photo = imageUrl;
@@ -90,10 +87,35 @@ export async function sendComplexMessage(
     }
 
     logger.info(`Successfully performed ${endpoint} for chat ${chatId}.`);
-    return { success: true, data }; // Return the full data object on success
+    return { success: true, data };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
     logger.error(`Error in sendComplexMessage for chat ${chatId}:`, errorMessage);
     return { success: false, error: errorMessage };
   }
+}
+
+export async function deleteTelegramMessage(chatId: number, messageId: number): Promise<boolean> {
+    if (!TELEGRAM_BOT_TOKEN) {
+        logger.error("[DeleteMessage] Telegram bot token not configured.");
+        return false;
+    }
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: chatId, message_id: messageId })
+        });
+        const data = await response.json();
+        if (!data.ok) {
+            logger.warn(`[DeleteMessage] Failed to delete message ${messageId} for chat ${chatId}. Reason: ${data.description}`);
+            return false;
+        }
+        logger.info(`[DeleteMessage] Successfully deleted message ${messageId} for chat ${chatId}.`);
+        return true;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+        logger.error(`[DeleteMessage] Critical error deleting message ${messageId}:`, errorMessage);
+        return false;
+    }
 }
