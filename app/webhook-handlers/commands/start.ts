@@ -9,7 +9,7 @@ interface SurveyState {
   user_id: string;
   current_step: number;
   answers: Record<string, string>;
-  message_id?: number;
+  message_id?: number | null; // Now explicitly allows null
 }
 
 const surveyQuestions = [
@@ -31,7 +31,6 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, messag
   const baseUrl = getBaseUrl();
   const buttons: InlineButton[][] = [];
   
-  // ✅ Fixed: Comparison now includes the emoji, matching the button text exactly.
   if (answers.purpose === '👨‍💻 Хочу кодить/контрибьютить') {
     buttons.push([{ text: "🛠️ В SUPERVIBE Studio", url: `${baseUrl}/repo-xml` }]);
     buttons.push([{ text: "🚀 Начать Тренировку", url: `${baseUrl}/start-training` }]);
@@ -49,19 +48,39 @@ export async function startCommand(chatId: number, userId: number, username?: st
   const userIdStr = String(userId);
 
   if (!callbackQuery) {
-    // === Handle initial /start command ===
+    // === Handle initial /start command with robust state handling ===
     const { data: completedSurvey } = await supabaseAdmin.from("user_surveys").select('id').eq('user_id', userIdStr).maybeSingle();
     if (completedSurvey) {
         await sendComplexMessage(chatId, `С возвращением, Агент! Ты уже проходил опрос. Твои гайды ждут тебя по команде /howto.`);
         return;
     }
-
-    const { data: existingState } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
     
-    const state: SurveyState = existingState || { user_id: userIdStr, current_step: 1, answers: {} };
-    const questionData = surveyQuestions.find(q => q.step === state.current_step);
+    // Step 1: Ensure user state exists in the database BEFORE sending a message.
+    let { data: state, error: stateError } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
+    if (stateError) {
+        logger.error(`[StartCommand] Error fetching user state for ${userIdStr}:`, stateError);
+        await sendComplexMessage(chatId, "🚨 Произошла ошибка базы данных. Попробуйте позже.");
+        return;
+    }
+
+    if (!state) {
+        const { data: newState, error: insertError } = await supabaseAdmin
+            .from("user_survey_state")
+            .insert({ user_id: userIdStr, current_step: 1, answers: {}, message_id: null })
+            .select()
+            .single();
+        if (insertError || !newState) {
+            logger.error(`[StartCommand] Error creating initial state for ${userIdStr}:`, insertError);
+            await sendComplexMessage(chatId, "🚨 Не удалось начать опрос. Попробуйте /start еще раз.");
+            return;
+        }
+        state = newState;
+    }
+
+    // Step 2: Send the message (or edit it if we already have a message_id).
+    const questionData = surveyQuestions.find(q => q.step === state!.current_step);
     if (!questionData) {
-      await sendComplexMessage(chatId, "🚨 Ошибка в логике опроса. Попробуй /start еще раз.");
+      await sendComplexMessage(chatId, "🚨 Ошибка в логике опроса. Сбрасываю состояние. Попробуй /start еще раз.");
       await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
       return;
     }
@@ -69,12 +88,12 @@ export async function startCommand(chatId: number, userId: number, username?: st
     const text = questionData.question;
     const buttons = [questionData.answers.map(a => ({ ...a, callback_data: `survey_${questionData.step}_${a.callback_data}` }))];
 
-    const result = await sendComplexMessage(chatId, text, buttons, undefined, state.message_id);
+    const result = await sendComplexMessage(chatId, text, buttons, undefined, state.message_id || undefined);
 
-    // ✅ THE CRITICAL FIX: If a new message was sent, capture its ID and save it to the user's state.
+    // Step 3: If a NEW message was sent, update the state with its ID.
     if (result.success && result.data?.result?.message_id && !state.message_id) {
         const newMessageId = result.data.result.message_id;
-        await supabaseAdmin.from("user_survey_state").upsert({ ...state, message_id: newMessageId });
+        await supabaseAdmin.from("user_survey_state").update({ message_id: newMessageId }).eq('user_id', userIdStr);
     }
 
   } else {
@@ -86,8 +105,15 @@ export async function startCommand(chatId: number, userId: number, username?: st
     const step = parseInt(stepStr);
     const { data: currentState } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
     
-    if (!currentState || currentState.current_step !== step) {
-      await sendComplexMessage(chatId, "Произошла ошибка состояния или вы ответили слишком быстро. Пожалуйста, начните заново с /start.");
+    if (!currentState) {
+      await sendComplexMessage(chatId, "Не могу найти твою сессию опроса. Возможно, она устарела. Начни заново с /start.", [], undefined, message.message_id);
+      return;
+    }
+
+    if (currentState.current_step !== step) {
+      // Don't send a new message, just edit the existing one to show the error.
+      await sendComplexMessage(chatId, "Произошла ошибка состояния или вы ответили на старое сообщение. Пожалуйста, начните заново с /start.", [], undefined, message.message_id);
+      await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
       return;
     }
     
@@ -110,6 +136,8 @@ export async function startCommand(chatId: number, userId: number, username?: st
 
 export async function handleStartCallback(chatId: number, userId: number, callbackData: string) {
     if (callbackData === 'request_howto') {
-        await howtoCommand(chatId, userId);
+        // Find the message to edit. We need to fetch the user's state.
+        const { data: state } = await supabaseAdmin.from("user_survey_state").select('message_id').eq('user_id', String(userId)).single();
+        await howtoCommand(chatId, userId, state?.message_id);
     }
 }
