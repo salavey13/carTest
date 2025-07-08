@@ -6,13 +6,9 @@ CREATE TABLE public.user_survey_state (
     last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_user
         FOREIGN KEY(user_id) 
-        REFERENCES users(id)
+        REFERENCES public.users(user_id)
         ON DELETE CASCADE
 );
-
-
-
-
 
 -- Table to store completed survey results.
 CREATE TABLE public.user_surveys (
@@ -23,6 +19,6 @@ CREATE TABLE public.user_surveys (
     completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_user
         FOREIGN KEY(user_id) 
-        REFERENCES users(id)
+        REFERENCES public.users(user_id)
         ON DELETE CASCADE
 );

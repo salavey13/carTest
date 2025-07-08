@@ -4,11 +4,12 @@ import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 
 interface SurveyState {
-  user_id: number;
+  user_id: string; // Changed to string to match DB
   current_step: number;
   answers: Record<string, string>;
 }
 
+// ... (surveyQuestions array remains unchanged)
 const surveyQuestions = [
   {
     step: 1,
@@ -44,41 +45,28 @@ const surveyQuestions = [
   },
 ];
 
+
 const sendOrEditQuestion = async (chatId: string, state: SurveyState, messageId?: number) => {
   const questionData = surveyQuestions.find(q => q.step === state.current_step);
-  if (!questionData) return; // Should not happen
+  if (!questionData) return;
 
   const text = questionData.question;
   const inline_keyboard = [questionData.answers.map(a => ({ ...a, callback_data: `survey_${questionData.step}_${a.callback_data}` }))];
 
-  const payload = {
-    chat_id: chatId,
-    text,
-    reply_markup: { inline_keyboard },
-    parse_mode: 'Markdown',
-  };
-
-  const url = messageId
-    ? `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`
-    : `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const payload: any = { chat_id: chatId, text, reply_markup: { inline_keyboard }, parse_mode: 'Markdown' };
+  const url = messageId ? `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText` : `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
   
-  if (messageId) {
-    (payload as any).message_id = messageId;
-  }
+  if (messageId) payload.message_id = messageId;
   
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 };
 
 const handleSurveyCompletion = async (chatId: string, state: SurveyState, messageId: number, username?: string) => {
-  const { answers, user_id } = state;
+  const { answers, user_id } = state; // user_id is already a string here
 
   // 1. Save final results
   const { error: insertError } = await supabaseAdmin.from("user_surveys").insert({
-    user_id,
+    user_id, // Pass string directly
     username: username || "unknown",
     survey_data: answers,
   });
@@ -113,60 +101,54 @@ const handleSurveyCompletion = async (chatId: string, state: SurveyState, messag
   });
 };
 
+// The function signature still receives userId as a number from Telegram
 export async function startCommand(chatId: number, userId: number, username?: string, callbackQuery?: any) {
-  logger.info(`[StartCommandV2] Triggered by user ${userId}. Is callback: ${!!callbackQuery}`);
+  logger.info(`[StartCommandV3] Triggered by user ${userId}. Is callback: ${!!callbackQuery}`);
+  const userIdStr = String(userId); // THE FIX: Convert to string immediately for all DB operations
 
   if (!callbackQuery) {
-    // === NEW SURVEY START ===
-    const { data: completedSurvey, error: completedError } = await supabaseAdmin.from("user_surveys").select('id').eq('user_id', userId).maybeSingle();
-    if (completedError) logger.error(`[StartCommandV2] Error checking for completed survey for user ${userId}`, completedError);
+    const { data: completedSurvey } = await supabaseAdmin.from("user_surveys").select('id').eq('user_id', userIdStr).maybeSingle();
     if (completedSurvey) {
         await sendTelegramMessage(`С возвращением, Агент! Ты уже проходил опрос. Твои гайды ждут тебя по команде /howto`, [], undefined, String(chatId));
         return;
     }
 
-    const { data: existingState, error: stateError } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userId).maybeSingle();
-    if (stateError) logger.error(`[StartCommandV2] Error fetching existing state for user ${userId}`, stateError);
+    const { data: existingState } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
     
-    const state = existingState || { user_id: userId, current_step: 1, answers: {} };
-    await sendOrEditQuestion(String(chatId), state);
+    const state = existingState || { user_id: userIdStr, current_step: 1, answers: {} };
+    await sendOrEditQuestion(String(chatId), state as SurveyState);
+
   } else {
-    // === SURVEY IN PROGRESS (CALLBACK) ===
     const message = callbackQuery.message;
     const [prefix, stepStr, answer] = callbackQuery.data.split('_');
-    if (prefix !== 'survey') return; // Not a survey callback
+    if (prefix !== 'survey') return;
     const step = parseInt(stepStr);
 
-    const { data: currentState, error: fetchError } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userId).maybeSingle();
+    const { data: currentState, error: fetchError } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
     if (fetchError || !currentState) {
-      logger.error(`[StartCommandV2] Could not fetch state for user ${userId} on callback.`, fetchError);
       await sendTelegramMessage("Произошла ошибка состояния. Пожалуйста, начни заново с /start.", [], undefined, String(chatId));
       return;
     }
     
     const questionData = surveyQuestions.find(q => q.step === step);
-    if (!questionData) return; // Invalid step
+    if (!questionData) return;
 
     const answerText = questionData.answers.find(a => a.callback_data === answer)?.text;
     const newAnswers = { ...currentState.answers, [questionData.key]: answerText || answer };
     const nextStep = step + 1;
 
-    const updatedState: SurveyState = { ...currentState, current_step: nextStep, answers: newAnswers };
+    const updatedState: SurveyState = { ...currentState, user_id: userIdStr, current_step: nextStep, answers: newAnswers };
 
     if (nextStep > surveyQuestions.length) {
       await handleSurveyCompletion(String(chatId), updatedState, message.message_id, username);
     } else {
       const { error: updateError } = await supabaseAdmin.from("user_survey_state").upsert(updatedState);
-      if (updateError) {
-        logger.error(`[StartCommandV2] Failed to update state for user ${userId}`, updateError);
-        return;
-      }
+      if (updateError) { logger.error(`[StartCommandV3] Failed to update state for user ${userIdStr}`, updateError); return; }
       await sendOrEditQuestion(String(chatId), updatedState, message.message_id);
     }
   }
 }
 
-// Separate handler for non-survey callbacks that might be on the final message
 export async function handleStartCallback(chatId: number, userId: number, callbackData: string) {
     if (callbackData === 'request_howto') {
         await howtoCommand(chatId, userId);
