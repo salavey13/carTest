@@ -12,7 +12,6 @@ import { helpCommand } from "./help";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
 
-
 /**
  * The main router for all incoming updates from the Telegram webhook.
  */
@@ -23,7 +22,9 @@ export async function handleCommand(update: any) {
     const chatId: number = update.message.chat.id;
     const userId: number = update.message.from.id;
     const username: string | undefined = update.message.from.username;
-    const command = text.split(' ')[0].toLowerCase();
+    const parts = text.split(' ');
+    const command = parts[0].toLowerCase();
+    const args = parts.slice(1);
 
     logger.info(`[Command Handler] Received text: '${text}' from User ID: ${userId}`);
 
@@ -33,7 +34,7 @@ export async function handleCommand(update: any) {
       "/rage": () => rageCommand(chatId, userId),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
-      "/file": () => fileCommand(chatId, userId),
+      "/file": () => fileCommand(chatId, userId, args),
       "/offer": () => offerCommand(chatId, userId),
       "/howto": () => howtoCommand(chatId, userId),
       "/ctx": () => ctxCommand(chatId, userId),
