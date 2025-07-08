@@ -6,38 +6,26 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY;
 const DEFAULT_FALLBACK_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/logo-4fd42ec1-ee7b-4ff1-8ee5-733030e376aa.jpg";
 
-export interface InlineButton {
+export interface KeyboardButton {
   text: string;
   url?: string;
   callback_data?: string;
 }
 
-async function getRandomUnsplashImage(query: string): Promise<string> {
-  if (!UNSPLASH_ACCESS_KEY) {
-    logger.warn("[Unsplash] Access key not configured. Using default fallback image.");
-    return DEFAULT_FALLBACK_IMAGE;
-  }
-  try {
-    const response = await fetch(`https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`);
-    if (!response.ok) {
-      logger.error("[Unsplash] Failed to fetch image, using fallback", { status: response.status, text: await response.text() });
-      return DEFAULT_FALLBACK_IMAGE;
-    }
-    const data = await response.json();
-    return data.urls?.regular || DEFAULT_FALLBACK_IMAGE;
-  } catch (error) {
-    logger.error("[Unsplash] Error fetching random image, using fallback:", error);
-    return DEFAULT_FALLBACK_IMAGE;
-  }
-}
-
+// This function now handles both Inline and Reply keyboards
 export async function sendComplexMessage(
   chatId: string | number,
   text: string,
-  buttons: InlineButton[][] = [],
-  imageQuery?: string,
-  messageId?: number
+  buttons: KeyboardButton[][] = [],
+  options: {
+    imageQuery?: string,
+    messageId?: number, // For editing
+    keyboardType?: 'inline' | 'reply',
+    removeKeyboard?: boolean
+  } = {}
 ): Promise<{ success: boolean; error?: string; data?: any }> {
+  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false } = options;
+  
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured." };
   }
@@ -51,14 +39,24 @@ export async function sendComplexMessage(
     chat_id: String(chatId),
     parse_mode: 'Markdown',
   };
-
-  if (buttons.length > 0) {
-    payload.reply_markup = { inline_keyboard: buttons };
+  
+  if (removeKeyboard) {
+    payload.reply_markup = { remove_keyboard: true };
+  } else if (buttons.length > 0) {
+    if (keyboardType === 'inline') {
+      payload.reply_markup = { inline_keyboard: buttons };
+    } else { // 'reply'
+      payload.reply_markup = {
+        keyboard: buttons,
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      };
+    }
   }
 
   let endpoint: string;
 
-  if (messageId) {
+  if (messageId && keyboardType === 'inline') {
     endpoint = 'editMessageText';
     payload.message_id = messageId;
     payload.text = text;
@@ -82,8 +80,7 @@ export async function sendComplexMessage(
     const data = await response.json();
 
     if (!data.ok) {
-      // Don't log "message is not modified" as an error, it's a common case.
-      if (data.description.includes('message is not modified')) {
+      if (data.description?.includes('message is not modified')) {
           logger.info(`[sendComplexMessage] Message not modified for chat ${chatId}.`);
           return { success: false, error: data.description };
       }
@@ -113,7 +110,6 @@ export async function deleteTelegramMessage(chatId: number, messageId: number): 
         });
         const data = await response.json();
         if (!data.ok) {
-            // It's not a critical error if the message is already deleted.
             logger.warn(`[DeleteMessage] Failed to delete message ${messageId} for chat ${chatId}. Reason: ${data.description}`);
             return false;
         }
