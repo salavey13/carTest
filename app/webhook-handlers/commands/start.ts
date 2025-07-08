@@ -3,13 +3,13 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 import { howtoCommand } from "./howto";
-import { sendComplexMessage, InlineButton } from "../actions/sendComplexMessage";
+import { sendComplexMessage, deleteTelegramMessage, InlineButton } from "../actions/sendComplexMessage";
 
 interface SurveyState {
   user_id: string;
   current_step: number;
   answers: Record<string, string>;
-  message_id?: number | null; // Now explicitly allows null
+  message_id?: number | null;
 }
 
 const surveyQuestions = [
@@ -22,7 +22,6 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, messag
   const { answers, user_id } = state;
 
   await supabaseAdmin.from("user_surveys").insert({ user_id, username: username || "unknown", survey_data: answers });
-  // Do not delete the state here, it will be cleaned up on next /start or automatically.
 
   const adminSummary = `🚨 **Новый Агент прошел онбординг!**\n- **User:** @${username || user_id} (${user_id})\n- **Цель:** ${answers.purpose || 'не указана'}\n- **Опыт:** ${answers.experience || 'не указан'}\n- **Мотивация:** ${answers.motive || 'не указан'}`;
   await notifyAdmin(adminSummary);
@@ -43,60 +42,37 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, messag
   await sendComplexMessage(chatId, summary, buttons, undefined, messageId);
 };
 
-export async function startCommand(chatId: number, userId: number, username?: string, callbackQuery?: any, isReset: boolean = false) {
-  logger.info(`[StartCommand] Triggered by user ${userId}. Is callback: ${!!callbackQuery}. Is reset: ${isReset}`);
+export async function startCommand(chatId: number, userId: number, username?: string, callbackQuery?: any) {
+  logger.info(`[StartCommand V2] Triggered by user ${userId}. Is callback: ${!!callbackQuery}.`);
   const userIdStr = String(userId);
 
-  if (isReset) {
-      logger.info(`[StartCommand] Resetting survey state for user ${userIdStr}.`);
-      await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
-      await supabaseAdmin.from("user_surveys").delete().eq('user_id', userIdStr);
-  }
-
   if (!callbackQuery) {
-    // === Handle initial /start command with robust state handling ===
-    const { data: completedSurvey } = await supabaseAdmin.from("user_surveys").select('id').eq('user_id', userIdStr).maybeSingle();
-    if (completedSurvey && !isReset) {
-        await sendComplexMessage(chatId, `С возвращением, Агент! Ты уже проходил опрос. Твои гайды ждут тебя по команде /howto. \n\nЧтобы начать опрос заново, используй команду /start reset`);
-        return;
+    // === NEW LOGIC FOR /start: Always reset and start fresh ===
+    logger.info(`[StartCommand V2] Received /start command. Performing full reset for user ${userIdStr}.`);
+
+    // 1. Find and delete the old survey message, if it exists
+    const { data: existingState } = await supabaseAdmin.from("user_survey_state").select('message_id').eq('user_id', userIdStr).maybeSingle();
+    if (existingState?.message_id) {
+        await deleteTelegramMessage(chatId, existingState.message_id);
     }
     
-    let { data: state, error: stateError } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
-    if (stateError) {
-        logger.error(`[StartCommand] Error fetching user state for ${userIdStr}:`, stateError);
-        await sendComplexMessage(chatId, "🚨 Произошла ошибка базы данных. Попробуйте позже.");
-        return;
-    }
+    // 2. Clean up database records for a fresh start
+    await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
+    await supabaseAdmin.from("user_surveys").delete().eq('user_id', userIdStr);
 
-    if (!state) {
-        const { data: newState, error: insertError } = await supabaseAdmin
-            .from("user_survey_state")
-            .insert({ user_id: userIdStr, current_step: 1, answers: {}, message_id: null })
-            .select()
-            .single();
-        if (insertError || !newState) {
-            logger.error(`[StartCommand] Error creating initial state for ${userIdStr}:`, insertError);
-            await sendComplexMessage(chatId, "🚨 Не удалось начать опрос. Попробуйте /start еще раз.");
-            return;
-        }
-        state = newState;
-    }
-
-    const questionData = surveyQuestions.find(q => q.step === state!.current_step);
-    if (!questionData) {
-      await sendComplexMessage(chatId, "🚨 Ошибка в логике опроса. Сбрасываю состояние. Попробуй /start reset.");
-      await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
-      return;
-    }
-    
+    // 3. Create a new state and send a new message
+    const questionData = surveyQuestions[0];
     const text = questionData.question;
     const buttons = [questionData.answers.map(a => ({ ...a, callback_data: `survey_${questionData.step}_${a.callback_data}` }))];
 
-    const result = await sendComplexMessage(chatId, text, buttons, undefined, state.message_id || undefined);
-
-    if (result.success && result.data?.result?.message_id && !state.message_id) {
+    const result = await sendComplexMessage(chatId, text, buttons);
+    
+    // 4. Save the new state with the new message_id
+    if (result.success && result.data?.result?.message_id) {
         const newMessageId = result.data.result.message_id;
-        await supabaseAdmin.from("user_survey_state").update({ message_id: newMessageId }).eq('user_id', userIdStr);
+        await supabaseAdmin
+            .from("user_survey_state")
+            .insert({ user_id: userIdStr, current_step: 1, answers: {}, message_id: newMessageId });
     }
 
   } else {
@@ -109,12 +85,12 @@ export async function startCommand(chatId: number, userId: number, username?: st
     const { data: currentState } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
     
     if (!currentState) {
-      await sendComplexMessage(chatId, "Не могу найти твою сессию опроса. Возможно, она устарела. Начни заново с /start reset.", [], undefined, message.message_id);
+      await sendComplexMessage(chatId, "Не могу найти твою сессию опроса. Возможно, она устарела. Начни заново с /start.", [], undefined, message.message_id);
       return;
     }
 
     if (currentState.current_step !== step) {
-      await sendComplexMessage(chatId, "Произошла ошибка состояния или вы ответили на старое сообщение. Пожалуйста, начните заново с /start reset.", [], undefined, message.message_id);
+      await sendComplexMessage(chatId, "Произошла ошибка состояния или вы ответили на старое сообщение. Пожалуйста, начните заново с /start.", [], undefined, message.message_id);
       await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
       return;
     }

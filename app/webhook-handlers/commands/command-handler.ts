@@ -23,15 +23,13 @@ export async function handleCommand(update: any) {
     const chatId: number = update.message.chat.id;
     const userId: number = update.message.from.id;
     const username: string | undefined = update.message.from.username;
-    const parts = text.split(' ');
-    const command = parts[0].toLowerCase(); // Get the base command
-    const args = parts.slice(1);
+    const command = text.split(' ')[0].toLowerCase(); // Get the base command
 
-    logger.info(`[Command Handler] Received text command: '${command}' with args: [${args.join(', ')}] from User ID: ${userId}`);
+    logger.info(`[Command Handler] Received text command: '${command}' from User ID: ${userId}`);
 
     // Create a command map for clean routing
     const commandMap: { [key: string]: Function } = {
-      "/start": () => startCommand(chatId, userId, username, undefined, args.includes('reset')),
+      "/start": () => startCommand(chatId, userId, username),
       "/rage": () => rageCommand(chatId, userId),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
@@ -49,7 +47,7 @@ export async function handleCommand(update: any) {
     } else {
       logger.warn(`[Command Handler] Unknown command: '${text}' from User ID: ${userId}.`);
       await sendTelegramMessage(
-        "Неизвестная команда, Агент. Проверь список доступных команд или начни с /start. Чтобы сбросить опрос, используй /start reset.",
+        "Неизвестная команда, Агент. Проверь список доступных команд или начни с /start.",
         [], undefined, String(chatId)
       );
     }
