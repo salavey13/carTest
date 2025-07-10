@@ -1,32 +1,50 @@
-import { sendTelegramMessage } from "@/app/actions";
 import { logger } from "@/lib/logger";
 import { fetchRepoTree } from "@/app/actions_github/actions";
-import { sendComplexMessage } from "../actions/sendComplexMessage";
+import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
+import { delay } from "@/lib/utils";
 
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL || "https://github.com/salavey13/carTest";
 
+function getFileCommentPrefix(filePath: string): string {
+    const extension = filePath.split('.').pop()?.toLowerCase() || '';
+    switch (extension) {
+        case 'sql': return '--';
+        case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': return '#';
+        case 'html': case 'xml': case 'vue': case 'svelte': return '<!--';
+        case 'css': case 'scss': return '/*';
+        default: return '//';
+    }
+}
+
+function getFileCommentSuffix(prefix: string): string {
+    if (prefix === '/*') return '*/';
+    if (prefix === '<!--') return '-->';
+    return '';
+}
+
 async function sendBatchedCode(chatId: number, content: string, path: string) {
     const MAX_LENGTH = 4096;
-    const codeBlockDelimiter = "```";
-    const firstLine = `\`${path}\`\n\n`;
+    const lang = path.split('.').pop() || 'txt';
 
-    // Split content by lines to avoid breaking code mid-line
-    const lines = content.split('\n');
-    let currentBatch = "";
+    const prefix = getFileCommentPrefix(path);
+    const suffix = getFileCommentSuffix(prefix);
+    const pathComment = `${prefix} /${path} ${suffix}`.trim();
 
-    for (const line of lines) {
-        if (currentBatch.length + line.length + codeBlockDelimiter.length * 2 + firstLine.length < MAX_LENGTH) {
-            currentBatch += line + '\n';
-        } else {
-            // Send the previous batch and start a new one
-            await sendComplexMessage(chatId, `${codeBlockDelimiter}typescript\n${currentBatch}${codeBlockDelimiter}`, []);
-            currentBatch = line + '\n';
-        }
+    let finalContent = content;
+    if (!content.trim().startsWith(pathComment)) {
+        finalContent = `${pathComment}\n${content}`;
+    }
+
+    const fullMessage = `\`\`\`${lang}\n${finalContent}\n\`\`\``;
+
+    const chunks: string[] = [];
+    for (let i = 0; i < fullMessage.length; i += MAX_LENGTH) {
+        chunks.push(fullMessage.substring(i, i + MAX_LENGTH));
     }
     
-    // Send the last batch
-    if (currentBatch) {
-        await sendComplexMessage(chatId, `${firstLine}${codeBlockDelimiter}typescript\n${currentBatch}${codeBlockDelimiter}`, []);
+    for (const chunk of chunks) {
+        await sendComplexMessage(chatId, chunk, []);
+        await delay(350); // Respect Telegram rate limits
     }
 }
 
@@ -45,13 +63,13 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
     try {
         const treeResult = await fetchRepoTree(REPO_URL);
 
-        if (!treeResult.success || !treeResult.tree) {
+        if (!treeResult.success || !treeResult.tree || !treeResult.owner || !treeResult.repo) {
             throw new Error(treeResult.error || "Не удалось получить дерево файлов из репозитория.");
         }
 
         const foundFiles = treeResult.tree
             .filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(searchTerm))
-            .slice(0, 5); // Limit to 5 results to avoid spam
+            .slice(0, 8); // Limit to 8 results for readability
 
         if (foundFiles.length === 0) {
             await sendComplexMessage(chatId, `🤷‍♂️ Файлы по запросу \`${searchTerm}\` не найдены. Попробуй другое ключевое слово.`, []);
@@ -59,16 +77,23 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
         }
 
         if (foundFiles.length > 1) {
-            const fileList = foundFiles.map((file, index) => `${index + 1}. \`${file.path}\``).join('\n');
-            await sendComplexMessage(chatId, `🎯 Найдено несколько файлов. Уточни запрос или выбери нужный:\n\n${fileList}`, []);
+            const message = `🎯 Найдено несколько файлов. Выбери нужный с помощью клавиатуры:`;
+            const buttons: KeyboardButton[][] = foundFiles.map(file => ([{
+                // The text on the button IS the command that will be sent back
+                text: `/file ${file.path}` 
+            }]));
+            
+            await sendComplexMessage(chatId, message, buttons, { keyboardType: 'reply' });
             return;
         }
 
         const file = foundFiles[0];
+        if (!file.path) { throw new Error("Найденный файл не имеет пути."); }
+        
         const { owner, repo } = treeResult;
         const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`;
 
-        await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Raw](${rawUrl})`, []);
+        await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Посмотреть на GitHub](${rawUrl})`, [], {removeKeyboard: true});
 
         const response = await fetch(rawUrl);
         if (!response.ok) {
@@ -76,7 +101,7 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
         }
         const content = await response.text();
         
-        await sendBatchedCode(chatId, content, file.path!);
+        await sendBatchedCode(chatId, content, file.path);
         
         const studioLink = `t.me/${process.env.BOT_USERNAME || 'oneSitePlsBot'}/app`;
         await sendComplexMessage(chatId, `Готово! Также можешь открыть [студию](${studioLink}) для полной картины.`, []);
@@ -84,6 +109,6 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
     } catch (error) {
         logger.error("[File Command] Error processing /file command:", error);
         const errorMessage = error instanceof Error ? error.message : "Произошла неизвестная ошибка.";
-        await sendComplexMessage(chatId, `🚨 Ошибка выполнения команды:\n\`${errorMessage}\``, []);
+        await sendComplexMessage(chatId, `🚨 Ошибка выполнения команды:\n\`${errorMessage}\``, [], {removeKeyboard: true});
     }
 }
