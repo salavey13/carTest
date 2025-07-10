@@ -40,7 +40,7 @@ async function sendBatchedCode(chatId: number, content: string, title: string) {
             message = `\`\`${message}`;
         }
         if (i === chunks.length - 1) {
-            message = `${message}\`\``;
+            message = `${message}\n\`\``;
         }
 
         await sendComplexMessage(chatId, message, []);
