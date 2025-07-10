@@ -1,10 +1,8 @@
-// /app/profile/page.tsx
 "use client";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox"; 
 import { Label } from "@/components/ui/label";     
 import AnimatedHeader from "@/components/AnimatedHeader";
@@ -102,11 +100,9 @@ const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
 });
 
-
 export default function ProfilePage() {
   const appContext = useAppContext();
   const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError } = appContext; 
-  // const { addToast } useAppToast(); // Removed, useAppContext now provides addToast
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
@@ -123,7 +119,6 @@ export default function ProfilePage() {
   });
 
   const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
-  const userHandle = dbUser?.username || telegramUser?.username || 'cyberspace_operative';
   const avatarUrl = dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR;
 
   const fetchProfileData = useCallback(async () => {
@@ -181,9 +176,7 @@ export default function ProfilePage() {
 
     setIntegrations(prev => ({ ...prev, [integrationKey]: isChecked }));
     const operationToastId = toast.loading(`${isChecked ? "Отметка" : "Снятие отметки"} интеграции с ${integrationKey}...`);
-
-    // Assuming checkAndUnlockFeatureAchievement is correctly typed and handles its own toasts on success/error.
-    // If it doesn't handle toasts for new achievements, you might need addToast here.
+    
     const result = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, isChecked);
     
     if (result.error) {
@@ -193,13 +186,12 @@ export default function ProfilePage() {
         toast.success(`Интеграция с ${integrationKey} ${isChecked ? "отмечена" : "снята"}!`, { id: operationToastId });
         if (isChecked && result.newAchievements?.length) {
              result.newAchievements.forEach(ach => {
-                 // Using addToast from useAppContext (if available and needed, or relying on checkAndUnlock... itself)
                  toast.info(`🏆 Ачивка: ${ach.name}!`, { description: ach.description, duration: 5000 });
             });
         }
         await fetchProfileData();
     }
-  }, [dbUser?.user_id, fetchProfileData]); // Removed addToast from deps as it's stable
+  }, [dbUser?.user_id, fetchProfileData]);
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
@@ -293,28 +285,11 @@ export default function ProfilePage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.5, delay: 0.2 }} // Added delay to sync with header animation
         className="container mx-auto max-w-3xl" 
       >
         <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-purple/60 shadow-2xl shadow-purple-glow">
           <CardHeader className="text-center p-6 md:p-8 border-b border-brand-purple/40">
-            {/*<div className="relative w-32 h-32 md:w-36 md:h-36 mx-auto mb-5 rounded-full overflow-hidden border-4 border-brand-pink shadow-[0_0_20px_rgba(var(--brand-pink-rgb),0.7)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(var(--brand-pink-rgb),0.9)] hover:scale-105">
-              <Image
-                src={avatarUrl}
-                alt={`${userName}'s Cybernetic Avatar`}
-                fill 
-                style={{objectFit:"cover"}} 
-                className="transform hover:scale-110 transition-transform duration-300"
-                priority
-                sizes="(max-width: 768px) 128px, 144px"
-              />
-            </div>
-            <CardTitle className="text-4xl font-orbitron font-bold text-brand-cyan cyber-text glitch" data-text={userName.toUpperCase()}>
-              {userName.toUpperCase()}
-            </CardTitle>
-            <CardDescription className="text-muted-foreground font-mono text-md mt-1">
-              @{userHandle}
-            </CardDescription>*/}
             <div className="mt-3 text-sm font-mono text-brand-yellow">
               Level: {currentLevel} | Cognitive OS: {cognitiveOS}
             </div>
@@ -581,6 +556,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-
-
