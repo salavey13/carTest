@@ -77,46 +77,43 @@ function AppInitializers() {
   return null; 
 }
 
-// Карта для сопоставления startapp параметров с путями в приложении
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   "elon": "/elon",
-  "musk_market": "/elon", // Альтернативный ключ для той же страницы
-  "arbitrage_seeker": "/elon", // Может также вести на вкладку арбитража внутри /elon
-  "topdf_psycho": "/topdf", // Ваш рабочий пример
+  "musk_market": "/elon",
+  "arbitrage_seeker": "/elon",
+  "topdf_psycho": "/topdf",
   "settings": "/settings",
   "profile": "/profile",
-  // Добавляйте другие страницы по мере необходимости
-  // "some_other_feature": "/some-other-feature-path"
 };
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { startParamPayload, isLoading: isAppLoading, isAuthenticating } = useAppContext();
-  const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true); // New state
+  const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
+  const startParamHandledRef = useRef(false); // Ref to track if redirect has been handled
 
-  
   useEffect(() => {
-    if (!isAppLoading && !isAuthenticating && startParamPayload) {
+    // Only handle redirect if context is loaded, we have a payload, and it hasn't been handled yet
+    if (!isAppLoading && !isAuthenticating && startParamPayload && !startParamHandledRef.current) {
+      startParamHandledRef.current = true; // Mark as handled immediately to prevent re-triggering
+      
       const lowerStartParam = startParamPayload.toLowerCase();
       const targetPathFromMap = START_PARAM_PAGE_MAP[lowerStartParam];
 
       if (targetPathFromMap) {
-        // Если ключ найден в карте, и мы еще не на этой странице
         if (pathname !== targetPathFromMap) {
-          logger.info(`[ClientLayout Logic] startParamPayload '${startParamPayload}' mapped to '${targetPathFromMap}'. Redirecting from '${pathname}'.`);
+          logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' => '${targetPathFromMap}'. Redirecting from '${pathname}'.`);
           router.replace(targetPathFromMap);
         } else {
-          logger.info(`[ClientLayout Logic] startParamPayload '${startParamPayload}' matched, already on target path '${targetPathFromMap}'. No redirect needed.`);
+          logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' matches current path '${targetPathFromMap}'. No redirect needed.`);
         }
       } else if (pathname === '/') { 
-        // Если ключ не в карте, но мы на главной, используем старую логику (предполагая, что это никнейм)
         const nicknamePath = `/${lowerStartParam}`;
-        logger.info(`[ClientLayout Logic] Root path ('/') detected with unmapped startParamPayload '${startParamPayload}'. Assuming nickname and redirecting to '${nicknamePath}'.`);
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on root. Assuming nickname => '${nicknamePath}'.`);
         router.replace(nicknamePath);
       } else {
-        // Ключ не в карте и мы не на главной - ничего не делаем
-        logger.info(`[ClientLayout Logic] startParamPayload '${startParamPayload}' not specifically mapped and not on root. No redirect for page mapping from current path '${pathname}'.`);
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on non-root page '${pathname}'. No redirect.`);
       }
     }
   }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating]);
@@ -128,9 +125,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/profile",
     "/hotvibes",
     "/leads",
-    "/elon", // Добавим /elon сюда, так как это важная страница
+    "/elon",
   ];
-  // Динамическое добавление путей типа /[nickname]
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 
   }
@@ -139,21 +135,15 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)); 
   
   const showBottomNav = isExactMatch || isStartsWithMatch;
-  logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
-
+  logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav}`);
   
   useEffect(() => {
-    if (pathname === "/profile" || pathname === "/repo-xml") { // Check if the current route is '/profile'
-      setShowHeaderAndFooter(false); // Disable header and footer
+    if (pathname === "/profile" || pathname === "/repo-xml") {
+      setShowHeaderAndFooter(false);
     } else {
-      setShowHeaderAndFooter(true); // Enable for all other paths
+      setShowHeaderAndFooter(true);
     }
-  }, [pathname]); // Update state whenever pathname changes
-
-
-
-
-
+  }, [pathname]);
 
   return (
     <>
