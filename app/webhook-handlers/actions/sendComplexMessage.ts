@@ -12,6 +12,25 @@ export interface KeyboardButton {
   callback_data?: string;
 }
 
+async function getRandomUnsplashImage(query: string): Promise<string> {
+  if (!UNSPLASH_ACCESS_KEY) {
+    logger.warn("[Unsplash] Access key not configured. Using default fallback image.");
+    return DEFAULT_FALLBACK_IMAGE;
+  }
+  try {
+    const response = await fetch(`https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`);
+    if (!response.ok) {
+      logger.error("[Unsplash] Failed to fetch image, using fallback", { status: response.status, text: await response.text() });
+      return DEFAULT_FALLBACK_IMAGE;
+    }
+    const data = await response.json();
+    return data.urls?.regular || DEFAULT_FALLBACK_IMAGE;
+  } catch (error) {
+    logger.error("[Unsplash] Error fetching random image, using fallback:", error);
+    return DEFAULT_FALLBACK_IMAGE;
+  }
+}
+
 // This function now handles both Inline and Reply keyboards
 export async function sendComplexMessage(
   chatId: string | number,
