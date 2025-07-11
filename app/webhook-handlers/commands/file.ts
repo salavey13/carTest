@@ -25,29 +25,25 @@ async function sendBatchedCode(chatId: number, content: string) {
     const chunks: string[] = [];
     let currentChunk = "";
 
-    await delay(350); // Initial delay before the first chunk
+    await delay(350); // Initial delay
 
     for (const line of lines) {
-        // Check if adding the next line would exceed the character limit for a single message
         if (currentChunk.length + line.length + 1 > MAX_LENGTH - overhead) {
-            // If the chunk is not empty, push it to the list and start a new one
             if (currentChunk) chunks.push(currentChunk);
             currentChunk = line + '\n';
         } else {
             currentChunk += line + '\n';
         }
     }
-    // Add the last remaining chunk
     if (currentChunk) {
         chunks.push(currentChunk);
     }
 
-    // Send each chunk wrapped in its own code block for parse safety
     for (const chunk of chunks) {
-        if (!chunk.trim()) continue; // Skip empty chunks
+        if (!chunk.trim()) continue;
         const message = `${header}${chunk.trimEnd()}${footer}`;
         await sendComplexMessage(chatId, message, []);
-        await delay(350); // Respect Telegram rate limits
+        await delay(350);
     }
 }
 
@@ -68,7 +64,6 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
         }
         const { tree, owner, repo } = treeResult;
 
-        // --- Multi-file search logic ---
         let combinedContent = "";
         let foundPaths: string[] = [];
         let ambiguousTerms: string[] = [];
@@ -82,14 +77,14 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
                 if (response.ok) {
                     const fileContent = await response.text();
                     const prefix = getFileCommentPrefix(filePath);
-                    const pathComment = `${prefix} /${filePath}`.trim();
+                    const pathComment = `${prefix} /${filePath}`;
                     
                     const contentWithHeader = fileContent.trim().startsWith(pathComment) 
                         ? fileContent 
                         : `${pathComment}\n\n${content}`;
                     
                     if (combinedContent) {
-                        combinedContent += `\`\`\`\n\n// --- END OF FILE: ${foundPaths[foundPaths.length - 1]} ---\n\n\`\`\``;
+                       combinedContent += `\n\n\`\`\`\n// --- END OF FILE: ${foundPaths[foundPaths.length - 1]} ---\n\`\`\`\n\n`;
                     }
                     combinedContent += contentWithHeader;
                     foundPaths.push(filePath);

@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { getArbitrageScannerSettings, updateArbitrageUserSettings } from "@/app/elon/arbitrage_scanner_actions";
 import type { ArbitrageSettings, ExchangeName } from "@/app/elon/arbitrage_scanner_types";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
+import { ALL_POSSIBLE_EXCHANGES_CONST } from "@/app/elon/arbitrage_scanner_types";
 
 function formatSettings(settings: ArbitrageSettings): string {
     return `*Текущие настройки симуляции:*\n` +
@@ -30,13 +31,15 @@ export async function rageSettingsCommand(chatId: number, userId: number, text: 
         }
     } else if (text.startsWith('Toggle')) {
         const exchange = text.split(' ')[1] as ExchangeName;
-        const isEnabled = currentSettings.enabledExchanges.includes(exchange);
-        if (isEnabled) {
-            currentSettings.enabledExchanges = currentSettings.enabledExchanges.filter(ex => ex !== exchange);
-        } else {
-            currentSettings.enabledExchanges.push(exchange);
+        if (ALL_POSSIBLE_EXCHANGES_CONST.includes(exchange)) {
+            const isEnabled = currentSettings.enabledExchanges.includes(exchange);
+            if (isEnabled) {
+                currentSettings.enabledExchanges = currentSettings.enabledExchanges.filter(ex => ex !== exchange);
+            } else {
+                currentSettings.enabledExchanges.push(exchange);
+            }
+            settingsUpdated = true;
         }
-        settingsUpdated = true;
     } else if (text === 'Done') {
         await sendComplexMessage(chatId, "Настройки сохранены. Клавиатура убрана.", [], { removeKeyboard: true });
         return;
@@ -49,7 +52,7 @@ export async function rageSettingsCommand(chatId: number, userId: number, text: 
     const message = formatSettings(currentSettings);
     const buttons = [
         [{ text: "Set Spread 0.5%" }, { text: "Set Spread 1.0%" }],
-        [{ text: "Toggle Binance" }, { text: "Toggle Bybit" }, { text: "Toggle KuCoin" }],
+        ALL_POSSIBLE_EXCHANGES_CONST.map(ex => ({ text: `Toggle ${ex}` })),
         [{ text: "Done" }]
     ];
     

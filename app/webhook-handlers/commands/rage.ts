@@ -39,7 +39,7 @@ function formatOpportunity(op: ArbitrageOpportunity): { text: string, buttons: K
 
 function formatSettings(settings: ArbitrageSettings): string {
     return `*Мин. Спред:* ${settings.minSpreadPercent}% | *Объем:* $${settings.defaultTradeVolumeUSD}\n` +
-           `*Биржи:* ${settings.enabledExchanges.join(', ')}\n` +
+           `*Биржи:* ${settings.enabledExchanges.join(', ') || 'Нет'}\n` +
            `*Пары:* ${settings.trackedPairs.join(', ')}`;
 }
 
@@ -70,7 +70,7 @@ export async function rageCommand(chatId: number, userId: number) {
 
         let mainButtons: KeyboardButton[][] = [[
             { text: "⚙️ Изменить Настройки", url: settingsLink },
-            { text: "🧠 Что это значит?", url: deepDiveLink }
+            { text: "⚡️ Быстрые Настройки", text: "/settings rage" }, // Changed to text command
         ]];
 
         if (!opportunities || opportunities.length === 0) {
@@ -87,7 +87,6 @@ export async function rageCommand(chatId: number, userId: number) {
 
         const { text: opportunityText, buttons: opportunityButtons } = formatOpportunity(topOp);
         
-        // Add opportunity-specific buttons to the main buttons
         if (opportunityButtons.length > 0) {
             mainButtons.unshift(opportunityButtons);
         }
