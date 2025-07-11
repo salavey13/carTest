@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
 import { fetchArbitrageOpportunities, getArbitrageScannerSettings } from "@/app/elon/arbitrage_scanner_actions";
 import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity, ArbitrageSettings } from "@/app/elon/arbitrage_scanner_types";
-import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
+import { sendComplexMessage, KeyboardButton, editMessage } from "../actions/sendComplexMessage";
 
 function createExchangeLink(exchange: string, pair: string): string {
     const formattedPair = pair.replace('/', '_');
@@ -35,14 +35,12 @@ function formatSettings(settings: ArbitrageSettings): string {
 }
 
 export async function rageCommand(chatId: number, userId: number) {
-    logger.info(`[RageCommand V5 - Edit Flow] User ${userId} triggered /rage.`);
+    logger.info(`[RageCommand V6 - Delete & Resend] User ${userId} triggered /rage.`);
     
-    // Send an initial "thinking" message and capture its ID
     const thinkingMessageResult = await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], { imageQuery: "lightning storm" });
 
     if (!thinkingMessageResult.success || !thinkingMessageResult.data?.result?.message_id) {
-        logger.error("[RageCommandV5] Failed to send initial 'thinking' message. Aborting.");
-        // We can't send an error message if the initial send failed, so we just log and exit.
+        logger.error("[RageCommandV6] Failed to send initial 'thinking' message. Aborting.");
         return;
     }
     const messageId = thinkingMessageResult.data.result.message_id;
@@ -59,7 +57,6 @@ export async function rageCommand(chatId: number, userId: number) {
 
         const botUsername = process.env.BOT_USERNAME || 'oneSitePlsBot';
         const settingsLink = `https://t.me/${botUsername}/app?startapp=settings`;
-        // NOTE: You'll need to add 'arbitrage-notdummies' to START_PARAM_PAGE_MAP in ClientLayout.tsx
         const deepDiveLink = `https://t.me/${botUsername}/app?startapp=arbitrage_notdummies`;
 
         const buttons: KeyboardButton[][] = [[
@@ -71,8 +68,8 @@ export async function rageCommand(chatId: number, userId: number) {
             const noResultMessage = `🧘‍♂️ *Рынок спокоен.*\nЗначимых возможностей не найдено с вашими текущими настройками:\n\n` +
                                     `\`${formatSettings(settings)}\`\n\n` +
                                     `Попробуйте изменить их или повторите попытку позже.`;
-            // Edit the original message with the result
-            await sendComplexMessage(chatId, noResultMessage, buttons, { messageId, keyboardType: 'inline' });
+            
+            await editMessage(chatId, messageId, noResultMessage, buttons, { imageQuery: "zen garden", keyboardType: 'inline' });
             return;
         }
 
@@ -84,12 +81,10 @@ export async function rageCommand(chatId: number, userId: number) {
                              `*Настройки симуляции:*\n` +
                              `\`${formatSettings(settings)}\``;
         
-        // Edit the original message with the successful result
-        await sendComplexMessage(chatId, finalMessage, buttons, { messageId, keyboardType: 'inline' });
+        await editMessage(chatId, messageId, finalMessage, buttons, { imageQuery: "gold treasure", keyboardType: 'inline' });
 
     } catch (error) {
-        logger.error("[RageCommandV5] Error processing command:", error);
-        // Edit the original message with an error message
-        await sendComplexMessage(chatId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась. Попробуйте позже или проверьте настройки.", [], { messageId });
+        logger.error("[RageCommandV6] Error processing command:", error);
+        await editMessage(chatId, messageId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась. Попробуйте позже или проверьте настройки.", [], { imageQuery: "explosion" });
     }
 }
