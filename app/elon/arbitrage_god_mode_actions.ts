@@ -1,106 +1,106 @@
 "use server";
+
 import { logger } from "@/lib/logger";
-import type { 
-  GodModeOpportunity, 
-  GodModeSimulationResult, 
-  ArbitrageSettings,
-  ExchangeName 
-} from "./arbitrage_scanner_types";
+import { supabaseAdmin } from "@/hooks/supabase";
+import type { ArbitrageSettings, GodModeOpportunity } from "./arbitrage_scanner_types";
 
-// Helper-симулятор, такой же как в обычном сканере
-const simulateOrderBook = (pair: string, exchange: ExchangeName) => {
-  let basePrice;
-  const a = pair.split('/')[0];
-  const b = pair.split('/')[1];
+type MarketDataPoint = { price: number; created_at: string };
 
-  if (a === "BTC") basePrice = 65000 + (Math.random() - 0.5) * 500;
-  else if (a === "ETH") basePrice = 3500 + (Math.random() - 0.5) * 50;
-  else if (a === "SOL") basePrice = 150 + (Math.random() - 0.5) * 10;
-  else if (a === "ETH" && b === "BTC") basePrice = 0.053 + (Math.random() - 0.5) * 0.001;
-  else basePrice = 1 + (Math.random() - 0.5) * 0.1;
+interface QuantumFluctuationResult {
+  opportunities: GodModeOpportunity[];
+  totalProfit: number;
+}
 
-  // Создаем искусственный спред между биржами для симуляции
-  const exchangeFactors: Record<ExchangeName, number> = {
-    "Binance": 1.0002, "Bybit": 0.9995, "KuCoin": 1.0005, "Gate.io": 0.9998, "OKX": 1.0001, "SimulatedExchangeA": 1.001, "SimulatedExchangeB": 0.999,
-  };
-  basePrice *= exchangeFactors[exchange] || 1;
-
-  const midPrice = basePrice * (1 + (Math.random() - 0.5) * 0.002);
-  const spread = midPrice * (0.0002 + Math.random() * 0.0005);
-  
-  return {
-    bid: parseFloat((midPrice - spread / 2).toFixed(b === "BTC" ? 8 : 4)),
-    ask: parseFloat((midPrice + spread / 2).toFixed(b === "BTC" ? 8 : 4)),
-  };
-};
-
-export async function runGodModeSimulation(
+/**
+ * Сердце симулятора. Выполняет квантовую флуктуацию, возвращая результат
+ * и опционально записывая его в market_data.
+ */
+export async function executeQuantumFluctuation(
   settings: ArbitrageSettings,
-  burstAmount: number
-): Promise<GodModeSimulationResult> {
-  logger.info(`[GodModeAction] Running simulation with burst: $${burstAmount}`);
-  const logs: string[] = [`GOD MODE SIMULATION (BURST: $${burstAmount})`];
+  burstAmount: number,
+): Promise<QuantumFluctuationResult> {
   
-  const priceMatrix: Map<string, { bestAsk: { price: number, exchange: ExchangeName }, bestBid: { price: number, exchange: ExchangeName } }> = new Map();
+  logger.info(`[QuantumEngine] Executing fluctuation. Burst: $${burstAmount}`);
+  const priceMatrix: Map<string, { bestAsk: { price: number, exchange: string }, bestBid: { price: number, exchange: string } }> = new Map();
+  const newDataPointsToInsert: { exchange: string; symbol: string; price: number; is_simulated: boolean }[] = [];
 
-  // 1. Собрать Матрицу Цен
   for (const pair of settings.trackedPairs) {
-      if (pair.includes('/')) {
-          const [baseAsset, quoteAsset] = pair.split('/');
-          if (quoteAsset !== 'USDT') continue; // God-Mode упрощенно работает с USDT как с основной валютой
+    if (!pair.includes('/USDT')) continue; // Упрощение для God-Mode
 
-          for (const exchange of settings.enabledExchanges) {
-              const { bid, ask } = simulateOrderBook(pair, exchange);
-              
-              if (!priceMatrix.has(baseAsset)) {
-                  priceMatrix.set(baseAsset, {
-                      bestAsk: { price: Infinity, exchange: "N/A" as ExchangeName },
-                      bestBid: { price: 0, exchange: "N/A" as ExchangeName },
-                  });
-              }
+    const baseAsset = pair.split('/')[0];
 
-              const assetData = priceMatrix.get(baseAsset)!;
-              if (ask < assetData.bestAsk.price) {
-                  assetData.bestAsk = { price: ask, exchange };
-              }
-              if (bid > assetData.bestBid.price) {
-                  assetData.bestBid = { price: bid, exchange };
-              }
-          }
+    for (const exchange of settings.enabledExchanges) {
+      // 1. Получаем 2 последние точки для расчета вектора
+      const { data: marketPoints, error } = await supabaseAdmin
+        .from('market_data')
+        .select('price, created_at')
+        .eq('exchange', exchange)
+        .eq('symbol', pair)
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      if (error || !marketPoints || marketPoints.length < 2) {
+        logger.warn(`[QuantumEngine] Not enough data for ${pair} on ${exchange}. Skipping.`);
+        continue;
       }
-  }
-  logs.push(`Price matrix assembled for ${priceMatrix.size} assets.`);
 
-  // 2. Найти Возможности
+      const [p_current, p_previous] = marketPoints as MarketDataPoint[];
+      
+      // 2. Рассчитываем вектор и "коллапсируем" цену
+      const timeNow = new Date().getTime();
+      const timeCurrent = new Date(p_current.created_at).getTime();
+      const timePrevious = new Date(p_previous.created_at).getTime();
+
+      const priceDelta = p_current.price - p_previous.price;
+      const timeDelta = timeCurrent - timePrevious;
+      const velocity = timeDelta > 0 ? priceDelta / timeDelta : 0; // цена в миллисекунду
+      
+      const executionTimeDelta = timeNow - timeCurrent;
+      const jitter = (Math.random() - 0.5) * velocity * 0.2; // Фактор неопределенности
+      
+      const p_execution = p_current.price + (velocity * executionTimeDelta) + (jitter * executionTimeDelta);
+
+      // 3. Сохраняем новую точку для последующей записи в БД
+      newDataPointsToInsert.push({ exchange, symbol: pair, price: p_execution, is_simulated: true });
+
+      // 4. Формируем матрицу цен на основе "сколлапсировавших" значений
+      const { bid, ask } = { bid: p_execution * 0.9999, ask: p_execution * 1.0001 }; // Упрощенный спред
+      
+      if (!priceMatrix.has(baseAsset)) {
+        priceMatrix.set(baseAsset, {
+          bestAsk: { price: Infinity, exchange: "N/A" },
+          bestBid: { price: 0, exchange: "N/A" },
+        });
+      }
+      const assetData = priceMatrix.get(baseAsset)!;
+      if (ask < assetData.bestAsk.price) assetData.bestAsk = { price: ask, exchange };
+      if (bid > assetData.bestBid.price) assetData.bestBid = { price: bid, exchange };
+    }
+  }
+
+  // 5. Расчет профита
   const opportunities: GodModeOpportunity[] = [];
   let totalProfit = 0;
-  let totalSpreadSum = 0;
 
   for (const [asset, data] of priceMatrix.entries()) {
-      if (data.bestBid.price > data.bestAsk.price) {
-          const spread = ((data.bestBid.price - data.bestAsk.price) / data.bestAsk.price) * 100;
-          if (spread >= settings.minSpreadPercent) {
-              const profit = burstAmount * (spread / 100);
-              opportunities.push({
-                  asset,
-                  spreadPercent: spread,
-                  potentialProfitUSD: profit,
-                  buyAt: data.bestAsk,
-                  sellAt: data.bestBid,
-              });
-              totalProfit += profit;
-              totalSpreadSum += spread;
-          }
-      }
+    if (data.bestBid.price > data.bestAsk.price) {
+      const spread = ((data.bestBid.price - data.bestAsk.price) / data.bestAsk.price);
+      const profit = burstAmount * spread;
+      opportunities.push({
+        asset, spreadPercent: spread * 100, potentialProfitUSD: profit,
+        buyAt: data.bestAsk, sellAt: data.bestBid,
+      });
+      totalProfit += profit;
+    }
+  }
+  
+  // 6. ЗАПИСЬ В ТКАНЬ РЫНКА
+  if (newDataPointsToInsert.length > 0) {
+    const { error: insertError } = await supabaseAdmin.from('market_data').insert(newDataPointsToInsert);
+    if (insertError) logger.error("[QuantumEngine] Failed to insert simulated data points:", insertError);
+    else logger.info(`[QuantumEngine] Successfully inserted ${newDataPointsToInsert.length} simulated data points into market_data.`);
   }
 
-  // 3. Рассчитать "Сочность Рынка"
-  const juiceFactor = opportunities.length > 0 ? (totalSpreadSum / opportunities.length) * 10 : 0;
-  const marketJuiciness = Math.min(100, Math.round(juiceFactor * opportunities.length));
-
-  logs.push(`Found ${opportunities.length} opportunities. Total profit: $${totalProfit.toFixed(2)}. Juiciness: ${marketJuiciness}/100`);
-
   opportunities.sort((a, b) => b.spreadPercent - a.spreadPercent);
-  
-  return { opportunities, totalProfit, marketJuiciness, logs };
+  return { opportunities, totalProfit };
 }

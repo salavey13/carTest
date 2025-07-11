@@ -12,47 +12,38 @@ import { helpCommand } from "./help";
 import { rageSettingsCommand } from "./rageSettings";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
-// НОВЫЕ ИМПОРТЫ
-import { simGodCommand } from "./sim_god";
-import { simGoCommand } from "./sim_go";
+import { simCommand } from "./sim"; // <-- НОВАЯ КОМАНДА
+import { simGoCommand } from "./sim_go"; // <-- ОБНОВЛЕННАЯ КОМАНДА
 
-/**
- * The main router for all incoming updates from the Telegram webhook.
- */
 export async function handleCommand(update: any) {
-  
-  // --- Text Message Handling ---
   if (update.message?.text) {
     const text: string = update.message.text;
     const chatId: number = update.message.chat.id;
-    const userId: number = update.message.from.id;
-    const userIdStr = String(userId); // Используем строковый ID для консистентности
+    const userIdStr = String(update.message.from.id);
     const username: string | undefined = update.message.from.username;
     const parts = text.split(' ');
     const command = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    logger.info(`[Command Handler] Received text: '${text}' from User ID: ${userId}`);
+    logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
 
     const commandMap: { [key: string]: Function } = {
-      "/start": () => startCommand(chatId, userId, username, text),
-      "/help": () => helpCommand(chatId, userId),
-      "/rage": () => rageCommand(chatId, userId),
-      "/settings": () => rageSettingsCommand(chatId, userId, text),
-      "/leads": () => leadsCommand(chatId, userId),
-      "/sauce": () => sauceCommand(chatId, userId),
-      "/file": () => fileCommand(chatId, userId, args),
-      "/offer": () => offerCommand(chatId, userId),
-      "/howto": () => howtoCommand(chatId, userId),
-      "/ctx": () => ctxCommand(chatId, userId),
-      "/profile": () => profileCommand(chatId, userId, username),
-      // НОВЫЕ КОМАНДЫ
-      "/sim_god": () => simGodCommand(chatId, userIdStr, args),
-      "/sim_go": () => simGoCommand(chatId, userIdStr, args),
+      "/start": () => startCommand(chatId, Number(userIdStr), username, text),
+      "/help": () => helpCommand(chatId, Number(userIdStr)),
+      "/rage": () => rageCommand(chatId, Number(userIdStr)),
+      "/settings": () => rageSettingsCommand(chatId, Number(userIdStr), text),
+      "/sim": () => simCommand(chatId, userIdStr, args), // <-- НОВЫЙ /sim
+      "/sim_god": () => simCommand(chatId, userIdStr, args), // <-- Алиас для обратной совместимости
+      "/sim_go": () => simGoCommand(chatId, userIdStr, args), // <-- ОБНОВЛЕННЫЙ /sim_go
+      "/leads": () => leadsCommand(chatId, Number(userIdStr)),
+      "/sauce": () => sauceCommand(chatId, Number(userIdStr)),
+      "/file": () => fileCommand(chatId, Number(userIdStr), args),
+      "/offer": () => offerCommand(chatId, Number(userIdStr)),
+      "/howto": () => howtoCommand(chatId, Number(userIdStr)),
+      "/ctx": () => ctxCommand(chatId, Number(userIdStr)),
+      "/profile": () => profileCommand(chatId, Number(userIdStr), username),
     };
     
-    const commandFunction = commandMap[command];
-
     if (commandFunction) {
       await commandFunction();
     } else {
