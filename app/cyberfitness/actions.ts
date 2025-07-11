@@ -1,80 +1,110 @@
 "use server";
 
-import { supabaseAdmin } from '@/hooks/supabase'; 
-import { logger } from "@/lib/logger";
+import { supabaseAdmin } from '@/hooks/supabase';
+import { fetchUserData as genericFetchUserData } from '@/hooks/supabase';
+import type { Database } from "@/types/database.types";
+import { debugLogger as logger } from "@/lib/debugLogger";
 
-/**
- * Spends KiloVibes for a user by calling the 'adjust_kilovibes' RPC.
- * This is a server-only function.
- */
-export async function spendKiloVibes(
-  userId: string, 
-  amount: number, 
-  reason: string
-): Promise<{ success: boolean; newBalance?: number; error?: string }> {
-  logger.info(`[SERVER ACTION spendKiloVibes] Calling DB function to spend ${amount} KV for user ${userId}. Reason: ${reason}`);
-  if (!userId || !amount || amount <= 0) {
-    return { success: false, error: "Invalid user ID or amount provided." };
-  }
+// These types and constants are safe to be on the server
+type DbUser = Database["public"]["Tables"]["users"]["Row"];
+type UserMetadata = DbUser['metadata'];
 
-  const adjustment = -Math.abs(amount);
-
-  const { data, error } = await supabaseAdmin.rpc('adjust_kilovibes', {
-      p_user_id: userId,
-      p_kv_adjustment: adjustment,
-  });
-
-  if (error) {
-    logger.error(`[SERVER ACTION spendKiloVibes] RPC call failed for user ${userId}:`, error);
-    return { success: false, error: "Database transaction failed." };
-  }
-  
-  const result = data[0];
-
-  if (!result.success) {
-    logger.warn(`[SERVER ACTION spendKiloVibes] DB function returned failure for user ${userId}: ${result.message}`);
-    return { success: false, error: result.message };
-  }
-
-  logger.info(`[SERVER ACTION spendKiloVibes] Successfully spent ${amount} KV for user ${userId}. New balance: ${result.new_balance.toFixed(2)}. Reason: ${reason}`);
-
-  return { success: true, newBalance: result.new_balance };
+export interface DailyActivityRecord {
+  date: string; 
+  filesExtracted: number;
+  tokensProcessed: number;
+  kworkRequestsSent: number; 
+  prsCreated: number;
+  branchesUpdated: number;
+  focusTimeMinutes?: number; 
 }
 
-/**
- * Adds KiloVibes to a user's account by calling the 'adjust_kilovibes' RPC.
- * This is a server-only function.
- */
-export async function addKiloVibes(
-  userId: string, 
-  amount: number, 
-  reason: string
-): Promise<{ success: boolean; newBalance?: number; error?: string }> {
-  logger.info(`[SERVER ACTION addKiloVibes] Calling DB function to ADD ${amount} KV for user ${userId}. Reason: ${reason}`);
-  if (!userId || !amount || amount <= 0) {
-    return { success: false, error: "Invalid user ID or amount provided." };
-  }
+export interface CyberFitnessProfile {
+  level: number; 
+  kiloVibes: number; 
+  focusTimeHours: number; 
+  skillsLeveled: number; 
+  activeQuests: string[]; 
+  completedQuests: string[]; 
+  unlockedPerks: string[]; 
+  achievements: string[]; 
+  cognitiveOSVersion: string; 
+  lastActivityTimestamp: string; 
+  dailyActivityLog: DailyActivityRecord[];
+  totalFilesExtracted: number; 
+  totalTokensProcessed: number; 
+  totalKworkRequestsSent: number; 
+  totalPrsCreated: number; 
+  totalBranchesUpdated: number; 
+  featuresUsed: Record<string, boolean | number | string>; 
+}
 
-  const adjustment = Math.abs(amount);
+export const CYBERFIT_METADATA_KEY = "cyberFitness"; 
+const QUEST_ORDER: string[] = [ "initial_boot_sequence", "first_fetch_completed", "first_parse_completed", "first_pr_created" ];
+const LEVEL_THRESHOLDS_KV = [0, 50, 150, 400, 800, 1500, 2800, 5000, 8000, 12000, 17000, 23000, 30000, 40000, 50000, 75000, 100000]; 
+const COGNITIVE_OS_VERSIONS = [
+    "v0.1 Genesis", "v0.2 Neural Spark", "v0.3 Code Apprentice", "v0.4 Vibe Engineer", 
+    "v0.5 Logic Architect", "v0.6 Context Weaver", "v0.7 Matrix Surfer", "v0.8 Quantum Coder", 
+    "v0.9 Singularity Pilot", "v1.0 Ascended Node", "v1.1 Vibe Master", "v1.2 Digital Demiurge",
+    "v1.3 Context Commander", "v1.4 Vibe Channeler", "v1.5 Nexus Oracle", "v1.6 Reality Shaper", "vX.X Transcendent UI", 
+]; 
 
-  const { data, error } = await supabaseAdmin.rpc('adjust_kilovibes', {
-      p_user_id: userId,
-      p_kv_adjustment: adjustment,
-  });
+const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
+    level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
+    activeQuests: [QUEST_ORDER[0]], 
+    completedQuests: [], unlockedPerks: [],
+    cognitiveOSVersion: COGNITIVE_OS_VERSIONS[0], lastActivityTimestamp: new Date(0).toISOString(), 
+    dailyActivityLog: [], achievements: [],
+    totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
+    totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
+});
 
-  if (error) {
-    logger.error(`[SERVER ACTION addKiloVibes] RPC call failed for user ${userId}:`, error);
-    return { success: false, error: "Database transaction failed." };
+const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | null | undefined): CyberFitnessProfile => {
+  const defaultProfile = getDefaultCyberFitnessProfile();
+  let finalProfile = { ...defaultProfile }; 
+
+  if (metadata && typeof metadata === 'object' && metadata[CYBERFIT_METADATA_KEY] && typeof metadata[CYBERFIT_METADATA_KEY] === 'object') {
+    const existingProfile = metadata[CYBERFIT_METADATA_KEY] as Partial<CyberFitnessProfile>;
+    finalProfile = {
+        ...defaultProfile, 
+        ...existingProfile, 
+        // Ensure nested objects and arrays are correctly initialized to prevent errors
+        dailyActivityLog: Array.isArray(existingProfile.dailyActivityLog) ? existingProfile.dailyActivityLog : [],
+        achievements: Array.isArray(existingProfile.achievements) ? existingProfile.achievements : [],
+        activeQuests: Array.isArray(existingProfile.activeQuests) ? existingProfile.activeQuests : [],
+        completedQuests: Array.isArray(existingProfile.completedQuests) ? existingProfile.completedQuests : [], 
+        unlockedPerks: Array.isArray(existingProfile.unlockedPerks) ? existingProfile.unlockedPerks : [],
+        featuresUsed: typeof existingProfile.featuresUsed === 'object' && existingProfile.featuresUsed !== null ? existingProfile.featuresUsed : {},
+    };
   }
   
-  const result = data[0];
+  const currentLevel = finalProfile.level || 0;
+  finalProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[currentLevel] || COGNITIVE_OS_VERSIONS[COGNITIVE_OS_VERSIONS.length -1] || defaultProfile.cognitiveOSVersion;
+  finalProfile.skillsLeveled = new Set(finalProfile.unlockedPerks || []).size; 
 
-  if (!result.success) {
-    logger.warn(`[SERVER ACTION addKiloVibes] DB function returned failure for user ${userId}: ${result.message}`);
-    return { success: false, error: result.message };
+  return finalProfile;
+};
+
+// This is the new, safe, server-side function
+export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> => {
+  logger.log(`[CyberFitness Server Action] Fetching profile for user_id: ${userId}`);
+  if (!userId) {
+    return { success: false, error: "User ID is required.", data: getDefaultCyberFitnessProfile() };
   }
+  
+  try {
+    const userData = await genericFetchUserData(userId); 
 
-  logger.info(`[SERVER ACTION addKiloVibes] Successfully added ${amount} KV for user ${userId}. New balance: ${result.new_balance.toFixed(2)}. Reason: ${reason}`);
-
-  return { success: true, newBalance: result.new_balance };
-}
+    if (!userData) {
+        logger.warn(`[CyberFitness Server Action] User ${userId} not found. Returning default profile.`);
+        return { success: false, error: `User ${userId} not found.`, data: getCyberFitnessProfile(userId, null) };
+    }
+    
+    const profile = getCyberFitnessProfile(userId, userData.metadata); 
+    logger.log(`[CyberFitness Server Action] Successfully parsed profile for user ${userId}. Level: ${profile.level}`);
+    return { success: true, data: profile };
+  } catch (e: any) {
+    logger.error(`[CyberFitness Server Action] Exception fetching profile for user ${userId}:`, e);
+    return { success: false, error: e.message || "Failed to fetch profile.", data: getCyberFitnessProfile(userId, null) }; 
+  }
+};
