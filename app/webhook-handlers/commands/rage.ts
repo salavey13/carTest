@@ -35,9 +35,17 @@ function formatSettings(settings: ArbitrageSettings): string {
 }
 
 export async function rageCommand(chatId: number, userId: number) {
-    logger.info(`[RageCommand V4] User ${userId} triggered /rage.`);
+    logger.info(`[RageCommand V5 - Edit Flow] User ${userId} triggered /rage.`);
     
-    await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], { imageQuery: "lightning storm" });
+    // Send an initial "thinking" message and capture its ID
+    const thinkingMessageResult = await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], { imageQuery: "lightning storm" });
+
+    if (!thinkingMessageResult.success || !thinkingMessageResult.data?.result?.message_id) {
+        logger.error("[RageCommandV5] Failed to send initial 'thinking' message. Aborting.");
+        // We can't send an error message if the initial send failed, so we just log and exit.
+        return;
+    }
+    const messageId = thinkingMessageResult.data.result.message_id;
 
     try {
         const settingsResult = await getArbitrageScannerSettings(String(userId));
@@ -51,7 +59,8 @@ export async function rageCommand(chatId: number, userId: number) {
 
         const botUsername = process.env.BOT_USERNAME || 'oneSitePlsBot';
         const settingsLink = `https://t.me/${botUsername}/app?startapp=settings`;
-        const deepDiveLink = `https://t.me/${botUsername}/app?startapp=arbitrage-notdummies`; // You need to add this mapping in ClientLayout
+        // NOTE: You'll need to add 'arbitrage-notdummies' to START_PARAM_PAGE_MAP in ClientLayout.tsx
+        const deepDiveLink = `https://t.me/${botUsername}/app?startapp=arbitrage_notdummies`;
 
         const buttons: KeyboardButton[][] = [[
             { text: "⚙️ Изменить Настройки", url: settingsLink },
@@ -62,7 +71,8 @@ export async function rageCommand(chatId: number, userId: number) {
             const noResultMessage = `🧘‍♂️ *Рынок спокоен.*\nЗначимых возможностей не найдено с вашими текущими настройками:\n\n` +
                                     `\`${formatSettings(settings)}\`\n\n` +
                                     `Попробуйте изменить их или повторите попытку позже.`;
-            await sendComplexMessage(chatId, noResultMessage, buttons, { imageQuery: "zen garden", keyboardType: 'inline' });
+            // Edit the original message with the result
+            await sendComplexMessage(chatId, noResultMessage, buttons, { messageId, keyboardType: 'inline' });
             return;
         }
 
@@ -73,11 +83,13 @@ export async function rageCommand(chatId: number, userId: number) {
         const finalMessage = `🏆 *Найден Топ-Сигнал:*\n\n${opportunityText}\n\n` +
                              `*Настройки симуляции:*\n` +
                              `\`${formatSettings(settings)}\``;
-
-        await sendComplexMessage(chatId, finalMessage, buttons, { imageQuery: "gold treasure", keyboardType: 'inline' });
+        
+        // Edit the original message with the successful result
+        await sendComplexMessage(chatId, finalMessage, buttons, { messageId, keyboardType: 'inline' });
 
     } catch (error) {
-        logger.error("[RageCommandV4] Error processing command:", error);
-        await sendComplexMessage(chatId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась.", [], { imageQuery: "explosion" });
+        logger.error("[RageCommandV5] Error processing command:", error);
+        // Edit the original message with an error message
+        await sendComplexMessage(chatId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась. Попробуйте позже или проверьте настройки.", [], { messageId });
     }
 }
