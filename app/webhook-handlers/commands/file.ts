@@ -48,7 +48,7 @@ async function sendBatchedCode(chatId: number, content: string) {
 }
 
 export async function fileCommand(chatId: number, userId: number, args: string[]) {
-    logger.info(`[File Command] User ${userId} triggered /file with args: [${args.join(', ')}]`);
+    logger.info(`[File Command - V4 - Stabilized] User ${userId} triggered /file with args: [${args.join(', ')}]`);
     
     if (args.length === 0) {
         await sendComplexMessage(chatId, "⚠️ Укажи ключевое слово для поиска файла. Например: `/file help` или `/file actions.ts`.", []);
@@ -64,37 +64,74 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
         }
         const { tree, owner, repo } = treeResult;
 
-        // --- Single-file search logic ---
-        const searchTerm = args.join(' ').toLowerCase();
-        const foundFiles = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(searchTerm)).slice(0, 8);
-        
-        if (foundFiles.length === 0) {
-            await sendComplexMessage(chatId, `🤷‍♂️ Файлы по запросу \`${searchTerm}\` не найдены.`, [], { removeKeyboard: true });
-            return;
+        // If there's only one argument, it could be a partial or full path.
+        if (args.length === 1) {
+            const searchTerm = args[0].toLowerCase();
+            const foundFiles = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(searchTerm)).slice(0, 8);
+
+            if (foundFiles.length === 0) {
+                await sendComplexMessage(chatId, `🤷‍♂️ Файлы по запросу \`${searchTerm}\` не найдены.`, [], { removeKeyboard: true });
+                return;
+            }
+
+            if (foundFiles.length > 1) {
+                const message = `🎯 Найдено несколько файлов. Уточни запрос, выбрав нужный:`;
+                const buttons: KeyboardButton[][] = foundFiles.map(file => ([{ text: `/file ${file.path}` }]));
+                await sendComplexMessage(chatId, message, buttons, { keyboardType: 'reply' });
+                return;
+            }
+            
+            const file = foundFiles[0];
+            if (!file.path) { throw new Error("Найденный файл не имеет пути."); }
+            
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`;
+            await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Посмотреть на GitHub](${rawUrl})`, [], { removeKeyboard: true });
+
+            const response = await fetch(rawUrl);
+            if (!response.ok) { throw new Error(`Не удалось загрузить содержимое файла. Статус: ${response.status}`); }
+            const content = await response.text();
+            
+            await sendBatchedCode(chatId, content);
+
+        } else { // Multi-file search logic restored and corrected
+            let combinedContent = "";
+            let foundPaths: string[] = [];
+            let notFoundTerms: string[] = [];
+            
+            const fetchPromises = args.map(async (term) => {
+                const found = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(term.toLowerCase()));
+                if (found.length === 1 && found[0].path) {
+                    const filePath = found[0].path;
+                    const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`);
+                    if (response.ok) {
+                        return { path: filePath, content: await response.text() };
+                    }
+                }
+                notFoundTerms.push(term);
+                return null;
+            });
+
+            const results = await Promise.all(fetchPromises);
+            
+            for (const result of results) {
+                if(result) {
+                    const prefix = getFileCommentPrefix(result.path);
+                    const pathComment = `${prefix} /${result.path}`;
+                    const contentWithHeader = result.content.trim().startsWith(pathComment) ? result.content : `${pathComment}\n\n${result.content}`;
+                    combinedContent += contentWithHeader + `\n\n// --- END OF FILE ---\n\n`;
+                    foundPaths.push(result.path);
+                }
+            }
+
+            if (notFoundTerms.length > 0) {
+                await sendComplexMessage(chatId, `⚠️ Не удалось найти уникальное совпадение для: \`${notFoundTerms.join('`, `')}\`.`);
+            }
+            
+            if (combinedContent) {
+                 await sendComplexMessage(chatId, `✅ Найдено ${foundPaths.length} файлов. Загружаю объединенный контекст...`, [], { removeKeyboard: true });
+                 await sendBatchedCode(chatId, combinedContent);
+            }
         }
-
-        if (foundFiles.length > 1) {
-            const message = `🎯 Найдено несколько файлов. Уточни запрос, выбрав нужный с помощью клавиатуры:`;
-            const buttons: KeyboardButton[][] = foundFiles.map(file => ([{ text: `/file ${file.path}` }]));
-            await sendComplexMessage(chatId, message, buttons, { keyboardType: 'reply' });
-            return;
-        }
-            
-        const file = foundFiles[0];
-        if (!file.path) { throw new Error("Найденный файл не имеет пути."); }
-            
-        const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`;
-        await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Посмотреть на GitHub](${rawUrl})`, [], { removeKeyboard: true });
-
-        const response = await fetch(rawUrl);
-        if (!response.ok) { throw new Error(`Не удалось загрузить содержимое файла. Статус: ${response.status}`); }
-        const content = await response.text(); // content is now defined here
-            
-        const prefix = getFileCommentPrefix(file.path);
-        const pathComment = `${prefix} /${file.path}`.trim();
-        const finalContent = content.trim().startsWith(pathComment) ? content : `${pathComment}\n\n${content}`;
-
-        await sendBatchedCode(chatId, finalContent);
         
         const studioLink = `t.me/${process.env.BOT_USERNAME || 'oneSitePlsBot'}/app`;
         await sendComplexMessage(chatId, `Готово! Также можешь открыть [студию](${studioLink}) для полной картины.`, []);

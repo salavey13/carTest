@@ -11,32 +11,21 @@ function createExchangeLink(
     amount?: number
 ): string {
     const formattedPair = pair.replace('/', '_');
-    const baseAsset = pair.split('/')[0];
 
     switch (exchange.toLowerCase()) {
         case 'binance':
-            // Binance supports deep linking with parameters for limit orders
-            const binanceParams = new URLSearchParams({
-                type: 'LIMIT',
-                symbol: pair.replace('/', ''),
-            });
+            const binanceParams = new URLSearchParams({ type: 'LIMIT', symbol: pair.replace('/', '') });
             if (price) binanceParams.set('price', price.toPrecision(6));
-            if (amount) binanceParams.set('quantity', (amount / (price || 1)).toPrecision(6)); // Calculate quantity based on USD amount
+            if (amount && price && price > 0) binanceParams.set('quantity', (amount / price).toPrecision(6));
             return `https://www.binance.com/en/trade/${formattedPair}?${binanceParams.toString()}`;
 
         case 'bybit':
-            // Bybit also supports deep linking
-            const bybitParams = new URLSearchParams({
-                type: 'LIMIT',
-                symbol: pair.replace('/', ''),
-                side: side.charAt(0).toUpperCase() + side.slice(1),
-            });
+            const bybitParams = new URLSearchParams({ type: 'LIMIT', symbol: pair.replace('/', ''), side: side.charAt(0).toUpperCase() + side.slice(1) });
             if (price) bybitParams.set('orderPrice', price.toPrecision(6));
-            if (amount) bybitParams.set('orderQty', (amount / (price || 1)).toPrecision(6));
+            if (amount && price && price > 0) bybitParams.set('orderQty', (amount / price).toPrecision(6));
              return `https://www.bybit.com/en/trade/spot/${pair.replace('/', '')}?${bybitParams.toString()}`;
 
         case 'kucoin':
-             // KuCoin's URL structure for spot trading is simpler and does not support order pre-filling via params.
             return `https://www.kucoin.com/trade/${pair.replace('/', '-')}`;
 
         default:
@@ -64,7 +53,6 @@ function formatOpportunity(op: ArbitrageOpportunity, tradeVolume: number): { tex
         text = `*3-Leg (Треугольный):* ${threeLegOp.currencyPair} на *${threeLegOp.exchange}*\n` +
                `*Цепочка:* \`${threeLegOp.legs.map(l => l.pair).join(' -> ')}\`\n` +
                `  - 🔥 *Профит: ${profit}*`;
-        // For 3-leg, a direct link is less useful as it involves multiple trades. We link to the first pair on the exchange.
         buttons = [{ text: `Go to ${threeLegOp.exchange}`, url: createExchangeLink(threeLegOp.exchange, threeLegOp.legs[0].pair, 'buy') }];
     }
     return { text, buttons };
@@ -77,12 +65,12 @@ function formatSettings(settings: ArbitrageSettings): string {
 }
 
 export async function rageCommand(chatId: number, userId: number) {
-    logger.info(`[RageCommand V8 - Deep Links] User ${userId} triggered /rage.`);
+    logger.info(`[RageCommand V10 - Stabilized] User ${userId} triggered /rage.`);
     
     const thinkingMessageResult = await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], { imageQuery: "lightning storm" });
 
     if (!thinkingMessageResult.success || !thinkingMessageResult.data?.result?.message_id) {
-        logger.error("[RageCommandV8] Failed to send initial 'thinking' message. Aborting.");
+        logger.error("[RageCommandV10] Failed to send initial 'thinking' message. Aborting.");
         return;
     }
     const messageId = thinkingMessageResult.data.result.message_id;
@@ -103,7 +91,7 @@ export async function rageCommand(chatId: number, userId: number) {
 
         let mainButtons: KeyboardButton[][] = [[
             { text: "⚙️ Изменить Настройки", url: settingsLink },
-            { text: "⚡️ Быстрые Настройки", text: "/settings rage" },
+            { text: "⚡️ Быстрые Настройки", callback_data: "rage_settings_prompt" }
         ]];
 
         if (!opportunities || opportunities.length === 0) {
@@ -131,7 +119,7 @@ export async function rageCommand(chatId: number, userId: number) {
         await editMessage(chatId, messageId, finalMessage, mainButtons, { imageQuery: "gold treasure", keyboardType: 'inline' });
 
     } catch (error) {
-        logger.error("[RageCommandV8] Error processing command:", error);
+        logger.error("[RageCommandV10] Error processing command:", error);
         await editMessage(chatId, messageId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась. Попробуйте позже или проверьте настройки.", [], { imageQuery: "explosion" });
     }
 }

@@ -41,7 +41,7 @@ export async function rageSettingsCommand(chatId: number, userId: number, text: 
             settingsUpdated = true;
         }
     } else if (text === 'Done') {
-        await sendComplexMessage(chatId, "Настройки сохранены. Клавиатура убрана.", [], { removeKeyboard: true });
+        await sendComplexMessage(chatId, "Настройки сохранены. Клавиатура убрана. Используй /rage, чтобы увидеть результат.", [], { removeKeyboard: true });
         return;
     }
 
@@ -51,7 +51,7 @@ export async function rageSettingsCommand(chatId: number, userId: number, text: 
 
     const message = formatSettings(currentSettings);
     const buttons = [
-        [{ text: "Set Spread 0.5%" }, { text: "Set Spread 1.0%" }],
+        [{ text: "Set Spread 0.5%" }, { text: "Set Spread 1.0%" }, { text: "Set Spread 1.5%" }],
         ALL_POSSIBLE_EXCHANGES_CONST.map(ex => ({ text: `Toggle ${ex}` })),
         [{ text: "Done" }]
     ];
