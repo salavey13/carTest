@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
-import { getBaseUrl } from "@/lib/utils";
-import { fetchUserCyberFitnessProfile, CyberFitnessProfile } from "@/hooks/cyberFitnessSupabase";
+import { fetchUserCyberFitnessProfile } from "@/app/cyberfitness/actions"; // CORRECTED IMPORT
+import type { CyberFitnessProfile } from "@/app/cyberfitness/actions";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 
 function formatProfileStats(profile: CyberFitnessProfile): string {
@@ -21,12 +21,13 @@ export async function profileCommand(chatId: number, userId: number, username:st
   const settingsLink = `https://t.me/${botUsername}/app?startapp=settings`;
 
   try {
+    // Using the new, safe, server-side function
     const { success, data: profile, error } = await fetchUserCyberFitnessProfile(String(userId));
 
     if (!success || !profile) {
         logger.warn(`[Profile Command] Could not fetch profile for user ${userId}. Error: ${error}. Sending default message.`);
         const defaultMessage = `Агент, твой кибернетический профиль готов к просмотру. Здесь ты найдешь свою статистику, достижения и перки.`;
-        const buttons: KeyboardButton[][] = [[{ text: "Открыть Профиль", url: profileLink }]];
+        const buttons: KeyboardButton[][] = [[{ text: "📊 Открыть Профиль", url: profileLink }]];
         await sendComplexMessage(chatId, defaultMessage, buttons, { keyboardType: 'inline' });
         return;
     }
