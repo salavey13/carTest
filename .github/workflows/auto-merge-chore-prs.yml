@@ -1,40 +1,86 @@
+name: Vibe-Driven Auto-Merge & Enhance
+
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review, edited]
 
 jobs:
-  auto-merge:
+  auto-merge-and-enhance:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      contents: write # Required for merge and branch deletion capabilities by the action
+      contents: write
 
-    # Condition to run the job:
-    # 1. The PR author must be 'salavey13'.
-    # 2. The PR title must start with one of the trigger phrases.
-    # 3. The PR must not be a draft and must be open.
     if: >
       github.event.pull_request.user.login == 'salavey13' &&
       (
         startsWith(github.event.pull_request.title, 'Chore: Update image') ||
         startsWith(github.event.pull_request.title, 'Chore: Update icon') ||
-        startsWith(github.event.pull_request.title, 'пульс:')
+        startsWith(github.event.pull_request.title, '⚡:')
       ) &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.state == 'open'
 
     steps:
-      - name: Add 'coolvibes' label for pulse PRs
-        # Этот шаг выполняется только для нашего нового секретного триггера
-        if: startsWith(github.event.pull_request.title, 'пульс:')
-        run: gh pr edit ${{ github.event.pull_request.number }} --add-label "coolvibes"
+      - name: Checkout code to analyze files
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Fetch changed files list
+        id: changed_files
+        run: |
+          files=$(gh pr diff ${{ github.event.pull_request.number }} --name-only)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable Auto-Merge for PR and Auto-Delete Branch
+      - name: Generate Title, Edit PR, and Add Label
+        if: startsWith(github.event.pull_request.title, '⚡:')
+        run: |
+          files="${{ steps.changed_files.outputs.files }}"
+          title=""
+
+          # --- НОВАЯ ЛОГИКА АНАЛИЗА ---
+          if echo "$files" | grep -q 'lib/cyberfitness.ts'; then
+            title="Refactor(core): Пересборка Квантового Ядра CyberFitness"
+          elif echo "$files" | grep -q 'components/repo/prompt.ts'; then
+            title="Refactor(core): Обновление Конституции Vibe"
+          elif echo "$files" | grep -q -E 'command-handler.ts|database.types.ts|/api/telegramWebhook/route.ts'; then
+            title="Refactor(core): Модификация центрального нейронного ядра"
+          elif echo "$files" | grep -q -E 'package.json|yarn.lock'; then
+            title="Chore(deps): Синхронизация временных парадоксов зависимостей"
+          elif echo "$files" | grep -q -E 'next.config|tailwind.config|eslintrc.json'; then
+            title="Chore(config): Калибровка системных параметров"
+          else
+            title="Chore: Плановая оптимизация систем"
+          fi
+          
+          echo "Generated Title: $title"
+          gh pr edit ${{ github.event.pull_request.number }} --title "$title" --add-label "coolvibes"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable Auto-Merge and Store Final Title
+        id: automerge
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
-          merge-method: squash # Other options: 'merge', 'rebase'
-          delete-branch-after-merge: true # Automatically delete the head branch after merge
+          merge-method: squash
+          delete-branch-after-merge: true
+
+      - name: Send Feedback to Telegram Bot
+        if: steps.automerge.outputs.automerge-enabled == 'true'
+        run: |
+          # Замыкаем петлю: отправляем уведомление обратно в наш бот
+          curl -X POST "${{ secrets.VERCEL_PROJECT_PRODUCTION_URL }}/api/github-action-feedback" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${{ secrets.ACTION_SECRET }}" \
+          -d '{
+            "pr_number": "${{ github.event.pull_request.number }}",
+            "pr_title": "${{ github.event.pull_request.title }}",
+            "author_id": "${{ github.event.pull_request.user.id }}"
+          }'
