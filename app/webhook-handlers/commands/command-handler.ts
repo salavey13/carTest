@@ -12,6 +12,9 @@ import { helpCommand } from "./help";
 import { rageSettingsCommand } from "./rageSettings";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
+// НОВЫЕ ИМПОРТЫ
+import { simGodCommand } from "./sim_god";
+import { simGoCommand } from "./sim_go";
 
 /**
  * The main router for all incoming updates from the Telegram webhook.
@@ -23,6 +26,7 @@ export async function handleCommand(update: any) {
     const text: string = update.message.text;
     const chatId: number = update.message.chat.id;
     const userId: number = update.message.from.id;
+    const userIdStr = String(userId); // Используем строковый ID для консистентности
     const username: string | undefined = update.message.from.username;
     const parts = text.split(' ');
     const command = parts[0].toLowerCase();
@@ -42,6 +46,9 @@ export async function handleCommand(update: any) {
       "/howto": () => howtoCommand(chatId, userId),
       "/ctx": () => ctxCommand(chatId, userId),
       "/profile": () => profileCommand(chatId, userId, username),
+      // НОВЫЕ КОМАНДЫ
+      "/sim_god": () => simGodCommand(chatId, userIdStr, args),
+      "/sim_go": () => simGoCommand(chatId, userIdStr, args),
     };
     
     const commandFunction = commandMap[command];

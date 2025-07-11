@@ -44,9 +44,34 @@ export interface ArbitrageSettings {
   networkFees: Partial<Record<string, number>>; 
 }
 
+// --- НОВЫЕ ТИПЫ ДЛЯ GOD-MODE ---
+
+/** Описывает одну "божественную" возможность мгновенного обмена. */
+export interface GodModeOpportunity {
+  asset: string;
+  spreadPercent: number;
+  potentialProfitUSD: number;
+  buyAt: { exchange: ExchangeName; price: number };
+  sellAt: { exchange: ExchangeName; price: number };
+}
+
+/** Описывает состояние командного центра God-Mode в `metadata`. */
+export interface GodModeDeck {
+  balances: Record<string, number>; // e.g. { "USDT": 13000, "BTC": 0.2 }
+  total_profit_usd: number;
+}
+
+/** Полный результат, возвращаемый функцией симуляции God-Mode. */
+export interface GodModeSimulationResult {
+  opportunities: GodModeOpportunity[];
+  totalProfit: number;
+  marketJuiciness: number; // Индекс "сочности" рынка от 0 до 100
+  logs: string[];
+}
+
+// --- СУЩЕСТВУЮЩИЕ КОНСТАНТЫ ---
 export const ALL_POSSIBLE_EXCHANGES_CONST: ExchangeName[] = ["Binance", "Bybit", "KuCoin", "Gate.io", "OKX", "SimulatedExchangeA", "SimulatedExchangeB"];
 export const DEFAULT_TRACKED_ASSETS_FOR_NETWORK_FEES: string[] = ["BTC", "ETH", "SOL", "USDT_ERC20", "USDT_TRC20"];
-
 
 const defaultExchangeFees: Partial<Record<ExchangeName, { maker: number; taker: number }>> = {};
 ALL_POSSIBLE_EXCHANGES_CONST.forEach(ex => {
@@ -62,7 +87,6 @@ DEFAULT_TRACKED_ASSETS_FOR_NETWORK_FEES.forEach(asset => {
     else if (asset === "USDT_TRC20") defaultNetworkFees[asset] = 1; 
     else defaultNetworkFees[asset] = 1; 
 });
-
 
 export const DEFAULT_ARBITRAGE_SETTINGS: ArbitrageSettings = { 
   minSpreadPercent: 0.5,
