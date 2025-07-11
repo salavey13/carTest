@@ -50,7 +50,7 @@ export async function sendComplexMessage(
     return { success: false, error: "Telegram bot token not configured." };
   }
   
-  // --- НОВЫЙ БЛОК: ПРОВЕРКА И РАЗБИВКА СЛИШКОМ ДЛИННЫХ СООБЩЕНИЙ ---
+  // --- БЛОК ПРОВЕРКИ И РАЗБИВКИ СЛИШКОМ ДЛИННЫХ СООБЩЕНИЙ ---
   if (text.length > TELEGRAM_MESSAGE_LIMIT) {
     logger.warn(`[sendComplexMessage] Message for chat ${chatId} is too long (${text.length} chars). Splitting into multiple messages.`);
     const chunks = [];
@@ -58,14 +58,12 @@ export async function sendComplexMessage(
     const lines = text.split('\n');
 
     for (const line of lines) {
-      // Если добавление новой строки превысит лимит, отправляем текущий чанк
       if (currentChunk.length + line.length + 1 > TELEGRAM_MESSAGE_LIMIT) {
         chunks.push(currentChunk);
         currentChunk = "";
       }
       currentChunk += line + '\n';
     }
-    // Добавляем последний оставшийся чанк
     if (currentChunk) {
       chunks.push(currentChunk);
     }
@@ -74,16 +72,14 @@ export async function sendComplexMessage(
         for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i];
             const isLastChunk = i === chunks.length - 1;
-            // Убираем лишние кнопки 'Done' если они есть, так как клавиатура будет одна.
-            const finalButtons = isLastChunk ? buttons.filter(row => !row.some(btn => btn.text === "Done")) : [];
             const payload = {
                 chat_id: String(chatId),
                 parse_mode: 'Markdown',
                 text: chunk,
-                reply_markup: finalButtons.length > 0 
+                reply_markup: isLastChunk && buttons.length > 0 
                     ? (keyboardType === 'inline' 
-                        ? { inline_keyboard: finalButtons } 
-                        : { keyboard: finalButtons, resize_keyboard: true, one_time_keyboard: true }) 
+                        ? { inline_keyboard: buttons } 
+                        : { keyboard: buttons, resize_keyboard: true, one_time_keyboard: true }) 
                     : (isLastChunk && removeKeyboard ? { remove_keyboard: true } : undefined),
             };
             const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -93,7 +89,6 @@ export async function sendComplexMessage(
             });
             const data = await response.json();
             if (!data.ok) {
-                // Если даже чанк не прошел, логируем и выходим
                 throw new Error(`Failed to send chunk ${i + 1}: ${data.description}`);
             }
         }
@@ -102,76 +97,44 @@ export async function sendComplexMessage(
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during chunk sending.";
         logger.error(`Error in sendComplexMessage (chunking) for chat ${chatId}:`, errorMessage);
-        // Отправляем короткое сообщение об ошибке, чтобы пользователь знал о проблеме
-        await sendComplexMessage(chatId, `🚨 Ошибка: не удалось отправить очень длинный ответ. Он был обрезан.`);
+        try {
+          await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ chat_id: String(chatId), text: `🚨 Ошибка: не удалось отправить очень длинный ответ.` })
+          });
+        } catch (e) { logger.warn("Failed to send error notification about chunking failure."); }
         return { success: false, error: errorMessage };
     }
   }
 
-  // --- СУЩЕСТВУЮЩАЯ ЛОГИКА ДЛЯ КОРОТКИХ СООБЩЕНИЙ ---
-  let imageUrl: string | null = null;
-  if (imageQuery && !messageId) {
-    imageUrl = await getRandomUnsplashImage(imageQuery);
-  }
-
-  const payload: any = {
-    chat_id: String(chatId),
-    parse_mode: 'Markdown',
-  };
-  
-  if (removeKeyboard) {
-    payload.reply_markup = { remove_keyboard: true };
-  } else if (buttons.length > 0) {
-    if (keyboardType === 'inline') {
-      payload.reply_markup = { inline_keyboard: buttons };
-    } else {
-      payload.reply_markup = {
-        keyboard: buttons,
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      };
-    }
-  }
-
-  let endpoint: string;
-  if (messageId) {
-    logger.warn(`[sendComplexMessage] Attempted to edit message ${messageId} via sendComplexMessage. This is deprecated. Use editMessage instead.`);
-    // Fallback logic
-    endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-    if (imageUrl) {
-        payload.photo = imageUrl;
-        payload.caption = text;
-    } else {
-        payload.text = text;
-    }
-  } else {
-    endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-    if (imageUrl) {
-        payload.photo = imageUrl;
-        payload.caption = text;
-    } else {
-        payload.text = text;
-    }
-  }
-
+  // --- ЛОГИКА ДЛЯ КОРОТКИХ СООБЩЕНИЙ (ТЕПЕРЬ ТАКЖЕ ВНУТРИ TRY...CATCH) ---
   try {
-    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    let imageUrl: string | null = imageQuery && !messageId ? await getRandomUnsplashImage(imageQuery) : null;
 
+    const payload: any = { chat_id: String(chatId), parse_mode: 'Markdown' };
+
+    if (removeKeyboard) {
+      payload.reply_markup = { remove_keyboard: true };
+    } else if (buttons.length > 0) {
+      payload.reply_markup = keyboardType === 'inline' 
+        ? { inline_keyboard: buttons } 
+        : { keyboard: buttons, resize_keyboard: true, one_time_keyboard: true };
+    }
+    
+    const endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
+    if (imageUrl) {
+      payload.photo = imageUrl;
+      payload.caption = text;
+    } else {
+      payload.text = text;
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+    });
     const data = await response.json();
 
     if (!data.ok) {
-        // Ловим ошибку здесь, чтобы прервать цикл
-      if (data.description?.includes('message is too long')) {
-          logger.error(`[sendComplexMessage] FATAL: Message still too long after check for chat ${chatId}. This should not happen.`, { length: text.length });
-          // Отправляем короткое сообщение об ошибке вместо падения
-          await sendComplexMessage(chatId, `🚨 Ошибка: Ответ слишком длинный и не может быть отправлен.`);
-          return { success: false, error: data.description };
-      }
-      logger.error(`Telegram API error (${endpoint}): ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code, payload });
       throw new Error(data.description || `Failed to ${endpoint}`);
     }
 
@@ -179,13 +142,11 @@ export async function sendComplexMessage(
     return { success: true, data };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
-    logger.error(`Error in sendComplexMessage for chat ${chatId}:`, errorMessage);
+    logger.error(`Error in sendComplexMessage (main) for chat ${chatId}:`, errorMessage);
+    // НЕ выбрасываем исключение дальше, чтобы не уронить вебхук
     return { success: false, error: errorMessage };
   }
 }
-
-// Функции deleteTelegramMessage и editMessage остаются здесь же, если они есть.
-// Для полноты картины, вот они:
 
 export async function deleteTelegramMessage(chatId: number, messageId: number): Promise<boolean> {
     if (!TELEGRAM_BOT_TOKEN) {
