@@ -5,9 +5,18 @@ import { delay } from "@/lib/utils";
 
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL || "https://github.com/salavey13/carTest";
 
-async function sendBatchedCode(chatId: number, content: string, title: string) {
+function getFileCommentPrefix(filePath: string): string {
+    const extension = filePath.split('.').pop()?.toLowerCase() || '';
+    switch (extension) {
+        case 'sql': return '--';
+        case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': return '#';
+        default: return '//';
+    }
+}
+
+async function sendBatchedCode(chatId: number, content: string) {
     const MAX_LENGTH = 4096;
-    const lang = 'typescript'; // Defaulting to ts for mixed contexts
+    const lang = 'typescript'; // A reasonable default for mixed content
     const header = `\`\`\`${lang}\n`;
     const footer = "\n\`\`\`";
     const overhead = header.length + footer.length;
@@ -16,33 +25,27 @@ async function sendBatchedCode(chatId: number, content: string, title: string) {
     const chunks: string[] = [];
     let currentChunk = "";
 
+    await delay(350); // Initial delay before the first chunk
+
     for (const line of lines) {
+        // Check if adding the next line would exceed the character limit for a single message
         if (currentChunk.length + line.length + 1 > MAX_LENGTH - overhead) {
-            chunks.push(currentChunk);
-            currentChunk = "";
+            // If the chunk is not empty, push it to the list and start a new one
+            if (currentChunk) chunks.push(currentChunk);
+            currentChunk = line + '\n';
+        } else {
+            currentChunk += line + '\n';
         }
-        currentChunk += line + '\n';
     }
+    // Add the last remaining chunk
     if (currentChunk) {
         chunks.push(currentChunk);
     }
 
-    await delay(350); // Delay before sending the first chunk
-
-    for (let i = 0; i < chunks.length; i++) {
-        let chunk = chunks[i];
-        
-        // Each chunk is sent as a complete, self-contained code block to protect from Markdown parsing
-        let message = `${header}${chunk.trimEnd()}${footer}`;
-        
-        // Add the special double-backtick wrappers for the very first and very last messages
-        if (i === 0) {
-            message = `\`\`${message}`;
-        }
-        if (i === chunks.length - 1) {
-            message = `${message}\n\`\``;
-        }
-
+    // Send each chunk wrapped in its own code block for parse safety
+    for (const chunk of chunks) {
+        if (!chunk.trim()) continue; // Skip empty chunks
+        const message = `${header}${chunk.trimEnd()}${footer}`;
         await sendComplexMessage(chatId, message, []);
         await delay(350); // Respect Telegram rate limits
     }
@@ -65,66 +68,53 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
         }
         const { tree, owner, repo } = treeResult;
 
-        // --- BONUS: Multi-file search logic ---
-        if (args.length > 1) {
-            let combinedContent = "";
-            let foundPaths: string[] = [];
-            let notFound: string[] = [];
+        // --- Multi-file search logic ---
+        let combinedContent = "";
+        let foundPaths: string[] = [];
+        let ambiguousTerms: string[] = [];
+        let notFoundTerms: string[] = [];
 
-            for (const term of args) {
-                const found = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(term.toLowerCase()));
-                if (found.length === 1 && found[0].path) {
-                    const filePath = found[0].path;
-                    const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`);
-                    if (response.ok) {
-                        const content = await response.text();
-                        combinedContent += `// /${filePath}\n\n${content}\n\n// --- END OF FILE: ${filePath} ---\n\n`;
-                        foundPaths.push(filePath);
+        for (const term of args) {
+            const found = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(term.toLowerCase()));
+            if (found.length === 1 && found[0].path) {
+                const filePath = found[0].path;
+                const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`);
+                if (response.ok) {
+                    const fileContent = await response.text();
+                    const prefix = getFileCommentPrefix(filePath);
+                    const pathComment = `${prefix} /${filePath}`.trim();
+                    
+                    const contentWithHeader = fileContent.trim().startsWith(pathComment) 
+                        ? fileContent 
+                        : `${pathComment}\n\n${content}`;
+                    
+                    if (combinedContent) {
+                        combinedContent += `\`\`\`\n\n// --- END OF FILE: ${foundPaths[foundPaths.length - 1]} ---\n\n\`\`\``;
                     }
-                } else {
-                    notFound.push(term);
+                    combinedContent += contentWithHeader;
+                    foundPaths.push(filePath);
                 }
-            }
-
-            if (notFound.length > 0) {
-                await sendComplexMessage(chatId, `⚠️ Пропущено: \`${notFound.join('`, `')}\` (не найдено или найдено >1 совпадения).`);
-            }
-
-            if (combinedContent) {
-                await sendComplexMessage(chatId, `✅ Найдено ${foundPaths.length} файлов. Загружаю объединенный контекст...`, [], { removeKeyboard: true });
-                await sendBatchedCode(chatId, combinedContent, `Combined context for ${args.join(', ')}`);
+            } else if (found.length > 1) {
+                ambiguousTerms.push(term);
             } else {
-                await sendComplexMessage(chatId, `🤷‍♂️ Ни один из запрошенных файлов не найден с уникальным совпадением.`, [], { removeKeyboard: true });
-                return;
+                notFoundTerms.push(term);
             }
+        }
+        
+        let warnings = [];
+        if (ambiguousTerms.length > 0) warnings.push(`неоднозначный поиск для: \`${ambiguousTerms.join('`, `')}\``);
+        if (notFoundTerms.length > 0) warnings.push(`не найдено для: \`${notFoundTerms.join('`, `')}\``);
 
-        } else {
-            // --- Original single-file search logic ---
-            const searchTerm = args[0].toLowerCase();
-            const foundFiles = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(searchTerm)).slice(0, 8);
+        if (warnings.length > 0) {
+            await sendComplexMessage(chatId, `⚠️ Пропущено: ${warnings.join('; ')}.`);
+        }
 
-            if (foundFiles.length === 0) {
-                await sendComplexMessage(chatId, `🤷‍♂️ Файлы по запросу \`${searchTerm}\` не найдены.`, [], { removeKeyboard: true });
-                return;
-            }
-
-            if (foundFiles.length > 1) {
-                const message = `🎯 Найдено несколько файлов. Выбери нужный с помощью клавиатуры:`;
-                const buttons: KeyboardButton[][] = foundFiles.map(file => ([{ text: `/file ${file.path}` }]));
-                await sendComplexMessage(chatId, message, buttons, { keyboardType: 'reply' });
-                return;
-            }
-            
-            const file = foundFiles[0];
-            if (!file.path) { throw new Error("Найденный файл не имеет пути."); }
-            
-            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`;
-            await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Посмотреть на GitHub](${rawUrl})`, [], { removeKeyboard: true });
-
-            const response = await fetch(rawUrl);
-            if (!response.ok) { throw new Error(`Не удалось загрузить содержимое файла. Статус: ${response.status}`); }
-            const content = await response.text();
-            await sendBatchedCode(chatId, content, file.path);
+        if (combinedContent) {
+            await sendComplexMessage(chatId, `✅ Найдено ${foundPaths.length} файлов. Загружаю объединенный контекст...`, [], { removeKeyboard: true });
+            await sendBatchedCode(chatId, combinedContent);
+        } else if (args.length > 0 && warnings.length === args.length) {
+            await sendComplexMessage(chatId, `🤷‍♂️ Ни один из запрошенных файлов не найден с уникальным совпадением.`, [], { removeKeyboard: true });
+            return;
         }
         
         const studioLink = `t.me/${process.env.BOT_USERNAME || 'oneSitePlsBot'}/app`;
@@ -133,6 +123,6 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
     } catch (error) {
         logger.error("[File Command] Error processing /file command:", error);
         const errorMessage = error instanceof Error ? error.message : "Произошла неизвестная ошибка.";
-        await sendComplexMessage(chatId, `🚨 Ошибка выполнения команды:\n\`${errorMessage}\``, [], {removeKeyboard: true});
+        await sendComplexMessage(chatId, `🚨 Ошибка выполнения команды:\n\`${errorMessage}\``, [], { removeKeyboard: true });
     }
 }
