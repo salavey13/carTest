@@ -6,10 +6,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import type { GodModeDeck } from "@/app/elon/arbitrage_scanner_types";
 
 const INITIAL_BALANCES: Record<string, number> = {
-  "USDT": 50000,
-  "BTC": 1,
-  "ETH": 15,
-  "SOL": 300
+  "USDT": 50000, "BTC": 1, "ETH": 15, "SOL": 300
 };
 
 export async function simGoCommand(chatId: number, userId: string, args: string[]) {
@@ -18,26 +15,27 @@ export async function simGoCommand(chatId: number, userId: string, args: string[
   
   await sendComplexMessage(chatId, `🚀 *Принято.* Совершаю квантовый сдвиг капитала на $${burstAmount}...`, []);
 
-  // --- ШАГ 1 & 2: READ & VERIFY ---
+  // --- ИСПРАВЛЕННЫЙ ЗАПРОС К SUPABASE ---
   const { data: userProfile, error: readError } = await supabaseAdmin
-      .from('profiles')
+      .from('users')      // <-- ИСПРАВЛЕНИЕ
       .select('metadata')
-      .eq('id', userId)
+      .eq('user_id', userId) // <-- ИСПРАВЛЕНИЕ
       .single();
 
   if (readError || !userProfile) {
-    logger.error(`[sim_go] CRITICAL: Failed to read user profile for ${userId}. Aborting write.`, readError);
+    logger.error(`[sim_go] CRITICAL: Failed to read user profile from 'users' table for ${userId}. Aborting write.`, readError);
     await sendComplexMessage(chatId, "🚨 КРИТИЧЕСКАЯ ОШИБКА: Не могу прочитать твой профиль. Операция отменена для защиты данных.");
     return;
   }
 
   try {
+    // ВАЖНО: getArbitrageScannerSettings тоже должен использовать 'users' и 'user_id'.
+    // Предполагаем, что он уже исправлен или будет исправлен.
     const settingsResult = await getArbitrageScannerSettings(userId);
     if (!settingsResult.success || !settingsResult.data) {
       throw new Error("Не удалось загрузить настройки пользователя.");
     }
     
-    // Запускаем симуляцию по самым свежим данным
     const simResult = await runGodModeSimulation(settingsResult.data, burstAmount);
 
     if (simResult.opportunities.length === 0) {
@@ -45,37 +43,30 @@ export async function simGoCommand(chatId: number, userId: string, args: string[
         return;
     }
 
-    // --- ШАГ 3: MODIFY (Calculate new state) ---
     const currentMetadata = userProfile.metadata || {};
     let deck: GodModeDeck = JSON.parse(JSON.stringify(currentMetadata.god_mode_deck || { balances: {}, total_profit_usd: 0 }));
     
-    // Инициализация, если балансы пустые
     if (Object.keys(deck.balances).length === 0) {
         deck.balances = { ...INITIAL_BALANCES };
         logger.info(`[sim_go] Initializing balances for user ${userId}`);
     }
 
-    // В God-Mode мы просто добавляем профит в USDT, т.к. предполагаем бесконечные балансы активов
     deck.balances["USDT"] = (deck.balances["USDT"] || 0) + simResult.totalProfit;
     deck.total_profit_usd = (deck.total_profit_usd || 0) + simResult.totalProfit;
 
-    // --- ШАГ 4: MERGE & WRITE ---
-    const finalMetadata = {
-        ...currentMetadata,
-        god_mode_deck: deck,
-    };
+    const finalMetadata = { ...currentMetadata, god_mode_deck: deck };
 
+    // --- ИСПРАВЛЕННЫЙ ЗАПРОС НА ОБНОВЛЕНИЕ ---
     const { error: writeError } = await supabaseAdmin
-        .from('profiles')
+        .from('users') // <-- ИСПРАВЛЕНИЕ
         .update({ metadata: finalMetadata })
-        .eq('id', userId);
+        .eq('user_id', userId); // <-- ИСПРАВЛЕНИЕ
 
     if (writeError) {
-      logger.error(`[sim_go] CRITICAL: Failed to write metadata for ${userId}.`, writeError);
+      logger.error(`[sim_go] CRITICAL: Failed to write metadata to 'users' table for ${userId}.`, writeError);
       throw new Error("Ошибка сохранения обновленного профиля.");
     }
     
-    // --- Финальный отчет ---
     const updatedScoreboardText = "*Updated Scoreboard:*\n" +
       Object.entries(deck.balances).map(([asset, amount]) => ` • \`${asset}\`: ${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 8})}`).join('\n') +
       `\n*Total Profit:* $${deck.total_profit_usd.toFixed(2)}`;
