@@ -44,6 +44,8 @@ export async function handleCommand(update: any) {
       "/profile": () => profileCommand(chatId, Number(userIdStr), username),
     };
     
+    const commandFunction = commandMap[command];
+    
     if (commandFunction) {
       await commandFunction();
     } else {
