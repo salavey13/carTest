@@ -6,7 +6,7 @@ CREATE TABLE market_data (
   ask_price NUMERIC(20, 10) NOT NULL,
   last_price NUMERIC(20, 10) NOT NULL,
   volume NUMERIC(30, 10) NOT NULL,
-  is_simulated BOOLEAN(FALSE),
+  is_simulated BOOLEAN NOT NULL DEFAULT false,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
