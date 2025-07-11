@@ -14,9 +14,10 @@ import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { simCommand } from "./sim"; 
 import { simGoCommand } from "./sim_go";
-import { seedMarketCommand } from "./seed_market"; // <-- НОВАЯ КОМАНДА
+import { seedMarketCommand } from "./seed_market";
 
 export async function handleCommand(update: any) {
+  // --- Text Message Handling ---
   if (update.message?.text) {
     const text: string = update.message.text;
     const chatId: number = update.message.chat.id;
@@ -37,7 +38,7 @@ export async function handleCommand(update: any) {
       "/sim": () => simCommand(chatId, userIdStr, args),
       "/sim_god": () => simCommand(chatId, userIdStr, args), 
       "/sim_go": () => simGoCommand(chatId, userIdStr, args),
-      "/seed_market": () => seedMarketCommand(chatId, userIdStr), // <-- НОВАЯ КОМАНДА
+      "/seed_market": () => seedMarketCommand(chatId, userIdStr),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
       "/file": () => fileCommand(chatId, userId, args),
@@ -47,17 +48,18 @@ export async function handleCommand(update: any) {
       "/profile": () => profileCommand(chatId, userId, username),
     };
     
-
     const commandFunction = commandMap[command];
     
     if (commandFunction) {
       await commandFunction();
     } else {
+      // Это отдельный обработчик для текстовых кнопок из /settings, он не является командой.
       if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
           await rageSettingsCommand(chatId, userId, text);
           return;
       }
 
+      // Проверка, не отвечает ли пользователь на опрос
       const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
       if (activeSurvey) {
         logger.info(`[Command Handler] Text is not a command, routing to survey handler for user ${userId}`);
@@ -69,6 +71,12 @@ export async function handleCommand(update: any) {
     }
     return;
   }
-  
-  // ... (остальная часть файла без изменений)
+
+  // --- Callback Query Handling ---
+  // Блок обработки `update.callback_query` был ЦЕЛЕНАПРАВЛЕННО УДАЛЕН.
+  // Этот паттерн признан нестабильным и хрупким.
+  // Вся логика переведена на прямые текстовые команды для повышения надежности и скорости.
+  // Протокол: "Bravity in dealing with bullshit on serverside."
+
+  logger.warn("[Command Handler] Received unhandled update type, returning 200 OK to prevent loops.", { update_id: update.update_id });
 }
