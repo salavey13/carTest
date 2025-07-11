@@ -9,7 +9,7 @@ import { howtoCommand } from "./howto";
 import { ctxCommand } from "./ctx";
 import { profileCommand } from "./profile";
 import { helpCommand } from "./help";
-import { rageSettingsCommand } from "./rageSettings"; // New import
+import { rageSettingsCommand } from "./rageSettings";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
 
@@ -18,6 +18,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
  */
 export async function handleCommand(update: any) {
   
+  // --- Text Message Handling ---
   if (update.message?.text) {
     const text: string = update.message.text;
     const chatId: number = update.message.chat.id;
@@ -65,6 +66,7 @@ export async function handleCommand(update: any) {
     return;
   }
 
+  // --- Callback Query Handling ---
   if (update.callback_query) {
     const callbackQuery = update.callback_query;
     const chatId: number = callbackQuery.message.chat.id;
@@ -73,6 +75,7 @@ export async function handleCommand(update: any) {
 
     logger.info(`[Command Handler] Received callback_query: '${data}' from User ID: ${userId}`);
     
+    // Always answer the callback query to remove the loading state on the button
     try {
         const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
         await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: callbackQuery.id }), });
@@ -82,6 +85,9 @@ export async function handleCommand(update: any) {
     
     if (data === "request_howto") {
       await howtoCommand(chatId, userId, callbackQuery.message?.message_id);
+    } else if (data === "rage_settings_prompt") {
+      // Trigger the settings command with the specific sub-command text
+      await rageSettingsCommand(chatId, userId, "/settings rage");
     } else {
       logger.warn(`[Command Handler] Unhandled callback_query data: '${data}' from User ID: ${userId}.`);
     }
