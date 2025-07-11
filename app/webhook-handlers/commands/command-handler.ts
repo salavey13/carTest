@@ -33,7 +33,7 @@ export async function handleCommand(update: any) {
       "/start": () => startCommand(chatId, userId, username, text),
       "/help": () => helpCommand(chatId, userId),
       "/rage": () => rageCommand(chatId, userId),
-      "/settings": () => rageSettingsCommand(chatId, userId, text), // Route /settings to the new handler
+      "/settings": () => rageSettingsCommand(chatId, userId, text),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
       "/file": () => fileCommand(chatId, userId, args),
@@ -48,13 +48,11 @@ export async function handleCommand(update: any) {
     if (commandFunction) {
       await commandFunction();
     } else {
-      // Check for rage settings commands
       if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
           await rageSettingsCommand(chatId, userId, text);
           return;
       }
 
-      // Check for active survey
       const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
       if (activeSurvey) {
         logger.info(`[Command Handler] Text is not a command, routing to survey handler for user ${userId}`);
@@ -67,7 +65,6 @@ export async function handleCommand(update: any) {
     return;
   }
 
-  // NOTE: Callback query handling is left here for future use
   if (update.callback_query) {
     const callbackQuery = update.callback_query;
     const chatId: number = callbackQuery.message.chat.id;
