@@ -31,14 +31,13 @@ async function getRandomUnsplashImage(query: string): Promise<string> {
   }
 }
 
-// This function now handles both Inline and Reply keyboards
 export async function sendComplexMessage(
   chatId: string | number,
   text: string,
   buttons: KeyboardButton[][] = [],
   options: {
     imageQuery?: string,
-    messageId?: number, // For editing
+    messageId?: number,
     keyboardType?: 'inline' | 'reply',
     removeKeyboard?: boolean
   } = {}
@@ -64,7 +63,7 @@ export async function sendComplexMessage(
   } else if (buttons.length > 0) {
     if (keyboardType === 'inline') {
       payload.reply_markup = { inline_keyboard: buttons };
-    } else { // 'reply'
+    } else {
       payload.reply_markup = {
         keyboard: buttons,
         resize_keyboard: true,
@@ -74,19 +73,23 @@ export async function sendComplexMessage(
   }
 
   let endpoint: string;
-
-  if (messageId && keyboardType === 'inline') {
-    endpoint = 'editMessageText';
-    payload.message_id = messageId;
-    payload.text = text;
+  // IMPORTANT: The logic for editing messages with photos is different.
+  // `editMessageText` cannot edit a message that has a photo (it has a caption, not text).
+  // The robust solution is to use `editMessageCaption` or delete and resend.
+  // We are now handling editing in a separate, smarter function.
+  
+  if (messageId) {
+    logger.warn(`[sendComplexMessage] Attempted to edit message ${messageId} via sendComplexMessage. This is deprecated. Use editMessage instead.`);
+    // Fallback to deleting and sending a new one.
+    await deleteTelegramMessage(Number(chatId), messageId);
+  }
+  
+  endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
+  if (imageUrl) {
+    payload.photo = imageUrl;
+    payload.caption = text;
   } else {
-    endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-    if (imageUrl) {
-      payload.photo = imageUrl;
-      payload.caption = text;
-    } else {
-      payload.text = text;
-    }
+    payload.text = text;
   }
 
   try {
@@ -128,15 +131,37 @@ export async function deleteTelegramMessage(chatId: number, messageId: number): 
             body: JSON.stringify({ chat_id: chatId, message_id: messageId })
         });
         const data = await response.json();
-        if (!data.ok) {
+        // Don't treat "message to delete not found" as a critical error.
+        if (!data.ok && !data.description?.includes('message to delete not found')) {
             logger.warn(`[DeleteMessage] Failed to delete message ${messageId} for chat ${chatId}. Reason: ${data.description}`);
             return false;
         }
-        logger.info(`[DeleteMessage] Successfully deleted message ${messageId} for chat ${chatId}.`);
+        logger.info(`[DeleteMessage] Successfully deleted message ${messageId} for chat ${chatId} (or it was already gone).`);
         return true;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
         logger.error(`[DeleteMessage] Critical error deleting message ${messageId}:`, errorMessage);
         return false;
     }
+}
+
+/**
+ * A more robust function to "update" a message. It deletes the old one and sends a new one.
+ * This avoids issues with editing photo captions vs. text messages.
+ */
+export async function editMessage(
+    chatId: number, 
+    messageId: number, 
+    newText: string,
+    buttons: KeyboardButton[][] = [],
+    options: {
+        imageQuery?: string;
+        keyboardType?: 'inline' | 'reply';
+    } = {}
+) {
+    // 1. Delete the old message. We don't care much if it fails (it might be already gone).
+    await deleteTelegramMessage(chatId, messageId);
+    
+    // 2. Send a brand new message with the updated content.
+    return await sendComplexMessage(chatId, newText, buttons, options);
 }
