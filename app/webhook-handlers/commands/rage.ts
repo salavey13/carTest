@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
-import { fetchArbitrageOpportunities } from "@/app/elon/arbitrage_scanner_actions";
-import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity } from "@/app/elon/arbitrage_scanner_types";
-import { sendComplexMessage } from "../actions/sendComplexMessage";
+import { fetchArbitrageOpportunities, getArbitrageScannerSettings } from "@/app/elon/arbitrage_scanner_actions";
+import type { ArbitrageOpportunity, TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity, ArbitrageSettings } from "@/app/elon/arbitrage_scanner_types";
+import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 
 function createExchangeLink(exchange: string, pair: string): string {
     const formattedPair = pair.replace('/', '_');
@@ -13,53 +13,71 @@ function createExchangeLink(exchange: string, pair: string): string {
     }
 }
 
-function formatOpportunity(op: ArbitrageOpportunity): { text: string; buttons: any[] } {
+function formatOpportunity(op: ArbitrageOpportunity): string {
     const profit = `${op.profitPercentage.toFixed(3)}% ($${op.potentialProfitUSD.toFixed(2)})`;
-    let text = "";
-    let buttons = [];
-
     if (op.type === '2-leg') {
         const twoLegOp = op as TwoLegArbitrageOpportunity;
-        text = `*2-Leg:* ${twoLegOp.currencyPair}\n` +
+        return `*2-Leg:* ${twoLegOp.currencyPair}\n` +
                `  - Покупка: *${twoLegOp.buyExchange}* @ ${twoLegOp.buyPrice.toFixed(4)}\n` +
                `  - Продажа: *${twoLegOp.sellExchange}* @ ${twoLegOp.sellPrice.toFixed(4)}\n` +
                `  - 🔥 *Профит: ${profit}*`;
-        buttons = [
-            { text: `Buy on ${twoLegOp.buyExchange}`, url: createExchangeLink(twoLegOp.buyExchange, twoLegOp.currencyPair) },
-            { text: `Sell on ${twoLegOp.sellExchange}`, url: createExchangeLink(twoLegOp.sellExchange, twoLegOp.currencyPair) }
-        ];
     } else {
-        text = `*3-Leg:* ${op.currencyPair} на *${op.exchange}*\n` +
+        const threeLegOp = op as ThreeLegArbitrageOpportunity;
+        return `*3-Leg:* ${threeLegOp.currencyPair} на *${threeLegOp.exchange}*\n` +
                `  - 🔥 *Профит: ${profit}*`;
-        buttons = [{ text: `Go to ${op.exchange}`, url: createExchangeLink(op.exchange, op.legs[0].pair) }];
     }
-    return { text, buttons };
+}
+
+function formatSettings(settings: ArbitrageSettings): string {
+    return `*Мин. Спред:* ${settings.minSpreadPercent}% | *Объем:* $${settings.defaultTradeVolumeUSD}\n` +
+           `*Биржи:* ${settings.enabledExchanges.join(', ')}\n` +
+           `*Пары:* ${settings.trackedPairs.join(', ')}`;
 }
 
 export async function rageCommand(chatId: number, userId: number) {
-    logger.info(`[RageCommandV3_ACTIONABLE] User ${userId} triggered /rage.`);
+    logger.info(`[RageCommand V4] User ${userId} triggered /rage.`);
     
-    // Send an initial "thinking" message that we can edit later
-    const thinkingMessage = await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], "lightning storm");
+    await sendComplexMessage(chatId, "⚡️ *Режим Ярости Активирован!* Сканирую симулированный рынок на наличие альфы...", [], { imageQuery: "lightning storm" });
 
     try {
+        const settingsResult = await getArbitrageScannerSettings(String(userId));
+        const settings = settingsResult.data;
+
+        if (!settings) {
+            throw new Error("Не удалось загрузить настройки пользователя.");
+        }
+
         const { opportunities } = await fetchArbitrageOpportunities(String(userId));
 
+        const botUsername = process.env.BOT_USERNAME || 'oneSitePlsBot';
+        const settingsLink = `https://t.me/${botUsername}/app?startapp=settings`;
+        const deepDiveLink = `https://t.me/${botUsername}/app?startapp=arbitrage-notdummies`; // You need to add this mapping in ClientLayout
+
+        const buttons: KeyboardButton[][] = [[
+            { text: "⚙️ Изменить Настройки", url: settingsLink },
+            { text: "🧠 Что это значит?", url: deepDiveLink }
+        ]];
+
         if (!opportunities || opportunities.length === 0) {
-            await sendComplexMessage(chatId, "🧘‍♂️ Рынок спокоен. Значимых возможностей не найдено. Попробуй позже.", [], "zen");
+            const noResultMessage = `🧘‍♂️ *Рынок спокоен.*\nЗначимых возможностей не найдено с вашими текущими настройками:\n\n` +
+                                    `\`${formatSettings(settings)}\`\n\n` +
+                                    `Попробуйте изменить их или повторите попытку позже.`;
+            await sendComplexMessage(chatId, noResultMessage, buttons, { imageQuery: "zen garden", keyboardType: 'inline' });
             return;
         }
 
         const sortedOps = opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage);
         const topOp = sortedOps[0];
 
-        const { text, buttons } = formatOpportunity(topOp);
-        const finalMessage = "🏆 *Найден Топ-Сигнал:*\n\n" + text;
+        const opportunityText = formatOpportunity(topOp);
+        const finalMessage = `🏆 *Найден Топ-Сигнал:*\n\n${opportunityText}\n\n` +
+                             `*Настройки симуляции:*\n` +
+                             `\`${formatSettings(settings)}\``;
 
-        await sendComplexMessage(chatId, finalMessage, [buttons], "gold treasure");
+        await sendComplexMessage(chatId, finalMessage, buttons, { imageQuery: "gold treasure", keyboardType: 'inline' });
 
     } catch (error) {
-        logger.error("[RageCommandV3] Error fetching arbitrage opportunities:", error);
-        await sendComplexMessage(chatId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась.", [], "explosion");
+        logger.error("[RageCommandV4] Error processing command:", error);
+        await sendComplexMessage(chatId, "🚨 Ошибка при сканировании рынка. Нейросеть перегрелась.", [], { imageQuery: "explosion" });
     }
 }
