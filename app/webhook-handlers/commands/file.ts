@@ -64,53 +64,37 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
         }
         const { tree, owner, repo } = treeResult;
 
-        let combinedContent = "";
-        let foundPaths: string[] = [];
-        let ambiguousTerms: string[] = [];
-        let notFoundTerms: string[] = [];
-
-        for (const term of args) {
-            const found = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(term.toLowerCase()));
-            if (found.length === 1 && found[0].path) {
-                const filePath = found[0].path;
-                const response = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/main/${filePath}`);
-                if (response.ok) {
-                    const fileContent = await response.text();
-                    const prefix = getFileCommentPrefix(filePath);
-                    const pathComment = `${prefix} /${filePath}`;
-                    
-                    const contentWithHeader = fileContent.trim().startsWith(pathComment) 
-                        ? fileContent 
-                        : `${pathComment}\n\n${content}`;
-                    
-                    if (combinedContent) {
-                       combinedContent += `\n\n\`\`\`\n// --- END OF FILE: ${foundPaths[foundPaths.length - 1]} ---\n\`\`\`\n\n`;
-                    }
-                    combinedContent += contentWithHeader;
-                    foundPaths.push(filePath);
-                }
-            } else if (found.length > 1) {
-                ambiguousTerms.push(term);
-            } else {
-                notFoundTerms.push(term);
-            }
-        }
+        // --- Single-file search logic ---
+        const searchTerm = args.join(' ').toLowerCase();
+        const foundFiles = tree.filter(item => item.type === 'blob' && item.path?.toLowerCase().includes(searchTerm)).slice(0, 8);
         
-        let warnings = [];
-        if (ambiguousTerms.length > 0) warnings.push(`неоднозначный поиск для: \`${ambiguousTerms.join('`, `')}\``);
-        if (notFoundTerms.length > 0) warnings.push(`не найдено для: \`${notFoundTerms.join('`, `')}\``);
-
-        if (warnings.length > 0) {
-            await sendComplexMessage(chatId, `⚠️ Пропущено: ${warnings.join('; ')}.`);
-        }
-
-        if (combinedContent) {
-            await sendComplexMessage(chatId, `✅ Найдено ${foundPaths.length} файлов. Загружаю объединенный контекст...`, [], { removeKeyboard: true });
-            await sendBatchedCode(chatId, combinedContent);
-        } else if (args.length > 0 && warnings.length === args.length) {
-            await sendComplexMessage(chatId, `🤷‍♂️ Ни один из запрошенных файлов не найден с уникальным совпадением.`, [], { removeKeyboard: true });
+        if (foundFiles.length === 0) {
+            await sendComplexMessage(chatId, `🤷‍♂️ Файлы по запросу \`${searchTerm}\` не найдены.`, [], { removeKeyboard: true });
             return;
         }
+
+        if (foundFiles.length > 1) {
+            const message = `🎯 Найдено несколько файлов. Уточни запрос, выбрав нужный с помощью клавиатуры:`;
+            const buttons: KeyboardButton[][] = foundFiles.map(file => ([{ text: `/file ${file.path}` }]));
+            await sendComplexMessage(chatId, message, buttons, { keyboardType: 'reply' });
+            return;
+        }
+            
+        const file = foundFiles[0];
+        if (!file.path) { throw new Error("Найденный файл не имеет пути."); }
+            
+        const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`;
+        await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Посмотреть на GitHub](${rawUrl})`, [], { removeKeyboard: true });
+
+        const response = await fetch(rawUrl);
+        if (!response.ok) { throw new Error(`Не удалось загрузить содержимое файла. Статус: ${response.status}`); }
+        const content = await response.text(); // content is now defined here
+            
+        const prefix = getFileCommentPrefix(file.path);
+        const pathComment = `${prefix} /${file.path}`.trim();
+        const finalContent = content.trim().startsWith(pathComment) ? content : `${pathComment}\n\n${content}`;
+
+        await sendBatchedCode(chatId, finalContent);
         
         const studioLink = `t.me/${process.env.BOT_USERNAME || 'oneSitePlsBot'}/app`;
         await sendComplexMessage(chatId, `Готово! Также можешь открыть [студию](${studioLink}) для полной картины.`, []);
