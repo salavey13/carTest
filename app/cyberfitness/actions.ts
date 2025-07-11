@@ -2,44 +2,14 @@
 
 import { supabaseAdmin } from '@/hooks/supabase';
 import { fetchUserData as genericFetchUserData } from '@/hooks/supabase';
-import type { Database } from "@/types/database.types";
 import { debugLogger as logger } from "@/lib/debugLogger";
+import { 
+    CyberFitnessProfile, 
+    CYBERFIT_METADATA_KEY,
+    UserMetadata
+} from './types';
 
-// These types and constants are safe to be on the server
-type DbUser = Database["public"]["Tables"]["users"]["Row"];
-type UserMetadata = DbUser['metadata'];
-
-export interface DailyActivityRecord {
-  date: string; 
-  filesExtracted: number;
-  tokensProcessed: number;
-  kworkRequestsSent: number; 
-  prsCreated: number;
-  branchesUpdated: number;
-  focusTimeMinutes?: number; 
-}
-
-export interface CyberFitnessProfile {
-  level: number; 
-  kiloVibes: number; 
-  focusTimeHours: number; 
-  skillsLeveled: number; 
-  activeQuests: string[]; 
-  completedQuests: string[]; 
-  unlockedPerks: string[]; 
-  achievements: string[]; 
-  cognitiveOSVersion: string; 
-  lastActivityTimestamp: string; 
-  dailyActivityLog: DailyActivityRecord[];
-  totalFilesExtracted: number; 
-  totalTokensProcessed: number; 
-  totalKworkRequestsSent: number; 
-  totalPrsCreated: number; 
-  totalBranchesUpdated: number; 
-  featuresUsed: Record<string, boolean | number | string>; 
-}
-
-export const CYBERFIT_METADATA_KEY = "cyberFitness"; 
+// These constants are now local to the server action file
 const QUEST_ORDER: string[] = [ "initial_boot_sequence", "first_fetch_completed", "first_parse_completed", "first_pr_created" ];
 const LEVEL_THRESHOLDS_KV = [0, 50, 150, 400, 800, 1500, 2800, 5000, 8000, 12000, 17000, 23000, 30000, 40000, 50000, 75000, 100000]; 
 const COGNITIVE_OS_VERSIONS = [
@@ -85,8 +55,8 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
   return finalProfile;
 };
 
-// This is the new, safe, server-side function
-export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> => {
+// This is the safe, server-side function to be exported
+export async function fetchUserCyberFitnessProfile(userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> {
   logger.log(`[CyberFitness Server Action] Fetching profile for user_id: ${userId}`);
   if (!userId) {
     return { success: false, error: "User ID is required.", data: getDefaultCyberFitnessProfile() };
