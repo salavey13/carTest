@@ -7,7 +7,6 @@ import { handleCommand } from "@/app/webhook-handlers/commands/command-handler";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const BOT_USERNAME = "oneSitePlsBot";
 
-// --- Minibot Helper Functions ---
 function extractCodeBlocks(fileContent: string): string[] {
   const codeBlockRegex = /```(?:\w*\n)?([\s\S]*?)```/g;
   const blocks: string[] = [];
@@ -24,20 +23,15 @@ function getFirstLine(codeBlock: string): string {
 }
 
 export async function POST(request: Request) {
-  // --- ГЛОБАЛЬНЫЙ БЛОК TRY...CATCH для предотвращения циклов ---
+  // --- GLOBAL, TOP-LEVEL ERROR HANDLING TO PREVENT ALL LOOPS ---
   try {
     const update = await request.json();
     logger.info("[Master Webhook] Received update:", Object.keys(update));
 
-    // Route 1: Handle payment-related updates via the dedicated proxy handler
     if (update.pre_checkout_query || update.message?.successful_payment) {
-      logger.info("[Master Webhook] Routing to Payment Proxy Handler...");
       await handleWebhookProxy(update);
     }
-    
-    // Route 2: Handle Minibot file uploads directly
     else if (update.message?.document) {
-      logger.info("[Master Webhook] Routing to Minibot File Handler...");
       const { document, chat } = update.message;
       const fileId = document.file_id;
       const chatId = chat.id;
@@ -46,8 +40,8 @@ export async function POST(request: Request) {
       const fileInfo = await fileInfoResponse.json();
 
       if (!fileInfo.ok) {
-        logger.error("[Minibot Logic] Error getting file info from Telegram:", fileInfo);
-        await sendTelegramMessage("Sorry, I couldn't retrieve that file's info.", [], undefined, chatId.toString());
+        logger.error("[Minibot Logic] Error getting file info:", fileInfo);
+        await sendTelegramMessage("Error retrieving file info.", [], undefined, chatId.toString());
       } else {
         const filePath = fileInfo.result.file_path;
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${filePath}`;
@@ -56,40 +50,33 @@ export async function POST(request: Request) {
 
         const codeBlocks = extractCodeBlocks(fileContent);
         if (codeBlocks.length === 0) {
-          await sendTelegramMessage("File received, but I couldn't find any code blocks marked with ```.", [], undefined, chatId.toString());
+          await sendTelegramMessage("File received, but no code blocks ``` found.", [], undefined, chatId.toString());
         } else {
           const fileList = codeBlocks.map((block, index) => {
             const cleanFileName = getFirstLine(block).replace(/^\/\/\s×|\/\×\s×|\×?\/\s×|#\s×/, '').trim();
             return `${index + 1}. \`${cleanFileName}\``;
           }).join('\n');
-
           const responseText = `ok, now go to t.me/${BOT_USERNAME}/app and paste your file there;)\n\nParsed files:\n${fileList}`;
           await sendTelegramMessage(responseText, [], undefined, chatId.toString());
         }
       }
     }
-
-    // Route 3 & 4: Handle text messages and callback queries
     else if (update.message?.text || update.callback_query) {
-      logger.info("[Master Webhook] Routing to Main Command Handler...");
       await handleCommand(update);
     }
-
-    // Route 5: Fallback for other message types
     else {
-      logger.info("[Master Webhook] Received unhandled update type, ignoring.", { keys: Object.keys(update || {}) });
+      logger.info("[Master Webhook] Unhandled update type, ignoring.", { keys: Object.keys(update || {}) });
     }
 
-    // Если все прошло без падений, возвращаем 200 OK
-    return NextResponse.json({ ok: true });
-
   } catch (error) {
-    // --- ЭТО САМАЯ ВАЖНАЯ ЧАСТЬ ---
-    // Если любая часть кода выше выбросила необработанное исключение, мы ловим его здесь.
-    logger.error("!!! CRITICAL UNHANDLED ERROR IN MASTER WEBHOOK !!!", error);
-    
-    // Мы НЕ даем функции упасть. Вместо этого мы отправляем 200 OK Telegram,
-    // чтобы он прекратил посылать повторные запросы и разорвал цикл.
+    // THIS BLOCK IS THE MOST IMPORTANT PIECE OF CODE.
+    // IT CATCHES ANY UNHANDLED EXCEPTION FROM THE LOGIC ABOVE.
+    logger.error("!!! CRITICAL UNHANDLED ERROR IN WEBHOOK, PREVENTING LOOP !!!", error);
+    // BY RETURNING 200 OK, WE TELL TELEGRAM THE UPDATE WAS RECEIVED,
+    // EVEN THOUGH IT FAILED. THIS STOPS THE RETRY CYCLE.
     return NextResponse.json({ ok: true, error: "Internal error handled gracefully to prevent webhook loop." }, { status: 200 });
   }
+
+  // If no error was thrown, we return 200 OK normally.
+  return NextResponse.json({ ok: true });
 }
