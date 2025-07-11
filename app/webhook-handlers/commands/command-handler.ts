@@ -9,6 +9,7 @@ import { howtoCommand } from "./howto";
 import { ctxCommand } from "./ctx";
 import { profileCommand } from "./profile";
 import { helpCommand } from "./help";
+import { rageSettingsCommand } from "./rageSettings"; // New import
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
 
@@ -32,6 +33,7 @@ export async function handleCommand(update: any) {
       "/start": () => startCommand(chatId, userId, username, text),
       "/help": () => helpCommand(chatId, userId),
       "/rage": () => rageCommand(chatId, userId),
+      "/settings": () => rageSettingsCommand(chatId, userId, text), // Route /settings to the new handler
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
       "/file": () => fileCommand(chatId, userId, args),
@@ -46,25 +48,26 @@ export async function handleCommand(update: any) {
     if (commandFunction) {
       await commandFunction();
     } else {
-      // If it's not a known command, check if it's an answer to a survey
+      // Check for rage settings commands
+      if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
+          await rageSettingsCommand(chatId, userId, text);
+          return;
+      }
+
+      // Check for active survey
       const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
-      
       if (activeSurvey) {
         logger.info(`[Command Handler] Text is not a command, routing to survey handler for user ${userId}`);
         await startCommand(chatId, userId, username, text);
       } else {
         logger.warn(`[Command Handler] Unknown command and no active survey for user ${userId}. Text: '${text}'`);
-        await sendComplexMessage(
-          chatId,
-          "Неизвестная команда, Агент. Используй /help, чтобы увидеть список доступных директив.",
-          []
-        );
+        await sendComplexMessage(chatId, "Неизвестная команда, Агент. Используй /help, чтобы увидеть список доступных директив.", []);
       }
     }
     return;
   }
 
-  // NOTE: Callback query handling is left here for future use, but is currently not triggered by the survey.
+  // NOTE: Callback query handling is left here for future use
   if (update.callback_query) {
     const callbackQuery = update.callback_query;
     const chatId: number = callbackQuery.message.chat.id;
@@ -75,11 +78,7 @@ export async function handleCommand(update: any) {
     
     try {
         const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`;
-        await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ callback_query_id: callbackQuery.id }),
-        });
+        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: callbackQuery.id }), });
     } catch (e) {
         logger.error(`[Command Handler] Failed to answer callback query:`, e);
     }
