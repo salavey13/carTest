@@ -13,7 +13,7 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from '@/contexts/AppContext';
 import type { GodModeSimulationResult, GodModeOpportunity } from '@/app/elon/arbitrage_scanner_types';
 import { motion } from 'framer-motion';
-import { supabaseAdmin as supabase } from "@/hooks/supabase”
+import { supabaseAdmin as supabase } from "@/hooks/supabase"
 
 const ArbitrageVoxelPlotWithNoSSR = dynamic(
   () => import('@/components/arbitrage/ArbitrageVoxelPlot'),
