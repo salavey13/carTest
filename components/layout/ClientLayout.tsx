@@ -99,6 +99,18 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       startParamHandledRef.current = true; // Mark as handled immediately to prevent re-triggering
       
       const lowerStartParam = startParamPayload.toLowerCase();
+
+      // Handle viz deep-link
+      if (lowerStartParam.startsWith('viz_')) {
+          const simId = startParamPayload.substring(4);
+          const targetPath = `/god-mode-sandbox?simId=${simId}`;
+          if (pathname !== targetPath) {
+              logger.info(`[ClientLayout Logic] viz startParam '${startParamPayload}' => '${targetPath}'. Redirecting from '${pathname}'.`);
+              router.replace(targetPath);
+          }
+          return;
+      }
+      
       const targetPathFromMap = START_PARAM_PAGE_MAP[lowerStartParam];
 
       if (targetPathFromMap) {
@@ -126,6 +138,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/hotvibes",
     "/leads",
     "/elon",
+    "/god-mode-sandbox",
   ];
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 

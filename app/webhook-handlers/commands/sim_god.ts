@@ -3,10 +3,11 @@ import { getArbitrageScannerSettings } from "@/app/elon/arbitrage_scanner_action
 import { runGodModeSimulation } from "@/app/elon/arbitrage_god_mode_actions";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { supabaseAdmin } from "@/hooks/supabase";
-import type { GodModeDeck } from "@/app/elon/arbitrage_scanner_types";
+import type { GodModeDeck, GodModeSimulationResult } from "@/app/elon/arbitrage_scanner_types";
 
 export async function simGodCommand(chatId: number, userId: string, args: string[]) {
   const burstAmount = parseInt(args[0]) || 5000;
+  const botUsername = process.env.BOT_USERNAME || 'oneSitePlsBot';
   logger.info(`[sim_god] User ${userId} requested God-Mode deck. Burst: $${burstAmount}`);
   
   await sendComplexMessage(chatId, "👑 *God Mode: ON.* Анализирую квантовые флуктуации...", []);
@@ -19,7 +20,22 @@ export async function simGodCommand(chatId: number, userId: string, args: string
 
     const simResult = await runGodModeSimulation(settingsResult.data, burstAmount);
     
-    // --- ИСПРАВЛЕНИЕ: Читаем текущий scoreboard из 'users' по 'user_id' ---
+    // Сохраняем результат симуляции в новую таблицу для real-time подписки
+    const { error: insertError } = await supabaseAdmin
+        .from('god_mode_simulations')
+        .insert({
+            user_id: userId,
+            simulation_result: simResult as unknown as any, // Cast to any to satisfy Supabase
+        });
+
+    if (insertError) {
+        logger.error(`[sim_god] Failed to insert simulation result for user ${userId}`, insertError);
+        // Не прерываем выполнение, просто логируем ошибку. Пользователь все равно получит отчет.
+    } else {
+        logger.info(`[sim_god] Successfully broadcasted simulation ${simResult.simulationId} for user ${userId}`);
+    }
+
+    // Читаем текущий scoreboard из 'users' по 'user_id'
     const { data: userProfile } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
     const deck: GodModeDeck = userProfile?.metadata?.god_mode_deck || { balances: {}, total_profit_usd: 0 };
     
@@ -46,12 +62,15 @@ export async function simGodCommand(chatId: number, userId: string, args: string
       opportunitiesText = "*Рынок спокоен. Альфы не найдено.*";
     }
 
+    // Создаем Deep Link
+    const vizLink = `https://t.me/${botUsername}/app?startapp=viz_${simResult.simulationId}`;
+
     const finalMessage = `👑 *GOD-MODE DECK (Burst: $${burstAmount.toLocaleString()})*\n\n` +
                          `*Market Vibe Index (Juiciness): ${simResult.marketJuiciness}/100* ${simResult.marketJuiciness > 70 ? '🔥' : '💧'}\n\n` +
                          `${scoreboardText}\n\n---\n\n${opportunitiesText}\n\n---\n` +
                          `*ИНСТРУКЦИЯ:*\n`+
-                         `Это снимок рынка. Чтобы совершить "взрыв" и обновить баланс, используй команду:\n` +
-                         `\`/sim_go ${burstAmount}\``;
+                         `Это снимок рынка. Чтобы совершить "взрыв" и обновить баланс, используй \`/sim_go ${burstAmount}\`\n\n` +
+                         `[🚀 Открыть 3D-визуализацию в Voxel Sandbox](${vizLink})`;
 
     await sendComplexMessage(chatId, finalMessage, []);
   } catch (error) {
