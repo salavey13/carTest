@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { ScrollArea } from '@/components/ui/scroll-area';
