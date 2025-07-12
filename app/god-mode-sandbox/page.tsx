@@ -56,7 +56,7 @@ const SandboxContent: React.FC = () => {
     logger.info("[SandboxPage] Rendering (Voxel Rebirth - Realtime).");
     const searchParams = useSearchParams();
     const { addToast } = useAppToast();
-    const { dbUser, supabase } = useAppContext();
+    const { dbUser } = useAppContext();
     const [simulation, setSimulation] = useState<GodModeSimulationResult | null>(null);
     const [logs, setLogs] = useState<string[]>(["Awaiting connection..."]);
     const [isLoading, setIsLoading] = useState(true);
