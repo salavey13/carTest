@@ -1,5 +1,5 @@
 // /app/god-mode-sandbox/page.tsx
-"use client";
+"use client"
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
@@ -13,6 +13,7 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from '@/contexts/AppContext';
 import type { GodModeSimulationResult, GodModeOpportunity } from '@/app/elon/arbitrage_scanner_types';
 import { motion } from 'framer-motion';
+import ( supabaseAdmin as supabase } from "@/hooks/supabase”
 
 const ArbitrageVoxelPlotWithNoSSR = dynamic(
   () => import('@/components/arbitrage/ArbitrageVoxelPlot'),
