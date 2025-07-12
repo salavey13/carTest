@@ -1,3 +1,4 @@
+// /app/god-mode-sandbox/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
@@ -6,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { logger } from '@/lib/logger';
+import { debugLogger as logger } from '@/lib/debugLogger';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from '@/contexts/AppContext';
