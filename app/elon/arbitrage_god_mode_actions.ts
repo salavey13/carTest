@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import type { ArbitrageSettings, GodModeOpportunity } from "./arbitrage_scanner_types";
 
-type MarketDataPoint = { last_price: number; created_at: string };
+type MarketDataPoint = { last_price: number; timestamp: string }; // <-- ИСПРАВЛЕНО с created_at на timestamp
 
 interface QuantumFluctuationResult {
   opportunities: GodModeOpportunity[];
@@ -35,10 +35,10 @@ export async function executeQuantumFluctuation(
     for (const exchange of settings.enabledExchanges) {
       const { data: marketPoints, error } = await supabaseAdmin
         .from('market_data')
-        .select('last_price, created_at') // <-- ИСПОЛЬЗУЕМ last_price
+        .select('last_price, timestamp') // <-- ИСПОЛЬЗУЕМ timestamp
         .eq('exchange', exchange)
         .eq('symbol', pair)
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false }) // <-- ИСПОЛЬЗУЕМ timestamp
         .limit(2);
 
       if (error || !marketPoints || marketPoints.length < 2) {
@@ -49,8 +49,8 @@ export async function executeQuantumFluctuation(
       const [p_current, p_previous] = marketPoints as MarketDataPoint[];
       
       const timeNow = new Date().getTime();
-      const timeCurrent = new Date(p_current.created_at).getTime();
-      const timePrevious = new Date(p_previous.created_at).getTime();
+      const timeCurrent = new Date(p_current.timestamp).getTime(); // <-- ИСПОЛЬЗУЕМ timestamp
+      const timePrevious = new Date(p_previous.timestamp).getTime(); // <-- ИСПОЛЬЗУЕМ timestamp
 
       const priceDelta = p_current.last_price - p_previous.last_price;
       const timeDelta = timeCurrent - timePrevious;
@@ -63,7 +63,6 @@ export async function executeQuantumFluctuation(
       const bid = p_execution * 0.9999;
       const ask = p_execution * 1.0001;
 
-      // <-- ЗАПОЛНЯЕМ ВСЕ ПОЛЯ ДЛЯ ЗАПИСИ
       newDataPointsToInsert.push({ 
         exchange, 
         symbol: pair, 
