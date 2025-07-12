@@ -16,16 +16,16 @@ jobs:
       (
         startsWith(github.event.pull_request.title, 'Chore: Update image') ||
         startsWith(github.event.pull_request.title, 'Chore: Update icon') ||
+        startsWith(github.event.pull_request.title, 'пульс:') ||
         startsWith(github.event.pull_request.title, '⚡:')
       ) &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.state == 'open'
 
     steps:
-      - name: Checkout code to analyze files
+      - name: Checkout repository context
+        # ЭТОТ ШАГ РЕШАЕТ ПРОБЛЕМУ 'not a git repository'
         uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch changed files list
         id: changed_files
@@ -38,12 +38,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Title, Edit PR, and Add Label
-        if: startsWith(github.event.pull_request.title, '⚡:')
+        # Этот шаг выполняется только для наших "умных" триггеров
+        if: startsWith(github.event.pull_request.title, '⚡:') || startsWith(github.event.pull_request.title, 'пульс:')
         run: |
           files="${{ steps.changed_files.outputs.files }}"
           title=""
 
-          # --- НОВАЯ ЛОГИКА АНАЛИЗА ---
           if echo "$files" | grep -q 'lib/cyberfitness.ts'; then
             title="Refactor(core): Пересборка Квантового Ядра CyberFitness"
           elif echo "$files" | grep -q 'components/repo/prompt.ts'; then
@@ -75,12 +75,14 @@ jobs:
       - name: Send Feedback to Telegram Bot
         if: steps.automerge.outputs.automerge-enabled == 'true'
         run: |
-          # Замыкаем петлю: отправляем уведомление обратно в наш бот
+          # Используем `gh` для получения финального заголовка PR после всех изменений
+          final_title=$(gh pr view ${{ github.event.pull_request.number }} --json title -q '.title')
+          
           curl -X POST "${{ secrets.VERCEL_PROJECT_PRODUCTION_URL }}/api/github-action-feedback" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.ACTION_SECRET }}" \
           -d '{
             "pr_number": "${{ github.event.pull_request.number }}",
-            "pr_title": "${{ github.event.pull_request.title }}",
+            "pr_title": "'"$final_title"'",
             "author_id": "${{ github.event.pull_request.user.id }}"
           }'
