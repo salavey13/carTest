@@ -1,9 +1,8 @@
-// /hooks/cyberFitnessSupabase.ts
 "use client"; 
 import { supabaseAdmin } from './supabase'; 
 import { updateUserMetadata as genericUpdateUserMetadata, fetchUserData as genericFetchUserData } from './supabase'; 
 import type { Database } from "@/types/database.types";
-import { debugLogger as logger } from "@/lib/debugLogger";
+import { logger } from "@/lib/logger";
 import { format } from 'date-fns';
 
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
@@ -232,7 +231,7 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
 };
 
 export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> => {
-  logger.log(`[CyberFitness FetchProfile ENTRY] Attempting to fetch profile for user_id: ${userId}`);
+  logger.info(`[CyberFitness FetchProfile ENTRY] Attempting to fetch profile for user_id: ${userId}`);
   if (!userId) {
     logger.warn("[CyberFitness FetchProfile] User ID (string) is missing. Cannot fetch profile.");
     return { success: false, error: "User ID (string) is required.", data: getDefaultCyberFitnessProfile() };
@@ -250,7 +249,7 @@ export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ su
     if (!userData.metadata || !userData.metadata[CYBERFIT_METADATA_KEY]) {
         logger.info(`[CyberFitness FetchProfile] User ${userId} found, but no CyberFitness metadata yet. Returning default. Will create on first update.`);
     } else {
-        logger.log(`[CyberFitness FetchProfile EXIT] Successfully parsed CyberFitness profile for user ${userId}. Level: ${profile.level}, KiloVibes: ${profile.kiloVibes}, CompletedQuests: ${profile.completedQuests.join(', ')}`);
+        logger.info(`[CyberFitness FetchProfile EXIT] Successfully parsed CyberFitness profile for user ${userId}. Level: ${profile.level}, KiloVibes: ${profile.kiloVibes}, CompletedQuests: ${profile.completedQuests.join(', ')}`);
     }
     return { success: true, data: profile };
   } catch (e: any) {
@@ -279,7 +278,7 @@ export const logSchematicCompleted = async (
     newPerks?: string[];
     kiloVibesAwarded?: number;
 }> => {
-    logger.log(`[CyberFitness SchematicComplete ENTRY] User_id: ${userId}, Schematic: ${schematicId}, Details:`, details);
+    logger.info(`[CyberFitness SchematicComplete ENTRY] User_id: ${userId}, Schematic: ${schematicId}, Details:`, details);
     if (!userId || !schematicId) {
         logger.warn("[CyberFitness SchematicComplete] User ID (string) and Schematic ID required.");
         return { success: false, error: "User ID (string) and Schematic ID required." };
@@ -362,7 +361,7 @@ export const logSchematicCompleted = async (
             return { success: false, error: updateResult.error || "Ошибка сохранения прогресса схемы." };
         }
         
-        logger.log(`[CyberFitness SchematicComplete EXIT] Schematic ${schematicId} completed by ${userId}. KV Awarded: ${awardedKV}. Perks: ${newPerksUnlocked.join(',')}. New Ach count: ${updateResult.newAchievements?.length}`);
+        logger.info(`[CyberFitness SchematicComplete EXIT] Schematic ${schematicId} completed by ${userId}. KV Awarded: ${awardedKV}. Perks: ${newPerksUnlocked.join(',')}. New Ach count: ${updateResult.newAchievements?.length}`);
         return { 
             success: true, 
             newAchievements: updateResult.newAchievements,
@@ -380,7 +379,7 @@ export const updateUserCyberFitnessProfile = async (
   userId: string,
   updates: Partial<CyberFitnessProfile> & { dynamicAchievementsToAdd?: Achievement[] } 
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
-  logger.log(`[CyberFitness UpdateProfile ENTRY] User_id: ${userId}, Updates Summary:`, {
+  logger.info(`[CyberFitness UpdateProfile ENTRY] User_id: ${userId}, Updates Summary:`, {
       keys: Object.keys(updates),
       kiloVibesDelta: updates.kiloVibes,
       levelUpdate: updates.level,
@@ -406,7 +405,7 @@ export const updateUserCyberFitnessProfile = async (
     const existingOverallMetadata = userData?.metadata || {};
     let existingCyberFitnessProfileData = getCyberFitnessProfile(userId, existingOverallMetadata);
     
-    logger.debug(`[CyberFitness UpdateProfile] User: ${userId}.
+    logger.info(`[CyberFitness UpdateProfile] User: ${userId}.
     Existing Profile (from DB read):
       Level: ${existingCyberFitnessProfileData.level}, KV: ${existingCyberFitnessProfileData.kiloVibes},
       Total Files: ${existingCyberFitnessProfileData.totalFilesExtracted}, Total Tokens: ${existingCyberFitnessProfileData.totalTokensProcessed},
@@ -610,7 +609,7 @@ export const updateUserCyberFitnessProfile = async (
         logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements (incl. dynamic):`, newlyUnlockedAchievements.map(a => `${a.name} (${a.id}, +${a.kiloVibesAward || 0}KV)`));
     }
     
-    logger.debug(`[CyberFitness UpdateProfile] User: ${userId}.
+    logger.info(`[CyberFitness UpdateProfile] User: ${userId}.
     Final Profile Values (Calculated, before save):
       Level: ${newCyberFitnessProfile.level}, KV: ${newCyberFitnessProfile.kiloVibes},
       Total Files: ${newCyberFitnessProfile.totalFilesExtracted}, Total Tokens: ${newCyberFitnessProfile.totalTokensProcessed},
@@ -628,7 +627,7 @@ export const updateUserCyberFitnessProfile = async (
       throw new Error(updateError || `Failed to update metadata for user ${userId} via genericUpdateUserMetadata`);
     }
 
-    logger.log(`[CyberFitness UpdateProfile EXIT] Successfully updated profile for ${userId}. New KV: ${newCyberFitnessProfile.kiloVibes}, Lvl: ${newCyberFitnessProfile.level}, OS: ${newCyberFitnessProfile.cognitiveOSVersion}`);
+    logger.info(`[CyberFitness UpdateProfile EXIT] Successfully updated profile for ${userId}. New KV: ${newCyberFitnessProfile.kiloVibes}, Lvl: ${newCyberFitnessProfile.level}, OS: ${newCyberFitnessProfile.cognitiveOSVersion}`);
     return { success: true, data: updatedUser, newAchievements: newlyUnlockedAchievements };
   } catch (e: any) {
     logger.error(`[CyberFitness UpdateProfile CATCH] Exception for ${userId}:`, e);
@@ -773,7 +772,7 @@ export const logCyberFitnessAction = async (
     }
 
     const finalKiloVibes = updateResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.kiloVibes; 
-    logger.log(`[CyberFitness LogAction EXIT] Action '${actionType}' logged for ${userId}. Final KV: ${finalKiloVibes ?? 'N/A'}. New ach: ${updateResult.newAchievements?.length || 0}`);
+    logger.info(`[CyberFitness LogAction EXIT] Action '${actionType}' logged for ${userId}. Final KV: ${finalKiloVibes ?? 'N/A'}. New ach: ${updateResult.newAchievements?.length || 0}`);
     return { success: true, newAchievements: updateResult.newAchievements };
 
   } catch (e: any) {
