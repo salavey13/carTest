@@ -2,9 +2,9 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { debugLogger as logger } from '@/lib/debugLogger';
-import type { ProcessedSandboxOpportunity } from '@/app/god-mode-sandbox/page'; // UPDATED IMPORT PATH
+import type { ProcessedSandboxOpportunity } from '@/app/god-mode-sandbox/page';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import type { GodModeOpportunity } from '@/app/elon/arbitrage_scanner_types'; // UPDATED IMPORT
+import type { GodModeOpportunity } from '@/app/elon/arbitrage_scanner_types';
 
 logger.debug("[ArbitrageVoxelPlot.tsx] V6 (GodMode Fix). File loaded.");
 
@@ -189,9 +189,7 @@ const ArbitrageVoxelPlot: React.FC<{
     return <div className="min-h-[600px] flex items-center justify-center"><p className="text-center text-muted-foreground p-8">No opportunities to visualize. Use /god in Telegram.</p></div>;
   }
   
-  // FIX: Safely render the opportunity details
   const renderOpportunityTitle = (op: ProcessedSandboxOpportunity) => {
-    // This now works with GodModeOpportunity structure
     const buyEx = op.buyAt?.exchange?.substring(0, 4) || 'N/A';
     const sellEx = op.sellAt?.exchange?.substring(0, 4) || 'N/A';
     const asset = op.asset || 'N/A';
@@ -231,4 +229,4 @@ const ArbitrageVoxelPlot: React.FC<{
   );
 };
 
-export { ArbitrageVoxelPlot as default };
+export default ArbitrageVoxelPlot;
