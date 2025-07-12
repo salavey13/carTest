@@ -19,8 +19,8 @@ export async function simGodCommand(chatId: number, userId: string, args: string
 
     const simResult = await runGodModeSimulation(settingsResult.data, burstAmount);
     
-    // Читаем текущий scoreboard
-    const { data: userProfile } = await supabaseAdmin.from('profiles').select('metadata').eq('id', userId).single();
+    // --- ИСПРАВЛЕНИЕ: Читаем текущий scoreboard из 'users' по 'user_id' ---
+    const { data: userProfile } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
     const deck: GodModeDeck = userProfile?.metadata?.god_mode_deck || { balances: {}, total_profit_usd: 0 };
     
     let scoreboardText = "";
@@ -55,7 +55,8 @@ export async function simGodCommand(chatId: number, userId: string, args: string
 
     await sendComplexMessage(chatId, finalMessage, []);
   } catch (error) {
-    logger.error("[sim_god] Error processing command:", error);
-    await sendComplexMessage(chatId, `🚨 Ошибка в режиме Бога: ${error.message}`, []);
+    const err = error as Error;
+    logger.error("[sim_god] Error processing command:", err);
+    await sendComplexMessage(chatId, `🚨 Ошибка в режиме Бога: ${err.message}`, []);
   }
 }

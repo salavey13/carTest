@@ -15,6 +15,8 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { simCommand } from "./sim"; 
 import { simGoCommand } from "./sim_go";
 import { seedMarketCommand } from "./seed_market";
+import { simGodCommand } from "./sim_god";
+import { leaderboardCommand } from "./leaderboard";
 
 export async function handleCommand(update: any) {
   // --- Text Message Handling ---
@@ -36,9 +38,12 @@ export async function handleCommand(update: any) {
       "/rage": () => rageCommand(chatId, userId),
       "/settings": () => rageSettingsCommand(chatId, userId, text),
       "/sim": () => simCommand(chatId, userIdStr, args),
-      "/sim_god": () => simCommand(chatId, userIdStr, args), 
+      "/sim_god": () => simGodCommand(chatId, userIdStr, args),
+      "/god": () => simGodCommand(chatId, userIdStr, args), 
       "/sim_go": () => simGoCommand(chatId, userIdStr, args),
       "/seed_market": () => seedMarketCommand(chatId, userIdStr),
+      "/leaderboard": () => leaderboardCommand(chatId, userIdStr),
+      "/board": () => leaderboardCommand(chatId, userIdStr),
       "/leads": () => leadsCommand(chatId, userId),
       "/sauce": () => sauceCommand(chatId, userId),
       "/file": () => fileCommand(chatId, userId, args),
