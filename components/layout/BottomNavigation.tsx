@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
-  FaBrain, FaUpLong, FaGithub, FaChartLine, FaUserNinja, FaCrosshairs, FaFire
+  FaBrain, FaUpLong, FaGithub, FaChartLine, FaUserNinja, FaCrosshairs, FaFire, FaSatelliteDish
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -40,7 +40,8 @@ const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/hotvibes", icon: FaFire, label: "HotVibes", color: "text-brand-orange", minLevelShow: 0, isFallback: true, isCentralCandidate: true, centralColor: "from-brand-orange to-brand-pink" }, 
   { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow", minLevelShow: 0, isFallback: true },
   { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green", minLevelShow: 1 },
-  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentralCandidate: true, centralColor: "from-brand-cyan to-brand-blue", minLevelShow: 1 }, 
+  { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentralCandidate: true, centralColor: "from-brand-cyan to-brand-blue", minLevelShow: 1 },
+  { href: "/god-mode-sandbox", icon: FaSatelliteDish, label: "GodMode", color: "text-brand-cyan", minLevelShow: 1, isCentralCandidate: true, centralColor: "from-brand-purple to-brand-pink" },
   { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan", minLevelShow: 1 },
   { href: "/leads", icon: FaCrosshairs, label: "Leads", isCentralCandidate: true, centralColor: "from-brand-lime to-brand-green", minLevelShow: 2, supportOnly: true },
 ];
@@ -48,11 +49,11 @@ const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
 const navTranslations: Record<string, Record<string, string>> = {
   en: {
     "OS Home": "OS Home", "HotVibes": "HotVibes", "AgentOS": "AgentOS",
-    "LevelUp": "LevelUp", "Studio": "Studio", "VibePlan": "VibePlan", "Leads": "Leads"
+    "LevelUp": "LevelUp", "Studio": "Studio", "VibePlan": "VibePlan", "Leads": "Leads", "GodMode": "GodMode"
   },
   ru: {
     "OS Home": "ОС Дом", "HotVibes": "Огонь!", "AgentOS": "АгентОС",
-    "LevelUp": "Прокачка", "Studio": "Студия", "VibePlan": "VIBE План", "Leads": "Лиды"
+    "LevelUp": "Прокачка", "Studio": "Студия", "VibePlan": "VIBE План", "Leads": "Лиды", "GodMode": "GodMode"
   }
 };
 
@@ -103,11 +104,14 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
     const maxItems = 5;
 
     let centralItem: NavItemConfig | undefined = undefined;
+    const godModeItem = availableItems.find(i => i.label === "GodMode");
     const studioItem = availableItems.find(i => i.label === "Studio");
     const leadsItem = availableItems.find(i => i.label === "Leads");
     const hotVibesItem = availableItems.find(i => i.label === "HotVibes");
 
-    if (studioItem) {
+    if (godModeItem) {
+        centralItem = { ...godModeItem, isActuallyCentral: true };
+    } else if (studioItem) {
         centralItem = { ...studioItem, isActuallyCentral: true };
     } else if (leadsItem) {
         centralItem = { ...leadsItem, isActuallyCentral: true };

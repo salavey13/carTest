@@ -63,6 +63,7 @@ export interface GodModeDeck {
 
 /** Полный результат, возвращаемый функцией симуляции God-Mode. */
 export interface GodModeSimulationResult {
+  simulationId: string; // Уникальный ID этой симуляции
   opportunities: GodModeOpportunity[];
   totalProfit: number;
   marketJuiciness: number; // Индекс "сочности" рынка от 0 до 100
