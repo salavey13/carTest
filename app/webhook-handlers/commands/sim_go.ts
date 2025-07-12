@@ -13,7 +13,6 @@ export async function simGoCommand(chatId: number, userId: string, args: string[
   
   await sendComplexMessage(chatId, `🚀 *Вмешательство...* Совершаю квантовый взрыв на $${burstAmount.toLocaleString()}...`, []);
 
-  // --- ИСПРАВЛЕНИЕ: Используем правильную кастомную таблицу 'users' с ключом 'user_id' ---
   const { data: userProfile, error: readError } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
   
   if (readError || !userProfile) {
@@ -26,21 +25,27 @@ export async function simGoCommand(chatId: number, userId: string, args: string[
     const settingsResult = await getArbitrageScannerSettings(userId);
     if (!settingsResult.success || !settingsResult.data) throw new Error("Не удалось загрузить настройки.");
     
-    // Выполняем флуктуацию
     const result = await executeQuantumFluctuation(settingsResult.data, burstAmount);
     
-    // Применяем результат к балансу
-    const currentMetadata = userProfile.metadata || {};
-    let deck: GodModeDeck = JSON.parse(JSON.stringify(currentMetadata.god_mode_deck || { balances: {}, total_profit_usd: 0 }));
-    if (Object.keys(deck.balances).length === 0) deck.balances = { ...INITIAL_BALANCES };
+    // --- SAFE METADATA UPDATE ---
+    // 1. Deep-copy the existing metadata to prevent any accidental data loss.
+    const updatedMetadata = JSON.parse(JSON.stringify(userProfile.metadata || {}));
 
+    // 2. Safely get or initialize the god_mode_deck within our copied metadata.
+    let deck: GodModeDeck = updatedMetadata.god_mode_deck || { balances: {}, total_profit_usd: 0 };
+    if (Object.keys(deck.balances).length === 0) {
+      deck.balances = { ...INITIAL_BALANCES };
+    }
+
+    // 3. Apply simulation results to the deck.
     deck.balances["USDT"] = (deck.balances["USDT"] || 0) + result.totalProfit;
     deck.total_profit_usd = (deck.total_profit_usd || 0) + result.totalProfit;
     
-    const finalMetadata = { ...currentMetadata, god_mode_deck: deck };
+    // 4. Place the modified deck back into our metadata copy.
+    updatedMetadata.god_mode_deck = deck;
     
-    // --- ИСПРАВЛЕНИЕ: Обновляем правильную таблицу 'users' ---
-    const { error: writeError } = await supabaseAdmin.from('users').update({ metadata: finalMetadata }).eq('user_id', userId);
+    // 5. Write the entire, safe, updated metadata object back.
+    const { error: writeError } = await supabaseAdmin.from('users').update({ metadata: updatedMetadata }).eq('user_id', userId);
     
     if (writeError) throw new Error(`Ошибка сохранения обновленного профиля: ${writeError.message}`);
 
