@@ -1,3 +1,4 @@
+// /app/god-mode-sandbox/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
@@ -16,7 +17,7 @@ import type {
   GodModeOpportunity
 } from '@/app/elon/arbitrage_scanner_types';
 import { motion } from 'framer-motion';
-
+import { supabaseAdmin as supabase } from "@/hooks/supabase"
 const ArbitrageVoxelPlotWithNoSSR = dynamic(
   () => import('@/components/arbitrage/ArbitrageVoxelPlot'),
   { 
@@ -70,7 +71,7 @@ const GodModeSandboxContent: React.FC = () => {
   logger.info("[GodModeSandbox] Rendering...");
   const searchParams = useSearchParams();
   const { addToast } = useAppToast();
-  const { dbUser, supabase } = useAppContext();
+  const { dbUser } = useAppContext();
   const [simulation, setSimulation] = useState<GodModeSimulationResult | null>(null);
   const [logs, setLogs] = useState<string[]>(["Realtime connection pending..."]);
   const [isLoading, setIsLoading] = useState(true);
@@ -197,7 +198,7 @@ const GodModeSandboxContent: React.FC = () => {
                 <p className="mt-2 text-muted-foreground text-xs">The visualization will update automatically.</p>
             </div>
              <h3 className="text-lg font-orbitron text-brand-pink pt-3 mt-4 mb-3 border-t-2 border-border dark:border-brand-purple/40 pb-1.5 flex items-center">
-                <VibeContentRenderer content="::FaInfoCircle className='inline mr-1.5'::" /> Current Simulation
+                <VibeContentRenderer content="::FaCircleInfo className='inline mr-1.5'::" /> Current Simulation
              </h3>
              <div className="text-xs space-y-1 p-2 bg-background dark:bg-black/30 rounded">
                 <p>ID: <span className="text-brand-cyan">{simulation?.simulationId.substring(0,8) || 'N/A'}</span></p>
