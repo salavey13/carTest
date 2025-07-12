@@ -3,6 +3,7 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import type { ArbitrageSettings, GodModeOpportunity, GodModeSimulationResult } from "./arbitrage_scanner_types";
+import { v4 as uuidv4 } from 'uuid';
 
 type MarketDataPoint = { last_price: number; timestamp: string };
 
@@ -42,16 +43,18 @@ export async function runGodModeSimulation(
   settings: ArbitrageSettings,
   burstAmount: number
 ): Promise<GodModeSimulationResult> {
-  logger.info(`[QuantumEngine-Simulate] Running God Mode simulation. Burst: $${burstAmount}`);
+  const simulationId = uuidv4();
+  logger.info(`[QuantumEngine-Simulate] Running God Mode simulation ${simulationId}. Burst: $${burstAmount}`);
   
   const { opportunities, totalProfit, logs } = await runGodModeSimulationCore(settings, burstAmount);
   
   const totalProfitPercent = opportunities.reduce((sum, op) => sum + op.spreadPercent, 0);
   const marketJuiciness = Math.min(100, Math.round(totalProfitPercent * 20 + opportunities.length * 5));
 
-  logger.info(`[QuantumEngine-Simulate] Simulation complete. Juiciness: ${marketJuiciness}`);
+  logger.info(`[QuantumEngine-Simulate] Simulation ${simulationId} complete. Juiciness: ${marketJuiciness}`);
   
   return {
+    simulationId,
     opportunities,
     totalProfit,
     marketJuiciness,

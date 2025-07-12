@@ -237,8 +237,16 @@ export default function HotVibesClientContent() {
 
   useEffect(() => {
     if (!appCtxLoading && !isAuthenticating && !isInitialVipCheckDone) {
+      // Prioritize startParamPayload, but check URL as fallback
       const leadIdFromUrl = searchParams.get('lead_identifier');
       let effectiveId = startParamPayload || leadIdFromUrl;
+      
+      // Do not process viz links here, let the global router handle it
+      if (effectiveId && effectiveId.startsWith('viz_')) {
+          logger.info(`[HotVibes InitialIdEffect] viz_ startParam detected, skipping local processing.`);
+          setIsInitialVipCheckDone(true);
+          return;
+      }
 
       if (startParamPayload === 'topdf_psycho' || startParamPayload === 'AlexandraSergeevna') {
         effectiveId = PERSONALITY_REPORT_PDF_CARD_ID; 
