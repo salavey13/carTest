@@ -2,11 +2,11 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { debugLogger as logger } from '@/lib/debugLogger';
-import type { ProcessedSandboxOpportunity } from '@/app/elon/testbase/arbitrage-viz-sandbox/page';
+import type { ProcessedSandboxOpportunity } from '@/app/god-mode-sandbox/page'; // UPDATED IMPORT PATH
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import type { TwoLegArbitrageOpportunity, ThreeLegArbitrageOpportunity } from '@/app/elon/arbitrage_scanner_types';
+import type { GodModeOpportunity } from '@/app/elon/arbitrage_scanner_types'; // UPDATED IMPORT
 
-logger.debug("[ArbitrageVoxelPlot.tsx] V5 (Prop Fix). File loaded.");
+logger.debug("[ArbitrageVoxelPlot.tsx] V6 (GodMode Fix). File loaded.");
 
 type R3FLibs = {
   THREE: typeof import('three');
@@ -147,8 +147,8 @@ const ArbitrageVoxelPlot: React.FC<{
   opportunities: ProcessedSandboxOpportunity[]; 
   isTabActive: boolean; 
   onVoxelSelect: (op: ProcessedSandboxOpportunity | null) => void;
-  selectedOpportunity: ProcessedSandboxOpportunity | null; // <<< FIX: ADD PROP
-}> = ({ opportunities, isTabActive, onVoxelSelect, selectedOpportunity }) => { // <<< FIX: DESTRUCTURE PROP
+  selectedOpportunity: ProcessedSandboxOpportunity | null;
+}> = ({ opportunities, isTabActive, onVoxelSelect, selectedOpportunity }) => {
   logger.info(`[ArbitrageVoxelPlot] VoxelRebirth render. Ops: ${opportunities.length}, TabActive: ${isTabActive}, Selected: ${selectedOpportunity?.id}`);
   const [hoveredOpportunity, setHoveredOpportunity] = useState<ProcessedSandboxOpportunity | null>(null);
   const [libs, setLibs] = useState<R3FLibs | null>(null);
@@ -179,16 +179,32 @@ const ArbitrageVoxelPlot: React.FC<{
   }
   
   const { Canvas: R3FCanvas } = libs;
-  const currentlyDisplayedOpportunity = hoveredOpportunity || selectedOpportunity; // <<< FIX: THIS LINE NOW WORKS
+  const currentlyDisplayedOpportunity = hoveredOpportunity || selectedOpportunity;
 
   if (!isTabActive) { 
       return <div className="min-h-[600px] bg-card/10 dark:bg-gray-900/50 rounded-md flex items-center justify-center"><p className="text-muted-foreground italic">Visualization paused</p></div>;
   }
 
   if (opportunities.length === 0) {
-    return <div className="min-h-[600px] flex items-center justify-center"><p className="text-center text-muted-foreground p-8">No opportunities to visualize based on current filters.</p></div>;
+    return <div className="min-h-[600px] flex items-center justify-center"><p className="text-center text-muted-foreground p-8">No opportunities to visualize. Use /god in Telegram.</p></div>;
   }
   
+  // FIX: Safely render the opportunity details
+  const renderOpportunityTitle = (op: ProcessedSandboxOpportunity) => {
+    // This now works with GodModeOpportunity structure
+    const buyEx = op.buyAt?.exchange?.substring(0, 4) || 'N/A';
+    const sellEx = op.sellAt?.exchange?.substring(0, 4) || 'N/A';
+    const asset = op.asset || 'N/A';
+    
+    return (
+        <>
+            <VibeContentRenderer content="::FaArrowsTurnRight:: " />
+            {`${buyEx} → ${sellEx}`}
+            <span className="text-gray-400 ml-1.5">({asset})</span> 
+        </>
+    );
+  };
+
   return (
     <div style={{ height: '600px', width: '100%', background: 'hsl(var(--card-background-rgb, 264 70% 11%))', borderRadius: '8px', position: 'relative', overflow: 'hidden', touchAction: isTabActive ? 'none' : 'auto' }} className="border border-border dark:border-brand-blue/60 shadow-xl dark:shadow-brand-blue/25">
         <R3FCanvas dpr={[1, 1.5]} camera={{ position: [8, 7, 12], fov: 50, near: 0.1, far: 1000 }} shadows gl={{ antialias: true }}>
@@ -204,9 +220,7 @@ const ArbitrageVoxelPlot: React.FC<{
       {isTabActive && currentlyDisplayedOpportunity && ( 
           <div className="absolute top-2.5 left-2.5 pointer-events-none z-10 p-2 text-xs text-white bg-black/70 backdrop-blur-sm border border-brand-purple/50 rounded-md shadow-lg max-w-[220px]">
               <p className="font-bold text-brand-cyan text-sm mb-1 border-b border-brand-cyan/25 pb-1"> 
-                  {currentlyDisplayedOpportunity.type === '2-leg' ? <VibeContentRenderer content="::FaArrowsTurnRight:: " /> : <VibeContentRenderer content="::FaShuffle:: " />} 
-                  {currentlyDisplayedOpportunity.type === '2-leg' ? `${(currentlyDisplayedOpportunity as TwoLegArbitrageOpportunity).buyExchange.substring(0,4)} → ${(currentlyDisplayedOpportunity as TwoLegArbitrageOpportunity).sellExchange.substring(0,4)}` : (currentlyDisplayedOpportunity as ThreeLegArbitrageOpportunity).exchange.substring(0,7)} 
-                  <span className="text-gray-400 ml-1.5">({currentlyDisplayedOpportunity.currencyPair.substring(0,8)})</span> 
+                  {renderOpportunityTitle(currentlyDisplayedOpportunity)}
               </p> 
               <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Spread:</strong> <span className="text-brand-lime font-semibold">{currentlyDisplayedOpportunity.profitPercentage.toFixed(2)}%</span></p> 
               <p className="leading-tight"><strong className="text-gray-400 w-[45px] inline-block">Profit:</strong> <span className="text-brand-lime">${currentlyDisplayedOpportunity.potentialProfitUSD.toFixed(2)}</span></p> 
