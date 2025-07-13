@@ -206,7 +206,7 @@ export async function handleCtxSelection(chatId: number, userId: number, selecte
 
         const fileName = `VibeContext_${selectedContext}_${new Date()
             .toISOString()
-            .split("T")[0]}.ts`;
+            .split("T")[0]}.txt`;
         const sendDocResult = await sendTelegramDocument(
             String(chatId),
             combinedContent,
