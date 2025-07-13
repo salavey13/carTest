@@ -1,3 +1,4 @@
+// /components/RepoTxtFetcher.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback, useRef } from "react"; 
@@ -93,22 +94,19 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "package.json", "app/layout.tsx",
         "tailwind.config.ts",
         "app/globals.css",
-        "/app/repo-xml/page.tsx", 
-        "/components/RepoTxtFetcher.tsx", 
-        "/components/AICodeAssistant.tsx", 
-        "/contexts/RepoXmlPageContext.tsx", 
         "app/style-guide/page.tsx",       
         "contexts/AppContext.tsx",
         "hooks/useAppToast.ts",
-        "hooks/useRepoFetcher.ts",
-        "hooks/useFileSelection.ts",
-        "hooks/useKworkInput.ts",
-        "hooks/supabase.ts", 
+        "hooks/supabase.ts",
+        "hooks/telegram.ts",  
         "app/actions.ts",
         "lib/debugLogger.ts",
+        "lib/logger.ts",
         "components/VibeContentRenderer.tsx",
         "components/Header.tsx",
-        "types/database.types.ts", 
+"components/layout/BottomNavigation.tsx",
+"components/layout/ClientLayout.tsx",
+        "types/database.types", 
         "components/repo/prompt.ts",
     ].filter(Boolean), []);
 
@@ -192,7 +190,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              return;
         }
 
-
         if (initialIdeaProcessedRef.current && lastProcessedIdeaSignatureRef.current === currentIdeaSignature) {
             logger.info(`${logPrefix} Skipping: Idea signature '${currentIdeaSignature}' has already been processed by this component instance.`);
             return;
@@ -260,7 +257,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                 detailsToProcess = { idea: ideaFromUrl }; 
             }
         }
-
 
         if (taskMatchesActiveContext) {
             logger.info(`${logPrefix} Task from ideaProp signature '${currentIdeaSignature}' matches an active context task/flow. Skipping re-trigger and marking as processed.`);
