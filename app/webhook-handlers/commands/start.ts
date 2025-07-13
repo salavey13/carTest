@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 import { howtoCommand } from "./howto";
 import { sendComplexMessage, deleteTelegramMessage, KeyboardButton } from "../actions/sendComplexMessage";
-import { surveyQuestions, SurveyQuestion, answerTexts } from "./content/start_survey_questions"; // Import the questions
+import { surveyQuestions, SurveyQuestion, answerTexts } from "./content/start_survey_questions_bike"; // Import the questions
 
 interface SurveyState {
   user_id: string;
