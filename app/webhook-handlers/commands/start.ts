@@ -111,4 +111,4 @@ Key improvements and explanations:
 • Dynamic Result Message: The handleSurveyCompletion function now dynamically builds the summary message using a loop that iterates through the answers object. The keys from the survey questions are used as labels in the summary.
 • answerTexts map Added a map to provide verbose names for survey keys, used in summary to show user readable text
 • Error Handling & Logging: The logging statements remain, which are crucial for debugging.
-• Typescript: Maintained strong typing.
+• Typescript: Maintained strong typing.*/
