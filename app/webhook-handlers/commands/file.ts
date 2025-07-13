@@ -1,3 +1,4 @@
+// /app/webhook-handlers/commands/file.ts
 import { logger } from "@/lib/logger";
 import { fetchRepoTree } from "@/app/actions_github/actions";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
@@ -85,7 +86,7 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
             if (!file.path) { throw new Error("Найденный файл не имеет пути."); }
             
             const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`;
-            await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n\n\`${file.path}\`\n\n[Посмотреть на GitHub](${rawUrl})`, [], { removeKeyboard: true });
+            await sendComplexMessage(chatId, `✅ Файл найден! Загружаю содержимое...\n[Посмотреть на GitHub](${rawUrl})\n\n\`${file.path}\`\n\n`, [], { removeKeyboard: true });
 
             const response = await fetch(rawUrl);
             if (!response.ok) { throw new Error(`Не удалось загрузить содержимое файла. Статус: ${response.status}`); }
@@ -133,7 +134,7 @@ export async function fileCommand(chatId: number, userId: number, args: string[]
             }
         }
         
-        const studioLink = `t.me/${process.env.BOT_USERNAME || 'oneSitePlsBot'}/app`;
+        const studioLink = `t.me/${process.env.BOT_USERNAME || 'oneSitePlsBot'}/app?startapp=repo-xml`;
         await sendComplexMessage(chatId, `Готово! Также можешь открыть [студию](${studioLink}) для полной картины.`, []);
 
     } catch (error) {
