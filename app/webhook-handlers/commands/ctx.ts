@@ -1,4 +1,3 @@
-oneSitePlsBot:
 import { sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
