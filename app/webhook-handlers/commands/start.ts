@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
 import { howtoCommand } from "./howto";
 import { sendComplexMessage, deleteTelegramMessage, KeyboardButton } from "../actions/sendComplexMessage";
-import { surveyQuestions, SurveyQuestion, answerTexts } from "./content/start_survey_questions_car"; // Import the CAR questions
+import { surveyQuestions, SurveyQuestion, answerTexts } from "./content/start_survey_questions_sportbike"; // Import the SPORTBIKE questions
 
 
 interface SurveyState {
@@ -23,7 +23,7 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   await supabaseAdmin.from("user_survey_state").delete().eq('user_id', user_id);
 
 
-  let adminSummary = `🚨 **Новый пилот прошел онбординг!**\n- **User:** @${username || user_id} (${user_id})\n`;
+  let adminSummary = `🚨 **Новый Райдер прошел онбординг!**\n- **User:** @${username || user_id} (${user_id})\n`;
   for (const key in answers) {
     adminSummary += `- **${answerTexts[key] || key}:** ${answers[key] || 'не указана'}\n`;
   }
@@ -36,7 +36,7 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
     summary += `- **${answerTexts[key] || key}:** ${answers[key] || 'не указана'}\n`;
   }
   summary += `Теперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
-  summary += `\n\n👉 Готов выбрать тачку?  Посети наш кибер-гараж: t.me/oneSitePlsBot/app?startapp=rent`;  // Add call to action
+  summary += `\n\n👉 Готов выбрать байк?  Посети наш мото-гараж: t.me/oneSitePlsBot/app?startapp=rent`;  // Add call to action
   await sendComplexMessage(chatId, summary, [], { removeKeyboard: true });
 };
 
