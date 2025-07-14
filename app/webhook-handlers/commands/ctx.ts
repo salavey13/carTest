@@ -31,12 +31,15 @@ export const subcontexts = { // Export subcontexts list for direct access by nam
         "components/arbitrage",
         "app/elon", //contains "GodMode" features in subdirectories
         "app/elon/testbase",
+        "supabase/migrations/market_data_1.sql",
+        "hooks/useTradeSimulator.ts",
     ],
     "Webhooks and Telegram Bot": [
         "app/api/telegramWebhook/route.ts",
         "app/webhook-handlers",
         "app/actions.ts",
         "telegram.d.ts",
+        "hooks/supabase.ts",
     ],
     "CyberFitness (Gamification)": [
         "app/cyberfitness",
@@ -46,7 +49,7 @@ export const subcontexts = { // Export subcontexts list for direct access by nam
         "app/topdf",
         "app/todoc",
     ],
-    "Tutorials/Examples": ["app/tutorials"],
+    "Tutorials/Examples": ["app/tutorials", "app/style-guide/page.tsx"],
     "Vibe Content Renderer": [
         "components/VibeContentRenderer.tsx",
         "lib/iconNameMap.ts",
