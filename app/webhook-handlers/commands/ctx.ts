@@ -1,3 +1,4 @@
+oneSitePlsBot:
 import { sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
@@ -100,6 +101,7 @@ export async function ctxCommand(chatId: number, userId: number) {
         await sendTelegramMessage(
             "🚨 Ошибка: URL репозитория не настроен на сервере.",
             [],
+
             undefined,
             chatId.toString()
         );
@@ -188,7 +190,7 @@ export async function handleCtxSelection(chatId: number, userId: number, selecte
 
         const combinedContent = files
             .map(
-                (file: any) => `// File: ${file.path}\n\n${file.content}\n\n// --- END OF FILE: ${file.path} ---\n\n`
+                (file: any) => `// --- FILE: ${file.path} ---\n\`\`\`\n// /${file.path}\n${file.content}\n`\`\`\`\n\n// --- END OF FILE: ${file.path} ---\n\n`
             )
             .join("");
 
@@ -226,6 +228,7 @@ export async function handleCtxSelection(chatId: number, userId: number, selecte
         );
 
     } catch (e) {
+
         logger.error("[Ctx Command] Error fetching or sending subcontext:", e);
         const errorMessage = e instanceof Error ? e.message : "Неизвестная ошибка.";
         await sendComplexMessage(
