@@ -53,17 +53,21 @@ export default function RentBikePage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const data = await fetchCars();
-        if (data) {
-          const bikes = data.filter(v => v.type === 'bike');
+        const response = await fetchCars();
+        if (response.success && response.data) {
+          const bikes = response.data.filter(v => v.type === 'bike');
           setVehicles(bikes);
           if (bikes.length > 0) {
             setSelectedBike(bikes[0]);
+          } else {
+            toast.info("В гараже пока нет байков.");
           }
+        } else {
+            toast.error(response.error || "Ошибка загрузки гаража!");
         }
       } catch (err) {
         console.error("Error loading bikes:", err);
-        toast.error("Ошибка загрузки гаража!");
+        toast.error("Критическая ошибка загрузки гаража!");
       } finally {
         setLoading(false);
       }
@@ -74,8 +78,10 @@ export default function RentBikePage() {
   useEffect(() => {
     const checkSubscription = async () => {
       if (dbUser?.user_id) {
-        const subscriptionId = await getUserSubscription(dbUser.user_id);
-        setHasSubscription(!!subscriptionId);
+        const subResult = await getUserSubscription(dbUser.user_id);
+        if (subResult.success) {
+            setHasSubscription(!!subResult.data);
+        }
       }
     };
     checkSubscription();
@@ -111,7 +117,7 @@ export default function RentBikePage() {
         image_url: selectedBike.image_url,
       };
       const invoiceId = `bike_rental_${selectedBike.id}_${tgUser.id}_${Date.now()}`;
-      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata);
+      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata.car_id, metadata);
 
       const description = hasSubscription
         ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка: 10%`
@@ -139,17 +145,33 @@ export default function RentBikePage() {
     }
   };
 
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <VibeContentRenderer content="::FaSpinner className='animate-spin h-12 w-12 text-brand-cyan':: <p className='font-mono text-brand-cyan ml-4'>ЗАГРУЗКА ГАРАЖА...</p>" />
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+          <Image 
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
+            alt="Loading Garage..."
+            width={200}
+            height={200}
+            className="cyber-loader-filter"
+            unoptimized
+          />
+        <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 pt-24 overflow-hidden bg-grid-pattern">
+    <div className="min-h-screen bg-black text-white p-4 pt-24 overflow-hidden relative">
+      <div className="fixed inset-0 z-[-1] opacity-30">
+        <Image
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
+          alt="Moto Garage Background"
+          fill
+          className="object-cover animate-pan-zoom"
+        />
+        <div className="absolute inset-0 bg-black/60"></div>
+      </div>
       <motion.header 
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
@@ -169,7 +191,7 @@ export default function RentBikePage() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="lg:col-span-1 space-y-6"
         >
-          <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg">
+          <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg backdrop-blur-sm">
             {BIKE_TYPES.map(type => (
               <button
                 key={type}
@@ -194,7 +216,7 @@ export default function RentBikePage() {
                   exit={{ opacity: 0, x: 20 }}
                   onClick={() => setSelectedBike(bike)}
                   className={cn(
-                    "flex items-center gap-4 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 bg-dark-card/70 hover:bg-dark-card",
+                    "flex items-center gap-4 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 bg-dark-card/70 hover:bg-dark-card backdrop-blur-sm",
                     selectedBike?.id === bike.id ? "border-brand-cyan shadow-lg shadow-brand-cyan/20" : "border-border hover:border-brand-cyan/50"
                   )}
                 >
@@ -232,10 +254,10 @@ export default function RentBikePage() {
                   <p className="font-sans text-muted-foreground mb-6">{selectedBike.description}</p>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
-                    <SpecItem icon="::FaGears::" label="Двигатель" value={`${selectedBike.specs?.engine_cc} cc`} />
-                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${selectedBike.specs?.horsepower} л.с.`} />
-                    <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${selectedBike.specs?.weight_kg} кг`} />
-                    <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${selectedBike.specs?.top_speed_kmh} км/ч`} />
+                    <SpecItem icon="::FaGears::" label="Двигатель" value={`${selectedBike.specs?.engine_cc || 'N/A'} cc`} />
+                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${selectedBike.specs?.horsepower || 'N/A'} л.с.`} />
+                    <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${selectedBike.specs?.weight_kg || 'N/A'} кг`} />
+                    <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${selectedBike.specs?.top_speed_kmh || 'N/A'} км/ч`} />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">

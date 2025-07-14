@@ -2,7 +2,7 @@
 
 import type React from "react"; 
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname, useRouter } from 'next/navigation'; 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'; 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
@@ -90,47 +90,48 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { startParamPayload, isLoading: isAppLoading, isAuthenticating } = useAppContext();
+  const searchParams = useSearchParams();
+  const { startParamPayload, isLoading: isAppLoading, isAuthenticating, clearStartParam } = useAppContext();
 
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
-  const startParamHandledRef = useRef(false); // Ref to track if redirect has been handled
+  const startParamHandledRef = useRef(false);
 
   useEffect(() => {
-    // Only handle redirect if context is loaded, we have a payload, and it hasn't been handled yet
     if (!isAppLoading && !isAuthenticating && startParamPayload && !startParamHandledRef.current) {
-      startParamHandledRef.current = true; // Mark as handled immediately to prevent re-triggering
-      
+      startParamHandledRef.current = true;
       const lowerStartParam = startParamPayload.toLowerCase();
+      let targetPath: string | undefined;
 
-      // Handle viz deep-link
       if (lowerStartParam.startsWith('viz_')) {
-          const simId = startParamPayload.substring(4);
-          const targetPath = `/god-mode-sandbox?simId=${simId}`;
-          if (pathname !== targetPath) {
-              logger.info(`[ClientLayout Logic] viz startParam '${startParamPayload}' => '${targetPath}'. Redirecting from '${pathname}'.`);
-              router.replace(targetPath);
-          }
-          return;
+        const simId = startParamPayload.substring(4);
+        targetPath = `/god-mode-sandbox?simId=${simId}`;
+      } else if (START_PARAM_PAGE_MAP[lowerStartParam]) {
+        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
+      } else if (pathname === '/') {
+        // This is the potential nickname logic, should be last resort.
+       // We can add checks here to prevent treating "rent-bike" as a nickname if needed.
+       if(!Object.values(START_PARAM_PAGE_MAP).some(p => `/${lowerStartParam}` === p)) {
+           targetPath = `/${lowerStartParam}`;
+       }
       }
-      
-      const targetPathFromMap = START_PARAM_PAGE_MAP[lowerStartParam];
 
-      if (targetPathFromMap) {
-        if (pathname !== targetPathFromMap) {
-          logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' => '${targetPathFromMap}'. Redirecting from '${pathname}'.`);
-          router.replace(targetPathFromMap);
-        } else {
-          logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' matches current path '${targetPathFromMap}'. No redirect needed.`);
-        }
-      } else if (pathname === '/') { 
-        const nicknamePath = `/${lowerStartParam}`;
-        logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on root. Assuming nickname => '${nicknamePath}'.`);
-        router.replace(nicknamePath);
-      } else {
+      if (targetPath && pathname !== targetPath) {
+        logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' => '${targetPath}'. Redirecting from '${pathname}'.`);
+        router.replace(targetPath);
+        // After redirecting, we conceptually want to clear the startParam.
+        // The router.replace() effectively does this by changing the URL.
+        // We can also clear it from the context if it's causing re-renders.
+        clearStartParam?.();
+      } else if (targetPath) {
+        logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' matches current path. Clearing param.`);
+        // Even if we don't redirect, we should clear the URL param to prevent issues.
+        router.replace(pathname, { scroll: false });
+        clearStartParam?.();
+      } else {
         logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on non-root page '${pathname}'. No redirect.`);
       }
     }
-  }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating]);
+  }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
   const pathsToShowBottomNavForStartsWith = [
@@ -191,7 +192,6 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
               style: {
                 background: "rgba(34, 34, 34, 0.9)",
                 color: "#00FF9D",
-
                 border: "1px solid rgba(0, 255, 157, 0.4)",
                 boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
                 fontFamily: "monospace",
