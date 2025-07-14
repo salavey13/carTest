@@ -31,7 +31,7 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
     summary += `- **${answerTexts[key] || key}:** ${answers[key] || 'не указана'}\n`;
   }
   summary += `Теперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
-
+  summary += `\n\n👉 Готовы выбрать велосипед?  Посетите наш сайт: t.me/oneSitePlsBot/app?startapp=rent`;  // Add call to action
   await sendComplexMessage(chatId, summary, [], { removeKeyboard: true });
 };
 
