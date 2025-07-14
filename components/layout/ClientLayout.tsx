@@ -84,6 +84,7 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "topdf_psycho": "/topdf",
   "settings": "/settings",
   "profile": "/profile",
+  "rent": "/rent-car",
 };
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
