@@ -190,7 +190,7 @@ export async function handleCtxSelection(chatId: number, userId: number, selecte
 
         const combinedContent = files
             .map(
-                (file: any) => `// --- FILE: ${file.path} ---\n\`\`\`\n// /${file.path}\n${file.content}\n`\`\`\`\n\n// --- END OF FILE: ${file.path} ---\n\n`
+                (file: any) => `// --- FILE: ${file.path} ---\n\`\`\`\n// /${file.path}\n${file.content}\n\`\`\`\n\n// --- END OF FILE: ${file.path} ---\n\n`
             )
             .join("");
 
