@@ -12,6 +12,7 @@ import type { Database } from "@/types/database.types";
 interface AppContextData extends ReturnType<typeof useTelegram> {
   startParamPayload: string | null;
   refreshDbUser: () => Promise<void>; 
+  clearStartParam: () => void;
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
@@ -20,42 +21,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const telegramHookData = useTelegram(); 
   const { user, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
-  // Локальный стейт для dbUser, инициализируется из хука, но может обновляться функцией refreshDbUser
   const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(telegramHookData.dbUser); 
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   
-  // Состояния загрузки и аутентификации берем из хука useTelegram, т.к. он управляет основным потоком
   const isLoading = isTelegramLoading;
   const isAuthenticating = isTelegramAuthenticating;
   const error = telegramError;
 
-  // Синхронизируем dbUser из useTelegram, если он там изменился (например, при первом получении)
   useEffect(() => {
-    // debugLogger.log("[AppContext] telegramHookData.dbUser changed, updating local dbUser state:", telegramHookData.dbUser);
     setDbUserInternal(telegramHookData.dbUser);
   }, [telegramHookData.dbUser]);
-
 
   const refreshDbUser = useCallback(async () => {
     if (user?.id) {
       debugLogger.info(`[AppContext refreshDbUser] Refreshing dbUser for user ID: ${user.id}`);
-      // Показываем загрузку во время обновления, если это необходимо UI (можно убрать, если не нужно)
-      // setIsContextLoading(true); 
       try {
         const freshDbUser = await dbFetchUserData(String(user.id));
-        setDbUserInternal(freshDbUser); // Обновляем локальный стейт dbUser
+        setDbUserInternal(freshDbUser); 
         debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully. New metadata:`, freshDbUser?.metadata?.xtr_protocards);
       } catch (e) {
         globalLogger.error("[AppContext refreshDbUser] Error refreshing dbUser:", e);
-        // setContextError(e instanceof Error ? e : new Error("Failed to refresh user data"));
-      } finally {
-        // setIsContextLoading(false);
       }
     } else {
       debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user.id is not available.");
     }
   }, [user?.id]);
-
+  
+  const clearStartParam = useCallback(() => {
+    debugLogger.info("[AppContext] Clearing startParamPayload.");
+    setStartParamPayload(null);
+  }, []);
 
   useEffect(() => {
     if (telegramHookData.tg && telegramHookData.tg.initDataUnsafe?.start_param) {
@@ -64,25 +59,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStartParamPayload(rawStartParam);
     } else {
       if (startParamPayload !== null) {
+        // This case is less likely to be hit now with router-based clearing, but good for safety.
         debugLogger.info(`[AppContext] No start_param found or tg not ready, ensuring startParamPayload is null.`);
         setStartParamPayload(null);
       }
     }
-  }, [telegramHookData.tg, telegramHookData.tg?.initDataUnsafe?.start_param, startParamPayload]);
+  }, [telegramHookData.tg, telegramHookData.tg?.initDataUnsafe?.start_param]);
 
   const contextValue = useMemo(() => {
-    // debugLogger.debug("[AppContext] Re-memoizing contextValue. Key dependencies changed. isLoading:", isLoading, "isAuthenticating:", isAuthenticating, "dbUser reference changed:", dbUser !== telegramHookData.dbUser);
     return {
         ...restTelegramData,
         user, 
-        dbUser, // Теперь это наш локальный стейт, который обновляется
+        dbUser,
         isLoading, 
         isAuthenticating, 
         error, 
         startParamPayload,
         refreshDbUser, 
+        clearStartParam,
     };
-  }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser]);
+  }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser, clearStartParam]);
 
   useEffect(() => {
     debugLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value or dbUser changed. Current state from context:", {
@@ -93,7 +89,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbUserExists: !!contextValue.dbUser, 
       dbUserMetadataExists: !!contextValue.dbUser?.metadata, 
       xtrProtocardsExist: !!contextValue.dbUser?.metadata?.xtr_protocards, 
-      xtrProtocardsContent: contextValue.dbUser?.metadata?.xtr_protocards, // Логируем содержимое для отладки
+      xtrProtocardsContent: contextValue.dbUser?.metadata?.xtr_protocards,
       dbUserStatus: contextValue.dbUser?.status,
       dbUserRole: contextValue.dbUser?.role,
       isAdminFuncType: typeof contextValue.isAdmin,
@@ -103,7 +99,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       platform: contextValue.platform,
       startParamPayload: contextValue.startParamPayload,
     });
-  }, [contextValue, dbUser]); // Добавил dbUser как зависимость
+  }, [contextValue, dbUser]);
 
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
@@ -155,6 +151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   const defaultRefreshDbUser = useCallback(async () => { debugLogger.warn("refreshDbUser() called on SKELETON AppContext"); }, []);
+  const defaultClearStartParam = useCallback(() => { debugLogger.warn("clearStartParam() called on SKELETON AppContext"); }, []);
   
   if (!context || context.isLoading === undefined || context.isAuthenticating === undefined ) {
      debugLogger.info("HOOK_APP_CONTEXT: Context is empty or key state flags (`isLoading`/`isAuthenticating`) are undefined. Returning SKELETON/LOADING defaults.");
@@ -172,16 +169,17 @@ export const useAppContext = (): AppContextData => {
         setBackgroundColor: (color: string) => debugLogger.warn(`setBackgroundColor(${color}) called on SKELETON AppContext`),
         platform: 'unknown_skeleton',
         themeParams: { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
-        initData: undefined, initDataUnsafe: undefined, colorScheme: 'dark', startParam: null, startParamPayload: null,
+        initData: undefined, initDataUnsafe: undefined, startParam: null, startParamPayload: null,
         refreshDbUser: defaultRefreshDbUser,
+        clearStartParam: defaultClearStartParam,
      } as AppContextData;
   }
 
   if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
     globalLogger.error( "HOOK_APP_CONTEXT: CRITICAL - Context fully loaded but context.isAdmin is NOT a function.", { contextDbUserExists: !!context.dbUser, contextDbUserStatus: context.dbUser?.status, contextDbUserRole: context.dbUser?.role, contextIsAuthenticated: context.isAuthenticated, contextKeys: Object.keys(context) });
     const fallbackIsAdmin = () => { if (context.dbUser) { const statusIsAdmin = context.dbUser.status === 'admin'; const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; debugLogger.warn(`[HOOK_APP_CONTEXT - Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`); return statusIsAdmin || roleIsAdmin; } debugLogger.warn("[HOOK_APP_CONTEXT - Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false."); return false; };
-    return { ...(context as AppContextData), isAdmin: fallbackIsAdmin, refreshDbUser: context.refreshDbUser || defaultRefreshDbUser, };
+    return { ...(context as AppContextData), isAdmin: fallbackIsAdmin, refreshDbUser: context.refreshDbUser || defaultRefreshDbUser, clearStartParam: context.clearStartParam || defaultClearStartParam };
   }
 
-  return { ...context, refreshDbUser: context.refreshDbUser || defaultRefreshDbUser } as AppContextData;
+  return { ...context, refreshDbUser: context.refreshDbUser || defaultRefreshDbUser, clearStartParam: context.clearStartParam || defaultClearStartParam } as AppContextData;
 };
