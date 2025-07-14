@@ -19,6 +19,9 @@ export const surveyQuestions: SurveyQuestion[] = [
     step: 1,
     key: "city",
     question: "Привет! 👋  Начнем знакомство. В каком городе планируете кататься?",
+    answers: [
+      { text: "Н. Новгород" },
+    ],
     free_answer: true,
   },
   {
