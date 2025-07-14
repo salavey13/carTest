@@ -66,7 +66,7 @@ export async function handleCommand(update: any) {
             }
 
             // *** NEW: Handle Subcontext Selection ***
-            const ctxKeys = Object.keys(require("./ctx").subcontexts); // import the file directly
+            const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts); // import the file directly
             if (ctxKeys.includes(text)) {
                 await handleCtxSelection(chatId, userId, text);
                 return; // Important: Prevent falling through to other handlers
