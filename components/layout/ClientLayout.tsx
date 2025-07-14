@@ -19,15 +19,24 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next"; 
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
+import Image from "next/image";
 
-function LoadingChatButtonFallback() {
-  return (
-    <div
-        className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" 
-        aria-hidden="true"
-    ></div>
-  );
+function GlobalLoader() {
+  return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
+        <Image 
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
+          alt="Loading System..."
+          width={200}
+          height={200}
+          className="cyber-loader-filter"
+          unoptimized
+        />
+      <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ИНИЦИАЛИЗАЦИЯ VIBE OS...</p>
+    </div>
+  );
 }
+
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -91,47 +100,46 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const { startParamPayload, isLoading: isAppLoading, isAuthenticating, clearStartParam } = useAppContext();
 
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);
 
   useEffect(() => {
-    if (!isAppLoading && !isAuthenticating && startParamPayload && !startParamHandledRef.current) {
+     // This effect now handles the initial startParam from context and subsequent ones from URL if needed.
+     const paramFromUrl = searchParams.get('tgWebAppStartParam');
+     const paramToProcess = startParamPayload || paramFromUrl;
+
+    if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
-      const lowerStartParam = startParamPayload.toLowerCase();
+      const lowerStartParam = paramToProcess.toLowerCase();
       let targetPath: string | undefined;
 
       if (lowerStartParam.startsWith('viz_')) {
-        const simId = startParamPayload.substring(4);
+        const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       } else if (START_PARAM_PAGE_MAP[lowerStartParam]) {
         targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
       } else if (pathname === '/') {
-        // This is the potential nickname logic, should be last resort.
-       // We can add checks here to prevent treating "rent-bike" as a nickname if needed.
        if(!Object.values(START_PARAM_PAGE_MAP).some(p => `/${lowerStartParam}` === p)) {
            targetPath = `/${lowerStartParam}`;
        }
       }
 
       if (targetPath && pathname !== targetPath) {
-        logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' => '${targetPath}'. Redirecting from '${pathname}'.`);
+        logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting from '${pathname}'.`);
         router.replace(targetPath);
-        // After redirecting, we conceptually want to clear the startParam.
-        // The router.replace() effectively does this by changing the URL.
-        // We can also clear it from the context if it's causing re-renders.
-        clearStartParam?.();
+        clearStartParam?.(); // Clear from context
       } else if (targetPath) {
-        logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' matches current path. Clearing param.`);
-        // Even if we don't redirect, we should clear the URL param to prevent issues.
-        router.replace(pathname, { scroll: false });
-        clearStartParam?.();
+        logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' matches current path. Clearing param.`);
+        router.replace(pathname, { scroll: false }); // Clear from URL
+        clearStartParam?.(); // Clear from context
       } else {
-        logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on non-root page '${pathname}'. No redirect.`);
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on non-root page '${pathname}'. No redirect.`);
       }
     }
-  }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
+  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
   const pathsToShowBottomNavForStartsWith = [
@@ -168,7 +176,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
-      <Suspense fallback={<LoadingChatButtonFallback />}>
+      <Suspense fallback={<div className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" aria-hidden="true"></div>}>
         <StickyChatButton />
       </Suspense>
       {showHeaderAndFooter && <Footer />}
@@ -183,7 +191,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-            <LayoutLogicController>{children}</LayoutLogicController>
+              <Suspense fallback={<GlobalLoader />}>
+              <LayoutLogicController>{children}</LayoutLogicController>
+              </Suspense>
           </ErrorBoundaryForOverlay>
           <SonnerToaster
             position="bottom-right"
