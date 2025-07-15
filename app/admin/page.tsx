@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { useRouter } from "next/navigation";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -13,7 +12,6 @@ import Image from "next/image";
 
 export default function AdminPage() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
-  const router = useRouter();
   const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
 
   useEffect(() => {
@@ -73,7 +71,7 @@ export default function AdminPage() {
 
             {isTrulyAdmin && (
                  <Link
-                    href="/shadow-fleet-admin"
+                    href="/paddock"
                     className="group inline-flex items-center justify-center w-full md:w-auto px-6 py-3 border-2 border-brand-cyan bg-brand-cyan/10 text-brand-cyan rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-brand-cyan hover:text-black hover:shadow-cyan-glow"
                 >
                     <VibeContentRenderer content="::FaWarehouse::" className="mr-3 transition-transform group-hover:-translate-x-1" />
