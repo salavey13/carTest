@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { X, Car, Bike } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
@@ -172,7 +173,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
-        {isSubmitting ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: ДОБАВЛЕНИЕ..." /> : <VibeContentRenderer content="::FaCirclePlus:: ДОБАВИТЬ В ГАРАЖ" />}
+        {isSubmitting ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: ДОБАВЛЕНИЕ..." /> : <VibeContentRenderer content="::FaPlusCircle:: ДОБАВИТЬ В ГАРАЖ" />}
       </Button>
     </motion.form>
   );
