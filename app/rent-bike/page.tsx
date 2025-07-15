@@ -33,7 +33,6 @@ interface Vehicle {
 }
 
 const YUAN_TO_STARS_RATE = 0.1;
-const BIKE_TYPES = ["All", "Supersport", "Naked", "Hypersport", "Cruiser"];
 
 export default function RentBikePage() {
   const router = useRouter();
@@ -44,6 +43,7 @@ export default function RentBikePage() {
   const [rentDays, setRentDays] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("All");
+  const [availableBikeTypes, setAvailableBikeTypes] = useState(["All"]);
   
   const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
@@ -57,6 +57,10 @@ export default function RentBikePage() {
         if (response.success && response.data) {
           const bikes = response.data.filter(v => v.type === 'bike');
           setVehicles(bikes);
+          
+          const types = new Set(bikes.map(b => b.specs?.type).filter(Boolean));
+          setAvailableBikeTypes(["All", ...Array.from(types)]);
+
           if (bikes.length > 0) {
             setSelectedBike(bikes[0]);
           } else {
@@ -153,10 +157,10 @@ export default function RentBikePage() {
             alt="Loading Garage..."
             width={200}
             height={200}
-            className="cyber-loader-filter"
+            className="cyber-loader-themed"
             unoptimized
           />
-        <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
+        <p className='font-mono text-brand-cyan mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
       </div>
     );
   }
@@ -192,7 +196,7 @@ export default function RentBikePage() {
           className="lg:col-span-1 space-y-6"
         >
           <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg backdrop-blur-sm">
-            {BIKE_TYPES.map(type => (
+            {availableBikeTypes.map(type => (
               <button
                 key={type}
                 onClick={() => setActiveFilter(type)}
