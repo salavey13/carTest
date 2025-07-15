@@ -71,19 +71,19 @@ const allPages: PageInfo[] = [
   { path: "/advice", name: "Advice Archive", icon: "FaRegLightbulb", group: "Content & Tools", color: "orange", minLevel: 0 },
   { path: "/expmind", name: "Experimental Mindset", icon: "FaBrain", group: "Content & Tools", color: "pink", minLevel: 0 },
   { path: "/veritasium", name: "Veritasium Insights", icon: "FaBookAtlas", group: "Content & Tools", color: "cyan", isImportant: true, isHot: true, minLevel: 0 },
-  { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "gray", minLevel: 0 },
-  { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "gray", minLevel: 0 },
+  { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "white", minLevel: 0 },
+  { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "white", minLevel: 0 },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green", minLevel: 0},
   { path: "/topdf", name: "XLSX-2-PDF Converter", icon: "FaFilePdf", group: "Content & Tools", color: "red", isHot: true, minLevel: 0 },
 
   // Misc
-  { path: "/cartest", name: "Cyber Garage", icon: "FaCarOn", group: "Misc", color: "blue", minLevel: 0 },
+  { path: "/rent-bike", name: "Cyber Garage", icon: "FaCarOn", group: "Misc", color: "blue", minLevel: 0 },
   { path: "/botbusters", name: "Bot Busters", icon: "FaRobot", group: "Misc", color: "blue", minLevel: 0},
   { path: "/bullshitdetector", name: "BS Detector", icon: "FaMagnifyingGlass", group: "Misc", color: "yellow", minLevel: 0 },
   { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: "FaGift", group: "Misc", color: "lime", minLevel: 0 },
   { path: "/invoices", name: "My Invoices", icon: "FaFileInvoiceDollar", group: "Misc", color: "green", minLevel: 1 },
   { path: "/donate", name: "Donate", icon: "FaHeart", group: "Misc", color: "red", minLevel: 0 },
-  { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: "FaListCheck", group: "Misc", color: "gray", minLevel: 0 },
+  { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: "FaListCheck", group: "Misc", color: "white", minLevel: 0 },
   { path: "/rent-car", name: "Rent a Car", icon: "FaCarOn", group: "Misc", color: "yellow", minLevel: 0 },
   { path: "/vpr-tests", name: "VPR Tests", icon: "FaListCheck", group: "Misc", color: 'pink', minLevel: 0 },
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: "FaGlobe", group: "Misc", color: 'green', minLevel: 0 },
@@ -93,7 +93,7 @@ const allPages: PageInfo[] = [
   // Admin Zone
   { path: "/admin", name: "Admin Panel", icon: "FaUserShield", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/arbitrage-test-agent", name: "Alpha Engine Deck", icon: "FaTerminal", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 }, // <-- NEWLY ADDED
-{ path: "/arbitrage-live-scanner", name: "Live Seeker", icon: "FaSearchDollar", group: "Admin Zone", isAdminOnly: true, color: "orange", minLevel: 0}, // NEW
+{ path: "/arbitrage-live-scanner", name: "Live Seeker", icon: "FaMagnifyingGlassDollar", group: "Admin Zone", isAdminOnly: true, color: "orange", minLevel: 0}, // NEW
   { path: "/advice-upload", name: "Upload Advice", icon: "FaUpload", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: "FaCarOn", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
