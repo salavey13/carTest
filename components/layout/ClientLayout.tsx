@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -23,20 +24,19 @@ import Image from "next/image";
 
 function GlobalLoader() {
   return (
-    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
+    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
         <Image 
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
           alt="Loading System..."
-          width={200}
-          height={200}
+          width={100}
+          height={100}
           className="cyber-loader-filter"
           unoptimized
         />
-      <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ИНИЦИАЛИЗАЦИЯ VIBE OS...</p>
+      <p className='font-mono text-black ml-4 mt-4 animate-pulse'>ИНИЦИАЛИЗАЦИЯ VIBE OS...</p>
     </div>
   );
 }
-
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
