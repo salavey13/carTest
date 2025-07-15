@@ -71,7 +71,7 @@ const allPages: PageInfo[] = [
   { path: "/advice", name: "Advice Archive", icon: "FaRegLightbulb", group: "Content & Tools", color: "orange", minLevel: 0 },
   { path: "/expmind", name: "Experimental Mindset", icon: "FaBrain", group: "Content & Tools", color: "pink", minLevel: 0 },
   { path: "/veritasium", name: "Veritasium Insights", icon: "FaBookAtlas", group: "Content & Tools", color: "cyan", isImportant: true, isHot: true, minLevel: 0 },
-  { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "white", minLevel: 0 },
+  { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "lime", minLevel: 0 },
   { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "white", minLevel: 0 },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green", minLevel: 0},
   { path: "/topdf", name: "XLSX-2-PDF Converter", icon: "FaFilePdf", group: "Content & Tools", color: "red", isHot: true, minLevel: 0 },
