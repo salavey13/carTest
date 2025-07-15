@@ -155,8 +155,8 @@ export default function RentBikePage() {
         <Image 
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
           alt="Loading Garage..."
-          width={200}
-          height={200}
+          width={100}
+          height={100}
           unoptimized
         />
         <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
