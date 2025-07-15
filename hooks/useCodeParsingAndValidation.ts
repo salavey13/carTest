@@ -1,3 +1,4 @@
+// /hooks/useCodeParser.ts
 "use client"
 
 import { useState, useCallback, useMemo } from 'react';
@@ -62,6 +63,7 @@ const fa6IconCorrectionMap: Record<string, string> = {
     FaCog: 'FaGear',
     FaUserCircle: 'FaCircleUser',
     FaTimesCircle: 'FaCircleXmark',
+    FaInfoCircle: 'FaCircleInfo',
     FaMapSigns: 'FaMapLocation',
     FaRunning: 'FaPersonRunning',
     FaSadTear: 'FaFaceSadTear',
@@ -79,7 +81,8 @@ const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|use
 
 // Regex to capture file paths, potentially starting with '.', in comments or as 'File: path'
 // Allows for paths like .github/workflows/file.yml or normal paths.
-const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w-]+(?:[/\\][.\w-]+)*\.\w+)/;
+// FIX: Added '[]' to character sets to correctly parse paths like /app/rent/[id]/page.tsx
+const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)/;
 
 const generateId = () => '_' + Math.random().toString(36).substring(2, 9);
 
@@ -99,8 +102,8 @@ export function useCodeParsingAndValidation() {
         let lastIndex = 0;
         const descriptionParts: string[] = [];
         // Regex to capture file path possibly before or after code block.
-        // Path can start with '.' (e.g., .github/workflows/...) or be a standard path.
-        const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w-]+(?:[/\\][.\w-]+)*\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w-]+(?:[/\\][.\w-]+)*\.\w+)\s*(?:\*\/)?\s*$))?/gm;
+        // FIX: Added '[]' to character sets to correctly parse paths like /app/rent/[id]/page.tsx
+        const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)\s*(?:\*\/)?\s*$))?/gm;
 
         let match;
         let fileCounter = 0;
@@ -136,8 +139,6 @@ export function useCodeParsingAndValidation() {
             if (path !== '/' && (path.startsWith('/') || path.startsWith('\\'))) {
                 path = path.substring(1);
             }
-            // For paths like '.github/workflows/main.yml', ensure it doesn't become 'github/workflows/main.yml'
-            // This is generally fine as leading '.' is significant.
 
             if (/^\s*```/m.test(content)) {
                  const fileId = generateId();
@@ -151,7 +152,7 @@ export function useCodeParsingAndValidation() {
         const description = descriptionParts.filter(Boolean).join('\n\n');
          logger.debug(`[Parse Logic] Finished parsing. Files: ${files.length}, Errors: ${parseErrors.length}, Desc Length: ${description.length}`);
         return { files, description, parseErrors };
-    }, [logger]); 
+    }, []); 
 
     const validateParsedFiles = useCallback(async (filesToValidate: FileEntry[]): Promise<ValidationIssue[]> => {
         logger.debug("[Validation Logic] Starting validateParsedFiles");
@@ -291,7 +292,7 @@ export function useCodeParsingAndValidation() {
             setValidationStatus('success');
         }
         return issues;
-    }, [logger]); 
+    }, []); 
 
      const parseAndValidateResponse = useCallback(async (response: string) => {
         logger.info("[Parse/Validate Trigger] Starting parseAndValidateResponse...");
@@ -340,11 +341,11 @@ export function useCodeParsingAndValidation() {
              logger.error("[Parse/Validate Trigger] Critical error during parsing/validation:", error);
              toastError("Критическая ошибка при разборе ответа.");
              setIsParsing(false); setValidationStatus('error');
-             const genericError: ValidationIssue = { id: generateId(), fileId: 'general', filePath: 'N/A', type: 'parseError', message: `Критическая ошибка разбора: ${error instanceof Error ? error.message : String(error)}`, details: null, fixable: false, restorable: false, severity: 'error' };
+             const genericError: ValidationIssue = { id: generateId(), fileId: 'general', filePath: 'N/A', type: 'parseError', message: `Критическая ошибка разбора: ${error instanceof Error ? error.message : String(error)}`, details: {}, fixable: false, restorable: false, severity: 'error' };
              setValidationIssues([genericError]);
              return { files: [], description: rawDescription, issues: [genericError] };
          }
-    }, [parseFilesFromText, validateParsedFiles, rawDescription, toastInfo, toastError, logger]); 
+    }, [parseFilesFromText, validateParsedFiles, rawDescription, toastInfo, toastError]); 
 
     const autoFixIssues = useCallback((filesToFix: FileEntry[], issuesToFix: ValidationIssue[]): FileEntry[] => {
          logger.info("[AutoFix Logic] Starting autoFixIssues...");
@@ -432,7 +433,7 @@ export function useCodeParsingAndValidation() {
             setValidationStatus(finalStatus); 
             return filesToFix;
         }
-    }, [validateParsedFiles, setParsedFiles, toastInfo, toastSuccess, toastError, toastWarning, logger]); 
+    }, [validateParsedFiles, setParsedFiles, toastInfo, toastSuccess, toastError, toastWarning]); 
 
      logger.debug("[useCodeParsingAndValidation] Hook setup complete.");
     return {
