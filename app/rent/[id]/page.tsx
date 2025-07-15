@@ -1,4 +1,3 @@
-// /app/rent/[id]/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -135,10 +134,10 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
           alt="Loading Vehicle..."
           width={200}
           height={200}
-          className="cyber-loader-filter"
+          className="cyber-loader-themed"
           unoptimized
         />
-        <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ЗАГРУЗКА ДАННЫХ...</p>
+        <p className='font-mono text-brand-cyan mt-4 animate-pulse'>ЗАГРУЗКА ДАННЫХ...</p>
       </div>
     );
   }

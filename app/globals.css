@@ -461,6 +461,11 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
   animation: pan-zoom 30s ease-in-out infinite;
 }
 
-.cyber-loader-filter {
-  filter: hue-rotate(180deg) saturate(1.5) brightness(1.2);
+.cyber-loader-themed {
+  /* Default (Light theme): Just colorize the black parts. */
+  filter: hue-rotate(220deg) saturate(3) brightness(0.7);
+}
+.dark .cyber-loader-themed {
+  /* Dark theme: Invert black-on-white to white-on-black, then colorize the white. */
+  filter: invert(1) hue-rotate(180deg) saturate(1.5) brightness(1.2);
 }
