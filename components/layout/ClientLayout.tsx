@@ -21,22 +21,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 import Image from "next/image";
+import { Loading } from "@/components/Loading";
 
-function GlobalLoader() {
-  return (
-    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
-        <Image 
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
-          alt="Loading System..."
-          width={100}
-          height={100}
-          className="cyber-loader-filter"
-          unoptimized
-        />
-      <p className='font-mono text-black ml-4 mt-4 animate-pulse'>ИНИЦИАЛИЗАЦИЯ VIBE OS...</p>
-    </div>
-  );
-}
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -191,7 +177,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-              <Suspense fallback={<GlobalLoader />}>
+              <Suspense fallback={<Loading />}>
               <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
           </ErrorBoundaryForOverlay>
