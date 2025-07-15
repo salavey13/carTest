@@ -16,8 +16,8 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
         <Image 
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
           alt="Loading Garage..."
-          width={150}
-          height={150}
+          width={100}
+          height={100}
           unoptimized
         />
         <p className='font-mono text-black dark:text-black mt-4 animate-pulse'>
@@ -30,7 +30,7 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
   // Generic loader
   return (
     <div className={cn("min-h-screen bg-black flex flex-col items-center justify-center", className)}>
-      <div className="w-16 h-16 border-4 border-t-brand-cyan border-brand-purple/30 rounded-full animate-spin"></div>
+      <div className="w-12 h-12 border-4 border-t-brand-cyan border-brand-purple/30 rounded-full animate-spin"></div>
       <p className='font-mono text-brand-cyan mt-4 animate-pulse'>
         {text || 'ИНИЦИАЛИЗАЦИЯ VIBE OS...'}
       </p>
