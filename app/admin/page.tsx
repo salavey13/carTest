@@ -55,7 +55,7 @@ export default function AdminPage() {
           >
             <VibeContentRenderer content="::FaSatelliteDish::" className="h-8 w-8 animate-pulse text-shadow-cyber" /> VIBE CONTROL CENTER
           </h2>
-          <p className="text-muted-foreground mb-8 text-base font-mono text-center">
+          <p className="text-brand-orange mb-8 text-base font-mono text-center">
             Добавь свой транспорт в систему и стань частью флота.
           </p>
           
