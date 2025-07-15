@@ -10,8 +10,9 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
 import { fetchCars, createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
+import { Loading } from "@/components/Loading";
+import Link from "next/link";
 
-// Define interfaces locally for clarity
 interface Vehicle {
   id: string;
   make: string;
@@ -36,7 +37,7 @@ const YUAN_TO_STARS_RATE = 10;
 
 export default function RentBikePage() {
   const router = useRouter();
-  const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
+  const { user: tgUser, isInTelegramContext, dbUser, isAdmin } = useAppContext();
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedBike, setSelectedBike] = useState<Vehicle | null>(null);
@@ -150,18 +151,7 @@ export default function RentBikePage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <Image 
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
-          alt="Loading Garage..."
-          width={100}
-          height={100}
-          unoptimized
-        />
-        <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
-      </div>
-    );
+    return <Loading variant="bike" />;
   }
 
   return (
@@ -297,6 +287,16 @@ export default function RentBikePage() {
           </AnimatePresence>
         </div>
       </div>
+      <Link href="/admin">
+        <motion.div 
+            className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 bg-brand-purple/80 text-white rounded-full p-4 shadow-lg shadow-brand-purple/50 cursor-pointer backdrop-blur-sm hover:bg-brand-purple transition-colors"
+            title="Добавить свой транспорт"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+        >
+            <VibeContentRenderer content="::FaPlus::" className="h-6 w-6"/>
+        </motion.div>
+    </Link>
     </div>
   );
 }

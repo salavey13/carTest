@@ -1,38 +1,35 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
+import { useRouter } from "next/navigation";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { toast } from "sonner";
+import { debugLogger as logger } from "@/lib/debugLogger";
+import { Loading } from "@/components/Loading";
+import Image from "next/image";
 
 export default function AdminPage() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
-  const [isAdminUser, setIsAdminUser] = useState(false);
+  const router = useRouter();
+  const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
 
   useEffect(() => {
+    logger.debug("[AdminPage] useEffect triggered", { dbUserExists: !!dbUser, appContextLoading });
+
     if (!appContextLoading && typeof isAdmin === 'function') {
       const adminStatus = isAdmin();
-      setIsAdminUser(adminStatus);
+      setIsTrulyAdmin(adminStatus);
       if(adminStatus) {
         toast.success("Vibe Control Center: Все системы в норме, Командир.");
       }
     }
-  }, [appContextLoading, isAdmin]);
+  }, [appContextLoading, isAdmin, dbUser]);
 
-  if (appContextLoading) {
-    return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center dark:invert">
-            <img 
-                src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
-                alt="Loading Vibe Control..."
-                width={100}
-                height={100}
-            />
-            <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ЦЕНТРА УПРАВЛЕНИЯ...</p>
-        </div>
-    );
+  if (appContextLoading) { 
+    return <Loading text="ПРОВЕРКА ДОСТУПА..." />;
   }
   
   return (
@@ -62,25 +59,27 @@ export default function AdminPage() {
           <p className="text-muted-foreground mb-8 text-base font-mono text-center">
             Добавь свой транспорт в систему и стань частью флота.
           </p>
+          
           <CarSubmissionForm ownerId={dbUser?.user_id} />
 
-          <div className="mt-10 pt-8 border-t-2 border-dashed border-brand-purple/20 space-y-4 text-center">
-            {isAdminUser && (
+          <div className="mt-10 pt-8 border-t-2 border-dashed border-brand-purple/20 space-y-4 md:space-y-0 md:flex md:justify-center md:items-center md:gap-6">
+            <Link
+              href="/rent-bike"
+              className="group inline-flex items-center justify-center w-full md:w-auto px-6 py-3 border-2 border-brand-pink bg-brand-pink/10 text-brand-pink rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-brand-pink hover:text-black hover:shadow-pink-glow"
+            >
+              <VibeContentRenderer content="::FaMotorcycle::" className="mr-3 transition-transform group-hover:rotate-[-5deg]" />
+              В МОТО-ГАРАЖ
+            </Link>
+
+            {isTrulyAdmin && (
                  <Link
                     href="/shadow-fleet-admin"
-                    className="group inline-flex items-center justify-center px-6 py-3 border-2 border-brand-cyan bg-brand-cyan/10 text-brand-cyan rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-brand-cyan hover:text-black hover:shadow-cyan-glow"
+                    className="group inline-flex items-center justify-center w-full md:w-auto px-6 py-3 border-2 border-brand-cyan bg-brand-cyan/10 text-brand-cyan rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-brand-cyan hover:text-black hover:shadow-cyan-glow"
                 >
                     <VibeContentRenderer content="::FaWarehouse::" className="mr-3 transition-transform group-hover:-translate-x-1" />
                     МОЙ ПАДДОК
                  </Link>
             )}
-            <Link
-              href="/rent-bike"
-              className="group inline-flex items-center justify-center px-6 py-3 border-2 border-brand-pink bg-brand-pink/10 text-brand-pink rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-brand-pink hover:text-black hover:shadow-pink-glow"
-            >
-              <VibeContentRenderer content="::FaMotorcycle::" className="mr-3 transition-transform group-hover:rotate-[-5deg]" />
-              В МОТО-ГАРАЖ
-            </Link>
           </div>
         </motion.div>
       </main>

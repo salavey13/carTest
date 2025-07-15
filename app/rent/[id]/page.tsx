@@ -10,6 +10,7 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
 import { fetchCarById, createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
+import { Loading } from "@/components/Loading";
 
 interface Vehicle {
   id: string;
@@ -127,18 +128,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <Image 
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
-          alt="Loading Vehicle..."
-          width={100}
-          height={100}
-          unoptimized
-        />
-        <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ДАННЫХ...</p>
-      </div>
-    );
+    return <Loading variant={vehicle?.type === 'bike' ? 'bike' : 'generic'} text="ЗАГРУЗКА ДАННЫХ..." />;
   }
 
   if (!vehicle) {
@@ -182,10 +172,21 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
                     <div className="bg-dark-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
                         <h3 className="text-2xl font-orbitron text-brand-pink mb-4">ХАРАКТЕРИСТИКИ</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            <SpecItem icon="::FaGears::" label="Двигатель" value={`${vehicle.specs?.engine_cc || 'N/A'} cc`} />
-                            <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${vehicle.specs?.horsepower || 'N/A'} л.с.`} />
-                            <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${vehicle.specs?.weight_kg || 'N/A'} кг`} />
-                            <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${vehicle.specs?.top_speed_kmh || 'N/A'} км/ч`} />
+                            {vehicle.type === 'bike' ? (
+                                <>
+                                    <SpecItem icon="::FaGears::" label="Двигатель" value={`${vehicle.specs?.engine_cc || 'N/A'} cc`} />
+                                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${vehicle.specs?.horsepower || 'N/A'} л.с.`} />
+                                    <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${vehicle.specs?.weight_kg || 'N/A'} кг`} />
+                                    <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${vehicle.specs?.top_speed_kmh || 'N/A'} км/ч`} />
+                                </>
+                            ) : (
+                                <>
+                                    <SpecItem icon="::FaBolt::" label="Двигатель" value={`${vehicle.specs?.version || 'N/A'}`} />
+                                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${vehicle.specs?.horsepower || 'N/A'} л.с.`} />
+                                    <SpecItem icon="::FaTachometerAlt::" label="Разгон" value={`${vehicle.specs?.acceleration || 'N/A'}`} />
+                                    <SpecItem icon="::FaRoad::" label="Макс. скорость" value={`${vehicle.specs?.topSpeed || 'N/A'}`} />
+                                </>
+                            )}
                         </div>
                     </div>
 
