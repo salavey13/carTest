@@ -2,7 +2,7 @@
 
 import type React from "react"; 
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname, useRouter } from 'next/navigation'; 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'; 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
@@ -19,15 +19,24 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next"; 
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
+import Image from "next/image";
 
-function LoadingChatButtonFallback() {
-  return (
-    <div
-        className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" 
-        aria-hidden="true"
-    ></div>
-  );
+function GlobalLoader() {
+  return (
+    <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[9999]">
+        <Image 
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
+          alt="Loading System..."
+          width={200}
+          height={200}
+          className="cyber-loader-filter"
+          unoptimized
+        />
+      <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ИНИЦИАЛИЗАЦИЯ VIBE OS...</p>
+    </div>
+  );
 }
+
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -90,47 +99,47 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { startParamPayload, isLoading: isAppLoading, isAuthenticating } = useAppContext();
+  const searchParams = useSearchParams();
+
+  const { startParamPayload, isLoading: isAppLoading, isAuthenticating, clearStartParam } = useAppContext();
 
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
-  const startParamHandledRef = useRef(false); // Ref to track if redirect has been handled
+  const startParamHandledRef = useRef(false);
 
   useEffect(() => {
-    // Only handle redirect if context is loaded, we have a payload, and it hasn't been handled yet
-    if (!isAppLoading && !isAuthenticating && startParamPayload && !startParamHandledRef.current) {
-      startParamHandledRef.current = true; // Mark as handled immediately to prevent re-triggering
-      
-      const lowerStartParam = startParamPayload.toLowerCase();
+     // This effect now handles the initial startParam from context and subsequent ones from URL if needed.
+     const paramFromUrl = searchParams.get('tgWebAppStartParam');
+     const paramToProcess = startParamPayload || paramFromUrl;
 
-      // Handle viz deep-link
+    if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
+      startParamHandledRef.current = true;
+      const lowerStartParam = paramToProcess.toLowerCase();
+      let targetPath: string | undefined;
+
       if (lowerStartParam.startsWith('viz_')) {
-          const simId = startParamPayload.substring(4);
-          const targetPath = `/god-mode-sandbox?simId=${simId}`;
-          if (pathname !== targetPath) {
-              logger.info(`[ClientLayout Logic] viz startParam '${startParamPayload}' => '${targetPath}'. Redirecting from '${pathname}'.`);
-              router.replace(targetPath);
-          }
-          return;
+        const simId = paramToProcess.substring(4);
+        targetPath = `/god-mode-sandbox?simId=${simId}`;
+      } else if (START_PARAM_PAGE_MAP[lowerStartParam]) {
+        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
+      } else if (pathname === '/') {
+       if(!Object.values(START_PARAM_PAGE_MAP).some(p => `/${lowerStartParam}` === p)) {
+           targetPath = `/${lowerStartParam}`;
+       }
       }
-      
-      const targetPathFromMap = START_PARAM_PAGE_MAP[lowerStartParam];
 
-      if (targetPathFromMap) {
-        if (pathname !== targetPathFromMap) {
-          logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' => '${targetPathFromMap}'. Redirecting from '${pathname}'.`);
-          router.replace(targetPathFromMap);
-        } else {
-          logger.info(`[ClientLayout Logic] startParam '${startParamPayload}' matches current path '${targetPathFromMap}'. No redirect needed.`);
-        }
-      } else if (pathname === '/') { 
-        const nicknamePath = `/${lowerStartParam}`;
-        logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on root. Assuming nickname => '${nicknamePath}'.`);
-        router.replace(nicknamePath);
-      } else {
-        logger.info(`[ClientLayout Logic] Unmapped startParam '${startParamPayload}' on non-root page '${pathname}'. No redirect.`);
+      if (targetPath && pathname !== targetPath) {
+        logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting from '${pathname}'.`);
+        router.replace(targetPath);
+        clearStartParam?.(); // Clear from context
+      } else if (targetPath) {
+        logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' matches current path. Clearing param.`);
+        router.replace(pathname, { scroll: false }); // Clear from URL
+        clearStartParam?.(); // Clear from context
+      } else {
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on non-root page '${pathname}'. No redirect.`);
       }
     }
-  }, [startParamPayload, pathname, router, isAppLoading, isAuthenticating]);
+  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
   const pathsToShowBottomNavForStartsWith = [
@@ -167,7 +176,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
-      <Suspense fallback={<LoadingChatButtonFallback />}>
+      <Suspense fallback={<div className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" aria-hidden="true"></div>}>
         <StickyChatButton />
       </Suspense>
       {showHeaderAndFooter && <Footer />}
@@ -182,7 +191,9 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-            <LayoutLogicController>{children}</LayoutLogicController>
+              <Suspense fallback={<GlobalLoader />}>
+              <LayoutLogicController>{children}</LayoutLogicController>
+              </Suspense>
           </ErrorBoundaryForOverlay>
           <SonnerToaster
             position="bottom-right"
@@ -191,7 +202,6 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
               style: {
                 background: "rgba(34, 34, 34, 0.9)",
                 color: "#00FF9D",
-
                 border: "1px solid rgba(0, 255, 157, 0.4)",
                 boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
                 fontFamily: "monospace",

@@ -1,58 +1,69 @@
 // /app/rent/[id]/page.tsx
 "use client";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { fetchCarById, fetchCars, createInvoice } from "@/hooks/supabase";
-import { sendTelegramInvoice } from "@/app/actions";
-import { useAppContext } from "@/contexts/AppContext";
-import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react";
-import {  getUserSubscription } from "@/hooks/supabase"
-interface Car {
+import { cn } from "@/lib/utils";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { useAppContext } from "@/contexts/AppContext";
+import { fetchCarById, createInvoice, getUserSubscription } from "@/hooks/supabase";
+import { sendTelegramInvoice } from "@/app/actions";
+
+interface Vehicle {
   id: string;
   make: string;
   model: string;
   daily_price: number;
   image_url: string;
-  specs?: Record<string, string | number | boolean>;
+  type: 'car' | 'bike';
+  description: string;
+  owner_id: string;
+  specs?: { [key: string]: any; };
 }
 
 const YUAN_TO_STARS_RATE = 0.1;
 
-export default function RentCarPage({ params }: { params: { id: string } }) {
+const SpecItem = ({ icon, label, value }: { icon: string; label: string; value: string | number }) => (
+    <div className="bg-muted/10 p-3 rounded-lg border border-border text-center">
+      <VibeContentRenderer content={icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
+      <p className="text-xs text-muted-foreground font-mono">{label}</p>
+      <p className="text-sm font-semibold font-orbitron">{value}</p>
+    </div>
+);
+
+export default function VehicleDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
-  const [car, setCar] = useState<Car | null>(null);
-  const [cars, setCars] = useState<Car[]>([]);
-  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
-  const [rentDays, setRentDays] = useState(1);
+  
+  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [rentDays, setRentDays] = useState(1);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
+      if (!params.id) {
+        toast.error("ID транспорта не указан.");
+        router.push("/rent-bike");
+        return;
+      }
       setLoading(true);
       try {
-        const [carData, allCars] = await Promise.all([fetchCarById(params.id), fetchCars()]);
-        if (!carData) {
-          toast.error("Машина не найдена, пиздец!");
-          router.push("/not-found");
-          return;
+        const { success, data, error: fetchError } = await fetchCarById(params.id);
+        if (success && data) {
+          setVehicle(data);
+        } else {
+          toast.error(fetchError || "Не удалось загрузить данные о транспорте.");
+          router.push("/rent-bike");
         }
-        setCar(carData);
-        setSelectedCar(carData);
-        setCars(allCars || []);
-        setCarouselIndex(allCars.findIndex((c) => c.id === carData.id) || 0);
-        toast.success(`Машина ${carData.make} ${carData.model} загружена, командир!`);
       } catch (err) {
-        console.error("Ошибка загрузки:", err);
-        toast.error("Кибер-гараж сломался, сорян!");
-        router.push("/not-found");
+        toast.error("Критическая ошибка при загрузке транспорта.");
+        router.push("/rent-bike");
       } finally {
         setLoading(false);
       }
@@ -63,66 +74,54 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const checkSubscription = async () => {
       if (dbUser?.user_id) {
-        const subscriptionId = await getUserSubscription(dbUser.user_id);
-        setHasSubscription(!!subscriptionId);
-        toast.success(subscriptionId ? "Ты в элите, братан!" : "Премиума нет, покажи бабки!");
+        const subResult = await getUserSubscription(dbUser.user_id);
+        if(subResult.success) {
+            setHasSubscription(!!subResult.data);
+        }
       }
     };
     checkSubscription();
   }, [dbUser]);
 
-  const handleCarouselPrev = () => {
-    setCarouselIndex((prev) => (prev === 0 ? cars.length - 1 : prev - 1));
-    setSelectedCar(cars[carouselIndex === 0 ? cars.length - 1 : carouselIndex - 1]);
-    toast.info(`Переключил на ${cars[carouselIndex === 0 ? cars.length - 1 : carouselIndex - 1].make} ${cars[carouselIndex === 0 ? cars.length - 1 : carouselIndex - 1].model}`);
-  };
-
-  const handleCarouselNext = () => {
-    setCarouselIndex((prev) => (prev === cars.length - 1 ? 0 : prev + 1));
-    setSelectedCar(cars[carouselIndex === cars.length - 1 ? 0 : carouselIndex + 1]);
-    toast.info(`Переключил на ${cars[carouselIndex === cars.length - 1 ? 0 : carouselIndex + 1].make} ${cars[carouselIndex === cars.length - 1 ? 0 : carouselIndex + 1].model}`);
-  };
-
   const handleRent = async () => {
-    if (!selectedCar || !tgUser || !isInTelegramContext) {
-      setError("Залогинься в Telegram, чувак!");
-      toast.error("Залогинься в Telegram, без этого никак!");
+    if (!vehicle || !tgUser || !isInTelegramContext) {
+      setError("Необходима авторизация в Telegram для аренды.");
+      toast.error("Сначала подключись к Telegram!");
       return;
     }
-
     setInvoiceLoading(true);
     setError(null);
-
     try {
-      const totalPriceYuan = selectedCar.daily_price * rentDays;
+      const totalPriceYuan = vehicle.daily_price * rentDays;
       const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE);
       const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars;
+      
       const metadata = {
         type: "car_rental",
-        car_id: selectedCar.id,
-        car_make: selectedCar.make,
-        car_model: selectedCar.model,
+        car_id: vehicle.id,
+        car_make: vehicle.make,
+        car_model: vehicle.model,
         days: rentDays,
         price_yuan: totalPriceYuan,
         price_stars: finalPrice,
         is_subscriber: hasSubscription,
-        original_price: totalPriceStars,
-        discount_applied: hasSubscription ? "10%" : "0%",
-        image_url: selectedCar.image_url,
+        image_url: vehicle.image_url,
       };
-      const invoiceId = `car_rental_${selectedCar.id}_${tgUser.id}_${Date.now()}`;
-      toast.success("Генерю счёт, держись!");
-      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata);
+      const invoiceId = `${vehicle.type}_rental_${vehicle.id}_${tgUser.id}_${Date.now()}`;
+      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata.car_id, metadata);
+
       const description = hasSubscription
-        ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка элиты: 10%`
-        : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`;
-      const response = await sendTelegramInvoice(tgUser.id.toString(), `Аренда ${selectedCar.make} ${selectedCar.model}`, description, invoiceId, finalPrice, undefined, selectedCar.image_url);
-      if (!response.success) throw new Error(response.error || "Счёт не взлетел!");
-      toast.success(hasSubscription ? "🌟 Счёт в Telegram, элитный гонщик!" : "🎉 Счёт в Telegram, жги!");
+        ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)`
+        : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`;
+
+      const response = await sendTelegramInvoice(tgUser.id.toString(), `Аренда ${vehicle.make} ${vehicle.model}`, description, invoiceId, finalPrice, undefined, vehicle.image_url);
+
+      if (!response.success) throw new Error(response.error || "Ошибка отправки счета");
+      toast.success("Счет отправлен в Telegram!");
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Хз что сломалось!";
-      setError("Ошибка: " + errMsg);
-      toast.error("Счёт не выгорел: " + errMsg);
+      const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка";
+      setError(`Ошибка: ${errMsg}`);
+      toast.error(`Не удалось создать счет: ${errMsg}`);
     } finally {
       setInvoiceLoading(false);
     }
@@ -130,239 +129,100 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-[#00ff9d] flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <Image 
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
+          alt="Loading Vehicle..."
+          width={200}
+          height={200}
+          className="cyber-loader-filter"
+          unoptimized
         />
-        <span className="ml-4 text-2xl font-mono animate-pulse">Гружу железо...</span>
+        <p className='font-mono text-brand-cyan ml-4 mt-4 animate-pulse'>ЗАГРУЗКА ДАННЫХ...</p>
       </div>
     );
   }
 
-  const specs = selectedCar?.specs || {
-    version: "v12",
-    electric: false,
-    color: "Кибер-синий",
-    theme: "Киберпанк",
-    horsepower: 900,
-    torque: "750 Нм",
-    acceleration: "2.9с 0-100 км/ч",
-    topSpeed: "340 км/ч",
-  };
-
-  // Categorize specs into "Power" and "Style"
-  const powerSpecs = ["version", "electric", "horsepower", "torque", "acceleration", "topSpeed"];
-  const styleSpecs = ["color", "theme"];
-  const powerEntries: [string, string | number | boolean][] = [];
-  const styleEntries: [string, string | number | boolean][] = [];
-  const customEntries: [string, string | number | boolean][] = [];
-
-  Object.entries(specs).forEach(([key, value]) => {
-    if (powerSpecs.includes(key)) {
-      powerEntries.push([key, value]);
-    } else if (styleSpecs.includes(key)) {
-      styleEntries.push([key, value]);
-    } else {
-      customEntries.push([key, value]);
-    }
-  });
+  if (!vehicle) {
+    return <div className="min-h-screen bg-black flex items-center justify-center"><p className="text-destructive font-mono">Транспорт не найден.</p></div>
+  }
 
   return (
-    <div className="min-h-screen pt-32 bg-gradient-to-b from-gray-900 to-black text-[#00ff9d] animate-[drift_30s_infinite]">
-      <header className="fixed top-20 left-0 right-0 bg-gray-900 shadow-[0_0_15px_rgba(255,107,107,0.5)] p-6 z-10 border-b border-[#ff007a]/50">
-        <h1 className="text-4xl font-mono text-[#00ff9d] glitch text-center animate-[neon_2s_infinite]" data-text="АРЕНДА КИБЕР-ТАЧКИ">
-          АРЕНДА ТАЧКИ
-        </h1>
-      </header>
-      <main className="container mx-auto pt-10 px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-5xl mx-auto p-8 bg-gray-900 rounded-2xl shadow-[0_0_25px_rgba(255,107,107,0.7)] border border-[#ff007a]/70"
+    <div className="min-h-screen bg-black text-white pt-24 pb-12 relative overflow-hidden">
+        <div className="fixed inset-0 z-[-1] opacity-30">
+            <Image
+            src={vehicle.image_url || "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"}
+            alt="Detail Background"
+            fill
+            className="object-cover animate-pan-zoom"
+            />
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        </div>
+
+        <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="container mx-auto max-w-4xl"
         >
-          <h2 className="text-3xl font-mono text-[#00ff9d] mb-8 cyber-text glitch flex items-center justify-center gap-2 animate-[neon_2s_infinite]" data-text="ВЫБЕРИ ЖЕЛЕЗО">
-            ВЫБЕРИ ЖЕЛЕЗО {hasSubscription && <span className="bg-[#ff007a]/80 text-white px-2 py-1 rounded font-mono text-sm"><Crown className="h-4 w-4 inline" /> Элита</span>}
-          </h2>
+            <div className="relative h-72 md:h-96 w-full rounded-xl overflow-hidden border-2 border-brand-cyan/30 shadow-2xl shadow-brand-cyan/20">
+                <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover" priority />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+                <div className="absolute bottom-6 left-6">
+                    <h1 className="text-4xl md:text-6xl font-orbitron font-bold drop-shadow-lg">{vehicle.make}</h1>
+                    <h2 className="text-3xl md:text-5xl font-orbitron text-brand-cyan drop-shadow-lg">{vehicle.model}</h2>
+                </div>
+            </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Carousel */}
-            <motion.div
-              initial={{ x: -50 }}
-              animate={{ x: 0 }}
-              transition={{ type: "spring", stiffness: 100 }}
-              className="bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.5)] border border-[#00ff9d]/50"
-            >
-              <h3 className="text-2xl font-mono text-[#00ff9d] mb-6 glitch animate-[neon_2s_infinite]" data-text="КАРУСЕЛЬ ЖЕЛЕЗА">
-                КАРУСЕЛЬ ЖЕЛЕЗА
-              </h3>
-              <div className="relative">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={carouselIndex}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="flex items-center justify-center"
-                  >
-                    {cars[carouselIndex] && (
-                      <div className="text-center">
-                        <Image
-                          src={cars[carouselIndex].image_url || "/placeholder.svg"}
-                          alt={`${cars[carouselIndex].make} ${cars[carouselIndex].model}`}
-                          width={250}
-                          height={180}
-                          className="mx-auto rounded-lg border border-[#00ff9d]/50 shadow-[0_0_20px_rgba(0,255,157,0.7)] hover:scale-105 transition-transform"
-                        />
-                        <p className="mt-4 font-mono text-xl text-[#00ff9d]">{cars[carouselIndex].make} {cars[carouselIndex].model}</p>
-                        <p className="font-mono text-base text-[#ff007a]">{cars[carouselIndex].daily_price}¥/день</p>
-                      </div>
-                    )}
-                  </motion.div>
-                </AnimatePresence>
-                <button
-                  onClick={handleCarouselPrev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-gray-700/50 p-3 rounded-full transition-all shadow-[0_0_10px_rgba(0,255,157,0.5)]"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-                <button
-                  onClick={handleCarouselNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-gray-700/50 p-3 rounded-full transition-all shadow-[0_0_10px_rgba(0,255,157,0.5)]"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
-              </div>
-              <div className="mt-6">
-                <label className="text-sm font-mono text-[#00ff9d] text-glow">СКОЛЬКО ДНЕЙ ЖЕЧЬ?</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={rentDays}
-                  onChange={(e) => setRentDays(Math.max(1, Number(e.target.value)))}
-                  className="w-full p-3 mt-2 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
-                />
-              </div>
-            </motion.div>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mt-8">
+                <div className="md:col-span-3 bg-dark-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
+                    <h3 className="text-2xl font-orbitron text-brand-pink mb-4">ОПИСАНИЕ</h3>
+                    <p className="font-sans text-muted-foreground leading-relaxed">{vehicle.description}</p>
+                </div>
 
-            {/* Car Info */}
-            <motion.div
-              initial={{ x: 50 }}
-              animate={{ x: 0 }}
-              transition={{ type: "spring", stiffness: 100, delay: 0.1 }}
-              className="bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.5)] border border-[#00ff9d]/50"
-            >
-              <h3 className="text-2xl font-mono text-[#00ff9d] mb-6 glitch animate-[neon_2s_infinite]" data-text="ДАННЫЕ ТАЧКИ">
-                ДАННЫЕ ТАЧКИ
-              </h3>
-              <AnimatePresence mode="wait">
-                {selectedCar ? (
-                  <motion.div key={selectedCar.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-                    <motion.div
-                      className="relative h-48 md:h-64 w-full rounded-xl overflow-hidden border border-[#00ff9d]/50 shadow-[0_0_20px_rgba(0,255,157,0.7)]"
-                      whileHover={{ scale: 1.03 }}
-                      transition={{ type: "spring", stiffness: 300 }}
-                    >
-                      <Image src={selectedCar.image_url || "/placeholder.svg"} alt={`${selectedCar.make} ${selectedCar.model}`} fill className="object-cover" />
-                    </motion.div>
-                    <div className="text-center space-y-4">
-                      <p className="font-mono text-2xl text-[#00ff9d]">{selectedCar.make} {selectedCar.model}</p>
-                      <p className="font-mono text-lg text-[#ff007a]">{selectedCar.daily_price}¥/день</p>
-                      <p className="font-mono text-xl text-[#00ff9d]/70">
-                        ИТОГО: {selectedCar.daily_price * rentDays}¥ (
-                        {hasSubscription ? (
-                          <span className="text-[#ff007a]">{Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE * 0.9)} XTR (10% ништяк)</span>
-                        ) : (
-                          `${Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE)} XTR`
-                        )})
-                      </p>
+                <div className="md:col-span-2 space-y-6">
+                    <div className="bg-dark-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
+                        <h3 className="text-2xl font-orbitron text-brand-pink mb-4">ХАРАКТЕРИСТИКИ</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <SpecItem icon="::FaGears::" label="Двигатель" value={`${vehicle.specs?.engine_cc || 'N/A'} cc`} />
+                            <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${vehicle.specs?.horsepower || 'N/A'} л.с.`} />
+                            <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${vehicle.specs?.weight_kg || 'N/A'} кг`} />
+                            <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${vehicle.specs?.top_speed_kmh || 'N/A'} км/ч`} />
+                        </div>
                     </div>
-                    <button
-                      onClick={handleRent}
-                      disabled={invoiceLoading || !isInTelegramContext}
-                      className={`w-full p-4 rounded-xl font-mono text-lg text-white ${hasSubscription ? "bg-gradient-to-r from-[#ff007a] to-[#00ff9d]" : "bg-[#ff007a]/80"} ${invoiceLoading ? "animate-pulse cursor-not-allowed" : "hover:bg-[#ff007a] hover:shadow-[0_0_25px_rgba(255,0,122,1)]"} transition-all`}
-                    >
-                      {invoiceLoading ? "ГЕНЕРЮ..." : hasSubscription ? "ГОНЯТЬ С НИШТЯКОМ" : "ГОНЯТЬ"}
-                    </button>
-                    {error && (
-                      <motion.p
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-[#ff007a] text-sm font-mono flex items-center justify-center gap-1 animate-[neon_2s_infinite]"
-                      >
-                        <AlertTriangle className="h-4 w-4" /> {error}
-                      </motion.p>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} className="text-center font-mono text-[#00ff9d]/70">
-                    КЛИКНИ НА ЖЕЛЕЗО, ЧТОБЫ УВИДЕТЬ!
-                  </motion.p>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </div>
 
-          {/* Dynamic Specs Section */}
-          {selectedCar && (
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="mt-12 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.5)] border border-[#00ff9d]/50"
-            >
-              <h3 className="text-2xl font-mono text-[#00ff9d] mb-6 glitch animate-[neon_2s_infinite]" data-text="ТЕРМИНАЛ ХАРАКТЕРИСТИК">
-                ТЕРМИНАЛ ХАРАКТЕРИСТИК
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Power Specs */}
-                <div className="space-y-4">
-                  <h4 className="text-lg font-mono text-[#ff007a] animate-[neon_2s_infinite]">МОЩА</h4>
-                  {powerEntries.map(([key, value]) => (
-                    <p key={key} className="text-[#00ff9d]/70 font-mono">
-                      <span className="text-[#00ff9d]">
-                        {key === "version" ? "Версия" :
-                         key === "electric" ? "Электро" :
-                         key === "horsepower" ? "Лошадки" :
-                         key === "torque" ? "Крутяк" :
-                         key === "acceleration" ? "Разгон" :
-                         key === "topSpeed" ? "Макс" : key}:
-                      </span>{" "}
-                      {key === "electric" ? (value ? "Да, братан!" : "Бенз, классика!") : value}
-                    </p>
-                  ))}
+                    <div className="bg-dark-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                            <div>
+                            <label className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                value={rentDays}
+                                onChange={e => setRentDays(Math.max(1, Number(e.target.value)))}
+                                className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono text-center text-lg"
+                            />
+                            </div>
+                            <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center h-full flex flex-col justify-center">
+                                <p className="text-sm font-mono text-muted-foreground">ИТОГО</p>
+                                <p className="text-2xl font-orbitron text-brand-yellow font-bold">
+                                    {Math.round((vehicle.daily_price * rentDays * YUAN_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
+                                </p>
+                            </div>
+                        </div>
+                        {hasSubscription && <p className="text-xs text-brand-green text-center mt-2">(Ваша скидка 10% применена)</p>}
+                         <button
+                            onClick={handleRent}
+                            disabled={invoiceLoading}
+                            className="w-full mt-4 p-4 rounded-xl font-orbitron text-lg font-bold text-black bg-gradient-to-r from-brand-cyan to-brand-green hover:brightness-125 transition-all duration-300 disabled:animate-pulse disabled:cursor-not-allowed disabled:brightness-75 shadow-lg hover:shadow-brand-cyan/50"
+                        >
+                            {invoiceLoading ? 'СОЗДАНИЕ СЧЕТА...' : 'АРЕНДОВАТЬ'}
+                        </button>
+                        {error && <p className="text-destructive text-center mt-2 font-mono text-sm">{error}</p>}
+                    </div>
                 </div>
-
-                {/* Style Specs */}
-                <div className="space-y-4">
-                  <h4 className="text-lg font-mono text-[#ff007a] animate-[neon_2s_infinite]">СТИЛЬ</h4>
-                  {styleEntries.map(([key, value]) => (
-                    <p key={key} className="text-[#00ff9d]/70 font-mono">
-                      <span className="text-[#00ff9d]">
-                        {key === "color" ? "Цвет" :
-                         key === "theme" ? "Тема" : key}:
-                      </span>{" "}
-                      {value}
-                    </p>
-                  ))}
-                  {customEntries.length > 0 && (
-                    <>
-                      <h4 className="text-lg font-mono text-[#ff007a] animate-[neon_2s_infinite] mt-4">КАСТОМ</h4>
-                      {customEntries.map(([key, value]) => (
-                        <p key={key} className="text-[#00ff9d]/70 font-mono">
-                          <span className="text-[#00ff9d]">{key}:</span> {value}
-                        </p>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            </motion.section>
-          )}
+            </div>
         </motion.div>
-      </main>
     </div>
   );
 }
-
