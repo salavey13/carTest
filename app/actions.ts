@@ -1,3 +1,4 @@
+// /app/actions.ts
 "use server"; 
 
 import {
@@ -632,4 +633,50 @@ export async function updateUserSettings(userId: string, partialSettingsToUpdate
     logger.error(`Exception in updateUserSettings for ${userId}:`, e);
     return { success: false, error: errorMsg };
   }
+}
+
+export async function createCrew(crewData: { name: string; description: string; logo_url: string; owner_id: string; }) {
+    if (!supabaseAdmin) {
+        return { success: false, error: "Admin client is not available." };
+    }
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('crews')
+            .insert({
+                name: crewData.name,
+                description: crewData.description,
+                logo_url: crewData.logo_url,
+                owner_id: crewData.owner_id
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        
+        // Also add the owner as the first member of the crew
+        await supabaseAdmin.from('crew_members').insert({
+            crew_id: data.id,
+            user_id: crewData.owner_id,
+            role: 'owner'
+        });
+
+        return { success: true, data };
+    } catch (error) {
+        logger.error("Error creating crew:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getTopFleets() {
+    if (!supabaseAdmin) {
+        return { success: false, error: "Admin client is not available." };
+    }
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_top_fleets');
+        if (error) throw error;
+        return { success: true, data };
+    } catch(error) {
+        logger.error("Error getting top fleets:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
 }
