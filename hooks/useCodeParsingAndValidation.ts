@@ -1,4 +1,4 @@
-// /hooks/useCodeParser.ts
+// /hooks/useCodeParsingAndValidation.ts
 "use client"
 
 import { useState, useCallback, useMemo } from 'react';
@@ -68,7 +68,8 @@ const fa6IconCorrectionMap: Record<string, string> = {
     FaRunning: 'FaPersonRunning',
     FaSadTear: 'FaFaceSadTear',
     FaSearchDollar: 'FaMagnifyingGlassDollar',
-    FaSignOutAlt: 'FaRightFromBracket', 
+    FaSignOutAlt: 'FaRightFromBracket',
+    FaBroadcastTower: 'FaMagnifyingGlassDollar',
 };
 const knownIncorrectFa6Names = Object.keys(fa6IconCorrectionMap);
 
