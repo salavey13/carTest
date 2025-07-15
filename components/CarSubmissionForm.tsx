@@ -129,22 +129,22 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
 
       <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="text-sm font-mono text-brand-cyan mb-1.5 block">Марка</Label>
+          <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Марка</Label>
           <Input value={formData.make} onChange={e => setFormData(p => ({ ...p, make: e.target.value }))} placeholder={vehicleType === 'bike' ? 'Ducati' : 'Tesla'} className="input-cyber" required/>
         </div>
         <div>
-          <Label className="text-sm font-mono text-brand-cyan mb-1.5 block">Модель</Label>
+          <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Модель</Label>
           <Input value={formData.model} onChange={e => setFormData(p => ({ ...p, model: e.target.value }))} placeholder={vehicleType === 'bike' ? 'Panigale V4' : 'Cybertruck'} className="input-cyber" required/>
         </div>
       </motion.div>
 
       <div>
-        <Label className="text-sm font-mono text-brand-cyan mb-1.5 block">Описание</Label>
+        <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Описание</Label>
         <Textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder="Краткое, но зажигательное описание..." className="textarea-cyber" required/>
       </div>
 
       <div>
-        <h3 className="text-lg font-mono text-brand-cyan mb-2">Характеристики</h3>
+        <h3 className="text-lg font-mono text-brand-purple mb-2">Характеристики</h3>
         <div className="space-y-2">
           {Object.entries(formData.specs).map(([key, value], index) => (
             <motion.div key={index} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2 items-center">
@@ -161,11 +161,11 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-              <Label className="text-sm font-mono text-brand-cyan mb-1.5 block">Цена за день (XTR)</Label>
+              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Цена за день (XTR)</Label>
               <Input type="number" value={formData.daily_price} onChange={e => setFormData(p => ({ ...p, daily_price: e.target.value }))} placeholder="999" className="input-cyber" required />
           </div>
           <div>
-              <Label className="text-sm font-mono text-brand-cyan mb-1.5 block">Изображение (URL или файл)</Label>
+              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Изображение (URL или файл)</Label>
               <div className="flex gap-2">
                   <Input value={formData.image_url} onChange={e => setFormData(p => ({ ...p, image_url: e.target.value }))} placeholder="https://..." className="input-cyber" />
                   <Button asChild variant="outline" className="flex-shrink-0"><Label htmlFor="image-upload" className="cursor-pointer"><VibeContentRenderer content="::FaUpload::" /></Label></Button>
