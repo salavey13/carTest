@@ -43,13 +43,13 @@ export function Paddock() {
   const isUserAdmin = isAdmin();
 
   const fetchFleetData = useCallback(async () => {
-    if (!dbUser?.id) return;
+    if (!dbUser?.user_id) return;
     setLoading(true);
     try {
       const { data, error } = await supabaseAdmin
         .from("cars")
         .select(`id, make, model, daily_price, image_url, type, owner_id, rentals (id, total_cost, payment_status, status)`)
-        .eq("owner_id", dbUser.id);
+        .eq("owner_id", dbUser.user_id);
 
       if (error) throw error;
 
@@ -82,7 +82,7 @@ export function Paddock() {
     } finally {
       setLoading(false);
     }
-  }, [dbUser?.id, searchQuery]);
+  }, [dbUser?.user_id, searchQuery]);
 
   useEffect(() => {
     if (!isAppContextLoading && isUserAdmin) {
