@@ -121,13 +121,21 @@ export function Paddock() {
       </div>
 
       <div className="pt-20 relative container mx-auto px-4">
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-3xl md:text-5xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-orbitron mb-8 drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]"
-        >
-          МОЙ ПАДДОК
-        </motion.h1>
+        <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <h1
+            className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-orbitron drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]"
+            >
+            МОЙ ПАДДОК
+            </h1>
+            <div className="flex gap-2">
+                <Link href="/crews/create" passHref>
+                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-green/20 border border-brand-green text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaPlus:: Создать Экипаж"/></motion.button>
+                </Link>
+                 <Link href="/leaderboard" passHref>
+                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-yellow/20 border border-brand-yellow text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaTrophy:: Лидерборд"/></motion.button>
+                </Link>
+            </div>
+        </motion.div>
 
         <div className="mb-6">
           <input
