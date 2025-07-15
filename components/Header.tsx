@@ -93,7 +93,7 @@ const allPages: PageInfo[] = [
   // Admin Zone
   { path: "/admin", name: "Admin Panel", icon: "FaUserShield", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/arbitrage-test-agent", name: "Alpha Engine Deck", icon: "FaTerminal", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 }, // <-- NEWLY ADDED
-{ path: "/arbitrage-live-scanner", name: "Live Seeker", icon: "FaBroadcastTower", group: "Admin Zone", isAdminOnly: true, color: "orange", minLevel: 0}, // NEW
+{ path: "/arbitrage-live-scanner", name: "Live Seeker", icon: "FaSearchDollar", group: "Admin Zone", isAdminOnly: true, color: "orange", minLevel: 0}, // NEW
   { path: "/advice-upload", name: "Upload Advice", icon: "FaUpload", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: "FaCarOn", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
   { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },
