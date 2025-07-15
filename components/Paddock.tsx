@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import type React from "react"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { useAppContext } from "@/contexts/AppContext"
@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { Loading } from "@/components/Loading";
 import Image from "next/image";
 import { VibeContentRenderer } from "./VibeContentRenderer"
-
+import { useRouter } from "next/navigation"
 
 interface VehicleStat {
   id: string;
@@ -27,70 +27,91 @@ interface VehicleStat {
 }
 
 export function Paddock() {
-  const { dbUser, isAdmin } = useAppContext()
-  const [fleet, setFleet] = useState<VehicleStat[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
+  const { dbUser, isAdmin, isLoading: isAppContextLoading } = useAppContext();
+  const router = useRouter();
+  
+  const [fleet, setFleet] = useState<VehicleStat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [stats, setStats] = useState({
     totalRentals: 0,
     totalRevenue: 0,
     totalActive: 0,
     topVehicle: null as VehicleStat | null,
-  })
+  });
+
+  const isUserAdmin = isAdmin();
+
+  const fetchFleetData = useCallback(async () => {
+    if (!dbUser?.id) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("cars")
+        .select(`id, make, model, daily_price, image_url, type, owner_id, rentals (id, total_cost, payment_status, status)`)
+        .eq("owner_id", dbUser.id);
+
+      if (error) throw error;
+
+      const processedVehicles = data.map((v: any) => ({
+        ...v,
+        rental_count: v.rentals.length,
+        total_revenue: v.rentals.filter((r: any) => r.payment_status === "paid").reduce((sum: number, r: any) => sum + r.total_cost, 0),
+        active_rentals: v.rentals.filter((r: any) => r.status === "active").length,
+        completed_rentals: v.rentals.filter((r: any) => r.status === "completed").length,
+        cancelled_rentals: v.rentals.filter((r: any) => r.status === "cancelled").length,
+      }));
+
+      const filteredVehicles = processedVehicles.filter(
+        (v) =>
+          v.make.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          v.model.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      setFleet(filteredVehicles);
+
+      const totalRentals = filteredVehicles.reduce((sum, v) => sum + v.rental_count, 0);
+      const totalRevenue = filteredVehicles.reduce((sum, v) => sum + v.total_revenue, 0);
+      const totalActive = filteredVehicles.reduce((sum, v) => sum + v.active_rentals, 0);
+      const topVehicle = filteredVehicles.sort((a, b) => b.total_revenue - a.total_revenue)[0] || null;
+
+      setStats({ totalRentals, totalRevenue, totalActive, topVehicle });
+    } catch (error) {
+      console.error("Error fetching fleet:", error);
+      toast.error("Ошибка загрузки паддока");
+    } finally {
+      setLoading(false);
+    }
+  }, [dbUser?.id, searchQuery]);
 
   useEffect(() => {
-    if (!dbUser || !isAdmin() || !dbUser.id) return
-
-    const fetchFleetData = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabaseAdmin
-          .from("cars")
-          .select(`id, make, model, daily_price, image_url, type, owner_id, rentals (id, total_cost, payment_status, status)`)
-          .eq("owner_id", dbUser.id)
-
-        if (error) throw error
-
-        const processedVehicles = data.map((v: any) => ({
-          ...v,
-          rental_count: v.rentals.length,
-          total_revenue: v.rentals.filter((r: any) => r.payment_status === "paid").reduce((sum: number, r: any) => sum + r.total_cost, 0),
-          active_rentals: v.rentals.filter((r: any) => r.status === "active").length,
-          completed_rentals: v.rentals.filter((r: any) => r.status === "completed").length,
-          cancelled_rentals: v.rentals.filter((r: any) => r.status === "cancelled").length,
-        }))
-
-        const filteredVehicles = processedVehicles.filter(
-          (v) =>
-            v.make.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            v.model.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-
-        setFleet(filteredVehicles);
-
-        const totalRentals = filteredVehicles.reduce((sum, v) => sum + v.rental_count, 0);
-        const totalRevenue = filteredVehicles.reduce((sum, v) => sum + v.total_revenue, 0);
-        const totalActive = filteredVehicles.reduce((sum, v) => sum + v.active_rentals, 0);
-        const topVehicle = filteredVehicles.sort((a, b) => b.total_revenue - a.total_revenue)[0] || null;
-
-        setStats({ totalRentals, totalRevenue, totalActive, topVehicle });
-      } catch (error) {
-        console.error("Error fetching fleet:", error)
-        toast.error("Ошибка загрузки паддока")
-      } finally {
-        setLoading(false)
-      }
+    if (!isAppContextLoading && isUserAdmin) {
+      fetchFleetData();
     }
+  }, [isAppContextLoading, isUserAdmin, fetchFleetData]);
 
-    fetchFleetData()
-  }, [dbUser, isAdmin, searchQuery])
+  if (isAppContextLoading) {
+    return <Loading variant="bike" text="ПРОВЕРКА ДОСТУПА В ПАДДОК..." />;
+  }
+
+  if (!isUserAdmin) {
+    return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center text-center p-4">
+            <VibeContentRenderer content="::FaLock::" className="text-7xl text-destructive mb-4"/>
+            <h1 className="text-3xl font-orbitron text-destructive">ДОСТУП ЗАПРЕЩЕН</h1>
+            <p className="text-muted-foreground font-mono mt-2 max-w-md">Этот раздел доступен только владельцам транспорта. Добавьте свой первый байк или авто в Vibe Control Center, чтобы получить доступ.</p>
+            <Link href="/admin">
+                <button className="mt-6 group inline-flex items-center justify-center px-6 py-3 border-2 border-brand-purple bg-brand-purple/10 text-brand-purple rounded-lg font-orbitron text-lg tracking-wider transition-all duration-300 hover:bg-brand-purple hover:text-black hover:shadow-purple-glow">
+                    <VibeContentRenderer content="::FaWrench::" className="mr-3 transition-transform group-hover:rotate-12"/>
+                    В VIBE CONTROL CENTER
+                </button>
+            </Link>
+        </div>
+    );
+  }
 
   if (loading) {
-    return <Loading variant="bike" text="ЗАГРУЗКА ПАДДОКА..." />;
-  }
-  
-  if (!dbUser || !isAdmin()) {
-    return null; // Redirect logic is in the page component
+     return <Loading variant="bike" text="ЗАГРУЗКА ПАДДОКА..." />;
   }
 
   return (
