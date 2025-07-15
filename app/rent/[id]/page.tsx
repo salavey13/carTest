@@ -128,16 +128,15 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <Image 
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
           alt="Loading Vehicle..."
           width={200}
           height={200}
-          className="cyber-loader-themed"
           unoptimized
         />
-        <p className='font-mono text-brand-cyan mt-4 animate-pulse'>ЗАГРУЗКА ДАННЫХ...</p>
+        <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ДАННЫХ...</p>
       </div>
     );
   }
