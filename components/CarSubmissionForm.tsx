@@ -172,7 +172,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
-        {isSubmitting ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: ДОБАВЛЕНИЕ..." /> : <VibeContentRenderer content="::FaPlusCircle:: ДОБАВИТЬ В ГАРАЖ" />}
+        {isSubmitting ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: ДОБАВЛЕНИЕ..." /> : <VibeContentRenderer content="::FaCirclePlus:: ДОБАВИТЬ В ГАРАЖ" />}
       </Button>
     </motion.form>
   );
