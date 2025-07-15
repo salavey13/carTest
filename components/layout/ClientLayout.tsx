@@ -177,7 +177,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-              <Suspense fallback={<Loading />}>
+              <Suspense fallback={<Loading variant="bike" text="⚡" />}>
               <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
           </ErrorBoundaryForOverlay>
