@@ -32,7 +32,7 @@ interface Vehicle {
   };
 }
 
-const YUAN_TO_STARS_RATE = 0.1;
+const YUAN_TO_STARS_RATE = 10;
 
 export default function RentBikePage() {
   const router = useRouter();
@@ -151,7 +151,7 @@ export default function RentBikePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center dark:invert">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
         <Image 
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
           alt="Loading Garage..."
@@ -159,7 +159,7 @@ export default function RentBikePage() {
           height={200}
           unoptimized
         />
-        <p className='font-mono text-brand-cyan dark:text-black mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
+        <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
       </div>
     );
   }
