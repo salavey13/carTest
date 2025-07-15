@@ -12,7 +12,9 @@ import { fetchCars, createInvoice, getUserSubscription } from "@/hooks/supabase"
 import { sendTelegramInvoice } from "@/app/actions";
 import { Loading } from "@/components/Loading";
 import Link from "next/link";
+import { Label } from "@/components/ui/label";
 
+// Define interfaces locally for clarity
 interface Vehicle {
   id: string;
   make: string;
@@ -255,8 +257,9 @@ export default function RentBikePage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                     <div>
-                      <label className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</label>
+                      <Label htmlFor="rent-days" className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</Label>
                       <input
+                        id="rent-days"
                         type="number"
                         min="1"
                         value={rentDays}
