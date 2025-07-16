@@ -699,3 +699,31 @@ export async function getTopCrews() {
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
+export async function getUserPaddockData(userId: string) {
+    if (!userId) return { success: false, error: "User ID is required." };
+    if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+
+    try {
+        const [fleetResult, crewResult] = await Promise.all([
+            supabaseAdmin.rpc('get_user_fleet_with_stats', { p_user_id: userId }),
+            supabaseAdmin
+                .from('crew_members')
+                .select('crew:crews!inner(id, name, slug, logo_url)')
+                .eq('user_id', userId)
+                .maybeSingle()
+        ]);
+        
+        if (fleetResult.error) throw fleetResult.error;
+        if (crewResult.error) throw crewResult.error;
+        
+        const fleetData = fleetResult.data || [];
+        const userCrew = crewResult.data?.crew || null;
+
+        return { success: true, data: { fleet: fleetData, userCrew: userCrew } };
+
+    } catch(error) {
+        logger.error(`Error fetching paddock data for user ${userId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching paddock data" };
+    }
+}
