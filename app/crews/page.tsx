@@ -4,7 +4,6 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { motion } from 'framer-motion'; // Placeholder for client component usage
 
 async function CrewsList() {
     const result = await getAllPublicCrews();
