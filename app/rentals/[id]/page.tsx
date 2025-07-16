@@ -4,6 +4,7 @@ import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import React, { Suspense } from 'react';
 
 async function RentalManagementContent({ id }: { id: string }) {
     // This is a simplified auth check for server components.
@@ -66,9 +67,9 @@ export default function RentalPage({ params }: { params: { id: string } }) {
     return (
         <div className="min-h-screen bg-black text-white p-4 pt-24">
             <div className="container mx-auto max-w-4xl">
-                <React.Suspense fallback={<Loading text="Загрузка деталей аренды..." />}>
+                <Suspense fallback={<Loading text="Загрузка деталей аренды..." />}>
                     <RentalManagementContent id={params.id} />
-                </React.Suspense>
+                </Suspense>
             </div>
         </div>
     );

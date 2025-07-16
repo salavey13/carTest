@@ -40,7 +40,7 @@ async function CrewDetailContent({ id }: { id: string }) {
                  <div className="flex flex-wrap gap-4">
                     {(crew.members as any[])?.map(({ user }) => (
                         <div key={user.user_id} className="flex items-center gap-2 bg-dark-card/50 p-2 rounded-full">
-                             <Image src={user.avatar_url || '/placeholder.svg'} alt={user.username} width={40} height={40} className="rounded-full" />
+                             <Image src={user.avatar_url || '/placeholder.svg'} alt={user.username || user.user_id} width={40} height={40} className="rounded-full" />
                             <span className="font-mono">@{user.username}</span>
                         </div>
                     ))}
