@@ -81,6 +81,13 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "rent": "/rent-bike",
 };
 
+const DYNAMIC_ROUTE_PATTERNS: Record<string, string> = {
+    "crew": "/crews",
+    "rental": "/rentals",
+    "lead": "/leads",
+    // Add more prefixes and their base paths here
+};
+
 const TRANSPARENT_LAYOUT_PAGES = [
     '/rent-bike',
     '/rent-car',
@@ -99,7 +106,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const startParamHandledRef = useRef(false);
 
   useEffect(() => {
-     // This effect now handles the initial startParam from context and subsequent ones from URL if needed.
      const paramFromUrl = searchParams.get('tgWebAppStartParam');
      const paramToProcess = startParamPayload || paramFromUrl;
 
@@ -108,27 +114,35 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       const lowerStartParam = paramToProcess.toLowerCase();
       let targetPath: string | undefined;
 
-      if (lowerStartParam.startsWith('viz_')) {
+      // 1. Check for static mappings
+      if (START_PARAM_PAGE_MAP[lowerStartParam]) {
+        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
+      // 2. Check for dynamic prefix patterns (e.g., "crew_the-vibe-riders")
+      } else if (lowerStartParam.includes('_')) {
+        const [prefix, ...slugParts] = lowerStartParam.split('_');
+        const slug = slugParts.join('_');
+        if (DYNAMIC_ROUTE_PATTERNS[prefix] && slug) {
+            targetPath = `${DYNAMIC_ROUTE_PATTERNS[prefix]}/${slug}`;
+        }
+      // 3. Check for special prefixes like "viz_"
+      } else if (lowerStartParam.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
-      } else if (START_PARAM_PAGE_MAP[lowerStartParam]) {
-        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
+      // 4. Fallback for root-level pages if on homepage
       } else if (pathname === '/') {
-       if(!Object.values(START_PARAM_PAGE_MAP).some(p => `/${lowerStartParam}` === p)) {
-           targetPath = `/${lowerStartParam}`;
-       }
+        targetPath = `/${lowerStartParam}`;
       }
 
       if (targetPath && pathname !== targetPath) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting from '${pathname}'.`);
         router.replace(targetPath);
-        clearStartParam?.(); // Clear from context
+        clearStartParam?.(); 
       } else if (targetPath) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' matches current path. Clearing param.`);
-        router.replace(pathname, { scroll: false }); // Clear from URL
-        clearStartParam?.(); // Clear from context
+        router.replace(pathname, { scroll: false }); 
+        clearStartParam?.(); 
       } else {
-        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on non-root page '${pathname}'. No redirect.`);
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on page '${pathname}'. No redirect.`);
       }
     }
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
@@ -191,7 +205,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-              <Suspense fallback={<Loading variant="bike" text="⚡" />}>
+              <Suspense fallback={<Loading variant="bike" text="🕶️" />}>
               <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
           </ErrorBoundaryForOverlay>

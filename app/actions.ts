@@ -1,4 +1,3 @@
-// /app/actions.ts
 "use server"; 
 
 import {
@@ -640,13 +639,15 @@ export async function createCrew(crewData: { name: string; description: string; 
         return { success: false, error: "Admin client is not available." };
     }
     try {
+        const slug = crewData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         const { data, error } = await supabaseAdmin
             .from('crews')
             .insert({
                 name: crewData.name,
                 description: crewData.description,
                 logo_url: crewData.logo_url,
-                owner_id: crewData.owner_id
+                owner_id: crewData.owner_id,
+                slug: slug,
             })
             .select()
             .single();

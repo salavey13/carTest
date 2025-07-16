@@ -92,6 +92,7 @@ export async function getAllPublicCrews() {
             .select(`
                 id,
                 name,
+                slug,
                 description,
                 logo_url,
                 owner:users!owner_id(username),
@@ -108,27 +109,34 @@ export async function getAllPublicCrews() {
     }
 }
 
-export async function getPublicCrewInfo(crewId: string) {
+export async function getPublicCrewInfo(identifier: string) {
     noStore();
-    if (!crewId) return { success: false, error: "Crew ID is required" };
+    if (!identifier) return { success: false, error: "Crew identifier is required" };
+
+    // Basic UUID check
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
 
     try {
-        const { data, error } = await supabaseAdmin
+        const query = supabaseAdmin
             .from('crews')
             .select(`
                 *,
                 owner:users!owner_id(username, user_id),
                 members:crew_members(user:users(user_id, username, avatar_url)),
                 vehicles:cars(id, make, model, image_url)
-            `)
-            .eq('id', crewId)
-            .single();
+            `);
+
+        const { data, error } = isUuid 
+            ? await query.eq('id', identifier).single()
+            : await query.eq('slug', identifier).single();
 
         if (error) throw error;
+        if (!data) return { success: false, error: "Crew not found" };
+
         return { success: true, data };
 
     } catch (error) {
-        logger.error(`Error fetching crew info for ${crewId}:`, error);
+        logger.error(`Error fetching crew info for ${identifier}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }

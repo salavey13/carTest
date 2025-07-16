@@ -25,7 +25,7 @@ async function CrewsList() {
                 const memberCount = (crew.members as any)[0]?.count ?? 0;
                 const vehicleCount = (crew.vehicles as any)[0]?.count ?? 0;
                 return (
-                    <Link href={`/crews/${crew.id}`} key={crew.id} className="block group">
+                    <Link href={`/crews/${crew.slug}`} key={crew.id} className="block group">
                         <div className="bg-dark-card/80 border border-border p-6 rounded-xl h-full flex flex-col items-center text-center transition-all duration-300 hover:border-brand-green hover:shadow-2xl hover:shadow-brand-green/20 transform hover:-translate-y-1">
                             <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Logo`} width={80} height={80} className="rounded-full mb-4 bg-black/50 border-2 border-border group-hover:border-brand-green transition-colors" />
                             <h2 className="text-2xl font-orbitron text-brand-green">{crew.name}</h2>
@@ -53,7 +53,7 @@ export default function CrewsPage() {
             />
             <div id={heroTriggerId} style={{ height: '50vh' }} aria-hidden="true" />
             <div className="container mx-auto max-w-6xl px-4 py-12 relative z-20 bg-background">
-                 <Suspense fallback={<Loading text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />}>
+                 <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />}>
                     <CrewsList />
                 </Suspense>
             </div>
