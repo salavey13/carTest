@@ -46,9 +46,10 @@ export function Paddock() {
     if (!dbUser?.user_id) return;
     setLoading(true);
     try {
+      // Updated to fetch from the new `rentals` table structure
       const { data, error } = await supabaseAdmin
         .from("cars")
-        .select(`id, make, model, daily_price, image_url, type, owner_id, rentals (id, total_cost, payment_status, status)`)
+        .select(`*, rentals!vehicle_id ( id, total_cost, payment_status, status )`)
         .eq("owner_id", dbUser.user_id);
 
       if (error) throw error;
@@ -56,8 +57,8 @@ export function Paddock() {
       const processedVehicles = data.map((v: any) => ({
         ...v,
         rental_count: v.rentals.length,
-        total_revenue: v.rentals.filter((r: any) => r.payment_status === "paid").reduce((sum: number, r: any) => sum + r.total_cost, 0),
-        active_rentals: v.rentals.filter((r: any) => r.status === "active").length,
+        total_revenue: v.rentals.filter((r: any) => r.payment_status === 'fully_paid' || r.payment_status === 'interest_paid').reduce((sum: number, r: any) => sum + (r.total_cost || 0), 0),
+        active_rentals: v.rentals.filter((r: any) => r.status === "active" || r.status === 'confirmed').length,
         completed_rentals: v.rentals.filter((r: any) => r.status === "completed").length,
         cancelled_rentals: v.rentals.filter((r: any) => r.status === "cancelled").length,
       }));
@@ -168,7 +169,7 @@ export function Paddock() {
           )}
         </div>
 
-        <Link href="/admin" className="mt-8 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono">
+        <Link href="/admin" className="mt-8 mb-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono">
           ← Назад в Vibe Control Center
         </Link>
       </div>
