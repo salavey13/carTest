@@ -45,7 +45,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
         } else {
             const rect = entry.boundingClientRect;
             if (rect.bottom < 0) setScrollProgress(1); // Fully scrolled past
-            else if (rect.top > viewportHeight) setScrollProgress(0); // Fully scrolled before
+            else if (rect.top > window.innerHeight) setScrollProgress(0); // Fully scrolled before
         }
       }, { threshold: Array.from({ length: 101 }, (_, i) => i / 100), rootMargin: "0px" } 
     );

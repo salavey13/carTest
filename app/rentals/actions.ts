@@ -45,7 +45,6 @@ export async function getRentalDetails(rentalId: string) {
     }
 }
 
-
 export async function updateRentalStatus(rentalId: string, newStatus: string) {
     noStore();
     const userId = headers().get('x-user-id');

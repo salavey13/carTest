@@ -42,7 +42,6 @@ async function CrewsList() {
     );
 }
 
-
 export default function CrewsPage() {
     const heroTriggerId = "crews-hero-trigger";
     return (
