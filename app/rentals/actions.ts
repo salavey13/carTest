@@ -94,7 +94,7 @@ export async function getAllPublicCrews() {
                 name,
                 description,
                 logo_url,
-                owner:users (username),
+                owner:users!owner_id(username),
                 members:crew_members(count),
                 vehicles:cars(count)
             `)
@@ -117,7 +117,7 @@ export async function getPublicCrewInfo(crewId: string) {
             .from('crews')
             .select(`
                 *,
-                owner:users(username, user_id),
+                owner:users!owner_id(username, user_id),
                 members:crew_members(user:users(user_id, username, avatar_url)),
                 vehicles:cars(id, make, model, image_url)
             `)
