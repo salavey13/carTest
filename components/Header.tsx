@@ -85,7 +85,7 @@ const allPages: PageInfo[] = [
   { path: "/invoices", name: "My Invoices", icon: "FaFileInvoiceDollar", group: "Misc", color: "green", minLevel: 1 },
   { path: "/donate", name: "Donate", icon: "FaHeart", group: "Misc", color: "red", minLevel: 0 },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: "FaListCheck", group: "Misc", color: "white", minLevel: 0 },
-  { path: "/rent-car", name: "Rent a Car", icon: "FaCar", group: "Misc", color: "yellow", minLevel: 0 },
+  { path: "/rent-car", name: "Rent a Car", icon: "FaCarOn", group: "Misc", color: "yellow", minLevel: 0 },
   { path: "/vpr-tests", name: "VPR Tests", icon: "FaListCheck", group: "Misc", color: 'pink', minLevel: 0 },
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: "FaGlobe", group: "Misc", color: 'green', minLevel: 0 },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: "FaLandmarkDome", group: "Misc", color: 'yellow', minLevel: 0 },
