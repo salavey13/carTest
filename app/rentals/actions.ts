@@ -87,48 +87,22 @@ export async function updateRentalStatus(rentalId: string, newStatus: string) {
 export async function getAllPublicCrews() {
     noStore();
     try {
-        const { data, error } = await supabaseAdmin
-            .from('crews')
-            .select(`
-                id,
-                name,
-                slug,
-                description,
-                logo_url,
-                owner:users!owner_id(username),
-                members:crew_members(count),
-                vehicles:cars(count)
-            `)
-            .order('created_at', { ascending: false });
+        const { data, error } = await supabaseAdmin.rpc('get_public_crews');
         
         if (error) throw error;
         return { success: true, data };
     } catch (error) {
-        logger.error("Error fetching all crews:", error);
+        logger.error("Error fetching all crews via RPC:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
 
-export async function getPublicCrewInfo(identifier: string) {
+export async function getPublicCrewInfo(slug: string) {
     noStore();
-    if (!identifier) return { success: false, error: "Crew identifier is required" };
-
-    // Basic UUID check
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    if (!slug) return { success: false, error: "Crew slug is required" };
 
     try {
-        const query = supabaseAdmin
-            .from('crews')
-            .select(`
-                *,
-                owner:users!owner_id(username, user_id),
-                members:crew_members(user:users(user_id, username, avatar_url)),
-                vehicles:cars(id, make, model, image_url)
-            `);
-
-        const { data, error } = isUuid 
-            ? await query.eq('id', identifier).single()
-            : await query.eq('slug', identifier).single();
+        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
 
         if (error) throw error;
         if (!data) return { success: false, error: "Crew not found" };
@@ -136,7 +110,7 @@ export async function getPublicCrewInfo(identifier: string) {
         return { success: true, data };
 
     } catch (error) {
-        logger.error(`Error fetching crew info for ${identifier}:`, error);
+        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
