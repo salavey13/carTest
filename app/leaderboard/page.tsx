@@ -88,7 +88,7 @@ export default function LeaderboardPage() {
                                         <p className="text-xs text-muted-foreground">{crew.total_members} участников</p>
                                     </div>
                                     <div className="text-right flex-shrink-0">
-                                        <p className="font-mono font-bold text-brand-yellow">{crew.total_fleet_value.toLocaleString()} XTR</p>
+                                        <p className="font-mono font-bold text-brand-yellow">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
                                         <p className="text-xs text-muted-foreground">Стоимость</p>
                                     </div>
                                 </motion.div>

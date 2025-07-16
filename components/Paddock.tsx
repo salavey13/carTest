@@ -26,6 +26,7 @@ interface VehicleStat {
   owner_id: string;
   crew: {
     id: string;
+    slug: string;
     name: string;
     logo_url: string;
   } | null
@@ -43,7 +44,7 @@ export function Paddock() {
     totalRevenue: 0,
     totalActive: 0,
     topVehicle: null as VehicleStat | null,
-    userCrew: null as { id: string; name: string; logo_url: string; } | null
+    userCrew: null as { id: string; slug: string; name: string; logo_url: string; } | null
   });
 
   const isUserAdmin = isAdmin();
@@ -54,7 +55,7 @@ export function Paddock() {
     try {
       const { data: fleetData, error: fleetError } = await supabaseAdmin
         .from("cars")
-        .select(`*, rentals(rental_id, total_cost, payment_status, status), crew:crews(id, name, logo_url)`)
+        .select(`*, rentals(rental_id, total_cost, payment_status, status), crew:crews(id, name, slug, logo_url)`)
         .eq("owner_id", dbUser.user_id);
 
       if (fleetError) throw fleetError;
@@ -70,7 +71,7 @@ export function Paddock() {
 
       const { data: crewData } = await supabaseAdmin
         .from('crew_members')
-        .select('crew:crews(id, name, logo_url)')
+        .select('crew:crews!inner(id, name, slug, logo_url)')
         .eq('user_id', dbUser.user_id)
         .maybeSingle();
 
@@ -133,7 +134,7 @@ export function Paddock() {
             </h1>
             <div className="flex items-center gap-4">
                 {stats.userCrew && (
-                    <Link href={`/crews/${stats.userCrew.id}`} className="flex items-center gap-2 bg-dark-card/50 p-2 pr-4 rounded-full border border-border hover:border-brand-green transition-colors">
+                    <Link href={`/crews/${stats.userCrew.slug}`} className="flex items-center gap-2 bg-dark-card/50 p-2 pr-4 rounded-full border border-border hover:border-brand-green transition-colors">
                         <Image src={stats.userCrew.logo_url} alt={stats.userCrew.name} width={32} height={32} className="rounded-full" />
                         <span className="font-mono text-sm">{stats.userCrew.name}</span>
                     </Link>
@@ -164,6 +165,9 @@ export function Paddock() {
             fleet.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} />)
           )}
         </div>
+        <Link href="/admin" className="mt-8 mb-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono">
+          ← Назад в Vibe Control Center
+        </Link>
       </div>
     </div>
   )
