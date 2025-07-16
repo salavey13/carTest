@@ -701,8 +701,14 @@ export async function getTopCrews() {
 }
 
 export async function getUserPaddockData(userId: string) {
-    if (!userId) return { success: false, error: "User ID is required." };
-    if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
+    if (!userId) {
+        logger.warn("getUserPaddockData called without userId.");
+        return { success: false, error: "User ID is required." };
+    }
+    if (!supabaseAdmin) {
+        logger.error("getUserPaddockData failed: Admin client not available.");
+        return { success: false, error: "Admin client not available."};
+    }
 
     try {
         const [fleetResult, crewResult] = await Promise.all([
@@ -714,16 +720,23 @@ export async function getUserPaddockData(userId: string) {
                 .maybeSingle()
         ]);
         
-        if (fleetResult.error) throw fleetResult.error;
-        if (crewResult.error) throw crewResult.error;
+        if (fleetResult.error) {
+            logger.error(`Error in get_user_fleet_with_stats RPC for user ${userId}:`, fleetResult.error);
+            throw fleetResult.error;
+        }
+        if (crewResult.error) {
+            logger.error(`Error fetching user's crew for user ${userId}:`, crewResult.error);
+            throw crewResult.error;
+        }
         
         const fleetData = fleetResult.data || [];
         const userCrew = crewResult.data?.crew || null;
 
+        logger.info(`Successfully fetched paddock data for user ${userId}. Fleet size: ${fleetData.length}, In crew: ${!!userCrew}`);
         return { success: true, data: { fleet: fleetData, userCrew: userCrew } };
 
     } catch(error) {
-        logger.error(`Error fetching paddock data for user ${userId}:`, error);
+        logger.error(`Exception in getUserPaddockData for user ${userId}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching paddock data" };
     }
 }
