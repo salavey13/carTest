@@ -93,6 +93,7 @@ const TRANSPARENT_LAYOUT_PAGES = [
     '/rent-car',
     '/crews',
     '/paddock',
+    '/leaderboard'
 ];
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
