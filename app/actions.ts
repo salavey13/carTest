@@ -680,3 +680,17 @@ export async function getTopFleets() {
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
+export async function getTopCrews() {
+    if (!supabaseAdmin) {
+        return { success: false, error: "Admin client is not available." };
+    }
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_top_crews');
+        if (error) throw error;
+        return { success: true, data };
+    } catch(error) {
+        logger.error("Error getting top crews:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
