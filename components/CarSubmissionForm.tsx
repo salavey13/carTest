@@ -61,6 +61,10 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         }
       }
 
+      if (!imageUrl) {
+        throw new Error("Необходимо указать URL изображения или загрузить файл.");
+      }
+
       const vehicleData = {
         id: generatedId,
         make: formData.make,
@@ -82,7 +86,6 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
 
       if (insertError) throw insertError;
       
-      // Grant admin status on first submission
       const { data: user, error: userError } = await supabaseAdmin.from("users").select("status").eq("user_id", ownerId).single();
       if(user && user.status !== 'admin') {
           await supabaseAdmin.from("users").update({ status: 'admin' }).eq("user_id", ownerId);
@@ -161,7 +164,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Цена за день (XTR)</Label>
+              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Цена за день (¥)</Label>
               <Input type="number" value={formData.daily_price} onChange={e => setFormData(p => ({ ...p, daily_price: e.target.value }))} placeholder="999" className="input-cyber" required />
           </div>
           <div>

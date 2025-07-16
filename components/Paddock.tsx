@@ -49,7 +49,7 @@ export function Paddock() {
       // Updated to fetch from the new `rentals` table structure
       const { data, error } = await supabaseAdmin
         .from("cars")
-        .select(`*, rentals!vehicle_id ( id, total_cost, payment_status, status )`)
+        .select(`*, rentals(rental_id, total_cost, payment_status, status)`)
         .eq("owner_id", dbUser.user_id);
 
       if (error) throw error;
@@ -57,8 +57,8 @@ export function Paddock() {
       const processedVehicles = data.map((v: any) => ({
         ...v,
         rental_count: v.rentals.length,
-        total_revenue: v.rentals.filter((r: any) => r.payment_status === 'fully_paid' || r.payment_status === 'interest_paid').reduce((sum: number, r: any) => sum + (r.total_cost || 0), 0),
-        active_rentals: v.rentals.filter((r: any) => r.status === "active" || r.status === 'confirmed').length,
+        total_revenue: v.rentals.filter((r: any) => r.payment_status === 'fully_paid' || r.payment_status === 'interest_paid').reduce((sum: number, r: any) => sum + (r.interest_amount || 0) + (r.total_cost || 0), 0),
+        active_rentals: v.rentals.filter((r: any) => r.status === "active" || r.status === 'confirmed' || r.status === 'pending_confirmation').length,
         completed_rentals: v.rentals.filter((r: any) => r.status === "completed").length,
         cancelled_rentals: v.rentals.filter((r: any) => r.status === "cancelled").length,
       }));
@@ -116,12 +116,12 @@ export function Paddock() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden p-4">
       <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-black to-purple-900 animate-pulse" />
       </div>
 
-      <div className="pt-20 relative container mx-auto px-4">
+      <div className="pt-20 relative container mx-auto">
         <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <h1
             className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-orbitron drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]"
@@ -138,16 +138,6 @@ export function Paddock() {
             </div>
         </motion.div>
 
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Поиск по марке или модели..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full max-w-md p-3 rounded-lg bg-gray-900/80 border border-cyan-500/30 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 shadow-[0_0_5px_rgba(0,255,255,0.3)]"
-          />
-        </div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -161,17 +151,13 @@ export function Paddock() {
         </motion.div>
 
         <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-cyan-400 mb-4 font-mono">Мой Гараж</h2>
+          <h2 className="text-2xl font-semibold text-cyan-400 mb-4 font-mono">Мой Гараж ({fleet.length})</h2>
           {fleet.length === 0 ? (
-            <div className="text-center text-gray-400">Ваш гараж пуст. Добавьте транспорт в Vibe Control Center!</div>
+            <div className="text-center text-gray-400 py-10 bg-dark-card/30 rounded-lg">Ваш гараж пуст. <Link href="/admin" className="text-brand-cyan hover:underline">Добавьте транспорт</Link> в Vibe Control Center!</div>
           ) : (
             fleet.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} />)
           )}
         </div>
-
-        <Link href="/admin" className="mt-8 mb-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono">
-          ← Назад в Vibe Control Center
-        </Link>
       </div>
     </div>
   )
@@ -181,7 +167,7 @@ function StatCard({ title, value, icon, glowColor }: { title: string; value: str
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
-      className={`p-6 rounded-lg bg-gray-900/80 border border-${glowColor}-500/30 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-${glowColor}-500/40 transition-all`}
+      className={`p-6 rounded-lg bg-dark-card/80 border border-${glowColor}-500/30 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-${glowColor}-500/40 transition-all backdrop-blur-sm`}
     >
       <div className="flex items-center gap-4">
         <VibeContentRenderer content={icon} className={`text-3xl text-${glowColor}-400`}/>
@@ -198,7 +184,7 @@ function VehicleCard({ vehicle }: { vehicle: VehicleStat }) {
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="p-4 rounded-lg bg-gray-900/80 border border-cyan-500/30 flex flex-col md:flex-row gap-6 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-cyan-500/30 transition-all"
+      className="p-4 rounded-lg bg-dark-card/70 border border-cyan-500/30 flex flex-col md:flex-row gap-6 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-cyan-500/30 transition-all backdrop-blur-sm"
     >
       <Image
         src={vehicle.image_url}
@@ -222,7 +208,7 @@ function VehicleCard({ vehicle }: { vehicle: VehicleStat }) {
 }
 
 const StatPill = ({ label, value }: { label: string, value: string | number }) => (
-    <div className="text-center bg-black/30 p-2 rounded-lg border border-gray-700">
+    <div className="text-center bg-black/30 p-2 rounded-lg border border-gray-700 h-full flex flex-col justify-center">
         <p className="text-2xl font-orbitron text-brand-yellow">{value}</p>
         <p className="text-xs text-muted-foreground font-mono uppercase">{label}</p>
     </div>

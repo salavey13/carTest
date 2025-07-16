@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -22,7 +21,7 @@ import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 import Image from "next/image";
 import { Loading } from "@/components/Loading";
-
+import { cn } from "@/lib/utils";
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -82,6 +81,13 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "rent": "/rent-bike",
 };
 
+const TRANSPARENT_LAYOUT_PAGES = [
+    '/rent-bike',
+    '/rent-car',
+    '/crews',
+    '/paddock',
+];
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -136,6 +142,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/leads",
     "/elon",
     "/god-mode-sandbox",
+    "/rent-bike",
+    "/crews"
   ];
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 
@@ -155,12 +163,18 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
+  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p));
+
   return (
     <>
       {showHeaderAndFooter && <Header />}
-      <main className={`flex-1 ${showBottomNav ? 'pb-20 sm:pb-0' : ''}`}> 
-        {children}
-      </main>
+        <main className={cn(
+            'flex-1',
+            showBottomNav ? 'pb-20 sm:pb-0' : '',
+            !isTransparentPage && 'bg-background'
+        )}>
+            {children}
+        </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
       <Suspense fallback={<div className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" aria-hidden="true"></div>}>
         <StickyChatButton />
