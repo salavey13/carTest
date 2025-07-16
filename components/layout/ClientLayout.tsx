@@ -128,8 +128,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       } else if (lowerStartParam.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
-      // 4. Fallback for root-level pages if on homepage
-      } else if (pathname === '/') {
+      // 4. Last resort fallback for any unhandled param
+      } else {
         targetPath = `/${lowerStartParam}`;
       }
 

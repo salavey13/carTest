@@ -5,6 +5,7 @@ export const carRentalHandler: WebhookHandler = {
   canHandle: (invoice) => invoice.type === "car_rental",
   handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId, baseUrl) => {
     const metadata = invoice.metadata;
+    const telegramBotLink = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneSitePlsBot/app";
     
     // 1. Fetch vehicle data including the owner_id
     const { data: vehicle, error: vehicleError } = await supabase
@@ -42,13 +43,12 @@ export const carRentalHandler: WebhookHandler = {
         throw new Error(`Failed to create rental record: ${rentalError.message}`);
     }
 
-    const rentalManagementUrl = `${baseUrl}/rentals/${rental.rental_id}`;
+    const rentalManagementUrl = `${telegramBotLink}?startapp=rental_${rental.rental_id}`;
     const vehicleTypeString = vehicle.type === 'bike' ? 'байк' : 'автомобиль';
 
     // 3. Notify the Renter (user who paid)
-    const renterMessage = `✅ Ваш интерес к аренде ${vehicleTypeString} **${metadata.car_make} ${metadata.car_model}** зафиксирован! Владелец уведомлен.\n\nПерейдите на страницу аренды, чтобы согласовать детали и дату.`
+    const renterMessage = `✅ Ваш интерес к аренде ${vehicleTypeString} **${metadata.car_make} ${metadata.car_model}** зафиксирован! Владелец уведомлен.\n\nНажмите кнопку ниже, чтобы открыть сделку.`;
     await sendTelegramMessage(
-        telegramToken,
         renterMessage,
         [{ text: "Управлять Арендой", url: rentalManagementUrl }],
         metadata.image_url,
@@ -57,9 +57,8 @@ export const carRentalHandler: WebhookHandler = {
 
     // 4. Notify the Owner
     if (vehicle.owner_id) {
-        const ownerMessage = `🔥 Новый запрос на аренду!\n\nПользователь @${userData.username || userId} оплатил интерес к вашему ${vehicleTypeString} **${metadata.car_make} ${metadata.car_model}**.\n\nПерейдите в "Паддок", чтобы подтвердить детали.`;
+        const ownerMessage = `🔥 Новый запрос на аренду!\n\nПользователь @${userData.username || userId} оплатил интерес к вашему ${vehicleTypeString} **${metadata.car_make} ${metadata.car_model}**.\n\nНажмите кнопку, чтобы открыть детали сделки.`;
         await sendTelegramMessage(
-            telegramToken,
             ownerMessage,
             [{ text: "К Деталям Сделки", url: rentalManagementUrl }],
             metadata.image_url,
@@ -69,6 +68,6 @@ export const carRentalHandler: WebhookHandler = {
 
     // 5. Notify the Admin (optional, can be commented out)
     const adminMessage = `🔔 Зафиксирован интерес к аренде: \n- **Транспорт:** ${metadata.car_make} ${metadata.car_model}\n- **Арендатор:** @${userData.username || userId}\n- **Владелец:** ${vehicle.owner_id}\n- **Сумма интереса:** ${totalAmount} XTR`;
-    await sendTelegramMessage(telegramToken, adminMessage, [], undefined, adminChatId);
+    await sendTelegramMessage(adminMessage, [], undefined, adminChatId);
   },
 };
