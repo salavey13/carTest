@@ -1,22 +1,60 @@
+"use client";
+
 import { getPublicCrewInfo } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
-async function CrewDetailContent({ slug }: { slug: string }) {
-    const result = await getPublicCrewInfo(slug);
+// Define a comprehensive type for the crew details
+type CrewDetails = {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    logo_url: string;
+    created_at: string;
+    owner: { user_id: string; username: string };
+    members: { user_id: string; username: string; avatar_url: string; role: string }[];
+    vehicles: { id: string; make: string; model: string; image_url: string }[];
+};
 
-    if (!result.success || !result.data) {
-        return <p className="text-destructive text-center py-20">{result.error || "Экипаж не найден."}</p>;
+function CrewDetailContent({ slug }: { slug: string }) {
+    const [crew, setCrew] = useState<CrewDetails | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function loadCrewDetails() {
+            try {
+                const result = await getPublicCrewInfo(slug);
+                if (result.success && result.data) {
+                    setCrew(result.data);
+                } else {
+                    setError(result.error || "Не удалось загрузить данные экипажа.");
+                }
+            } catch (e: any) {
+                setError(e.message || "Неизвестная ошибка на клиенте.");
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadCrewDetails();
+    }, [slug]);
+
+    if (loading) {
+        return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    }
+
+    if (error || !crew) {
+        return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     }
     
-    const { data: crew } = result;
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
     const hasVehicles = crew.vehicles && crew.vehicles.length > 0;
     const hasMembers = crew.members && crew.members.length > 0;
@@ -61,7 +99,7 @@ async function CrewDetailContent({ slug }: { slug: string }) {
                         </TabsList>
                         <TabsContent value="garage" className="mt-6">
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {hasVehicles ? crew.vehicles.map((vehicle: any) => (
+                                {hasVehicles ? crew.vehicles.map((vehicle) => (
                                     <Link href={`/rent/${vehicle.id}`} key={vehicle.id} className="bg-dark-card/50 p-4 rounded-lg hover:bg-dark-card transition-colors group">
                                         <div className="relative w-full h-40 rounded-md mb-3 overflow-hidden">
                                             <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover group-hover:scale-105 transition-transform duration-300"/>
@@ -73,7 +111,7 @@ async function CrewDetailContent({ slug }: { slug: string }) {
                         </TabsContent>
                         <TabsContent value="roster" className="mt-6">
                             <div className="space-y-3">
-                                {hasMembers ? crew.members.map((member: any) => (
+                                {hasMembers ? crew.members.map((member) => (
                                     <div key={member.user_id} className="flex items-center gap-4 bg-dark-card/50 p-3 rounded-lg border border-border">
                                         <Image src={member.avatar_url || '/placeholder.svg'} alt={member.username || member.user_id} width={48} height={48} className="rounded-full" />
                                         <div className="flex-grow">
