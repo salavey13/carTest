@@ -157,7 +157,7 @@ export default function RentBikePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 pt-24 overflow-hidden relative">
+    <div className="min-h-screen text-white p-4 pt-24 overflow-hidden relative">
       <div className="fixed inset-0 z-[-1] opacity-30">
         <Image
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
@@ -290,16 +290,16 @@ export default function RentBikePage() {
           </AnimatePresence>
         </div>
       </div>
-      <Link href="/admin">
-        <motion.div 
-            className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 bg-brand-purple/80 text-white rounded-full p-4 shadow-lg shadow-brand-purple/50 cursor-pointer backdrop-blur-sm hover:bg-brand-purple transition-colors"
-            title="Добавить свой транспорт"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-        >
-            <VibeContentRenderer content="::FaPlus::" className="h-6 w-6"/>
-        </motion.div>
-    </Link>
+        <Link href="/crews">
+            <motion.div 
+                className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 bg-brand-green/80 text-white rounded-full p-4 shadow-lg shadow-brand-green/50 cursor-pointer backdrop-blur-sm hover:bg-brand-green transition-colors"
+                title="К Экипажам"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+            >
+                <VibeContentRenderer content="::FaUsers::" className="h-6 w-6"/>
+            </motion.div>
+        </Link>
     </div>
   );
 }
