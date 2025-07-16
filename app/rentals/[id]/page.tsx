@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 
 async function RentalManagementContent({ id }: { id: string }) {
     const userId = headers().get('x-user-id') || "";
-    const result = await getRentalDetails(id, userId);
+    const result = await getRentalDetails(id);
 
     if (!result.success || !result.data) {
         return (
