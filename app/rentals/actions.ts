@@ -3,12 +3,19 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
+import { headers } from 'next/headers';
 
-export async function getRentalDetails(rentalId: string, userId: string) {
+export async function getRentalDetails(rentalId: string) {
     noStore();
-    if (!rentalId || !userId) {
-        logger.error("[getRentalDetails] Rental ID and User ID are required.");
-        return { success: false, error: "Missing required parameters." };
+    const userId = headers().get('x-user-id'); // Simplified auth for Server Components
+
+    if (!rentalId) {
+        logger.error("[getRentalDetails] Rental ID is required.");
+        return { success: false, error: "Missing rental ID." };
+    }
+     if (!userId) {
+        logger.error("[getRentalDetails] User ID missing from headers.");
+        return { success: false, error: "Unauthorized." };
     }
 
     try {
@@ -25,8 +32,8 @@ export async function getRentalDetails(rentalId: string, userId: string) {
 
         if (error) throw error;
         
-        // Basic authorization check
         if (data.user_id !== userId && data.owner_id !== userId) {
+            logger.warn(`[getRentalDetails] Unauthorized attempt to access rental ${rentalId} by user ${userId}.`);
             return { success: false, error: "Unauthorized access to rental details." };
         }
 
@@ -39,14 +46,15 @@ export async function getRentalDetails(rentalId: string, userId: string) {
 }
 
 
-export async function updateRentalStatus(rentalId: string, newStatus: string, userId: string) {
+export async function updateRentalStatus(rentalId: string, newStatus: string) {
     noStore();
+    const userId = headers().get('x-user-id');
+
     if (!rentalId || !newStatus || !userId) {
          return { success: false, error: "Missing required parameters." };
     }
     
     try {
-        // Fetch to verify ownership/rentership before update
         const { data: rental, error: fetchError } = await supabaseAdmin
             .from('rentals')
             .select('owner_id, user_id')
@@ -83,8 +91,11 @@ export async function getAllPublicCrews() {
         const { data, error } = await supabaseAdmin
             .from('crews')
             .select(`
-                *,
-                owner:users (*),
+                id,
+                name,
+                description,
+                logo_url,
+                owner:users (username),
                 members:crew_members(count),
                 vehicles:cars(count)
             `)
@@ -107,9 +118,9 @@ export async function getPublicCrewInfo(crewId: string) {
             .from('crews')
             .select(`
                 *,
-                owner:users(*),
-                members:crew_members(user:users(*)),
-                vehicles:cars(*)
+                owner:users(username, user_id),
+                members:crew_members(user:users(user_id, username, avatar_url)),
+                vehicles:cars(id, make, model, image_url)
             `)
             .eq('id', crewId)
             .single();
