@@ -90,13 +90,13 @@ function CrewsList() {
 export default function CrewsPage() {
     const heroTriggerId = "crews-hero-trigger";
     return (
-        <div className="relative min-h-screen bg-background">
+        <div className="relative min-h-screen">
             <RockstarHeroSection
                 title="ЭКИПАЖИ"
                 subtitle="Команды, которые правят улицами. Найди своих или брось им вызов."
                 triggerElementSelector={`#${heroTriggerId}`}
             />
-            <div id={heroTriggerId} style={{ height: '50vh' }} aria-hidden="true" />
+            <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
             <div className="container mx-auto max-w-6xl px-4 py-12 relative z-20 bg-background">
                  <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />}>
                     <CrewsList />

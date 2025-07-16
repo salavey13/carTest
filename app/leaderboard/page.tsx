@@ -21,7 +21,7 @@ type Crew = {
     logo_url: string;
     total_members: number;
     total_fleet_value: number;
-    link: string; // Added link property
+    link: string;
 };
 
 
@@ -51,7 +51,7 @@ export default function LeaderboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-black text-white p-4 pt-24 relative overflow-hidden">
+        <div className="min-h-screen text-white p-4 pt-24 relative overflow-hidden">
              <div className="fixed inset-0 z-[-1] opacity-20">
                 <Image
                 src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
@@ -72,7 +72,7 @@ export default function LeaderboardPage() {
                 </motion.h1>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                     <LeaderboardSection title="Топ Экипажи" icon="::FaUsers::">
+                     <LeaderboardSection title="Топ Экипажи" icon="::FaUsers::" actionLink="/crews" actionText="Все экипажи">
                         {topCrews.length > 0 ? topCrews.map((crew, index) => (
                            <Link href={crew.link} key={crew.crew_id} className="block w-full">
                                 <motion.div
@@ -125,16 +125,23 @@ export default function LeaderboardPage() {
     );
 }
 
-const LeaderboardSection = ({ title, icon, children }: { title: string, icon: string, children: React.ReactNode }) => (
+const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: { title: string, icon: string, children: React.ReactNode, actionLink?: string, actionText?: string }) => (
     <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="bg-dark-card/50 backdrop-blur-sm border border-brand-purple/50 p-6 rounded-2xl shadow-lg shadow-brand-purple/10"
     >
-        <h2 className="text-3xl font-orbitron text-brand-purple mb-6 text-center flex items-center justify-center gap-3">
-            <VibeContentRenderer content={icon} /> {title}
-        </h2>
+        <div className="flex justify-between items-center mb-6">
+            <h2 className="text-3xl font-orbitron text-brand-purple flex items-center gap-3">
+                <VibeContentRenderer content={icon} /> {title}
+            </h2>
+            {actionLink && actionText && (
+                <Link href={actionLink} className="text-xs font-mono text-brand-cyan hover:underline">
+                    {actionText} →
+                </Link>
+            )}
+        </div>
         <div className="space-y-3">
             {children}
         </div>

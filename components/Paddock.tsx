@@ -24,6 +24,11 @@ interface VehicleStat {
   completed_rentals: number;
   cancelled_rentals: number;
   owner_id: string;
+  crew: {
+    id: string;
+    name: string;
+    logo_url: string;
+  } | null
 }
 
 export function Paddock() {
@@ -38,6 +43,7 @@ export function Paddock() {
     totalRevenue: 0,
     totalActive: 0,
     topVehicle: null as VehicleStat | null,
+    userCrew: null as { id: string; name: string; logo_url: string; } | null
   });
 
   const isUserAdmin = isAdmin();
@@ -46,15 +52,14 @@ export function Paddock() {
     if (!dbUser?.user_id) return;
     setLoading(true);
     try {
-      // Updated to fetch from the new `rentals` table structure
-      const { data, error } = await supabaseAdmin
+      const { data: fleetData, error: fleetError } = await supabaseAdmin
         .from("cars")
-        .select(`*, rentals(rental_id, total_cost, payment_status, status)`)
+        .select(`*, rentals(rental_id, total_cost, payment_status, status), crew:crews(id, name, logo_url)`)
         .eq("owner_id", dbUser.user_id);
 
-      if (error) throw error;
+      if (fleetError) throw fleetError;
 
-      const processedVehicles = data.map((v: any) => ({
+      const processedVehicles = fleetData.map((v: any) => ({
         ...v,
         rental_count: v.rentals.length,
         total_revenue: v.rentals.filter((r: any) => r.payment_status === 'fully_paid' || r.payment_status === 'interest_paid').reduce((sum: number, r: any) => sum + (r.interest_amount || 0) + (r.total_cost || 0), 0),
@@ -63,27 +68,27 @@ export function Paddock() {
         cancelled_rentals: v.rentals.filter((r: any) => r.status === "cancelled").length,
       }));
 
-      const filteredVehicles = processedVehicles.filter(
-        (v) =>
-          v.make.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          v.model.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const { data: crewData } = await supabaseAdmin
+        .from('crew_members')
+        .select('crew:crews(id, name, logo_url)')
+        .eq('user_id', dbUser.user_id)
+        .maybeSingle();
 
-      setFleet(filteredVehicles);
+      setFleet(processedVehicles);
 
-      const totalRentals = filteredVehicles.reduce((sum, v) => sum + v.rental_count, 0);
-      const totalRevenue = filteredVehicles.reduce((sum, v) => sum + v.total_revenue, 0);
-      const totalActive = filteredVehicles.reduce((sum, v) => sum + v.active_rentals, 0);
-      const topVehicle = filteredVehicles.sort((a, b) => b.total_revenue - a.total_revenue)[0] || null;
+      const totalRentals = processedVehicles.reduce((sum, v) => sum + v.rental_count, 0);
+      const totalRevenue = processedVehicles.reduce((sum, v) => sum + v.total_revenue, 0);
+      const totalActive = processedVehicles.reduce((sum, v) => sum + v.active_rentals, 0);
+      const topVehicle = processedVehicles.sort((a, b) => b.total_revenue - a.total_revenue)[0] || null;
 
-      setStats({ totalRentals, totalRevenue, totalActive, topVehicle });
+      setStats({ totalRentals, totalRevenue, totalActive, topVehicle, userCrew: crewData?.crew || null });
     } catch (error) {
       console.error("Error fetching fleet:", error);
       toast.error("Ошибка загрузки паддока");
     } finally {
       setLoading(false);
     }
-  }, [dbUser?.user_id, searchQuery]);
+  }, [dbUser?.user_id]);
 
   useEffect(() => {
     if (!isAppContextLoading && isUserAdmin) {
@@ -116,24 +121,25 @@ export function Paddock() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden p-4">
+    <div className="min-h-screen text-white relative overflow-hidden p-4">
       <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-900 via-black to-purple-900 animate-pulse" />
       </div>
 
       <div className="pt-20 relative container mx-auto">
         <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-wrap items-center justify-between gap-4 mb-8">
-            <h1
-            className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-orbitron drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]"
-            >
+            <h1 className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-orbitron drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]">
             МОЙ ПАДДОК
             </h1>
-            <div className="flex gap-2">
-                <Link href="/crews/create" passHref>
-                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-green/20 border border-brand-green text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaPlus:: Создать Экипаж"/></motion.button>
-                </Link>
-                 <Link href="/leaderboard" passHref>
-                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-yellow/20 border border-brand-yellow text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaTrophy:: Лидерборд"/></motion.button>
+            <div className="flex items-center gap-4">
+                {stats.userCrew && (
+                    <Link href={`/crews/${stats.userCrew.id}`} className="flex items-center gap-2 bg-dark-card/50 p-2 pr-4 rounded-full border border-border hover:border-brand-green transition-colors">
+                        <Image src={stats.userCrew.logo_url} alt={stats.userCrew.name} width={32} height={32} className="rounded-full" />
+                        <span className="font-mono text-sm">{stats.userCrew.name}</span>
+                    </Link>
+                )}
+                <Link href="/crews" passHref>
+                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-green/20 border border-brand-green text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaUsers:: Экипажи"/></motion.button>
                 </Link>
             </div>
         </motion.div>
