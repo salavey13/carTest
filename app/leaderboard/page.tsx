@@ -69,7 +69,7 @@ export default function LeaderboardPage() {
   }, [mode]);
 
   if (loading) {
-    return <Loading text="ЗАГРУЗКА РЕЙТИНГОВ..." />;
+    return <Loading variant="bike" text="ЗАГРУЗКА РЕЙТИНГОВ..." />;
   }
 
   return (
