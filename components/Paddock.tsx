@@ -55,7 +55,7 @@ export function Paddock() {
     try {
       const { data: fleetData, error: fleetError } = await supabaseAdmin
         .from("cars")
-        .select(`*, rentals(rental_id, total_cost, payment_status, status), crew:crews(id, name, slug, logo_url)`)
+        .select(`*, rentals!vehicle_id(rental_id, total_cost, payment_status, status, interest_amount), crew:crews(id, name, slug, logo_url)`)
         .eq("owner_id", dbUser.user_id);
 
       if (fleetError) throw fleetError;

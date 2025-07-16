@@ -68,7 +68,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 backgroundImageObjectUrl={crew.logo_url || undefined}
                 triggerElementSelector={`#${heroTriggerId}`}
             />
-            <div id={heroTriggerId} style={{ height: '50vh' }} aria-hidden="true" />
+            <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
 
             <motion.div 
                 initial={{ opacity: 0, y: 50 }}
@@ -131,7 +131,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
 export default function CrewPage({ params }: { params: { slug: string } }) {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground">
         <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />}>
           <CrewDetailContent slug={params.slug} />
         </Suspense>
