@@ -1,20 +1,58 @@
+"use client";
+
 import { getAllPublicCrews } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { motion } from 'framer-motion';
 
-async function CrewsList() {
-    const result = await getAllPublicCrews();
+type Crew = {
+    id: string;
+    name: string;
+    slug: string;
+    description: string;
+    logo_url: string;
+    owner_username: string;
+    member_count: number;
+    vehicle_count: number;
+};
 
-    if (!result.success || !result.data || result.data.length === 0) {
+function CrewsList() {
+    const [crews, setCrews] = useState<Crew[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function loadCrews() {
+            try {
+                const result = await getAllPublicCrews();
+                if (result.success && result.data) {
+                    setCrews(result.data);
+                } else {
+                    setError(result.error || "Не удалось загрузить список экипажей.");
+                }
+            } catch (e: any) {
+                setError(e.message || "Неизвестная ошибка на клиенте.");
+            } finally {
+                setLoading(false);
+            }
+        }
+        loadCrews();
+    }, []);
+
+
+    if (loading) {
+        return <Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />;
+    }
+
+    if (error || crews.length === 0) {
         return (
             <div className="text-center py-10">
                 <p className="text-muted-foreground font-mono">
-                    {result.error ? `Не удалось загрузить список экипажей: ${result.error}` : "Пока не создано ни одного экипажа. Будь первым!"}
+                    {error || "Пока не создано ни одного экипажа. Будь первым!"}
                 </p>
             </div>
         );
@@ -22,7 +60,7 @@ async function CrewsList() {
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {result.data.map((crew, index) => (
+            {crews.map((crew, index) => (
                 <Link href={`/crews/${crew.slug}`} key={crew.id} className="block group">
                     <motion.div 
                         initial={{ opacity: 0, y: 20 }}
