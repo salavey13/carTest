@@ -688,10 +688,13 @@ export async function getTopCrews() {
     }
     try {
         const { data, error } = await supabaseAdmin.rpc('get_top_crews');
-        if (error) throw error;
+        if (error) {
+            logger.error('Error fetching top crews via RPC:', error);
+            throw error;
+        }
         return { success: true, data: data || [] };
     } catch(error) {
-        logger.error("Error getting top crews:", error);
+        logger.error("Exception in getTopCrews action:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
