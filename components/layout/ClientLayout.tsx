@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -12,7 +13,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
-import BottomNavigation from "@/components/layout/BottomNavigation";
+import BottomNavigation from "@/components/layout/BottomNavigationBike";
 import { debugLogger as logger } from "@/lib/debugLogger"; 
 import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; 
 import { Analytics } from "@vercel/analytics/react"; 
@@ -157,8 +158,11 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/leads",
     "/elon",
     "/god-mode-sandbox",
-    "/rent-bike",
-    "/crews"
+    "/rent",
+    "/crews",
+    "/leaderboard",
+    "/admin",
+    "/paddock",
   ];
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 
