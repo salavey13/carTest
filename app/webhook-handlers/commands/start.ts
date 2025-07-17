@@ -30,13 +30,13 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   await notifyAdmin(adminSummary);
 
 
-
+  const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneSitePlsBot/app";
   let summary = `✅ **Опрос Завершен!**\nТвои предпочтения записаны. Спасибо!\n`;
   for (const key in answers) {
     summary += `- **${answerTexts[key] || key}:** ${answers[key] || 'не указана'}\n`;
   }
-  summary += `Теперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
-  summary += `\n\n👉 Готов выбрать байк?  Посети наш мото-гараж: t.me/oneSitePlsBot/app?startapp=rent`;  // Add call to action
+  summary += `\n\nТеперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
+  summary += `\n\n👉 Готов выбрать байк?  Посети наш мото-гараж: ${botUrl}`;  // Add call to action
   await sendComplexMessage(chatId, summary, [], { removeKeyboard: true });
 };
 
