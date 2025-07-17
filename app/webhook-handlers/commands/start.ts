@@ -30,13 +30,13 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   await notifyAdmin(adminSummary);
 
 
-
+  const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneSitePlsBot/app";
   let summary = `✅ **Опрос Завершен!**\nТвои предпочтения записаны. Спасибо!\n`;
   for (const key in answers) {
     summary += `- **${answerTexts[key] || key}:** ${answers[key] || 'не указана'}\n`;
   }
-  summary += `Теперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
-  summary += `\n\n👉 Готов выбрать байк?  Посети наш мото-гараж: t.me/oneSitePlsBot/app?startapp=rent`;  // Add call to action
+  summary += `\n\nТеперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
+  summary += `\n\n👉 Готов выбрать байк?  Посети наш мото-гараж: ${botUrl}`;  // Add call to action
   await sendComplexMessage(chatId, summary, [], { removeKeyboard: true });
 };
 
@@ -92,55 +92,3 @@ export async function startCommand(chatId: number, userId: number, username?: st
       if (!isValidAnswer) {
         logger.warn(`[StartCommand V4] Invalid answer "${text}" for step ${currentState.current_step}. Resending question.`);
         const buttons = currentQuestion.answers.map(a => ([{ text: a.text }]));
-        await sendComplexMessage(chatId, `Неверный ответ. Пожалуйста, выбери один из вариантов или введи свой ответ.\n\n${currentQuestion.question}`, buttons, { keyboardType: 'reply' });
-        return;
-      }
-    }
-
-
-    const newAnswers = { ...currentState.answers, [currentQuestion.key]: text };
-    const nextStep = currentState.current_step + 1;
-
-
-    if (nextStep > surveyQuestions.length) {
-      // Survey is complete
-      await handleSurveyCompletion(chatId, { ...currentState, answers: newAnswers }, username);
-    } else {
-      // Move to the next question
-      await supabaseAdmin.from("user_survey_state").update({ current_step: nextStep, answers: newAnswers }).eq('user_id', userIdStr);
-      const nextQuestion = surveyQuestions.find(q => q.step === nextStep)!;
-      const buttons = nextQuestion.answers ? nextQuestion.answers.map(a => ([{ text: a.text }])) : [];
-
-
-      // Remove keyboard if no answers, otherwise show reply keyboard
-      await sendComplexMessage(chatId, nextQuestion.question, buttons, { keyboardType: nextQuestion.answers ? 'reply' : 'remove' });
-    }
-  }
-}
-
-/*
-
-Key improvements and explanations:
-
-
-• start_survey_questions.ts: Holds the surveyQuestions array and the SurveyQuestion interface, making the survey definition separate and manageable. Includes the free_answer boolean on each question.
-
-• Import: The startCommand function now imports surveyQuestions from the separate file.
-
-• free_answer Flag: The SurveyQuestion interface now includes a free_answer: boolean field. If this is true for a question, the answer validation is skipped, allowing the user to enter any text.
-
-• Conditional Answer Validation: The code now checks if (currentQuestion.answers && !currentQuestion.free_answer) before validating the answer. This makes sure the validation is only done when there are predefined answers AND the question doesn't allow a free answer.
-
-• Dynamic Keyboards: The sendComplexMessage call now includes the check keyboardType: nextQuestion.answers ? 'reply' : 'remove'. This means that if a question doesn't have predefined answers (and therefore nextQuestion.answers is undefined), the keyboard will be removed automatically.
-
-• Handling No Predefined Answers: The code now handles questions without predefined answers by checking if question.answers exists before mapping to buttons. If it doesn't exist, an empty array is used.
-
-• Clearer Logic: The logic for determining whether to validate the answer and whether to show the keyboard is now clearer and more concise.
-
-• Dynamic Result Message: The handleSurveyCompletion function now dynamically builds the summary message using a loop that iterates through the answers object. The keys from the survey questions are used as labels in the summary.
-
-• answerTexts map Added a map to provide verbose names for survey keys, used in summary to show user readable text
-
-• Error Handling & Logging: The logging statements remain, which are crucial for debugging.
-
-• Typescript: Maintained strong typing.*/
