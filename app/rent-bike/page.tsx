@@ -290,16 +290,6 @@ export default function RentBikePage() {
           </AnimatePresence>
         </div>
       </div>
-        <Link href="/crews">
-            <motion.div 
-                className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 bg-brand-green/80 text-white rounded-full p-4 shadow-lg shadow-brand-green/50 cursor-pointer backdrop-blur-sm hover:bg-brand-green transition-colors"
-                title="К Экипажам"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-            >
-                <VibeContentRenderer content="::FaUsers::" className="h-6 w-6"/>
-            </motion.div>
-        </Link>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-// /components/VibeContentRenderer.tsx
 "use client";
 
 import React from 'react';
@@ -7,6 +6,7 @@ import Link from 'next/link';
 import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { iconNameMap } from '@/lib/iconNameMap'; 
+import { cn } from '@/lib/utils';
 
 function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
     return typeof iconName === 'string' && iconName.startsWith('Fa') && iconName in Fa6Icons;
@@ -176,7 +176,18 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       const parsedContent = parse(processedContent, simplifiedParserOptions); 
       
       if (className) {
-        return <div className={className}>{parsedContent}</div>;
+        // If the parsed content is a single, valid React element, clone it and apply the className.
+        // This avoids adding a wrapper div, which was causing layout issues.
+        if (React.isValidElement(parsedContent)) {
+          return React.cloneElement(parsedContent, {
+            className: cn(parsedContent.props.className, className)
+          });
+        } else {
+          // If the content is complex (e.g., text and an icon), fall back to a SPAN wrapper.
+          // This is more inline-friendly than a div.
+          logger.warn("[VCR] Applying className to a span wrapper because content is not a single element.", content);
+          return <span className={className}>{parsedContent}</span>;
+        }
       }
       return <>{parsedContent}</>;
 
@@ -184,6 +195,7 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       logger.error("[VCR Root] Parse Error:", error, "Input for parsing:", content, "Processed HTML:", preprocessIconSyntaxInternal(applySimpleMarkdown(String(content))));
       const ErrorSpan = () => <span className="text-red-500">[Content Parse Error]</span>;
       if (className) {
+        // The wrapper for an error is acceptable.
         return <div className={className}><ErrorSpan /></div>;
       }
       return <ErrorSpan />;
