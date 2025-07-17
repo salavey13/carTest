@@ -102,7 +102,7 @@ export default function CrewsPage() {
                     <CrewsList />
                 </Suspense>
             </div>
-            <Link href="/crews">
+            <Link href="/crews/create">
             <motion.div 
                 className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 bg-brand-green/80 text-white rounded-full  shadow-lg shadow-brand-green/50 cursor-pointer backdrop-blur-sm hover:bg-brand-green transition-colors"
                 title="К Экипажам"
