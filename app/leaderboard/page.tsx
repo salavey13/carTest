@@ -107,7 +107,7 @@ export default function LeaderboardPage() {
                                 className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg"
                             >
                                 <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
-                                <Image src={fleet.avatar_url || '/placeholder.svg'} alt={fleet.username} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
+                                <Image src={fleet.avatar_url || '/placeholder.svg'} alt={fleet.username || 'avatar'} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                 <div className="flex-grow">
                                     <p className="font-semibold text-brand-lime">@{fleet.username ?? 'N/A'}</p>
                                     <p className="text-xs text-muted-foreground">{(fleet.total_vehicles ?? 0)} ед. транспорта</p>
