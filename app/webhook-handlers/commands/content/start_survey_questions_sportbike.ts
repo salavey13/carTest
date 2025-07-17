@@ -62,7 +62,7 @@ export const surveyQuestions: SurveyQuestion[] = [
   {
     step: 5,
     key: "terms_agreement",
-    question: "Последний шаг: ты осознаешь все риски и готов нести ответственность за управление мощным спортбайком? (Ознакомься с условиями по ссылке)[https:/github.com/salavey13/cartest/blob/main/LICENSE]",
+    question: "Последний шаг: ты осознаешь все риски и готов нести ответственность за управление мощным спортбайком? (Ознакомься с условиями по ссылке)[https://github.com/salavey13/cartest/blob/main/LICENSE]",
     answers: [
       { text: "Да, я готов(а)!" },
       { text: "Нужно подумать" },
