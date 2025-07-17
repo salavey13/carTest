@@ -5,8 +5,8 @@ import { Loading } from "@/components/Loading";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { FaBug } from "react-icons/fa6";
+import { motion, AnimatePresence } from "framer-motion";
+import { FaBug, FaChevronDown } from "react-icons/fa6";
 
 type DebugInfo = {
     [key: string]: string | number;
@@ -23,7 +23,7 @@ type Fleet = {
 
 type Crew = {
     crew_id: string;
-    name: string;
+    crew_name: string; // <-- FIX: was 'name'
     slug: string;
     logo_url: string;
     owner_username: string;
@@ -109,9 +109,9 @@ export default function LeaderboardPage() {
                                     className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg hover:bg-card hover:border-brand-lime transition-all duration-300"
                                 >
                                     <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
-                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
+                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.crew_name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                     <div className="flex-grow">
-                                        <p className="font-semibold text-brand-lime">{crew.name ?? 'N/A'}</p>
+                                        <p className="font-semibold text-brand-lime">{crew.crew_name ?? 'N/A'}</p>
                                         <p className="text-xs text-muted-foreground">@{crew.owner_username ?? 'N/A'}</p>
 
                                     </div>
@@ -177,26 +177,63 @@ const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: {
     </motion.div>
 );
 
-const DebugInfoSection = ({ info }: { info: DebugInfo }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-        className="mt-12"
-    >
-        <details className="bg-card/30 backdrop-blur-sm border border-yellow-500/30 rounded-lg p-4">
-            <summary className="cursor-pointer font-mono text-yellow-400 flex items-center gap-2 hover:text-yellow-300">
-                <FaBug />
-                Debug Info
-            </summary>
-            <div className="mt-4 pt-4 border-t border-yellow-500/30 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-xs font-mono">
-                {Object.entries(info).map(([key, value]) => (
-                    <div key={key} className="flex flex-col">
-                        <span className="text-muted-foreground">{key.replace(/_/g, ' ')}</span>
-                        <span className="text-foreground font-bold text-base">{value.toLocaleString()}</span>
-                    </div>
-                ))}
+const statMetadata: { [key: string]: { title: string; icon: string } } = {
+    users_count: { title: "Total Users", icon: "::FaUsers::" },
+    cars_count: { title: "Total Cars", icon: "::FaCar::" },
+    rentals_count: { title: "Total Rentals", icon: "::FaKey::" },
+    rentals_fully_paid_count: { title: "Paid Rentals", icon: "::FaMoneyBillWave::" },
+    users_with_cars_count: { title: "Car Owners", icon: "::FaUserCheck::" },
+    crews_count: { title: "Total Crews", icon: "::FaUsersCog::" },
+    cars_with_crew_count: { title: "Cars in Crews", icon: "::FaParking::" },
+    crew_members_count: { title: "Crew Memberships", icon: "::FaUserFriends::" },
+    crews_with_cars_count: { title: "Active Crews", icon: "::FaToolbox::" }
+};
+
+const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-12"
+        >
+            <div className="bg-card/30 backdrop-blur-sm border border-yellow-500/30 rounded-lg p-4 transition-colors hover:border-yellow-500/60">
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full font-mono text-yellow-400 flex items-center justify-between gap-2 text-left"
+                >
+                    <span className="flex items-center gap-2"><FaBug /> System Telemetry</span>
+                    <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+                        <FaChevronDown />
+                    </motion.div>
+                </button>
+                <AnimatePresence>
+                    {isOpen && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                        >
+                            <div className="mt-4 pt-4 border-t border-yellow-500/30 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                {Object.entries(info).map(([key, value]) => {
+                                    const meta = statMetadata[key] || { title: key.replace(/_/g, ' '), icon: "::FaQuestionCircle::" };
+                                    return (
+                                        <div key={key} className="bg-card/50 p-3 rounded-md flex flex-col items-center text-center border border-border hover:border-brand-yellow/50 transition-colors">
+                                            <VibeContentRenderer content={meta.icon} className="text-3xl text-brand-yellow mb-2" />
+                                            <span className="text-foreground font-bold text-2xl font-orbitron">{Number(value).toLocaleString()}</span>
+                                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider font-mono">{meta.title}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
-        </details>
-    </motion.div>
-);
+        </motion.div>
+    );
+};
