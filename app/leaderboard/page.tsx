@@ -51,7 +51,7 @@ export default function LeaderboardPage() {
     }
 
     return (
-        <div className="min-h-screen text-white p-4 pt-24 relative overflow-hidden">
+        <div className="min-h-screen text-foreground p-4 pt-24 relative overflow-hidden">
              <div className="fixed inset-0 z-[-1] opacity-20">
                 <Image
                 src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
@@ -59,7 +59,7 @@ export default function LeaderboardPage() {
                 fill
                 className="object-cover animate-pan-zoom"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
             </div>
 
             <div className="container mx-auto max-w-5xl">
@@ -79,13 +79,13 @@ export default function LeaderboardPage() {
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: index * 0.1 }}
-                                    className="flex items-center gap-4 p-3 bg-dark-card/70 border border-border rounded-lg hover:bg-dark-card hover:border-brand-lime transition-colors cursor-pointer"
+                                    className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg hover:bg-card hover:border-brand-lime transition-all duration-300"
                                 >
                                     <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
-                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.name} width={48} height={48} className="rounded-full flex-shrink-0" />
+                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                     <div className="flex-grow">
-                                        <p className="font-semibold text-brand-lime">{crew.name}</p>
-                                        <p className="text-xs text-muted-foreground">{crew.total_members} участников</p>
+                                        <p className="font-semibold text-brand-lime">{crew.name ?? 'N/A'}</p>
+                                        <p className="text-xs text-muted-foreground">{(crew.total_members ?? 0)} участников</p>
                                     </div>
                                     <div className="text-right flex-shrink-0">
                                         <p className="font-mono font-bold text-brand-yellow">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
@@ -94,7 +94,7 @@ export default function LeaderboardPage() {
                                 </motion.div>
                             </Link>
                         )) : <p className="text-muted-foreground text-center col-span-full">Нет данных</p>}
-                        <Link href="/crews/create" className="text-center text-sm text-brand-cyan hover:underline mt-4">Создать свой экипаж</Link>
+                        <Link href="/crews/create" className="block text-center text-sm text-brand-cyan hover:underline mt-4">Создать свой экипаж</Link>
                     </LeaderboardSection>
 
                     <LeaderboardSection title="Топ Владельцы" icon="::FaUserSecret::">
@@ -104,16 +104,16 @@ export default function LeaderboardPage() {
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: index * 0.1 }}
-                                className="flex items-center gap-4 p-3 bg-dark-card/70 border border-border rounded-lg"
+                                className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg"
                             >
                                 <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
-                                <Image src={fleet.avatar_url || '/placeholder.svg'} alt={fleet.username} width={48} height={48} className="rounded-full flex-shrink-0" />
+                                <Image src={fleet.avatar_url || '/placeholder.svg'} alt={fleet.username} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                 <div className="flex-grow">
-                                    <p className="font-semibold text-brand-lime">@{fleet.username}</p>
-                                    <p className="text-xs text-muted-foreground">{fleet.total_vehicles} ед. транспорта</p>
+                                    <p className="font-semibold text-brand-lime">@{fleet.username ?? 'N/A'}</p>
+                                    <p className="text-xs text-muted-foreground">{(fleet.total_vehicles ?? 0)} ед. транспорта</p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                    <p className="font-mono font-bold text-brand-yellow">{fleet.total_revenue.toLocaleString()} XTR</p>
+                                    <p className="font-mono font-bold text-brand-yellow">{(fleet.total_revenue ?? 0).toLocaleString()} XTR</p>
                                     <p className="text-xs text-muted-foreground">Доход</p>
                                 </div>
                             </motion.div>
@@ -130,7 +130,7 @@ const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-dark-card/50 backdrop-blur-sm border border-brand-purple/50 p-6 rounded-2xl shadow-lg shadow-brand-purple/10"
+        className="bg-card/50 backdrop-blur-sm border border-brand-purple/50 p-6 rounded-2xl shadow-lg shadow-brand-purple/10"
     >
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-3xl font-orbitron text-brand-purple flex items-center gap-3">
