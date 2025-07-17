@@ -23,7 +23,7 @@ type Fleet = {
 
 type Crew = {
     crew_id: string;
-    crew_name: string; // <-- FIX: was 'name'
+    crew_name: string;
     slug: string;
     logo_url: string;
     owner_username: string;
@@ -178,19 +178,30 @@ const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: {
 );
 
 const statMetadata: { [key: string]: { title: string; icon: string } } = {
-    users_count: { title: "Total Users", icon: "::FaUsers::" },
-    cars_count: { title: "Total Cars", icon: "::FaCar::" },
-    rentals_count: { title: "Total Rentals", icon: "::FaKey::" },
-    rentals_fully_paid_count: { title: "Paid Rentals", icon: "::FaMoneyBillWave::" },
-    users_with_cars_count: { title: "Car Owners", icon: "::FaUserCheck::" },
-    crews_count: { title: "Total Crews", icon: "::FaUsersCog::" },
-    cars_with_crew_count: { title: "Cars in Crews", icon: "::FaParking::" },
-    crew_members_count: { title: "Crew Memberships", icon: "::FaUserFriends::" },
-    crews_with_cars_count: { title: "Active Crews", icon: "::FaToolbox::" }
+    users_count: { title: "Всего пользователей", icon: "::FaUsers::" },
+    cars_count: { title: "Всего машин", icon: "::FaCar::" },
+    rentals_count: { title: "Всего аренд", icon: "::FaKey::" },
+    rentals_fully_paid_count: { title: "Оплаченные аренды", icon: "::FaMoneyBillWave::" },
+    users_with_cars_count: { title: "Владельцы", icon: "::FaUserCheck::" },
+    crews_count: { title: "Всего экипажей", icon: "::FaUsersGear::" },
+    cars_with_crew_count: { title: "Авто в экипажах", icon: "::FaSquareParking::" },
+    crew_members_count: { title: "Участники экипажей", icon: "::FaUserGroup::" },
+    crews_with_cars_count: { title: "Активные экипажи", icon: "::FaToolbox::" },
+    crew_engagement: { title: "Вовлеченность", icon: "::FaFire::" }
 };
 
 const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
-    const [isOpen, setIsOpen] = useState(false);
+    
+    const augmentedInfo = {...info};
+    const crewsCount = Number(info.crews_count || 0);
+    const crewMembersCount = Number(info.crew_members_count || 0);
+    const carsWithCrewCount = Number(info.cars_with_crew_count || 0);
+
+    if (crewsCount > 0) {
+        const engagement = (crewMembersCount + carsWithCrewCount) / crewsCount;
+        augmentedInfo.crew_engagement = engagement.toFixed(2);
+    }
+
 
     return (
         <motion.div
@@ -199,40 +210,27 @@ const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-12"
         >
-            <div className="bg-card/30 backdrop-blur-sm border border-yellow-500/30 rounded-lg p-4 transition-colors hover:border-yellow-500/60">
-                <button
-                    onClick={() => setIsOpen(!isOpen)}
-                    className="w-full font-mono text-yellow-400 flex items-center justify-between gap-2 text-left"
-                >
-                    <span className="flex items-center gap-2"><FaBug /> System Telemetry</span>
-                    <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-                        <FaChevronDown />
-                    </motion.div>
-                </button>
-                <AnimatePresence>
-                    {isOpen && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
-                            className="overflow-hidden"
-                        >
-                            <div className="mt-4 pt-4 border-t border-yellow-500/30 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                {Object.entries(info).map(([key, value]) => {
-                                    const meta = statMetadata[key] || { title: key.replace(/_/g, ' '), icon: "::FaQuestionCircle::" };
-                                    return (
-                                        <div key={key} className="bg-card/50 p-3 rounded-md flex flex-col items-center text-center border border-border hover:border-brand-yellow/50 transition-colors">
-                                            <VibeContentRenderer content={meta.icon} className="text-3xl text-brand-yellow mb-2" />
-                                            <span className="text-foreground font-bold text-2xl font-orbitron">{Number(value).toLocaleString()}</span>
-                                            <span className="text-muted-foreground text-[10px] uppercase tracking-wider font-mono">{meta.title}</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+            <div className="bg-card/30 backdrop-blur-sm border border-brand-purple/20 rounded-lg p-4 transition-colors">
+                <div className="font-orbitron text-brand-yellow flex items-center gap-2 text-xl mb-4">
+                    <FaBug />
+                    <span>СИСТЕМНАЯ ТЕЛЕМЕТРИЯ</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {Object.entries(augmentedInfo).map(([key, value]) => {
+                        const meta = statMetadata[key] || { title: key.replace(/_/g, ' '), icon: "::FaQuestionCircle::" };
+                        return (
+                            <motion.div 
+                                key={key}
+                                whileHover={{ y: -5, scale: 1.05 }}
+                                className="bg-card/50 backdrop-blur-sm p-4 rounded-md flex flex-col items-center text-center border border-brand-purple/20 transition-all duration-300 hover:border-brand-lime/50 hover:shadow-lg hover:shadow-brand-lime/10"
+                            >
+                                <VibeContentRenderer content={meta.icon} className="text-4xl text-brand-lime mb-2" />
+                                <span className="text-foreground font-bold text-3xl font-orbitron">{Number(value).toLocaleString()}</span>
+                                <span className="text-muted-foreground text-xs uppercase tracking-wider font-mono mt-1">{meta.title}</span>
+                            </motion.div>
+                        )
+                    })}
+                </div>
             </div>
         </motion.div>
     );
