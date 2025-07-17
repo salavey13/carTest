@@ -1,3 +1,4 @@
+DROP FUNCTION get_top_fleets();
 CREATE OR REPLACE FUNCTION get_top_fleets()
 RETURNS TABLE(
     owner_id TEXT,

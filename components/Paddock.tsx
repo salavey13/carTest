@@ -120,8 +120,8 @@ export function Paddock() {
                         <span className="font-mono text-sm">{stats.userCrew.name}</span>
                     </Link>
                 )}
-                <Link href="/crews" passHref>
-                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-green/20 border border-brand-green text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaUsers:: Экипажи"/></motion.button>
+                 <Link href="/leaderboard" passHref>
+                    <motion.button whileHover={{scale: 1.05}} className="px-4 py-2 text-sm bg-brand-yellow/20 border border-brand-yellow text-white rounded-lg font-semibold"><VibeContentRenderer content="::FaTrophy:: Лидерборд"/></motion.button>
                 </Link>
             </div>
         </motion.div>
