@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getTopFleets, getTopCrews } from "@/app/actions";
+import { getTopFleets, getTopCrews } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { FaBug, FaChevronDown } from "react-icons/fa6";
+
+type DebugInfo = {
+    [key: string]: string | number;
+};
 
 type Fleet = {
     owner_id: string;
@@ -13,19 +18,20 @@ type Fleet = {
     avatar_url: string;
     total_vehicles: number;
     total_revenue: number;
+    debug_info?: DebugInfo;
 };
 
 type Crew = {
     crew_id: string;
-    name: string;
+    crew_name: string;
     slug: string;
     logo_url: string;
     owner_username: string;
     owner_avatar_url: string;
     total_members: number;
     total_fleet_value: number;
+    debug_info?: DebugInfo;
 };
-
 
 const trophyColors = ["text-yellow-400", "text-gray-400", "text-yellow-600"];
 
@@ -33,6 +39,7 @@ export default function LeaderboardPage() {
     const [topFleets, setTopFleets] = useState<Fleet[]>([]);
     const [topCrews, setTopCrews] = useState<Crew[]>([]);
     const [loading, setLoading] = useState(true);
+    const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
     useEffect(() => {
         async function loadLeaderboards() {
@@ -41,8 +48,26 @@ export default function LeaderboardPage() {
                 getTopFleets(),
                 getTopCrews()
             ]);
-            if (fleetsResult.success) setTopFleets(fleetsResult.data || []);
-            if (crewsResult.success) setTopCrews(crewsResult.data || []);
+
+            let combinedDebug: DebugInfo = {};
+
+            if (fleetsResult.success && fleetsResult.data?.length) {
+                setTopFleets(fleetsResult.data);
+                if (fleetsResult.data[0].debug_info) {
+                    combinedDebug = { ...combinedDebug, ...fleetsResult.data[0].debug_info };
+                }
+            }
+            if (crewsResult.success && crewsResult.data?.length) {
+                setTopCrews(crewsResult.data);
+                if (crewsResult.data[0].debug_info) {
+                    combinedDebug = { ...combinedDebug, ...crewsResult.data[0].debug_info };
+                }
+            }
+            
+            if (Object.keys(combinedDebug).length > 0) {
+                setDebugInfo(combinedDebug);
+            }
+
             setLoading(false);
         }
         loadLeaderboards();
@@ -84,10 +109,11 @@ export default function LeaderboardPage() {
                                     className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg hover:bg-card hover:border-brand-lime transition-all duration-300"
                                 >
                                     <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
-                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
+                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.crew_name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                     <div className="flex-grow">
-                                        <p className="font-semibold text-brand-lime">{crew.name ?? 'N/A'}</p>
+                                        <p className="font-semibold text-brand-lime">{crew.crew_name ?? 'N/A'}</p>
                                         <p className="text-xs text-muted-foreground">@{crew.owner_username ?? 'N/A'}</p>
+
                                     </div>
                                     <div className="text-right flex-shrink-0">
                                         <p className="font-mono font-bold text-brand-yellow">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
@@ -122,6 +148,7 @@ export default function LeaderboardPage() {
                         )) : <p className="text-muted-foreground text-center col-span-full">Нет данных</p>}
                     </LeaderboardSection>
                 </div>
+                {debugInfo && <DebugInfoSection info={debugInfo} />}
             </div>
         </div>
     );
@@ -149,3 +176,62 @@ const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: {
         </div>
     </motion.div>
 );
+
+const statMetadata: { [key: string]: { title: string; icon: string } } = {
+    users_count: { title: "Всего пользователей", icon: "::FaUsers::" },
+    cars_count: { title: "Всего машин", icon: "::FaCar::" },
+    rentals_count: { title: "Всего аренд", icon: "::FaKey::" },
+    rentals_fully_paid_count: { title: "Оплаченные аренды", icon: "::FaMoneyBillWave::" },
+    users_with_cars_count: { title: "Владельцы", icon: "::FaUserCheck::" },
+    crews_count: { title: "Всего экипажей", icon: "::FaUsersGear::" },
+    cars_with_crew_count: { title: "Авто в экипажах", icon: "::FaSquareParking::" },
+    crew_members_count: { title: "Участники экипажей", icon: "::FaUserGroup::" },
+    crews_with_cars_count: { title: "Активные экипажи", icon: "::FaToolbox::" },
+    crew_engagement: { title: "Вовлеченность", icon: "::FaFire::" }
+};
+
+const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
+    
+    const augmentedInfo = {...info};
+    const crewsCount = Number(info.crews_count || 0);
+    const crewMembersCount = Number(info.crew_members_count || 0);
+    const carsWithCrewCount = Number(info.cars_with_crew_count || 0);
+
+    if (crewsCount > 0) {
+        const engagement = (crewMembersCount + carsWithCrewCount) / crewsCount;
+        augmentedInfo.crew_engagement = engagement.toFixed(2);
+    }
+
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-12"
+        >
+            <div className="bg-card/30 backdrop-blur-sm border border-brand-purple/20 rounded-lg p-4 transition-colors">
+                <div className="font-orbitron text-brand-yellow flex items-center gap-2 text-xl mb-4">
+                    <FaBug />
+                    <span>СИСТЕМНАЯ ТЕЛЕМЕТРИЯ</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {Object.entries(augmentedInfo).map(([key, value]) => {
+                        const meta = statMetadata[key] || { title: key.replace(/_/g, ' '), icon: "::FaQuestionCircle::" };
+                        return (
+                            <motion.div 
+                                key={key}
+                                whileHover={{ y: -5, scale: 1.05 }}
+                                className="bg-card/50 backdrop-blur-sm p-4 rounded-md flex flex-col items-center text-center border border-brand-purple/20 transition-all duration-300 hover:border-brand-lime/50 hover:shadow-lg hover:shadow-brand-lime/10"
+                            >
+                                <VibeContentRenderer content={meta.icon} className="text-4xl text-brand-lime mb-2" />
+                                <span className="text-foreground font-bold text-3xl font-orbitron">{Number(value).toLocaleString()}</span>
+                                <span className="text-muted-foreground text-xs uppercase tracking-wider font-mono mt-1">{meta.title}</span>
+                            </motion.div>
+                        )
+                    })}
+                </div>
+            </div>
+        </motion.div>
+    );
+};
