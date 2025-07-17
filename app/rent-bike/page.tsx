@@ -10,6 +10,9 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
 import { fetchCars, createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
+import { Loading } from "@/components/Loading";
+import Link from "next/link";
+import { Label } from "@/components/ui/label";
 
 // Define interfaces locally for clarity
 interface Vehicle {
@@ -36,7 +39,7 @@ const YUAN_TO_STARS_RATE = 10;
 
 export default function RentBikePage() {
   const router = useRouter();
-  const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
+  const { user: tgUser, isInTelegramContext, dbUser, isAdmin } = useAppContext();
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedBike, setSelectedBike] = useState<Vehicle | null>(null);
@@ -150,22 +153,11 @@ export default function RentBikePage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <Image 
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
-          alt="Loading Garage..."
-          width={100}
-          height={100}
-          unoptimized
-        />
-        <p className='font-mono text-black mt-4 animate-pulse'>ЗАГРУЗКА ГАРАЖА...</p>
-      </div>
-    );
+    return <Loading variant="bike" />;
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 pt-24 overflow-hidden relative">
+    <div className="min-h-screen text-white p-4 pt-24 overflow-hidden relative">
       <div className="fixed inset-0 z-[-1] opacity-30">
         <Image
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
@@ -265,8 +257,9 @@ export default function RentBikePage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                     <div>
-                      <label className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</label>
+                      <Label htmlFor="rent-days" className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</Label>
                       <input
+                        id="rent-days"
                         type="number"
                         min="1"
                         value={rentDays}
@@ -297,6 +290,16 @@ export default function RentBikePage() {
           </AnimatePresence>
         </div>
       </div>
+        <Link href="/crews">
+            <motion.div 
+                className="fixed bottom-24 right-4 md:bottom-6 md:right-6 z-50 bg-brand-green/80 text-white rounded-full p-4 shadow-lg shadow-brand-green/50 cursor-pointer backdrop-blur-sm hover:bg-brand-green transition-colors"
+                title="К Экипажам"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+            >
+                <VibeContentRenderer content="::FaUsers::" className="h-6 w-6"/>
+            </motion.div>
+        </Link>
     </div>
   );
 }

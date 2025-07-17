@@ -21,9 +21,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   triggerElementSelector,
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
   const fixedHeroContainerRef = useRef<HTMLDivElement>(null);
-  // fadeOverlayRef is not strictly needed if we control opacity based on heroContentOverallOpacity for it too
   
   useEffect(() => {
     const triggerElement = document.querySelector(triggerElementSelector);
@@ -34,9 +32,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsVisible(entry.isIntersecting);
-        // Update scrollProgress based on intersection and bounding box
-        // This logic ensures progress is updated even when not actively scrolling but intersection changes
         if (entry.isIntersecting) {
             const rect = entry.boundingClientRect;
             const viewportHeight = window.innerHeight;
@@ -44,10 +39,10 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
             setScrollProgress(progress);
         } else {
             const rect = entry.boundingClientRect;
-            if (rect.bottom < 0) setScrollProgress(1); // Fully scrolled past
-            else if (rect.top > viewportHeight) setScrollProgress(0); // Fully scrolled before
+            if (rect.bottom < 0) setScrollProgress(1);
+            else if (rect.top > window.innerHeight) setScrollProgress(0);
         }
-      }, { threshold: Array.from({ length: 101 }, (_, i) => i / 100), rootMargin: "0px" } 
+      }, { rootMargin: '0px 0px 0px 0px', threshold: Array.from({ length: 101 }, (_, i) => i / 100) } 
     );
     observer.observe(triggerElement);
 
@@ -56,54 +51,24 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     };
   }, [triggerElementSelector]); 
 
-  useEffect(() => {
-    const handleScroll = () => {
-        const currentTriggerEl = document.querySelector(triggerElementSelector);
-        if(currentTriggerEl){
-            const rect = currentTriggerEl.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            // Calculate progress based on how much of the trigger element has passed the top of the viewport
-            // or how much is visible from the bottom.
-            // This ensures a smooth 0 to 1 progress as the trigger element scrolls through the viewport.
-            const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + rect.height)));
-            setScrollProgress(progress);
-        }
-    };
 
-    if (isVisible) { 
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        handleScroll(); // Initial call to set progress
-    } else {
-        window.removeEventListener('scroll', handleScroll);
-    }
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [isVisible, triggerElementSelector]);
-
-  // Adjusted thresholds: content starts fading earlier and finishes fading earlier.
   const contentFadeThresholds = {
-    start: 0.35, // Start fading content (title, subtitle, children, main BG) at 35% scroll of trigger
-    end: 0.75,   // Content fully faded by 75% scroll of trigger
+    start: 0.35,
+    end: 0.75,
   };
-
+  
   const mainBgInitialScale = 1.5;
   const mainBgTargetScale = 1;
   
-  // Calculate progress for content fading
   let contentFadeProgress = 0;
   if (scrollProgress >= contentFadeThresholds.start) {
     contentFadeProgress = Math.min(1, (scrollProgress - contentFadeThresholds.start) / (contentFadeThresholds.end - contentFadeThresholds.start));
-  } else if (scrollProgress < contentFadeThresholds.start) {
-    contentFadeProgress = 0; // Fully visible before start threshold
   }
   const heroContentOverallOpacity = 1 - contentFadeProgress;
 
-  // Main BG scale and translate logic (can still use original scrollProgress or tie to contentFade)
-  // For simplicity, let's keep it tied to the raw scrollProgress for now, but fade with heroContentOverallOpacity
-  let mainBgScaleProgress = Math.min(1, scrollProgress / 0.65); // Scale happens up to 65%
+  let mainBgScaleProgress = Math.min(1, scrollProgress / 0.65);
   const mainBgScale = mainBgInitialScale - mainBgScaleProgress * (mainBgInitialScale - mainBgTargetScale);
-  const mainBgTranslateY = scrollProgress * 1; // Minimal translate, scaling does most work
+  const mainBgTranslateY = scrollProgress * 1; 
 
   const bgObjectInitialScale = 0.5;
   const bgObjectTargetScale = 1.1;
@@ -111,38 +76,31 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
   const bgObjectTranslateY = -scrollProgress * 3; 
   const bgObjectOpacity = Math.max(0.05, 0.6 - scrollProgress * 0.55); 
 
-  // The bottom gradient fade overlay now also uses heroContentOverallOpacity to fade along with content
-  // Or, it can have its own timing if you want it to linger or fade differently.
-  // For simplicity, let's make it fade with the content.
-  // fadeOverlayProgress is essentially contentFadeProgress
-
   return (
     <div 
         ref={fixedHeroContainerRef} 
-        className="fixed top-0 left-0 w-full h-screen flex flex-col items-center justify-center overflow-hidden z-10" // Added z-10
+        className="fixed top-0 left-0 w-full h-screen flex flex-col items-center justify-center overflow-hidden z-10"
         style={{
-            opacity: isVisible ? 1 : 0, 
-            pointerEvents: isVisible ? 'auto' : 'none',
-            transition: 'opacity 0.3s ease-in-out', 
+            pointerEvents: scrollProgress >= 1 ? 'none' : 'auto',
         }}
     >
-        {/* Layer 1: Main Background */}
+        {/* Main Background */}
         <div
-          className="absolute inset-0 bg-cover bg-center -z-30" // Stays behind all hero content
+          className="absolute inset-0 bg-cover bg-center -z-30"
           style={{ 
             backgroundImage: `url(${mainBackgroundImageUrl})`,
             transform: `translateY(${mainBgTranslateY}vh) scale(${Math.max(mainBgTargetScale, mainBgScale)})`, 
-            willChange: 'transform',
-            opacity: heroContentOverallOpacity, // Fades with other content
+            willChange: 'transform, opacity',
+            opacity: heroContentOverallOpacity,
           }}
         />
         
-        {/* Layer 2: Decorative Background Object */}
+        {/* Decorative Object */}
         {backgroundImageObjectUrl && (
           <div
-            className="absolute inset-0 flex items-center justify-center -z-10 pointer-events-none" // Above main BG, below title
+            className="absolute inset-0 flex items-center justify-center -z-10 pointer-events-none"
             style={{
-              opacity: bgObjectOpacity * heroContentOverallOpacity, // Also fades with content
+              opacity: bgObjectOpacity * heroContentOverallOpacity,
               transform: `scale(${bgObjectScale}) translateY(${bgObjectTranslateY}vh)`,
               willChange: 'opacity, transform',
             }}
@@ -154,8 +112,8 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </div>
         )}
         
-        {/* Layer 3: Title (Static, centrally aligned) */}
-        <div className="relative text-center px-4" style={{ opacity: heroContentOverallOpacity }}> {/* Default z-index, effectively on top of -z layers */}
+        {/* Title */}
+        <div className="relative text-center px-4" style={{ opacity: heroContentOverallOpacity, willChange: 'opacity' }}>
           <h1 className={cn(
               "text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-orbitron font-bold mb-4 md:mb-6",
               "gta-vibe-text-effect", 
@@ -167,23 +125,23 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
           </h1>
         </div>
         
-        {/* Gradient Fade Overlay - to make bottom content blend into page background */}
+        {/* Gradient Fade Overlay */}
         <div
-          className="absolute inset-0 pointer-events-none" // Stays above decorative BGs, below bottom content
+          className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: `linear-gradient(to bottom, transparent 60%, hsl(var(--background)) 95%)`, // Gradient starts higher, ends stronger
-            opacity: 1, // Always visible to create the fade effect for the hero itself
-            zIndex: 5, // Ensures it's above background elements but below UI text/buttons
+            backgroundImage: `linear-gradient(to bottom, transparent 60%, hsl(var(--background)) 95%)`,
+            zIndex: 5,
           }}
         />
         
-        {/* Layer 6: Subtitle and Children (Buttons, etc.) */}
+        {/* Subtitle and Children */}
         <div 
             className="absolute bottom-[8vh] md:bottom-[10vh] w-full px-4 text-center flex flex-col items-center gap-4 md:gap-6" 
             style={{ 
-                opacity: heroContentOverallOpacity, // Fades with all other content
-                transition: 'opacity 0.2s ease-in-out', // Faster fade for content
-                zIndex: 10, // Ensures it's above the gradient fade overlay
+                opacity: heroContentOverallOpacity,
+                transition: 'opacity 0.2s ease-in-out',
+                zIndex: 10,
+                willChange: 'opacity'
             }} 
         >
             {subtitle && (

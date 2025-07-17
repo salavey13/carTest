@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -21,22 +20,8 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
 import Image from "next/image";
-
-function GlobalLoader() {
-  return (
-    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-[9999]">
-        <Image 
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
-          alt="Loading System..."
-          width={100}
-          height={100}
-          className="cyber-loader-filter"
-          unoptimized
-        />
-      <p className='font-mono text-black ml-4 mt-4 animate-pulse'>ИНИЦИАЛИЗАЦИЯ VIBE OS...</p>
-    </div>
-  );
-}
+import { Loading } from "@/components/Loading";
+import { cn } from "@/lib/utils";
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -96,6 +81,21 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "rent": "/rent-bike",
 };
 
+const DYNAMIC_ROUTE_PATTERNS: Record<string, string> = {
+    "crew": "/crews",
+    "rental": "/rentals",
+    "lead": "/leads",
+    // Add more prefixes and their base paths here
+};
+
+const TRANSPARENT_LAYOUT_PAGES = [
+    '/rent-bike',
+    '/rent-car',
+    '/crews',
+    '/paddock',
+    '/leaderboard'
+];
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -107,7 +107,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const startParamHandledRef = useRef(false);
 
   useEffect(() => {
-     // This effect now handles the initial startParam from context and subsequent ones from URL if needed.
      const paramFromUrl = searchParams.get('tgWebAppStartParam');
      const paramToProcess = startParamPayload || paramFromUrl;
 
@@ -116,27 +115,35 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       const lowerStartParam = paramToProcess.toLowerCase();
       let targetPath: string | undefined;
 
-      if (lowerStartParam.startsWith('viz_')) {
+      // 1. Check for static mappings
+      if (START_PARAM_PAGE_MAP[lowerStartParam]) {
+        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
+      // 2. Check for dynamic prefix patterns (e.g., "crew_the-vibe-riders")
+      } else if (lowerStartParam.includes('_')) {
+        const [prefix, ...slugParts] = lowerStartParam.split('_');
+        const slug = slugParts.join('_');
+        if (DYNAMIC_ROUTE_PATTERNS[prefix] && slug) {
+            targetPath = `${DYNAMIC_ROUTE_PATTERNS[prefix]}/${slug}`;
+        }
+      // 3. Check for special prefixes like "viz_"
+      } else if (lowerStartParam.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
-      } else if (START_PARAM_PAGE_MAP[lowerStartParam]) {
-        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
-      } else if (pathname === '/') {
-       if(!Object.values(START_PARAM_PAGE_MAP).some(p => `/${lowerStartParam}` === p)) {
-           targetPath = `/${lowerStartParam}`;
-       }
+      // 4. Last resort fallback for any unhandled param
+      } else {
+        targetPath = `/${lowerStartParam}`;
       }
 
       if (targetPath && pathname !== targetPath) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting from '${pathname}'.`);
         router.replace(targetPath);
-        clearStartParam?.(); // Clear from context
+        clearStartParam?.(); 
       } else if (targetPath) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' matches current path. Clearing param.`);
-        router.replace(pathname, { scroll: false }); // Clear from URL
-        clearStartParam?.(); // Clear from context
+        router.replace(pathname, { scroll: false }); 
+        clearStartParam?.(); 
       } else {
-        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on non-root page '${pathname}'. No redirect.`);
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on page '${pathname}'. No redirect.`);
       }
     }
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
@@ -150,6 +157,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/leads",
     "/elon",
     "/god-mode-sandbox",
+    "/rent-bike",
+    "/crews"
   ];
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 
@@ -169,12 +178,18 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
+  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p));
+
   return (
     <>
       {showHeaderAndFooter && <Header />}
-      <main className={`flex-1 ${showBottomNav ? 'pb-20 sm:pb-0' : ''}`}> 
-        {children}
-      </main>
+        <main className={cn(
+            'flex-1',
+            showBottomNav ? 'pb-20 sm:pb-0' : '',
+            !isTransparentPage && 'bg-background'
+        )}>
+            {children}
+        </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
       <Suspense fallback={<div className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" aria-hidden="true"></div>}>
         <StickyChatButton />
@@ -191,7 +206,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-              <Suspense fallback={<GlobalLoader />}>
+              <Suspense fallback={<Loading variant="bike" text="🕶️" />}>
               <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
           </ErrorBoundaryForOverlay>

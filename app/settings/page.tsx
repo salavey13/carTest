@@ -29,6 +29,7 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import { Loading } from "@/components/Loading";
 
 interface GeneralSettingConfig {
   key: string;
@@ -95,6 +96,7 @@ export default function SettingsPage() {
       }
     } else if (!isAppContextLoading && !dbUser) {
       logger.warn("[SettingsPage] AppContext loaded, but no dbUser. Using default general settings.");
+
       const defaults = getDefaultGeneralSettings();
       setGeneralSettingsProfile(defaults);
       document.documentElement.classList.toggle('dark', defaults.dark_mode_enabled);
@@ -106,10 +108,10 @@ export default function SettingsPage() {
   }, [dbUser, isAppContextLoading, appContextError]);
 
   const loadArbitrageSettings = useCallback(async () => {
-    if (!dbUser?.user_id) return; // Corrected to user_id
+    if (!dbUser?.user_id) return;
     setIsLoadingArbitrageSettings(true);
     try {
-      const result = await getArbitrageScannerSettings(dbUser.user_id); // Corrected to user_id
+      const result = await getArbitrageScannerSettings(dbUser.user_id);
       if (result.success && result.data) {
         setArbitrageSettings(result.data);
         logger.debug("[SettingsPage] Arbitrage settings loaded:", result.data);
@@ -123,17 +125,17 @@ export default function SettingsPage() {
       setArbitrageSettings({ ...DEFAULT_ARBITRAGE_SETTINGS }); 
     }
     setIsLoadingArbitrageSettings(false);
-  }, [dbUser?.user_id]); // Corrected to user_id
+  }, [dbUser?.user_id]);
 
   useEffect(() => {
-    if (dbUser?.user_id) { // Corrected to user_id
+    if (dbUser?.user_id) { 
       loadArbitrageSettings();
     }
-  }, [dbUser?.user_id, loadArbitrageSettings]); // Corrected to user_id
+  }, [dbUser?.user_id, loadArbitrageSettings]);
 
 
   const handleGeneralSettingChange = useCallback(async (settingKey: string, value: boolean) => {
-    if (!generalSettingsProfile || !dbUser?.user_id) { // Corrected to user_id and check generalSettingsProfile
+    if (!generalSettingsProfile || !dbUser?.user_id) { 
       toast.error("Профиль пользователя не загружен для общих настроек. Попробуйте позже.");
       return;
     }
@@ -153,7 +155,7 @@ export default function SettingsPage() {
     try {
       const currentMetadata = dbUser.metadata || {};
       const updatedMetadata = { ...currentMetadata, settings_profile: newSettings }; 
-      const result = await updateGeneralUserSettings(dbUser.user_id, updatedMetadata); // Corrected to user_id
+      const result = await updateGeneralUserSettings(dbUser.user_id, updatedMetadata);
       if (result.success) {
         toast.success(toastMessage);
       } else {
@@ -186,6 +188,7 @@ export default function SettingsPage() {
   const handleArbitrageExchangeEnabledToggle = (exchangeName: ExchangeName, checked: boolean) => {
     setArbitrageSettings(prev => {
       if (!prev) return null;
+
       const newEnabledExchanges = checked
         ? [...prev.enabledExchanges, exchangeName]
         : prev.enabledExchanges.filter(ex => ex !== exchangeName);
@@ -222,13 +225,13 @@ export default function SettingsPage() {
   };
 
   const handleSaveArbitrageSettings = async () => {
-    if (!dbUser?.user_id || !arbitrageSettings) { // Corrected to user_id
+    if (!dbUser?.user_id || !arbitrageSettings) { 
       toast.error("Пользователь или настройки арбитража не определены.");
       return;
     }
     setIsSavingArbitrage(true);
     try {
-      const result = await updateArbitrageUserSettings(dbUser.user_id, arbitrageSettings); // Corrected to user_id
+      const result = await updateArbitrageUserSettings(dbUser.user_id, arbitrageSettings);
       if (result.success) {
         toast.success("Настройки арбитражного сканера сохранены!");
         if (result.data) setArbitrageSettings(result.data);
@@ -247,36 +250,28 @@ export default function SettingsPage() {
         toast.error("Сообщение обратной связи не может быть пустым.");
         return;
     }
-    logger.log("Feedback submitted (client-side):", { userId: dbUser?.user_id, message: feedbackMessage }); // Corrected to user_id
+    logger.log("Feedback submitted (client-side):", { userId: dbUser?.user_id, message: feedbackMessage });
     toast.success("Спасибо за ваш VIBE-отзыв! Мы его изучим.");
     setFeedbackMessage("");
     setIsFeedbackModalOpen(false);
   };
 
   if (isAppContextLoading || generalSettingsProfile === null || isLoadingArbitrageSettings) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
-        <div className="flex flex-col items-center">
-            <VibeContentRenderer content="::FaSliders className='text-6xl text-brand-purple animate-pulse mb-6'::" />
-            <h1 className="text-2xl text-brand-purple animate-pulse font-orbitron tracking-wider">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</h1>
-            {pageError && <p className="text-red-500 mt-2 font-mono">{pageError}</p>}
-        </div>
-      </div>
-    );
+    return <Loading text="КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-10">
+    <div className="min-h-screen bg-background text-foreground p-4 pt-24 pb-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="container mx-auto max-w-3xl"
+        className="container mx-auto max-w-3xl space-y-8"
       >
-        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-purple/60 shadow-2xl shadow-purple-glow mb-8"> 
-          <CardHeader className="text-center p-6 md:p-8 border-b border-brand-purple/40">
-            <VibeContentRenderer content="::FaUserGear className='text-6xl text-brand-purple mx-auto mb-4 filter drop-shadow-[0_0_10px_hsl(var(--brand-purple-rgb))]'::" />
-            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="ОБЩИЕ НАСТРОЙКИ">
+        <Card> 
+          <CardHeader className="text-center p-6 md:p-8 border-b">
+            <VibeContentRenderer content="::FaUserGear className='text-6xl text-primary mx-auto mb-4 filter drop-shadow-[0_0_10px_hsl(var(--primary))]'::" />
+            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold cyber-text" data-text="ОБЩИЕ НАСТРОЙКИ">
               ОБЩИЕ НАСТРОЙКИ
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono mt-1 text-sm md:text-base">
@@ -299,11 +294,11 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {arbitrageSettings && (
-        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-cyan/60 shadow-2xl shadow-cyan-glow">
-            <CardHeader className="text-center p-6 md:p-8 border-b border-brand-cyan/40">
+        {generalSettingsProfile.experimental_alpha_protocols && arbitrageSettings && (
+        <Card>
+            <CardHeader className="text-center p-6 md:p-8 border-b">
                 <VibeContentRenderer content="::FaRobot className='text-6xl text-brand-cyan mx-auto mb-4 filter drop-shadow-[0_0_10px_hsl(var(--brand-cyan-rgb))]'::" />
-                <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-cyan cyber-text glitch" data-text="ARBITRAGE SEEKER">
+                <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-cyan cyber-text" data-text="ARBITRAGE SEEKER">
                     ARBITRAGE SEEKER
                 </CardTitle>
                 <CardDescription className="text-muted-foreground font-mono mt-1 text-sm md:text-base">
@@ -316,13 +311,13 @@ export default function SettingsPage() {
                         <Label htmlFor="arbMinSpread" className="text-brand-cyan/90 font-orbitron">
                             <VibeContentRenderer content="::FaPercent className='inline mr-1.5'::" />Мин. Спред (%)
                         </Label>
-                        <Input id="arbMinSpread" type="number" step="0.01" value={arbitrageSettings.minSpreadPercent} onChange={e => handleArbitrageSettingChange('minSpreadPercent', e.target.value)} className="input-cyber border-brand-cyan/50 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
+                        <Input id="arbMinSpread" type="number" step="0.01" value={arbitrageSettings.minSpreadPercent} onChange={e => handleArbitrageSettingChange('minSpreadPercent', e.target.value)} className="input-cyber" disabled={isSavingArbitrage}/>
                     </div>
                     <div>
                         <Label htmlFor="arbTradeVolume" className="text-brand-cyan/90 font-orbitron">
                            <VibeContentRenderer content="::FaDollarSign className='inline mr-1.5'::" />Объем Сделки (USD)
                         </Label>
-                        <Input id="arbTradeVolume" type="number" step="100" value={arbitrageSettings.defaultTradeVolumeUSD} onChange={e => handleArbitrageSettingChange('defaultTradeVolumeUSD', e.target.value)} className="input-cyber border-brand-cyan/50 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
+                        <Input id="arbTradeVolume" type="number" step="100" value={arbitrageSettings.defaultTradeVolumeUSD} onChange={e => handleArbitrageSettingChange('defaultTradeVolumeUSD', e.target.value)} className="input-cyber" disabled={isSavingArbitrage}/>
                     </div>
                 </div>
                 <div>
@@ -331,9 +326,9 @@ export default function SettingsPage() {
                     </Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {ALL_POSSIBLE_EXCHANGES_CONST.map(ex => (
-                            <div key={ex} className="flex items-center space-x-2 p-2 bg-dark-bg/60 rounded border border-gray-700">
-                                <Checkbox id={`arbEx-${ex}`} checked={arbitrageSettings.enabledExchanges.includes(ex)} onCheckedChange={(checked) => handleArbitrageExchangeEnabledToggle(ex, !!checked)} className="border-brand-cyan data-[state=checked]:bg-brand-cyan" disabled={isSavingArbitrage}/>
-                                <Label htmlFor={`arbEx-${ex}`} className="text-sm font-medium text-light-text leading-none">{ex}</Label>
+                            <div key={ex} className="flex items-center space-x-2 p-2 bg-muted/20 rounded border">
+                                <Checkbox id={`arbEx-${ex}`} checked={arbitrageSettings.enabledExchanges.includes(ex)} onCheckedChange={(checked) => handleArbitrageExchangeEnabledToggle(ex, !!checked)} className="border-primary data-[state=checked]:bg-primary" disabled={isSavingArbitrage}/>
+                                <Label htmlFor={`arbEx-${ex}`} className="text-sm font-medium leading-none">{ex}</Label>
                             </div>
                         ))}
                     </div>
@@ -342,32 +337,32 @@ export default function SettingsPage() {
                     <Label htmlFor="arbTrackedPairs" className="text-brand-cyan/90 font-orbitron">
                         <VibeContentRenderer content="::FaListUl className='inline mr-1.5'::" />Отслеживаемые Пары (через запятую)
                     </Label>
-                    <Input id="arbTrackedPairs" type="text" value={arbitrageSettings.trackedPairs.join(', ')} onChange={handleArbitrageTrackedPairChange} placeholder="BTC/USDT, ETH/USDT" className="input-cyber border-brand-cyan/50 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
+                    <Input id="arbTrackedPairs" type="text" value={arbitrageSettings.trackedPairs.join(', ')} onChange={handleArbitrageTrackedPairChange} placeholder="BTC/USDT, ETH/USDT" className="input-cyber" disabled={isSavingArbitrage}/>
                 </div>
                 
                 <div className="space-y-4">
                     <h4 className="text-lg font-orbitron text-brand-cyan/90 mt-4">
                         <VibeContentRenderer content="::FaCoins className='inline mr-1.5'::" />Комиссии Бирж (%)
                     </h4>
-                    <ScrollArea className="h-[250px] p-2 border border-brand-cyan/30 rounded-md simple-scrollbar bg-dark-bg/30">
+                    <ScrollArea className="h-[250px] p-2 border rounded-md simple-scrollbar bg-muted/20">
                         <div className="space-y-3 pr-2">
                         {ALL_POSSIBLE_EXCHANGES_CONST.map(ex => (
-                            <div key={`arbFee-${ex}`} className="p-2.5 bg-dark-bg/70 rounded-md border border-gray-700/50">
-                                <p className="text-sm font-semibold text-brand-cyan mb-1.5">{ex}</p>
+                            <div key={`arbFee-${ex}`} className="p-2.5 bg-background/70 rounded-md border">
+                                <p className="text-sm font-semibold text-primary mb-1.5">{ex}</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <Label htmlFor={`arbFee-${ex}-maker`} className="text-xs text-gray-400">Maker Fee (%)</Label>
+                                        <Label htmlFor={`arbFee-${ex}-maker`} className="text-xs text-muted-foreground">Maker Fee (%)</Label>
                                         <Input id={`arbFee-${ex}-maker`} type="number" step="0.001" placeholder="0.1"
                                             value={((arbitrageSettings.exchangeFees[ex]?.maker || 0) * 100).toFixed(4)}
                                             onChange={e => handleArbitrageExchangeFeeChange(ex, 'maker', e.target.value)}
-                                            className="input-cyber text-xs h-8 border-brand-cyan/40 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
+                                            className="input-cyber text-xs h-8" disabled={isSavingArbitrage}/>
                                     </div>
                                     <div>
-                                        <Label htmlFor={`arbFee-${ex}-taker`} className="text-xs text-gray-400">Taker Fee (%)</Label>
+                                        <Label htmlFor={`arbFee-${ex}-taker`} className="text-xs text-muted-foreground">Taker Fee (%)</Label>
                                         <Input id={`arbFee-${ex}-taker`} type="number" step="0.001" placeholder="0.1"
                                             value={((arbitrageSettings.exchangeFees[ex]?.taker || 0) * 100).toFixed(4)}
                                             onChange={e => handleArbitrageExchangeFeeChange(ex, 'taker', e.target.value)}
-                                            className="input-cyber text-xs h-8 border-brand-cyan/40 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
+                                            className="input-cyber text-xs h-8" disabled={isSavingArbitrage}/>
                                     </div>
                                 </div>
                             </div>
@@ -379,28 +374,29 @@ export default function SettingsPage() {
                     <h4 className="text-lg font-orbitron text-brand-cyan/90 mt-4">
                        <VibeContentRenderer content="::FaNetworkWired className='inline mr-1.5'::" />Сетевые Комиссии (USD)
                     </h4>
-                    <ScrollArea className="h-[200px] p-2 border border-brand-cyan/30 rounded-md simple-scrollbar bg-dark-bg/30">
+                    <ScrollArea className="h-[200px] p-2 border rounded-md simple-scrollbar bg-muted/20">
+
                         <div className="space-y-3 pr-2">
                         {DEFAULT_TRACKED_ASSETS_FOR_NETWORK_FEES.map(assetSymbol => (
-                            <div key={`arbNetFee-${assetSymbol}`} className="p-2.5 bg-dark-bg/70 rounded-md border border-gray-700/50">
-                                <Label htmlFor={`arbNetFee-${assetSymbol}-input`} className="text-sm text-brand-cyan mb-1 block">{assetSymbol} Network Fee (USD)</Label>
+                            <div key={`arbNetFee-${assetSymbol}`} className="p-2.5 bg-background/70 rounded-md border">
+                                <Label htmlFor={`arbNetFee-${assetSymbol}-input`} className="text-sm text-primary mb-1 block">{assetSymbol} Network Fee (USD)</Label>
                                 <Input id={`arbNetFee-${assetSymbol}-input`} type="number" step="0.01" placeholder="e.g., 5"
                                     value={arbitrageSettings.networkFees[assetSymbol] || 0}
                                     onChange={e => handleArbitrageNetworkFeeChange(assetSymbol, e.target.value)}
-                                    className="input-cyber text-xs h-8 border-brand-cyan/40 focus:ring-brand-cyan" disabled={isSavingArbitrage}/>
+                                    className="input-cyber text-xs h-8" disabled={isSavingArbitrage}/>
                             </div>
                         ))}
                         </div>
                     </ScrollArea>
                 </div>
-                <Button onClick={handleSaveArbitrageSettings} disabled={isSavingArbitrage || isSavingGeneral} className="w-full bg-brand-cyan hover:bg-brand-cyan/80 text-black font-orbitron">
+                <Button onClick={handleSaveArbitrageSettings} disabled={isSavingArbitrage || isSavingGeneral} className="w-full">
                     {isSavingArbitrage ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Сохранение..." /> : <VibeContentRenderer content="::FaSave className='mr-2':: Сохранить Настройки Арбитража" />}
                 </Button>
             </CardContent>
         </Card>
         )}
 
-        <div className="mt-10 pt-6 border-t border-brand-purple/30 text-center">
+        <div className="mt-10 pt-6 border-t border-border text-center">
             <Button
             variant="outline"
             onClick={() => setIsFeedbackModalOpen(true)}
@@ -419,7 +415,7 @@ export default function SettingsPage() {
         confirmText="Отправить Сигнал"
         onConfirm={handleSendFeedback}
         icon={<VibeContentRenderer content="::FaCircleQuestion className='text-brand-pink'::" />}
-        dialogClassName="bg-dark-card border-brand-pink text-light-text"
+        dialogClassName="bg-card border-brand-pink"
         titleClassName="text-brand-pink"
         confirmButtonClassName="bg-brand-pink hover:bg-brand-pink/80 text-black"
         cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
@@ -451,16 +447,16 @@ const SettingToggle: React.FC<SettingToggleProps> = ({ iconName, title, descript
   const uniqueId = `switch-${title.replace(/\s+/g, '-')}`;
   return (
     <div className={cn(
-        "flex items-center justify-between p-3.5 bg-dark-bg/50 rounded-lg border border-gray-700/70 hover:border-brand-purple/60 transition-all duration-200 ease-out shadow-md hover:shadow-lg",
+        "flex items-center justify-between p-3.5 bg-card rounded-lg border hover:border-primary/50 transition-all duration-200 ease-out shadow-sm hover:shadow-md",
         isDisabled && "opacity-70 cursor-not-allowed"
       )}
     >
       <Label htmlFor={uniqueId} className={cn("flex items-center text-md flex-grow pr-4", isDisabled ? "cursor-not-allowed" : "cursor-pointer")}>
-        <span className="text-2xl mr-3.5 flex-shrink-0 w-7 text-center">
+        <span className="text-2xl mr-3.5 flex-shrink-0 w-7 text-center text-primary">
             <VibeContentRenderer content={`::${iconName}::`} />
         </span>
         <div className="flex-grow">
-          <VibeContentRenderer content={`**${title}**`} className="font-orbitron text-light-text text-base" />
+          <VibeContentRenderer content={`**${title}**`} className="font-orbitron text-foreground text-base" />
           <p className="text-xs text-muted-foreground font-mono mt-1">{description}</p>
         </div>
       </Label>
