@@ -294,10 +294,10 @@ function greet(name: string) {
                     <Button variant="outline">Открыть Меню <VibeContentRenderer content="::FaGears::" className="ml-2 h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56 bg-popover border-border">
-                    <DropdownMenuItem><VibeContentRenderer content="::FaUser:: Профиль"/> </DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard:: Биллинг"/></DropdownMenuItem>
-                    <DropdownMenuItem disabled><VibeContentRenderer content="::FaLifeRing:: Поддержка (Неактивно)"/></DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaRightFromBracket:: Выйти"/></DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaUser:: Профиль" className="flex items-center gap-2"/></DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard:: Биллинг" className="flex items-center gap-2"/></DropdownMenuItem>
+                    <DropdownMenuItem disabled><VibeContentRenderer content="::FaLifeRing:: Поддержка (Неактивно)" className="flex items-center gap-2"/></DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaRightFromBracket:: Выйти" className="flex items-center gap-2"/></DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
