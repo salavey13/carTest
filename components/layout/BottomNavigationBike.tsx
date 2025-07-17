@@ -7,7 +7,7 @@ import {
   FaMotorcycle,
   FaUsers,
   FaRankingStar,
-  FaPlusCircle,
+  FaCirclePlus,
   FaWarehouse
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
   { href: "/leaderboard", icon: FaRankingStar, label: "Leaderboard", color: "text-brand-yellow" },
   { href: "/crews", icon: FaUsers, label: "Crews", color: "text-brand-green" },
   { href: "/paddock", icon: FaWarehouse, label: "Paddock", color: "text-brand-cyan", adminOnly: true },
-  { href: "/admin", icon: FaPlusCircle, label: "Admin", color: "text-brand-pink", adminOnly: false },
+  { href: "/admin", icon: FaCirclePlus, label: "Admin", color: "text-brand-pink", adminOnly: false },
   // Central item is defined here, the layout logic will place it in the middle
   { href: "/rent-bike", icon: FaMotorcycle, label: "Rent", isCentralCandidate: true, centralColor: "from-amber-400 to-orange-500" },
 ];
