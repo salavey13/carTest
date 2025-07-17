@@ -51,7 +51,6 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
     };
   }, [triggerElementSelector]); 
 
-
   const contentFadeThresholds = {
     start: 0.35,
     end: 0.75,
@@ -136,7 +135,7 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
         
         {/* Subtitle and Children */}
         <div 
-            className="absolute bottom-[8vh] md:bottom-[10vh] w-full px-4 text-center flex flex-col items-center gap-4 md:gap-6" 
+            className="absolute bottom-20 w-full px-4 text-center flex flex-col items-center gap-4 md:gap-6" 
             style={{ 
                 opacity: heroContentOverallOpacity,
                 transition: 'opacity 0.2s ease-in-out',
