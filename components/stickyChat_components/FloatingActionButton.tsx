@@ -22,7 +22,7 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 }) => {
     // Base classes for appearance and interaction, *without* positioning
     const baseClasses = `
-         w-5 h-5 rounded-full
+         w-6 h-6 rounded-full
         shadow-[0_0_15px_rgba(0,255,157,0.7)] hover:shadow-[0_0_20px_rgba(0,255,157,0.9)]
         transition-all duration-200 ease-in-out
         focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-gray-900
