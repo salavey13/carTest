@@ -633,3 +633,109 @@ export async function updateUserSettings(userId: string, partialSettingsToUpdate
     return { success: false, error: errorMsg };
   }
 }
+
+export async function createCrew(crewData: { name: string; description: string; logo_url: string; owner_id: string; }) {
+    if (!supabaseAdmin) {
+        return { success: false, error: "Admin client is not available." };
+    }
+    try {
+        const slug = crewData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        const { data, error } = await supabaseAdmin
+            .from('crews')
+            .insert({
+                name: crewData.name,
+                description: crewData.description,
+                logo_url: crewData.logo_url,
+                owner_id: crewData.owner_id,
+                slug: slug,
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        
+        // Also add the owner as the first member of the crew
+        await supabaseAdmin.from('crew_members').insert({
+            crew_id: data.id,
+            user_id: crewData.owner_id,
+            role: 'owner'
+        });
+
+        return { success: true, data };
+    } catch (error) {
+        logger.error("Error creating crew:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getTopFleets() {
+    if (!supabaseAdmin) {
+        return { success: false, error: "Admin client is not available." };
+    }
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_top_fleets');
+        if (error) throw error;
+        return { success: true, data };
+    } catch(error) {
+        logger.error("Error getting top fleets:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getTopCrews() {
+    if (!supabaseAdmin) {
+        return { success: false, error: "Admin client is not available." };
+    }
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_top_crews');
+        if (error) {
+            logger.error('Error fetching top crews via RPC:', error);
+            throw error;
+        }
+        return { success: true, data: data || [] };
+    } catch(error) {
+        logger.error("Exception in getTopCrews action:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getUserPaddockData(userId: string) {
+    if (!userId) {
+        logger.warn("getUserPaddockData called without userId.");
+        return { success: false, error: "User ID is required." };
+    }
+    if (!supabaseAdmin) {
+        logger.error("getUserPaddockData failed: Admin client not available.");
+        return { success: false, error: "Admin client not available."};
+    }
+
+    try {
+        const [fleetResult, crewResult] = await Promise.all([
+            supabaseAdmin.rpc('get_user_fleet_with_stats', { p_user_id: userId }),
+            supabaseAdmin
+                .from('crew_members')
+                .select('crew:crews!inner(id, name, slug, logo_url)')
+                .eq('user_id', userId)
+                .maybeSingle()
+        ]);
+        
+        if (fleetResult.error) {
+            logger.error(`Error in get_user_fleet_with_stats RPC for user ${userId}:`, fleetResult.error);
+            throw fleetResult.error;
+        }
+        if (crewResult.error) {
+            logger.error(`Error fetching user's crew for user ${userId}:`, crewResult.error);
+            throw crewResult.error;
+        }
+        
+        const fleetData = fleetResult.data || [];
+        const userCrew = crewResult.data?.crew || null;
+
+        logger.info(`Successfully fetched paddock data for user ${userId}. Fleet size: ${fleetData.length}, In crew: ${!!userCrew}`);
+        return { success: true, data: { fleet: fleetData, userCrew: userCrew } };
+
+    } catch(error) {
+        logger.error(`Exception in getUserPaddockData for user ${userId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching paddock data" };
+    }
+}
