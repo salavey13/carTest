@@ -21,7 +21,7 @@ type Crew = {
     logo_url: string;
     total_members: number;
     total_fleet_value: number;
-    link: string;
+    slug: string;
 };
 
 
@@ -74,17 +74,17 @@ export default function LeaderboardPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                      <LeaderboardSection title="Топ Экипажи" icon="::FaUsers::" actionLink="/crews" actionText="Все экипажи">
                         {topCrews.length > 0 ? topCrews.map((crew, index) => (
-                           <Link href={crew.link} key={crew.crew_id} className="block w-full">
+                           <Link href={`/crews/${crew.slug}`} key={crew.crew_id} className="block w-full">
                                 <motion.div
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: index * 0.1 }}
-                                    className="flex items-center gap-4 p-3 bg-dark-card/70 border border-border rounded-lg hover:bg-dark-card hover:border-brand-green transition-colors cursor-pointer"
+                                    className="flex items-center gap-4 p-3 bg-dark-card/70 border border-border rounded-lg hover:bg-dark-card hover:border-brand-lime transition-colors cursor-pointer"
                                 >
                                     <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
                                     <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.name} width={48} height={48} className="rounded-full flex-shrink-0" />
                                     <div className="flex-grow">
-                                        <p className="font-semibold text-brand-green">{crew.name}</p>
+                                        <p className="font-semibold text-brand-lime">{crew.name}</p>
                                         <p className="text-xs text-muted-foreground">{crew.total_members} участников</p>
                                     </div>
                                     <div className="text-right flex-shrink-0">
@@ -109,7 +109,7 @@ export default function LeaderboardPage() {
                                 <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
                                 <Image src={fleet.avatar_url || '/placeholder.svg'} alt={fleet.username} width={48} height={48} className="rounded-full flex-shrink-0" />
                                 <div className="flex-grow">
-                                    <p className="font-semibold text-brand-cyan">@{fleet.username}</p>
+                                    <p className="font-semibold text-brand-lime">@{fleet.username}</p>
                                     <p className="text-xs text-muted-foreground">{fleet.total_vehicles} ед. транспорта</p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
