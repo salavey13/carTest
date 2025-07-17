@@ -59,7 +59,6 @@ const allPages: PageInfo[] = [
   // CyberFitness
   { path: "/profile", name: "Agent Profile", icon: "FaCircleUser", group: "CyberFitness", color: "pink", minLevel: 0 },
   { path: "/buy-subscription", name: "OS Upgrades", icon: "FaCreditCard", group: "CyberFitness", color: "green", minLevel: 1 },
-  { path: "/paddock", name: "My Paddock", icon: "FaWarehouse", group: "CyberFitness", color: "orange", minLevel: 0, isAdminOnly: true },
   { path: "/premium", name: "Premium Modules", icon: "FaStar", group: "CyberFitness", color: "yellow", minLevel: 3 },
   { path: "/nutrition", name: "Vibe Schematics", icon: "FaToolbox", group: "CyberFitness", color: "orange", minLevel: 1},
   { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue", minLevel: 1 },
@@ -75,11 +74,11 @@ const allPages: PageInfo[] = [
   { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "lime", minLevel: 0 },
   { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "white", minLevel: 0 },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green", minLevel: 0},
-  { path: "/topdf", name: "XLSX-2-PDF Converter", icon: "FaFilePdf", group: "Content & Tools", color: "red", isHot: true, minLevel: 0 },
 
   // Misc
   { path: "/rent-bike", name: "Cyber Garage", icon: "FaMotorcycle", group: "Misc", color: "blue", minLevel: 0 },
   { path: "/crews", name: "Crews", icon: "FaUsers", group: "Misc", color: "green", minLevel: 0 },
+  { path: "/paddock", name: "My Paddock", icon: "FaWarehouse", group: "Misc", color: "orange", minLevel: 0, isAdminOnly: true },
   { path: "/botbusters", name: "Bot Busters", icon: "FaRobot", group: "Misc", color: "blue", minLevel: 0},
   { path: "/bullshitdetector", name: "BS Detector", icon: "FaMagnifyingGlass", group: "Misc", color: "yellow", minLevel: 0 },
   { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: "FaGift", group: "Misc", color: "lime", minLevel: 0 },
@@ -91,6 +90,7 @@ const allPages: PageInfo[] = [
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: "FaGlobe", group: "Misc", color: 'green', minLevel: 0 },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: "FaLandmarkDome", group: "Misc", color: 'yellow', minLevel: 0 },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: "FaLeaf", group: "Misc", color: 'lime', minLevel: 0 },
+  { path: "/topdf", name: "XLSX-2-PDF Converter", icon: "FaFilePdf", group: "Misc", color: "red", isHot: true, minLevel: 0 },
 
   // Admin Zone
   { path: "/admin", name: "Admin Panel", icon: "FaUserShield", group: "Admin Zone", isAdminOnly: true, color: "red", minLevel: 0 },

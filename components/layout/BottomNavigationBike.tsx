@@ -3,13 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import {
-  FaMotorcycle,
-  FaUsers,
-  FaRankingStar,
-  FaCirclePlus,
-  FaWarehouse
-} from "react-icons/fa6";
+import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppContext } from '@/contexts/AppContext';
@@ -26,7 +20,7 @@ const bottomNavVariants = {
 
 interface NavItemConfig {
   href: string;
-  icon: React.ElementType;
+  icon: string; // Changed to string for VibeContentRenderer
   label: string;
   color?: string;
   isCentralCandidate?: boolean;
@@ -35,14 +29,14 @@ interface NavItemConfig {
   isActuallyCentral?: boolean;
 }
 
-// Configuration for the bike rental navigation
+// Configuration for the bike rental navigation using string icon names
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
-  { href: "/leaderboard", icon: FaRankingStar, label: "Leaderboard", color: "text-brand-yellow" },
-  { href: "/crews", icon: FaUsers, label: "Crews", color: "text-brand-green" },
-  { href: "/paddock", icon: FaWarehouse, label: "Paddock", color: "text-brand-cyan", adminOnly: true },
-  { href: "/admin", icon: FaCirclePlus, label: "Admin", color: "text-brand-pink", adminOnly: false },
+  { href: "/leaderboard", icon: "FaRankingStar", label: "Leaderboard", color: "text-brand-yellow" },
+  { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" },
+  { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true },
+  { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-brand-pink", adminOnly: false },
   // Central item is defined here, the layout logic will place it in the middle
-  { href: "/rent-bike", icon: FaMotorcycle, label: "Rent", isCentralCandidate: true, centralColor: "from-amber-400 to-orange-500" },
+  { href: "/rent-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-amber-400 to-orange-500" },
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {
@@ -93,34 +87,27 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
       return !(item.adminOnly && !isAdmin);
     });
 
-    let finalLayout: NavItemConfig[] = [];
     const maxItems = 5;
-
-    let centralItem: NavItemConfig | undefined = availableItems.find(i => i.isCentralCandidate);
+    const centralItem = availableItems.find(i => i.isCentralCandidate);
+    const otherItems = availableItems.filter(i => !i.isCentralCandidate);
     
-    if (centralItem) {
-      centralItem = { ...centralItem, isActuallyCentral: true };
-    }
-
-    let otherItems = availableItems.filter(i => !i.isCentralCandidate);
-
-    const desiredTotal = Math.min(availableItems.length, maxItems);
-    let numNonCentral = centralItem ? desiredTotal - 1 : desiredTotal;
-    numNonCentral = Math.max(0, numNonCentral);
-    
-    // Ensure `otherItems` does not cause the total to exceed maxItems
-    otherItems = otherItems.slice(0, numNonCentral);
+    let finalLayout: NavItemConfig[] = [];
 
     if (centralItem) {
-      const leftCount = Math.ceil(otherItems.length / 2);
+      const centralItemWithFlag = { ...centralItem, isActuallyCentral: true };
+      const nonCentralCount = Math.min(otherItems.length, maxItems - 1);
+      const itemsToDisplay = otherItems.slice(0, nonCentralCount);
       
-      finalLayout.push(...otherItems.slice(0, leftCount));
-      finalLayout.push(centralItem);
-      finalLayout.push(...otherItems.slice(leftCount));
-    } else {
-      finalLayout.push(...otherItems.slice(0, desiredTotal));
-    }
+      const leftCount = Math.ceil(itemsToDisplay.length / 2);
+      
+      finalLayout.push(...itemsToDisplay.slice(0, leftCount));
+      finalLayout.push(centralItemWithFlag);
+      finalLayout.push(...itemsToDisplay.slice(leftCount));
 
+    } else {
+      finalLayout = otherItems.slice(0, maxItems);
+    }
+    
     logger.debug(`[BottomNav] Final layout:`, finalLayout.map(i => `${i.label}${i.isActuallyCentral ? " (C)" : ""}`));
     return finalLayout;
 
@@ -148,8 +135,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
       )}>
         {navItemsToDisplay.map((item) => {
           const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
-          const IconComponent = item.icon;
-
+          
           return item.isActuallyCentral ? (
             <Button
               asChild
@@ -163,7 +149,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               title={tNav(item.label)}
             >
               <Link href={item.href}>
-                <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+                <VibeContentRenderer content={`::${item.icon}::`} className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
                 <span className="sr-only">{tNav(item.label)}</span>
               </Link>
             </Button>
@@ -184,7 +170,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
                 item.color,
                 isActive ? "opacity-100 current-nav-glow" : "opacity-70 hover:opacity-100"
               )}>
-                <IconComponent className="w-5 h-5 sm:w-[22px] sm:h-[22px] mb-0.5" />
+                <VibeContentRenderer content={`::${item.icon}::`} className="w-5 h-5 sm:w-[22px] sm:h-[22px] mb-0.5" />
                 <span className="text-[0.55rem] sm:text-[0.6rem] font-orbitron tracking-tight leading-none text-center line-clamp-1">
                   {tNav(item.label)}
                 </span>
