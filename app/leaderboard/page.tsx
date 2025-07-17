@@ -18,10 +18,12 @@ type Fleet = {
 type Crew = {
     crew_id: string;
     name: string;
+    slug: string;
     logo_url: string;
+    owner_username: string;
+    owner_avatar_url: string;
     total_members: number;
     total_fleet_value: number;
-    slug: string;
 };
 
 
@@ -85,11 +87,11 @@ export default function LeaderboardPage() {
                                     <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                     <div className="flex-grow">
                                         <p className="font-semibold text-brand-lime">{crew.name ?? 'N/A'}</p>
-                                        <p className="text-xs text-muted-foreground">{(crew.total_members ?? 0)} участников</p>
+                                        <p className="text-xs text-muted-foreground">@{crew.owner_username ?? 'N/A'}</p>
                                     </div>
                                     <div className="text-right flex-shrink-0">
                                         <p className="font-mono font-bold text-brand-yellow">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
-                                        <p className="text-xs text-muted-foreground">Стоимость</p>
+                                        <p className="text-xs text-muted-foreground">{(crew.total_members ?? 0)} участников</p>
                                     </div>
                                 </motion.div>
                             </Link>
