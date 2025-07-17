@@ -2,22 +2,39 @@ import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 
 export async function howtoCommand(chatId: number, userId: number) {
-  logger.info(`[HOWTO_V11_RENTAL] User ${userId} triggered /howto command.`);
+  logger.info(`[HOWTO_V12_COMBO] User ${userId} triggered /howto command.`);
 
   const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneSitePlsBot/app";
 
-  const message = "Привет, гонщик! Добро пожаловать в **Paddock Protocol**. Это не просто аренда, это — твоя гоночная карьера. Вот основные точки входа в нашу экосистему:";
+  const message = `Агент, это не просто платформа. Это **комбо-вомбо**: ты можешь быть **Звездой Трека** или **Архитектором Цифры**. Или и тем, и другим.
 
-  // Curated buttons based on the "Trilogy" plan for the rental platform
+--- 🏆 **ПУТЬ ГОНЩИКА** ---
+Доминируй на улицах, создавай экипажи, впиши свое имя в историю.
+
+--- 🛠️ **ПУТЬ АРХИТЕКТОРА** ---
+Создавай такие же приложения, прокачивай VIBE, стань легендой-разработчиком.
+
+Выбери свой путь. Или пройди оба.`;
+
   const buttons = [
+    // Racer's Path
     [
       { text: "🏍️ Арендовать Байк", url: `${botUrl}?startapp=rent-bike` },
       { text: "🏆 Таблица Лидеров", url: `${botUrl}?startapp=leaderboard` },
     ],
     [
-      { text: "👥 Вступить в Экипаж", url: `${botUrl}?startapp=crews` },
-      { text: "➕ Добавить свой Байк", url: `${botUrl}?startapp=admin` },
+      { text: "👥 Мои Экипажи", url: `${botUrl}?startapp=crews` },
+      { text: "⛽ Мой Гараж", url: `${botUrl}?startapp=paddock` },
     ],
+    // Architect's Path
+    [
+      { text: "📱 VIBE Studio (IDE)", url: `${botUrl}?startapp=repo-xml` },
+      { text: "🚀 Прокачка (CyberDev OS)", url: `${botUrl}?startapp=start-training` },
+    ],
+    [
+      { text: "🎨 Гайд по Стилю", url: `${botUrl}?startapp=style-guide` },
+      { text: "⚙️ Настройки OS", url: `${botUrl}?startapp=settings` },
+    ]
   ];
 
   try {
@@ -25,17 +42,17 @@ export async function howtoCommand(chatId: number, userId: number) {
       chatId,
       message,
       buttons,
-      "motorcycle, neon, city, night, racing" // Updated image query for relevance
+      "cyberpunk motorcycle, racing, neon city, data streams, code" // Combo image query
     );
     
     if (!result.success) {
       throw new Error(result.error || "Unknown error sending message.");
     }
     
-    logger.info(`[HOWTO_V11_RENTAL] Rental-focused interactive guide sent successfully to user ${userId}.`);
+    logger.info(`[HOWTO_V12_COMBO] Combo Racer/Architect guide sent successfully to user ${userId}.`);
 
   } catch (error) {
-    logger.error("[HOWTO_V11_RENTAL] Failed to send interactive guide:", error);
+    logger.error("[HOWTO_V12_COMBO] Failed to send interactive guide:", error);
     await sendComplexMessage(
         chatId,
         "🚨 Не удалось отправить инструктаж. Сервера, возможно, на перезарядке. Попробуй позже."
