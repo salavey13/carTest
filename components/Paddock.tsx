@@ -1,7 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import type React from "react"
-import { supabaseAdmin } from "@/hooks/supabase"
 import { useAppContext } from "@/contexts/AppContext"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -10,6 +9,7 @@ import { Loading } from "@/components/Loading";
 import Image from "next/image";
 import { VibeContentRenderer } from "./VibeContentRenderer"
 import { useRouter } from "next/navigation"
+import { getUserPaddockData } from "@/app/actions"
 
 interface VehicleStat {
   id: string;
@@ -21,15 +21,13 @@ interface VehicleStat {
   rental_count: number;
   total_revenue: number;
   active_rentals: number;
-  completed_rentals: number;
-  cancelled_rentals: number;
-  owner_id: string;
-  crew: {
+}
+
+interface UserCrew {
     id: string;
     slug: string;
     name: string;
     logo_url: string;
-  } | null
 }
 
 export function Paddock() {
@@ -38,54 +36,37 @@ export function Paddock() {
   
   const [fleet, setFleet] = useState<VehicleStat[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
   const [stats, setStats] = useState({
     totalRentals: 0,
     totalRevenue: 0,
     totalActive: 0,
     topVehicle: null as VehicleStat | null,
-    userCrew: null as { id: string; slug: string; name: string; logo_url: string; } | null
+    userCrew: null as UserCrew | null
   });
 
   const isUserAdmin = isAdmin();
 
-  const fetchFleetData = useCallback(async () => {
+  const fetchPaddockData = useCallback(async () => {
     if (!dbUser?.user_id) return;
     setLoading(true);
     try {
-      const { data: fleetData, error: fleetError } = await supabaseAdmin
-        .from("cars")
-        .select(`*, rentals!vehicle_id(rental_id, total_cost, payment_status, status, interest_amount), crew:crews(id, name, slug, logo_url)`)
-        .eq("owner_id", dbUser.user_id);
-
-      if (fleetError) throw fleetError;
-
-      const processedVehicles = fleetData.map((v: any) => ({
-        ...v,
-        rental_count: v.rentals.length,
-        total_revenue: v.rentals.filter((r: any) => r.payment_status === 'fully_paid' || r.payment_status === 'interest_paid').reduce((sum: number, r: any) => sum + (r.interest_amount || 0) + (r.total_cost || 0), 0),
-        active_rentals: v.rentals.filter((r: any) => r.status === "active" || r.status === 'confirmed' || r.status === 'pending_confirmation').length,
-        completed_rentals: v.rentals.filter((r: any) => r.status === "completed").length,
-        cancelled_rentals: v.rentals.filter((r: any) => r.status === "cancelled").length,
-      }));
-
-      const { data: crewData } = await supabaseAdmin
-        .from('crew_members')
-        .select('crew:crews!inner(id, name, slug, logo_url)')
-        .eq('user_id', dbUser.user_id)
-        .maybeSingle();
-
-      setFleet(processedVehicles);
-
-      const totalRentals = processedVehicles.reduce((sum, v) => sum + v.rental_count, 0);
-      const totalRevenue = processedVehicles.reduce((sum, v) => sum + v.total_revenue, 0);
-      const totalActive = processedVehicles.reduce((sum, v) => sum + v.active_rentals, 0);
-      const topVehicle = processedVehicles.sort((a, b) => b.total_revenue - a.total_revenue)[0] || null;
-
-      setStats({ totalRentals, totalRevenue, totalActive, topVehicle, userCrew: crewData?.crew || null });
+        const result = await getUserPaddockData(dbUser.user_id);
+        if (result.success && result.data) {
+            const { fleet: fleetData, userCrew } = result.data;
+            setFleet(fleetData);
+            
+            const totalRentals = fleetData.reduce((sum, v) => sum + (v.rental_count || 0), 0);
+            const totalRevenue = fleetData.reduce((sum, v) => sum + (v.total_revenue || 0), 0);
+            const totalActive = fleetData.reduce((sum, v) => sum + (v.active_rentals || 0), 0);
+            const topVehicle = [...fleetData].sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0))[0] || null;
+            
+            setStats({ totalRentals, totalRevenue, totalActive, topVehicle, userCrew });
+        } else {
+            throw new Error(result.error || "Failed to fetch paddock data.");
+        }
     } catch (error) {
-      console.error("Error fetching fleet:", error);
-      toast.error("Ошибка загрузки паддока");
+      console.error("Error fetching paddock:", error);
+      toast.error(error instanceof Error ? error.message : "Ошибка загрузки паддока");
     } finally {
       setLoading(false);
     }
@@ -93,9 +74,9 @@ export function Paddock() {
 
   useEffect(() => {
     if (!isAppContextLoading && isUserAdmin) {
-      fetchFleetData();
+      fetchPaddockData();
     }
-  }, [isAppContextLoading, isUserAdmin, fetchFleetData]);
+  }, [isAppContextLoading, isUserAdmin, fetchPaddockData]);
 
   if (isAppContextLoading) {
     return <Loading variant="bike" text="ПРОВЕРКА ДОСТУПА В ПАДДОК..." />;
@@ -210,7 +191,7 @@ function VehicleCard({ vehicle }: { vehicle: VehicleStat }) {
             <Link href={`/rent/${vehicle.id}`} className="mt-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono text-sm">Подробности →</Link>
         </div>
         <StatPill label="Всего аренд" value={vehicle.rental_count} />
-        <StatPill label="Доход (XTR)" value={vehicle.total_revenue.toLocaleString()} />
+        <StatPill label="Доход (XTR)" value={(vehicle.total_revenue ?? 0).toLocaleString()} />
         <StatPill label="Активно" value={vehicle.active_rentals} />
       </div>
     </motion.div>
