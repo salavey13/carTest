@@ -668,37 +668,6 @@ export async function createCrew(crewData: { name: string; description: string; 
     }
 }
 
-export async function getTopFleets() {
-    if (!supabaseAdmin) {
-        return { success: false, error: "Admin client is not available." };
-    }
-    try {
-        const { data, error } = await supabaseAdmin.rpc('get_top_fleets');
-        if (error) throw error;
-        return { success: true, data };
-    } catch(error) {
-        logger.error("Error getting top fleets:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-}
-
-export async function getTopCrews() {
-    if (!supabaseAdmin) {
-        return { success: false, error: "Admin client is not available." };
-    }
-    try {
-        const { data, error } = await supabaseAdmin.rpc('get_top_crews');
-        if (error) {
-            logger.error('Error fetching top crews via RPC:', error);
-            throw error;
-        }
-        return { success: true, data: data || [] };
-    } catch(error) {
-        logger.error("Exception in getTopCrews action:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-}
-
 export async function getUserPaddockData(userId: string) {
     if (!userId) {
         logger.warn("getUserPaddockData called without userId.");
