@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getTopFleets, getTopCrews } from "@/app/actions";
+import { getTopFleets, getTopCrews } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { FaBug } from "react-icons/fa6";
+
+type DebugInfo = {
+    [key: string]: string | number;
+};
 
 type Fleet = {
     owner_id: string;
@@ -13,6 +18,7 @@ type Fleet = {
     avatar_url: string;
     total_vehicles: number;
     total_revenue: number;
+    debug_info?: DebugInfo;
 };
 
 type Crew = {
@@ -24,8 +30,8 @@ type Crew = {
     owner_avatar_url: string;
     total_members: number;
     total_fleet_value: number;
+    debug_info?: DebugInfo;
 };
-
 
 const trophyColors = ["text-yellow-400", "text-gray-400", "text-yellow-600"];
 
@@ -33,6 +39,7 @@ export default function LeaderboardPage() {
     const [topFleets, setTopFleets] = useState<Fleet[]>([]);
     const [topCrews, setTopCrews] = useState<Crew[]>([]);
     const [loading, setLoading] = useState(true);
+    const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
     useEffect(() => {
         async function loadLeaderboards() {
@@ -41,8 +48,26 @@ export default function LeaderboardPage() {
                 getTopFleets(),
                 getTopCrews()
             ]);
-            if (fleetsResult.success) setTopFleets(fleetsResult.data || []);
-            if (crewsResult.success) setTopCrews(crewsResult.data || []);
+
+            let combinedDebug: DebugInfo = {};
+
+            if (fleetsResult.success && fleetsResult.data?.length) {
+                setTopFleets(fleetsResult.data);
+                if (fleetsResult.data[0].debug_info) {
+                    combinedDebug = { ...combinedDebug, ...fleetsResult.data[0].debug_info };
+                }
+            }
+            if (crewsResult.success && crewsResult.data?.length) {
+                setTopCrews(crewsResult.data);
+                if (crewsResult.data[0].debug_info) {
+                    combinedDebug = { ...combinedDebug, ...crewsResult.data[0].debug_info };
+                }
+            }
+            
+            if (Object.keys(combinedDebug).length > 0) {
+                setDebugInfo(combinedDebug);
+            }
+
             setLoading(false);
         }
         loadLeaderboards();
@@ -88,6 +113,7 @@ export default function LeaderboardPage() {
                                     <div className="flex-grow">
                                         <p className="font-semibold text-brand-lime">{crew.name ?? 'N/A'}</p>
                                         <p className="text-xs text-muted-foreground">@{crew.owner_username ?? 'N/A'}</p>
+
                                     </div>
                                     <div className="text-right flex-shrink-0">
                                         <p className="font-mono font-bold text-brand-yellow">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
@@ -122,6 +148,7 @@ export default function LeaderboardPage() {
                         )) : <p className="text-muted-foreground text-center col-span-full">Нет данных</p>}
                     </LeaderboardSection>
                 </div>
+                {debugInfo && <DebugInfoSection info={debugInfo} />}
             </div>
         </div>
     );
@@ -147,5 +174,29 @@ const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: {
         <div className="space-y-3">
             {children}
         </div>
+    </motion.div>
+);
+
+const DebugInfoSection = ({ info }: { info: DebugInfo }) => (
+    <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.5 }}
+        className="mt-12"
+    >
+        <details className="bg-card/30 backdrop-blur-sm border border-yellow-500/30 rounded-lg p-4">
+            <summary className="cursor-pointer font-mono text-yellow-400 flex items-center gap-2 hover:text-yellow-300">
+                <FaBug />
+                Debug Info
+            </summary>
+            <div className="mt-4 pt-4 border-t border-yellow-500/30 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-xs font-mono">
+                {Object.entries(info).map(([key, value]) => (
+                    <div key={key} className="flex flex-col">
+                        <span className="text-muted-foreground">{key.replace(/_/g, ' ')}</span>
+                        <span className="text-foreground font-bold text-base">{value.toLocaleString()}</span>
+                    </div>
+                ))}
+            </div>
+        </details>
     </motion.div>
 );
