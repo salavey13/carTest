@@ -689,11 +689,8 @@ export async function getTopCrews() {
     try {
         const { data, error } = await supabaseAdmin.rpc('get_top_crews');
         if (error) throw error;
-        const crewsWithLinks = data.map((crew: any) => ({
-            ...crew,
-            link: `/crews/${crew.slug}`
-        }));
-        return { success: true, data: crewsWithLinks };
+        // RPC already returns slug, so we just need to use it
+        return { success: true, data: data || [] };
     } catch(error) {
         logger.error("Error getting top crews:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
