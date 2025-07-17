@@ -3,18 +3,16 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
-import { headers } from 'next/headers';
 
-export async function getRentalDetails(rentalId: string) {
+export async function getRentalDetails(rentalId: string, userId: string) {
     noStore();
-    const userId = headers().get('x-user-id'); // Simplified auth for Server Components
 
     if (!rentalId) {
         logger.error("[getRentalDetails] Rental ID is required.");
         return { success: false, error: "Missing rental ID." };
     }
      if (!userId) {
-        logger.error("[getRentalDetails] User ID missing from headers.");
+        logger.error("[getRentalDetails] User ID was not provided to the action.");
         return { success: false, error: "Unauthorized." };
     }
 
@@ -45,9 +43,8 @@ export async function getRentalDetails(rentalId: string) {
     }
 }
 
-export async function updateRentalStatus(rentalId: string, newStatus: string) {
+export async function updateRentalStatus(rentalId: string, newStatus: string, userId: string) {
     noStore();
-    const userId = headers().get('x-user-id');
 
     if (!rentalId || !newStatus || !userId) {
          return { success: false, error: "Missing required parameters." };
