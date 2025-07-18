@@ -194,9 +194,10 @@ export async function getUserRentals(userId: string) {
         if (crewError) throw crewError;
         const ownedCrewIds = ownedCrews?.map(c => c.id) || [];
 
+        // This RPC needs to be created in Supabase
         const { data, error } = await supabaseAdmin.rpc('get_user_rentals_dashboard', {
             p_user_id: userId,
-            p_owned_crew_ids: ownedCrewIds
+            p_owned_crew_ids: ownedCrewIds.length > 0 ? ownedCrewIds : null
         });
 
         if (error) throw error;
@@ -204,6 +205,33 @@ export async function getUserRentals(userId: string) {
         return { success: true, data };
     } catch (error) {
         logger.error(`[getUserRentals] Error:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getTopFleets() {
+    noStore();
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_top_fleets');
+        if (error) throw error;
+        return { success: true, data };
+    } catch(error) {
+        logger.error("Error getting top fleets:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getTopCrews() {
+    noStore();
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_top_crews');
+        if (error) {
+            logger.error('Error fetching top crews via RPC:', error);
+            throw error;
+        }
+        return { success: true, data: data || [] };
+    } catch(error) {
+        logger.error("Exception in getTopCrews action:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
