@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
         let notification_text = '';
         const recipient_ids = new Set<string>();
         let action_link_slug = 'view';
+        let action_button_text = '🚨 К Событию';
 
         switch(event_type) {
             case 'sos_fuel':
@@ -59,7 +60,17 @@ export async function POST(request: NextRequest) {
                     else members?.forEach(m => recipient_ids.add(m.user_id));
                 }
                 action_link_slug = 'accept-hustle';
+                action_button_text = '💰 Принять Вызов';
                 break;
+            
+            case 'photo_start':
+                 notification_text = `📸 Арендатор @${renter?.username || created_by} добавил фото "ДО" для ${vehicle?.make} ${vehicle?.model}. Необходимо ваше подтверждение.`;
+                 recipient_ids.add(owner_id);
+                 action_link_slug = 'confirm-pickup';
+                 action_button_text = "✅ Подтвердить получение";
+                break;
+
+            // Add more cases for other event types like 'photo_end', 'pickup_confirmed' etc.
             default:
                 logger.warn(`[Notify API] No handler for event type: ${event_type}`);
                 return NextResponse.json({ ok: true, message: "No handler for event type" });
@@ -72,7 +83,7 @@ export async function POST(request: NextRequest) {
             await sendComplexMessage(
                 recipientId,
                 notification_text,
-                [[{ text: '🚨 К Событию', url: deep_link_url }]]
+                [[{ text: action_button_text, url: deep_link_url }]]
             );
         }
 
