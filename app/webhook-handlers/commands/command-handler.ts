@@ -64,10 +64,11 @@ export async function handleCommand(update: any) {
             if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
                 await rageSettingsCommand(chatId, userId, text); return;
             }
-            if (text.startsWith('⛽️') || text.startsWith('🛠️') || text === '❌ Отмена') {
+            if (text.startsWith('⛽️') || text.startsWith('🛠️')) {
                 await handleSosChoice(chatId, userIdStr, text); return;
             }
-            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Закрыть') {
+            // Catch all reply keyboard presses from /actions
+            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Отмена') {
                 await handleActionChoice(chatId, userIdStr, text); return;
             }
             const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts);
