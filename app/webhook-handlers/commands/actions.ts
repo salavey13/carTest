@@ -3,6 +3,7 @@
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
+import { sosCommand } from './sos';
 
 // Helper to determine the current state and available actions
 async function getRentalContext(userId: string): Promise<{rentalId: string, role: 'renter' | 'owner'} | null> {
@@ -90,7 +91,6 @@ export async function handleActionChoice(chatId: number, userId: string, choice:
             actionResponse = `Чтобы загрузить фото, откройте страницу аренды.`;
             break;
         case "✅ Подтвердить получение":
-            // Here you would trigger the actual server action
             actionResponse = "Подтверждаю получение... "; // Placeholder
             break;
         case "✅ Подтвердить возврат":

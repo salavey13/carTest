@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         }
 
         const { vehicle, renter, owner, owner_id } = rentalContext;
-        const deep_link_url = `${getBaseUrl()}/app?startapp=rental_${rental_id}`;
+        const deep_link_url = `${getBaseUrl()}/app?startapp=rental_view_${rental_id}`;
         let notification_text = '';
         let recipient_ids: string[] = [];
         
