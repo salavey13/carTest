@@ -3,6 +3,8 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
+import { sendComplexMessage } from "../webhook-handlers/actions/sendComplexMessage";
+import { getBaseUrl } from "@/lib/utils";
 
 export async function getRentalDetails(rentalId: string, userId: string) {
     noStore();
@@ -80,6 +82,79 @@ export async function updateRentalStatus(rentalId: string, newStatus: string, us
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
+export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
+    noStore();
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals').select('user_id, owner_id, vehicle:cars(make, model)').eq('rental_id', rentalId).single();
+        if (fetchError || !rental) return { success: false, error: "Rental not found." };
+        if (rental.user_id !== userId) return { success: false, error: "Only the renter can add photos." };
+
+        const updateData = photoType === 'start' ? { start_photo_url: photoUrl } : { end_photo_url: photoUrl };
+        const { data: updatedRental, error } = await supabaseAdmin.from('rentals').update(updateData).eq('rental_id', rentalId).select().single();
+        if (error) throw error;
+
+        // Notify owner
+        const carInfo = rental.vehicle ? `${rental.vehicle.make} ${rental.vehicle.model}` : 'транспорта';
+        const messageText = `📸 Арендатор добавил фото **"${photoType === 'start' ? 'ДО' : 'ПОСЛЕ'}"** для ${carInfo}. Пожалуйста, проверьте и подтвердите следующий шаг.`;
+        await sendComplexMessage(rental.owner_id, messageText, [[{ text: "К Управлению Арендой", url: `${getBaseUrl()}/app?startapp=rental_${rentalId}` }]]);
+
+        return { success: true, data: updatedRental };
+    } catch (e: any) {
+        logger.error(`[addRentalPhoto] Error:`, e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function confirmVehiclePickup(rentalId: string, userId: string) {
+    noStore();
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals').select('user_id, owner_id, vehicle:cars(make, model)').eq('rental_id', rentalId).single();
+        if (fetchError || !rental) return { success: false, error: "Rental not found." };
+        if (rental.owner_id !== userId) return { success: false, error: "Only the owner can confirm pickup." };
+
+        const { data: updatedRental, error } = await supabaseAdmin.from('rentals')
+            .update({ pickup_confirmed_at: new Date().toISOString(), status: 'active' }).eq('rental_id', rentalId).select().single();
+        if (error) throw error;
+        
+        // Notify renter
+        const carInfo = rental.vehicle ? `${rental.vehicle.make} ${rental.vehicle.model}` : 'Транспорт';
+        const messageText = `✅ Владелец подтвердил получение ${carInfo}. Аренда официально *началась*. Приятной поездки!`;
+        await sendComplexMessage(rental.user_id, messageText, [[{ text: "К Управлению Арендой", url: `${getBaseUrl()}/app?startapp=rental_${rentalId}` }]]);
+
+        return { success: true, data: updatedRental };
+    } catch (e: any) {
+        logger.error(`[confirmVehiclePickup] Error:`, e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function confirmVehicleReturn(rentalId: string, userId: string) {
+    noStore();
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals').select('user_id, owner_id, vehicle:cars(make, model)').eq('rental_id', rentalId).single();
+        if (fetchError || !rental) return { success: false, error: "Rental not found." };
+        if (rental.owner_id !== userId) return { success: false, error: "Only the owner can confirm return." };
+
+        const { data: updatedRental, error } = await supabaseAdmin.from('rentals')
+            .update({ return_confirmed_at: new Date().toISOString(), status: 'completed' }).eq('rental_id', rentalId).select().single();
+        if (error) throw error;
+
+        // Notify renter
+        const carInfo = rental.vehicle ? `${rental.vehicle.make} ${rental.vehicle.model}` : 'Транспорт';
+        const messageText = `🏁 Владелец подтвердил возврат ${carInfo}. Аренда *завершена*. Спасибо за использование сервиса!`;
+        await sendComplexMessage(rental.user_id, messageText, [[{ text: "Оставить отзыв", url: `${getBaseUrl()}/rent-bike` }]]);
+
+        return { success: true, data: updatedRental };
+    } catch (e: any) {
+        logger.error(`[confirmVehicleReturn] Error:`, e);
+        return { success: false, error: e.message };
+    }
+}
+
 
 export async function getAllPublicCrews() {
     noStore();
