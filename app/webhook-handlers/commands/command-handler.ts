@@ -67,7 +67,7 @@ export async function handleCommand(update: any) {
             if (text.startsWith('⛽️') || text.startsWith('🛠️') || text === '❌ Отмена') {
                 await handleSosChoice(chatId, userIdStr, text); return;
             }
-            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text === '❌ Закрыть') {
+            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Закрыть') {
                 await handleActionChoice(chatId, userIdStr, text); return;
             }
             const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts);

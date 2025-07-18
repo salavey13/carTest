@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { sosCommand } from './sos';
 import { confirmVehiclePickup, confirmVehicleReturn } from '@/app/rentals/actions';
+import { sendTelegramInvoice } from "@/app/actions";
 
 const buttonLabels: Record<string, string> = {
     "action_upload-photo-start": "📸 Загрузить фото 'ДО'",
@@ -52,8 +53,8 @@ export async function actionsCommand(chatId: number, userId: string) {
         return;
     }
 
-    const eventTypes = new Set(events.map(e => e.type));
     const buttons: KeyboardButton[][] = [];
+    const eventTypes = new Set(events.map(e => e.type));
 
     if (context.role === 'renter') {
         if (context.status === 'active') {
@@ -108,6 +109,10 @@ export async function handleActionChoice(chatId: number, userId: string, choice:
         case "action_confirm-return":
             await confirmVehicleReturn(context.rentalId, userId);
             await sendComplexMessage(chatId, "Возврат транспорта подтвержден!", [], { removeKeyboard: true });
+            break;
+        case "action_drop-anywhere":
+            await sendTelegramInvoice(String(chatId), "Hustle: Drop Anywhere", "Оплата сбора за вызов экипажа для возврата транспорта.", `hustle_dropoff_${context.rentalId}_${Date.now()}`, 20000, 0); // 200 XTR
+            await sendComplexMessage(chatId, "Счет на 200 XTR отправлен. После оплаты вы сможете указать геолокацию.", [], { removeKeyboard: true });
             break;
         case "sos":
             await sosCommand(chatId, userId);
