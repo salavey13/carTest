@@ -54,7 +54,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     -- The base URL of your Vercel deployment, INCLUDING the /api/notify part
-    -- Store this in Supabase secrets: `supasecrets secrets set NOTIFY_API_URL=https://v0-car-test.vercel.app/api/notify`
+    -- Store this in Supabase secrets: `supabase secrets set NOTIFY_API_URL=https://<your-project>.vercel.app/api/notify`
     api_url TEXT := secrets.get('NOTIFY_API_URL');
     api_secret TEXT := secrets.get('CRON_SECRET'); -- A shared secret
 BEGIN
@@ -63,8 +63,7 @@ BEGIN
     PERFORM http((
         'POST',
         api_url,
-        ARRAY[('Authorization', 'Bearer ' || api_secret)],
-        'application/json',
+        ARRAY[('Authorization', 'Bearer ' || api_secret), ('Content-Type', 'application/json')],
         jsonb_build_object(
             'event_id', NEW.id,
             'rental_id', NEW.rental_id,
@@ -79,6 +78,7 @@ END;
 $$;
 
 -- Step 5: Create the trigger on the 'events' table
+DROP TRIGGER IF EXISTS on_new_rental_event ON public.events;
 CREATE TRIGGER on_new_rental_event
 AFTER INSERT ON public.events
 FOR EACH ROW
