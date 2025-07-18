@@ -67,7 +67,6 @@ export async function handleSosChoice(chatId: number, userId: string, choice: st
         await sendComplexMessage(chatId, "Действие отменено.", [], { removeKeyboard: true });
         return;
     } else {
-        // This case should ideally not be reached if command-handler is set up correctly
         await sendComplexMessage(chatId, "Неизвестный выбор. Используйте /sos для начала.", [], { removeKeyboard: true });
         return;
     }
