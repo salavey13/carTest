@@ -4,9 +4,10 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
 import { sosCommand } from './sos';
+import { confirmVehiclePickup, confirmVehicleReturn } from '@/app/rentals/actions';
 
 // Helper to determine the current state and available actions
-async function getRentalContext(userId: string): Promise<{rentalId: string, role: 'renter' | 'owner'} | null> {
+async function getRentalContext(userId: string): Promise<{rentalId: string, role: 'renter' | 'owner', status: string} | null> {
     const { data, error } = await supabaseAdmin
         .from('rentals')
         .select('rental_id, user_id, owner_id, status')
@@ -23,7 +24,8 @@ async function getRentalContext(userId: string): Promise<{rentalId: string, role
     
     return {
         rentalId: data.rental_id,
-        role: data.user_id === userId ? 'renter' : 'owner'
+        role: data.user_id === userId ? 'renter' : 'owner',
+        status: data.status,
     };
 }
 
@@ -53,22 +55,34 @@ export async function actionsCommand(chatId: number, userId: string) {
     const buttons: KeyboardButton[][] = [];
     const eventTypes = new Set(events.map(e => e.type));
 
-    if (context.role === 'renter') {
-        if (!eventTypes.has('photo_start')) buttons.push([{ text: "📸 Загрузить фото 'ДО'" }]);
-        if (eventTypes.has('pickup_confirmed') && !eventTypes.has('photo_end')) buttons.push([{ text: "📸 Загрузить фото 'ПОСЛЕ'" }]);
+    if (context.role === 'renter' && context.status === 'active') {
+        if (!eventTypes.has('photo_end')) buttons.push([{ text: "action_upload-photo-end" }]);
         buttons.push([{ text: "🆘 SOS" }]);
+    } else if (context.role === 'renter') {
+        if (!eventTypes.has('photo_start')) buttons.push([{ text: "action_upload-photo-start" }]);
     }
 
     if (context.role === 'owner') {
-        const lastPendingEvent = events.filter(e => e.status === 'pending').pop();
-        if (lastPendingEvent?.type === 'photo_start') buttons.push([{ text: "✅ Подтвердить получение" }]);
-        if (lastPendingEvent?.type === 'photo_end') buttons.push([{ text: "✅ Подтвердить возврат" }]);
+        const hasPendingStartPhoto = events.some(e => e.type === 'photo_start' && e.status === 'completed');
+        const hasPickupConfirmed = events.some(e => e.type === 'pickup_confirmed' && e.status === 'completed');
+        const hasPendingEndPhoto = events.some(e => e.type === 'photo_end' && e.status === 'completed');
+
+        if (hasPendingStartPhoto && !hasPickupConfirmed) buttons.push([{ text: "action_confirm-pickup" }]);
+        if (hasPendingEndPhoto) buttons.push([{ text: "action_confirm-return" }]);
     }
     
     buttons.push([{ text: "❌ Закрыть" }]);
+    const buttonLabels: Record<string, string> = {
+        "action_upload-photo-start": "📸 Загрузить фото 'ДО'",
+        "action_upload-photo-end": "📸 Загрузить фото 'ПОСЛЕ'",
+        "action_confirm-pickup": "✅ Подтвердить получение",
+        "action_confirm-return": "✅ Подтвердить возврат",
+    }
 
-    if (buttons.length > 1) { // More than just the "Close" button
-        await sendComplexMessage(chatId, "👇 Выберите доступное действие:", buttons, { keyboardType: 'reply' });
+    const formattedButtons = buttons.map(row => row.map(button => ({ text: buttonLabels[button.text] || button.text })));
+
+    if (buttons.length > 1) {
+        await sendComplexMessage(chatId, "👇 Выберите доступное действие:", formattedButtons, { keyboardType: 'reply' });
     } else {
         await sendComplexMessage(chatId, "На данный момент для вас нет доступных действий.", [], { removeKeyboard: true });
     }
@@ -83,24 +97,33 @@ export async function handleActionChoice(chatId: number, userId: string, choice:
         return;
     }
 
+    const actionKey = Object.keys(buttonLabels).find(key => buttonLabels[key] === choice);
+
+    if (!actionKey) {
+        if (choice === "🆘 SOS") {
+            await sosCommand(chatId, userId);
+        } else {
+            await sendComplexMessage(chatId, "Действие отменено или не распознано.", [], { removeKeyboard: true });
+        }
+        return;
+    }
+
     let actionResponse = "Действие в обработке...";
     
-    switch(choice) {
-        case "📸 Загрузить фото 'ДО'":
-        case "📸 Загрузить фото 'ПОСЛЕ'":
-            actionResponse = `Чтобы загрузить фото, откройте страницу аренды.`;
+    switch(actionKey) {
+        case "action_upload-photo-start":
+        case "action_upload-photo-end":
+            const photoType = actionKey.endsWith('start') ? 'start' : 'end';
+            await supabaseAdmin.from('user_states').upsert({ user_id: userId, state: 'awaiting_rental_photo', context: { rental_id: context.rentalId, photo_type: photoType }});
+            actionResponse = `Отлично! Теперь просто отправьте фото в этот чат. Я жду...`;
             break;
-        case "✅ Подтвердить получение":
-            actionResponse = "Подтверждаю получение... "; // Placeholder
+        case "action_confirm-pickup":
+            await confirmVehiclePickup(context.rentalId, userId);
+            actionResponse = "Получение транспорта подтверждено!";
             break;
-        case "✅ Подтвердить возврат":
-            actionResponse = "Подтверждаю возврат..."; // Placeholder
-            break;
-        case "🆘 SOS":
-            await sosCommand(chatId, userId);
-            return; // SOS has its own flow
-        case "❌ Закрыть":
-            actionResponse = "Меню действий закрыто.";
+        case "action_confirm-return":
+            await confirmVehicleReturn(context.rentalId, userId);
+            actionResponse = "Возврат транспорта подтвержден!";
             break;
         default:
             actionResponse = "Неизвестное действие.";

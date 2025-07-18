@@ -122,10 +122,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         
         if (DYNAMIC_ROUTE_PATTERNS[prefix]) {
             const [basePath, actionParamName] = DYNAMIC_ROUTE_PATTERNS[prefix];
-            // rental_confirm-pickup_uuid  ->  parts = ["confirm-pickup", "uuid"]
             if (actionParamName && parts.length > 1) {
                 const action = parts[0];
-                const id = parts.slice(1).join('_'); // Re-join in case ID has underscores
+                const id = parts.slice(1).join('_');
                 targetPath = `${basePath}/${id}?${actionParamName}=${action}`;
             } else {
                 const slug = parts.join('_');
