@@ -8,6 +8,7 @@ import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessag
 export async function sosCommand(chatId: number, userId: string) {
     logger.info(`[SOS Command] User ${userId} initiated /sos command.`);
 
+    // 1. Find the user's most recent *active* rental
     const { data: activeRental, error } = await supabaseAdmin
         .from('rentals')
         .select('rental_id, vehicle_id')
@@ -23,6 +24,7 @@ export async function sosCommand(chatId: number, userId: string) {
         return;
     }
 
+    // 2. Present options via a reply keyboard
     const message = "🚨 *Экстренная Служба VIBE*\n\nЧто случилось? Выбери опцию, и мы оповестим владельца и его экипаж.";
     const buttons: KeyboardButton[][] = [
         [{ text: "⛽️ Запрос Топлива (50 XTR)" }],
@@ -37,6 +39,7 @@ export async function sosCommand(chatId: number, userId: string) {
 export async function handleSosChoice(chatId: number, userId: string, choice: string) {
     logger.info(`[SOS Handler] User ${userId} chose: "${choice}"`);
 
+    // 1. Find the active rental again
     const { data: activeRental, error: rentalError } = await supabaseAdmin
         .from('rentals')
         .select('rental_id')
@@ -64,11 +67,12 @@ export async function handleSosChoice(chatId: number, userId: string, choice: st
         await sendComplexMessage(chatId, "Действие отменено.", [], { removeKeyboard: true });
         return;
     } else {
+        // This case should ideally not be reached if command-handler is set up correctly
         await sendComplexMessage(chatId, "Неизвестный выбор. Используйте /sos для начала.", [], { removeKeyboard: true });
         return;
     }
     
-    // Create the event in the new 'events' table. The DB trigger will handle notifications.
+    // 2. Create the event in the new 'events' table. The DB trigger will handle notifications.
     const { error: eventError } = await supabaseAdmin
         .from('events')
         .insert({
@@ -85,6 +89,7 @@ export async function handleSosChoice(chatId: number, userId: string, choice: st
         return;
     }
 
+    // 3. Confirm to the user and remove the keyboard
     const confirmationMessage = `✅ Ваш запрос отправлен! Владелец и его экипаж будут уведомлены. Ожидайте помощи. Вы можете следить за статусом на странице аренды.`;
     await sendComplexMessage(chatId, confirmationMessage, [], { removeKeyboard: true });
 }
