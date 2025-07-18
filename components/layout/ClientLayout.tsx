@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -82,14 +81,14 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "rent": "/rent-bike",
 };
 
-const DYNAMIC_ROUTE_PATTERNS: Record<string, string> = {
-    "crew": "/crews",
-    "rental": "/rentals",
-    "lead": "/leads",
-    // Add more prefixes and their base paths here
+const DYNAMIC_ROUTE_PATTERNS: Record<string, [string, string?]> = {
+    "crew": ["/crews"],
+    "rental": ["/rentals", "action"], // [basePath, queryParamNameForAction]
+    "lead": ["/leads"],
 };
 
 const TRANSPARENT_LAYOUT_PAGES = [
+    '/rentals', // Make the new list page transparent too
     '/rent-bike',
     '/rent-car',
     '/crews',
@@ -116,54 +115,42 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       const lowerStartParam = paramToProcess.toLowerCase();
       let targetPath: string | undefined;
 
-      // 1. Check for static mappings
       if (START_PARAM_PAGE_MAP[lowerStartParam]) {
         targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
-      // 2. Check for dynamic prefix patterns (e.g., "crew_the-vibe-riders")
       } else if (lowerStartParam.includes('_')) {
-        const [prefix, ...slugParts] = lowerStartParam.split('_');
-        const slug = slugParts.join('_');
-        if (DYNAMIC_ROUTE_PATTERNS[prefix] && slug) {
-            targetPath = `${DYNAMIC_ROUTE_PATTERNS[prefix]}/${slug}`;
+        const [prefix, ...parts] = lowerStartParam.split('_');
+        
+        if (DYNAMIC_ROUTE_PATTERNS[prefix]) {
+            const [basePath, actionParamName] = DYNAMIC_ROUTE_PATTERNS[prefix];
+            // rental_confirm-pickup_uuid  ->  parts = ["confirm-pickup", "uuid"]
+            if (actionParamName && parts.length > 1) {
+                const action = parts[0];
+                const id = parts.slice(1).join('_'); // Re-join in case ID has underscores
+                targetPath = `${basePath}/${id}?${actionParamName}=${action}`;
+            } else {
+                const slug = parts.join('_');
+                targetPath = `${basePath}/${slug}`;
+            }
         }
-      // 3. Check for special prefixes like "viz_"
       } else if (lowerStartParam.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
-      // 4. Last resort fallback for any unhandled param
       } else {
         targetPath = `/${lowerStartParam}`;
       }
 
-      if (targetPath && pathname !== targetPath) {
+      if (targetPath) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting from '${pathname}'.`);
         router.replace(targetPath);
         clearStartParam?.(); 
-      } else if (targetPath) {
-        logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' matches current path. Clearing param.`);
-        router.replace(pathname, { scroll: false }); 
-        clearStartParam?.(); 
-      } else {
+      } else {
         logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on page '${pathname}'. No redirect.`);
       }
     }
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
-  const pathsToShowBottomNavForStartsWith = [
-    "/selfdev/gamified", 
-    "/p-plan", 
-    "/profile",
-    "/hotvibes",
-    "/leads",
-    "/elon",
-    "/god-mode-sandbox",
-    "/rent",
-    "/crews",
-    "/leaderboard",
-    "/admin",
-    "/paddock",
-  ];
+  const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals" ];
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 
   }
@@ -172,14 +159,10 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)); 
   
   const showBottomNav = isExactMatch || isStartsWithMatch;
-  logger.debug(`[ClientLayout Logic] showBottomNav for "${pathname}" evaluated to: ${showBottomNav}`);
   
   useEffect(() => {
-    if (pathname === "/profile" || pathname === "/repo-xml") {
-      setShowHeaderAndFooter(false);
-    } else {
-      setShowHeaderAndFooter(true);
-    }
+    if (pathname === "/profile" || pathname === "/repo-xml") setShowHeaderAndFooter(false);
+   else setShowHeaderAndFooter(true);
   }, [pathname]);
 
   const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p));
@@ -187,17 +170,11 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   return (
     <>
       {showHeaderAndFooter && <Header />}
-        <main className={cn(
-            'flex-1',
-            showBottomNav ? 'pb-20 sm:pb-0' : '',
-            !isTransparentPage && 'bg-background'
-        )}>
+        <main className={cn( 'flex-1', showBottomNav ? 'pb-20 sm:pb-0' : '', !isTransparentPage && 'bg-background' )}>
             {children}
         </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
-      <Suspense fallback={<div className="fixed bottom-16 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse sm:bottom-4" aria-hidden="true"></div>}>
-        <StickyChatButton />
-      </Suspense>
+      <Suspense fallback={null}><StickyChatButton /></Suspense>
       {showHeaderAndFooter && <Footer />}
     </>
   );
@@ -214,20 +191,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
               <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
           </ErrorBoundaryForOverlay>
-          <SonnerToaster
-            position="bottom-right"
-            richColors
-            toastOptions={{
-              style: {
-                background: "rgba(34, 34, 34, 0.9)",
-                color: "#00FF9D",
-                border: "1px solid rgba(0, 255, 157, 0.4)",
-                boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
-                fontFamily: "monospace",
-              },
-              className: 'text-sm',
-            }}
-          />
+          <SonnerToaster position="bottom-right" richColors toastOptions={{ style: { background: "rgba(34, 34, 34, 0.9)", color: "#00FF9D", border: "1px solid rgba(0, 255, 157, 0.4)", boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)", fontFamily: "monospace", }, className: 'text-sm' }} />
           <DevErrorOverlay />
         </TooltipProvider>
         <Analytics /> 
