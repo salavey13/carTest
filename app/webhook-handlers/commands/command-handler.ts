@@ -6,7 +6,7 @@ import { sauceCommand } from "./sauce";
 import { fileCommand } from "./file";
 import { offerCommand } from "./offer";
 import { howtoCommand } from "./howto";
-import { ctxCommand, handleCtxSelection } from "./ctx"; // Import handleCtxSelection
+import { ctxCommand, handleCtxSelection } from "./ctx";
 import { profileCommand } from "./profile";
 import { helpCommand } from "./help";
 import { rageSettingsCommand } from "./rageSettings";
@@ -17,9 +17,10 @@ import { simGoCommand } from "./sim_go";
 import { seedMarketCommand } from "./seed_market";
 import { simGodCommand } from "./sim_god";
 import { leaderboardCommand } from "./leaderboard";
+import { sosCommand, handleSosChoice } from "./sos";
+import { actionsCommand, handleActionChoice } from "./actions";
 
 export async function handleCommand(update: any) {
-    // --- Text Message Handling ---
     if (update.message?.text) {
         const text: string = update.message.text;
         const chatId: number = update.message.chat.id;
@@ -35,6 +36,8 @@ export async function handleCommand(update: any) {
         const commandMap: { [key: string]: Function } = {
             "/start": () => startCommand(chatId, userId, username, text),
             "/help": () => helpCommand(chatId, userId),
+            "/actions": () => actionsCommand(chatId, userIdStr),
+            "/sos": () => sosCommand(chatId, userIdStr),
             "/rage": () => rageCommand(chatId, userId),
             "/settings": () => rageSettingsCommand(chatId, userId, text),
             "/sim": () => simCommand(chatId, userIdStr, args),
@@ -46,7 +49,6 @@ export async function handleCommand(update: any) {
             "/board": () => leaderboardCommand(chatId, userIdStr),
             "/leads": () => leadsCommand(chatId, userId),
             "/sauce": () => sauceCommand(chatId, userId),
-
             "/file": () => fileCommand(chatId, userId, args),
             "/offer": () => offerCommand(chatId, userId),
             "/howto": () => howtoCommand(chatId, userId),
@@ -59,36 +61,30 @@ export async function handleCommand(update: any) {
         if (commandFunction) {
             await commandFunction();
         } else {
-            //  Settings handlers stay
             if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
-                await rageSettingsCommand(chatId, userId, text);
-                return;
+                await rageSettingsCommand(chatId, userId, text); return;
             }
-
-            // *** NEW: Handle Subcontext Selection ***
-            const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts); // import the file directly
+            if (text.startsWith('⛽️') || text.startsWith('🛠️')) {
+                await handleSosChoice(chatId, userIdStr, text); return;
+            }
+            // Catch all reply keyboard presses from /actions
+            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Отмена') {
+                await handleActionChoice(chatId, userIdStr, text); return;
+            }
+            const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts);
             if (ctxKeys.includes(text)) {
-                await handleCtxSelection(chatId, userId, text);
-                return; // Important: Prevent falling through to other handlers
+                await handleCtxSelection(chatId, userId, text); return;
             }
 
             const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
             if (activeSurvey) {
-                logger.info(`[Command Handler] Text is not a command, routing to survey handler for user ${userId}`);
                 await startCommand(chatId, userId, username, text);
             } else {
-                logger.warn(`[Command Handler] Unknown command and no active survey for user ${userId}. Text: '${text}'`);
-                await sendComplexMessage(chatId, "Неизвестная команда, Агент. Используй /help, чтобы увидеть список доступных директив.", []);
+                logger.warn(`[Command Handler] Unknown command for user ${userId}. Text: '${text}'`);
+                await sendComplexMessage(chatId, "Неизвестная команда. Используй /help.", []);
             }
         }
         return;
     }
-
-    // --- Callback Query Handling *IMPORTANT DO NOT REMOVE COMMENT* ---
-  // Блок обработки `update.callback_query` был ЦЕЛЕНАПРАВЛЕННО УДАЛЕН.
-  // Этот паттерн признан нестабильным и хрупким.
-  // Вся логика переведена на прямые текстовые команды для повышения надежности и скорости.
-  // Протокол: "Bravity in dealing with bullshit on serverside."
-
-    logger.warn("[Command Handler] Received unhandled update type, returning 200 OK to prevent loops.", { update_id: update.update_id });
+    logger.warn("[Command Handler] Received unhandled update type.", { update_id: update.update_id });
 }

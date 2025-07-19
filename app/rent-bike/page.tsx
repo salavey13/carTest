@@ -35,7 +35,7 @@ interface Vehicle {
   };
 }
 
-const YUAN_TO_STARS_RATE = 10;
+const RUB_TO_STARS_RATE = 1;
 
 export default function RentBikePage() {
   const router = useRouter();
@@ -108,27 +108,28 @@ export default function RentBikePage() {
     setInvoiceLoading(true);
     setError(null);
     try {
-      const totalPriceYuan = selectedBike.daily_price * rentDays;
-      const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE);
+      const totalPriceRub = selectedBike.daily_price * rentDays;
+      const totalPriceStars = Math.round(totalPriceRub * RUB_TO_STARS_RATE);
       const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars;
       
       const metadata = {
-        type: "car_rental", // Keep this for now to use existing webhook
+        type: "bike_rental", 
         car_id: selectedBike.id,
         car_make: selectedBike.make,
         car_model: selectedBike.model,
         days: rentDays,
-        price_yuan: totalPriceYuan,
+        price_rub: totalPriceRub,
         price_stars: finalPrice,
         is_subscriber: hasSubscription,
         image_url: selectedBike.image_url,
       };
       const invoiceId = `bike_rental_${selectedBike.id}_${tgUser.id}_${Date.now()}`;
-      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata.car_id, metadata);
+      
+      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata);
 
       const description = hasSubscription
-        ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка: 10%`
-        : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`;
+        ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceRub} ₽)\nСкидка: 10%`
+        : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceRub} ₽)`;
 
       const response = await sendTelegramInvoice(
         tgUser.id.toString(),
@@ -218,7 +219,7 @@ export default function RentBikePage() {
                   <Image src={bike.image_url} alt={bike.model} width={80} height={80} className="rounded-md object-cover aspect-square" />
                   <div>
                     <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
-                    <p className="text-sm text-brand-pink font-mono">{bike.daily_price}¥ / день</p>
+                    <p className="text-sm text-brand-pink font-mono">{bike.daily_price}₽ / день</p>
                     <p className="text-xs text-muted-foreground font-mono">Гараж: {bike.owner_id}</p>
                   </div>
                 </motion.div>
@@ -263,14 +264,18 @@ export default function RentBikePage() {
                         type="number"
                         min="1"
                         value={rentDays}
-                        onChange={e => setRentDays(Math.max(1, Number(e.target.value)))}
+                        onChange={e => {
+                          const value = Number(e.target.value);
+                          // Prevent NaN from being set. Fallback to 1 if input is invalid or less than 1.
+                          setRentDays(isNaN(value) || value < 1 ? 1 : value);
+                        }}
                         className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono text-center text-lg"
                       />
                     </div>
                     <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
                       <p className="text-2xl font-orbitron text-brand-yellow font-bold">
-                        {Math.round((selectedBike.daily_price * rentDays * YUAN_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
+                        {Math.round((selectedBike.daily_price * rentDays * RUB_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
                       </p>
                       {hasSubscription && <p className="text-xs text-brand-green">(Скидка 10% применена)</p>}
                     </div>
