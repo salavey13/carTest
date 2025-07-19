@@ -235,3 +235,34 @@ export async function getTopCrews() {
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
+export async function getAllPublicCrews() {
+    noStore();
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_public_crews');
+        
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        logger.error("Error fetching all crews via RPC:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getPublicCrewInfo(slug: string) {
+    noStore();
+    if (!slug) return { success: false, error: "Crew slug is required" };
+
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
+
+        if (error) throw error;
+        if (!data) return { success: false, error: "Crew not found" };
+
+        return { success: true, data };
+
+    } catch (error) {
+        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
