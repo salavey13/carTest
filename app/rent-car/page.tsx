@@ -1,4 +1,3 @@
-// /app/rent-car/page.tsx
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
@@ -204,7 +203,11 @@ export default function RentCar() {
                   type="number"
                   min="1"
                   value={rentDays}
-                  onChange={(e) => setRentDays(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    // Prevent NaN from being set. Fallback to 1 if input is invalid or less than 1.
+                    setRentDays(isNaN(value) || value < 1 ? 1 : value);
+                  }}
                   className="w-full p-3 mt-2 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono"
                 />
               </div>
@@ -279,4 +282,3 @@ export default function RentCar() {
     </div>
   );
 }
-
