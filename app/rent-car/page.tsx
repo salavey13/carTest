@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
-const YUAN_TO_STARS_RATE = 0.1;
+const RUB_TO_STARS_RATE = 1;
 const AUTO_INCREMENT_INTERVAL = 3000;
 const REENGAGE_DELAY = 2000;
 
@@ -89,8 +89,8 @@ export default function RentCar() {
     }
 
     try {
-      const totalPriceYuan = selectedCar.daily_price * rentDays;
-      const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE);
+      const totalPriceRub = selectedCar.daily_price * rentDays;
+      const totalPriceStars = Math.round(totalPriceRub * RUB_TO_STARS_RATE);
       const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars;
       const metadata = {
         type: "car_rental",
@@ -98,7 +98,7 @@ export default function RentCar() {
         car_make: selectedCar.make,
         car_model: selectedCar.model,
         days: rentDays,
-        price_yuan: totalPriceYuan,
+        price_rub: totalPriceRub,
         price_stars: finalPrice,
         is_subscriber: hasSubscription,
         original_price: totalPriceStars,
@@ -107,7 +107,7 @@ export default function RentCar() {
       };
       const invoiceId = `car_rental_${selectedCar.id}_${tgUser.id}_${Date.now()}`;
       await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata);
-      const description = hasSubscription ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка подписчика: 10%` : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`;
+      const description = hasSubscription ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceRub} ₽)\nСкидка подписчика: 10%` : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceRub} ₽)`;
       const response = await sendTelegramInvoice(tgUser.id.toString(), `Аренда ${selectedCar.make} ${selectedCar.model}`, description, invoiceId, finalPrice, undefined, selectedCar.image_url);
       if (!response.success) throw new Error(response.error || "Ошибка счёта");
       setSuccess(true);
@@ -179,7 +179,7 @@ export default function RentCar() {
                           className="mx-auto rounded-lg border border-muted shadow-[0_0_10px_rgba(255,107,107,0.3)]"
                         />
                         <p className="mt-4 font-mono text-lg text-foreground">{cars[carouselIndex].make} {cars[carouselIndex].model}</p>
-                        <p className="font-mono text-sm text-primary">{cars[carouselIndex].daily_price}¥/день</p>
+                        <p className="font-mono text-sm text-primary">{cars[carouselIndex].daily_price}₽/день</p>
                       </div>
                     )}
                   </motion.div>
@@ -231,13 +231,13 @@ export default function RentCar() {
                     </motion.div>
                     <div className="text-center space-y-3">
                       <p className="font-mono text-xl md:text-2xl text-foreground">{selectedCar.make} {selectedCar.model}</p>
-                      <p className="font-mono text-lg text-primary">{selectedCar.daily_price}¥/день</p>
+                      <p className="font-mono text-lg text-primary">{selectedCar.daily_price}₽/день</p>
                       <p className="font-mono text-xl md:text-2xl mt-4 text-muted-foreground">
-                        ИТОГО: {selectedCar.daily_price * rentDays}¥ (
+                        ИТОГО: {selectedCar.daily_price * rentDays}₽ (
                         {hasSubscription ? (
-                          <span className="text-accent">{Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE * 0.9)} XTR (10% скидка)</span>
+                          <span className="text-accent">{Math.round(selectedCar.daily_price * rentDays * RUB_TO_STARS_RATE * 0.9)} XTR (10% скидка)</span>
                         ) : (
-                          `${Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE)} XTR`
+                          `${Math.round(selectedCar.daily_price * rentDays * RUB_TO_STARS_RATE)} XTR`
                         )})
                       </p>
                     </div>

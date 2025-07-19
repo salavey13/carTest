@@ -136,7 +136,7 @@ export async function sendTelegramMessage(
     if (carId) {
       const { data: car, error } = await supabaseAdmin.from("cars").select("make, model, daily_price").eq("id", carId).single();
       if (error) logger.error(`Failed to fetch car ${carId} for message: ${error.message}`);
-      else if (car) finalMessage += `\n\nCar: ${car.make} ${car.model}\nDaily Price: ${car.daily_price} XTR`;
+      else if (car) finalMessage += `\n\nCar: ${car.make} ${car.model}\nDaily Price: ${car.daily_price} ₽`;
     }
     const payload: SendPayload = imageUrl ? { chat_id: finalChatId, photo: imageUrl, caption: finalMessage, parse_mode: "Markdown" } : { chat_id: finalChatId, text: finalMessage, parse_mode: "Markdown" };
     if (buttons.length > 0) payload.reply_markup = { inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))] };
