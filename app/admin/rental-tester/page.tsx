@@ -10,8 +10,6 @@ import { toast } from 'sonner';
 import { useAppContext } from "@/contexts/AppContext";
 import { Loading } from '@/components/Loading';
 import {
-  DEMO_OWNER_ID_CREW, 
-  DEMO_OWNER_ID_OTHER,
   setupTestScenario,
   cleanupTestData,
   getTestRentalState,
@@ -19,6 +17,9 @@ import {
 } from './actions';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 
+// Predefined User IDs (replace with actual IDs from your demo setup)
+export const DEMO_OWNER_ID_CREW = "413553377"; // Owner of the crew and 1 bike
+export const DEMO_OWNER_ID_OTHER = "341729406"; // Owner of other 4 bikes (no crew)
 
 type TestUser = { id: string; username: string };
 type TestRental = any;
