@@ -157,9 +157,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
   try {
     const { data: rental, error: rentalFetchError } = await supabaseAdmin.from('rentals').select('status').eq('rental_id', rentalId).single();
     if (rentalFetchError) {
-      logger.error(`[triggerTestAction] Could
-
-not fetch rental data before performing ${actionName}`, rentalFetchError);
+      logger.error(`[triggerTestAction] Could not fetch rental data before performing ${actionName}`, rentalFetchError);
       return { success: false, error: `Failed to fetch rental details before action: ${rentalFetchError.message}` };
     }
 
