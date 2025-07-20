@@ -24,7 +24,7 @@ interface Vehicle {
   specs?: { [key: string]: any; };
 }
 
-const YUAN_TO_STARS_RATE = 10;
+const RUB_TO_STARS_RATE = 1;
 
 const SpecItem = ({ icon, label, value }: { icon: string; label: string; value: string | number }) => (
     <div className="bg-muted/10 p-3 rounded-lg border border-border text-center">
@@ -92,8 +92,8 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
     setInvoiceLoading(true);
     setError(null);
     try {
-      const totalPriceYuan = vehicle.daily_price * rentDays;
-      const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE);
+      const totalPriceRub = vehicle.daily_price * rentDays;
+      const totalPriceStars = Math.round(totalPriceRub * RUB_TO_STARS_RATE);
       const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars;
       
       const metadata = {
@@ -102,7 +102,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
         car_make: vehicle.make,
         car_model: vehicle.model,
         days: rentDays,
-        price_yuan: totalPriceYuan,
+        price_rub: totalPriceRub,
         price_stars: finalPrice,
         is_subscriber: hasSubscription,
         image_url: vehicle.image_url,
@@ -111,8 +111,8 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
       await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata.car_id, metadata);
 
       const description = hasSubscription
-        ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)`
-        : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`;
+        ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceRub} ₽)`
+        : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceRub} ₽)`;
 
       const response = await sendTelegramInvoice(tgUser.id.toString(), `Аренда ${vehicle.make} ${vehicle.model}`, description, invoiceId, finalPrice, undefined, vehicle.image_url);
 
@@ -205,7 +205,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
                             <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center h-full flex flex-col justify-center">
                                 <p className="text-sm font-mono text-muted-foreground">ИТОГО</p>
                                 <p className="text-2xl font-orbitron text-brand-yellow font-bold">
-                                    {Math.round((vehicle.daily_price * rentDays * YUAN_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
+                                    {Math.round((vehicle.daily_price * rentDays * RUB_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
                                 </p>
                             </div>
                         </div>

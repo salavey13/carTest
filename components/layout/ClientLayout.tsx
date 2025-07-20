@@ -88,9 +88,8 @@ const DYNAMIC_ROUTE_PATTERNS: Record<string, [string, string?]> = {
 };
 
 const TRANSPARENT_LAYOUT_PAGES = [
-    '/rentals', // Make the new list page transparent too
+    '/rentals', 
     '/rent-bike',
-    '/rent-car',
     '/crews',
     '/paddock',
     '/leaderboard'
@@ -164,7 +163,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
    else setShowHeaderAndFooter(true);
   }, [pathname]);
 
-  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p));
+  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || pathname.startsWith('/rent/');
 
   return (
     <>
