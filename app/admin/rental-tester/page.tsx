@@ -1,3 +1,4 @@
+// /app/admin/rental-tester/page.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,12 +10,15 @@ import { toast } from 'sonner';
 import { useAppContext } from "@/contexts/AppContext";
 import { Loading } from '@/components/Loading';
 import {
+  DEMO_OWNER_ID_CREW, 
+  DEMO_OWNER_ID_OTHER,
   setupTestScenario,
   cleanupTestData,
   getTestRentalState,
   triggerTestAction
 } from './actions';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
+
 
 type TestUser = { id: string; username: string };
 type TestRental = any;

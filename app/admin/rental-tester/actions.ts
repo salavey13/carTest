@@ -1,3 +1,4 @@
+// /app/admin/rental-tester/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -8,8 +9,8 @@ import { handleWebhookUpdate } from '@/app/actions'; // Import the master handle
 import { v4 as uuidv4 } from 'uuid';
 
 // Predefined User IDs (replace with actual IDs from your demo setup)
-const DEMO_OWNER_ID_CREW = "413553377"; // Owner of the crew and 1 bike
-const DEMO_OWNER_ID_OTHER = "341729406"; // Owner of other 4 bikes (no crew)
+export const DEMO_OWNER_ID_CREW = "413553377"; // Owner of the crew and 1 bike
+export const DEMO_OWNER_ID_OTHER = "341729406"; // Owner of other 4 bikes (no crew)
 
 async function findDemoBike(): Promise<{ bikeId: string; } | null> {
     try {
