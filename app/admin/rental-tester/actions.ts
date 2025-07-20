@@ -134,23 +134,6 @@ export async function getTestRentalState(rentalId: string) {
   }
 }
 
-// Mock Telegram Payloads (adjust to match your expected structure)
-const MOCK_PRE_CHECKOUT_QUERY = {
-  id: "mock_pre_checkout_query_id",
-  from: { id: Number(DEMO_OWNER_ID_OTHER) },
-  currency: "XTR",
-  total_amount: 100,
-  invoice_payload: "test_invoice_123",
-};
-
-const MOCK_SUCCESSFUL_PAYMENT = {
-  currency: "XTR",
-  total_amount: 100,
-  invoice_payload: "test_invoice_123",
-  telegram_payment_charge_id: "tg_charge_123",
-  provider_payment_charge_id: "provider_charge_123",
-};
-
 export async function triggerTestAction(rentalId: string, actorId: string, actionName: string, payload: any) {
   noStore();
   logger.info(`[triggerTestAction] Triggering action "${actionName}" for rental ${rentalId} by ${actorId}`);
@@ -168,75 +151,71 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
       case 'addRentalPhoto': {
         const photoType = (rental?.status === 'pending_confirmation') ? 'start' : 'end';
         logger.info(`[triggerTestAction] addRentalPhoto called (type: ${photoType})`);
-
-        // Instead of modifying rentals table, we create a new event
         const { error: eventError } = await supabaseAdmin.from('events').insert({
           rental_id: rentalId,
           type: `photo_${photoType}`,
           created_by: actorId,
-          payload: { photo_url: 'https://example.com/mock-photo.jpg' } // Add the photo URL to the payload
+          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/my-bobber.jpg' }
         });
-
-        if (eventError) {
-          logger.error(`[triggerTestAction] Failed to insert photo event:`, eventError);
-          return { success: false, error: `Failed to insert photo event: ${eventError.message}` };
-        }
-
+        if (eventError) throw eventError;
         mockNotification = `Owner notified about new ${photoType} photo.`;
         result = { success: true };
         break;
       }
       case 'confirmVehiclePickup': {
         logger.info(`[triggerTestAction] confirmVehiclePickup called`);
-
-        // Instead of updating rentals table, we create a pickup_confirmed event
-        // The DB trigger on the events table will update the rental status to 'active'
         const { error: eventError } = await supabaseAdmin.from('events').insert({
-          rental_id: rentalId,
-          type: 'pickup_confirmed',
-          created_by: actorId,
+          rental_id: rentalId, type: 'pickup_confirmed', created_by: actorId,
         });
-
-        if (eventError) {
-          logger.error(`[triggerTestAction] Failed to insert pickup_confirmed event:`, eventError);
-          return { success: false, error: `Failed to insert pickup_confirmed event: ${eventError.message}` };
-        }
-
+        if (eventError) throw eventError;
         mockNotification = `Renter notified that pickup is confirmed and rental is active.`;
         result = { success: true };
         break;
       }
       case 'confirmVehicleReturn': {
         logger.info(`[triggerTestAction] confirmVehicleReturn called`);
-
-        // Instead of updating rentals table, we create a return_confirmed event
         const { error: eventError } = await supabaseAdmin.from('events').insert({
-          rental_id: rentalId,
-          type: 'return_confirmed',
-          created_by: actorId,
+          rental_id: rentalId, type: 'return_confirmed', created_by: actorId,
         });
-
-        if (eventError) {
-          logger.error(`[triggerTestAction] Failed to insert return_confirmed event:`, eventError);
-          return { success: false, error: `Failed to insert return_confirmed event: ${eventError.message}` };
-        }
-
+        if (eventError) throw eventError;
         mockNotification = `Renter notified that return is confirmed and rental is complete.`;
         result = { success: true };
         break;
       }
       case 'triggerSos':
         logger.info(`[triggerTestAction] triggerSos called`);
-        await supabaseAdmin.from('events').insert({ rental_id: rentalId, type: 'sos_fuel', created_by: actorId, status: 'pending' });
+        const { error: eventError } = await supabaseAdmin.from('events').insert({ rental_id: rentalId, type: 'sos_fuel', created_by: actorId, status: 'pending' });
+        if (eventError) throw eventError;
         mockNotification = `SOS Fuel event created. Crew and Owner have been notified.`;
         result = { success: true };
         break;
-
-      // NEW: Simulate Payment Success
       case 'simulatePaymentSuccess':
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
-        const mockPreCheckoutUpdate = { pre_checkout_query: MOCK_PRE_CHECKOUT_QUERY };
-        const mockPaymentUpdate = { message: { successful_payment: MOCK_SUCCESSFUL_PAYMENT, chat: { id: Number(actorId) } } }; // Mimic message structure
+        const invoice_payload = `test_invoice_${uuidv4()}`;
+        
+        // FIX: Create the invoice in the DB *before* simulating the webhook
+        const { error: invoiceError } = await supabaseAdmin.from('invoices').insert({
+          id: invoice_payload,
+          user_id: actorId,
+          amount: 100,
+          status: 'pending',
+          type: 'car_rental', // Ensure this matches a handler
+          subscription_id: 'dummy_sub_id', // Add required non-null field
+          metadata: { test_scenario: true, car_id: 'my-bobber' }
+        });
+
+        if (invoiceError) {
+          logger.error("[triggerTestAction] Failed to create mock invoice:", invoiceError);
+          throw new Error(`Failed to create mock invoice: ${invoiceError.message}`);
+        }
+        logger.info(`[triggerTestAction] Mock invoice ${invoice_payload} created.`);
+
+        const mockPreCheckoutUpdate = {
+          pre_checkout_query: { id: "mock_pre_checkout_query_id", from: { id: Number(actorId) }, currency: "XTR", total_amount: 100, invoice_payload }
+        };
+        const mockPaymentUpdate = {
+          message: { successful_payment: { currency: "XTR", total_amount: 100, invoice_payload }, chat: { id: Number(actorId) } }
+        };
 
         try {
           await handleWebhookUpdate(mockPreCheckoutUpdate);
@@ -271,7 +250,6 @@ export async function cleanupTestData(rentalId: string) {
   noStore();
   logger.info(`[cleanupTestData] Cleaning up test data for rental: ${rentalId}`);
   try {
-    // Delete the rental
     const { error: rentalDeleteError } = await supabaseAdmin.from('rentals').delete().eq('rental_id', rentalId);
     if (rentalDeleteError) {
       logger.error(`[cleanupTestData] Failed to delete rental ${rentalId}:`, rentalDeleteError);
