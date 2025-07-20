@@ -157,9 +157,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
   try {
     const { data: rental, error: rentalFetchError } = await supabaseAdmin.from('rentals').select('status').eq('rental_id', rentalId).single();
     if (rentalFetchError) {
-      logger.error(`[triggerTestAction] Could
-
-not fetch rental data before performing ${actionName}`, rentalFetchError);
+      logger.error(`[triggerTestAction] Could not fetch rental data before performing ${actionName}`, rentalFetchError);
       return { success: false, error: `Failed to fetch rental details before action: ${rentalFetchError.message}` };
     }
 
@@ -192,6 +190,7 @@ not fetch rental data before performing ${actionName}`, rentalFetchError);
         logger.info(`[triggerTestAction] confirmVehiclePickup called`);
 
         // Instead of updating rentals table, we create a pickup_confirmed event
+        // The DB trigger on the events table will update the rental status to 'active'
         const { error: eventError } = await supabaseAdmin.from('events').insert({
           rental_id: rentalId,
           type: 'pickup_confirmed',
@@ -201,13 +200,6 @@ not fetch rental data before performing ${actionName}`, rentalFetchError);
         if (eventError) {
           logger.error(`[triggerTestAction] Failed to insert pickup_confirmed event:`, eventError);
           return { success: false, error: `Failed to insert pickup_confirmed event: ${eventError.message}` };
-        }
-
-        //update rental state
-        const { error: updateError } = await supabaseAdmin.from('rentals').update({ status: 'active' }).eq('rental_id', rentalId);
-        if (updateError) {
-            logger.error(`[triggerTestAction] Failed to update rental status to active for sos_fuel_hustle:`, updateError);
-            return { success: false, error: `Failed to set rental to active: ${updateError.message}` };
         }
 
         mockNotification = `Renter notified that pickup is confirmed and rental is active.`;
@@ -243,9 +235,7 @@ not fetch rental data before performing ${actionName}`, rentalFetchError);
       // NEW: Simulate Payment Success
       case 'simulatePaymentSuccess':
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
-        const mockPreCheckoutUpdate = { pre_checkout_query: MOCK_PRE_CHECK
-
-OUT_QUERY };
+        const mockPreCheckoutUpdate = { pre_checkout_query: MOCK_PRE_CHECKOUT_QUERY };
         const mockPaymentUpdate = { message: { successful_payment: MOCK_SUCCESSFUL_PAYMENT, chat: { id: Number(actorId) } } }; // Mimic message structure
 
         try {
