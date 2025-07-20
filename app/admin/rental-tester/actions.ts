@@ -157,7 +157,9 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
   try {
     const { data: rental, error: rentalFetchError } = await supabaseAdmin.from('rentals').select('status').eq('rental_id', rentalId).single();
     if (rentalFetchError) {
-      logger.error(`[triggerTestAction] Could not fetch rental data before performing ${actionName}`, rentalFetchError);
+      logger.error(`[triggerTestAction] Could
+
+not fetch rental data before performing ${actionName}`, rentalFetchError);
       return { success: false, error: `Failed to fetch rental details before action: ${rentalFetchError.message}` };
     }
 
@@ -241,7 +243,9 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
       // NEW: Simulate Payment Success
       case 'simulatePaymentSuccess':
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
-        const mockPreCheckoutUpdate = { pre_checkout_query: MOCK_PRE_CHECKOUT_QUERY };
+        const mockPreCheckoutUpdate = { pre_checkout_query: MOCK_PRE_CHECK
+
+OUT_QUERY };
         const mockPaymentUpdate = { message: { successful_payment: MOCK_SUCCESSFUL_PAYMENT, chat: { id: Number(actorId) } } }; // Mimic message structure
 
         try {
