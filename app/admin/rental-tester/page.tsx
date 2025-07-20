@@ -1,4 +1,3 @@
-// /app/admin/rental-tester/page.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -16,6 +15,7 @@ import {
   triggerTestAction
 } from './actions';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
+import { cn } from '@/lib/utils';
 
 // Predefined User IDs (replace with actual IDs from your demo setup)
 export const DEMO_OWNER_ID_CREW = "413553377"; // Owner of the crew and 1 bike
@@ -24,7 +24,6 @@ export const DEMO_OWNER_ID_OTHER = "341729406"; // Owner of other 4 bikes (no cr
 type TestUser = { id: string; username: string };
 type TestRental = any;
 type TestEvent = any;
-type UserRole = 'renter' | 'owner';
 
 const SCENARIOS = [
   {
@@ -161,7 +160,11 @@ export default function RentalTesterPage() {
   };
 
   if (isAppLoading) return <Loading />;
-  if (!isAdmin) return <div className="text-center p-8 text-destructive">ДОСТУП ЗАПРЕЩЕН</div>;
+  
+  const isUserReallyAdmin = isAdmin();
+  if (!isUserReallyAdmin) {
+      return <div className="text-center p-8 text-destructive">ДОСТУП ЗАПРЕЩЕН</div>;
+  }
 
   const getAvailableActions = () => {
     if (!rental) return [];

@@ -61,3 +61,5 @@ This tutorial explains how to effectively use the rental test page (\`/app/admin
 
       // ... existing code ...
     }
+\`\`\`
+`;
