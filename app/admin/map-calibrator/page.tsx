@@ -1,13 +1,14 @@
+// /app/admin/map-calibrator/page.tsx
 "use client";
 
 import { VibeMapCalibrator } from "@/components/VibeMapCalibrator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const INITIAL_MAP_BOUNDS = {
-  top: 56.42231338799844,
-  bottom: 56.56.123051835133,
-  left: 43.35436684660189,
-  right: 44.43547740802101,
+  top:    56.422313387,
+  bottom: 56.123051835,
+  left:  43.354366846,
+  right: 44.435477408,
 };
 
 export default function MapCalibratorPage() {
