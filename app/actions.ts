@@ -753,7 +753,7 @@ export async function saveMapPreset(
     try {
         // Simple admin check
         const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
-        if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) {
+        if (userError || !['admin'].includes(user?.role || '')) {
             throw new Error("Unauthorized: Only admins can save map presets.");
         }
         
