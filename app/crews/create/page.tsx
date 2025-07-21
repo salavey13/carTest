@@ -13,13 +13,24 @@ import { Label } from "@/components/ui/label";
 import { Loading } from "@/components/Loading";
 import Image from "next/image";
 
+const generateSlug = (name: string) =>
+  name
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-') // Заменяем пробелы и подчеркивания на дефис
+    .replace(/[^\w-]+/g, '') // Удаляем все не-буквенно-цифровые символы, кроме дефисов
+    .replace(/--+/g, '-') // Заменяем несколько дефисов на один
+    .replace(/^-+|-+$/g, ''); // Удаляем дефисы в начале и конце
+
 export default function CreateCrewPage() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const router = useRouter();
 
   const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [hqLocation, setHqLocation] = useState("56.3269,44.0059"); // Default HQ location
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -28,11 +39,20 @@ export default function CreateCrewPage() {
       router.push("/admin");
     }
   }, [appContextLoading, isAdmin, router]);
+  
+  // Auto-generate slug from name
+  useEffect(() => {
+    setSlug(generateSlug(name));
+  }, [name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!dbUser?.user_id) {
       toast.error("Ошибка: не удалось определить ID пользователя.");
+      return;
+    }
+    if (!slug) {
+      toast.error("Slug не может быть пустым. Введите название экипажа.");
       return;
     }
     setIsSubmitting(true);
@@ -41,9 +61,11 @@ export default function CreateCrewPage() {
     try {
       const result = await createCrew({
         name,
+        slug,
         description,
         logo_url: logoUrl,
         owner_id: dbUser.user_id,
+        hq_location: hqLocation,
       });
 
       if (result.success && result.data) {
@@ -86,9 +108,15 @@ export default function CreateCrewPage() {
             <p className="text-muted-foreground font-mono mt-2">Собери свою команду и начни доминировать на улицах.</p>
           </div>
           
-          <div>
-            <Label htmlFor="crew-name" className="text-brand-green font-mono">НАЗВАНИЕ ЭКИПАЖА</Label>
-            <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Night Runners" required className="input-cyber mt-1" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div>
+               <Label htmlFor="crew-name" className="text-brand-green font-mono">НАЗВАНИЕ ЭКИПАЖА</Label>
+               <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Night Runners" required className="input-cyber mt-1" />
+             </div>
+             <div>
+               <Label htmlFor="crew-slug" className="text-brand-green font-mono">SLUG (АДРЕС)</Label>
+               <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="night-runners" required className="input-cyber mt-1" />
+             </div>
           </div>
           
           <div>
@@ -96,9 +124,15 @@ export default function CreateCrewPage() {
             <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Мы — тени, что скользят по ночному городу..." required className="textarea-cyber mt-1" />
           </div>
 
-          <div>
-            <Label htmlFor="crew-logo" className="text-brand-green font-mono">URL ЛОГОТИПА</Label>
-            <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="input-cyber mt-1" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="crew-logo" className="text-brand-green font-mono">URL ЛОГОТИПА</Label>
+              <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="input-cyber mt-1" />
+            </div>
+            <div>
+              <Label htmlFor="crew-hq" className="text-brand-green font-mono">КООРДИНАТЫ ШТАБА</Label>
+              <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="input-cyber mt-1" />
+            </div>
           </div>
           
           <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
