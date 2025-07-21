@@ -1,3 +1,4 @@
+// /app/actions.ts
 "use server"; 
 
 import {
@@ -65,6 +66,59 @@ type SendPhotoPayload = SendPayloadBase & { photo: string; caption: string; pars
 type SendPayload = SendTextPayload | SendPhotoPayload;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// The interface for creating a crew
+interface CreateCrewArgs {
+  name: string;
+  description: string;
+  logo_url: string;
+  owner_id: string;
+  slug: string;
+  hq_location: string;
+}
+
+export async function createCrew({ name, description, logo_url, owner_id, slug, hq_location }: CreateCrewArgs): Promise<{
+  success: boolean;
+  data?: Database['public']['Tables']['crews']['Row'];
+  error?: string;
+}> {
+  try {
+    if (!name || !slug) {
+      throw new Error("Название и slug экипажа обязательны.");
+    }
+    
+    // Check if slug is unique
+    const { data: existingCrew, error: slugError } = await supabaseAdmin
+      .from('crews')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (slugError) throw slugError;
+    if (existingCrew) throw new Error(`Экипаж с таким slug (${slug}) уже существует.`);
+
+    const { data, error } = await supabaseAdmin
+      .from("crews")
+      .insert([{
+        name,
+        description,
+        logo_url,
+        owner_id,
+        slug,
+        hq_location,
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return { success: true, data: data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
+    logger.error("[createCrew Action] Error:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
 
 async function pollCozeChat(conversationId: string, chatId: string, apiKey: string | undefined, maxAttempts = 15, pollInterval = 2000) {
     if (!apiKey) throw new Error("Coze API Key not configured");
@@ -632,40 +686,6 @@ export async function updateUserSettings(userId: string, partialSettingsToUpdate
     logger.error(`Exception in updateUserSettings for ${userId}:`, e);
     return { success: false, error: errorMsg };
   }
-}
-
-export async function createCrew(crewData: { name: string; description: string; logo_url: string; owner_id: string; }) {
-    if (!supabaseAdmin) {
-        return { success: false, error: "Admin client is not available." };
-    }
-    try {
-        const slug = crewData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        const { data, error } = await supabaseAdmin
-            .from('crews')
-            .insert({
-                name: crewData.name,
-                description: crewData.description,
-                logo_url: crewData.logo_url,
-                owner_id: crewData.owner_id,
-                slug: slug,
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-        
-        // Also add the owner as the first member of the crew
-        await supabaseAdmin.from('crew_members').insert({
-            crew_id: data.id,
-            user_id: crewData.owner_id,
-            role: 'owner'
-        });
-
-        return { success: true, data };
-    } catch (error) {
-        logger.error("Error creating crew:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
 }
 
 export async function getUserPaddockData(userId: string) {
