@@ -11,18 +11,18 @@ import { v4 as uuidv4 } from 'uuid';
 const DEMO_OWNER_ID_CREW = "413553377"; // Owner of the crew and 1 bike
 const DEMO_OWNER_ID_OTHER = "341729406"; // Owner of other 4 bikes (no crew)
 
-async function findDemoBike(): Promise<{ bikeId: string; } | null> {
+async function findDemoBike(): Promise<{ id: string; make: string; model: string; image_url: string; } | null> {
   try {
-    const { data: bikes, error } = await supabaseAdmin.from('cars').select('id').eq('type', 'bike').limit(1).single();
+    const { data: bike, error } = await supabaseAdmin.from('cars').select('id, make, model, image_url').eq('type', 'bike').limit(1).single();
     if (error) {
       logger.error(`[findDemoBike] Error fetching bike:`, error);
       return null;
     }
-    if (!bikes || !bikes.id) {
+    if (!bike) {
       logger.warn(`[findDemoBike] No demo bikes found. Check your demo setup!`);
       return null;
     }
-    return { bikeId: bikes.id };
+    return bike;
   } catch (error) {
     logger.error(`[findDemoBike] Exception finding bikes:`, error);
     return null;
@@ -62,12 +62,12 @@ export async function setupTestScenario(scenario: string) {
   logger.info(`[setupTestScenario] Setting up scenario: ${scenario}`);
   try {
     const demoBikeResult = await findDemoBike();
-    if (!demoBikeResult || !demoBikeResult.bikeId) {
+    if (!demoBikeResult || !demoBikeResult.id) {
       logger.error("[setupTestScenario] No demo bike found.  Scenario setup aborted.");
       return { success: false, error: "No demo bike found in the database. Check your demo setup." };
     }
 
-    const { bikeId } = demoBikeResult;
+    const { id: bikeId } = demoBikeResult;
 
     // Create the initial rental record
     const renterId = DEMO_OWNER_ID_OTHER;
@@ -103,7 +103,6 @@ export async function setupTestScenario(scenario: string) {
         renter: { id: renterId, username: renterId }, // Using IDs for demonstration
         owner: { id: ownerId, username: ownerId },     // Using IDs for demonstration
         rental: { rental_id: rentalId },
-
         events: events || []
       }
     };
@@ -156,7 +155,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
           rental_id: rentalId,
           type: `photo_${photoType}`,
           created_by: actorId,
-          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ural-bobber.jpg' }
+          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/my-bobber.jpg' }
         });
         if (eventError) throw eventError;
         mockNotification = `Owner notified about new ${photoType} photo.`;
@@ -191,19 +190,26 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
         result = { success: true };
         break;
       case 'simulatePaymentSuccess':
-
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
         const invoice_payload = `test_invoice_${uuidv4()}`;
+        const demoBike = await findDemoBike(); // Fetch demo bike info
         
-        // FIX: Create the invoice in the DB *before* simulating the webhook
+        const metadata = {
+            test_scenario: true,
+            car_id: demoBike?.id || 'unknown_bike',
+            car_make: demoBike?.make || 'Unknown Make',
+            car_model: demoBike?.model || 'Unknown Model',
+            image_url: demoBike?.image_url || '',
+        };
+
         const { error: invoiceError } = await supabaseAdmin.from('invoices').insert({
           id: invoice_payload,
           user_id: actorId,
           amount: 100,
           status: 'pending',
-          type: 'car_rental', // Ensure this matches a handler
-          subscription_id: 'dummy_sub_id', // Add required non-null field
-          metadata: { test_scenario: true, car_id: 'ural-bobber' }
+          type: 'car_rental',
+          subscription_id: 'dummy_sub_id', 
+          metadata: metadata
         });
 
         if (invoiceError) {
