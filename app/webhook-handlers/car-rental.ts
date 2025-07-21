@@ -65,11 +65,11 @@ export const carRentalHandler: WebhookHandler = {
     const carModel = escapeMarkdown(metadata.car_model);
     const username = escapeMarkdown(userData.username || userId);
 
-    const renterMessage = `✅ Ваш интерес к аренде ${vehicleTypeString} *${carMake} ${carModel}* зафиксирован! Владелец уведомлен\\.\n\nНажмите кнопку ниже, чтобы открыть сделку\\.`;
+    const renterMessage = `✅ Ваш интерес к аренде ${vehicleTypeString} *${carMake} ${carModel}* зафиксирован! Владелец уведомлен.\n\nНажмите кнопку ниже, чтобы открыть сделку.`;
     await sendTelegramMessage(renterMessage, [{ text: "Управлять Арендой", url: rentalManagementUrl }], metadata.image_url, userId);
 
     if (vehicle.owner_id) {
-        const ownerMessage = `🔥 Новый запрос на аренду!\\n\\nПользователь @${username} оплатил интерес к вашему ${vehicleTypeString} *${carMake} ${carModel}*\\.\\n\\nНажмите кнопку, чтобы открыть детали сделки\\.`;
+        const ownerMessage = `🔥 Новый запрос на аренду!\\n\\nПользователь @${username} оплатил интерес к вашему ${vehicleTypeString} *${carMake} ${carModel}*.\\n\\nНажмите кнопку, чтобы открыть детали сделки.`;
         await sendTelegramMessage(ownerMessage, [{ text: "К Деталям Сделки", url: rentalManagementUrl }], metadata.image_url, vehicle.owner_id);
     }
     const adminMessage = `🔔 Зафиксирован интерес к аренде: \n- *Транспорт:* ${carMake} ${carModel}\n- *Арендатор:* @${username}\n- *Владелец:* ${vehicle.owner_id}\n- *Сумма интереса:* ${totalAmount} XTR`;
