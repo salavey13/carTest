@@ -10,6 +10,7 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { VibeMap, MapPoint } from '@/components/VibeMap';
 
 // Define a comprehensive type for the crew details
 type CrewDetails = {
@@ -19,6 +20,7 @@ type CrewDetails = {
     description: string;
     logo_url: string;
     created_at: string;
+    hq_location?: string;
     owner: { user_id: string; username: string };
     members: { user_id: string; username: string; avatar_url: string; role: string }[];
     vehicles: { id: string; make: string; model: string; image_url: string }[];
@@ -59,6 +61,14 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const hasVehicles = crew.vehicles && crew.vehicles.length > 0;
     const hasMembers = crew.members && crew.members.length > 0;
 
+    const hqPoint: MapPoint | null = crew.hq_location ? {
+        id: crew.id,
+        name: `${crew.name} HQ`,
+        coordinates: crew.hq_location.split(',').map(Number) as [number, number],
+        icon: '::FaSkullCrossbones::',
+        color: 'bg-brand-pink'
+    } : null;
+
     return (
         <>
             <RockstarHeroSection
@@ -78,29 +88,36 @@ function CrewDetailContent({ slug }: { slug: string }) {
             >
                 {/* Left Column: Manifesto */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-dark-card/70 border border-border p-6 rounded-xl sticky top-24">
-                         <h2 className="text-2xl font-orbitron text-brand-pink mb-4">Манифест</h2>
+                    <div className="bg-card/70 backdrop-blur-sm border border-border p-6 rounded-xl sticky top-24">
+                        <h2 className="text-2xl font-orbitron text-brand-pink mb-4">Манифест</h2>
                         <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Logo`} width={96} height={96} className="rounded-full mx-auto mb-4 border-2 border-brand-pink shadow-lg shadow-brand-pink/30" />
                         <h3 className="text-3xl font-orbitron text-center text-brand-green">{crew.name}</h3>
                         <p className="text-sm text-muted-foreground font-mono mt-3 text-center">{crew.description}</p>
-                         <div className="mt-4 border-t border-border/50 pt-3 text-center">
+                        <div className="mt-4 border-t border-border/50 pt-3 text-center">
                             <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
                             <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>
                         </div>
+                        {hqPoint && (
+                            <div className="mt-4 border-t border-border/50 pt-3">
+                                <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4>
+                                <VibeMap points={[hqPoint]} zoom={1.5} center={hqPoint.coordinates} className="h-48"/>
+                                <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Right Column: Assets */}
                 <div className="lg:col-span-2">
                      <Tabs defaultValue="garage" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-dark-card/50">
+                        <TabsList className="grid w-full grid-cols-2 bg-card/50">
                             <TabsTrigger value="garage">Гараж ({crew.vehicles?.length || 0})</TabsTrigger>
                             <TabsTrigger value="roster">Состав ({crew.members?.length || 0})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="garage" className="mt-6">
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {hasVehicles ? crew.vehicles.map((vehicle) => (
-                                    <Link href={`/rent/${vehicle.id}`} key={vehicle.id} className="bg-dark-card/50 p-4 rounded-lg hover:bg-dark-card transition-colors group">
+                                    <Link href={`/rent/${vehicle.id}`} key={vehicle.id} className="bg-card/50 p-4 rounded-lg hover:bg-card transition-colors group">
                                         <div className="relative w-full h-40 rounded-md mb-3 overflow-hidden">
                                             <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover group-hover:scale-105 transition-transform duration-300"/>
                                         </div>
@@ -112,7 +129,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                         <TabsContent value="roster" className="mt-6">
                             <div className="space-y-3">
                                 {hasMembers ? crew.members.map((member) => (
-                                    <div key={member.user_id} className="flex items-center gap-4 bg-dark-card/50 p-3 rounded-lg border border-border">
+                                    <div key={member.user_id} className="flex items-center gap-4 bg-card/50 p-3 rounded-lg border border-border">
                                         <Image src={member.avatar_url || '/placeholder.svg'} alt={member.username || member.user_id} width={48} height={48} className="rounded-full" />
                                         <div className="flex-grow">
                                             <span className="font-mono font-semibold">@{member.username}</span>

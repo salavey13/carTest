@@ -3,9 +3,10 @@
 import { getAllPublicCrews } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
+import { VibeMap, MapPoint } from '@/components/VibeMap';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useMemo } from 'react';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { motion } from 'framer-motion';
 
@@ -18,18 +19,19 @@ type Crew = {
     owner_username: string;
     member_count: number;
     vehicle_count: number;
+    hq_location?: string;
     // Augmented on client
     avg_fleet_value?: number;
     influence?: number;
     mission_success_rate?: number;
 };
 
-const MetricItem = ({ icon, value, label, valueClass = '' }: { icon: string; value: string | number; label:string; valueClass?: string; }) => (
-    <div className='text-center'>
-        <VibeContentRenderer content={icon} className="mb-1 mx-auto text-lg" />
+const MetricItem = ({ icon, value, label }: { icon: string; value: string | number; label:string; }) => (
+    <div className='text-center p-2 rounded-lg bg-black/20'>
+        <VibeContentRenderer content={icon} className="mb-1 mx-auto text-xl text-brand-cyan" />
         <p className="font-mono text-xs">
-            <strong className={`block text-xl font-orbitron text-foreground ${valueClass}`}>{value}</strong>
-            <span className="text-muted-foreground">{label}</span>
+            <strong className={`block text-2xl font-orbitron text-foreground`}>{value}</strong>
+            <span className="text-muted-foreground uppercase tracking-wider">{label}</span>
         </p>
     </div>
 );
@@ -38,13 +40,13 @@ function CrewsList() {
     const [crews, setCrews] = useState<Crew[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [highlightedCrewId, setHighlightedCrewId] = useState<string | null>(null);
 
     useEffect(() => {
         async function loadCrews() {
             try {
                 const result = await getAllPublicCrews();
                 if (result.success && result.data) {
-                    // Augment data with fake metrics for UI purposes
                     const augmentedCrews = result.data.map(crew => ({
                         ...crew,
                         avg_fleet_value: crew.vehicle_count > 0 ? Math.floor(Math.random() * 45000 + 20000) : 0,
@@ -63,6 +65,22 @@ function CrewsList() {
         }
         loadCrews();
     }, []);
+    
+    const mapPoints: MapPoint[] = useMemo(() =>
+        crews
+            .filter(crew => crew.hq_location)
+            .map(crew => {
+                const [lat, lon] = crew.hq_location!.split(',').map(Number);
+                return {
+                    id: crew.id,
+                    name: crew.name,
+                    coordinates: [lat, lon],
+                    icon: '::FaSkullCrossbones::',
+                    color: 'bg-brand-pink'
+                };
+            })
+    , [crews]);
+
 
     if (loading) {
         return <Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />;
@@ -79,37 +97,40 @@ function CrewsList() {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {crews.map((crew, index) => (
-                <Link href={`/crews/${crew.slug}`} key={crew.id} className="block group">
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="bg-card/80 backdrop-blur-sm border border-border p-5 rounded-xl h-full flex flex-col transition-all duration-300 hover:border-brand-lime hover:shadow-2xl hover:shadow-lime-glow transform hover:-translate-y-1 relative overflow-hidden"
-                    >
-                        <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Background`} fill className="absolute inset-0 object-cover opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-300 blur-sm scale-125" />
-                        <div className="relative z-10 flex flex-col h-full">
-                            <div className="flex items-start gap-4 mb-4">
-                                <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Logo`} width={64} height={64} className="rounded-full bg-black/50 border-2 border-border group-hover:border-brand-lime transition-colors flex-shrink-0 shadow-lg" />
-                                <div className="flex-grow">
-                                    <h2 className="text-2xl font-orbitron text-brand-lime group-hover:text-shadow-brand-lime">{crew.name}</h2>
-                                    <p className="text-xs text-muted-foreground font-mono">by @{crew.owner_username}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="lg:h-[80vh] lg:overflow-y-auto simple-scrollbar pr-4 space-y-6">
+                 {crews.map((crew, index) => (
+                    <Link href={`/crews/${crew.slug}`} key={crew.id} className="block group" onMouseEnter={() => setHighlightedCrewId(crew.id)} onMouseLeave={() => setHighlightedCrewId(null)}>
+                        <motion.div 
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="bg-card/80 backdrop-blur-sm border border-border p-5 rounded-xl h-full flex flex-col transition-all duration-300 hover:border-brand-lime hover:shadow-2xl hover:shadow-lime-glow transform hover:-translate-y-1 relative overflow-hidden"
+                        >
+                            <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Background`} fill className="absolute inset-0 object-cover opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-300 blur-sm scale-125" />
+                            <div className="relative z-10 flex flex-col h-full">
+                                <div className="flex items-start gap-4 mb-4">
+                                    <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Logo`} width={64} height={64} className="rounded-full bg-black/50 border-2 border-border group-hover:border-brand-lime transition-colors flex-shrink-0 shadow-lg" />
+                                    <div className="flex-grow">
+                                        <h2 className="text-2xl font-orbitron text-brand-lime group-hover:text-shadow-brand-lime">{crew.name}</h2>
+                                        <p className="text-xs text-muted-foreground font-mono">by @{crew.owner_username}</p>
+                                    </div>
+                                </div>
+                                <p className="text-neutral-300 dark:text-neutral-400 font-sans text-sm mt-2 flex-grow min-h-[50px]">{crew.description}</p>
+                                
+                                <div className="grid grid-cols-3 gap-2 mt-4 border-t border-border/50 pt-4">
+                                   <MetricItem icon="::FaUsers::" value={crew.member_count} label="Участников" />
+                                   <MetricItem icon="::FaWarehouse::" value={crew.vehicle_count} label="Единиц" />
+                                   <MetricItem icon="::FaBullseye::" value={`${crew.mission_success_rate ?? 0}%`} label="Успех" />
                                 </div>
                             </div>
-                            <p className="text-neutral-300 dark:text-neutral-400 font-sans text-sm mt-2 flex-grow min-h-[50px]">{crew.description}</p>
-                            
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-4 border-t border-border/50 pt-4">
-                               <MetricItem icon="::FaUsers className='text-brand-cyan'::" value={crew.member_count} label="Участников" />
-                               <MetricItem icon="::FaWarehouse className='text-brand-orange'::" value={crew.vehicle_count} label="Единиц" />
-                               <MetricItem icon="::FaCoins className='text-brand-yellow'::" value={`${crew.avg_fleet_value?.toLocaleString() ?? 0}`} label="Сред. стоимость" />
-                               <MetricItem icon="::FaSkullCrossbones className='text-brand-pink'::" value={crew.influence ?? 0} label="Влияние" />
-                               <MetricItem icon="::FaBullseye className='text-brand-green'::" value={`${crew.mission_success_rate ?? 0}%`} label="Успех миссий" />
-                            </div>
-                        </div>
-                    </motion.div>
-                </Link>
-            ))}
+                        </motion.div>
+                    </Link>
+                ))}
+            </div>
+            <div className="lg:sticky lg:top-24 h-[60vh] lg:h-auto">
+                <VibeMap points={mapPoints} highlightedPointId={highlightedCrewId} />
+            </div>
         </div>
     );
 }
@@ -124,7 +145,7 @@ export default function CrewsPage() {
                 triggerElementSelector={`#${heroTriggerId}`}
             />
             <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
-            <div className="container mx-auto max-w-6xl px-4 py-12 relative z-20">
+            <div className="container mx-auto max-w-7xl px-4 py-12 relative z-20">
                  <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />}>
                     <CrewsList />
                 </Suspense>
