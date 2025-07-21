@@ -1,4 +1,5 @@
-"use client";
+// /app/crews/page.tsx
+'use client';
 
 import { getAllPublicCrews, getMapPresets } from '@/app/actions';
 import { Loading } from '@/components/Loading';
@@ -18,7 +19,7 @@ const FALLBACK_MAP: MapPreset = {
     id: 'fallback-map',
     name: 'Стандартная Карта',
     map_image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
-    bounds: { top: 56.42231338799844, bottom: 56.56.123051835133, left: 43.35436684660189, right: 44.43547740802101 } as MapBounds,
+    bounds: { top: 56.422313387, bottom: 56.123051835, left: 43.354366846, right: 44.435477408 } as MapBounds,
     is_default: true,
     created_at: new Date().toISOString(),
     owner_id: null,
