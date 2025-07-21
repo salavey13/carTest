@@ -62,3 +62,12 @@ export function formatTime(dateInput: Date | string | number, locale: string = '
         return "Error";
     }
 }
+
+// New helper function to escape characters for Telegram's MarkdownV2 parser
+export const escapeMarkdown = (text: string | null | undefined): string => {
+  if (text === null || typeof text === 'undefined') {
+    return '';
+  }
+  const toEscape = '_*[]()~`>#+-=|{}.!';
+  return String(text).replace(new RegExp(`[${toEscape.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}]`, 'g'), '\\$&');
+};

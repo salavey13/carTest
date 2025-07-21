@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { getBaseUrl } from "@/lib/utils";
+import { getBaseUrl, escapeMarkdown } from "@/lib/utils";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -41,6 +41,14 @@ export async function POST(request: NextRequest) {
         let action_link_slug = 'view';
         let action_button_text = '🚨 К Событию';
         let doNotNotifyCreator = true;
+        
+        // Sanitize all inputs before using them in Markdown
+        const renterUsername = escapeMarkdown(renter?.username || created_by);
+        const ownerUsername = escapeMarkdown(owner?.username || owner_id);
+        const vehicleMake = escapeMarkdown(vehicle?.make);
+        const vehicleModel = escapeMarkdown(vehicle?.model);
+        const vehicleFullName = `${vehicleMake} ${vehicleModel}`;
+        const xtrAmount = escapeMarkdown(String(payload?.xtr_amount) || 'N/A');
 
         switch(event_type) {
             case 'sos_fuel':
@@ -49,7 +57,7 @@ export async function POST(request: NextRequest) {
                 const isFuel = event_type === 'sos_fuel';
                 const title = isFuel ? '⛽️ *SOS: Запрос Топлива* ⛽️' : event_type === 'sos_evac' ? '🛠️ *SOS: Запрос Эвакуации* 🛠️' : '棄 *Hustle: Перехват* 棄';
                 const verb = isFuel ? 'запрашивает дозаправку' : event_type === 'sos_evac' ? 'возникла проблема с' : 'оставил';
-                notification_text = `${title}\n\nАрендатор @${renter?.username || created_by} ${verb} ${vehicle?.make} ${vehicle?.model}.\n\nНаграда: *${payload?.xtr_amount || 'N/A'} XTR*`;
+                notification_text = `${title}\n\nАрендатор @${renterUsername} ${verb} ${vehicleFullName}\\.\n\nНаграда: *${xtrAmount} XTR*`;
                 recipient_ids.add(owner_id);
 
                 if (vehicle?.crew_id) {
@@ -65,20 +73,33 @@ export async function POST(request: NextRequest) {
                 break;
             
             case 'photo_start':
-                 notification_text = `📸 Арендатор @${renter?.username || created_by} добавил фото "ДО" для ${vehicle?.make} ${vehicle?.model}. Необходимо ваше подтверждение.`;
+                 notification_text = `📸 Арендатор @${renterUsername} добавил фото "ДО" для ${vehicleFullName}\\. Необходимо ваше подтверждение\\.`;
                  recipient_ids.add(owner_id);
                  action_link_slug = 'confirm-pickup';
                  action_button_text = "✅ Подтвердить получение";
                 break;
             
+            case 'photo_end':
+                notification_text = `📸 Арендатор @${renterUsername} добавил фото "ПОСЛЕ" для ${vehicleFullName}\\. Необходимо подтвердить возврат\\.`;
+                recipient_ids.add(owner_id);
+                action_link_slug = 'confirm-return';
+                action_button_text = "✅ Подтвердить возврат";
+               break;
+
             case 'pickup_confirmed':
-                notification_text = `✅ Владелец @${owner?.username || owner_id} подтвердил получение ${vehicle?.make} ${vehicle?.model}. Ваша аренда *активна*. Приятной поездки!`;
+                notification_text = `✅ Владелец @${ownerUsername} подтвердил получение ${vehicleFullName}\\. Ваша аренда *активна*\\. Приятной поездки!`;
                 recipient_ids.add(rentalContext.user_id);
                 action_link_slug = 'view';
                 action_button_text = 'К Управлению Арендой';
                 break;
+            
+            case 'return_confirmed':
+                notification_text = `🏁 Владелец @${ownerUsername} подтвердил возврат ${vehicleFullName}\\. Аренда *завершена*\\. Спасибо за использование сервиса!`;
+                recipient_ids.add(rentalContext.user_id);
+                action_link_slug = 'review';
+                action_button_text = '⭐️ Оставить отзыв';
+                break;
 
-            // Add more cases for other event types like 'photo_end', 'pickup_confirmed' etc.
             default:
                 logger.warn(`[Notify API] No handler for event type: ${event_type}`);
                 return NextResponse.json({ ok: true, message: "No handler for event type" });
@@ -87,7 +108,7 @@ export async function POST(request: NextRequest) {
         const deep_link_url = `${getBaseUrl()}/app?startapp=rental_${action_link_slug}_${rental_id}`;
 
         for (const recipientId of Array.from(recipient_ids)) {
-             if (doNotNotifyCreator && recipientId === created_by) continue; // Don't notify the person who created the event
+             if (doNotNotifyCreator && recipientId === created_by) continue; 
             await sendComplexMessage(
                 recipientId,
                 notification_text,

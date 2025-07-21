@@ -1,6 +1,7 @@
 import { WebhookHandler } from "./types";
 import { sendTelegramMessage } from "../actions";
 import { supabaseAdmin } from "@/hooks/supabase";
+import { escapeMarkdown } from "@/lib/utils";
 
 export const carRentalHandler: WebhookHandler = {
   canHandle: (invoice) => ["car_rental", "drop_anywhere"].includes(invoice.type as string),
@@ -58,15 +59,20 @@ export const carRentalHandler: WebhookHandler = {
 
     const rentalManagementUrl = `${telegramBotLink}?startapp=rental_view_${rental.rental_id}`;
     const vehicleTypeString = vehicle.type === 'bike' ? 'байк' : 'автомобиль';
+    
+    // Sanitize variables for Markdown
+    const carMake = escapeMarkdown(metadata.car_make);
+    const carModel = escapeMarkdown(metadata.car_model);
+    const username = escapeMarkdown(userData.username || userId);
 
-    const renterMessage = `✅ Ваш интерес к аренде ${vehicleTypeString} **${metadata.car_make} ${metadata.car_model}** зафиксирован! Владелец уведомлен.\n\nНажмите кнопку ниже, чтобы открыть сделку.`;
+    const renterMessage = `✅ Ваш интерес к аренде ${vehicleTypeString} *${carMake} ${carModel}* зафиксирован! Владелец уведомлен\\.\n\nНажмите кнопку ниже, чтобы открыть сделку\\.`;
     await sendTelegramMessage(renterMessage, [{ text: "Управлять Арендой", url: rentalManagementUrl }], metadata.image_url, userId);
 
     if (vehicle.owner_id) {
-        const ownerMessage = `🔥 Новый запрос на аренду!\n\nПользователь @${userData.username || userId} оплатил интерес к вашему ${vehicleTypeString} **${metadata.car_make} ${metadata.car_model}**.\n\nНажмите кнопку, чтобы открыть детали сделки.`;
+        const ownerMessage = `🔥 Новый запрос на аренду!\\n\\nПользователь @${username} оплатил интерес к вашему ${vehicleTypeString} *${carMake} ${carModel}*\\.\\n\\nНажмите кнопку, чтобы открыть детали сделки\\.`;
         await sendTelegramMessage(ownerMessage, [{ text: "К Деталям Сделки", url: rentalManagementUrl }], metadata.image_url, vehicle.owner_id);
     }
-    const adminMessage = `🔔 Зафиксирован интерес к аренде: \n- **Транспорт:** ${metadata.car_make} ${metadata.car_model}\n- **Арендатор:** @${userData.username || userId}\n- **Владелец:** ${vehicle.owner_id}\n- **Сумма интереса:** ${totalAmount} XTR`;
+    const adminMessage = `🔔 Зафиксирован интерес к аренде: \n- *Транспорт:* ${carMake} ${carModel}\n- *Арендатор:* @${username}\n- *Владелец:* ${vehicle.owner_id}\n- *Сумма интереса:* ${totalAmount} XTR`;
     await sendTelegramMessage(adminMessage, [], undefined, adminChatId);
   },
 };
