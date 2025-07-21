@@ -128,7 +128,7 @@ export async function getTestRentalState(rentalId: string) {
       logger.error(`[getTestRentalState] Failed to fetch events:`, eventsError);
     }
 
-    logger.info(`[getTestRentalState] Successfully fetched state for rental: ${rentalId}`);
+    logger.info(`[getTestRentalState] Successfully fetched state for rental: ${rentalId}. New status: ${rental?.status}`);
     return { success: true, data: { rental, events } };
   } catch (error) {
     logger.error(`[getTestRentalState] Failed to fetch state:`, error);
@@ -151,7 +151,8 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
 
     switch (actionName) {
       case 'addRentalPhoto': {
-        const photoType = (rental?.status === 'pending_confirmation') ? 'start' : 'end';
+        // The logic now correctly depends on the rental status from the database.
+        const photoType = (rental?.status === 'active') ? 'end' : 'start';
         logger.info(`[triggerTestAction] addRentalPhoto called (type: ${photoType})`);
         const { error: eventError } = await supabaseAdmin.from('events').insert({
           rental_id: rentalId,
@@ -186,7 +187,13 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
       }
       case 'triggerSos':
         logger.info(`[triggerTestAction] triggerSos called`);
-        const { error: eventError } = await supabaseAdmin.from('events').insert({ rental_id: rentalId, type: 'sos_fuel', created_by: actorId, status: 'pending' });
+        const { error: eventError } = await supabaseAdmin.from('events').insert({
+            rental_id: rentalId,
+            type: 'sos_fuel',
+            created_by: actorId,
+            status: 'pending',
+            payload: { xtr_amount: 50 } // FIX: Added xtr_amount to payload
+        });
         if (eventError) throw eventError;
         mockNotification = `SOS Fuel event created. Crew and Owner have been notified.`;
         result = { success: true };
