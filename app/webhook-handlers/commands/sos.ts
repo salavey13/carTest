@@ -2,13 +2,12 @@
 
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage";
+import { sendComplexMessage, KeyboardButton, sendTelegramInvoice } from "../actions/sendComplexMessage";
 
 // This function presents the initial SOS options
 export async function sosCommand(chatId: number, userId: string) {
     logger.info(`[SOS Command] User ${userId} initiated /sos command.`);
 
-    // 1. Find the user's most recent *active* rental
     const { data: activeRental, error } = await supabaseAdmin
         .from('rentals')
         .select('rental_id, vehicle_id')
@@ -20,12 +19,11 @@ export async function sosCommand(chatId: number, userId: string) {
     
     if (error || !activeRental) {
         logger.warn(`[SOS Command] User ${userId} has no active rentals.`, error);
-        await sendComplexMessage(chatId, "🚨 У вас нет активных аренд для вызова SOS. Эта команда работает только во время поездки.", []);
+        await sendComplexMessage(chatId, "🚨 У вас нет активных аренд для вызова SOS. Эта команда работает только во время поездки.", [], { removeKeyboard: true });
         return;
     }
 
-    // 2. Present options via a reply keyboard
-    const message = "🚨 *Экстренная Служба VIBE*\n\nЧто случилось? Выбери опцию, и мы оповестим владельца и его экипаж.";
+    const message = "🚨 *Экстренная Служба VIBE*\n\nЧто случилось? Выбери опцию, и мы выставим счет. После оплаты будет отправлено уведомление.";
     const buttons: KeyboardButton[][] = [
         [{ text: "⛽️ Запрос Топлива (50 XTR)" }],
         [{ text: "🛠️ Запрос Эвакуации (250 XTR)" }],
@@ -39,7 +37,6 @@ export async function sosCommand(chatId: number, userId: string) {
 export async function handleSosChoice(chatId: number, userId: string, choice: string) {
     logger.info(`[SOS Handler] User ${userId} chose: "${choice}"`);
 
-    // 1. Find the active rental again
     const { data: activeRental, error: rentalError } = await supabaseAdmin
         .from('rentals')
         .select('rental_id')
@@ -54,15 +51,21 @@ export async function handleSosChoice(chatId: number, userId: string, choice: st
         return;
     }
     
-    let eventType: string | null = null;
+    let invoiceType: string | null = null;
+    let title: string | null = null;
+    let description: string | null = null;
     let xtrAmount: number | null = null;
 
     if (choice.startsWith("⛽️ Запрос Топлива")) {
-        eventType = 'sos_fuel';
-        xtrAmount = 50;
+        invoiceType = 'sos_fuel';
+        title = 'SOS: Доставка Топлива';
+        description = 'Оплата за экстренную доставку топлива к вашему местоположению.';
+        xtrAmount = 5000; // 50 XTR in cents
     } else if (choice.startsWith("🛠️ Запрос Эвакуации")) {
-        eventType = 'sos_evac';
-        xtrAmount = 250;
+        invoiceType = 'sos_evac';
+        title = 'SOS: Эвакуация';
+        description = 'Оплата за вызов эвакуатора для вашего транспортного средства.';
+        xtrAmount = 25000; // 250 XTR in cents
     } else if (choice === "❌ Отмена") {
         await sendComplexMessage(chatId, "Действие отменено.", [], { removeKeyboard: true });
         return;
@@ -70,25 +73,16 @@ export async function handleSosChoice(chatId: number, userId: string, choice: st
         await sendComplexMessage(chatId, "Неизвестный выбор. Используйте /sos для начала.", [], { removeKeyboard: true });
         return;
     }
-    
-    // 2. Create the event in the new 'events' table. The DB trigger will handle notifications.
-    const { error: eventError } = await supabaseAdmin
-        .from('events')
-        .insert({
-            rental_id: activeRental.rental_id,
-            type: eventType,
-            status: 'pending',
-            payload: { xtr_amount: xtrAmount, reason: "User initiated SOS" },
-            created_by: userId
-        });
 
-    if (eventError) {
-        logger.error(`[SOS Handler] Failed to create event for rental ${activeRental.rental_id}`, eventError);
-        await sendComplexMessage(chatId, "🚨 Ошибка при создании запроса. Пожалуйста, попробуйте снова.", [], { removeKeyboard: true });
-        return;
-    }
+    // Create an invoice instead of an event
+    const invoicePayload = `${invoiceType}_${activeRental.rental_id}_${Date.now()}`;
+    await sendTelegramInvoice(
+        userId,
+        title,
+        description,
+        invoicePayload,
+        xtrAmount
+    );
 
-    // 3. Confirm to the user and remove the keyboard
-    const confirmationMessage = `✅ Ваш запрос отправлен! Владелец и его экипаж будут уведомлены. Ожидайте помощи. Вы можете следить за статусом на странице аренды.`;
-    await sendComplexMessage(chatId, confirmationMessage, [], { removeKeyboard: true });
+    await sendComplexMessage(chatId, `Счет на ${xtrAmount/100} XTR отправлен. После оплаты владелец и экипаж будут немедленно уведомлены.`, [], { removeKeyboard: true });
 }
