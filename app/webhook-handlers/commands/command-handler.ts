@@ -17,7 +17,7 @@ import { simGoCommand } from "./sim_go";
 import { seedMarketCommand } from "./seed_market";
 import { simGodCommand } from "./sim_god";
 import { leaderboardCommand } from "./leaderboard";
-import { sosCommand, handleSosChoice } from "./sos";
+import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
 
 export async function handleCommand(update: any) {
@@ -61,15 +61,15 @@ export async function handleCommand(update: any) {
         if (commandFunction) {
             await commandFunction();
         } else {
+            // Priority handlers for reply keyboard presses
+            if (text.startsWith('⛽️') || text.startsWith('🛠️') || text.startsWith('🙏')) {
+                await handleSosPaymentChoice(chatId, userIdStr, text); return;
+            }
+            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Закрыть') {
+                await handleActionChoice(chatId, userIdStr, text); return;
+            }
             if (text.startsWith('Set Spread') || text.startsWith('Toggle') || text === 'Done') {
                 await rageSettingsCommand(chatId, userId, text); return;
-            }
-            if (text.startsWith('⛽️') || text.startsWith('🛠️')) {
-                await handleSosChoice(chatId, userIdStr, text); return;
-            }
-            // Catch all reply keyboard presses from /actions
-            if (text.startsWith('📸') || text.startsWith('✅') || text.startsWith('🆘') || text.startsWith('棄') || text === '❌ Отмена') {
-                await handleActionChoice(chatId, userIdStr, text); return;
             }
             const ctxKeys = Object.keys(require("./content/subcontexts").subcontexts);
             if (ctxKeys.includes(text)) {
