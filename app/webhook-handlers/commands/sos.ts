@@ -4,13 +4,13 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage, KeyboardButton, sendTelegramInvoice } from "../actions/sendComplexMessage";
 
-// This function presents the initial SOS options
+// This function INITIATES the SOS flow by requesting a location
 export async function sosCommand(chatId: number, userId: string) {
     logger.info(`[SOS Command] User ${userId} initiated /sos command.`);
 
     const { data: activeRental, error } = await supabaseAdmin
         .from('rentals')
-        .select('rental_id, vehicle_id')
+        .select('rental_id, vehicle:cars(crew_id)')
         .eq('user_id', userId)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
@@ -23,66 +23,75 @@ export async function sosCommand(chatId: number, userId: string) {
         return;
     }
 
-    const message = "🚨 *Экстренная Служба VIBE*\n\nЧто случилось? Выбери опцию, и мы выставим счет. После оплаты будет отправлено уведомление.";
-    const buttons: KeyboardButton[][] = [
-        [{ text: "⛽️ Запрос Топлива (50 XTR)" }],
-        [{ text: "🛠️ Запрос Эвакуации (250 XTR)" }],
-        [{ text: "❌ Отмена" }]
-    ];
+    if (!activeRental.vehicle?.crew_id) {
+        await sendComplexMessage(chatId, "🚨 Не удалось определить экипаж для этого транспорта. SOS временно недоступен.", [], { removeKeyboard: true });
+        return;
+    }
 
-    await sendComplexMessage(chatId, message, buttons, { keyboardType: 'reply' });
+    // Put user in a state to await their location
+    await supabaseAdmin
+        .from('user_states')
+        .upsert({
+            user_id: userId,
+            state: 'awaiting_sos_geotag',
+            context: { rental_id: activeRental.rental_id, crew_id: activeRental.vehicle.crew_id }
+        });
+
+    const message = "🚨 *Экстренная Служба VIBE*\n\nПонял, нужна помощь. Чтобы я мог рассчитать стоимость и оповестить экипаж, пожалуйста, отправь свою геолокацию.\n\nИспользуй скрепку (📎) в Telegram и выбери 'Геопозиция'.";
+    await sendComplexMessage(chatId, message, [], { removeKeyboard: true });
 }
 
-// This function handles the user's choice from the reply keyboard
-export async function handleSosChoice(chatId: number, userId: string, choice: string) {
-    logger.info(`[SOS Handler] User ${userId} chose: "${choice}"`);
+// This function handles the user's PAYMENT choice from the reply keyboard
+export async function handleSosPaymentChoice(chatId: number, userId: string, choice: string) {
+    logger.info(`[SOS Handler] User ${userId} chose payment: "${choice}"`);
 
-    const { data: activeRental, error: rentalError } = await supabaseAdmin
-        .from('rentals')
-        .select('rental_id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+    const { data: userState, error: stateError } = await supabaseAdmin
+        .from('user_states').select('*').eq('user_id', userId).single();
 
-    if (rentalError || !activeRental) {
-        await sendComplexMessage(chatId, "Не удалось найти активную аренду. Операция отменена.", [], { removeKeyboard: true });
+    if (stateError || !userState || userState.state !== 'awaiting_sos_payment_choice') {
+        await sendComplexMessage(chatId, "Не удалось найти ваш запрос SOS. Пожалуйста, начните заново с /sos.", [], { removeKeyboard: true });
         return;
     }
+
+    const { rental_id, geotag } = userState.context as { rental_id: string, geotag: {latitude: number, longitude: number} };
     
-    let invoiceType: string | null = null;
-    let title: string | null = null;
-    let description: string | null = null;
-    let xtrAmount: number | null = null;
+    // Parse amount from button text like "⛽️ Топливо (150 XTR)"
+    const amountMatch = choice.match(/\((\d+)\s*XTR\)/);
+    const amount = amountMatch ? parseInt(amountMatch[1], 10) : 0;
+    const isFuel = choice.includes('Топливо');
+    const type = isFuel ? 'sos_fuel' : 'sos_evac';
 
-    if (choice.startsWith("⛽️ Запрос Топлива")) {
-        invoiceType = 'sos_fuel';
-        title = 'SOS: Доставка Топлива';
-        description = 'Оплата за экстренную доставку топлива к вашему местоположению.';
-        xtrAmount = 5000; // 50 XTR in cents
-    } else if (choice.startsWith("🛠️ Запрос Эвакуации")) {
-        invoiceType = 'sos_evac';
-        title = 'SOS: Эвакуация';
-        description = 'Оплата за вызов эвакуатора для вашего транспортного средства.';
-        xtrAmount = 25000; // 250 XTR in cents
-    } else if (choice === "❌ Отмена") {
-        await sendComplexMessage(chatId, "Действие отменено.", [], { removeKeyboard: true });
-        return;
-    } else {
-        await sendComplexMessage(chatId, "Неизвестный выбор. Используйте /sos для начала.", [], { removeKeyboard: true });
+    if (amount === 0) { // Handle "No payment" case
+        await supabaseAdmin.from('events').insert({
+            rental_id,
+            type,
+            status: 'pending',
+            payload: { xtr_amount: 0, reason: "User requested help without payment", geotag },
+            created_by: userId
+        });
+        await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
+        await sendComplexMessage(chatId, "✅ Ваша просьба о помощи отправлена! Экипаж уведомлен.", [], { removeKeyboard: true });
         return;
     }
 
-    // Create an invoice instead of an event
-    const invoicePayload = `${invoiceType}_${activeRental.rental_id}_${Date.now()}`;
-    await sendTelegramInvoice(
-        userId,
-        title,
-        description,
-        invoicePayload,
-        xtrAmount
-    );
+    // Create an invoice for payment
+    const invoicePayload = `${type}_${rental_id}_${Date.now()}`;
+    const description = `Экстренная помощь для аренды ${rental_id}.`;
+    
+    // We create the invoice in our DB FIRST
+    await supabaseAdmin.from('invoices').insert({
+        id: invoicePayload,
+        type: type,
+        user_id: userId,
+        amount: amount,
+        status: 'pending',
+        subscription_id: rental_id, // Re-using this field for rental_id context
+        metadata: { rental_id, geotag }
+    });
 
-    await sendComplexMessage(chatId, `Счет на ${xtrAmount/100} XTR отправлен. После оплаты владелец и экипаж будут немедленно уведомлены.`, [], { removeKeyboard: true });
+    await sendTelegramInvoice(userId, choice, description, invoicePayload, amount * 100); // Amount in smallest units for TG
+    await sendComplexMessage(chatId, `Счет на ${amount} XTR отправлен. После оплаты экипаж будет немедленно уведомлен.`, [], { removeKeyboard: true });
+    
+    // Clear state after sending invoice
+    await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
 }
