@@ -1,6 +1,6 @@
 "use client";
 
-import { getAllPublicCrews, getMapPresets } from '@/app/rentals/actions';
+import { getAllPublicCrews, getMapPresets } from '@/app/actions';
 import { Loading } from '@/components/Loading';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { VibeMap, MapPoint, MapBounds } from '@/components/VibeMap';
@@ -17,8 +17,8 @@ type MapPreset = Database['public']['Tables']['maps']['Row'];
 const FALLBACK_MAP: MapPreset = {
     id: 'fallback-map',
     name: 'Стандартная Карта',
-    map_image_url: 'https://i.imgur.com/22n6k1V.png',
-    bounds: { top: 56.38, bottom: 56.25, left: 43.85, right: 44.15 } as MapBounds,
+    map_image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
+    bounds: { top: 56.42231338799844, bottom: 56.56.123051835133, left: 43.35436684660189, right: 44.43547740802101 } as MapBounds,
     is_default: true,
     created_at: new Date().toISOString(),
     owner_id: null,
