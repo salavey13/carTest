@@ -1,14 +1,18 @@
 -- Step 1: Replace the trigger function to correctly use Supabase Vault.
 -- This version queries the vault.decrypted_secrets view, which is the correct way.
+-- This requires the `pg_net` extension to be enabled in your Supabase project.
 
 CREATE OR REPLACE FUNCTION public.handle_new_rental_event()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+-- Set a search path to ensure the function can find the vault schema.
+SET search_path = extensions, public;
 AS $$
 DECLARE
     api_url TEXT;
     api_secret TEXT;
+    response_id BIGINT;
 BEGIN
     -- Correctly and securely fetch secrets from the Supabase Vault.
     -- This requires secrets named 'NOTIFY_API_URL' and 'CRON_SECRET' to exist in your Vault.
@@ -22,8 +26,7 @@ BEGIN
     END IF;
 
     -- Perform the HTTP request to our own notification API endpoint.
-    -- This requires the pg_net extension to be enabled.
-    PERFORM net.http_post(
+    SELECT net.http_post(
         url := api_url,
         headers := jsonb_build_object(
             'Authorization', 'Bearer ' || api_secret,
@@ -36,7 +39,7 @@ BEGIN
             'created_by', NEW.created_by,
             'payload', NEW.payload
         )
-    );
+    ) INTO response_id;
 
     RETURN NEW;
 EXCEPTION
