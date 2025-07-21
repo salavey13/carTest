@@ -11,20 +11,22 @@ import { v4 as uuidv4 } from 'uuid';
 const DEMO_OWNER_ID_CREW = "413553377"; // Owner of the crew and 1 bike
 const DEMO_OWNER_ID_OTHER = "341729406"; // Owner of other 4 bikes (no crew)
 
-async function findDemoBike(): Promise<{ id: string; make: string; model: string; image_url: string; } | null> {
+const DEMO_BIKE_ID = 'ural-bobber'; // Hardcoded bike ID for predictable tests
+
+async function getDemoBike(): Promise<{ id: string; make: string; model: string; image_url: string; } | null> {
   try {
-    const { data: bike, error } = await supabaseAdmin.from('cars').select('id, make, model, image_url').eq('type', 'bike').limit(1).single();
+    const { data: bike, error } = await supabaseAdmin.from('cars').select('id, make, model, image_url').eq('id', DEMO_BIKE_ID).single();
     if (error) {
-      logger.error(`[findDemoBike] Error fetching bike:`, error);
+      logger.error(`[getDemoBike] Error fetching bike ID ${DEMO_BIKE_ID}:`, error);
       return null;
     }
     if (!bike) {
-      logger.warn(`[findDemoBike] No demo bikes found. Check your demo setup!`);
+      logger.warn(`[getDemoBike] Demo bike with ID ${DEMO_BIKE_ID} not found. Check your seed data!`);
       return null;
     }
     return bike;
   } catch (error) {
-    logger.error(`[findDemoBike] Exception finding bikes:`, error);
+    logger.error(`[getDemoBike] Exception finding bike:`, error);
     return null;
   }
 }
@@ -61,7 +63,7 @@ export async function setupTestScenario(scenario: string) {
   noStore();
   logger.info(`[setupTestScenario] Setting up scenario: ${scenario}`);
   try {
-    const demoBikeResult = await findDemoBike();
+    const demoBikeResult = await getDemoBike();
     if (!demoBikeResult || !demoBikeResult.id) {
       logger.error("[setupTestScenario] No demo bike found.  Scenario setup aborted.");
       return { success: false, error: "No demo bike found in the database. Check your demo setup." };
@@ -192,7 +194,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
       case 'simulatePaymentSuccess':
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
         const invoice_payload = `test_invoice_${uuidv4()}`;
-        const demoBike = await findDemoBike(); // Fetch demo bike info
+        const demoBike = await getDemoBike(); // Fetch demo bike info
         
         const metadata = {
             test_scenario: true,

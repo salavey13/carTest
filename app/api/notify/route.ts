@@ -2,15 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { getBaseUrl, escapeMarkdown } from "@/lib/utils";
+import { escapeMarkdown } from "@/lib/utils";
 
 const CRON_SECRET = process.env.CRON_SECRET;
+const TELEGRAM_BOT_LINK = process.env.NEXT_PUBLIC_TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 
 export async function POST(request: NextRequest) {
     const authorization = request.headers.get('Authorization');
     if (authorization !== `Bearer ${CRON_SECRET}`) {
         logger.warn('Unauthorized attempt to access internal notify API.');
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    if (!TELEGRAM_BOT_LINK) {
+        logger.error("[Notify API] Missing NEXT_PUBLIC_TELEGRAM_BOT_LINK environment variable.");
+        // We still return 200 to prevent the DB trigger from retrying.
+        return NextResponse.json({ error: "Server configuration error: Bot link not set." }, { status: 200 });
     }
 
     try {
@@ -57,7 +64,7 @@ export async function POST(request: NextRequest) {
                 const isFuel = event_type === 'sos_fuel';
                 const title = isFuel ? '⛽️ *SOS: Запрос Топлива* ⛽️' : event_type === 'sos_evac' ? '🛠️ *SOS: Запрос Эвакуации* 🛠️' : '棄 *Hustle: Перехват* 棄';
                 const verb = isFuel ? 'запрашивает дозаправку' : event_type === 'sos_evac' ? 'возникла проблема с' : 'оставил';
-                notification_text = `${title}\n\nАрендатор @${renterUsername} ${verb} ${vehicleFullName}\\.\n\nНаграда: *${xtrAmount} XTR*`;
+                notification_text = `${title}\n\nАрендатор @${renterUsername} ${verb} ${vehicleFullName}.\n\nНаграда: *${xtrAmount} XTR*`;
                 recipient_ids.add(owner_id);
 
                 if (vehicle?.crew_id) {
@@ -73,28 +80,28 @@ export async function POST(request: NextRequest) {
                 break;
             
             case 'photo_start':
-                 notification_text = `📸 Арендатор @${renterUsername} добавил фото "ДО" для ${vehicleFullName}\\. Необходимо ваше подтверждение\\.`;
+                 notification_text = `📸 Арендатор @${renterUsername} добавил фото "ДО" для ${vehicleFullName}. Необходимо ваше подтверждение.`;
                  recipient_ids.add(owner_id);
                  action_link_slug = 'confirm-pickup';
                  action_button_text = "✅ Подтвердить получение";
                 break;
             
             case 'photo_end':
-                notification_text = `📸 Арендатор @${renterUsername} добавил фото "ПОСЛЕ" для ${vehicleFullName}\\. Необходимо подтвердить возврат\\.`;
+                notification_text = `📸 Арендатор @${renterUsername} добавил фото "ПОСЛЕ" для ${vehicleFullName}. Необходимо подтвердить возврат.`;
                 recipient_ids.add(owner_id);
                 action_link_slug = 'confirm-return';
                 action_button_text = "✅ Подтвердить возврат";
                break;
 
             case 'pickup_confirmed':
-                notification_text = `✅ Владелец @${ownerUsername} подтвердил получение ${vehicleFullName}\\. Ваша аренда *активна*\\. Приятной поездки!`;
+                notification_text = `✅ Владелец @${ownerUsername} подтвердил получение ${vehicleFullName}. Ваша аренда *активна*. Приятной поездки!`;
                 recipient_ids.add(rentalContext.user_id);
                 action_link_slug = 'view';
                 action_button_text = 'К Управлению Арендой';
                 break;
             
             case 'return_confirmed':
-                notification_text = `🏁 Владелец @${ownerUsername} подтвердил возврат ${vehicleFullName}\\. Аренда *завершена*\\. Спасибо за использование сервиса!`;
+                notification_text = `🏁 Владелец @${ownerUsername} подтвердил возврат ${vehicleFullName}. Аренда *завершена*. Спасибо за использование сервиса!`;
                 recipient_ids.add(rentalContext.user_id);
                 action_link_slug = 'review';
                 action_button_text = '⭐️ Оставить отзыв';
@@ -105,7 +112,7 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ ok: true, message: "No handler for event type" });
         }
         
-        const deep_link_url = `${getBaseUrl()}/app?startapp=rental_${action_link_slug}_${rental_id}`;
+        const deep_link_url = `${TELEGRAM_BOT_LINK}?startapp=rental_${action_link_slug}_${rental_id}`;
 
         for (const recipientId of Array.from(recipient_ids)) {
              if (doNotNotifyCreator && recipientId === created_by) continue; 
