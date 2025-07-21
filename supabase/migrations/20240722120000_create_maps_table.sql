@@ -25,10 +25,10 @@ USING (true);
 CREATE POLICY "Admins can manage map presets"
 ON public.maps FOR ALL
 USING (
-    (SELECT role FROM public.users WHERE user_id = auth.jwt() ->> 'chat_id') IN ('admin')
+    (SELECT role FROM public.users WHERE user_id = auth.jwt() ->> 'chat_id') IN ('admin', 'vprAdmin')
 )
 WITH CHECK (
-    (SELECT role FROM public.users WHERE user_id = auth.jwt() ->> 'chat_id') IN ('admin')
+    (SELECT role FROM public.users WHERE user_id = auth.jwt() ->> 'chat_id') IN ('admin', 'vprAdmin')
 );
 
 -- Ensure only one map can be default

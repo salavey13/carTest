@@ -1,6 +1,6 @@
 "use client";
 
-import { getPublicCrewInfo } from '@/app/rentals/actions';
+import { getPublicCrewInfo, getMapPresets } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -10,35 +10,46 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { VibeMap, MapPoint } from '@/components/VibeMap';
+import { VibeMap, MapPoint, MapBounds } from '@/components/VibeMap';
+import { Database } from '@/types/database.types';
 
-// Define a comprehensive type for the crew details
-type CrewDetails = {
-    id: string;
-    name: string;
-    slug: string;
-    description: string;
-    logo_url: string;
-    created_at: string;
-    hq_location?: string;
-    owner: { user_id: string; username: string };
-    members: { user_id: string; username: string; avatar_url: string; role: string }[];
-    vehicles: { id: string; make: string; model: string; image_url: string }[];
+type CrewDetails = Database['public']['Views']['crew_details']['Row'];
+type MapPreset = Database['public']['Tables']['maps']['Row'];
+
+const FALLBACK_MAP: MapPreset = {
+    id: 'fallback-map',
+    name: 'Стандартная Карта',
+    map_image_url: 'https://i.imgur.com/22n6k1V.png',
+    bounds: { top: 56.38, bottom: 56.25, left: 43.85, right: 44.15 } as MapBounds,
+    is_default: true,
+    created_at: new Date().toISOString(),
+    owner_id: null,
+    points_of_interest: []
 };
 
 function CrewDetailContent({ slug }: { slug: string }) {
     const [crew, setCrew] = useState<CrewDetails | null>(null);
+    const [defaultMap, setDefaultMap] = useState<MapPreset>(FALLBACK_MAP);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        async function loadCrewDetails() {
+        async function loadData() {
             try {
-                const result = await getPublicCrewInfo(slug);
-                if (result.success && result.data) {
-                    setCrew(result.data);
+                const [crewResult, mapsResult] = await Promise.all([
+                    getPublicCrewInfo(slug),
+                    getMapPresets()
+                ]);
+
+                if (crewResult.success && crewResult.data) {
+                    setCrew(crewResult.data);
                 } else {
-                    setError(result.error || "Не удалось загрузить данные экипажа.");
+                    setError(crewResult.error || "Не удалось загрузить данные экипажа.");
+                }
+
+                if (mapsResult.success && mapsResult.data && mapsResult.data.length > 0) {
+                    const foundDefault = mapsResult.data.find(m => m.is_default);
+                    if (foundDefault) setDefaultMap(foundDefault);
                 }
             } catch (e: any) {
                 setError(e.message || "Неизвестная ошибка на клиенте.");
@@ -46,16 +57,11 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 setLoading(false);
             }
         }
-        loadCrewDetails();
+        loadData();
     }, [slug]);
 
-    if (loading) {
-        return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
-    }
-
-    if (error || !crew) {
-        return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
-    }
+    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
     const hasVehicles = crew.vehicles && crew.vehicles.length > 0;
@@ -64,7 +70,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const hqPoint: MapPoint | null = crew.hq_location ? {
         id: crew.id,
         name: `${crew.name} HQ`,
-        coordinates: crew.hq_location.split(',').map(Number) as [number, number],
+        coordinates: (crew.hq_location as string).split(',').map(Number) as [number, number],
         icon: '::FaSkullCrossbones::',
         color: 'bg-brand-pink'
     } : null;
@@ -81,12 +87,9 @@ function CrewDetailContent({ slug }: { slug: string }) {
             <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
 
             <motion.div 
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
+                initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
                 className="container mx-auto max-w-6xl px-4 py-12 relative z-20 bg-background grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
-                {/* Left Column: Manifesto */}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-card/70 backdrop-blur-sm border border-border p-6 rounded-xl sticky top-24">
                         <h2 className="text-2xl font-orbitron text-brand-pink mb-4">Манифест</h2>
@@ -100,14 +103,12 @@ function CrewDetailContent({ slug }: { slug: string }) {
                         {hqPoint && (
                             <div className="mt-4 border-t border-border/50 pt-3">
                                 <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4>
-                                <VibeMap points={[hqPoint]} zoom={1.5} center={hqPoint.coordinates} className="h-48"/>
-                                <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location}</p>
+                                <VibeMap points={[hqPoint]} zoom={2} center={hqPoint.coordinates} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/>
+                                <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location as string}</p>
                             </div>
                         )}
                     </div>
                 </div>
-
-                {/* Right Column: Assets */}
                 <div className="lg:col-span-2">
                      <Tabs defaultValue="garage" className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-card/50">

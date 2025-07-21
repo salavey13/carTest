@@ -1,29 +1,28 @@
 "use client";
 
-import { getAllPublicCrews } from '@/app/rentals/actions';
+import { getAllPublicCrews, getMapPresets } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
-import { VibeMap, MapPoint } from '@/components/VibeMap';
+import { VibeMap, MapPoint, MapBounds } from '@/components/VibeMap';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense, useEffect, useState, useMemo } from 'react';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { motion } from 'framer-motion';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
-type Crew = {
-    id: string;
-    name: string;
-    slug: string;
-    description: string;
-    logo_url: string;
-    owner_username: string;
-    member_count: number;
-    vehicle_count: number;
-    hq_location?: string;
-    // Augmented on client
-    avg_fleet_value?: number;
-    influence?: number;
-    mission_success_rate?: number;
+type Crew = Database['public']['Views']['crews_with_stats']['Row'];
+type MapPreset = Database['public']['Tables']['maps']['Row'];
+
+const FALLBACK_MAP: MapPreset = {
+    id: 'fallback-map',
+    name: 'Стандартная Карта',
+    map_image_url: 'https://i.imgur.com/22n6k1V.png',
+    bounds: { top: 56.38, bottom: 56.25, left: 43.85, right: 44.15 } as MapBounds,
+    is_default: true,
+    created_at: new Date().toISOString(),
+    owner_id: null,
+    points_of_interest: []
 };
 
 const MetricItem = ({ icon, value, label }: { icon: string; value: string | number; label:string; }) => (
@@ -38,24 +37,30 @@ const MetricItem = ({ icon, value, label }: { icon: string; value: string | numb
 
 function CrewsList() {
     const [crews, setCrews] = useState<Crew[]>([]);
+    const [mapPresets, setMapPresets] = useState<MapPreset[]>([FALLBACK_MAP]);
+    const [selectedMap, setSelectedMap] = useState<MapPreset>(FALLBACK_MAP);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [highlightedCrewId, setHighlightedCrewId] = useState<string | null>(null);
 
     useEffect(() => {
-        async function loadCrews() {
+        async function loadData() {
             try {
-                const result = await getAllPublicCrews();
-                if (result.success && result.data) {
-                    const augmentedCrews = result.data.map(crew => ({
-                        ...crew,
-                        avg_fleet_value: crew.vehicle_count > 0 ? Math.floor(Math.random() * 45000 + 20000) : 0,
-                        influence: Math.floor(Math.random() * 800 + 150),
-                        mission_success_rate: Math.floor(Math.random() * 30 + 65)
-                    }));
-                    setCrews(augmentedCrews);
+                const [crewsResult, mapsResult] = await Promise.all([
+                    getAllPublicCrews(),
+                    getMapPresets()
+                ]);
+
+                if (crewsResult.success && crewsResult.data) {
+                    setCrews(crewsResult.data);
                 } else {
-                    setError(result.error || "Не удалось загрузить список экипажей.");
+                    setError(crewsResult.error || "Не удалось загрузить список экипажей.");
+                }
+
+                if (mapsResult.success && mapsResult.data && mapsResult.data.length > 0) {
+                    setMapPresets(mapsResult.data);
+                    const defaultMap = mapsResult.data.find(m => m.is_default) || mapsResult.data[0];
+                    setSelectedMap(defaultMap);
                 }
             } catch (e: any) {
                 setError(e.message || "Неизвестная ошибка на клиенте.");
@@ -63,7 +68,7 @@ function CrewsList() {
                 setLoading(false);
             }
         }
-        loadCrews();
+        loadData();
     }, []);
     
     const mapPoints: MapPoint[] = useMemo(() =>
@@ -81,20 +86,8 @@ function CrewsList() {
             })
     , [crews]);
 
-
-    if (loading) {
-        return <Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />;
-    }
-
-    if (error || crews.length === 0) {
-        return (
-            <div className="text-center py-10">
-                <p className="text-muted-foreground font-mono">
-                    {error || "Пока не создано ни одного экипажа. Будь первым!"}
-                </p>
-            </div>
-        );
-    }
+    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ..." />;
+    if (error) return <div className="text-center py-10"><p className="text-muted-foreground font-mono">{error}</p></div>;
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -102,9 +95,7 @@ function CrewsList() {
                  {crews.map((crew, index) => (
                     <Link href={`/crews/${crew.slug}`} key={crew.id} className="block group" onMouseEnter={() => setHighlightedCrewId(crew.id)} onMouseLeave={() => setHighlightedCrewId(null)}>
                         <motion.div 
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
+                            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}
                             className="bg-card/80 backdrop-blur-sm border border-border p-5 rounded-xl h-full flex flex-col transition-all duration-300 hover:border-brand-lime hover:shadow-2xl hover:shadow-lime-glow transform hover:-translate-y-1 relative overflow-hidden"
                         >
                             <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Background`} fill className="absolute inset-0 object-cover opacity-[0.03] group-hover:opacity-[0.06] transition-opacity duration-300 blur-sm scale-125" />
@@ -117,19 +108,39 @@ function CrewsList() {
                                     </div>
                                 </div>
                                 <p className="text-neutral-300 dark:text-neutral-400 font-sans text-sm mt-2 flex-grow min-h-[50px]">{crew.description}</p>
-                                
                                 <div className="grid grid-cols-3 gap-2 mt-4 border-t border-border/50 pt-4">
-                                   <MetricItem icon="::FaUsers::" value={crew.member_count} label="Участников" />
-                                   <MetricItem icon="::FaWarehouse::" value={crew.vehicle_count} label="Единиц" />
-                                   <MetricItem icon="::FaBullseye::" value={`${crew.mission_success_rate ?? 0}%`} label="Успех" />
+                                   <MetricItem icon="::FaUsers::" value={crew.member_count || 0} label="Участников" />
+                                   <MetricItem icon="::FaWarehouse::" value={crew.vehicle_count || 0} label="Единиц" />
+                                   <MetricItem icon="::FaRoute::" value={'N/A'} label="Миссий" />
                                 </div>
                             </div>
                         </motion.div>
                     </Link>
                 ))}
             </div>
-            <div className="lg:sticky lg:top-24 h-[60vh] lg:h-auto">
-                <VibeMap points={mapPoints} highlightedPointId={highlightedCrewId} />
+            <div className="lg:sticky lg:top-24 h-[60vh] lg:h-[calc(100vh-8rem)]">
+                <div className="relative w-full h-full">
+                    <VibeMap points={mapPoints} highlightedPointId={highlightedCrewId} bounds={selectedMap.bounds as MapBounds} imageUrl={selectedMap.map_image_url} />
+                    <Sheet>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" size="icon" className="absolute top-4 right-4 z-20 bg-card/50 backdrop-blur-sm"><VibeContentRenderer content="::FaPaintbrush::"/></Button>
+                        </SheetTrigger>
+                        <SheetContent>
+                            <SheetHeader><SheetTitle>Выбрать Карту</SheetTitle></SheetHeader>
+                            <div className="py-4 space-y-2">
+                                {mapPresets.map(preset => (
+                                    <div key={preset.id} onClick={() => setSelectedMap(preset)} className="p-2 border rounded-md cursor-pointer hover:border-brand-cyan">
+                                        <p className="font-semibold">{preset.name}</p>
+                                        <p className="text-xs text-muted-foreground">{preset.is_default ? "По умолчанию" : ""}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+                    <div className="absolute bottom-4 left-4 bg-card/50 backdrop-blur-sm p-2 rounded-lg text-xs font-mono flex items-center gap-2">
+                        <VibeContentRenderer content="::FaSkullCrossbones::" className="text-brand-pink"/> <span>Штаб Экипажа</span>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -139,11 +150,7 @@ export default function CrewsPage() {
     const heroTriggerId = "crews-hero-trigger";
     return (
         <div className="relative min-h-screen bg-background">
-            <RockstarHeroSection
-                title="ЭКИПАЖИ"
-                subtitle="Команды, которые правят улицами. Найди своих или брось им вызов."
-                triggerElementSelector={`#${heroTriggerId}`}
-            />
+            <RockstarHeroSection title="ЭКИПАЖИ" subtitle="Команды, которые правят улицами. Найди своих или брось им вызов." triggerElementSelector={`#${heroTriggerId}`} />
             <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
             <div className="container mx-auto max-w-7xl px-4 py-12 relative z-20">
                  <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ЭКИПАЖЕЙ..." />}>
@@ -154,8 +161,7 @@ export default function CrewsPage() {
                 <motion.div 
                     className="w-16 h-16 flex items-center justify-center bg-brand-lime/80 text-background rounded-full shadow-lg shadow-brand-lime/50 cursor-pointer backdrop-blur-sm hover:bg-brand-lime transition-colors"
                     title="Создать Экипаж"
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.95 }}
                 >
                     <VibeContentRenderer content="::FaCirclePlus::" className="h-8 w-8"/>
                 </motion.div>
