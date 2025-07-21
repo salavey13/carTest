@@ -25,8 +25,8 @@ export async function POST(request: NextRequest) {
                 user_id,
                 owner_id,
                 vehicle:cars (make, model, crew_id),
-                renter:users (username),
-                owner:users (username)
+                renter:rentals_user_id_fkey (username),
+                owner:rentals_owner_id_fkey (username)
             `)
             .eq('rental_id', rental_id)
             .single();
