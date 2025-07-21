@@ -16,11 +16,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json();
-    const { pr_number, pr_title, author_id } = payload;
+    const { pr_number, pr_title } = payload;
 
-    if (!pr_number || !pr_title || !author_id) {
+    if (!pr_number || !pr_title) {
         logger.error("[GitHub Feedback] Invalid payload received.", payload);
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+        return NextResponse.json({ error: "Invalid payload: pr_number and pr_title are required." }, { status: 400 });
     }
     
     // 2. Отправляем уведомление в Telegram админу (тебе)

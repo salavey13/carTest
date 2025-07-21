@@ -78,11 +78,11 @@ jobs:
           # Используем `gh` для получения финального заголовка PR после всех изменений
           final_title=$(gh pr view ${{ github.event.pull_request.number }} --json title -q '.title')
           
-          curl -X POST "${{ secrets.VERCEL_PROJECT_PRODUCTION_URL }}/api/github-action-feedback" \
+          # Use -v for verbose output to see request details in action logs
+          curl -v -X POST "${{ secrets.VERCEL_PROJECT_PRODUCTION_URL }}/api/github-action-feedback" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.ACTION_SECRET }}" \
           -d '{
             "pr_number": "${{ github.event.pull_request.number }}",
-            "pr_title": "'"$final_title"'",
-            "author_id": "${{ github.event.pull_request.user.id }}"
+            "pr_title": "'"$final_title"'"
           }'
