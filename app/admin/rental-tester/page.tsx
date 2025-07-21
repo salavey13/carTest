@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,31 +48,41 @@ const SCENARIOS = [
   },
 ];
 
-const TEST_ACTIONS = [
+const ALL_TEST_ACTIONS = [
   {
     name: 'addRentalPhoto',
     label: "Загрузить Фото",
     description: "Симулирует загрузку фото транспорта (в начале или конце аренды, в зависимости от текущего состояния).",
+    roles: ['renter'],
+    statuses: ['pending_confirmation', 'active'],
   },
   {
     name: 'confirmVehiclePickup',
     label: "Подтвердить Получение",
     description: "Симулирует подтверждение владельцем, что арендатор забрал транспорт. Переводит аренду в статус 'активна'.",
+    roles: ['owner'],
+    statuses: ['pending_confirmation'],
   },
   {
     name: 'confirmVehicleReturn',
     label: "Подтвердить Возврат",
     description: "Симулирует подтверждение владельцем, что арендатор вернул транспорт. Переводит аренду в статус 'завершена'.",
+    roles: ['owner'],
+    statuses: ['active'],
   },
   {
     name: 'triggerSos',
     label: "Вызвать SOS: Топливо",
     description: "Симулирует запрос арендатора на экстренную доставку топлива.",
+    roles: ['renter'],
+    statuses: ['active'],
   },
   {
     name: 'simulatePaymentSuccess',
     label: "Симулировать Оплату",
     description: "Симулирует успешное получение уведомления об оплате от Telegram, запуская следующие шаги в процессе аренды.",
+    roles: ['renter', 'owner'], // Anyone can trigger this for testing
+    statuses: ['pending_confirmation', 'active', 'completed'], // Can be triggered anytime
   },
 ];
 
@@ -101,8 +111,13 @@ export default function RentalTesterPage() {
     if (result.success) {
       setRenter({ id: result.data.renter.id, username: result.data.renter.username });
       setOwner({ id: result.data.owner.id, username: result.data.owner.username });
-      setRental(result.data.rental);
-      setEvents(result.data.events);
+      
+      const initialState = await getTestRentalState(result.data.rental.rental_id);
+      if (initialState.success) {
+        setRental(initialState.data.rental);
+        setEvents(initialState.data.events);
+      }
+      
       setTelegramLog([`Сценарий успешно настроен. ID аренды: ${result.data.rental.rental_id}`]);
       toast.success("Сценарий успешно настроен!", { id: toastId });
     } else {
@@ -140,7 +155,7 @@ export default function RentalTesterPage() {
     setIsProcessing(true);
     setErrorMessage(null);
     const actorId = actingAs === 'renter' ? DEMO_OWNER_ID_OTHER : DEMO_OWNER_ID_CREW;
-    const toastId = toast.loading(`Выполнение действия "${TEST_ACTIONS.find(a => a.name === actionName)?.label}" от имени ${actingAs}...`);
+    const toastId = toast.loading(`Выполнение действия "${ALL_TEST_ACTIONS.find(a => a.name === actionName)?.label}" от имени ${actingAs}...`);
 
     const result = await triggerTestAction(rental.rental_id, actorId, actionName, payload);
 
@@ -159,19 +174,20 @@ export default function RentalTesterPage() {
     setIsProcessing(false);
   };
 
+  const availableActions = useMemo(() => {
+    if (!rental || !rental.status) return [];
+    return ALL_TEST_ACTIONS.filter(action => 
+        action.roles.includes(actingAs) && action.statuses.includes(rental.status)
+    );
+  }, [rental, actingAs]);
+
+
   if (isAppLoading) return <Loading />;
   
   const isUserReallyAdmin = isAdmin();
   if (!isUserReallyAdmin) {
       return <div className="text-center p-8 text-destructive">ДОСТУП ЗАПРЕЩЕН</div>;
   }
-
-  const getAvailableActions = () => {
-    if (!rental) return [];
-    return TEST_ACTIONS;
-  };
-
-  const availableActions = getAvailableActions();
 
   return (
     <div className="container mx-auto p-4 pt-24 space-y-4">
@@ -219,14 +235,16 @@ export default function RentalTesterPage() {
               </Select>
               <div className="space-y-2">
                 <h4 className="font-semibold">Доступные Действия:</h4>
-                {availableActions.map(action => (
+                {availableActions.length > 0 ? availableActions.map(action => (
                   <div key={action.name} className="space-y-1">
                     <Button onClick={() => handleAction(action.name)} className="w-full" disabled={isProcessing}>
                       {action.label}
                     </Button>
                     <p className="text-xs text-muted-foreground">{action.description}</p>
                   </div>
-                ))}
+                )) : (
+                    <p className="text-xs text-muted-foreground font-mono p-2 bg-muted/50 rounded text-center">Нет доступных действий для роли "{actingAs}" в статусе "{rental.status}".</p>
+                )}
               </div>
             </CardContent>
           </Card>
