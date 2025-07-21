@@ -155,7 +155,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
           rental_id: rentalId,
           type: `photo_${photoType}`,
           created_by: actorId,
-          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/my-bobber.jpg' }
+          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//salavey13-15-05-2024-0001.jpg' }
         });
         if (eventError) throw eventError;
         mockNotification = `Owner notified about new ${photoType} photo.`;
