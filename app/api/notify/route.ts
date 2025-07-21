@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
         const recipient_ids = new Set<string>();
         let action_link_slug = 'view';
         let action_button_text = '🚨 К Событию';
+        let doNotNotifyCreator = true;
 
         switch(event_type) {
             case 'sos_fuel':
@@ -69,6 +70,13 @@ export async function POST(request: NextRequest) {
                  action_link_slug = 'confirm-pickup';
                  action_button_text = "✅ Подтвердить получение";
                 break;
+            
+            case 'pickup_confirmed':
+                notification_text = `✅ Владелец @${owner?.username || owner_id} подтвердил получение ${vehicle?.make} ${vehicle?.model}. Ваша аренда *активна*. Приятной поездки!`;
+                recipient_ids.add(rentalContext.user_id);
+                action_link_slug = 'view';
+                action_button_text = 'К Управлению Арендой';
+                break;
 
             // Add more cases for other event types like 'photo_end', 'pickup_confirmed' etc.
             default:
@@ -79,7 +87,7 @@ export async function POST(request: NextRequest) {
         const deep_link_url = `${getBaseUrl()}/app?startapp=rental_${action_link_slug}_${rental_id}`;
 
         for (const recipientId of Array.from(recipient_ids)) {
-             if (recipientId === created_by) continue; // Don't notify the person who created the event
+             if (doNotNotifyCreator && recipientId === created_by) continue; // Don't notify the person who created the event
             await sendComplexMessage(
                 recipientId,
                 notification_text,

@@ -71,18 +71,14 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
 
   const isAdmin = useMemo(() => {
     if (typeof isAdminFunc === 'function') return isAdminFunc();
-    logger.warn("[BottomNav] isAdminFunc not available on context");
     return false;
   }, [isAdminFunc]);
 
   const navItemsToDisplay = useMemo(() => {
     if (appCtxLoading || isAuthenticating || !dbUser) {
-      logger.debug("[BottomNav] Context/dbUser loading or not available, returning no items yet.");
       return [];
     }
-
-    logger.debug(`[BottomNav] Filtering bike rental items. IsAdmin: ${isAdmin}`);
-
+    
     const availableItems = ALL_POSSIBLE_NAV_ITEMS.filter(item => {
       return !(item.adminOnly && !isAdmin);
     });
@@ -108,13 +104,11 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
       finalLayout = otherItems.slice(0, maxItems);
     }
     
-    logger.debug(`[BottomNav] Final layout:`, finalLayout.map(i => `${i.label}${i.isActuallyCentral ? " (C)" : ""}`));
     return finalLayout;
 
   }, [dbUser, appCtxLoading, isAuthenticating, isAdmin]);
 
   if (appCtxLoading || isAuthenticating || !dbUser || navItemsToDisplay.length === 0) {
-    logger.debug("[BottomNav] Either loading, no dbUser, or no items to display. Returning null.");
     return null;
   }
 

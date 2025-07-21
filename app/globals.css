@@ -1,4 +1,3 @@
-/* /app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -50,7 +49,7 @@
   --border: 220 15% 88%;              /* Light gray for borders */
   --input: 0 0% 100%;                 /* White background for inputs in light theme */
   --input-border: 220 15% 85%;        /* Slightly darker border for inputs */
-  --ring: hsl(var(--brand-blue));     /* Blue for focus rings */
+  --ring: var(--brand-blue);          /* <-- FIX: Removed hsl() wrapper */
 
   /* RGB Versions for Shadows/Gradients */
   --purple-rgb: 153, 102, 255; 
@@ -119,17 +118,17 @@
   --brand-lime: 90 70% 55%;
 
   /* Derived UI Element Colors (for Dark Theme) */
-  --primary: hsl(var(--brand-cyan)); 
-  --primary-foreground: 180 60% 10%;   /* Dark teal text for cyan primary */
-  --secondary: hsl(var(--brand-purple)); 
-  --secondary-foreground: 270 80% 98%; /* Light purple/white text for purple secondary */
-  --accent: hsl(var(--brand-lime)); 
-  --accent-foreground: 90 50% 10%;     /* Dark lime text for lime accent */
+  --primary: var(--brand-cyan);            /* <-- FIX: Removed hsl() wrapper */
+  --primary-foreground: 180 60% 10%;       /* Dark teal text for cyan primary */
+  --secondary: var(--brand-purple);        /* <-- FIX: Removed hsl() wrapper */
+  --secondary-foreground: 270 80% 98%;     /* Light purple/white text for purple secondary */
+  --accent: var(--brand-lime);             /* <-- FIX: Removed hsl() wrapper */
+  --accent-foreground: 90 50% 10%;         /* Dark lime text for lime accent */
 
-  --border: hsl(var(--brand-cyan) / 0.4);       
-  --input: hsl(var(--brand-purple) / 0.15); 
-  --input-border: hsl(var(--brand-purple) / 0.4); 
-  --ring: hsl(var(--brand-lime));       
+  --border: var(--brand-cyan) / 0.4;       /* <-- FIX: Removed hsl() wrapper */
+  --input: var(--brand-purple) / 0.15;     /* <-- FIX: Removed hsl() wrapper */
+  --input-border: var(--brand-purple) / 0.4; /* <-- FIX: Removed hsl() wrapper */
+  --ring: var(--brand-lime);               /* <-- FIX: Removed hsl() wrapper */
   
   --bg-rgb: 10, 2, 28;
   --card-rgb: 22, 8, 49;

@@ -25,7 +25,6 @@ async function handlePhotoMessage(message: any) {
     
     const { rental_id, photo_type } = userState.context as { rental_id: string, photo_type: 'start' | 'end' };
     
-    // Download the lowest resolution photo to save resources
     const photo = message.photo[0]; // Telegram sends multiple sizes, 0 is the smallest
     const fileId = photo.file_id;
 
@@ -42,15 +41,28 @@ async function handlePhotoMessage(message: any) {
         formData.append('bucketName', 'rentals');
         formData.append('file', imageBlob, `rental_${rental_id}_${photo_type}.jpg`);
 
-        const uploadResult = await uploadSingleImage(formData); // Use the core action
+        const uploadResult = await uploadSingleImage(formData);
         if (!uploadResult.success || !uploadResult.url) {
             throw new Error(uploadResult.error || "Failed to upload image to storage.");
         }
 
-        await addRentalPhoto(rental_id, userId, uploadResult.url, photo_type);
+        // Create an event instead of calling the action directly
+        // The DB trigger on the events table will handle the notification and state update
+        const { error: eventError } = await supabaseAdmin.from('events').insert({
+          rental_id: rental_id,
+          type: `photo_${photo_type}`,
+          created_by: userId,
+          payload: { photo_url: uploadResult.url }
+        });
+        
+        if (eventError) {
+          throw new Error(`Failed to create photo event: ${eventError.message}`);
+        }
+
+        // Clear the user's state
         await supabaseAdmin.from('user_states').delete().eq('user_id', userId);
         
-        await sendTelegramMessage(`📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено!`, [], undefined, chatId.toString());
+        await sendTelegramMessage(`📸 Фото "${photo_type === 'start' ? 'ДО' : 'ПОСЛЕ'}" успешно загружено! Владелец уведомлен.`, [], undefined, chatId.toString());
 
     } catch (error) {
         logger.error(`[Webhook Photo Handler] Error processing photo for user ${userId}:`, error);
@@ -93,7 +105,6 @@ async function handleLocationMessage(message: any) {
         await sendTelegramMessage(`🚨 Ошибка при обработке геотега. Пожалуйста, попробуйте снова.`, [], undefined, chatId.toString());
     }
 }
-
 
 export async function POST(request: Request) {
   try {

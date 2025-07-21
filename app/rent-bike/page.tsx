@@ -125,7 +125,7 @@ export default function RentBikePage() {
       };
       const invoiceId = `bike_rental_${selectedBike.id}_${tgUser.id}_${Date.now()}`;
       
-      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata);
+      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata.car_id, metadata);
 
       const description = hasSubscription
         ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceRub} ₽)\nСкидка: 10%`

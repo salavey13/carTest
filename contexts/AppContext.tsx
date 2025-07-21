@@ -38,7 +38,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const freshDbUser = await dbFetchUserData(String(user.id));
         setDbUserInternal(freshDbUser); 
-        debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully. New metadata:`, freshDbUser?.metadata?.xtr_protocards);
+        debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
       } catch (e) {
         globalLogger.error("[AppContext refreshDbUser] Error refreshing dbUser:", e);
       }
@@ -59,7 +59,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStartParamPayload(rawStartParam);
     } else {
       if (startParamPayload !== null) {
-        // This case is less likely to be hit now with router-based clearing, but good for safety.
         debugLogger.info(`[AppContext] No start_param found or tg not ready, ensuring startParamPayload is null.`);
         setStartParamPayload(null);
       }
@@ -81,25 +80,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser, clearStartParam]);
 
   useEffect(() => {
-    debugLogger.log("[APP_CONTEXT EFFECT_STATUS_UPDATE] Context value or dbUser changed. Current state from context:", {
+    debugLogger.log("[APP_CONTEXT] State Updated.", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
       isAuthenticating: contextValue.isAuthenticating,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
-      dbUserExists: !!contextValue.dbUser, 
-      dbUserMetadataExists: !!contextValue.dbUser?.metadata, 
-      xtrProtocardsExist: !!contextValue.dbUser?.metadata?.xtr_protocards, 
-      xtrProtocardsContent: contextValue.dbUser?.metadata?.xtr_protocards,
-      dbUserStatus: contextValue.dbUser?.status,
-      dbUserRole: contextValue.dbUser?.role,
-      isAdminFuncType: typeof contextValue.isAdmin,
-      errorMsg: contextValue.error?.message,
-      inTelegram: contextValue.isInTelegramContext,
-      mockUserEnv: process.env.NEXT_PUBLIC_USE_MOCK_USER,
-      platform: contextValue.platform,
+      dbUserExists: !!contextValue.dbUser,
+      isAdmin: typeof contextValue.isAdmin === 'function' ? contextValue.isAdmin() : 'N/A',
       startParamPayload: contextValue.startParamPayload,
     });
-  }, [contextValue, dbUser]);
+  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.dbUser, contextValue.user, contextValue.startParamPayload, contextValue.isAdmin]);
+
 
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
@@ -154,19 +145,18 @@ export const useAppContext = (): AppContextData => {
   const defaultClearStartParam = useCallback(() => { debugLogger.warn("clearStartParam() called on SKELETON AppContext"); }, []);
   
   if (!context || context.isLoading === undefined || context.isAuthenticating === undefined ) {
-     debugLogger.info("HOOK_APP_CONTEXT: Context is empty or key state flags (`isLoading`/`isAuthenticating`) are undefined. Returning SKELETON/LOADING defaults.");
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false,
         isLoading: true, isAuthenticating: true, error: null,
-        isAdmin: () => { debugLogger.warn("isAdmin() called on SKELETON AppContext, returning false."); return false; },
-        openLink: (url: string) => debugLogger.warn(`openLink(${url}) called on SKELETON AppContext`),
-        close: () => debugLogger.warn('close() called on SKELETON AppContext'),
-        showPopup: (params: any) => debugLogger.warn('showPopup() called on SKELETON AppContext', params),
-        sendData: (data: string) => debugLogger.warn(`sendData(${data}) called on SKELETON AppContext`),
-        getInitData: () => { debugLogger.warn('getInitData() called on SKELETON AppContext'); return null; },
-        expand: () => debugLogger.warn('expand() called on SKELETON AppContext'),
-        setHeaderColor: (color: string) => debugLogger.warn(`setHeaderColor(${color}) called on SKELETON AppContext`),
-        setBackgroundColor: (color: string) => debugLogger.warn(`setBackgroundColor(${color}) called on SKELETON AppContext`),
+        isAdmin: () => { return false; },
+        openLink: (url: string) => {},
+        close: () => {},
+        showPopup: (params: any) => {},
+        sendData: (data: string) => {},
+        getInitData: () => { return null; },
+        expand: () => {},
+        setHeaderColor: (color: string) => {},
+        setBackgroundColor: (color: string) => {},
         platform: 'unknown_skeleton',
         themeParams: { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
         initData: undefined, initDataUnsafe: undefined, startParam: null, startParamPayload: null,
@@ -177,7 +167,7 @@ export const useAppContext = (): AppContextData => {
 
   if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
     globalLogger.error( "HOOK_APP_CONTEXT: CRITICAL - Context fully loaded but context.isAdmin is NOT a function.", { contextDbUserExists: !!context.dbUser, contextDbUserStatus: context.dbUser?.status, contextDbUserRole: context.dbUser?.role, contextIsAuthenticated: context.isAuthenticated, contextKeys: Object.keys(context) });
-    const fallbackIsAdmin = () => { if (context.dbUser) { const statusIsAdmin = context.dbUser.status === 'admin'; const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; debugLogger.warn(`[HOOK_APP_CONTEXT - Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`); return statusIsAdmin || roleIsAdmin; } debugLogger.warn("[HOOK_APP_CONTEXT - Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false."); return false; };
+    const fallbackIsAdmin = () => { if (context.dbUser) { const statusIsAdmin = context.dbUser.status === 'admin'; const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; return statusIsAdmin || roleIsAdmin; } return false; };
     return { ...(context as AppContextData), isAdmin: fallbackIsAdmin, refreshDbUser: context.refreshDbUser || defaultRefreshDbUser, clearStartParam: context.clearStartParam || defaultClearStartParam };
   }
 
