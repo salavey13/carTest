@@ -5,7 +5,7 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import { escapeMarkdown } from "@/lib/utils";
 
 const CRON_SECRET = process.env.CRON_SECRET;
-const TELEGRAM_BOT_LINK = process.env.NEXT_PUBLIC_TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
+const TELEGRAM_BOT_LINK = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 
 export async function POST(request: NextRequest) {
     const authorization = request.headers.get('Authorization');
