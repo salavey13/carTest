@@ -49,42 +49,21 @@ const SCENARIOS = [
 ];
 
 const ALL_TEST_ACTIONS = [
-  {
-    name: 'addRentalPhoto',
-    label: "Загрузить Фото",
-    description: "Симулирует загрузку фото транспорта (в начале или конце аренды, в зависимости от текущего состояния).",
-    roles: ['renter'],
-    statuses: ['pending_confirmation', 'active'],
-  },
-  {
-    name: 'confirmVehiclePickup',
-    label: "Подтвердить Получение",
-    description: "Симулирует подтверждение владельцем, что арендатор забрал транспорт. Переводит аренду в статус 'активна'.",
-    roles: ['owner'],
-    statuses: ['pending_confirmation'],
-  },
-  {
-    name: 'confirmVehicleReturn',
-    label: "Подтвердить Возврат",
-    description: "Симулирует подтверждение владельцем, что арендатор вернул транспорт. Переводит аренду в статус 'завершена'.",
-    roles: ['owner'],
-    statuses: ['active'],
-  },
-  {
-    name: 'triggerSos',
-    label: "Вызвать SOS: Топливо",
-    description: "Симулирует запрос арендатора на экстренную доставку топлива.",
-    roles: ['renter'],
-    statuses: ['active'],
-  },
-  {
-    name: 'simulatePaymentSuccess',
-    label: "Симулировать Оплату",
-    description: "Симулирует успешное получение уведомления об оплате от Telegram, запуская следующие шаги в процессе аренды.",
-    roles: ['renter', 'owner'], // Anyone can trigger this for testing
-    statuses: ['pending_confirmation', 'active', 'completed'], // Can be triggered anytime
-  },
+  { name: 'simulatePaymentSuccess', label: "Симулировать Оплату", description: "Имитирует успешную оплату для старта аренды.", roles: ['renter', 'owner'], statuses: ['pending_confirmation'], category: 'payment' },
+  { name: 'addRentalPhoto', label: "Загрузить Фото", description: "Загрузка фото ДО (в начале) или ПОСЛЕ (в конце).", roles: ['renter'], statuses: ['pending_confirmation', 'active'], category: 'data' },
+  { name: 'confirmVehiclePickup', label: "Подтвердить Получение", description: "Владелец подтверждает, что арендатор забрал транспорт.", roles: ['owner'], statuses: ['pending_confirmation'], category: 'approval' },
+  { name: 'confirmVehicleReturn', label: "Подтвердить Возврат", description: "Владелец подтверждает, что арендатор вернул транспорт.", roles: ['owner'], statuses: ['active'], category: 'approval' },
+  { name: 'triggerSosFuel', label: "SOS: Топливо", description: "Запрос на доставку топлива (требует оплаты).", roles: ['renter'], statuses: ['active'], category: 'hustle' },
+  { name: 'triggerSosEvac', label: "SOS: Эвакуация", description: "Запрос на эвакуацию (требует оплаты).", roles: ['renter'], statuses: ['active'], category: 'hustle' },
+  { name: 'sendGeotag', label: "Отправить Геотег", description: "Отправка координат после оплаты 'Бросить где угодно'.", roles: ['renter'], statuses: ['active'], category: 'data' },
 ];
+
+const categoryStyles: Record<string, string> = {
+    payment: 'bg-brand-green/80 hover:bg-brand-green text-black',
+    approval: 'bg-brand-blue/80 hover:bg-brand-blue text-white',
+    data: 'bg-brand-purple/80 hover:bg-brand-purple text-white',
+    hustle: 'bg-brand-orange/80 hover:bg-brand-orange text-black',
+};
 
 export default function RentalTesterPage() {
   const { isAdmin, isLoading: isAppLoading } = useAppContext();
@@ -188,6 +167,9 @@ export default function RentalTesterPage() {
   if (!isUserReallyAdmin) {
       return <div className="text-center p-8 text-destructive">ДОСТУП ЗАПРЕЩЕН</div>;
   }
+  
+  const paymentAction = availableActions.find(a => a.category === 'payment');
+  const otherActions = availableActions.filter(a => a.category !== 'payment');
 
   return (
     <div className="container mx-auto p-4 pt-24 space-y-4">
@@ -235,14 +217,22 @@ export default function RentalTesterPage() {
               </Select>
               <div className="space-y-2">
                 <h4 className="font-semibold">Доступные Действия:</h4>
-                {availableActions.length > 0 ? availableActions.map(action => (
+                {paymentAction && (
+                    <div key={paymentAction.name} className="space-y-1 border-b pb-3 mb-3 border-dashed border-border">
+                        <Button onClick={() => handleAction(paymentAction.name)} className={cn("w-full", categoryStyles[paymentAction.category])} disabled={isProcessing}>
+                            {paymentAction.label}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">{paymentAction.description}</p>
+                    </div>
+                )}
+                {otherActions.length > 0 ? otherActions.map(action => (
                   <div key={action.name} className="space-y-1">
-                    <Button onClick={() => handleAction(action.name)} className="w-full" disabled={isProcessing}>
+                    <Button onClick={() => handleAction(action.name)} className={cn("w-full", categoryStyles[action.category])} disabled={isProcessing}>
                       {action.label}
                     </Button>
                     <p className="text-xs text-muted-foreground">{action.description}</p>
                   </div>
-                )) : (
+                )) : !paymentAction && (
                     <p className="text-xs text-muted-foreground font-mono p-2 bg-muted/50 rounded text-center">Нет доступных действий для роли "{actingAs}" в статусе "{rental.status}".</p>
                 )}
               </div>

@@ -3,7 +3,6 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
-import * as rentalActions from '@/app/rentals/actions';
 import { handleWebhookUpdate } from '@/app/actions'; // Import the master handler
 import { v4 as uuidv4 } from 'uuid';
 
@@ -151,7 +150,6 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
 
     switch (actionName) {
       case 'addRentalPhoto': {
-        // The logic now correctly depends on the rental status from the database.
         const photoType = (rental?.status === 'active') ? 'end' : 'start';
         logger.info(`[triggerTestAction] addRentalPhoto called (type: ${photoType})`);
         const { error: eventError } = await supabaseAdmin.from('events').insert({
@@ -185,23 +183,35 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
         result = { success: true };
         break;
       }
-      case 'triggerSos':
-        logger.info(`[triggerTestAction] triggerSos called`);
+      case 'triggerSosFuel':
+      case 'triggerSosEvac':
+        const isFuel = actionName === 'triggerSosFuel';
+        logger.info(`[triggerTestAction] ${actionName} called`);
         const { error: eventError } = await supabaseAdmin.from('events').insert({
             rental_id: rentalId,
-            type: 'sos_fuel',
+            type: isFuel ? 'sos_fuel' : 'sos_evac',
             created_by: actorId,
             status: 'pending',
-            payload: { xtr_amount: 50 } // FIX: Added xtr_amount to payload
+            payload: { xtr_amount: isFuel ? 50 : 250 }
         });
         if (eventError) throw eventError;
-        mockNotification = `SOS Fuel event created. Crew and Owner have been notified.`;
+        mockNotification = `SOS ${isFuel ? 'Fuel' : 'Evac'} event created. Crew and Owner have been notified.`;
         result = { success: true };
         break;
+      case 'sendGeotag':
+         logger.info(`[triggerTestAction] sendGeotag called`);
+         const { error: eventUpdateError } = await supabaseAdmin.from('events')
+            .update({ payload: { geotag: { latitude: 55.751244, longitude: 37.618423 } }, status: 'pending_acceptance'})
+            .eq('rental_id', rentalId)
+            .eq('type', 'hustle_pickup'); // Assuming one hustle per rental
+         if (eventUpdateError) throw eventUpdateError;
+         mockNotification = `Geotag sent. Crew notified.`;
+         result = { success: true };
+         break;
       case 'simulatePaymentSuccess':
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
         const invoice_payload = `test_invoice_${uuidv4()}`;
-        const demoBike = await getDemoBike(); // Fetch demo bike info
+        const demoBike = await getDemoBike();
         
         const metadata = {
             test_scenario: true,
@@ -212,19 +222,11 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
         };
 
         const { error: invoiceError } = await supabaseAdmin.from('invoices').insert({
-          id: invoice_payload,
-          user_id: actorId,
-          amount: 100,
-          status: 'pending',
-          type: 'car_rental',
-          subscription_id: 'dummy_sub_id', 
-          metadata: metadata
+          id: invoice_payload, user_id: actorId, amount: 100, status: 'pending', type: 'car_rental',
+          subscription_id: 'dummy_sub_id', metadata: metadata
         });
 
-        if (invoiceError) {
-          logger.error("[triggerTestAction] Failed to create mock invoice:", invoiceError);
-          throw new Error(`Failed to create mock invoice: ${invoiceError.message}`);
-        }
+        if (invoiceError) throw invoiceError;
         logger.info(`[triggerTestAction] Mock invoice ${invoice_payload} created.`);
 
         const mockPreCheckoutUpdate = {
