@@ -1,4 +1,3 @@
-// /app/actions.ts
 "use server"; 
 
 import {
@@ -21,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 type UserSettings = User['metadata']; 
+type MapBounds = { top: number; bottom: number; left: number; right: number; };
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; 
@@ -266,6 +266,7 @@ export async function notifyAdmins(message: string): Promise<{ success: boolean;
     if (!admins || admins.length === 0) { logger.warn("No admins found to notify."); return { success: true }; }
     let allSuccessful = true;
     for (const admin of admins) {
+      if (!admin.user_id) continue;
       const result = await sendTelegramMessage(message, [], undefined, admin.user_id);
       if (!result.success) { allSuccessful = false; logger.error(`Failed to notify admin ${admin.user_id}: ${result.error}`); }
     }
@@ -726,5 +727,60 @@ export async function getUserPaddockData(userId: string) {
     } catch(error) {
         logger.error(`Exception in getUserPaddockData for user ${userId}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching paddock data" };
+    }
+}
+
+
+export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
+    try {
+        const { data, error } = await supabaseAdmin.from('maps').select('*');
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[getMapPresets Action] Error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
+}
+
+export async function saveMapPreset(
+    userId: string,
+    name: string,
+    map_image_url: string,
+    bounds: MapBounds,
+    is_default: boolean = false
+): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
+    try {
+        // Simple admin check
+        const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+        if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) {
+            throw new Error("Unauthorized: Only admins can save map presets.");
+        }
+        
+        // If setting this as default, unset other defaults first
+        if (is_default) {
+            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
+            if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('maps')
+            .insert({
+                name,
+                map_image_url,
+                bounds: bounds as any, // Cast to any to satisfy Supabase type
+                is_default,
+                owner_id: userId
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return { success: true, data };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[saveMapPreset Action] Error:", errorMessage);
+        return { success: false, error: errorMessage };
     }
 }
