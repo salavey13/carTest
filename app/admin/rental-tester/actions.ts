@@ -103,6 +103,7 @@ export async function setupTestScenario(scenario: string) {
         renter: { id: renterId, username: renterId }, // Using IDs for demonstration
         owner: { id: ownerId, username: ownerId },     // Using IDs for demonstration
         rental: { rental_id: rentalId },
+
         events: events || []
       }
     };
@@ -155,7 +156,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
           rental_id: rentalId,
           type: `photo_${photoType}`,
           created_by: actorId,
-          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/my-bobber.jpg' }
+          payload: { photo_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ural-bobber.jpg' }
         });
         if (eventError) throw eventError;
         mockNotification = `Owner notified about new ${photoType} photo.`;
@@ -190,6 +191,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
         result = { success: true };
         break;
       case 'simulatePaymentSuccess':
+
         logger.info(`[triggerTestAction] simulatePaymentSuccess called`);
         const invoice_payload = `test_invoice_${uuidv4()}`;
         
@@ -201,7 +203,7 @@ export async function triggerTestAction(rentalId: string, actorId: string, actio
           status: 'pending',
           type: 'car_rental', // Ensure this matches a handler
           subscription_id: 'dummy_sub_id', // Add required non-null field
-          metadata: { test_scenario: true, car_id: 'my-bobber' }
+          metadata: { test_scenario: true, car_id: 'ural-bobber' }
         });
 
         if (invoiceError) {
