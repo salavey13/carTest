@@ -14,46 +14,42 @@ export interface MapPoint {
   color?: string;
 }
 
+export interface MapBounds {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
 interface VibeMapProps {
   points: MapPoint[];
+  bounds: MapBounds;
+  imageUrl: string;
   highlightedPointId?: string | null;
   className?: string;
   zoom?: number;
   center?: [number, number];
 }
 
-// Bounding box for Nizhny Novgorod map image
-const MAP_BOUNDS = {
-  top: 56.38, // North
-  bottom: 56.25, // South
-  left: 43.85, // West
-  right: 44.15, // East
-};
-
-const MAP_IMAGE_URL = 'https://i.imgur.com/22n6k1V.png'; // Using a direct link to a static map image
-
-// Function to convert GPS coordinates to pixel coordinates on the map image
-const projectCoordinates = (lat: number, lon: number): { x: number; y: number } | null => {
-  if (lat > MAP_BOUNDS.top || lat < MAP_BOUNDS.bottom || lon < MAP_BOUNDS.left || lon > MAP_BOUNDS.right) {
-    return null; // Point is outside the map bounds
+const projectCoordinates = (lat: number, lon: number, bounds: MapBounds): { x: number; y: number } | null => {
+  if (lat > bounds.top || lat < bounds.bottom || lon < bounds.left || lon > bounds.right) {
+    return null;
   }
-
-  const x = ((lon - MAP_BOUNDS.left) / (MAP_BOUNDS.right - MAP_BOUNDS.left)) * 100;
-  const y = ((MAP_BOUNDS.top - lat) / (MAP_BOUNDS.top - MAP_BOUNDS.bottom)) * 100;
-
+  const x = ((lon - bounds.left) / (bounds.right - bounds.left)) * 100;
+  const y = ((bounds.top - lat) / (bounds.top - bounds.bottom)) * 100;
   return { x, y };
 };
 
-export function VibeMap({ points, highlightedPointId, className, zoom = 1, center }: VibeMapProps) {
+export function VibeMap({ points, bounds, imageUrl, highlightedPointId, className, zoom = 1, center }: VibeMapProps) {
   const containerSize = 100 * zoom;
   const offset = (containerSize - 100) / 2;
   
   let centerOffset = { x: 0, y: 0 };
   if(center) {
-    const projectedCenter = projectCoordinates(center[0], center[1]);
+    const projectedCenter = projectCoordinates(center[0], center[1], bounds);
     if(projectedCenter) {
-      centerOffset.x = 50 - projectedCenter.x;
-      centerOffset.y = 50 - projectedCenter.y;
+      centerOffset.x = 50 - projectedCenter.x * zoom;
+      centerOffset.y = 50 - projectedCenter.y * zoom;
     }
   }
 
@@ -61,28 +57,25 @@ export function VibeMap({ points, highlightedPointId, className, zoom = 1, cente
     <TooltipProvider delayDuration={100}>
       <div className={cn("relative w-full h-full bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30 shadow-lg shadow-brand-purple/20", className)}>
         <motion.div
-            className="relative w-full h-full"
+            className="relative"
             style={{ 
               width: `${containerSize}%`, 
               height: `${containerSize}%`,
               top: `-${offset - centerOffset.y}%`,
               left: `-${offset - centerOffset.x}%`
             }}
-            animate={{
-              scale: zoom
-            }}
-            transition={{ type: "spring", stiffness: 100 }}
         >
           <Image
-            src={MAP_IMAGE_URL}
+            src={imageUrl}
             alt="Vibe City Map"
             layout="fill"
             objectFit="contain"
             className="opacity-50"
+            unoptimized // Good for external URLs that might change
           />
 
           {points.map((point) => {
-            const projected = projectCoordinates(point.coordinates[0], point.coordinates[1]);
+            const projected = projectCoordinates(point.coordinates[0], point.coordinates[1], bounds);
             if (!projected) return null;
 
             const isHighlighted = highlightedPointId === point.id;
@@ -98,10 +91,10 @@ export function VibeMap({ points, highlightedPointId, className, zoom = 1, cente
                       zIndex: isHighlighted ? 10 : 5,
                     }}
                     initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.2, type: 'spring' }}
+                    animate={{ scale: isHighlighted ? 1.5 : 1, opacity: 1 }}
+                    transition={{ type: 'spring' }}
                   >
-                    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300", point.color, isHighlighted ? 'scale-150' : 'scale-100')}>
+                    <div className={cn("w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300", point.color)}>
                        <div className="absolute inset-0 bg-current rounded-full animate-pulse opacity-50"/>
                        <VibeContentRenderer content={point.icon} className="relative z-10 w-4 h-4 text-white drop-shadow-lg"/>
                     </div>
