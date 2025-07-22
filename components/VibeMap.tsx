@@ -7,13 +7,20 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 
-export interface MapPoint {
+export interface PointOfInterest {
   id: string;
   name: string;
-  coordinates: [number, number]; // [latitude, longitude]
+  type: 'point' | 'path' | 'loop';
   icon: string;
-  color?: string;
+  color: string;
+  coords: [number, number][]; // Array of [lat, lon]
 }
 
 export interface MapBounds {
@@ -24,67 +31,71 @@ export interface MapBounds {
 }
 
 interface VibeMapProps {
-  points: MapPoint[];
+  points: PointOfInterest[];
   bounds: MapBounds;
   imageUrl: string;
   highlightedPointId?: string | null;
   className?: string;
-  zoom?: number;
-  center?: [number, number];
+  isEditable?: boolean;
+  onMapClick?: (coords: [number, number]) => void;
 }
 
-const projectCoordinates = (lat: number, lon: number, bounds: MapBounds): { x: number; y: number } | null => {
-  if (lat > bounds.top || lat < bounds.bottom || lon < bounds.left || lon > bounds.right) {
-    return null;
-  }
+const project = (lat: number, lon: number, bounds: MapBounds): { x: number; y: number } | null => {
+  if (lat > bounds.top || lat < bounds.bottom || lon < bounds.left || lon > bounds.right) return null;
   const x = ((lon - bounds.left) / (bounds.right - bounds.left)) * 100;
   const y = ((bounds.top - lat) / (bounds.top - bounds.bottom)) * 100;
   return { x, y };
 };
 
-export function VibeMap({ points, bounds, imageUrl, highlightedPointId, className, zoom = 1, center }: VibeMapProps) {
-  const [scale, setScale] = useState(zoom);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+const unproject = (xPercent: number, yPercent: number, bounds: MapBounds): [number, number] => {
+    const lon = (xPercent / 100) * (bounds.right - bounds.left) + bounds.left;
+    const lat = bounds.top - (yPercent / 100) * (bounds.top - bounds.bottom);
+    return [lat, lon];
+}
+
+export function VibeMap({ points, bounds, imageUrl, highlightedPointId, className, isEditable = false, onMapClick }: VibeMapProps) {
+  const [scale, setScale] = useState(1);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Center map on initial load if center prop is provided
-    if (center && mapContainerRef.current) {
-        const projectedCenter = projectCoordinates(center[0], center[1], bounds);
-        if (projectedCenter) {
-            const containerWidth = mapContainerRef.current.offsetWidth;
-            const containerHeight = mapContainerRef.current.offsetHeight;
-            
-            const targetX = (containerWidth / 2) - (projectedCenter.x / 100 * containerWidth * scale);
-            const targetY = (containerHeight / 2) - (projectedCenter.y / 100 * containerHeight * scale);
-            
-            setOffset({ x: targetX, y: targetY });
-        }
-    }
-  }, [center, zoom, bounds]); // Rerun if these change to recenter
-
-
-  const handleZoom = (direction: 'in' | 'out') => {
-    const zoomFactor = 1.5;
-    const newScale = direction === 'in' ? scale * zoomFactor : scale / zoomFactor;
-    setScale(Math.max(1, Math.min(newScale, 16))); // Clamp zoom between 1x and 16x
+  const handleZoom = (direction: 'in' | 'out', factor = 1.5) => {
+    const newScale = direction === 'in' ? scale * factor : scale / factor;
+    setScale(Math.max(0.5, Math.min(newScale, 16))); // Clamp zoom
   };
+
+  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onMapClick || !mapContainerRef.current) return;
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    const currentX = x.get();
+    const currentY = y.get();
+
+    // Calculate click position relative to the pannable/zoomable map div
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    
+    // Adjust for current pan and zoom
+    const mapX = (clickX - currentX) / scale;
+    const mapY = (clickY - currentY) / scale;
+
+    // Convert pixel position to percentage
+    const xPercent = (mapX / rect.width) * 100;
+    const yPercent = (mapY / rect.height) * 100;
+    
+    const coords = unproject(xPercent, yPercent, bounds);
+    onMapClick(coords);
+  }
 
   return (
     <TooltipProvider delayDuration={100}>
       <div ref={mapContainerRef} className={cn("relative w-full h-full bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30 shadow-lg shadow-brand-purple/20 cursor-grab active:cursor-grabbing", className)}>
         <motion.div
             className="relative w-full h-full"
-            style={{ scale, x: offset.x, y: offset.y }}
+            style={{ scale, x, y }}
             drag
             dragConstraints={mapContainerRef}
-            onDrag={(_, info) => {
-                setOffset({ x: offset.x + info.delta.x, y: offset.y + info.delta.y });
-            }}
-            onWheel={(e) => {
-                e.preventDefault();
-                handleZoom(e.deltaY < 0 ? 'in' : 'out');
-            }}
+            onWheel={(e) => { e.preventDefault(); handleZoom(e.deltaY < 0 ? 'in' : 'out'); }}
+            onClick={handleMapClick}
         >
           <Image
             src={imageUrl}
@@ -94,10 +105,33 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
             className="opacity-50 pointer-events-none"
             unoptimized
           />
+          <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {points.map(point => {
+                  if (point.type === 'point' || point.coords.length < 2) return null;
+                  const pathPoints = point.coords.map(c => project(c[0], c[1], bounds)).filter(p => p !== null) as {x: number, y: number}[];
+                  const pathData = pathPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+                  
+                  return (
+                     <motion.path
+                        key={point.id}
+                        d={pathData + (point.type === 'loop' ? ' Z' : '')}
+                        stroke={point.color || '#FF69B4'}
+                        strokeWidth={0.5 / scale}
+                        fill="none"
+                        strokeDasharray={isEditable ? `${1 / scale} ${1 / scale}` : 'none'}
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 0.7 }}
+                        transition={{ duration: 1 }}
+                     />
+                  )
+              })}
+          </svg>
 
           {points.map((point) => {
-            const projected = projectCoordinates(point.coordinates[0], point.coordinates[1], bounds);
-            if (!projected) return null;
+            const isSinglePoint = point.type === 'point' || point.coords.length === 1;
+            const positionCoords = point.coords[0];
+            const projected = project(positionCoords[0], positionCoords[1], bounds);
+            if (!projected || !isSinglePoint) return null;
 
             const isHighlighted = highlightedPointId === point.id;
 
@@ -106,12 +140,7 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
                 <TooltipTrigger asChild>
                   <motion.div
                     className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                    style={{
-                      left: `${projected.x}%`,
-                      top: `${projected.y}%`,
-                      zIndex: isHighlighted ? 10 : 5,
-                      scale: 1 / scale // Counter-scale to keep size constant
-                    }}
+                    style={{ left: `${projected.x}%`, top: `${projected.y}%`, zIndex: isHighlighted ? 10 : 5, scale: 1 / scale }}
                     animate={{ scale: (isHighlighted ? 1.5 : 1) / scale }}
                     transition={{ type: 'spring', stiffness: 300 }}
                   >
@@ -121,14 +150,11 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
                     </div>
                   </motion.div>
                 </TooltipTrigger>
-                <TooltipContent className="bg-dark-card border-brand-lime text-foreground font-mono">
-                  <p>{point.name}</p>
-                </TooltipContent>
+                <TooltipContent className="bg-dark-card border-brand-lime text-foreground font-mono"><p>{point.name}</p></TooltipContent>
               </Tooltip>
             );
           })}
         </motion.div>
-
          <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
             <Button size="icon" onClick={() => handleZoom('in')} className="w-8 h-8"><VibeContentRenderer content="::FaPlus::" /></Button>
             <Button size="icon" onClick={() => handleZoom('out')} className="w-8 h-8"><VibeContentRenderer content="::FaMinus::" /></Button>

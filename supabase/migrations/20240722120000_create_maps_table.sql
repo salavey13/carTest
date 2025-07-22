@@ -11,7 +11,7 @@ CREATE TABLE public.maps (
 
 COMMENT ON TABLE public.maps IS 'Stores map presets including image, boundaries, and points of interest.';
 COMMENT ON COLUMN public.maps.bounds IS 'Stores the geographical boundaries {top, bottom, left, right} of the map image.';
-COMMENT ON COLUMN public.maps.points_of_interest IS 'Stores an array of custom points like race tracks, potholes, etc.';
+COMMENT ON COLUMN public.maps.points_of_interest IS 'Stores an array of POIs. Schema: {id, name, type: "point"|"path"|"loop", icon, color, coords: [[lat, lon], ...]}';
 COMMENT ON COLUMN public.maps.is_default IS 'If true, this map is loaded by default.';
 
 -- Enable RLS
