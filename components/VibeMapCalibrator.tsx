@@ -9,13 +9,14 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
 import { saveMapPreset } from '@/app/rentals/actions';
+import { cn } from '@/lib/utils';
 
 interface Bounds { top: number; bottom: number; left: number; right: number; }
 interface Point { id: string; name: string; coords: [number, number]; }
 interface PixelPosition { x: number; y: number; }
 
 const REFERENCE_POINTS: Point[] = [
-  { id: 'main_square', name: 'Главная Площадь', coords: [56.3269, 44.0059] },
+  { id: 'aska', name: 'Аська', coords: [56.330, 44.018] },
   { id: 'airport', name: 'Аэропорт Стригино', coords: [56.229, 43.784] },
 ];
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
@@ -51,7 +52,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
 
   useEffect(() => {
     if (!isCalibrating || Object.keys(positions).length < 2) return;
-    const p1 = REFERENCE_POINTS[0]; // main_square
+    const p1 = REFERENCE_POINTS[0]; // aska
     const p2 = REFERENCE_POINTS[1]; // airport
     const pos1 = positions[p1.id];
     const pos2 = positions[p2.id];
@@ -89,18 +90,13 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
 
   const calibrationBoxStyle = () => {
     if (!isCalibrating || Object.keys(positions).length < 2) return { display: 'none' };
-    const pos1 = positions['main_square'];
+    const pos1 = positions['aska'];
     const pos2 = positions['airport'];
     const left = Math.min(pos1.x, pos2.x);
     const top = Math.min(pos1.y, pos2.y);
     const width = Math.abs(pos1.x - pos2.x);
     const height = Math.abs(pos1.y - pos2.y);
-    return {
-      left: `${left}%`,
-      top: `${top}%`,
-      width: `${width}%`,
-      height: `${height}%`,
-    };
+    return { left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%` };
   };
 
   return (
@@ -112,7 +108,6 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
         </div>
         <div ref={mapContainerRef} className="relative w-full aspect-[16/10] bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30">
           {mapUrl && <img src={mapUrl} alt="Map Background" className="absolute inset-0 w-full h-full object-contain opacity-50 pointer-events-none" />}
-          
           <div style={calibrationBoxStyle()} className="absolute bg-brand-cyan/10 border-2 border-dashed border-brand-cyan pointer-events-none" />
 
           {isCalibrating ? (
@@ -130,6 +125,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
                   setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
                 }}
                 className="absolute w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50 z-10"
+                initial={{ x: '-50%', y: '-50%', ...positions[point.id] }}
                 style={{ left: `${positions[point.id]?.x}%`, top: `${positions[point.id]?.y}%`, translateX: '-50%', translateY: '-50%' }}
               >
                 <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
@@ -139,7 +135,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
             REFERENCE_POINTS.map(point => {
               const pos = project(point.coords[0], point.coords[1], bounds);
               if (!pos) return null;
-              return <div key={point.id} className="absolute w-4 h-4 bg-brand-pink rounded-full" style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }} />;
+              return <div key={point.id} className={cn("absolute w-4 h-4 rounded-full", point.id === 'aska' ? 'bg-brand-pink' : 'bg-brand-cyan')} style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }} />;
             })
           )}
         </div>
