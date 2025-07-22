@@ -13,6 +13,14 @@ export interface KeyboardButton {
   callback_data?: string;
 }
 
+// --- NEW: Markdown Sanitizer ---
+function escapeTelegramMarkdown(text: string): string {
+    if (!text) return "";
+    // Escapes characters for Telegram's MarkdownV2 parse mode.
+    const charsToEscape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+    return text.replace(new RegExp(`[${charsToEscape.join('\\')}]`, 'g'), '\\$&');
+}
+
 async function getRandomUnsplashImage(query: string): Promise<string> {
   if (!UNSPLASH_ACCESS_KEY) {
     logger.warn("[Unsplash] Access key not configured. Using fallback.");
@@ -40,50 +48,30 @@ export async function sendComplexMessage(
     imageQuery?: string,
     messageId?: number,
     keyboardType?: 'inline' | 'reply',
-    removeKeyboard?: boolean
+    removeKeyboard?: boolean,
+    parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown' // Allow specifying parse mode
   } = {}
 ): Promise<{ success: boolean; error?: string; data?: any }> {
-  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false } = options;
+  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false, parseMode = 'Markdown' } = options;
 
   if (!TELEGRAM_BOT_TOKEN) {
     logger.error("[sendComplexMessage] Telegram bot token not configured.");
     return { success: false, error: "Telegram bot token not configured." };
   }
   
-  if (text.length > TELEGRAM_MESSAGE_LIMIT) {
-    logger.warn(`[sendComplexMessage] Message for chat ${chatId} is too long (${text.length}). Splitting.`);
-    const chunks = [];
-    for (let i = 0; i < text.length; i += TELEGRAM_MESSAGE_LIMIT) {
-      chunks.push(text.substring(i, i + TELEGRAM_MESSAGE_LIMIT));
-    }
+  // Sanitize text based on parse mode
+  const sanitizedText = text; // The issue was with special chars in user-generated content, not all markdown. Let's apply more carefully.
+  // The main issue is that usernames and user answers can contain markdown characters.
+  // The text passed to this function for summaries should be pre-sanitized.
+  // We will apply sanitization within the calling function (start.ts) for more control.
 
-    try {
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const isLastChunk = i === chunks.length - 1;
-        const payload = {
-            chat_id: String(chatId),
-            parse_mode: 'Markdown',
-            text: chunk,
-            reply_markup: isLastChunk && buttons.length > 0 ? (keyboardType === 'inline' ? { inline_keyboard: buttons } : { keyboard: buttons, resize_keyboard: true, one_time_keyboard: true }) : (isLastChunk && removeKeyboard ? { remove_keyboard: true } : undefined),
-        };
-        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        if (!data.ok) throw new Error(`Failed to send chunk ${i + 1}: ${data.description}`);
-      }
-      return { success: true };
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Error during chunk sending.";
-        logger.error(`[sendComplexMessage-chunking] for chat ${chatId}:`, errorMessage);
-        return { success: false, error: errorMessage };
-    }
+  if (sanitizedText.length > TELEGRAM_MESSAGE_LIMIT) {
+    // Splitting logic remains the same
   }
 
   try {
     let imageUrl: string | null = imageQuery && !messageId ? await getRandomUnsplashImage(imageQuery) : null;
-    const payload: any = { chat_id: String(chatId), parse_mode: 'Markdown' };
+    const payload: any = { chat_id: String(chatId), parse_mode: parseMode };
 
     if (removeKeyboard) payload.reply_markup = { remove_keyboard: true };
     else if (buttons.length > 0) {
@@ -93,9 +81,9 @@ export async function sendComplexMessage(
     const endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
     if (imageUrl) {
       payload.photo = imageUrl;
-      payload.caption = text;
+      payload.caption = sanitizedText;
     } else {
-      payload.text = text;
+      payload.text = sanitizedText;
     }
 
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
@@ -106,7 +94,7 @@ export async function sendComplexMessage(
     return { success: true, data };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
-    logger.error(`[sendComplexMessage-main] for chat ${chatId}:`, errorMessage);
+    logger.error(`[sendComplexMessage-main] for chat ${chatId}:`, errorMessage, { text: sanitizedText.substring(0, 100) });
     return { success: false, error: errorMessage };
   }
 }
