@@ -1,4 +1,3 @@
-// /components/VibeMapCalibrator.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -88,6 +87,22 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
     });
   };
 
+  const calibrationBoxStyle = () => {
+    if (!isCalibrating || Object.keys(positions).length < 2) return { display: 'none' };
+    const pos1 = positions['main_square'];
+    const pos2 = positions['airport'];
+    const left = Math.min(pos1.x, pos2.x);
+    const top = Math.min(pos1.y, pos2.y);
+    const width = Math.abs(pos1.x - pos2.x);
+    const height = Math.abs(pos1.y - pos2.y);
+    return {
+      left: `${left}%`,
+      top: `${top}%`,
+      width: `${width}%`,
+      height: `${height}%`,
+    };
+  };
+
   return (
     <TooltipProvider>
       <div className="space-y-4">
@@ -96,24 +111,28 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
           <Input value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} className="input-cyber mt-1" />
         </div>
         <div ref={mapContainerRef} className="relative w-full aspect-[16/10] bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30">
-          {mapUrl && <img src={mapUrl} alt="Map Background" className="absolute inset-0 w-full h-full object-contain opacity-50" />}
+          {mapUrl && <img src={mapUrl} alt="Map Background" className="absolute inset-0 w-full h-full object-contain opacity-50 pointer-events-none" />}
+          
+          <div style={calibrationBoxStyle()} className="absolute bg-brand-cyan/10 border-2 border-dashed border-brand-cyan pointer-events-none" />
+
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
               <motion.div
                 key={point.id}
                 drag
                 dragMomentum={false}
+                dragConstraints={mapContainerRef}
                 onDragEnd={(_, info) => {
                   if (!mapContainerRef.current) return;
                   const rect = mapContainerRef.current.getBoundingClientRect();
-                  const newX = ((info.point.x - rect.left) / rect.width) * 100;
-                  const newY = ((info.point.y - rect.top) / rect.height) * 100;
+                  const newX = Math.max(0, Math.min(100, ((info.point.x - rect.left) / rect.width) * 100));
+                  const newY = Math.max(0, Math.min(100, ((info.point.y - rect.top) / rect.height) * 100));
                   setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
                 }}
-                className="absolute w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50"
+                className="absolute w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50 z-10"
                 style={{ left: `${positions[point.id]?.x}%`, top: `${positions[point.id]?.y}%`, translateX: '-50%', translateY: '-50%' }}
               >
-                <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaMapMarkerAlt::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
               </motion.div>
             ))
           ) : (
