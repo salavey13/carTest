@@ -1,3 +1,4 @@
+// /components/VibeMapCalibrator.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -8,7 +9,7 @@ import { VibeContentRenderer } from './VibeContentRenderer';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
-import { saveMapPreset } from '@/app/actions';
+import { saveMapPreset } from '@/app/rentals/actions';
 
 interface Bounds { top: number; bottom: number; left: number; right: number; }
 interface Point { id: string; name: string; coords: [number, number]; }

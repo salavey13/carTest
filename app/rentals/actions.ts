@@ -1,3 +1,4 @@
+// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -264,5 +265,61 @@ export async function getPublicCrewInfo(slug: string) {
     } catch (error) {
         logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
+    try {
+        const { data, error } = await supabaseAdmin.from('maps').select('*');
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[getMapPresets Action] Error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
+}
+
+
+
+export async function saveMapPreset(
+    userId: string,
+    name: string,
+    map_image_url: string,
+    bounds: MapBounds,
+    is_default: boolean = false
+): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
+    try {
+        // Simple admin check
+        const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+        if (userError || !['admin'].includes(user?.role || '')) {
+            throw new Error("Unauthorized: Only admins can save map presets.");
+        }
+        
+        // If setting this as default, unset other defaults first
+        if (is_default) {
+            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
+            if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('maps')
+            .insert({
+                name,
+                map_image_url,
+                bounds: bounds as any, // Cast to any to satisfy Supabase type
+                is_default,
+                owner_id: userId
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return { success: true, data };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[saveMapPreset Action] Error:", errorMessage);
+        return { success: false, error: errorMessage };
     }
 }

@@ -1,7 +1,7 @@
 // /app/crews/page.tsx
 'use client';
 
-import { getAllPublicCrews, getMapPresets } from '@/app/actions';
+import { getAllPublicCrews, getMapPresets } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { VibeMap, MapPoint, MapBounds } from '@/components/VibeMap';
