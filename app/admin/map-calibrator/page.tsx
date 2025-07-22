@@ -1,20 +1,21 @@
-// /app/admin/map-calibrator/page.tsx
 "use client";
 
 import { VibeMapCalibrator } from "@/components/VibeMapCalibrator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+// These are deliberately inaccurate initial boundaries to demonstrate the calibration process.
 const INITIAL_MAP_BOUNDS = {
-  top:    56.422313387,
-  bottom: 56.123051835,
-  left:  43.354366846,
-  right: 44.435477408,
+  top: 56.4,
+  bottom: 56.2,
+  left: 43.8,
+  right: 44.2,
 };
 
 export default function MapCalibratorPage() {
     return (
         <div className="container mx-auto p-4 pt-24">
             <h1 className="text-4xl font-orbitron mb-8 text-brand-cyan">Калибровщик Карты</h1>
+
             <Card className="max-w-3xl mx-auto">
                 <CardHeader>
                     <CardTitle>Инструкция</CardTitle>
