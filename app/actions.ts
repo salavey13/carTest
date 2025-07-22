@@ -1,11 +1,10 @@
-// /app/actions.ts
 "use server"; 
 
 import {
   generateCarEmbedding, 
   supabaseAdmin, 
   fetchUserData as dbFetchUserData, 
-  updateUserMetadata as dbUpdateUserMetadata, // <--- ВОССТАНОВЛЕН АЛИАС
+  updateUserMetadata as dbUpdateUserMetadata,
   uploadImage, 
 } from "@/hooks/supabase"; 
 import axios from "axios";
@@ -18,6 +17,7 @@ import { getBaseUrl } from "@/lib/utils";
 import type { Database } from "@/types/database.types";
 import { Bucket } from '@supabase/storage-js'; 
 import { v4 as uuidv4 } from 'uuid'; 
+import { sendComplexMessage } from "./webhook-handlers/actions/sendComplexMessage";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 type UserSettings = User['metadata']; 
@@ -255,7 +255,7 @@ export async function confirmPayment(preCheckoutQueryId: string): Promise<{ succ
 }
 
 export async function notifyAdmin(message: string): Promise<{ success: boolean; error?: string }> {
-  const result = await sendTelegramMessage(message, [], undefined, ADMIN_CHAT_ID);
+  const result = await sendComplexMessage(ADMIN_CHAT_ID, message, []);
   if (!result.success) { logger.error(`Failed to notify primary admin (${ADMIN_CHAT_ID}): ${result.error}`); }
   return { success: result.success, error: result.error };
 }
@@ -268,7 +268,7 @@ export async function notifyAdmins(message: string): Promise<{ success: boolean;
     let allSuccessful = true;
     for (const admin of admins) {
       if (!admin.user_id) continue;
-      const result = await sendTelegramMessage(message, [], undefined, admin.user_id);
+      const result = await sendComplexMessage(admin.user_id, message, []);
       if (!result.success) { allSuccessful = false; logger.error(`Failed to notify admin ${admin.user_id}: ${result.error}`); }
     }
     return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to notify one or more admins" };
@@ -284,8 +284,8 @@ export async function notifyCarAdmin(carId: string, message: string): Promise<{ 
     if (error) { logger.error(`Error fetching car ${carId} for notification:`, error); return { success: false, error: `Failed to fetch car: ${error.message}` }; }
     if (!car) { logger.warn(`Car ${carId} not found for notification.`); return { success: false, error: `Car with ID ${carId} not found.` }; }
     if (!car.owner_id) { logger.warn(`Car ${carId} has no owner_id set for notification.`); return { success: true }; }
-    const adminId = car.owner_id; const baseUrl = getBaseUrl(); const fullMessage = `${message}\nCar: ${car.make || 'N/A'} ${car.model || 'N/A'}`; const buttons = [{ text: "View Car", url: `${baseUrl}/rent/${carId}` }];
-    const result = await sendTelegramMessage( fullMessage, buttons, car.image_url, adminId );
+    const adminId = car.owner_id; const baseUrl = getBaseUrl(); const fullMessage = `${message}\nCar: ${car.make || 'N/A'} ${car.model || 'N/A'}`; const buttons = [[{ text: "View Car", url: `${baseUrl}/rent/${carId}` }]];
+    const result = await sendComplexMessage( adminId, fullMessage, buttons, { imageQuery: car.image_url });
     if (!result.success) { logger.error(`Failed to notify car admin ${adminId} for car ${carId}: ${result.error}`); }
     return { success: result.success, error: result.error };
   } catch (error) {
@@ -302,7 +302,7 @@ export async function superNotification(message: string): Promise<{ success: boo
     if (!owners || owners.length === 0) { logger.warn("No car owners found for super notification."); return { success: true }; }
     logger.info(`Sending super notification to ${owners.length} owners.`);
     let allSuccessful = true;
-    for (const owner of owners) { if (!owner.owner_id) continue; const result = await sendTelegramMessage(message, [], undefined, owner.owner_id); if (!result.success) { allSuccessful = false; logger.error(`Failed to send super notification to owner ${owner.owner_id}: ${result.error}`); }}
+    for (const owner of owners) { if (!owner.owner_id) continue; const result = await sendComplexMessage(owner.owner_id, message, []); if (!result.success) { allSuccessful = false; logger.error(`Failed to send super notification to owner ${owner.owner_id}: ${result.error}`); }}
     return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to send super notification to one or more owners" };
    } catch(error) {
        logger.error("Error sending super notification:", error);
@@ -318,7 +318,7 @@ export async function broadcastMessage(message: string, role?: User['role']): Pr
     if (!users || users.length === 0) { logger.warn(`No users found for broadcast (role: ${role || 'all'}).`); return { success: true }; }
     logger.info(`Broadcasting message to ${users.length} users (role: ${role || 'all'}).`);
     let allSuccessful = true;
-    for (const user of users) { if (!user.user_id) continue; const result = await sendTelegramMessage(message, [], undefined, user.user_id); if (!result.success) { allSuccessful = false; logger.error(`Failed to broadcast message to user ${user.user_id}: ${result.error}`); } await delay(50); }
+    for (const user of users) { if (!user.user_id) continue; const result = await sendComplexMessage(user.user_id, message, []); if (!result.success) { allSuccessful = false; logger.error(`Failed to broadcast message to user ${user.user_id}: ${result.error}`); } await delay(50); }
     return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to broadcast message to one or more users" };
   } catch (error) {
       logger.error("Error during broadcast:", error);
@@ -334,7 +334,7 @@ export async function notifyCaptchaSuccess(userId: string, username?: string | n
 export async function notifySuccessfulUsers(userIds: string[]) {
   try {
     const message = `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`;
-    for (const userId of userIds) { const result = await sendTelegramMessage( message, [], undefined, userId ); if (!result.success) { console.error(`Failed to notify user ${userId}:`, result.error); }}
+    for (const userId of userIds) { const result = await sendComplexMessage( userId, message, [] ); if (!result.success) { console.error(`Failed to notify user ${userId}:`, result.error); }}
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Failed to notify users" };
@@ -346,7 +346,7 @@ export async function notifyUsers(userIds: string[], message: string): Promise<{
   logger.info(`Notifying ${userIds.length} users.`);
   let allSuccessful = true;
   try {
-    for (const userId of userIds) { const result = await sendTelegramMessage(message, [], undefined, userId); if (!result.success) { allSuccessful = false; logger.error(`Failed to notify user ${userId}:`, result.error); } await delay(50); }
+    for (const userId of userIds) { const result = await sendComplexMessage(userId, message, []); if (!result.success) { allSuccessful = false; logger.error(`Failed to notify user ${userId}:`, result.error); } await delay(50); }
     return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to notify one or more users" };
   } catch (error) {
      logger.error("Error notifying multiple users:", error);
@@ -359,7 +359,7 @@ export async function notifyWinners(winningNumber: number, winners: User[]): Pro
   try {
     const winnerNotificationMessage = `🎉 Congratulations! Your lucky number ${winningNumber} has been drawn in the Wheel of Fortune! You are a winner! 🏆`;
     let allWinnersNotified = true;
-    for (const winner of winners) { if (!winner.user_id) continue; const result = await sendTelegramMessage(winnerNotificationMessage, [], undefined, winner.user_id); if (!result.success) { allWinnersNotified = false; logger.error(`Failed to notify winner ${winner.user_id}: ${result.error}`); } await delay(50); }
+    for (const winner of winners) { if (!winner.user_id) continue; const result = await sendComplexMessage(winner.user_id, winnerNotificationMessage, []); if (!result.success) { allWinnersNotified = false; logger.error(`Failed to notify winner ${winner.user_id}: ${result.error}`); } await delay(50); }
     const winnerNames = winners.map((w) => w.username || w.full_name || w.user_id).join(", ");
     const adminMessage = `🎮 Wheel of Fortune Results:\nWinning Number: ${winningNumber}\nWinners (${winners.length}): ${winnerNames}`;
     const adminNotifyResult = await notifyAdmin(adminMessage); 
@@ -728,5 +728,60 @@ export async function getUserPaddockData(userId: string) {
     } catch(error) {
         logger.error(`Exception in getUserPaddockData for user ${userId}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching paddock data" };
+    }
+}
+
+
+export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
+    try {
+        const { data, error } = await supabaseAdmin.from('maps').select('*');
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[getMapPresets Action] Error:", errorMessage);
+        return { success: false, error: errorMessage };
+    }
+}
+
+export async function saveMapPreset(
+    userId: string,
+    name: string,
+    map_image_url: string,
+    bounds: MapBounds,
+    is_default: boolean = false
+): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
+    try {
+        // Simple admin check
+        const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+        if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) {
+            throw new Error("Unauthorized: Only admins can save map presets.");
+        }
+        
+        // If setting this as default, unset other defaults first
+        if (is_default) {
+            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
+            if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('maps')
+            .insert({
+                name,
+                map_image_url,
+                bounds: bounds as any, // Cast to any to satisfy Supabase type
+                is_default,
+                owner_id: userId
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return { success: true, data };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        logger.error("[saveMapPreset Action] Error:", errorMessage);
+        return { success: false, error: errorMessage };
     }
 }
