@@ -37,6 +37,14 @@ interface Vehicle {
 
 const RUB_TO_STARS_RATE = 1;
 
+// --- NEW: Mapping from survey answers to bike types ---
+const SURVEY_TO_BIKE_TYPE_MAP: Record<string, string> = {
+  "Агрессивный нейкед (стритфайтер)": "Naked",
+  "Суперспорт (обтекатели, поза эмбриона)": "Supersport",
+  "Спорт-турист (мощность и комфорт)": "Sport-tourer", // Assuming this type exists in your data
+  "Нео-ретро (стиль и харизма)": "Neo-retro" // Assuming this type exists in your data
+};
+
 export default function RentBikePage() {
   const router = useRouter();
   const { user: tgUser, isInTelegramContext, dbUser, isAdmin } = useAppContext();
@@ -51,6 +59,15 @@ export default function RentBikePage() {
   const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // --- NEW: Get recommended type from user metadata ---
+  const recommendedType = useMemo(() => {
+    const surveyStyle = dbUser?.metadata?.survey_results?.bike_style;
+    if (typeof surveyStyle === 'string') {
+      return SURVEY_TO_BIKE_TYPE_MAP[surveyStyle] || null;
+    }
+    return null;
+  }, [dbUser]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -64,11 +81,17 @@ export default function RentBikePage() {
           const types = new Set(bikes.map(b => b.specs?.type).filter(Boolean));
           setAvailableBikeTypes(["All", ...Array.from(types) as string[]]);
 
-          if (bikes.length > 0) {
+          // --- NEW: Set initial filter and selected bike based on recommendation ---
+          if (recommendedType && bikes.some(b => b.specs?.type === recommendedType)) {
+            setActiveFilter(recommendedType);
+            setSelectedBike(bikes.find(b => b.specs?.type === recommendedType) || bikes[0]);
+            toast.success(`Подобрали для тебя ${recommendedType} байки!`);
+          } else if (bikes.length > 0) {
             setSelectedBike(bikes[0]);
           } else {
             toast.info("В гараже пока нет байков.");
           }
+
         } else {
             toast.error(response.error || "Ошибка загрузки гаража!");
         }
@@ -80,7 +103,7 @@ export default function RentBikePage() {
       }
     };
     loadData();
-  }, []);
+  }, [recommendedType]); // Re-run if recommendation changes
   
   useEffect(() => {
     const checkSubscription = async () => {
@@ -95,9 +118,23 @@ export default function RentBikePage() {
   }, [dbUser]);
   
   const filteredBikes = useMemo(() => {
-    if (activeFilter === "All") return vehicles;
-    return vehicles.filter(bike => bike.specs?.type === activeFilter);
-  }, [activeFilter, vehicles]);
+    let bikesToShow = vehicles;
+    if (activeFilter !== "All") {
+      bikesToShow = vehicles.filter(bike => bike.specs?.type === activeFilter);
+    }
+    
+    // --- NEW: Sort to show recommended bikes first ---
+    if (recommendedType) {
+      bikesToShow.sort((a, b) => {
+        const aIsRecommended = a.specs?.type === recommendedType;
+        const bIsRecommended = b.specs?.type === recommendedType;
+        if (aIsRecommended && !bIsRecommended) return -1;
+        if (!aIsRecommended && bIsRecommended) return 1;
+        return 0;
+      });
+    }
+    return bikesToShow;
+  }, [activeFilter, vehicles, recommendedType]);
 
   const handleRent = async () => {
     if (!selectedBike || !tgUser || !isInTelegramContext) {
@@ -176,7 +213,7 @@ export default function RentBikePage() {
         <h1 className="text-5xl md:text-7xl font-bold font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan via-brand-pink to-brand-yellow animate-glitch" data-text="MOTO-GARAGE">
           MOTO-GARAGE
         </h1>
-        <p className="text-muted-foreground font-mono mt-2">Выбери своего зверя</p>
+        <p className="text-muted-foreground font-mono mt-2">{recommendedType ? `Рекомендуем для тебя: ${recommendedType}` : "Выбери своего зверя"}</p>
       </motion.header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
@@ -193,11 +230,12 @@ export default function RentBikePage() {
                 key={type}
                 onClick={() => setActiveFilter(type)}
                 className={cn(
-                  "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono",
+                  "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative",
                   activeFilter === type ? "bg-brand-cyan text-black shadow-[0_0_10px_theme(colors.brand.cyan)]" : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 )}
               >
                 {type}
+                {type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute -top-1 -right-1 text-yellow-400 w-3 h-3"/>}
               </button>
             ))}
           </div>
@@ -212,10 +250,11 @@ export default function RentBikePage() {
                   exit={{ opacity: 0, x: 20 }}
                   onClick={() => setSelectedBike(bike)}
                   className={cn(
-                    "flex items-center gap-4 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 bg-dark-card/70 hover:bg-dark-card backdrop-blur-sm",
+                    "flex items-center gap-4 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 bg-dark-card/70 hover:bg-dark-card backdrop-blur-sm relative",
                     selectedBike?.id === bike.id ? "border-brand-cyan shadow-lg shadow-brand-cyan/20" : "border-border hover:border-brand-cyan/50"
                   )}
                 >
+                  {bike.specs?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 right-2 text-yellow-400 w-4 h-4 text-shadow-brand-yellow"/>}
                   <Image src={bike.image_url} alt={bike.model} width={80} height={80} className="rounded-md object-cover aspect-square" />
                   <div>
                     <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
@@ -266,7 +305,6 @@ export default function RentBikePage() {
                         value={rentDays}
                         onChange={e => {
                           const value = Number(e.target.value);
-                          // Prevent NaN from being set. Fallback to 1 if input is invalid or less than 1.
                           setRentDays(isNaN(value) || value < 1 ? 1 : value);
                         }}
                         className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono text-center text-lg"
