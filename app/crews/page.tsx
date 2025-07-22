@@ -1,5 +1,4 @@
-// /app/crews/page.tsx
-'use client';
+"use client";
 
 import { getAllPublicCrews, getMapPresets } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
@@ -11,6 +10,7 @@ import { Suspense, useEffect, useState, useMemo } from 'react';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { motion } from 'framer-motion';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 
 type Crew = Database['public']['Views']['crews_with_stats']['Row'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
@@ -18,8 +18,8 @@ type MapPreset = Database['public']['Tables']['maps']['Row'];
 const FALLBACK_MAP: MapPreset = {
     id: 'fallback-map',
     name: 'Стандартная Карта',
-    map_image_url: 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
-    bounds: { top: 56.422313387, bottom: 56.123051835, left: 43.354366846, right: 44.435477408 } as MapBounds,
+    map_image_url: 'https://i.imgur.com/22n6k1V.png',
+    bounds: { top: 56.38, bottom: 56.25, left: 43.85, right: 44.15 } as MapBounds,
     is_default: true,
     created_at: new Date().toISOString(),
     owner_id: null,
@@ -164,7 +164,7 @@ export default function CrewsPage() {
                     title="Создать Экипаж"
                     whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.95 }}
                 >
-                    <VibeContentRenderer content="::FaCirclePlus::" className="h-8 w-8"/>
+                    <VibeContentRenderer content="::FaCirclePlus::" className="h-5 w-5"/>
                 </motion.div>
             </Link>
         </div>
