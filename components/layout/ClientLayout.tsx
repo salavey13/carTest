@@ -85,6 +85,7 @@ const DYNAMIC_ROUTE_PATTERNS: Record<string, [string, string?]> = {
     "crew": ["/crews"],
     "rental": ["/rentals", "action"], // [basePath, queryParamNameForAction]
     "lead": ["/leads"],
+    "rent": ["/rent"],
 };
 
 const TRANSPARENT_LAYOUT_PAGES = [
@@ -126,7 +127,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
                 const id = parts.slice(1).join('_');
                 targetPath = `${basePath}/${id}?${actionParamName}=${action}`;
             } else {
-                const slug = parts.join('_');
+                const slug = parts.join('-');
                 targetPath = `${basePath}/${slug}`;
             }
         }
@@ -186,6 +187,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
               <Suspense fallback={<Loading variant="bike" text="🕶️" />}>
+
               <LayoutLogicController>{children}</LayoutLogicController>
               </Suspense>
           </ErrorBoundaryForOverlay>
