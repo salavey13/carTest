@@ -49,16 +49,16 @@ ALTER TABLE public.rentals ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view their own rentals" 
 ON public.rentals FOR SELECT
-USING (auth.jwt() ->> 'sub' = user_id);
+USING (auth.jwt() ->> 'chat_id' = user_id);
 
 CREATE POLICY "Owners can view rentals of their vehicles" 
 ON public.rentals FOR SELECT
-USING (auth.jwt() ->> 'sub' = owner_id);
+USING (auth.jwt() ->> 'chat_id' = owner_id);
 
 CREATE POLICY "Users can create their own rental interests"
 ON public.rentals FOR INSERT
-WITH CHECK (auth.jwt() ->> 'sub' = user_id);
+WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
 
 CREATE POLICY "Owners and Renters can update their rental agreement"
 ON public.rentals FOR UPDATE
-USING (auth.jwt() ->> 'sub' = user_id OR auth.jwt() ->> 'sub' = owner_id);
+USING (auth.jwt() ->> 'chat_id' = user_id OR auth.jwt() ->> 'chat_id' = owner_id);
