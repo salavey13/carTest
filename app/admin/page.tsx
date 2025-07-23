@@ -1,31 +1,65 @@
-// /app/admin/page.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { toast } from "sonner";
-import { debugLogger as logger } from "@/lib/debugLogger";
 import { Loading } from "@/components/Loading";
 import Image from "next/image";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { supabaseAdmin } from "@/hooks/supabase";
+import type { Database } from "@/types/database.types";
+
+type Vehicle = Database['public']['Tables']['cars']['Row'];
 
 export default function AdminPage() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
+  const [userVehicles, setUserVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
+
+  const fetchUserVehicles = useCallback(async () => {
+    if (!dbUser?.user_id) return;
+    setIsFetchingVehicles(true);
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('cars')
+        .select('*')
+        .eq('owner_id', dbUser.user_id);
+
+      if (error) throw error;
+      setUserVehicles(data || []);
+    } catch (error) {
+      toast.error("Не удалось загрузить ваш транспорт.");
+    } finally {
+      setIsFetchingVehicles(false);
+    }
+  }, [dbUser?.user_id]);
 
   useEffect(() => {
-    logger.debug("[AdminPage] useEffect triggered", { dbUserExists: !!dbUser, appContextLoading });
-
     if (!appContextLoading && typeof isAdmin === 'function') {
       const adminStatus = isAdmin();
       setIsTrulyAdmin(adminStatus);
-      if(adminStatus) {
+      if (adminStatus) {
         toast.success("Vibe Control Center: Все системы в норме, Командир.");
+        fetchUserVehicles();
       }
     }
-  }, [appContextLoading, isAdmin, dbUser]);
+  }, [appContextLoading, isAdmin, fetchUserVehicles]);
+
+  const handleVehicleSelect = (vehicleId: string) => {
+    const vehicle = userVehicles.find(v => v.id === vehicleId);
+    setSelectedVehicle(vehicle || null);
+  };
+  
+  const handleFormSuccess = () => {
+      fetchUserVehicles(); // Refresh the list after any successful operation
+      setSelectedVehicle(null); // Reset to "create new" mode
+  };
 
   if (appContextLoading) { 
     return <Loading text="ПРОВЕРКА ДОСТУПА..." />;
@@ -56,10 +90,29 @@ export default function AdminPage() {
             <VibeContentRenderer content="::FaSatelliteDish::" className="h-8 w-8 animate-pulse text-shadow-cyber" /> VIBE CONTROL CENTER
           </h2>
           <p className="text-brand-orange mb-8 text-base font-mono text-center">
-            Добавь свой транспорт в систему и стань частью флота.
+            {selectedVehicle ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` : 'Добавь свой транспорт в систему и стань частью флота.'}
           </p>
+
+          <div className="mb-6 space-y-2">
+            <label className="text-sm font-mono text-muted-foreground">УПРАВЛЕНИЕ ГАРАЖОМ</label>
+            <div className="flex gap-2">
+                <Select onValueChange={handleVehicleSelect} disabled={isFetchingVehicles}>
+                    <SelectTrigger className="input-cyber flex-1">
+                        <SelectValue placeholder="Выберите транспорт для редактирования..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {userVehicles.map(v => (
+                            <SelectItem key={v.id} value={v.id}>{v.make} {v.model}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={() => setSelectedVehicle(null)}>
+                    <VibeContentRenderer content="::FaPlus:: Создать новый"/>
+                </Button>
+            </div>
+          </div>
           
-          <CarSubmissionForm ownerId={dbUser?.user_id} />
+          <CarSubmissionForm ownerId={dbUser?.user_id} vehicleToEdit={selectedVehicle} onSuccess={handleFormSuccess} />
 
           <div className="mt-10 pt-8 border-t-2 border-dashed border-brand-purple/20 space-y-4 md:space-y-0 md:flex md:justify-center md:items-center md:gap-6">
             <Link
