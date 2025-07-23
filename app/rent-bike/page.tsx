@@ -13,6 +13,7 @@ import { sendTelegramInvoice } from "@/app/actions";
 import { getVehiclesWithStatus } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 type VehicleWithStatus = Awaited<ReturnType<typeof getVehiclesWithStatus>>['data'] extends (infer U)[] ? U : never;
 
