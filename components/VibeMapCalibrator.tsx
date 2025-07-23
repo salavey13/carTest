@@ -109,9 +109,39 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
     setCalculatedBounds({ top: newTop, bottom: newBottom, left: newLeft, right: newRight });
   }, [positions, isCalibrating, imageSize]);
 
-  const handleSave = async () => { /* ... (same as before) ... */ };
+  const handleSave = async () => {
+    if (!calculatedBounds || !presetName.trim() || !dbUser?.user_id) {
+      toast.error("Имя пресета и вычисленные границы обязательны для сохранения.");
+      return;
+    }
+    setIsSaving(true);
+    const promise = saveMapPreset(dbUser.user_id, presetName.trim(), mapUrl, calculatedBounds, false);
+    toast.promise(promise, {
+      loading: "Сохранение пресета карты...",
+      success: (res) => {
+        if (res.success) {
+          setIsCalibrating(false);
+          setBounds(calculatedBounds);
+          return `Пресет "${res.data?.name}" успешно сохранен!`;
+        }
+        throw new Error(res.error);
+      },
+      error: (err) => `Ошибка сохранения: ${err.message}`,
+      finally: () => setIsSaving(false),
+    });
+  };
 
-  const calibrationBoxStyle = () => { /* ... (same as before) ... */ };
+  const calibrationBoxStyle = () => {
+    if (!isCalibrating || Object.keys(positions).length < 2) return { display: 'none' };
+    const pos1 = positions['aska'];
+    const pos2 = positions['airport'];
+    if (!pos1 || !pos2) return { display: 'none' };
+    const left = Math.min(pos1.x, pos2.x);
+    const top = Math.min(pos1.y, pos2.y);
+    const width = Math.abs(pos1.x - pos2.x);
+    const height = Math.abs(pos1.y - pos2.y);
+    return { left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%` };
+  };
 
   return (
     <TooltipProvider>
@@ -150,51 +180,23 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
             })
           )}
         </div>
-        {!isCalibrating ? ( <Button onClick={startCalibration} className="w-full"><VibeContentRenderer content="::FaRulerCombined:: Начать Калибровку"/></Button> ) : ( /* ... (rest is the same) ... */ )}
+        {!isCalibrating ? ( <Button onClick={startCalibration} className="w-full"><VibeContentRenderer content="::FaRulerCombined:: Начать Калибровку"/></Button> ) : (
+          <div className="bg-card/50 p-4 rounded-lg space-y-4">
+            <h3 className="font-orbitron">Перетащи точки на их реальные места на карте</h3>
+            {calculatedBounds && (
+              <div className="space-y-2">
+                <h4 className="font-mono text-brand-cyan">Новые Границы:</h4>
+                <pre className="text-xs bg-black/30 p-2 rounded overflow-x-auto simple-scrollbar">{JSON.stringify(calculatedBounds, null, 2)}</pre>
+                <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Название пресета (e.g., Nizhny Novgorod Center)" className="input-cyber" />
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button onClick={handleSave} disabled={!calculatedBounds || !presetName.trim() || isSaving} className="flex-1"><VibeContentRenderer content="::FaSave:: Сохранить"/></Button>
+              <Button onClick={() => setIsCalibrating(false)} variant="secondary" className="flex-1">Отмена</Button>
+            </div>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );
-}
-
-// /app/admin/map-calibrator/page.tsx
-"use client";
-
-import { VibeMapCalibrator } from "@/components/VibeMapCalibrator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-// These are deliberately inaccurate initial boundaries to demonstrate the calibration process.
-const INITIAL_MAP_BOUNDS = {
-  top: 56.4,
-  bottom: 56.2,
-  left: 43.7,
-  right: 44.1,
-};
-
-export default function MapCalibratorPage() {
-    return (
-        <div className="container mx-auto p-4 pt-24">
-            <h1 className="text-4xl font-orbitron mb-8 text-brand-cyan">Калибровщик Карты</h1>
-            <Card className="max-w-3xl mx-auto">
-                <CardHeader>
-                    <CardTitle>Инструкция</CardTitle>
-                    <CardDescription className="font-mono">
-                        Этот инструмент поможет вам определить точные географические границы для любого изображения карты и сохранить их как пресет.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                   <ol className="list-decimal list-inside space-y-2 text-sm">
-                        <li>Вставьте URL вашего изображения карты.</li>
-                        <li>Нажмите "Начать Калибровку". Появятся два зеленых маркера.</li>
-                        <li>Перетащите маркер "Аська" на место легендарного байк-поста на набережной.</li>
-                        <li>Перетащите маркер "Аэропорт" на место аэропорта.</li>
-                        <li>Ниже появятся вычисленные географические границы, а на карте - рамка калибровки.</li>
-                        <li>Введите название для вашего пресета и нажмите "Сохранить".</li>
-                   </ol>
-                    <div className="pt-4 border-t border-border">
-                         <VibeMapCalibrator initialBounds={INITIAL_MAP_BOUNDS} />
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    );
 }
