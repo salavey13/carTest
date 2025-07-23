@@ -1,14 +1,14 @@
-// /app/admin/map-calibrator/page.tsx
 "use client";
 
 import { VibeMapCalibrator } from "@/components/VibeMapCalibrator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+// These are deliberately inaccurate initial boundaries to demonstrate the calibration process.
 const INITIAL_MAP_BOUNDS = {
-  top:    56.422313387,
-  bottom: 56.123051835,
-  left:  43.354366846,
-  right: 44.435477408,
+  top: 56.4,
+  bottom: 56.2,
+  left: 43.7,
+  right: 44.1,
 };
 
 export default function MapCalibratorPage() {
@@ -26,9 +26,9 @@ export default function MapCalibratorPage() {
                    <ol className="list-decimal list-inside space-y-2 text-sm">
                         <li>Вставьте URL вашего изображения карты.</li>
                         <li>Нажмите "Начать Калибровку". Появятся два зеленых маркера.</li>
-                        <li>Перетащите маркер "Главная Площадь" на место главной площади на вашей карте.</li>
+                        <li>Перетащите маркер "Аська" на место легендарного байк-поста на набережной.</li>
                         <li>Перетащите маркер "Аэропорт" на место аэропорта.</li>
-                        <li>Ниже появятся вычисленные географические границы.</li>
+                        <li>Ниже появятся вычисленные географические границы, а на карте - рамка калибровки.</li>
                         <li>Введите название для вашего пресета и нажмите "Сохранить".</li>
                    </ol>
                     <div className="pt-4 border-t border-border">
