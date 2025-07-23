@@ -5,7 +5,7 @@ INSERT INTO public.maps (name, map_image_url, bounds, is_default, points_of_inte
 VALUES (
     'Карта Нижнего Новгорода',
     'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg',
-    '{ "top": 56.3392, "bottom": 56.285, "left": 43.963, "right": 44.052 }',
+    '{ "top": 56.3601, "bottom": 56.1834, "left": 43.74, "right": 44.09 }'::jsonb,
     true,
     '[
         {
