@@ -17,8 +17,8 @@ interface PixelPosition { x: number; y: number; }
 interface ImageDimensions { width: number; height: number; }
 
 const REFERENCE_POINTS: Point[] = [
-  { id: 'aska', name: 'Аська', coords: [56.330, 44.018] },
-  { id: 'airport', name: 'Аэропорт Стригино', coords: [56.229, 43.784] },
+  { id: 'kremlin_corner', name: 'Кремль (угол)', coords: [56.3283, 44.0059] },
+  { id: 'stadium_corner', name: 'Стадион (угол)', coords: [56.3340, 43.9650] },
 ];
 const DEFAULT_MAP_URL = 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250721_203250-d268820b-f598-42ce-b8af-60689a7cc79e.jpg';
 
@@ -73,8 +73,8 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
 
   useEffect(() => {
     if (!isCalibrating || Object.keys(positions).length < 2 || !imageSize || !mapContainerRef.current) return;
-    const p1 = REFERENCE_POINTS[0]; // aska
-    const p2 = REFERENCE_POINTS[1]; // airport
+    const p1 = REFERENCE_POINTS[0]; 
+    const p2 = REFERENCE_POINTS[1]; 
     const pos1 = positions[p1.id];
     const pos2 = positions[p2.id];
 
@@ -133,8 +133,8 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
 
   const calibrationBoxStyle = () => {
     if (!isCalibrating || Object.keys(positions).length < 2) return { display: 'none' };
-    const pos1 = positions['aska'];
-    const pos2 = positions['airport'];
+    const pos1 = positions[REFERENCE_POINTS[0].id];
+    const pos2 = positions[REFERENCE_POINTS[1].id];
     if (!pos1 || !pos2) return { display: 'none' };
     const left = Math.min(pos1.x, pos2.x);
     const top = Math.min(pos1.y, pos2.y);
@@ -176,7 +176,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
             imageSize && mapContainerRef.current && REFERENCE_POINTS.map(point => {
               const pos = project(point.coords[0], point.coords[1], bounds, imageSize, mapContainerRef.current!.getBoundingClientRect());
               if (!pos) return null;
-              return <div key={point.id} className={cn("absolute w-4 h-4 rounded-full", point.id === 'aska' ? 'bg-brand-pink' : 'bg-brand-cyan')} style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }} />;
+              return <div key={point.id} className={cn("absolute w-4 h-4 rounded-full", point.id === 'kremlin_corner' ? 'bg-brand-pink' : 'bg-brand-cyan')} style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }} />;
             })
           )}
         </div>
