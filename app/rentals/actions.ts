@@ -6,6 +6,27 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { sendComplexMessage } from "../webhook-handlers/actions/sendComplexMessage";
 import { getBaseUrl } from "@/lib/utils";
 import { v4 as uuidv4 } from 'uuid';
+import { Database } from "@/types/database.types";
+
+type MapBounds = { top: number; bottom: number; left: number; right: number; };
+type PointOfInterest = { id: string; name: string; type: 'point' | 'path' | 'loop'; icon: string; color: string; coords: [number, number][]; };
+
+
+export async function getVehiclesWithStatus() {
+    noStore();
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_vehicles_with_status');
+        if (error) {
+            logger.error('Error calling get_vehicles_with_status RPC:', error);
+            throw error;
+        }
+        return { success: true, data };
+    } catch (error) {
+        logger.error("Exception in getVehiclesWithStatus action:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
 
 export async function getRentalDetails(rentalId: string, userId: string) {
     noStore();
@@ -194,7 +215,6 @@ export async function getUserRentals(userId: string) {
         if (crewError) throw crewError;
         const ownedCrewIds = ownedCrews?.map(c => c.id) || [];
 
-        // This RPC needs to be created in Supabase
         const { data, error } = await supabaseAdmin.rpc('get_user_rentals_dashboard', {
             p_user_id: userId,
             p_owned_crew_ids: ownedCrewIds.length > 0 ? ownedCrewIds : null
@@ -279,8 +299,6 @@ export async function getMapPresets(): Promise<{ success: boolean; data?: Databa
     }
 }
 
-
-
 export async function saveMapPreset(
     userId: string,
     name: string,
@@ -289,14 +307,11 @@ export async function saveMapPreset(
     is_default: boolean = false
 ): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
     try {
-        // Simple admin check
-
         const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
-        if (userError || !['admin'].includes(user?.role || '')) {
+        if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) {
             throw new Error("Unauthorized: Only admins can save map presets.");
         }
         
-        // If setting this as default, unset other defaults first
         if (is_default) {
             const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
             if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
@@ -304,18 +319,11 @@ export async function saveMapPreset(
 
         const { data, error } = await supabaseAdmin
             .from('maps')
-            .insert({
-                name,
-                map_image_url,
-                bounds: bounds as any, // Cast to any to satisfy Supabase type
-                is_default,
-                owner_id: userId
-            })
+            .insert({ name, map_image_url, bounds: bounds as any, is_default, owner_id: userId })
             .select()
             .single();
 
         if (error) throw error;
-
         return { success: true, data };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";

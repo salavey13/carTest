@@ -8,49 +8,29 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
-import { fetchCars, createInvoice, getUserSubscription } from "@/hooks/supabase";
+import { createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
+import { getVehiclesWithStatus } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
-import Link from "next/link";
 import { Label } from "@/components/ui/label";
 
-// Define interfaces locally for clarity
-interface Vehicle {
-  id: string;
-  make: string;
-  model: string;
-  daily_price: number;
-  image_url: string;
-  type: 'car' | 'bike';
-  description: string;
-  owner_id: string;
-  specs?: {
-    engine_cc?: number;
-    horsepower?: number;
-    weight_kg?: number;
-    top_speed_kmh?: number;
-    type?: string;
-    electronics?: string[];
-    [key: string]: any;
-  };
-}
+type VehicleWithStatus = Awaited<ReturnType<typeof getVehiclesWithStatus>>['data'] extends (infer U)[] ? U : never;
 
 const RUB_TO_STARS_RATE = 1;
 
-// --- NEW: Mapping from survey answers to bike types ---
 const SURVEY_TO_BIKE_TYPE_MAP: Record<string, string> = {
   "Агрессивный нейкед (стритфайтер)": "Naked",
   "Суперспорт (обтекатели, поза эмбриона)": "Supersport",
-  "Спорт-турист (мощность и комфорт)": "Sport-tourer", // Assuming this type exists in your data
-  "Нео-ретро (стиль и харизма)": "Neo-retro" // Assuming this type exists in your data
+  "Спорт-турист (мощность и комфорт)": "Sport-tourer",
+  "Нео-ретро (стиль и харизма)": "Neo-retro"
 };
 
 export default function RentBikePage() {
   const router = useRouter();
-  const { user: tgUser, isInTelegramContext, dbUser, isAdmin } = useAppContext();
+  const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [selectedBike, setSelectedBike] = useState<Vehicle | null>(null);
+  const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
+  const [selectedBike, setSelectedBike] = useState<VehicleWithStatus | null>(null);
   const [rentDays, setRentDays] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("All");
@@ -60,10 +40,10 @@ export default function RentBikePage() {
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // --- NEW: Get recommended type from user metadata ---
   const recommendedType = useMemo(() => {
-    const surveyStyle = dbUser?.metadata?.survey_results?.bike_style;
-    if (typeof surveyStyle === 'string') {
+    const surveyResults = dbUser?.metadata?.survey_results as Record<string, string> | undefined;
+    const surveyStyle = surveyResults?.bike_style;
+    if (surveyStyle) {
       return SURVEY_TO_BIKE_TYPE_MAP[surveyStyle] || null;
     }
     return null;
@@ -73,25 +53,23 @@ export default function RentBikePage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const response = await fetchCars();
+        const response = await getVehiclesWithStatus();
         if (response.success && response.data) {
           const bikes = response.data.filter(v => v.type === 'bike');
           setVehicles(bikes);
           
-          const types = new Set(bikes.map(b => b.specs?.type).filter(Boolean));
+          const types = new Set(bikes.map(b => (b.specs as any)?.type).filter(Boolean));
           setAvailableBikeTypes(["All", ...Array.from(types) as string[]]);
 
-          // --- NEW: Set initial filter and selected bike based on recommendation ---
-          if (recommendedType && bikes.some(b => b.specs?.type === recommendedType)) {
+          if (recommendedType && bikes.some(b => (b.specs as any)?.type === recommendedType)) {
             setActiveFilter(recommendedType);
-            setSelectedBike(bikes.find(b => b.specs?.type === recommendedType) || bikes[0]);
+            setSelectedBike(bikes.find(b => (b.specs as any)?.type === recommendedType && b.availability === 'available') || bikes.find(b => b.availability === 'available') || bikes[0]);
             toast.success(`Подобрали для тебя ${recommendedType} байки!`);
           } else if (bikes.length > 0) {
-            setSelectedBike(bikes[0]);
+            setSelectedBike(bikes.find(b => b.availability === 'available') || bikes[0]);
           } else {
             toast.info("В гараже пока нет байков.");
           }
-
         } else {
             toast.error(response.error || "Ошибка загрузки гаража!");
         }
@@ -103,7 +81,7 @@ export default function RentBikePage() {
       }
     };
     loadData();
-  }, [recommendedType]); // Re-run if recommendation changes
+  }, [recommendedType]);
   
   useEffect(() => {
     const checkSubscription = async () => {
@@ -120,14 +98,13 @@ export default function RentBikePage() {
   const filteredBikes = useMemo(() => {
     let bikesToShow = vehicles;
     if (activeFilter !== "All") {
-      bikesToShow = vehicles.filter(bike => bike.specs?.type === activeFilter);
+      bikesToShow = vehicles.filter(bike => (bike.specs as any)?.type === activeFilter);
     }
     
-    // --- NEW: Sort to show recommended bikes first ---
     if (recommendedType) {
       bikesToShow.sort((a, b) => {
-        const aIsRecommended = a.specs?.type === recommendedType;
-        const bIsRecommended = b.specs?.type === recommendedType;
+        const aIsRecommended = (a.specs as any)?.type === recommendedType;
+        const bIsRecommended = (b.specs as any)?.type === recommendedType;
         if (aIsRecommended && !bIsRecommended) return -1;
         if (!aIsRecommended && bIsRecommended) return 1;
         return 0;
@@ -142,10 +119,14 @@ export default function RentBikePage() {
       toast.error("Сначала подключись к Telegram!");
       return;
     }
+    if (selectedBike.availability === 'taken') {
+        toast.error("Этот байк уже занят!");
+        return;
+    }
     setInvoiceLoading(true);
     setError(null);
     try {
-      const totalPriceRub = selectedBike.daily_price * rentDays;
+      const totalPriceRub = selectedBike.daily_price! * rentDays;
       const totalPriceStars = Math.round(totalPriceRub * RUB_TO_STARS_RATE);
       const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars;
       
@@ -169,13 +150,8 @@ export default function RentBikePage() {
         : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceRub} ₽)`;
 
       const response = await sendTelegramInvoice(
-        tgUser.id.toString(),
-        `Аренда ${selectedBike.make} ${selectedBike.model}`,
-        description,
-        invoiceId,
-        finalPrice,
-        undefined,
-        selectedBike.image_url
+        tgUser.id.toString(), `Аренда ${selectedBike.make} ${selectedBike.model}`,
+        description, invoiceId, finalPrice, undefined, selectedBike.image_url!
       );
 
       if (!response.success) throw new Error(response.error || "Ошибка отправки счета");
@@ -199,15 +175,12 @@ export default function RentBikePage() {
       <div className="fixed inset-0 z-[-1] opacity-30">
         <Image
           src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
-          alt="Moto Garage Background"
-          fill
-          className="object-cover animate-pan-zoom"
+          alt="Moto Garage Background" fill className="object-cover animate-pan-zoom"
         />
         <div className="absolute inset-0 bg-black/60"></div>
       </div>
       <motion.header 
-        initial={{ opacity: 0, y: -50 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }}
         className="text-center mb-12"
       >
         <h1 className="text-5xl md:text-7xl font-bold font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan via-brand-pink to-brand-yellow animate-glitch" data-text="MOTO-GARAGE">
@@ -217,20 +190,14 @@ export default function RentBikePage() {
       </motion.header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-        {/* Bike Selection Grid */}
         <motion.div 
-          initial={{ opacity: 0, x: -100 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          initial={{ opacity: 0, x: -100 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, ease: "easeOut" }}
           className="lg:col-span-1 space-y-6"
         >
           <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg backdrop-blur-sm">
             {availableBikeTypes.map(type => (
-              <button
-                key={type}
-                onClick={() => setActiveFilter(type)}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative",
+              <button key={type} onClick={() => setActiveFilter(type)}
+                className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative",
                   activeFilter === type ? "bg-brand-cyan text-black shadow-[0_0_10px_theme(colors.brand.cyan)]" : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 )}
               >
@@ -243,89 +210,74 @@ export default function RentBikePage() {
             <AnimatePresence>
               {filteredBikes.map(bike => (
                 <motion.div
-                  key={bike.id}
-                  layout
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
+                  key={bike.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
                   onClick={() => setSelectedBike(bike)}
-                  className={cn(
-                    "flex items-center gap-4 p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 bg-dark-card/70 hover:bg-dark-card backdrop-blur-sm relative",
-                    selectedBike?.id === bike.id ? "border-brand-cyan shadow-lg shadow-brand-cyan/20" : "border-border hover:border-brand-cyan/50"
+                  className={cn( "p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 bg-dark-card/70 hover:bg-dark-card backdrop-blur-sm relative",
+                    selectedBike?.id === bike.id ? "border-brand-cyan shadow-lg shadow-brand-cyan/20" : "border-border hover:border-brand-cyan/50",
+                    bike.availability === 'taken' && 'opacity-50'
                   )}
                 >
-                  {bike.specs?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 right-2 text-yellow-400 w-4 h-4 text-shadow-brand-yellow"/>}
-                  <Image src={bike.image_url} alt={bike.model} width={80} height={80} className="rounded-md object-cover aspect-square" />
-                  <div>
-                    <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
-                    <p className="text-sm text-brand-pink font-mono">{bike.daily_price}₽ / день</p>
-                    <p className="text-xs text-muted-foreground font-mono">Гараж: {bike.owner_id}</p>
-                  </div>
+                    <div className="flex items-center gap-4">
+                        <Image src={bike.image_url!} alt={bike.model!} width={80} height={80} className="rounded-md object-cover aspect-square" />
+                        <div>
+                            <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
+                            <p className="text-sm text-brand-pink font-mono">{bike.daily_price}₽ / день</p>
+                            <p className="text-xs text-muted-foreground font-mono">{bike.crew_name || `Владелец: ${bike.owner_id}`}</p>
+                        </div>
+                    </div>
+                    {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-brand-lime shadow-lime-glow"/>}
+                    <div className={cn("absolute bottom-2 right-2 text-xs font-mono flex items-center gap-1 p-1 rounded",
+                        bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400')}>
+                        {bike.availability === 'available' ? <VibeContentRenderer content="::FaCircleCheck::"/> : <VibeContentRenderer content="::FaClock::"/>}
+                        <span>{bike.availability === 'available' ? 'Свободен' : 'Занят'}</span>
+                    </div>
+                     {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-yellow-400 w-4 h-4 text-shadow-brand-yellow"/>}
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         </motion.div>
 
-        {/* Selected Bike Display */}
         <div className="lg:col-span-2">
           <AnimatePresence mode="wait">
             {selectedBike && (
-              <motion.div
-                key={selectedBike.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.4 }}
-                className="sticky top-24"
-              >
+              <motion.div key={selectedBike.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.4 }} className="sticky top-24">
                 <div className="bg-dark-card/80 border border-border rounded-xl shadow-2xl backdrop-blur-sm p-6">
                   <motion.div layoutId={`bike-image-${selectedBike.id}`} className="relative h-64 md:h-80 w-full mb-6 rounded-lg overflow-hidden">
-                    <Image src={selectedBike.image_url} alt={selectedBike.model} fill className="object-cover" priority />
+                    <Image src={selectedBike.image_url!} alt={selectedBike.model!} fill className="object-cover" priority />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
                     <h2 className="absolute bottom-4 left-4 text-4xl font-orbitron font-bold drop-shadow-lg">{selectedBike.make} <span className="text-brand-cyan">{selectedBike.model}</span></h2>
+                     {selectedBike.crew_logo_url && <Image src={selectedBike.crew_logo_url} alt={selectedBike.crew_name || 'Crew Logo'} width={48} height={48} className="absolute top-4 right-4 rounded-full border-2 border-brand-lime shadow-lime-glow"/>}
                   </motion.div>
                   
                   <p className="font-sans text-muted-foreground mb-6">{selectedBike.description}</p>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
-                    <SpecItem icon="::FaGears::" label="Двигатель" value={`${selectedBike.specs?.engine_cc || 'N/A'} cc`} />
-                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${selectedBike.specs?.horsepower || 'N/A'} л.с.`} />
-                    <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${selectedBike.specs?.weight_kg || 'N/A'} кг`} />
-                    <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${selectedBike.specs?.top_speed_kmh || 'N/A'} км/ч`} />
+                    <SpecItem icon="::FaGears::" label="Двигатель" value={`${(selectedBike.specs as any)?.engine_cc || 'N/A'} cc`} />
+                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${(selectedBike.specs as any)?.horsepower || 'N/A'} л.с.`} />
+                    <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${(selectedBike.specs as any)?.weight_kg || 'N/A'} кг`} />
+                    <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${(selectedBike.specs as any)?.top_speed_kmh || 'N/A'} км/ч`} />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                     <div>
                       <Label htmlFor="rent-days" className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</Label>
-                      <input
-                        id="rent-days"
-                        type="number"
-                        min="1"
-                        value={rentDays}
-                        onChange={e => {
-                          const value = Number(e.target.value);
-                          setRentDays(isNaN(value) || value < 1 ? 1 : value);
-                        }}
-                        className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono text-center text-lg"
-                      />
+                      <input id="rent-days" type="number" min="1" value={rentDays} onChange={e => {const v=Number(e.target.value); setRentDays(isNaN(v)||v<1?1:v);}}
+                        className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono text-center text-lg"/>
                     </div>
                     <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
                       <p className="text-2xl font-orbitron text-brand-yellow font-bold">
-                        {Math.round((selectedBike.daily_price * rentDays * RUB_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
+                        {Math.round((selectedBike.daily_price! * rentDays * RUB_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
                       </p>
                       {hasSubscription && <p className="text-xs text-brand-green">(Скидка 10% применена)</p>}
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleRent}
-                    disabled={invoiceLoading}
-                    className="w-full mt-6 p-4 rounded-xl font-orbitron text-lg font-bold text-black bg-gradient-to-r from-brand-cyan to-brand-green hover:brightness-125 transition-all duration-300 disabled:animate-pulse disabled:cursor-not-allowed disabled:brightness-75 shadow-lg hover:shadow-brand-cyan/50"
-                  >
-                    {invoiceLoading ? 'СОЗДАНИЕ СЧЕТА...' : 'АРЕНДОВАТЬ'}
-                  </button>
+                  <Button onClick={handleRent} disabled={invoiceLoading || selectedBike.availability === 'taken'}
+                    className="w-full mt-6 p-4 rounded-xl font-orbitron text-lg font-bold  transition-all duration-300 disabled:cursor-not-allowed disabled:brightness-75 shadow-lg">
+                    {invoiceLoading ? 'СОЗДАНИЕ СЧЕТА...' : selectedBike.availability === 'taken' ? 'ЗАНЯТ' : 'АРЕНДОВАТЬ'}
+                  </Button>
                   {error && <p className="text-destructive text-center mt-2 font-mono text-sm">{error}</p>}
                 </div>
               </motion.div>
