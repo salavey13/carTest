@@ -159,6 +159,7 @@ create table public.invoices (
   currency text null default 'XTR'::text,
   created_at timestamp with time zone null default now(),
   updated_at timestamp with time zone null default now(),
+
   metadata jsonb null default '{}'::jsonb,
   constraint invoices_pkey primary key (id),
   constraint invoices_user_id_fkey foreign KEY (user_id) references users (user_id) on delete CASCADE,
@@ -311,6 +312,7 @@ DECLARE
     v_invoice public.invoices;
 BEGIN
     INSERT INTO public.invoices (type, id, user_id, amount, metadata, subscription_id)
+
     VALUES (p_type, p_id, p_user_id, p_amount, p_metadata, p_subscription_id)
     RETURNING * INTO v_invoice;
     
@@ -433,9 +435,10 @@ $$;
 INSERT INTO public.cars (id, make, model, description, daily_price, image_url, rent_link, is_test_result, type, specs, owner_id) VALUES
 ('bmw-s1000rr', 'BMW', 'S1000RR', 'Немецкий суперспорт, созданный для доминирования на треке. Асимметричный дизайн и невероятная мощность в 205 л.с. Выбор тех, кто не признает компромиссов.', 1200, 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/99d74aec-2144-42c5-9059-e5e940f6fa95-0d42b877-33df-43b4-b57e-97519639d254.jpg', '/rent/bmw-s1000rr', false, 'bike', '{"engine_cc": 999, "horsepower": 205, "weight_kg": 197, "top_speed_kmh": 299, "type": "Supersport", "electronics": ["ABS Pro", "DTC", "Riding Modes Pro"]}', 'friend_owner_id'),
 ('ducati-panigale-v4', 'Ducati', 'Panigale V4 S', 'Итальянская страсть в каждой детали. Двигатель Desmosedici Stradale V4 и передовая аэродинамика делают его королем скорости. Для истинных ценителей дизайна и производительности.', 1500, 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/46f34997-2589-4ae7-9082-a374f19419a6-c899f118-1692-45b9-b6ef-d1066a607426.jpg', '/rent/ducati-panigale-v4', false, 'bike', '{"engine_cc": 1103, "horsepower": 215, "weight_kg": 195, "top_speed_kmh": 300, "type": "Supersport", "electronics": ["Ohlins Smart EC 2.0", "Cornering ABS", "Slide Control"]}', 'crew_member_1'),
+
 ('yamaha-mt09', 'Yamaha', 'MT-09 SP', 'Мастер крутящего момента из темной стороны Японии. Агрессивный нейкед с 3-цилиндровым двигателем CP3 для уличного доминирования. Идеален для города и извилистых дорог.', 850, 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/e89461c2-9b12-4b81-a280-1b92abcf96de-9832b179-481a-4e07-8133-ae49dc9b045e.jpg', '/rent/yamaha-mt09', false, 'bike', '{"engine_cc": 890, "horsepower": 119, "weight_kg": 190, "top_speed_kmh": 225, "type": "Naked", "electronics": ["Cruise Control", "Quick Shifter", "6-axis IMU"]}', 'crew_member_2'),
 ('kawasaki-ninja-h2', 'Kawasaki', 'Ninja H2', 'Единственный в мире серийный гипербайк с компрессорным наддувом. Ускорение, которое искажает реальность. Это не просто байк, это заявление.', 2000, 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/ab105fba-b108-4724-99ac-99c783a8d6f8-0a4ead3c-d0c5-4cfa-ae97-67272d69bb84.jpg', '/rent/kawasaki-ninja-h2', false, 'bike', '{"engine_cc": 998, "horsepower": 231, "weight_kg": 238, "top_speed_kmh": 337, "type": "Hypersport", "electronics": ["Supercharger", "KTRC", "Launch Control"]}', 'friend_owner_id'),
-('my-bobber', 'Custom', 'Bobber "Virus"', 'Мой собственный кастомный боббер. Сырой, громкий и с характером. Никакой электроники, только ты, дорога и вибрации. Не для новичков.', 666, 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/my-bobber.jpg', '/rent/my-bobber', false, 'bike', '{"engine_cc": 1200, "horsepower": 77, "weight_kg": 251, "top_speed_kmh": 180, "type": "Cruiser", "electronics": ["None"]}', 'your_owner_id');
+('ural-bobber', 'Custom', 'Bobber "Virus"', 'Мой собственный кастомный боббер. Сырой, громкий и с характером. Никакой электроники, только ты, дорога и вибрации. Не для новичков.', 666, 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/my-bobber.jpg', '/rent/my-bobber', false, 'bike', '{"engine_cc": 1200, "horsepower": 77, "weight_kg": 251, "top_speed_kmh": 180, "type": "Cruiser", "electronics": ["None"]}', 'your_owner_id');
 
 
 -- Question 1: **Как ты стартуешь день?**
@@ -491,6 +494,7 @@ INSERT INTO public.questions (id, text, theme, position) VALUES
 (7, 'Технологии или механика?', 'tech_vs_mech', 7);
 
 INSERT INTO public.answers (question_id, text, next_question) VALUES
+
 (7, 'Технологии, всё автоматизировано!', 9),  -- Next: Итог - авто по ИИ?
 (7, 'Механика, чувствовать машину!', 10);  -- Next: Итог - авто с механикой?
 
