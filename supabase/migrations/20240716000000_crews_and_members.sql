@@ -55,8 +55,8 @@ USING (true);
 
 CREATE POLICY "Owners can manage their own crews"
 ON public.crews FOR ALL
-USING (auth.jwt() ->> 'sub' = owner_id)
-WITH CHECK (auth.jwt() ->> 'sub' = owner_id);
+USING (auth.jwt() ->> 'chat_id' = owner_id)
+WITH CHECK (auth.jwt() ->> 'chat_id' = owner_id);
 
 
 -- RLS Policies for 'crew_members' table
@@ -67,9 +67,10 @@ USING (true);
 CREATE POLICY "Crew owners can manage their crew members"
 ON public.crew_members FOR ALL
 USING (
-    (SELECT owner_id FROM public.crews WHERE id = crew_id) = auth.jwt() ->> 'sub'
+    (SELECT owner_id FROM public.crews WHERE id = crew_id) = auth.jwt() ->> 'chat_id'
 );
 
 CREATE POLICY "Users can leave crews"
 ON public.crew_members FOR DELETE
-USING (user_id = auth.jwt() ->> 'sub');
+
+USING (user_id = auth.jwt() ->> 'chat_id');
