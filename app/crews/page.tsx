@@ -31,7 +31,7 @@ const FALLBACK_MAP: MapPreset = {
     is_default: true,
     created_at: new Date().toISOString(),
     owner_id: null,
-    points_of_interest: [] as any
+    points_of_interest: [] as any,
 };
 
 const MetricItem = ({ icon, value, label }: { icon: string; value: string | number; label:string; }) => (
@@ -178,7 +178,7 @@ function CrewsList() {
                         </Sheet>
                         {isAdmin() && (
                             <Sheet open={isEditingMap} onOpenChange={setIsEditingMap}>
-                                <SheetTrigger asChild><Button variant="outline" size="icon" className="bg-card/50 backdrop-blur-sm"><VibeContentRenderer content="::FaPencilAlt::"/></Button></SheetTrigger>
+                                <SheetTrigger asChild><Button variant="outline" size="icon" className="bg-card/50 backdrop-blur-sm"><VibeContentRenderer content="::FaFlagCheckered::"/></Button></SheetTrigger>
                                 <SheetContent>
                                     <SheetHeader><SheetTitle>Редактор POI</SheetTitle></SheetHeader>
                                     <div className="py-4 space-y-4">
