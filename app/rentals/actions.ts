@@ -27,6 +27,57 @@ export async function getVehiclesWithStatus() {
     }
 }
 
+export async function getVehicleCalendar(vehicleId: string) {
+    noStore();
+    if (!vehicleId) return { success: false, error: "Vehicle ID is required." };
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_vehicle_calendar', { p_vehicle_id: vehicleId });
+        if (error) {
+            logger.error(`Error calling get_vehicle_calendar RPC for ${vehicleId}:`, error);
+            throw error;
+        }
+        return { success: true, data };
+    } catch (error) {
+        logger.error(`Exception in getVehicleCalendar for ${vehicleId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+export async function createBooking(
+    userId: string,
+    vehicleId: string,
+    startDate: Date,
+    endDate: Date
+) {
+    noStore();
+    // This is a simplified booking action. A real-world scenario would have more complex conflict checks.
+    // For now, it creates a rental in 'pending_confirmation' which acts as a booking request.
+    try {
+        const { data: vehicle, error: vehicleError } = await supabaseAdmin.from('cars').select('owner_id').eq('id', vehicleId).single();
+        if(vehicleError || !vehicle) throw new Error("Vehicle not found or error fetching owner.");
+
+        const { data, error } = await supabaseAdmin.from('rentals').insert({
+            user_id: userId,
+            vehicle_id: vehicleId,
+            owner_id: vehicle.owner_id,
+            status: 'pending_confirmation',
+            payment_status: 'pending', // Payment will be requested upon confirmation
+            requested_start_date: startDate.toISOString(),
+            requested_end_date: endDate.toISOString(),
+        }).select('rental_id').single();
+        
+        if (error) throw error;
+        
+        // Notify owner about the new booking request (simplified notification)
+        await sendComplexMessage(vehicle.owner_id, `Новый запрос на бронирование для вашего транспорта (ID: ${vehicleId}) с ${startDate.toLocaleDateString()} по ${endDate.toLocaleDateString()}.`);
+
+        return { success: true, data };
+    } catch (error) {
+        logger.error(`Error creating booking for vehicle ${vehicleId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to create booking." };
+    }
+}
+
 
 export async function getRentalDetails(rentalId: string, userId: string) {
     noStore();
