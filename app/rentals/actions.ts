@@ -104,61 +104,6 @@ export async function createBooking(
 
 export async function getRentalDetails(rentalId: string, userId: string) {
     noStore();
-    if (!rentalId) { return { success: false, error: "Missing rental ID." }; }
-     if (!userId) { return { success: false, error: "Unauthorized." }; }
-    try {
-        const { data, error } = await supabaseAdmin.from('rentals').select(`*, vehicle:cars(*), renter:users!rentals_user_id_fkey(*), owner:users!rentals_owner_id_fkey(*)`).eq('rental_id', rentalId).single();
-        if (error) throw error;
-        if (data.user_id !== userId && data.owner_id !== userId) { return { success: false, error: "Unauthorized access to rental details." }; }
-        return { success: true, data };
-    } catch (error) {
-        logger.error(`Error fetching rental details for ${rentalId}:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-}
-
-export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
-    try {
-        const { data, error } = await supabaseAdmin.from('maps').select('*');
-        if (error) throw error;
-        return { success: true, data };
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        logger.error("[getMapPresets Action] Error:", errorMessage);
-        return { success: false, error: errorMessage };
-    }
-}
-
-export async function saveMapPreset( userId: string, name: string, map_image_url: string, bounds: MapBounds, is_default: boolean = false): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
-    try {
-        const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
-        if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) {
-            throw new Error("Unauthorized: Only admins can save map presets.");
-        }
-        if (is_default) {
-            const { error: updateError } = await supabaseAdmin.from('maps').update({ is_default: false }).eq('is_default', true);
-            if (updateError) throw new Error(`Failed to unset other default maps: ${updateError.message}`);
-        }
-        const { data, error } = await supabaseAdmin.from('maps').insert({ name, map_image_url, bounds: bounds as any, is_default, owner_id: userId }).select().single();
-        if (error) throw error;
-        return { success: true, data };
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        logger.error("[saveMapPreset Action] Error:", errorMessage);
-        return { success: false, error: errorMessage };
-    }
-}
-
-export async function updateMapPois( userId: string, mapId: string, newPois: PointOfInterest[]): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
-     try {
-        const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
-        if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) {
-            throw new Error("Unauthorized: Only admins can edit maps.");
-        }
-        const { data, error } = await supabaseAdmin.from('maps').update({ points_of_interest: newPois as any }).eq('id', 
-
-export async function getRentalDetails(rentalId: string, userId: string) {
-    noStore();
 
     if (!rentalId) {
         logger.error("[getRentalDetails] Rental ID is required.");
