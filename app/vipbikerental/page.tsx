@@ -1,3 +1,4 @@
+// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
@@ -134,7 +135,7 @@ export default function HomePage() {
                     <CardContent className="space-y-4">
                         <InfoItem icon="::FaUserClock::">Возраст от 23 лет</InfoItem>
                         <InfoItem icon="::FaIdCard::">Паспорт и В/У категории "А"</InfoItem>
-                        <InfoItem icon="::FaShieldAlt::">Залог от 20 000 ₽</InfoItem>
+                        <InfoItem icon="::FaAward::">Залог от 20 000 ₽</InfoItem>
                         <InfoItem icon="::FaCreditCard::">Оплата любым удобным способом</InfoItem>
                     </CardContent>
                 </Card>
