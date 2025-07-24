@@ -50,8 +50,6 @@ export async function createBooking(
     endDate: Date
 ) {
     noStore();
-    // This is a simplified booking action. A real-world scenario would have more complex conflict checks.
-    // For now, it creates a rental in 'pending_confirmation' which acts as a booking request.
     try {
         const { data: vehicle, error: vehicleError } = await supabaseAdmin.from('cars').select('owner_id').eq('id', vehicleId).single();
         if(vehicleError || !vehicle) throw new Error("Vehicle not found or error fetching owner.");
@@ -61,14 +59,15 @@ export async function createBooking(
             vehicle_id: vehicleId,
             owner_id: vehicle.owner_id,
             status: 'pending_confirmation',
-            payment_status: 'pending', // Payment will be requested upon confirmation
+            payment_status: 'pending',
             requested_start_date: startDate.toISOString(),
             requested_end_date: endDate.toISOString(),
+            agreed_start_date: startDate.toISOString(), // Set agreed dates for calendar blocking
+            agreed_end_date: endDate.toISOString(),
         }).select('rental_id').single();
         
         if (error) throw error;
         
-        // Notify owner about the new booking request (simplified notification)
         await sendComplexMessage(vehicle.owner_id, `Новый запрос на бронирование для вашего транспорта (ID: ${vehicleId}) с ${startDate.toLocaleDateString()} по ${endDate.toLocaleDateString()}.`);
 
         return { success: true, data };
@@ -238,7 +237,7 @@ export async function uploadSingleImage(formData: FormData): Promise<{ success: 
         const { error: uploadError } = await supabaseAdmin.storage
             .from(bucketName)
             .upload(filePath, file, {
-                cacheControl: '604800', // 7 days
+                cacheControl: '604800',
                 upsert: false
             });
 
@@ -382,7 +381,6 @@ export async function saveMapPreset(
         return { success: false, error: errorMessage };
     }
 }
-
 
 export async function updateMapPois(
     userId: string,

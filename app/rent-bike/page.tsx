@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
-import { createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { getVehiclesWithStatus, getVehicleCalendar, createBooking } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { Label } from "@/components/ui/label";
@@ -16,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
+import type { Database } from "@/types/database.types";
 
 type VehicleWithStatus = Awaited<ReturnType<typeof getVehiclesWithStatus>>['data'] extends (infer U)[] ? U : never;
 
@@ -63,9 +63,10 @@ export default function RentBikePage() {
             toast.info("В гараже пока нет байков.");
           }
         } else {
-          toast.error(response.error || "Ошибка загрузки гаража!");
+            toast.error(response.error || "Ошибка загрузки гаража!");
         }
       } catch (err) {
+        console.error("Error loading bikes:", err);
         toast.error("Критическая ошибка загрузки гаража!");
       } finally {
         setLoading(false);
@@ -123,7 +124,21 @@ export default function RentBikePage() {
       const result = await createBooking(dbUser.user_id, selectedBike.id, date.from, date.to);
       if (result.success) {
           toast.success("Запрос на бронирование отправлен владельцу!");
-          // Optionally redirect or clear form
+          setDate(undefined); // Reset calendar
+          // Re-fetch calendar for the selected bike
+          const calendarResult = await getVehicleCalendar(selectedBike.id);
+          if (calendarResult.success && calendarResult.data) {
+             const bookedDates: Date[] = [];
+             calendarResult.data.forEach(booking => {
+                 let currentDate = new Date(booking.start_date!);
+                 const endDate = new Date(booking.end_date!);
+                 while (currentDate <= endDate) {
+                     bookedDates.push(new Date(currentDate));
+                     currentDate.setDate(currentDate.getDate() + 1);
+                 }
+             });
+             setDisabledDates(bookedDates);
+          }
       } else {
           toast.error(`Ошибка бронирования: ${result.error}`);
       }
@@ -148,7 +163,17 @@ export default function RentBikePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, x: -100 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-1 space-y-6">
-          <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg backdrop-blur-sm">{/* Filters */}</div>
+          <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg backdrop-blur-sm">
+            {availableBikeTypes.map(type => (
+              <button key={type} onClick={() => setActiveFilter(type)}
+                className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative",
+                  activeFilter === type ? "bg-brand-cyan text-black shadow-[0_0_10px_theme(colors.brand.cyan)]" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                )}>
+                {type}
+                {type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute -top-1 -right-1 text-yellow-400 w-3 h-3"/>}
+              </button>
+            ))}
+          </div>
           <div className="space-y-3 h-[60vh] overflow-y-auto simple-scrollbar pr-2">
             <AnimatePresence>
               {filteredBikes.map(bike => (
@@ -157,7 +182,22 @@ export default function RentBikePage() {
                     selectedBike?.id === bike.id ? "border-brand-cyan shadow-lg shadow-brand-cyan/20" : "border-border hover:border-brand-cyan/50",
                     bike.availability !== 'available' && 'opacity-50'
                   )}>
-                    {/* ... Bike Card Content with Status ... */}
+                    <div className="flex items-center gap-4">
+                        <Image src={bike.image_url!} alt={bike.model!} width={80} height={80} className="rounded-md object-cover aspect-square" />
+                        <div>
+                            <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
+                            <p className="text-sm text-brand-pink font-mono">{bike.daily_price}₽ / день</p>
+                            <p className="text-xs text-muted-foreground font-mono">{bike.crew_name || `Владелец: ${bike.owner_id?.substring(0,6)}...`}</p>
+                        </div>
+                    </div>
+                    {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-brand-lime shadow-lime-glow"/>}
+                    <div className={cn("absolute bottom-2 right-2 text-xs font-mono flex items-center gap-1 p-1 rounded",
+                        bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 
+                        bike.availability === 'taken' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400')}>
+                        {bike.availability === 'available' ? <VibeContentRenderer content="::FaCircleCheck::"/> : bike.availability === 'taken' ? <VibeContentRenderer content="::FaClock::"/> : <VibeContentRenderer content="::FaBan::"/>}
+                        <span>{bike.availability === 'available' ? 'Свободен' : bike.availability === 'taken' ? 'Занят' : 'Недоступен'}</span>
+                    </div>
+                     {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-yellow-400 w-4 h-4 text-shadow-brand-yellow"/>}
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -168,7 +208,21 @@ export default function RentBikePage() {
             {selectedBike && (
               <motion.div key={selectedBike.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="sticky top-24">
                 <div className="bg-dark-card/80 border border-border rounded-xl shadow-2xl backdrop-blur-sm p-6">
-                  {/* ... Selected Bike Details ... */}
+                  <motion.div layoutId={`bike-image-${selectedBike.id}`} className="relative h-64 md:h-80 w-full mb-6 rounded-lg overflow-hidden">
+                    <Image src={selectedBike.image_url!} alt={selectedBike.model!} fill className="object-cover" priority />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
+                    <h2 className="absolute bottom-4 left-4 text-4xl font-orbitron font-bold drop-shadow-lg">{selectedBike.make} <span className="text-brand-cyan">{selectedBike.model}</span></h2>
+                     {selectedBike.crew_logo_url && <Image src={selectedBike.crew_logo_url} alt={selectedBike.crew_name || 'Crew Logo'} width={48} height={48} className="absolute top-4 right-4 rounded-full border-2 border-brand-lime shadow-lime-glow"/>}
+                  </motion.div>
+                  
+                  <p className="font-sans text-muted-foreground mb-6">{selectedBike.description}</p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-center">
+                    {selectedBike.specs && Object.entries(selectedBike.specs).map(([key, value]) => (
+                        <SpecItem key={key} label={key} value={String(value)} />
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                     <div>
                       <Label className="text-sm font-mono text-muted-foreground">ДАТЫ БРОНИРОВАНИЯ</Label>
@@ -176,18 +230,20 @@ export default function RentBikePage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className={cn("w-full justify-start text-left font-normal mt-1 input-cyber", !date && "text-muted-foreground")}>
                             <VibeContentRenderer content="::FaCalendarDays::" className="mr-2 h-4 w-4" />
-                            {date?.from ? (date.to ? `${format(date.from, "LLL dd, y")} - ${format(date.to, "LLL dd, y")}`: format(date.from, "LLL dd, y")) : <span>Выберите даты</span>}
+                            {date?.from ? (date.to ? `${format(date.from, "d LLL, y")} - ${format(date.to, "d LLL, y")}`: format(date.from, "d LLL, y")) : <span>Выберите даты</span>}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="range" selected={date} onSelect={setDate} initialFocus disabled={[{ before: new Date() }, ...disabledDates]} />
+                          {isCalendarLoading ? <div className="p-4"><Loading text="Загрузка..."/></div> :
+                            <Calendar mode="range" selected={date} onSelect={setDate} initialFocus disabled={[{ before: new Date() }, ...disabledDates]} />
+                          }
                         </PopoverContent>
                       </Popover>
                     </div>
                     <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
                       <p className="text-2xl font-orbitron text-brand-yellow font-bold">{totalPrice} ₽</p>
-                      {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : 'дней'})</p>}
+                      {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : (totalDays > 1 && totalDays < 5) ? 'дня' : 'дней'})</p>}
                     </div>
                   </div>
                   <Button onClick={handleBooking} disabled={isBooking || selectedBike.availability !== 'available' || !date?.from || !date?.to} className="w-full mt-6 p-4 rounded-xl font-orbitron text-lg font-bold">
@@ -203,10 +259,9 @@ export default function RentBikePage() {
   );
 }
 
-const SpecItem = ({ icon, label, value }: { icon: string; label: string; value: string | number }) => (
+const SpecItem = ({ label, value }: { label: string; value: string | number }) => (
     <div className="bg-muted/10 p-3 rounded-lg border border-border">
-        <VibeContentRenderer content={icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
-        <p className="text-xs text-muted-foreground font-mono">{label}</p>
+        <p className="text-xs text-muted-foreground font-mono uppercase">{label}</p>
         <p className="text-sm font-semibold font-orbitron">{value}</p>
     </div>
 );
