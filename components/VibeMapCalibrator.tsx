@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
 import { saveMapPreset } from '@/app/rentals/actions';
 import { cn } from '@/lib/utils';
+import { Loading } from './Loading';
 
 interface Bounds { top: number; bottom: number; left: number; right: number; }
 interface Point { id: string; name: string; coords: [number, number]; }
@@ -53,7 +54,13 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
   const [calculatedBounds, setCalculatedBounds] = useState<Bounds | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [imageSize, setImageSize] = useState<ImageDimensions | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(true);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsImageLoading(true);
+    setImageSize(null);
+  }, [mapUrl]);
 
   const startCalibration = useCallback(() => {
     if (!imageSize || !mapContainerRef.current) {
@@ -151,7 +158,8 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
           <Input value={mapUrl} onChange={(e) => setMapUrl(e.target.value)} className="input-cyber mt-1" />
         </div>
         <div ref={mapContainerRef} className="relative w-full aspect-[16/10] bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30">
-          {mapUrl && <img src={mapUrl} alt="Map Background" className="absolute inset-0 w-full h-full object-contain opacity-50 pointer-events-none" onLoadingComplete={(img) => setImageSize({width: img.naturalWidth, height: img.naturalHeight})} />}
+          {isImageLoading && <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/50"><Loading text="ЗАГРУЗКА КАРТЫ..." /></div>}
+          {mapUrl && <img src={mapUrl} alt="Map Background" className={cn("absolute inset-0 w-full h-full object-contain pointer-events-none", isImageLoading ? "opacity-0" : "opacity-50")} onLoadingComplete={(img) => { setImageSize({width: img.naturalWidth, height: img.naturalHeight}); setIsImageLoading(false); }} />}
           <div style={calibrationBoxStyle()} className="absolute bg-brand-cyan/10 border-2 border-dashed border-brand-cyan pointer-events-none" />
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
@@ -180,7 +188,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
             })
           )}
         </div>
-        {!isCalibrating ? ( <Button onClick={startCalibration} className="w-full"><VibeContentRenderer content="::FaRulerCombined:: Начать Калибровку"/></Button> ) : (
+        {!isCalibrating ? ( <Button onClick={startCalibration} disabled={isImageLoading} className="w-full"><VibeContentRenderer content="::FaRulerCombined:: Начать Калибровку"/></Button> ) : (
           <div className="bg-card/50 p-4 rounded-lg space-y-4">
             <h3 className="font-orbitron">Перетащи точки на их реальные места на карте</h3>
             {calculatedBounds && (
