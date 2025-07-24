@@ -24,8 +24,28 @@ const SURVEY_TO_BIKE_TYPE_MAP: Record<string, string> = {
   "Спорт-турист (мощность и комфорт)": "Sport-tourer", "Нео-ретро (стиль и харизма)": "Neo-retro"
 };
 
+const SPEC_LABELS_AND_ICONS: Record<string, { label: string; icon: string }> = {
+    engine_cc: { label: "Двигатель", icon: "::FaGears::" },
+    horsepower: { label: "Мощность", icon: "::FaHorseHead::" },
+    weight_kg: { label: "Вес", icon: "::FaWeightHanging::" },
+    top_speed_kmh: { label: "Макс. скорость", icon: "::FaGaugeHigh::" },
+    type: { label: "Класс", icon: "::FaShieldHalved::" },
+    seat_height_mm: { label: "Высота по седлу", icon: "::FaRulerVertical::" },
+};
+
+const SpecItem = ({ specKey, value }: { specKey: string; value: string | number }) => {
+    const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaQuestionCircle::' };
+    return (
+        <div className="bg-muted/10 p-3 rounded-lg border border-border">
+            <VibeContentRenderer content={specInfo.icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
+            <p className="text-xs text-muted-foreground font-mono uppercase">{specInfo.label}</p>
+            <p className="text-sm font-semibold font-orbitron">{value}</p>
+        </div>
+    );
+};
+
 export default function RentBikePage() {
-  const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
+  const { dbUser } = useAppContext();
   const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
   const [selectedBike, setSelectedBike] = useState<VehicleWithStatus | null>(null);
   const [date, setDate] = useState<DateRange | undefined>();
@@ -66,7 +86,6 @@ export default function RentBikePage() {
             toast.error(response.error || "Ошибка загрузки гаража!");
         }
       } catch (err) {
-        console.error("Error loading bikes:", err);
         toast.error("Критическая ошибка загрузки гаража!");
       } finally {
         setLoading(false);
@@ -121,11 +140,13 @@ export default function RentBikePage() {
           return;
       }
       setIsBooking(true);
-      const result = await createBooking(dbUser.user_id, selectedBike.id, date.from, date.to);
+      const totalDays = Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const totalPrice = totalDays * (selectedBike?.daily_price || 0);
+
+      const result = await createBooking(dbUser.user_id, selectedBike.id, date.from, date.to, totalPrice);
       if (result.success) {
-          toast.success("Запрос на бронирование отправлен владельцу!");
-          setDate(undefined); // Reset calendar
-          // Re-fetch calendar for the selected bike
+          toast.success("Запрос на бронирование отправлен! Ожидайте счет на оплату залога в Telegram.");
+          setDate(undefined);
           const calendarResult = await getVehicleCalendar(selectedBike.id);
           if (calendarResult.success && calendarResult.data) {
              const bookedDates: Date[] = [];
@@ -219,7 +240,7 @@ export default function RentBikePage() {
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-center">
                     {selectedBike.specs && Object.entries(selectedBike.specs).map(([key, value]) => (
-                        <SpecItem key={key} label={key} value={String(value)} />
+                        <SpecItem key={key} specKey={key} value={String(value)} />
                     ))}
                   </div>
 
@@ -258,10 +279,3 @@ export default function RentBikePage() {
     </div>
   );
 }
-
-const SpecItem = ({ label, value }: { label: string; value: string | number }) => (
-    <div className="bg-muted/10 p-3 rounded-lg border border-border">
-        <p className="text-xs text-muted-foreground font-mono uppercase">{label}</p>
-        <p className="text-sm font-semibold font-orbitron">{value}</p>
-    </div>
-);
