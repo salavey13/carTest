@@ -1,3 +1,4 @@
+// /app/rent-bike/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -34,7 +35,7 @@ const SPEC_LABELS_AND_ICONS: Record<string, { label: string; icon: string }> = {
 };
 
 const SpecItem = ({ specKey, value }: { specKey: string; value: string | number }) => {
-    const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaQuestionCircle::' };
+    const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaCirclequestion::' };
     return (
         <div className="bg-muted/10 p-3 rounded-lg border border-border">
             <VibeContentRenderer content={specInfo.icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
