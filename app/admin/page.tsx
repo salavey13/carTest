@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { supabaseAdmin } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
+import { v4 as uuidv4 } from 'uuid'; 
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
