@@ -143,7 +143,7 @@ export default function HomePage() {
                     <CardContent className="space-y-4">
                         <InfoItem icon="::FaCircleCheck::">Полностью обслуженный и чистый мотоцикл</InfoItem>
                         <InfoItem icon="::FaFileSignature::">Открытый полис ОСАГО</InfoItem>
-                        <InfoItem icon="::FaShieldUser::">Шлем и подшлемник</InfoItem>
+                        <InfoItem icon="::FaUsershield::">Шлем и подшлемник</InfoItem>
                         <InfoItem icon="::FaPersonFalling::">Краткий инструктаж по управлению</InfoItem>
                     </CardContent>
                 </Card>
