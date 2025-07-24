@@ -102,7 +102,6 @@ export async function createBooking(
     }
 }
 
-// ... (rest of the file remains the same)
 export async function getRentalDetails(rentalId: string, userId: string) {
     noStore();
     if (!rentalId) { return { success: false, error: "Missing rental ID." }; }
