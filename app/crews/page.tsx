@@ -54,7 +54,6 @@ function CrewsList() {
     const [highlightedCrewId, setHighlightedCrewId] = useState<string | null>(null);
     const [isEditingMap, setIsEditingMap] = useState(false);
 
-    // POI Editor State
     const [newPoi, setNewPoi] = useState<Partial<PointOfInterest>>({ type: 'path', name: '', icon: '::FaRoute::', color: '#FF69B4', coords: []});
     const [isSavingPoi, setIsSavingPoi] = useState(false);
 
@@ -80,6 +79,7 @@ function CrewsList() {
                 await loadMapData();
             } catch (e: any) {
                 setError(e.message || "Неизвестная ошибка на клиенте.");
+
             } finally {
                 setLoading(false);
             }
@@ -151,6 +151,7 @@ function CrewsList() {
                                     <Image src={crew.logo_url || '/placeholder.svg'} alt={`${crew.name} Logo`} width={64} height={64} className="rounded-full bg-black/50 border-2 border-border group-hover:border-brand-lime transition-colors flex-shrink-0 shadow-lg" />
                                     <div className="flex-grow">
                                         <h2 className="text-2xl font-orbitron text-brand-lime group-hover:text-shadow-brand-lime">{crew.name}</h2>
+
                                         <p className="text-xs text-muted-foreground font-mono">by @{crew.owner_username}</p>
                                     </div>
                                 </div>
@@ -187,6 +188,7 @@ function CrewsList() {
                                         <div><Label>Тип</Label><Select value={newPoi.type} onValueChange={(v: any) => setNewPoi(p => ({...p, type: v}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="point">Точка</SelectItem><SelectItem value="path">Путь</SelectItem><SelectItem value="loop">Петля</SelectItem></SelectContent></Select></div>
                                         <div><Label>Иконка (для точек)</Label><Input value={newPoi.icon} onChange={e => setNewPoi(p => ({...p, icon: e.target.value}))} className="input-cyber" placeholder="::FaRoute::"/></div>
                                         <div><Label>Цвет</Label><Input type="color" value={newPoi.color} onChange={e => setNewPoi(p => ({...p, color: e.target.value}))} className="w-full p-1"/></div>
+
                                         <div className="text-xs font-mono space-y-1"><Label>Координаты ({newPoi.coords?.length || 0})</Label><ScrollArea className="h-24 p-2 border rounded">{newPoi.coords?.map((c, i) => <div key={i}>{c[0].toFixed(4)}, {c[1].toFixed(4)}</div>)}</ScrollArea></div>
                                     </div>
                                     <SheetFooter><Button onClick={handleSavePoi} disabled={isSavingPoi}>{isSavingPoi ? "Сохранение..." : "Сохранить POI"}</Button></SheetFooter>
