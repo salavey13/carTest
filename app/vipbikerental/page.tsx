@@ -141,9 +141,9 @@ export default function HomePage() {
                  <Card>
                     <CardHeader><CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaGift::" className="text-brand-green"/> Что вы получаете</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
-                        <InfoItem icon="::FaCheckCircle::">Полностью обслуженный и чистый мотоцикл</InfoItem>
+                        <InfoItem icon="::FaCircleCheck::">Полностью обслуженный и чистый мотоцикл</InfoItem>
                         <InfoItem icon="::FaFileSignature::">Открытый полис ОСАГО</InfoItem>
-                        <InfoItem icon="::FaUserShield::">Шлем и подшлемник</InfoItem>
+                        <InfoItem icon="::FaShieldUser::">Шлем и подшлемник</InfoItem>
                         <InfoItem icon="::FaPersonFalling::">Краткий инструктаж по управлению</InfoItem>
                     </CardContent>
                 </Card>
