@@ -144,7 +144,7 @@ export default function HomePage() {
                         <InfoItem icon="::FaCheckCircle::">Полностью обслуженный и чистый мотоцикл</InfoItem>
                         <InfoItem icon="::FaFileSignature::">Открытый полис ОСАГО</InfoItem>
                         <InfoItem icon="::FaUserShield::">Шлем и подшлемник</InfoItem>
-                        <InfoItem icon="::Fa6 FaPersonFalling::">Краткий инструктаж по управлению</InfoItem>
+                        <InfoItem icon="::FaPersonFalling::">Краткий инструктаж по управлению</InfoItem>
                     </CardContent>
                 </Card>
             </section>
