@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { v4 as uuidv4 } from 'uuid';
+import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database['public']['Tables']['cars']['Row']>;
 type SpecItem = { id: string; key: string; value: string };
@@ -85,8 +87,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   const removeSpec = (id: string) => {
     setSpecs(currentSpecs => currentSpecs.filter(spec => spec.id !== id));
   };
-  
-  const v4 = () => Math.random().toString(36).substring(2, 15);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,7 +129,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         if (updateError) throw updateError;
         toast.success("Транспорт успешно обновлен!");
       } else {
-        const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}-${v4()}`;
+        const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}-${uuidv4().substring(0,8)}`;
         const { error: insertError } = await supabaseAdmin.from("cars").insert([{ ...vehicleData, id: generatedId, owner_id: ownerId! }]);
         if (insertError) throw insertError;
         toast.success("Транспорт успешно добавлен в гараж!");
