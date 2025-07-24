@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getVehiclesWithStatus } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import { cn } from '@/lib/utils';
+import bikeFooter from "@/components/bikeFooter"; // Import bikeFooter
 
 type VehicleWithStatus = Awaited<ReturnType<typeof getVehiclesWithStatus>>['data'] extends (infer U)[] ? U : never;
 
@@ -22,7 +23,7 @@ const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode 
 );
 
 const StepItem = ({ num, title, icon, children }: { num: string, title: string, icon: string, children: React.ReactNode }) => (
-    <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative">
+    <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative h-full">
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-brand-pink text-black rounded-full w-8 h-8 flex items-center justify-center font-orbitron font-bold">{num}</div>
         <VibeContentRenderer content={icon} className="text-4xl text-brand-pink mx-auto my-4" />
         <h4 className="font-orbitron text-lg mb-2">{title}</h4>
@@ -143,7 +144,7 @@ export default function HomePage() {
                     <CardContent className="space-y-4">
                         <InfoItem icon="::FaCheckCircle::">Полностью обслуженный и чистый мотоцикл</InfoItem>
                         <InfoItem icon="::FaFileSignature::">Открытый полис ОСАГО</InfoItem>
-                        <InfoItem icon="::FaUserShield::">Шлем и подшлемник</InfoItem>
+                        <InfoItem icon="::FaRoad::">Безлимитный пробег в пределах города</InfoItem>
                         <InfoItem icon="::FaHandsHelping::">Краткий инструктаж по управлению</InfoItem>
                     </CardContent>
                 </Card>
@@ -160,6 +161,24 @@ export default function HomePage() {
                 </div>
             </section>
             
+            {/* Equipment Teaser Section */}
+            <section>
+                 <h2 className="text-4xl font-orbitron text-center mb-10">Экипировка в Аренду</h2>
+                 <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div className="bg-card/50 p-4 rounded-lg"><VibeContentRenderer content="::FaHelmetSafety::" className="text-4xl mx-auto mb-2 text-brand-purple"/> <p>Шлемы</p></div>
+                    <div className="bg-card/50 p-4 rounded-lg"><VibeContentRenderer content="::FaUserShield::" className="text-4xl mx-auto mb-2 text-brand-purple"/> <p>Куртки</p></div>
+                    <div className="bg-card/50 p-4 rounded-lg"><VibeContentRenderer content="::FaGloves::" className="text-4xl mx-auto mb-2 text-brand-purple"/> <p>Перчатки</p></div>
+                    <div className="bg-card/50 p-4 rounded-lg"><VibeContentRenderer content="::FaVideo::" className="text-4xl mx-auto mb-2 text-brand-purple"/> <p>Камеры</p></div>
+                 </div>
+                 <div className="text-center mt-8">
+                     <Link href="/equipment">
+                        <Button size="lg" variant="outline" className="font-orbitron">
+                            Смотреть всю экипировку <VibeContentRenderer content="::FaArrowRight::" className="ml-2"/>
+                        </Button>
+                     </Link>
+                 </div>
+            </section>
+
             {/* FAQ Section */}
             <section className="max-w-3xl mx-auto">
                 <h2 className="text-4xl font-orbitron text-center mb-10">Частые вопросы</h2>
@@ -177,12 +196,13 @@ export default function HomePage() {
                         <AccordionContent>Да, вы можете путешествовать. Однако, для дальних поездок (свыше 300 км от города) требуется дополнительное согласование, чтобы мы были уверены в вашей подготовке и техническом состоянии байка.</AccordionContent>
                     </AccordionItem>
                      <AccordionItem value="item-4">
-                        <AccordionTrigger>Что входит в стоимость аренды?</AccordionTrigger>
-                        <AccordionContent>В стоимость входит аренда самого мотоцикла на 24 часа, полис ОСАГО, один шлем и подшлемник. Пробег обычно ограничен (например, 300 км/сутки), превышение оплачивается отдельно.</AccordionContent>
+                        <AccordionTrigger>Какой лимит пробега и что входит в стоимость?</AccordionTrigger>
+                        <AccordionContent>В стоимость входит аренда мотоцикла на 24 часа и полис ОСАГО. Суточный лимит пробега — 200 км, превышение оплачивается отдельно. Вся защитная экипировка, включая шлемы, предоставляется в аренду за дополнительную плату.</AccordionContent>
                     </AccordionItem>
                 </Accordion>
             </section>
         </div>
+        <bikeFooter/>
     </div>
   );
 }
