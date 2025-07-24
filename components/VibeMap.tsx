@@ -58,8 +58,11 @@ const unproject = (xPercent: number, yPercent: number, bounds: MapBounds, imageS
         offsetX = (containerSize.width - renderWidth) / 2;
     }
 
-    const xOnImage = ((xPercent / 100) * containerSize.width) - offsetX;
-    const yOnImage = ((yPercent / 100) * containerSize.height) - offsetY;
+    const xOnContainer = (xPercent / 100) * containerSize.width;
+    const yOnContainer = (yPercent / 100) * containerSize.height;
+    
+    const xOnImage = xOnContainer - offsetX;
+    const yOnImage = yOnContainer - offsetY;
 
     const xImagePercent = (xOnImage / renderWidth) * 100;
     const yImagePercent = (yOnImage / renderHeight) * 100;
@@ -79,7 +82,12 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
   useGesture({
       onDrag: ({ offset: [dx, dy] }) => setViewState(prev => ({ ...prev, x: dx, y: dy })),
       onPinch: ({ offset: [s] }) => setViewState(prev => ({ ...prev, scale: Math.max(0.5, Math.min(s, 16))})),
-  }, { target: mapContainerRef, eventOptions: { passive: false } });
+  }, { 
+      target: mapContainerRef, 
+      eventOptions: { passive: false },
+      drag: { preventDefault: true },
+      pinch: { preventDefault: true }
+  });
   
   const handleZoom = (direction: 'in' | 'out', factor = 1.5) => {
     setViewState(prev => ({...prev, scale: Math.max(0.5, Math.min(direction === 'in' ? prev.scale * factor : prev.scale / factor, 16))}));
@@ -91,8 +99,11 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     
-    const xPercent = (clickX / rect.width) * 100;
-    const yPercent = (clickY / rect.height) * 100;
+    const mapX = (clickX - viewState.x) / viewState.scale;
+    const mapY = (clickY - viewState.y) / viewState.scale;
+
+    const xPercent = (mapX / rect.width) * 100;
+    const yPercent = (mapY / rect.height) * 100;
     
     const coords = unproject(xPercent, yPercent, bounds, imageSize, rect);
     onMapClick(coords);
@@ -100,7 +111,11 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
 
   return (
     <TooltipProvider delayDuration={100}>
-      <div ref={mapContainerRef} className={cn("relative w-full h-full bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30 shadow-lg shadow-brand-purple/20 cursor-grab active:cursor-grabbing", className)}>
+      <div 
+        ref={mapContainerRef} 
+        className={cn("relative w-full h-full bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30 shadow-lg shadow-brand-purple/20 cursor-grab active:cursor-grabbing", className)}
+        style={{ touchAction: 'none' }} // This is the key to prevent page scroll on mobile
+      >
         <motion.div
             className="relative w-full h-full"
             style={{ x: viewState.x, y: viewState.y, scale: viewState.scale }}
