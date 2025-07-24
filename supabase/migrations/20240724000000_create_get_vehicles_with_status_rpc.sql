@@ -1,3 +1,9 @@
+-- /supabase/migrations/20240725000000_fix_vehicle_status_duplicates.sql
+
+-- This migration fixes a bug in the get_vehicles_with_status RPC function
+-- where vehicles with multiple rentals would appear multiple times in the result.
+-- The LEFT JOIN is modified to only consider a single, most relevant rental status ('active').
+
 CREATE OR REPLACE FUNCTION get_vehicles_with_status()
 RETURNS TABLE (
     id TEXT,
@@ -36,7 +42,11 @@ BEGIN
         c.owner_id,
         c.crew_id,
         CASE
-            WHEN r.rental_id IS NOT NULL THEN 'taken'
+            -- 1. Check for an active rental (highest priority)
+            WHEN r.vehicle_id IS NOT NULL THEN 'taken'
+            -- 2. Check for base availability rules
+            WHEN c.availability_rules->>'type' = 'weekends_only' AND EXTRACT(ISODOW FROM CURRENT_DATE) NOT IN (6, 7) THEN 'unavailable'
+            -- 3. If no blocking rules, it's available
             ELSE 'available'
         END AS availability,
         cr.name AS crew_name,
@@ -44,7 +54,8 @@ BEGIN
     FROM
         public.cars AS c
     LEFT JOIN
-        public.rentals AS r ON c.id = r.vehicle_id AND r.status = 'active'
+        -- Correctly join only against active rentals to prevent duplication
+        (SELECT vehicle_id FROM public.rentals WHERE status = 'active' LIMIT 1) AS r ON c.id = r.vehicle_id
     LEFT JOIN
         public.crews AS cr ON c.crew_id = cr.id;
 END;
