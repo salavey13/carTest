@@ -31,7 +31,6 @@ const StepItem = ({ num, title, icon, children }: { num: string, title: string, 
     </div>
 );
 
-
 export default function HomePage() {
   const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +115,7 @@ export default function HomePage() {
                                 <CardContent className="p-4">
                                     <h3 className="text-lg font-bold font-orbitron">{bike.make} {bike.model}</h3>
                                     <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono my-3 text-muted-foreground">
-                                        <div><VibeContentRenderer content="::FaTachometerAlt::" className="mx-auto mb-1 text-brand-cyan"/> {bike.specs?.top_speed_kmh || 'N/A'} км/ч</div>
+                                        <div><VibeContentRenderer content="::FaGaugeHigh::" className="mx-auto mb-1 text-brand-cyan"/> {bike.specs?.top_speed_kmh || 'N/A'} км/ч</div>
                                         <div><VibeContentRenderer content="::FaGears::" className="mx-auto mb-1 text-brand-cyan"/> {bike.specs?.engine_cc || 'N/A'} см³</div>
                                         <div><VibeContentRenderer content="::FaHorseHead::" className="mx-auto mb-1 text-brand-cyan"/> {bike.specs?.horsepower || 'N/A'} л.с.</div>
                                     </div>
