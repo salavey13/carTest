@@ -1,4 +1,3 @@
-// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
@@ -23,13 +22,30 @@ const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode 
 );
 
 const StepItem = ({ num, title, icon, children }: { num: string, title: string, icon: string, children: React.ReactNode }) => (
-    <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative">
+    <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative h-full">
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-brand-pink text-black rounded-full w-8 h-8 flex items-center justify-center font-orbitron font-bold">{num}</div>
         <VibeContentRenderer content={icon} className="text-4xl text-brand-pink mx-auto my-4" />
         <h4 className="font-orbitron text-lg mb-2">{title}</h4>
         <p className="text-sm text-muted-foreground">{children}</p>
     </div>
 );
+
+// New component for featured bikes based on scraped data
+const FeaturedBikeCard = ({ name, description, imageUrl }: { name: string, description: string, imageUrl: string }) => (
+    <Card className="bg-card/80 backdrop-blur-sm overflow-hidden group">
+        <CardHeader className="p-0">
+            <div className="relative h-56 w-full">
+                <Image src={imageUrl} alt={name} layout="fill" objectFit="cover" className="group-hover:scale-105 transition-transform duration-300" />
+            </div>
+        </CardHeader>
+        <CardContent className="p-4">
+            <h3 className="text-lg font-bold font-orbitron">{name}</h3>
+            <p className="text-sm text-muted-foreground font-mono my-3">{description}</p>
+            <Link href="#fleet" className="w-full"><Button className="w-full font-semibold">Смотреть весь парк</Button></Link>
+        </CardContent>
+    </Card>
+);
+
 
 export default function HomePage() {
   const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
@@ -78,8 +94,8 @@ export default function HomePage() {
                 transition={{ duration: 0.8 }}
                 className="relative z-10"
             >
-                <h1 className="text-4xl md:text-6xl font-orbitron font-bold text-shadow-neon">АРЕНДА МОТОЦИКЛОВ VIBE RIDE</h1>
-                <p className="max-w-2xl mx-auto mt-4 text-lg text-gray-300">Твой байк на любой вкус: от дерзких нейкедов до спортбайков. Выбери свой вайб и покори город.</p>
+                <h1 className="text-4xl md:text-6xl font-orbitron font-bold text-shadow-neon">АРЕНДА МОТОЦИКЛОВ VIPBIKE</h1>
+                <p className="max-w-2xl mx-auto mt-4 text-lg text-gray-300">Твой байк на любой вкус: от круизеров до спортбайков. Выбери свой вайб и покори город. Лидеры проката в Нижнем Новгороде! [1]</p>
                 <div className="mt-8">
                     <Link href="#fleet">
                         <Button size="lg" className="font-orbitron text-lg bg-brand-lime hover:bg-brand-lime/90 text-black shadow-lg shadow-brand-lime/30 hover:shadow-brand-lime/50 transition-all duration-300 transform hover:scale-105">
@@ -91,10 +107,32 @@ export default function HomePage() {
         </section>
 
         <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
+            
+            {/* Featured Bikes Section - NEW */}
+            <section id="featured">
+                <h2 className="text-4xl font-orbitron text-center mb-10">Жемчужины Нашего Парка</h2>
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <FeaturedBikeCard 
+                        name="VOGE AC525X" 
+                        description="Абсолютно новый, потрясающе удобный и маневренный мотоцикл. Доступен уже сегодня! [1]"
+                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/voge-525-acx-2023-a.jpg"
+                    />
+                    <FeaturedBikeCard 
+                        name="Harley-Davidson Custom" 
+                        description="Такого в Нижнем Новгороде еще не было! Байк в максимальном тюнинге для истинных ценителей. Только для опытных райдеров. [1]"
+                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/harley-davidson-fat-boy.jpg"
+                    />
+                    <FeaturedBikeCard 
+                        name="Ducati X-Diavel" 
+                        description="Крутейший пауэр-круизер, который дарит невероятные эмоции. Один из флагманов нашего парка. [1]"
+                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/diavel_v4_p_01_hero.jpg"
+                    />
+                </div>
+            </section>
 
             {/* Fleet Section */}
             <section id="fleet">
-                <h2 className="text-4xl font-orbitron text-center mb-10">Наш Мотопарк</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10">Полный Каталог</h2>
                 <div className="flex justify-center flex-wrap gap-2 mb-8">
                     {bikeTypes.map(type => (
                         <Button key={type} variant={activeFilter === type || (activeFilter === null && type === 'Все') ? 'default' : 'outline'} onClick={() => setActiveFilter(type)} className="font-mono">
@@ -133,8 +171,9 @@ export default function HomePage() {
                     <CardHeader><CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaClipboardList::" className="text-brand-pink"/> Требования</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <InfoItem icon="::FaUserClock::">Возраст от 23 лет</InfoItem>
-                        <InfoItem icon="::FaIdCard::">Паспорт и В/У категории "А"</InfoItem>
+                        <InfoItem icon="::FaIdCard::">Паспорт и В/У категории "А" (есть скутеры без категории)</InfoItem>
                         <InfoItem icon="::FaAward::">Залог от 20 000 ₽</InfoItem>
+
                         <InfoItem icon="::FaCreditCard::">Оплата любым удобным способом</InfoItem>
                     </CardContent>
                 </Card>
@@ -143,8 +182,9 @@ export default function HomePage() {
                     <CardContent className="space-y-4">
                         <InfoItem icon="::FaCircleCheck::">Полностью обслуженный и чистый мотоцикл</InfoItem>
                         <InfoItem icon="::FaFileSignature::">Открытый полис ОСАГО</InfoItem>
-                        <InfoItem icon="::FaUsershield::">Шлем и подшлемник</InfoItem>
+                        <InfoItem icon="::FaUsershield::">Полный комплект защитной экипировки. [1]</InfoItem>
                         <InfoItem icon="::FaPersonFalling::">Краткий инструктаж по управлению</InfoItem>
+                        <InfoItem icon="::FaTag::">Скидка 10% на первую аренду по промокоду "ЛЕТО2025". [1]</InfoItem>
                     </CardContent>
                 </Card>
             </section>
@@ -154,9 +194,9 @@ export default function HomePage() {
                 <h2 className="text-4xl font-orbitron text-center mb-10">Как это работает</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     <StepItem num="1" title="Бронь" icon="::FaCalendarCheck::">Выберите модель и оформите бронь онлайн. Для аренды обязательна защитная экипировка.</StepItem>
-                    <StepItem num="2" title="Подтверждение" icon="::FaPaperPlane::">Отправьте копии документов. Возьмите с собой оригиналы и залог.</StepItem>
-                    <StepItem num="3" title="Получение" icon="::FaKey::">Приезжайте к нам, подписываем договор, вносите залог и забираете свой байк.</StepItem>
-                    <StepItem num="4" title="Возврат" icon="::FaFlagCheckered::">Верните мотоцикл в срок, чистым и с полным баком. Залог возвращается после проверки.</StepItem>
+                    <StepItem num="2" title="Подтверждение" icon="::FaPaperPlane::">Свяжитесь с нами для подтверждения. Возьмите с собой оригиналы документов и залог.</StepItem>
+                    <StepItem num="3" title="Получение" icon="::FaKey::">Приезжайте к нам по адресу Стригинский переулок 13Б, подписываем договор и забираете байк. [1]</StepItem>
+                    <StepItem num="4" title="Отдых" icon="::FaGamepad::">После поездки можно отдохнуть в нашей лаунж-зоне с кальяном и приставкой. [1]</StepItem>
                 </div>
             </section>
             
@@ -166,19 +206,19 @@ export default function HomePage() {
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
                         <AccordionTrigger>Можно ли арендовать мотоцикл без опыта?</AccordionTrigger>
-                        <AccordionContent>Мы требуем наличие прав категории "А". Для новичков у нас есть малокубатурные модели и мы проводим обязательный инструктаж. Ваша безопасность - наш приоритет.</AccordionContent>
+                        <AccordionContent>Мы требуем наличие прав категории "А". Для новичков у нас есть малокубатурные модели и мы проводим обязательный инструктаж. Ваша безопасность - наш приоритет. Также есть скутеры, не требующие категории "А". [1]</AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
                         <AccordionTrigger>Что будет, если я попаду в ДТП?</AccordionTrigger>
                         <AccordionContent>Все мотоциклы застрахованы по ОСАГО. Ваша финансовая ответственность ограничена суммой залога, если нет серьезных нарушений с вашей стороны. Главное - немедленно связаться с нами.</AccordionContent>
                     </AccordionItem>
-                    <AccordionItem value="item-3">
-                        <AccordionTrigger>Можно ли выезжать за пределы города?</AccordionTrigger>
-                        <AccordionContent>Да, вы можете путешествовать. Однако, для дальних поездок (свыше 300 км от города) требуется дополнительное согласование, чтобы мы были уверены в вашей подготовке и техническом состоянии байка.</AccordionContent>
+                     <AccordionItem value="item-3">
+                        <AccordionTrigger>Что входит в стоимость аренды?</AccordionTrigger>
+                        <AccordionContent>В стоимость входит аренда самого мотоцикла на 24 часа, полис ОСАГО и полный комплект защитной экипировки. [1] Пробег обычно ограничен (например, 300 км/сутки), превышение оплачивается отдельно.</AccordionContent>
                     </AccordionItem>
                      <AccordionItem value="item-4">
-                        <AccordionTrigger>Что входит в стоимость аренды?</AccordionTrigger>
-                        <AccordionContent>В стоимость входит аренда самого мотоцикла на 24 часа, полис ОСАГО, один шлем и подшлемник. Пробег обычно ограничен (например, 300 км/сутки), превышение оплачивается отдельно.</AccordionContent>
+                        <AccordionTrigger>У вас есть свой сервис?</AccordionTrigger>
+                        <AccordionContent>Да, теперь у нас новая локация со своим сервисом. Вы можете пригнать своего верного друга к нам на обслуживание или ремонт. [1]</AccordionContent>
                     </AccordionItem>
                 </Accordion>
             </section>
