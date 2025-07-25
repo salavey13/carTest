@@ -11,6 +11,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { fetchCarById, createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
 import { Loading } from "@/components/Loading";
+import { ImageGallery } from "@/components/ImageGallery"; // IMPORT NEW COMPONENT
 
 interface Vehicle {
   id: string;
@@ -21,7 +22,10 @@ interface Vehicle {
   type: 'car' | 'bike';
   description: string;
   owner_id: string;
-  specs?: { [key: string]: any; };
+  specs?: { 
+    gallery?: string[];
+    [key: string]: any; 
+  };
 }
 
 const RUB_TO_STARS_RATE = 1;
@@ -44,6 +48,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   const [rentDays, setRentDays] = useState(1);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false); // GALLERY STATE
 
   useEffect(() => {
     const loadData = async () => {
@@ -56,7 +61,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
       try {
         const { success, data, error: fetchError } = await fetchCarById(params.id);
         if (success && data) {
-          setVehicle(data);
+          setVehicle(data as Vehicle);
         } else {
           toast.error(fetchError || "Не удалось загрузить данные о транспорте.");
           router.push("/rent-bike");
@@ -126,6 +131,11 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
       setInvoiceLoading(false);
     }
   };
+  
+  const galleryImages = useMemo(() => {
+    if (!vehicle) return [];
+    return [vehicle.image_url, ...(vehicle.specs?.gallery || [])].filter(Boolean);
+  }, [vehicle]);
 
   if (loading) {
     return <Loading variant={vehicle?.type === 'bike' ? 'bike' : 'generic'} text="ЗАГРУЗКА ДАННЫХ..." />;
@@ -136,6 +146,8 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   }
 
   return (
+    <>
+    <ImageGallery images={galleryImages} open={isGalleryOpen} onOpenChange={setIsGalleryOpen} />
     <div className="min-h-screen bg-black text-white pt-24 pb-12 relative overflow-hidden">
         <div className="fixed inset-0 z-[-1] opacity-30">
             <Image
@@ -153,9 +165,15 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="container mx-auto max-w-4xl"
         >
-            <div className="relative h-72 md:h-96 w-full rounded-xl overflow-hidden border-2 border-brand-cyan/30 shadow-2xl shadow-brand-cyan/20">
-                <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover" priority />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+            <div 
+                className="relative h-72 md:h-96 w-full rounded-xl overflow-hidden border-2 border-brand-cyan/30 shadow-2xl shadow-brand-cyan/20 group cursor-pointer"
+                onClick={() => setIsGalleryOpen(true)}
+            >
+                <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover group-hover:scale-105 transition-transform duration-300" priority />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 group-hover:bg-black/50 transition-colors" />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <VibeContentRenderer content="::FaImages::" className="text-5xl text-white drop-shadow-lg"/>
+                </div>
                 <div className="absolute bottom-6 left-6">
                     <h1 className="text-4xl md:text-6xl font-orbitron font-bold drop-shadow-lg">{vehicle.make}</h1>
                     <h2 className="text-3xl md:text-5xl font-orbitron text-brand-cyan drop-shadow-lg">{vehicle.model}</h2>
@@ -223,5 +241,6 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
             </div>
         </motion.div>
     </div>
+    </>
   );
 }
