@@ -152,7 +152,7 @@ export default function HomePage() {
                         <InfoItem icon="::FaTools::">Обслуживание и ремонт вашего мотоцикла</InfoItem>
                         <InfoItem icon="::FaGamepad::">Лаунж-зона с кальяном и игровыми приставками</InfoItem>
                         <InfoItem icon="::FaMapLocationDot::">Новая удобная локация: Стригинский переулок 13Б</InfoItem>
-                        <InfoItem icon="::FaCoffee::">Место, где можно встретить единомышленников</InfoItem>
+                        <InfoItem icon="::FaBeerMugEmpty::">Место, где можно встретить единомышленников</InfoItem>
                     </CardContent>
                 </Card>
             </section>
