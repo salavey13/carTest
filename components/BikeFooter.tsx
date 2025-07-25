@@ -22,23 +22,28 @@ export default function BikeFooter() {
           </div>
 
           <div>
-            <h3 className="text-xl font-orbitron font-semibold text-brand-cyan cyber-text glitch mb-4" data-text="НАВИГАЦИЯ">
-              НАВИГАЦИЯ
+            <h3 className="text-xl font-orbitron font-semibold text-brand-cyan cyber-text glitch mb-4" data-text="РАЗДЕЛЫ">
+              РАЗДЕЛЫ
             </h3>
             <ul className="space-y-3">
               <li>
-                 <Link href="/vipbikerental#fleet" className={`${footerLinkClass} text-base font-semibold`}>
-                   <VibeContentRenderer content="::FaMotorcycle::" /> Наш Мотопарк
+                 <Link href="/rent-bike" className={`${footerLinkClass} text-base font-semibold`}>
+                   <VibeContentRenderer content="::FaMotorcycle::" /> Мотопарк
                  </Link>
                </li>
                <li>
-                 <Link href="/vipbikerental#conditions" className={footerLinkClass}>
-                   Условия Аренды
+                 <Link href="/leaderboard" className={footerLinkClass}>
+                   <VibeContentRenderer content="::FaTrophy::" /> Зал Славы
                  </Link>
                </li>
                <li>
-                 <Link href="/vipbikerental#faq" className={footerLinkClass}>
-                    Частые Вопросы
+                 <Link href="/crews" className={footerLinkClass}>
+                    <VibeContentRenderer content="::FaUsers::" /> Экипажи
+                 </Link>
+               </li>
+                <li>
+                 <Link href="/vipbikerental" className={footerLinkClass}>
+                    <VibeContentRenderer content="::FaCircleInfo::" /> О Нас
                  </Link>
                </li>
             </ul>
