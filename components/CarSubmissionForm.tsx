@@ -52,6 +52,8 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       });
       setVehicleType(vehicleToEdit.type === 'car' ? 'car' : 'bike');
       setImagePreview(vehicleToEdit.image_url || null);
+      setImageFile(null); // Clear file input on edit
+      
       if (vehicleToEdit.specs && typeof vehicleToEdit.specs === 'object') {
         const specEntries = Object.entries(vehicleToEdit.specs);
         const regularSpecs = specEntries
@@ -61,13 +63,18 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
 
         const galleryUrls = (vehicleToEdit.specs as any).gallery || [];
         setGallery(galleryUrls.map((url: string) => ({ id: uuidv4(), url })));
+      } else {
+        setSpecs([]);
+        setGallery([]);
       }
     } else {
+      // FIX: Explicitly clear form state when switching to create mode
       setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
       setSpecs([]);
       setGallery([]);
-      setImagePreview(null);
       setImageFile(null);
+      setImagePreview(null);
+      setVehicleType('bike');
     }
   }, [vehicleToEdit]);
 

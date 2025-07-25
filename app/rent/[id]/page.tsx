@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
-import { fetchCarById, createInvoice, getUserSubscription, getVehicleCalendar, createBooking } from "@/app/rentals/actions";
+import { fetchCarById, createBooking, getUserSubscription, getVehicleCalendar } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Label } from "@/components/ui/label";
@@ -33,17 +33,29 @@ interface Vehicle {
   };
 }
 
-const SpecItem = ({ icon, label, value }: { icon: string; label: string; value: string | number }) => (
-    <div className="bg-muted/10 p-3 rounded-lg border border-border text-center">
-      <VibeContentRenderer content={icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
-      <p className="text-xs text-muted-foreground font-mono">{label}</p>
-      <p className="text-sm font-semibold font-orbitron">{value}</p>
-    </div>
-);
+const SPEC_LABELS_AND_ICONS: Record<string, { label: string; icon: string }> = {
+    engine_cc: { label: "Двигатель", icon: "::FaGears::" },
+    horsepower: { label: "Мощность", icon: "::FaHorseHead::" },
+    weight_kg: { label: "Вес", icon: "::FaWeightHanging::" },
+    top_speed_kmh: { label: "Макс. скорость", icon: "::FaGaugeHigh::" },
+    type: { label: "Класс", icon: "::FaShieldHalved::" },
+    seat_height_mm: { label: "Высота по седлу", icon: "::FaRulerVertical::" },
+};
+
+const SpecItem = ({ specKey, value }: { specKey: string; value: string | number }) => {
+    const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaCircleInfo::' };
+    return (
+        <div className="bg-muted/10 p-3 rounded-lg border border-border text-center">
+          <VibeContentRenderer content={specInfo.icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
+          <p className="text-xs text-muted-foreground font-mono">{specInfo.label}</p>
+          <p className="text-sm font-semibold font-orbitron">{value}</p>
+        </div>
+    );
+};
 
 export default function VehicleDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
+  const { dbUser } = useAppContext();
   
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,28 +70,27 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   useEffect(() => {
     const loadData = async () => {
       if (!params.id) {
-        toast.error("ID транспорта не указан.");
-        router.push("/rent-bike");
+        setError("ID транспорта не указан.");
+        setLoading(false);
         return;
       }
       setLoading(true);
+      setError(null);
       try {
         const { success, data, error: fetchError } = await fetchCarById(params.id);
         if (success && data) {
           setVehicle(data as Vehicle);
         } else {
-          toast.error(fetchError || "Не удалось загрузить данные о транспорте.");
-          router.push("/rent-bike");
+          setError(fetchError || "Не удалось загрузить данные о транспорте.");
         }
       } catch (err) {
-        toast.error("Критическая ошибка при загрузке транспорта.");
-        router.push("/rent-bike");
+        setError("Критическая ошибка при загрузке транспорта.");
       } finally {
         setLoading(false);
       }
     };
     loadData();
-  }, [params.id, router]);
+  }, [params.id]);
 
   useEffect(() => {
     const fetchCalendar = async () => {
@@ -125,19 +136,30 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
       return;
     }
     setInvoiceLoading(true);
-    setError(null);
     try {
       const result = await createBooking(dbUser.user_id, vehicle.id, date.from, date.to, finalPrice);
       if (result.success) {
           toast.success("Запрос на бронирование отправлен! Ожидайте счет на оплату залога в Telegram.");
           setDate(undefined);
+          // Re-fetch calendar after successful booking
+          const newCalendar = await getVehicleCalendar(params.id);
+          if (newCalendar.success && newCalendar.data) {
+            const bookedDates: Date[] = [];
+            newCalendar.data.forEach(booking => {
+                let currentDate = new Date(booking.start_date!);
+                const endDate = new Date(booking.end_date!);
+                while (currentDate <= endDate) {
+                    bookedDates.push(new Date(currentDate));
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            });
+            setDisabledDates(bookedDates);
+          }
       } else {
           throw new Error(result.error || "Ошибка при создании бронирования.");
       }
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка";
-      setError(`Ошибка: ${errMsg}`);
-      toast.error(`Не удалось создать счет: ${errMsg}`);
+      toast.error(`Не удалось создать счет: ${err instanceof Error ? err.message : "Неизвестная ошибка"}`);
     } finally {
       setInvoiceLoading(false);
     }
@@ -149,11 +171,17 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   }, [vehicle]);
 
   if (loading) {
-    return <Loading variant={vehicle?.type === 'bike' ? 'bike' : 'generic'} text="ЗАГРУЗКА ДАННЫХ..." />;
+    return <Loading variant={'bike'} text="ЗАГРУЗКА ДАННЫХ..." />;
   }
 
-  if (!vehicle) {
-    return <div className="min-h-screen bg-black flex items-center justify-center"><p className="text-destructive font-mono">Транспорт не найден.</p></div>
+  if (error || !vehicle) {
+    return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 text-center">
+            <VibeContentRenderer content="::FaTimesCircle::" className="text-5xl text-destructive mb-4"/>
+            <p className="text-destructive font-mono text-lg">{error || "Транспорт не найден."}</p>
+            <Button onClick={() => router.push('/rent-bike')} className="mt-6">Назад в гараж</Button>
+        </div>
+    );
   }
 
   return (
@@ -202,7 +230,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
                         <h3 className="text-2xl font-orbitron text-brand-pink mb-4">ХАРАКТЕРИСТИКИ</h3>
                         <div className="grid grid-cols-2 gap-4">
                            {vehicle.specs && Object.entries(vehicle.specs).filter(([key]) => key !== 'gallery').map(([key, value]) => (
-                                <SpecItem key={key} icon={SPEC_LABELS_AND_ICONS[key]?.icon || '::FaCircleInfo::'} label={SPEC_LABELS_AND_ICONS[key]?.label || key} value={String(value)} />
+                                <SpecItem key={key} specKey={key} value={String(value)} />
                             ))}
                         </div>
                     </div>
@@ -237,7 +265,6 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
                         >
                             {invoiceLoading ? 'СОЗДАНИЕ СЧЕТА...' : 'ЗАБРОНИРОВАТЬ'}
                         </button>
-                        {error && <p className="text-destructive text-center mt-2 font-mono text-sm">{error}</p>}
                     </div>
                 </div>
             </div>
