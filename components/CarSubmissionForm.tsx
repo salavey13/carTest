@@ -3,7 +3,7 @@ import React, { useState, useEffect, useId } from "react";
 import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { X, Car, Bike, PlusCircle } from "lucide-react";
+import { X, Car, Bike, PlusCircle, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,13 @@ import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database['public']['Tables']['cars']['Row']>;
 type SpecItem = { id: string; key: string; value: string };
+type GalleryItem = { id: string; url: string };
 type VehicleType = 'car' | 'bike';
 
 interface CarSubmissionFormProps {
   ownerId?: string;
   vehicleToEdit?: VehicleData | null;
-  onSuccess?: () => void; // Callback to refresh parent component
+  onSuccess?: () => void;
 }
 
 const carSpecKeys = ["version", "electric", "color", "theme", "horsepower", "torque", "acceleration", "topSpeed"];
@@ -30,15 +31,12 @@ const bikeSpecKeys = ["engine_cc", "horsepower", "weight_kg", "top_speed_kmh", "
 export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubmissionFormProps) {
   const isEditMode = !!vehicleToEdit;
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [vehicleType, setVehicleType] = useState<VehicleType>(vehicleToEdit?.type === 'car' ? 'car' : 'bike');
+  const [vehicleType, setVehicleType] = useState<VehicleType>('bike');
   const [formData, setFormData] = useState({
-    make: "",
-    model: "",
-    description: "",
-    daily_price: "",
-    image_url: "",
+    make: "", model: "", description: "", daily_price: "", image_url: "",
   });
   const [specs, setSpecs] = useState<SpecItem[]>([]);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const formId = useId();
@@ -55,8 +53,21 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       setVehicleType(vehicleToEdit.type === 'car' ? 'car' : 'bike');
       setImagePreview(vehicleToEdit.image_url || null);
       if (vehicleToEdit.specs && typeof vehicleToEdit.specs === 'object') {
-        setSpecs(Object.entries(vehicleToEdit.specs).map(([key, value]) => ({ id: uuidv4(), key, value: String(value) })));
+        const specEntries = Object.entries(vehicleToEdit.specs);
+        const regularSpecs = specEntries
+          .filter(([key]) => key !== 'gallery')
+          .map(([key, value]) => ({ id: uuidv4(), key, value: String(value) }));
+        setSpecs(regularSpecs);
+
+        const galleryUrls = (vehicleToEdit.specs as any).gallery || [];
+        setGallery(galleryUrls.map((url: string) => ({ id: uuidv4(), url })));
       }
+    } else {
+      setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
+      setSpecs([]);
+      setGallery([]);
+      setImagePreview(null);
+      setImageFile(null);
     }
   }, [vehicleToEdit]);
 
@@ -73,20 +84,16 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   };
 
   const handleSpecChange = (id: string, field: 'key' | 'value', newValue: string) => {
-    setSpecs(currentSpecs =>
-      currentSpecs.map(spec =>
-        spec.id === id ? { ...spec, [field]: newValue } : spec
-      )
-    );
+    setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
   };
+  const addNewSpec = () => setSpecs(s => [...s, { id: uuidv4(), key: "", value: "" }]);
+  const removeSpec = (id: string) => setSpecs(s => s.filter(spec => spec.id !== id));
 
-  const addNewSpec = () => {
-    setSpecs(currentSpecs => [...currentSpecs, { id: uuidv4(), key: "", value: "" }]);
+  const handleGalleryChange = (id: string, url: string) => {
+    setGallery(g => g.map(item => item.id === id ? { ...item, url } : item));
   };
-
-  const removeSpec = (id: string) => {
-    setSpecs(currentSpecs => currentSpecs.filter(spec => spec.id !== id));
-  };
+  const addNewGalleryItem = () => setGallery(g => [...g, { id: uuidv4(), url: "" }]);
+  const removeGalleryItem = (id: string) => setGallery(g => g.filter(item => item.id !== id));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +121,12 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       const specsObject = specs.reduce((acc, { key, value }) => {
         if (key) acc[key] = value;
         return acc;
-      }, {} as Record<string, string>);
+      }, {} as Record<string, any>);
+
+      const galleryUrls = gallery.map(item => item.url).filter(Boolean);
+      if (galleryUrls.length > 0) {
+        specsObject.gallery = galleryUrls;
+      }
 
       const vehicleData = {
         make: formData.make, model: formData.model, description: formData.description,
@@ -125,23 +137,17 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       };
 
       if (isEditMode) {
-        const { error: updateError } = await supabaseAdmin.from("cars").update(vehicleData).eq('id', vehicleToEdit.id!);
-        if (updateError) throw updateError;
+        const { error } = await supabaseAdmin.from("cars").update(vehicleData).eq('id', vehicleToEdit.id!);
+        if (error) throw error;
         toast.success("Транспорт успешно обновлен!");
       } else {
-        const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}-${uuidv4().substring(0,8)}`;
-        const { error: insertError } = await supabaseAdmin.from("cars").insert([{ ...vehicleData, id: generatedId, owner_id: ownerId! }]);
-        if (insertError) throw insertError;
+        const id = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}-${uuidv4().substring(0,8)}`;
+        const { error } = await supabaseAdmin.from("cars").insert([{ ...vehicleData, id, owner_id: ownerId! }]);
+        if (error) throw error;
         toast.success("Транспорт успешно добавлен в гараж!");
       }
 
-      onSuccess?.(); // Trigger refresh on parent
-      if (!isEditMode) { // Clear form only on creation
-          setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
-          setSpecs([]);
-          setImageFile(null);
-          setImagePreview(null);
-      }
+      onSuccess?.();
     } catch (error) {
       toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Неизвестная ошибка")}`);
     } finally {
@@ -187,9 +193,25 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
               <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
             </motion.div>
           ))}
-          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить</Button>
+          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить характеристику</Button>
         </div>
       </div>
+
+      {isEditMode && (
+      <div>
+        <h3 className="text-lg font-mono text-brand-cyan mb-2">Фотогалерея</h3>
+        <div className="space-y-2">
+          {gallery.map(item => (
+            <motion.div key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
+              <ImageIcon className="h-5 w-5 text-brand-cyan flex-shrink-0" />
+              <Input value={item.url} onChange={e => handleGalleryChange(item.id, e.target.value)} placeholder="https://.../image.jpg" className="input-cyber" />
+              <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
+            </motion.div>
+          ))}
+          <Button type="button" onClick={addNewGalleryItem} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить фото в галерею</Button>
+        </div>
+      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -197,7 +219,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
               <Input type="number" value={formData.daily_price} onChange={e => setFormData(p => ({ ...p, daily_price: e.target.value }))} placeholder="999" className="input-cyber" required />
           </div>
           <div>
-              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Изображение (URL или файл)</Label>
+              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Главное изображение</Label>
               <div className="flex gap-2">
                   <Input value={formData.image_url} onChange={e => {setFormData(p => ({ ...p, image_url: e.target.value })); setImagePreview(e.target.value); setImageFile(null);}} placeholder="https://..." className="input-cyber" />
                   <Button asChild variant="outline" className="flex-shrink-0"><Label htmlFor="image-upload" className="cursor-pointer"><VibeContentRenderer content="::FaUpload::" /></Label></Button>
