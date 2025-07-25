@@ -16,7 +16,7 @@ export default function BikeHeader() {
         <div className="container mx-auto px-4 py-2.5 sm:py-3">
           <div className="flex items-center justify-between">
             <Link
-              href="/vipbikerental"
+              href="/rent-bike"
               className={cn("text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider", "transition-all duration-300 hover:brightness-125 flex items-baseline")}
             >
               <span className="text-brand-orange glitch" data-text="VIP">VIP</span>
