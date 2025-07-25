@@ -5,6 +5,8 @@ import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'; 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BikeHeader from "@/components/BikeHeader";
+import BikeFooter from "@/components/BikeFooter";
 import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext } from "@/contexts/AppContext"; 
 import { Toaster as SonnerToaster } from "sonner";
@@ -93,6 +95,7 @@ const TRANSPARENT_LAYOUT_PAGES = [
     '/rent-bike',
     '/crews',
     '/paddock',
+    '/admin',
     '/leaderboard'
 ];
 
@@ -165,16 +168,17 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || pathname.startsWith('/rent/');
+  const isVipBikePage = pathname === '/vipbikerental';
 
   return (
     <>
-      {showHeaderAndFooter && <Header />}
+      {showHeaderAndFooter && (isVipBikePage ? <BikeHeader /> : <Header />)}
         <main className={cn( 'flex-1', showBottomNav ? 'pb-20 sm:pb-0' : '', !isTransparentPage && 'bg-background' )}>
             {children}
         </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
       <Suspense fallback={null}><StickyChatButton /></Suspense>
-      {showHeaderAndFooter && <Footer />}
+      {showHeaderAndFooter && (isVipBikePage ? <BikeFooter /> : <Footer />)}
     </>
   );
 }
