@@ -8,10 +8,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
-import { fetchCarById, createInvoice, getUserSubscription } from "@/hooks/supabase";
-import { sendTelegramInvoice } from "@/app/actions";
+import { fetchCarById, createInvoice, getUserSubscription, getVehicleCalendar, createBooking } from "@/app/rentals/actions";
 import { Loading } from "@/components/Loading";
-import { ImageGallery } from "@/components/ImageGallery"; // IMPORT NEW COMPONENT
+import { ImageGallery } from "@/components/ImageGallery";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 
 interface Vehicle {
   id: string;
@@ -28,8 +33,6 @@ interface Vehicle {
   };
 }
 
-const RUB_TO_STARS_RATE = 1;
-
 const SpecItem = ({ icon, label, value }: { icon: string; label: string; value: string | number }) => (
     <div className="bg-muted/10 p-3 rounded-lg border border-border text-center">
       <VibeContentRenderer content={icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
@@ -45,10 +48,12 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rentDays, setRentDays] = useState(1);
+  const [date, setDate] = useState<DateRange | undefined>();
+  const [disabledDates, setDisabledDates] = useState<Date[]>([]);
+  const [isCalendarLoading, setIsCalendarLoading] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [isGalleryOpen, setIsGalleryOpen] = useState(false); // GALLERY STATE
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -77,6 +82,28 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   }, [params.id, router]);
 
   useEffect(() => {
+    const fetchCalendar = async () => {
+        if (!params.id) return;
+        setIsCalendarLoading(true);
+        const result = await getVehicleCalendar(params.id);
+        if (result.success && result.data) {
+            const bookedDates: Date[] = [];
+            result.data.forEach(booking => {
+                let currentDate = new Date(booking.start_date!);
+                const endDate = new Date(booking.end_date!);
+                while (currentDate <= endDate) {
+                    bookedDates.push(new Date(currentDate));
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            });
+            setDisabledDates(bookedDates);
+        }
+        setIsCalendarLoading(false);
+    };
+    fetchCalendar();
+  }, [params.id]);
+
+  useEffect(() => {
     const checkSubscription = async () => {
       if (dbUser?.user_id) {
         const subResult = await getUserSubscription(dbUser.user_id);
@@ -88,41 +115,25 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
     checkSubscription();
   }, [dbUser]);
 
+  const totalDays = date?.from && date?.to ? Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
+  const totalPrice = totalDays * (vehicle?.daily_price || 0);
+  const finalPrice = hasSubscription ? Math.round(totalPrice * 0.9) : totalPrice;
+
   const handleRent = async () => {
-    if (!vehicle || !tgUser || !isInTelegramContext) {
-      setError("Необходима авторизация в Telegram для аренды.");
-      toast.error("Сначала подключись к Telegram!");
+    if (!vehicle || !dbUser?.user_id || !date?.from || !date.to) {
+      toast.error("Выберите даты для аренды.");
       return;
     }
     setInvoiceLoading(true);
     setError(null);
     try {
-      const totalPriceRub = vehicle.daily_price * rentDays;
-      const totalPriceStars = Math.round(totalPriceRub * RUB_TO_STARS_RATE);
-      const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars;
-      
-      const metadata = {
-        type: "car_rental",
-        car_id: vehicle.id,
-        car_make: vehicle.make,
-        car_model: vehicle.model,
-        days: rentDays,
-        price_rub: totalPriceRub,
-        price_stars: finalPrice,
-        is_subscriber: hasSubscription,
-        image_url: vehicle.image_url,
-      };
-      const invoiceId = `${vehicle.type}_rental_${vehicle.id}_${tgUser.id}_${Date.now()}`;
-      await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata.car_id, metadata);
-
-      const description = hasSubscription
-        ? `Премиум-аренда: ${rentDays} дн.\nЦена со скидкой: ${finalPrice} XTR (${totalPriceRub} ₽)`
-        : `Аренда: ${rentDays} дн.\nЦена: ${finalPrice} XTR (${totalPriceRub} ₽)`;
-
-      const response = await sendTelegramInvoice(tgUser.id.toString(), `Аренда ${vehicle.make} ${vehicle.model}`, description, invoiceId, finalPrice, undefined, vehicle.image_url);
-
-      if (!response.success) throw new Error(response.error || "Ошибка отправки счета");
-      toast.success("Счет отправлен в Telegram!");
+      const result = await createBooking(dbUser.user_id, vehicle.id, date.from, date.to, finalPrice);
+      if (result.success) {
+          toast.success("Запрос на бронирование отправлен! Ожидайте счет на оплату залога в Telegram.");
+          setDate(undefined);
+      } else {
+          throw new Error(result.error || "Ошибка при создании бронирования.");
+      }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка";
       setError(`Ошибка: ${errMsg}`);
@@ -190,50 +201,41 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
                     <div className="bg-dark-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
                         <h3 className="text-2xl font-orbitron text-brand-pink mb-4">ХАРАКТЕРИСТИКИ</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            {vehicle.type === 'bike' ? (
-                                <>
-                                    <SpecItem icon="::FaGears::" label="Двигатель" value={`${vehicle.specs?.engine_cc || 'N/A'} cc`} />
-                                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${vehicle.specs?.horsepower || 'N/A'} л.с.`} />
-                                    <SpecItem icon="::FaWeightHanging::" label="Вес" value={`${vehicle.specs?.weight_kg || 'N/A'} кг`} />
-                                    <SpecItem icon="::FaGaugeHigh::" label="Макс. скорость" value={`${vehicle.specs?.top_speed_kmh || 'N/A'} км/ч`} />
-                                </>
-                            ) : (
-                                <>
-                                    <SpecItem icon="::FaBolt::" label="Двигатель" value={`${vehicle.specs?.version || 'N/A'}`} />
-                                    <SpecItem icon="::FaHorseHead::" label="Мощность" value={`${vehicle.specs?.horsepower || 'N/A'} л.с.`} />
-                                    <SpecItem icon="::FaTachometerAlt::" label="Разгон" value={`${vehicle.specs?.acceleration || 'N/A'}`} />
-                                    <SpecItem icon="::FaRoad::" label="Макс. скорость" value={`${vehicle.specs?.topSpeed || 'N/A'}`} />
-                                </>
-                            )}
+                           {vehicle.specs && Object.entries(vehicle.specs).filter(([key]) => key !== 'gallery').map(([key, value]) => (
+                                <SpecItem key={key} icon={SPEC_LABELS_AND_ICONS[key]?.icon || '::FaCircleInfo::'} label={SPEC_LABELS_AND_ICONS[key]?.label || key} value={String(value)} />
+                            ))}
                         </div>
                     </div>
 
                     <div className="bg-dark-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                            <div>
-                            <label className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ (ДНЕЙ)</label>
-                            <input
-                                type="number"
-                                min="1"
-                                value={rentDays}
-                                onChange={e => setRentDays(Math.max(1, Number(e.target.value)))}
-                                className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono text-center text-lg"
-                            />
-                            </div>
-                            <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center h-full flex flex-col justify-center">
-                                <p className="text-sm font-mono text-muted-foreground">ИТОГО</p>
-                                <p className="text-2xl font-orbitron text-brand-yellow font-bold">
-                                    {Math.round((vehicle.daily_price * rentDays * RUB_TO_STARS_RATE) * (hasSubscription ? 0.9 : 1))} XTR
-                                </p>
-                            </div>
+                        <div>
+                            <Label className="text-sm font-mono text-muted-foreground">СРОК АРЕНДЫ</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button variant="outline" className={cn("w-full justify-start text-left font-normal mt-1 input-cyber", !date && "text-muted-foreground")}>
+                                    <VibeContentRenderer content="::FaCalendarDays::" className="mr-2 h-4 w-4" />
+                                    {date?.from ? (date.to ? `${format(date.from, "d LLL, y")} - ${format(date.to, "d LLL, y")}`: format(date.from, "d LLL, y")) : <span>Выберите даты</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                {isCalendarLoading ? <div className="p-4"><Loading text="Загрузка..."/></div> :
+                                    <Calendar mode="range" selected={date} onSelect={setDate} initialFocus disabled={[{ before: new Date() }, ...disabledDates]} />
+                                }
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center mt-4">
+                            <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
+                            <p className="text-2xl font-orbitron text-brand-yellow font-bold">{finalPrice} ₽</p>
+                            {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : (totalDays > 1 && totalDays < 5) ? 'дня' : 'дней'})</p>}
                         </div>
                         {hasSubscription && <p className="text-xs text-brand-green text-center mt-2">(Ваша скидка 10% применена)</p>}
                          <button
                             onClick={handleRent}
-                            disabled={invoiceLoading}
+                            disabled={invoiceLoading || !date?.from || !date?.to}
                             className="w-full mt-4 p-4 rounded-xl font-orbitron text-lg font-bold text-black bg-gradient-to-r from-brand-cyan to-brand-green hover:brightness-125 transition-all duration-300 disabled:animate-pulse disabled:cursor-not-allowed disabled:brightness-75 shadow-lg hover:shadow-brand-cyan/50"
                         >
-                            {invoiceLoading ? 'СОЗДАНИЕ СЧЕТА...' : 'АРЕНДОВАТЬ'}
+                            {invoiceLoading ? 'СОЗДАНИЕ СЧЕТА...' : 'ЗАБРОНИРОВАТЬ'}
                         </button>
                         {error && <p className="text-destructive text-center mt-2 font-mono text-sm">{error}</p>}
                     </div>
