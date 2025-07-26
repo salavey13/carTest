@@ -118,7 +118,7 @@ export default function HomePage() {
                     <FeaturedBikeCard 
                         name="Harley-Davidson Fat Boy" 
                         description="Байк в максимальном тюнинге для истинных ценителей. Такого в Нижнем Новгороде еще не было!"
-                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/harley-davidson-fat-boy.jpg"
+                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/mFdiL90Oxis-15d938c2-5b98-47b1-bfc9-fdf97adf9866.jpg"
                     />
                     <FeaturedBikeCard 
                         name="Ducati X-Diavel" 
