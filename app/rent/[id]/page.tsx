@@ -77,14 +77,19 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
       setLoading(true);
       setError(null);
       try {
+        // This function now correctly returns an error instead of throwing one.
         const { success, data, error: fetchError } = await fetchCarById(params.id);
         if (success && data) {
           setVehicle(data as Vehicle);
         } else {
+          // The page will now set an error state instead of redirecting immediately.
           setError(fetchError || "Не удалось загрузить данные о транспорте.");
+          toast.error(fetchError || "Не удалось загрузить данные о транспорте.");
         }
       } catch (err) {
-        setError("Критическая ошибка при загрузке транспорта.");
+        const errorMessage = err instanceof Error ? err.message : "Критическая ошибка";
+        setError(`Критическая ошибка при загрузке: ${errorMessage}`);
+        toast.error(`Критическая ошибка при загрузке: ${errorMessage}`);
       } finally {
         setLoading(false);
       }
@@ -174,10 +179,11 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
     return <Loading variant={'bike'} text="ЗАГРУЗКА ДАННЫХ..." />;
   }
 
+  // This block now correctly handles the error state without redirecting.
   if (error || !vehicle) {
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 text-center">
-            <VibeContentRenderer content="::FaTimesCircle::" className="text-5xl text-destructive mb-4"/>
+            <VibeContentRenderer content="::FaCircleXmark::" className="text-5xl text-destructive mb-4"/>
             <p className="text-destructive font-mono text-lg">{error || "Транспорт не найден."}</p>
             <Button onClick={() => router.push('/rent-bike')} className="mt-6">Назад в гараж</Button>
         </div>
