@@ -1,8 +1,8 @@
-// /app/rent-bike/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import Link from 'next/link';
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -237,10 +237,8 @@ export default function RentBikePage() {
                      {selectedBike.crew_logo_url && <Image src={selectedBike.crew_logo_url} alt={selectedBike.crew_name || 'Crew Logo'} width={48} height={48} className="absolute top-4 right-4 rounded-full border-2 border-brand-lime shadow-lime-glow"/>}
                   </motion.div>
                   
-                  <p className="font-sans text-muted-foreground mb-6">{selectedBike.description}</p>
-
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-center">
-                    {selectedBike.specs && Object.entries(selectedBike.specs).map(([key, value]) => (
+                    {selectedBike.specs && Object.entries(selectedBike.specs).filter(([key]) => key !== 'gallery').map(([key, value]) => (
                         <SpecItem key={key} specKey={key} value={String(value)} />
                     ))}
                   </div>
@@ -262,13 +260,14 @@ export default function RentBikePage() {
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center">
+                     <Link href={`/rent/${selectedBike.id}`} className="w-full"><Button variant="outline" className="w-full h-10">Подробнее</Button></Link>
+                  </div>
+                   <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center mt-4">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
                       <p className="text-2xl font-orbitron text-brand-yellow font-bold">{totalPrice} ₽</p>
                       {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : (totalDays > 1 && totalDays < 5) ? 'дня' : 'дней'})</p>}
                     </div>
-                  </div>
-                  <Button onClick={handleBooking} disabled={isBooking || selectedBike.availability !== 'available' || !date?.from || !date?.to} className="w-full mt-6 p-4 rounded-xl font-orbitron text-lg font-bold">
+                  <Button onClick={handleBooking} disabled={isBooking || selectedBike.availability !== 'available' || !date?.from || !date?.to} className="w-full mt-4 p-4 rounded-xl font-orbitron text-lg font-bold">
                     {isBooking ? 'БРОНИРОВАНИЕ...' : selectedBike.availability !== 'available' ? selectedBike.availability === 'taken' ? 'ЗАНЯТ' : 'НЕДОСТУПЕН' : 'ЗАБРОНИРОВАТЬ'}
                   </Button>
                 </div>
