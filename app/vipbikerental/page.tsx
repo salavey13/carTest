@@ -1,3 +1,4 @@
+// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
@@ -112,7 +113,7 @@ export default function HomePage() {
                     <FeaturedBikeCard 
                         name="VOGE 525 ACX" 
                         description="Абсолютно новый, потрясающе удобный и маневренный мотоцикл. Доступен уже сегодня!"
-                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/voge-525-acx-2023-a.jpg"
+                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/SF2_F0AnoG8-eb48600f-4d24-4cf9-a8c3-fe53574b1c56.jpg"
                     />
                     <FeaturedBikeCard 
                         name="Harley-Davidson Fat Boy" 
