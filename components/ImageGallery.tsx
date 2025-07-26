@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import useEmblaCarousel, { EmblaOptionsType } from 'embla-carousel-react';
+import useEmblaCarousel from 'embla-carousel-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
@@ -61,7 +61,7 @@ export function ImageGallery({ images, open, onOpenChange }: ImageGalleryProps) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl w-full h-[90vh] bg-black/80 border-none p-0 flex flex-col items-center justify-center">
-         <button onClick={() => onOpenChange(false)} className="absolute top-4 right-4 z-50 text-white bg-black/50 rounded-full p-2"><X/></button>
+         {/* The redundant close button has been removed from here */}
          <div className="w-full h-full flex-grow relative overflow-hidden" ref={emblaRef}>
             <div className="flex h-full">
                 {images.map((src, index) => (

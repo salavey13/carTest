@@ -92,7 +92,15 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   const handleSpecChange = (id: string, field: 'key' | 'value', newValue: string) => {
     setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
   };
-  const addNewSpec = () => setSpecs(s => [...s, { id: uuidv4(), key: "", value: "" }]);
+
+  // RESTORED & IMPROVED FUNCTIONALITY
+  const addNewSpec = () => {
+    const currentSpecKeys = specs.map(s => s.key);
+    const availableKeys = vehicleType === 'bike' ? bikeSpecKeys : carSpecKeys;
+    const nextKey = availableKeys.find(k => !currentSpecKeys.includes(k));
+    setSpecs(currentSpecs => [...currentSpecs, { id: uuidv4(), key: nextKey || "", value: "" }]);
+  };
+  
   const removeSpec = (id: string) => setSpecs(s => s.filter(spec => spec.id !== id));
 
   const handleGalleryChange = (id: string, url: string) => {
@@ -194,7 +202,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         <div className="space-y-2">
           {specs.map((spec) => (
             <motion.div key={spec.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
-              <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder={'Ключ'} className="input-cyber flex-[2]" />
+              <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder="Ключ" className="input-cyber flex-[2]" />
               <Input value={spec.value} onChange={e => handleSpecChange(spec.id, 'value', e.target.value)} placeholder="Значение" className="input-cyber flex-[3]" />
               <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
             </motion.div>
