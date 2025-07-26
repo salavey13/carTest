@@ -52,7 +52,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       });
       setVehicleType(vehicleToEdit.type === 'car' ? 'car' : 'bike');
       setImagePreview(vehicleToEdit.image_url || null);
-      setImageFile(null); // Clear file input on edit
+      setImageFile(null);
       
       if (vehicleToEdit.specs && typeof vehicleToEdit.specs === 'object') {
         const specEntries = Object.entries(vehicleToEdit.specs);
@@ -68,7 +68,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         setGallery([]);
       }
     } else {
-      // FIX: Explicitly clear form state when switching to create mode
       setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
       setSpecs([]);
       setGallery([]);
@@ -193,9 +192,9 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       <div>
         <h3 className="text-lg font-mono text-brand-purple mb-2">Характеристики</h3>
         <div className="space-y-2">
-          {specs.map((spec, index) => (
+          {specs.map((spec) => (
             <motion.div key={spec.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
-              <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder={(vehicleType === 'bike' ? bikeSpecKeys : carSpecKeys)[index] || 'Ключ'} className="input-cyber flex-[2]" />
+              <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder={'Ключ'} className="input-cyber flex-[2]" />
               <Input value={spec.value} onChange={e => handleSpecChange(spec.id, 'value', e.target.value)} placeholder="Значение" className="input-cyber flex-[3]" />
               <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
             </motion.div>
