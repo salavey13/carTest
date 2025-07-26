@@ -5,6 +5,8 @@ import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'; 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BikeHeader from "@/components/BikeHeader";
+import BikeFooter from "@/components/BikeFooter";
 import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext } from "@/contexts/AppContext"; 
 import { Toaster as SonnerToaster } from "sonner";
@@ -78,7 +80,6 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "topdf_psycho": "/topdf",
   "settings": "/settings",
   "profile": "/profile",
-  "rent": "/rent-bike",
 };
 
 const DYNAMIC_ROUTE_PATTERNS: Record<string, [string, string?]> = {
@@ -90,10 +91,21 @@ const DYNAMIC_ROUTE_PATTERNS: Record<string, [string, string?]> = {
 
 const TRANSPARENT_LAYOUT_PAGES = [
     '/rentals', 
-    '/rent-bike',
     '/crews',
     '/paddock',
+    '/admin',
     '/leaderboard'
+];
+
+const BIKE_THEME_PAGES = [
+    '/vipbikerental',
+    '/rent-bike',
+    '/rent/', // Using '/rent/' ensures it matches /rent/some-id
+    "/crews",
+    "/leaderboard",
+    "/admin",
+    "/paddock",
+    "/rentals/"
 ];
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
@@ -149,7 +161,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
   const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
-  const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals" ];
+  const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals", "/vipbikerental" ];
   if (pathname && pathname.match(/^\/[^/]+(?:\/)?$/) && !pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p)) && !pathsToShowBottomNavForExactMatch.includes(pathname)) {
     pathsToShowBottomNavForStartsWith.push(pathname); 
   }
@@ -164,17 +176,18 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
    else setShowHeaderAndFooter(true);
   }, [pathname]);
 
-  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || pathname.startsWith('/rent/');
+  const isBikeThemePage = BIKE_THEME_PAGES.some(p => pathname.startsWith(p));
+  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || isBikeThemePage;
 
   return (
     <>
-      {showHeaderAndFooter && <Header />}
+      {showHeaderAndFooter && (isBikeThemePage ? <BikeHeader /> : <Header />)}
         <main className={cn( 'flex-1', showBottomNav ? 'pb-20 sm:pb-0' : '', !isTransparentPage && 'bg-background' )}>
             {children}
         </main>
       {showBottomNav && <BottomNavigation pathname={pathname} />}
       <Suspense fallback={null}><StickyChatButton /></Suspense>
-      {showHeaderAndFooter && <Footer />}
+      {showHeaderAndFooter && (isBikeThemePage ? <BikeFooter /> : <Footer />)}
     </>
   );
 }

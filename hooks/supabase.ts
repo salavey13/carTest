@@ -1,3 +1,4 @@
+// /hooks/supabase.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
@@ -917,15 +918,17 @@ export const fetchCarById = async (id: string): Promise<{ success: boolean; data
         .maybeSingle();
 
     if (error) {
-        throw error;
+        // CORRECTED LOGIC: Return the error in the object instead of throwing it.
+        logger.error(`Error fetching car by ID ${id} from Supabase:`, error);
+        return { success: false, error: error.message };
     }
     if (!data) {
         return { success: false, error: `Car with ID ${id} not found.` };
     }
     return { success: true, data };
-  } catch (error) {
-    logger.error(`Error fetching car by ID ${id}:`, error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch car" };
+  } catch (catchError) {
+    logger.error(`Exception in fetchCarById for ${id}:`, catchError);
+    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to fetch car" };
   }
 }
 

@@ -22,7 +22,7 @@ const statusConfig = {
     pending: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow" },
     active: { label: "Активна", icon: "::FaPlayCircle::", color: "text-brand-green" },
     completed: { label: "Завершена", icon: "::FaCheckCircle::", color: "text-muted-foreground" },
-    cancelled: { label: "Отменена", icon: "::FaTimesCircle::", color: "text-destructive" },
+    cancelled: { label: "Отменена", icon: "::FaCircleXmark::", color: "text-destructive" },
     default: { label: "Неизвестно", icon: "::FaQuestionCircle::", color: "text-muted-foreground" },
 };
 
