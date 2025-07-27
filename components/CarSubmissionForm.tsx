@@ -92,7 +92,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   const handleSpecChange = (id: string, field: 'key' | 'value', newValue: string) => {
     setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
   };
-
+  
   const addNewSpec = () => {
     const currentSpecKeys = specs.map(s => s.key);
     const availableKeys = vehicleType === 'bike' ? bikeSpecKeys : carSpecKeys;
@@ -216,7 +216,9 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         <div className="space-y-2">
           {gallery.map(item => (
             <motion.div key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
-              <ImageIcon className="h-5 w-5 text-brand-cyan flex-shrink-0" />
+              <div className="w-10 h-10 flex-shrink-0 bg-black/20 rounded border border-border flex items-center justify-center">
+                <Image src={item.url || 'https://placehold.co/36x36/000000/31343C/png?text=??'} alt="Gallery preview" width={36} height={36} className="object-cover rounded-sm" />
+              </div>
               <Input value={item.url} onChange={e => handleGalleryChange(item.id, e.target.value)} placeholder="https://.../image.jpg" className="input-cyber" />
               <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
             </motion.div>
