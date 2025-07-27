@@ -1,4 +1,3 @@
-// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -12,6 +11,21 @@ import { createInvoice, sendTelegramInvoice } from "@/app/actions";
 
 type MapBounds = { top: number; bottom: number; left: number; right: number; };
 type PointOfInterest = { id: string; name: string; type: 'point' | 'path' | 'loop'; icon: string; color: string; coords: [number, number][]; };
+
+export async function getUserCrewCommandDeck(userId: string) {
+    noStore();
+    if (!userId) return { success: false, error: "User ID is required." };
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_user_crew_command_deck', { p_user_id: userId });
+        if (error) throw error;
+        // The RPC will return an array, but it should only ever have one item or be empty.
+        const commandDeckData = data && data.length > 0 ? data[0] : null;
+        return { success: true, data: commandDeckData };
+    } catch (error) {
+        logger.error(`[getUserCrewCommandDeck] Error:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
 
 export async function getVehiclesWithStatus() {
     noStore();
@@ -376,8 +390,6 @@ export async function getMapPresets(): Promise<{ success: boolean; data?: Databa
     }
 }
 
-
-
 export async function saveMapPreset(
     userId: string,
     name: string,
@@ -420,7 +432,6 @@ export async function saveMapPreset(
         return { success: false, error: errorMessage };
     }
 }
-
 
 export async function updateMapPois(
     userId: string,
