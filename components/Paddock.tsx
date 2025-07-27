@@ -10,6 +10,8 @@ import Image from "next/image";
 import { VibeContentRenderer } from "./VibeContentRenderer"
 import { useRouter } from "next/navigation"
 import { getUserPaddockData } from "@/app/actions"
+import { Button } from "./ui/button"
+import { cn } from "@/lib/utils"
 
 interface VehicleStat {
   id: string;
@@ -111,7 +113,7 @@ export function Paddock() {
       <div className="pt-20 relative container mx-auto">
         <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <h1 className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-orbitron drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]">
-            МОЙ ПАДДОК
+            КОМАНДНЫЙ МОСТИК
             </h1>
             <div className="flex items-center gap-4">
                 {stats.userCrew && (
@@ -139,14 +141,24 @@ export function Paddock() {
         </motion.div>
 
         <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-cyan-400 mb-4 font-mono">Мой Гараж ({fleet.length})</h2>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-2xl font-semibold text-cyan-400 font-mono">Управление Автопарком ({fleet.length})</h2>
+            <Link href="/admin">
+                <Button className="bg-brand-green hover:bg-brand-green/80 text-black font-semibold shadow-lg shadow-brand-green/20">
+                    <VibeContentRenderer content="::FaPlusCircle::" className="mr-2"/>
+                    Добавить Транспорт
+                </Button>
+            </Link>
+          </div>
           {fleet.length === 0 ? (
             <div className="text-center text-gray-400 py-10 bg-dark-card/30 rounded-lg">Ваш гараж пуст. <Link href="/admin" className="text-brand-cyan hover:underline">Добавьте транспорт</Link> в Vibe Control Center!</div>
           ) : (
-            fleet.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} />)
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {fleet.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} />)}
+            </div>
           )}
         </div>
-        <Link href="/admin" className="mt-8 mb-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono">
+        <Link href="/admin" className="mt-8 mb-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono text-sm">
           ← Назад в Vibe Control Center
         </Link>
       </div>
@@ -172,35 +184,44 @@ function StatCard({ title, value, icon, glowColor }: { title: string; value: str
 }
 
 function VehicleCard({ vehicle }: { vehicle: VehicleStat }) {
+  const isRented = vehicle.active_rentals > 0;
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className="p-4 rounded-lg bg-dark-card/70 border border-cyan-500/30 flex flex-col md:flex-row gap-6 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-cyan-500/30 transition-all backdrop-blur-sm"
+      className="p-4 rounded-lg bg-dark-card/70 border border-cyan-500/30 flex flex-col gap-4 shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-cyan-500/30 transition-all backdrop-blur-sm"
     >
-      <Image
-        src={vehicle.image_url}
-        alt={`${vehicle.make} ${vehicle.model}`}
-        width={200}
-        height={150}
-        className="w-full md:w-1/4 h-40 object-cover rounded-lg shadow-[0_0_8px_rgba(0,255,255,0.5)]"
-      />
-      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-        <div>
+      <div className="flex gap-4">
+        <Image
+          src={vehicle.image_url}
+          alt={`${vehicle.make} ${vehicle.model}`}
+          width={120}
+          height={120}
+          className="w-1/3 object-cover rounded-lg shadow-[0_0_8px_rgba(0,255,255,0.5)]"
+        />
+        <div className="flex-1">
+            <div className={cn("inline-block px-2 py-1 text-xs font-mono rounded-full mb-2", isRented ? "bg-brand-orange/20 text-brand-orange" : "bg-brand-green/20 text-brand-green")}>
+                {isRented ? "В АРЕНДЕ" : "СВОБОДЕН"}
+            </div>
             <h3 className="text-xl font-semibold text-cyan-400 font-orbitron">{vehicle.make} {vehicle.model}</h3>
-            <p className="text-gray-400 mt-1">Цена: {vehicle.daily_price} XTR/день</p>
-            <Link href={`/rent/${vehicle.id}`} className="mt-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors font-mono text-sm">Подробности →</Link>
+            <p className="text-gray-400 mt-1 text-sm">Цена: {vehicle.daily_price} XTR/день</p>
         </div>
-        <StatPill label="Всего аренд" value={vehicle.rental_count} />
-        <StatPill label="Доход (XTR)" value={(vehicle.total_revenue ?? 0).toLocaleString()} />
-        <StatPill label="Активно" value={vehicle.active_rentals} />
       </div>
+       <div className="grid grid-cols-2 gap-2 text-center text-sm">
+            <StatPill label="Всего аренд" value={vehicle.rental_count} />
+            <StatPill label="Доход (XTR)" value={(vehicle.total_revenue ?? 0).toLocaleString()} />
+       </div>
+       <Link href={`/admin?edit=${vehicle.id}`} className="w-full">
+            <Button variant="outline" className="w-full border-brand-yellow/50 text-brand-yellow hover:bg-brand-yellow/10 hover:text-brand-yellow">
+                <VibeContentRenderer content="::FaPencilAlt::" className="mr-2"/> Редактировать
+            </Button>
+       </Link>
     </motion.div>
   )
 }
 
 const StatPill = ({ label, value }: { label: string, value: string | number }) => (
-    <div className="text-center bg-black/30 p-2 rounded-lg border border-gray-700 h-full flex flex-col justify-center">
-        <p className="text-2xl font-orbitron text-brand-yellow">{value}</p>
+    <div className="bg-black/30 p-2 rounded-lg border border-gray-700 h-full flex flex-col justify-center">
+        <p className="text-lg font-orbitron text-brand-yellow">{value}</p>
         <p className="text-xs text-muted-foreground font-mono uppercase">{label}</p>
     </div>
 )
