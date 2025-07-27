@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from 'next/navigation';
 import { useAppContext } from "@/contexts/AppContext";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
@@ -12,12 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { supabaseAdmin } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
-import { v4 as uuidv4 } from 'uuid'; 
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
-export default function AdminPage() {
+function AdminPageContent() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
+
   const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
   const [userVehicles, setUserVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -27,26 +30,33 @@ export default function AdminPage() {
     if (!dbUser?.user_id) return;
     setIsFetchingVehicles(true);
     try {
-      const { data, error } = await supabaseAdmin
-        .from('cars')
-        .select('*')
-        .eq('owner_id', dbUser.user_id);
-
+      const { data, error } = await supabaseAdmin.from('cars').select('*').eq('owner_id', dbUser.user_id);
       if (error) throw error;
       setUserVehicles(data || []);
+      
+      // If an edit ID is in the URL, find and set that vehicle
+      if(editId) {
+        const vehicleToEdit = data?.find(v => v.id === editId);
+        if (vehicleToEdit) {
+            setSelectedVehicle(vehicleToEdit);
+            toast.info(`Загружен для редактирования: ${vehicleToEdit.make} ${vehicleToEdit.model}`);
+        } else {
+            toast.error(`Транспорт с ID ${editId} не найден в вашем гараже.`);
+        }
+      }
+
     } catch (error) {
       toast.error("Не удалось загрузить ваш транспорт.");
     } finally {
       setIsFetchingVehicles(false);
     }
-  }, [dbUser?.user_id]);
+  }, [dbUser?.user_id, editId]);
 
   useEffect(() => {
     if (!appContextLoading && typeof isAdmin === 'function') {
       const adminStatus = isAdmin();
       setIsTrulyAdmin(adminStatus);
       if (adminStatus) {
-        toast.success("Vibe Control Center: Все системы в норме, Командир.");
         fetchUserVehicles();
       }
     }
@@ -58,8 +68,10 @@ export default function AdminPage() {
   };
   
   const handleFormSuccess = () => {
-      fetchUserVehicles(); // Refresh the list after any successful operation
-      setSelectedVehicle(null); // Reset to "create new" mode
+      fetchUserVehicles();
+      if (!editId) { // Only reset to create mode if not coming from a direct edit link
+          setSelectedVehicle(null);
+      }
   };
 
   if (appContextLoading) { 
@@ -97,7 +109,7 @@ export default function AdminPage() {
           <div className="mb-6 space-y-2">
             <label className="text-sm font-mono text-muted-foreground">УПРАВЛЕНИЕ ГАРАЖОМ</label>
             <div className="flex gap-2">
-                <Select onValueChange={handleVehicleSelect} disabled={isFetchingVehicles}>
+                <Select onValueChange={handleVehicleSelect} value={selectedVehicle?.id || ""} disabled={isFetchingVehicles || !!editId}>
                     <SelectTrigger className="input-cyber flex-1">
                         <SelectValue placeholder="Выберите транспорт для редактирования..." />
                     </SelectTrigger>
@@ -107,7 +119,7 @@ export default function AdminPage() {
                         ))}
                     </SelectContent>
                 </Select>
-                <Button variant="outline" onClick={() => setSelectedVehicle(null)}>
+                <Button variant="outline" onClick={() => { router.push('/admin'); setSelectedVehicle(null); }}>
                     <VibeContentRenderer content="::FaPlus:: Создать новый"/>
                 </Button>
             </div>
@@ -138,4 +150,13 @@ export default function AdminPage() {
       </main>
     </div>
   );
+}
+
+
+export default function AdminPage() {
+    return (
+        <Suspense fallback={<Loading text="Загрузка параметров..." />}>
+            <AdminPageContent />
+        </Suspense>
+    );
 }
