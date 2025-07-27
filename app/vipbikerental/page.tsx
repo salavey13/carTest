@@ -1,4 +1,3 @@
-// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
@@ -8,12 +7,7 @@ import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { useState, useEffect, useMemo } from 'react';
-import { getVehiclesWithStatus } from '@/app/rentals/actions';
-import { Loading } from '@/components/Loading';
-import { cn } from '@/lib/utils';
-
-type VehicleWithStatus = Awaited<ReturnType<typeof getVehiclesWithStatus>>['data'] extends (infer U)[] ? U : never;
+import { BikeShowcase } from '@/components/BikeShowcase'; // IMPORT NEW COMPONENT
 
 const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode }) => (
     <div className="flex items-start gap-3">
@@ -31,56 +25,7 @@ const StepItem = ({ num, title, icon, children }: { num: string, title: string, 
     </div>
 );
 
-const FeaturedBikeCard = ({ name, description, imageUrl }: { name: string, description: string, imageUrl: string }) => (
-    <Card className="bg-card/80 backdrop-blur-sm overflow-hidden group">
-        <CardHeader className="p-0">
-            <div className="relative h-56 w-full">
-                <Image src={imageUrl} alt={name} layout="fill" objectFit="cover" className="group-hover:scale-105 transition-transform duration-300" />
-            </div>
-        </CardHeader>
-        <CardContent className="p-4">
-            <h3 className="text-lg font-bold font-orbitron">{name}</h3>
-            <p className="text-sm text-muted-foreground font-mono my-3 min-h-[4.5rem]">{description}</p>
-            <Link href="/rent-bike" className="w-full"><Button className="w-full font-semibold">Смотреть весь парк</Button></Link>
-        </CardContent>
-    </Card>
-);
-
-
 export default function HomePage() {
-  const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadData = async () => {
-        try {
-            const response = await getVehiclesWithStatus();
-            if (response.success && response.data) {
-                const bikes = response.data.filter(v => v.type === 'bike');
-                setVehicles(bikes);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-    loadData();
-  }, []);
-
-  const bikeTypes = useMemo(() => {
-      const types = new Set(vehicles.map(v => (v.specs as any)?.type).filter(Boolean));
-      return ['Все', ...Array.from(types)];
-  }, [vehicles]);
-
-  const filteredVehicles = useMemo(() => {
-      if (!activeFilter || activeFilter === 'Все') {
-          return vehicles;
-      }
-      return vehicles.filter(v => (v.specs as any)?.type === activeFilter);
-  }, [vehicles, activeFilter]);
-
   return (
     <div className="relative min-h-screen bg-background overflow-hidden text-foreground">
         <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center text-center text-white p-4">
@@ -105,29 +50,9 @@ export default function HomePage() {
             </motion.div>
         </section>
 
-        <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
-            
-            <section id="featured">
-                <h2 className="text-4xl font-orbitron text-center mb-10">Жемчужины Нашего Парка</h2>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <FeaturedBikeCard 
-                        name="VOGE 525 ACX" 
-                        description="Абсолютно новый, потрясающе удобный и маневренный мотоцикл. Доступен уже сегодня!"
-                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/SF2_F0AnoG8-eb48600f-4d24-4cf9-a8c3-fe53574b1c56.jpg"
-                    />
-                    <FeaturedBikeCard 
-                        name="Harley-Davidson Fat Boy" 
-                        description="Байк в максимальном тюнинге для истинных ценителей. Такого в Нижнем Новгороде еще не было!"
-                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/mFdiL90Oxis-15d938c2-5b98-47b1-bfc9-fdf97adf9866.jpg"
-                    />
-                    <FeaturedBikeCard 
-                        name="Ducati X-Diavel" 
-                        description="Крутейший пауэр-круизер, который дарит невероятные эмоции. Один из флагманов нашего парка."
-                        imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/diavel_v4_p_01_hero.jpg"
-                    />
-                </div>
-            </section>
+        <BikeShowcase />
 
+        <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-start">
                 <Card className="lg:col-span-1">
                     <CardHeader><CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaClipboardList::" className="text-brand-pink"/> Требования</CardTitle></CardHeader>
