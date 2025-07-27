@@ -93,7 +93,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
     setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
   };
 
-  // RESTORED & IMPROVED FUNCTIONALITY
   const addNewSpec = () => {
     const currentSpecKeys = specs.map(s => s.key);
     const availableKeys = vehicleType === 'bike' ? bikeSpecKeys : carSpecKeys;
