@@ -119,7 +119,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 setLoading(false);
             }
         }
-        if (dbUser) { // Only run when dbUser is available
+        if (dbUser) { 
             loadData();
         }
     }, [slug, dbUser]);
