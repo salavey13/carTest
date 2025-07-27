@@ -19,6 +19,7 @@ import { simGodCommand } from "./sim_god";
 import { leaderboardCommand } from "./leaderboard";
 import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
+import { shiftCommand } from "./shift"; // NEW IMPORT
 
 export async function handleCommand(update: any) {
     if (update.message?.text) {
@@ -34,8 +35,9 @@ export async function handleCommand(update: any) {
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
 
         const commandMap: { [key: string]: Function } = {
-            "/start": () => startCommand(chatId, userId, username, text),
+            "/start": () => startCommand(chatId, userId, update.message.from, text),
             "/help": () => helpCommand(chatId, userId),
+            "/shift": () => shiftCommand(chatId, userIdStr, username), // NEW COMMAND
             "/actions": () => actionsCommand(chatId, userIdStr),
             "/sos": () => sosCommand(chatId, userIdStr),
             "/rage": () => rageCommand(chatId, userId),
@@ -78,7 +80,7 @@ export async function handleCommand(update: any) {
 
             const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
             if (activeSurvey) {
-                await startCommand(chatId, userId, username, text);
+                await startCommand(chatId, userId, update.message.from, text);
             } else {
                 logger.warn(`[Command Handler] Unknown command for user ${userId}. Text: '${text}'`);
                 await sendComplexMessage(chatId, "Неизвестная команда. Используй /help.", []);
