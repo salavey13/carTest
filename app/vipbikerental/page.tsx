@@ -7,12 +7,12 @@ import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { BikeShowcase } from '@/components/BikeShowcase'; // IMPORT NEW COMPONENT
+import { BikeShowcase } from '@/components/BikeShowcase';
 
 const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode }) => (
     <div className="flex items-start gap-3">
         <VibeContentRenderer content={icon} className="text-xl text-brand-green mt-1 flex-shrink-0" />
-        <p className="text-muted-foreground">{children}</p>
+        <p className="text-white/90">{children}</p>
     </div>
 );
 
@@ -23,6 +23,26 @@ const StepItem = ({ num, title, icon, children }: { num: string, title: string, 
         <h4 className="font-orbitron text-lg mb-2">{title}</h4>
         <p className="text-sm text-muted-foreground">{children}</p>
     </div>
+);
+
+// New component for visually rich service cards
+const ServiceCard = ({ title, icon, items, imageUrl, borderColorClass }: { title: string; icon: string; items: {icon: string, text: string}[]; imageUrl?: string; borderColorClass?: string; }) => (
+    <Card className={`relative lg:col-span-1 overflow-hidden bg-black ${borderColorClass || 'border-border'}`}>
+        {imageUrl && (
+            <Image src={imageUrl} alt={title} layout="fill" objectFit="cover" className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-300"/>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"/>
+        <div className="relative h-full flex flex-col p-6">
+            <CardHeader className="p-0 mb-4">
+                <CardTitle className={`flex items-center gap-3 text-2xl ${borderColorClass?.replace('border-', 'text-')}`}>{icon} {title}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 space-y-4 flex-grow">
+                {items.map((item, index) => (
+                    <InfoItem key={index} icon={item.icon}>{item.text}</InfoItem>
+                ))}
+            </CardContent>
+        </div>
+    </Card>
 );
 
 export default function HomePage() {
@@ -53,34 +73,42 @@ export default function HomePage() {
         <BikeShowcase />
 
         <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-start">
-                <Card className="lg:col-span-1">
-                    <CardHeader><CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaClipboardList::" className="text-brand-pink"/> Требования</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <InfoItem icon="::FaUserClock::">Возраст от 23 лет</InfoItem>
-                        <InfoItem icon="::FaIdCard::">Паспорт и В/У категории "А" (есть скутеры без "А")</InfoItem>
-                        <InfoItem icon="::FaAward::">Залог от 20 000 ₽</InfoItem>
-                        <InfoItem icon="::FaCreditCard::">Оплата любым удобным способом</InfoItem>
-                    </CardContent>
-                </Card>
-                 <Card className="lg:col-span-1">
-                    <CardHeader><CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaGift::" className="text-brand-green"/> Что вы получаете</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <InfoItem icon="::FaCircleCheck::">Полностью обслуженный и чистый мотоцикл</InfoItem>
-                        <InfoItem icon="::FaFileSignature::">Открытый полис ОСАГО</InfoItem>
-                        <InfoItem icon="::FaUsershield::">Полный комплект защитной экипировки</InfoItem>
-                        <InfoItem icon="::FaTag::">Скидка 10% на первую аренду по промокоду "ЛЕТО2025"</InfoItem>
-                    </CardContent>
-                </Card>
-                <Card className="lg:col-span-1 border-brand-cyan shadow-cyan-glow">
-                    <CardHeader><CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaWrench::" className="text-brand-cyan"/> Наши Услуги</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                        <InfoItem icon="::FaTools::">Обслуживание и ремонт вашего мотоцикла</InfoItem>
-                        <InfoItem icon="::FaGamepad::">Лаунж-зона с кальяном и игровыми приставками</InfoItem>
-                        <InfoItem icon="::FaMapLocationDot::">Новая удобная локация: Стригинский переулок 13Б</InfoItem>
-                        <InfoItem icon="::FaBeerMugEmpty::">Место, где можно встретить единомышленников</InfoItem>
-                    </CardContent>
-                </Card>
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
+                <ServiceCard 
+                    title="Требования"
+                    icon="::FaClipboardList::"
+                    borderColorClass="border-brand-pink"
+                    items={[
+                        { icon: "::FaUserClock::", text: "Возраст от 23 лет" },
+                        { icon: "::FaIdCard::", text: "Паспорт и В/У категории 'А' (есть скутеры без 'А')" },
+                        { icon: "::FaAward::", text: "Залог от 20 000 ₽" },
+                        { icon: "::FaCreditCard::", text: "Оплата любым удобным способом" }
+                    ]}
+                />
+                 <ServiceCard 
+                    title="Что вы получаете"
+                    icon="::FaGift::"
+                    borderColorClass="border-brand-green"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/81Dts9uMBXZXTKC7PjIbBRRRHYGQx_2TPEKFWvaUwDzzgSQPjxUf4GjAiRaDWIcWgwmeaZQTKppFn5VBS6yZeK7R-38bfc7fb-0d5a-4b62-b7e6-ca83950cb265.jpg"
+                    items={[
+                        { icon: "::FaCircleCheck::", text: "Полностью обслуженный и чистый мотоцикл" },
+                        { icon: "::FaFileSignature::", text: "Открытый полис ОСАГО" },
+                        { icon: "::FaUsershield::", text: "Полный комплект защитной экипировки" },
+                        { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'ЛЕТО2025'" }
+                    ]}
+                />
+                <ServiceCard 
+                    title="Наши Услуги"
+                    icon="::FaWrench::"
+                    borderColorClass="border-brand-cyan"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/servicefplaceholder.jpg"
+                    items={[
+                        { icon: "::FaTools::", text: "Обслуживание и ремонт вашего мотоцикла" },
+                        { icon: "::FaGamepad::", text: "Лаунж-зона с кальяном и игровыми приставками" },
+                        { icon: "::FaMapLocationDot::", text: "Новая удобная локация: Стригинский переулок 13Б" },
+                        { icon: "::FaBeerMugEmpty::", text: "Место, где можно встретить единомышленников" }
+                    ]}
+                />
             </section>
 
             <section>
@@ -106,6 +134,7 @@ export default function HomePage() {
                     </AccordionItem>
                      <AccordionItem value="item-3">
                         <AccordionTrigger>Что входит в стоимость аренды?</AccordionTrigger>
+
                         <AccordionContent>В стоимость входит аренда самого мотоцикла на 24 часа, полис ОСАГО и полный комплект защитной экипировки. Пробег обычно ограничен (например, 300 км/сутки), превышение оплачивается отдельно.</AccordionContent>
                     </AccordionItem>
                      <AccordionItem value="item-4">
