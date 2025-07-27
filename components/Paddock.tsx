@@ -1,3 +1,4 @@
+// /components/Paddock.tsx
 "use client"
 import { useState, useEffect, useCallback } from "react"
 import type React from "react"
@@ -212,7 +213,7 @@ function VehicleCard({ vehicle }: { vehicle: VehicleStat }) {
        </div>
        <Link href={`/admin?edit=${vehicle.id}`} className="w-full">
             <Button variant="outline" className="w-full border-brand-yellow/50 text-brand-yellow hover:bg-brand-yellow/10 hover:text-brand-yellow">
-                <VibeContentRenderer content="::FaPencilAlt::" className="mr-2"/> Редактировать
+                <VibeContentRenderer content="::FaTools::" className="mr-2"/> Редактировать
             </Button>
        </Link>
     </motion.div>
