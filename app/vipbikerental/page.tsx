@@ -27,14 +27,17 @@ const StepItem = ({ num, title, icon, children }: { num: string, title: string, 
 
 // New component for visually rich service cards
 const ServiceCard = ({ title, icon, items, imageUrl, borderColorClass }: { title: string; icon: string; items: {icon: string, text: string}[]; imageUrl?: string; borderColorClass?: string; }) => (
-    <Card className={`relative lg:col-span-1 overflow-hidden bg-black ${borderColorClass || 'border-border'}`}>
+    <Card className={`relative lg:col-span-1 overflow-hidden bg-black group ${borderColorClass || 'border-border'}`}>
         {imageUrl && (
-            <Image src={imageUrl} alt={title} layout="fill" objectFit="cover" className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-300"/>
+            <Image src={imageUrl} alt={title} layout="fill" objectFit="cover" className="absolute inset-0 opacity-40 group-hover:opacity-50 transition-opacity duration-300"/>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"/>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent/10"/>
         <div className="relative h-full flex flex-col p-6">
             <CardHeader className="p-0 mb-4">
-                <CardTitle className={`flex items-center gap-3 text-2xl ${borderColorClass?.replace('border-', 'text-')}`}>{icon} {title}</CardTitle>
+                <CardTitle className={`flex items-center gap-3 text-2xl ${borderColorClass?.replace('border-', 'text-')}`}>
+                    <VibeContentRenderer content={icon} />
+                    {title}
+                </CardTitle>
             </CardHeader>
             <CardContent className="p-0 space-y-4 flex-grow">
                 {items.map((item, index) => (
@@ -93,7 +96,7 @@ export default function HomePage() {
                     items={[
                         { icon: "::FaCircleCheck::", text: "Полностью обслуженный и чистый мотоцикл" },
                         { icon: "::FaFileSignature::", text: "Открытый полис ОСАГО" },
-                        { icon: "::FaUsershield::", text: "Полный комплект защитной экипировки" },
+                        { icon: "::FaUserShield::", text: "Полный комплект защитной экипировки" },
                         { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'ЛЕТО2025'" }
                     ]}
                 />
