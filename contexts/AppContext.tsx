@@ -6,31 +6,41 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
 import { toast } from "sonner";
-import { fetchUserData as dbFetchUserData } from "@/hooks/supabase"; 
+import { fetchUserData as dbFetchUserData, supabaseAdmin } from "@/hooks/supabase"; 
 import type { Database } from "@/types/database.types"; 
+
+export type UserCrewInfo = {
+  id: string;
+  slug: string;
+  name: string;
+  logo_url: string;
+  is_owner: boolean;
+};
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   startParamPayload: string | null;
   refreshDbUser: () => Promise<void>; 
   clearStartParam: () => void;
+  userCrewInfo: UserCrewInfo | null;
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const telegramHookData = useTelegram(); 
-  const { user, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
+  const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
-  const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(telegramHookData.dbUser); 
+  const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(initialDbUser); 
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
+  const [userCrewInfo, setUserCrewInfo] = useState<UserCrewInfo | null>(null);
   
   const isLoading = isTelegramLoading;
   const isAuthenticating = isTelegramAuthenticating;
   const error = telegramError;
 
   useEffect(() => {
-    setDbUserInternal(telegramHookData.dbUser);
-  }, [telegramHookData.dbUser]);
+    setDbUserInternal(initialDbUser);
+  }, [initialDbUser]);
 
   const refreshDbUser = useCallback(async () => {
     if (user?.id) {
@@ -46,6 +56,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user.id is not available.");
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    const fetchUserCrewInfo = async () => {
+      if (!dbUser?.user_id) {
+        setUserCrewInfo(null);
+        return;
+      }
+      
+      const { data: ownedCrew } = await supabaseAdmin.from('crews').select('id, slug, name, logo_url').eq('owner_id', dbUser.user_id).single();
+      if (ownedCrew) {
+        setUserCrewInfo({ ...ownedCrew, is_owner: true });
+        return;
+      }
+      
+      const { data: memberCrew } = await supabaseAdmin.from('crew_members').select('crews(id, slug, name, logo_url)').eq('user_id', dbUser.user_id).eq('status', 'active').single();
+      if (memberCrew && memberCrew.crews) {
+        setUserCrewInfo({ ...(memberCrew.crews as any), is_owner: false });
+      } else {
+        setUserCrewInfo(null);
+      }
+    };
+    
+    fetchUserCrewInfo();
+  }, [dbUser]);
   
   const clearStartParam = useCallback(() => {
     debugLogger.info("[AppContext] Clearing startParamPayload.");
@@ -76,8 +110,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startParamPayload,
         refreshDbUser, 
         clearStartParam,
+        userCrewInfo,
     };
-  }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser, clearStartParam]);
+  }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser, clearStartParam, userCrewInfo]);
 
   useEffect(() => {
     debugLogger.log("[APP_CONTEXT] State Updated.", {
@@ -88,9 +123,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbUserExists: !!contextValue.dbUser,
       isAdmin: typeof contextValue.isAdmin === 'function' ? contextValue.isAdmin() : 'N/A',
       startParamPayload: contextValue.startParamPayload,
+      userCrewInfo: contextValue.userCrewInfo ? { name: contextValue.userCrewInfo.name, is_owner: contextValue.userCrewInfo.is_owner } : null
     });
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.dbUser, contextValue.user, contextValue.startParamPayload, contextValue.isAdmin]);
-
+  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.dbUser, contextValue.user, contextValue.startParamPayload, contextValue.isAdmin, contextValue.userCrewInfo]);
 
   useEffect(() => {
     let loadingTimer: NodeJS.Timeout | null = null;
@@ -162,6 +197,7 @@ export const useAppContext = (): AppContextData => {
         initData: undefined, initDataUnsafe: undefined, startParam: null, startParamPayload: null,
         refreshDbUser: defaultRefreshDbUser,
         clearStartParam: defaultClearStartParam,
+        userCrewInfo: null,
      } as AppContextData;
   }
 
