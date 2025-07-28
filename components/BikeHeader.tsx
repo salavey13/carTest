@@ -8,9 +8,67 @@ import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { FaTelegram } from "react-icons/fa6";
+import { useAppContext } from "@/contexts/AppContext";
+import { useEffect, useState } from "react";
+import { supabaseAdmin } from "@/hooks/supabase";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+type UserCrewInfo = {
+    slug: string;
+    is_owner: boolean;
+    logo_url: string;
+    name: string;
+}
 
 export default function BikeHeader() {
+  const { dbUser, tg, isInTelegramContext } = useAppContext();
+  const [crewInfo, setCrewInfo] = useState<UserCrewInfo | null>(null);
+
+  useEffect(() => {
+    const fetchCrewInfo = async () => {
+      if (!dbUser?.user_id) return;
+
+      // Check if user is an owner first
+      const { data: ownedCrew, error: ownerError } = await supabaseAdmin
+        .from('crews')
+        .select('slug, logo_url, name')
+        .eq('owner_id', dbUser.user_id)
+        .single();
+      
+      if (ownedCrew) {
+        setCrewInfo({ ...ownedCrew, is_owner: true });
+        return;
+      }
+      
+      // If not an owner, check if they are a member
+      const { data: memberCrew, error: memberError } = await supabaseAdmin
+        .from('crew_members')
+        .select('crews(slug, logo_url, name)')
+        .eq('user_id', dbUser.user_id)
+        .eq('status', 'active')
+        .single();
+
+      if (memberCrew && memberCrew.crews) {
+        setCrewInfo({ ...memberCrew.crews, is_owner: false });
+      }
+    };
+    fetchCrewInfo();
+  }, [dbUser]);
+
+  const handleInvite = () => {
+    if (!crewInfo || !crewInfo.is_owner) return;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${crewInfo.slug}-join_crew`;
+    const text = `Присоединяйся к нашему экипажу '${crewInfo.name}' в VibeRider!`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    if (isInTelegramContext && tg) {
+        tg.openLink(shareUrl);
+    } else {
+        window.open(shareUrl, "_blank");
+    }
+  };
+
   return (
+    <TooltipProvider>
       <motion.header
         className={cn("fixed top-0 left-0 right-0 z-40 bg-black/80 border-b border-brand-orange/40 shadow-md backdrop-blur-md")}
         initial={{ y: -100 }} animate={{ y: 0 }} transition={{ type: "tween", duration: 0.3 }}
@@ -26,7 +84,7 @@ export default function BikeHeader() {
                 alt="Vip Bike Rental Logo" 
                 width={36} 
                 height={36} 
-                className="rounded-full border-2 border-brand-orange/50"
+                className="rounded-full"
               />
               <div className="flex items-baseline">
                 <span className="text-brand-orange glitch" data-text="VIP">VIP</span>
@@ -35,15 +93,38 @@ export default function BikeHeader() {
             </Link>
             <div className="flex items-center gap-1.5 md:gap-2">
                 <ThemeToggleButton />
-                <a href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener noreferrer" title="Telegram Bot">
-                    <button className="p-2 text-brand-cyan hover:text-brand-cyan/70 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-cyan/10">
-                        <FaTelegram className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </button>
-                </a>
+                
+                {crewInfo?.is_owner ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button onClick={handleInvite} className="p-2 text-brand-lime hover:text-brand-lime/70 focus:outline-none focus:ring-2 focus:ring-brand-lime focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-lime/10">
+                                <VibeContentRenderer content="::FaUserPlus::" className="h-5 w-5 sm:h-6 sm:w-6" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Пригласить в Экипаж</p></TooltipContent>
+                    </Tooltip>
+                ) : crewInfo ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <Link href={`/crews/${crewInfo.slug}`}>
+                                <Image src={crewInfo.logo_url} alt={crewInfo.name} width={32} height={32} className="rounded-full border-2 border-brand-green/50 hover:border-brand-green transition-colors"/>
+                             </Link>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Мой Экипаж: {crewInfo.name}</p></TooltipContent>
+                    </Tooltip>
+                ) : (
+                    <a href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener noreferrer" title="Telegram Bot">
+                        <button className="p-2 text-brand-cyan hover:text-brand-cyan/70 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-cyan/10">
+                            <FaTelegram className="h-5 w-5 sm:h-6 sm:w-6" />
+                        </button>
+                    </a>
+                )}
+
                 <UserInfo />
             </div>
           </div>
         </div>
       </motion.header>
+    </TooltipProvider>
   );
 }
