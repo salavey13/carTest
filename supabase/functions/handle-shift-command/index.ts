@@ -1,7 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const VERCEL_NOTIFY_ENDPOINT = Deno.env.get("VERCEL_NOTIFICATION_API_ENDPOINT");
 const CRON_SECRET = Deno.env.get("CRON_SECRET");
 
@@ -13,10 +12,7 @@ async function notifyVercel(payload: object) {
   try {
     await fetch(VERCEL_NOTIFY_ENDPOINT, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CRON_SECRET}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CRON_SECRET}` },
       body: JSON.stringify(payload)
     });
   } catch (e) {
@@ -25,7 +21,7 @@ async function notifyVercel(payload: object) {
 }
 
 serve(async (req) => {
-  const { userId, chatId, username } = await req.json();
+  const { userId, chatId, username, action } = await req.json();
 
   const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -37,10 +33,11 @@ serve(async (req) => {
       .from("crew_members")
       .select("crew_id, crews(owner_id, name)")
       .eq("user_id", userId)
+      .eq("status", "active")
       .single();
 
     if (crewError || !crewMember) {
-      await notifyVercel({ chatId, message: "Вы не состоите в экипаже. Команда `/shift` недоступна." });
+      await notifyVercel({ chatId, message: "Вы не являетесь активным участником экипажа. Команда `/shift` недоступна." });
       return new Response("ok");
     }
 
@@ -49,44 +46,47 @@ serve(async (req) => {
 
     const { data: activeShift, error: shiftError } = await supabaseAdmin
       .from("crew_member_shifts")
-      .select("id, clock_in_time")
+      .select("id, clock_in_time, shift_type")
       .eq("member_id", userId)
       .is("clock_out_time", null)
       .single();
 
     if (shiftError && shiftError.code !== 'PGRST116') throw shiftError;
-
-    if (activeShift) {
-      const { data: updatedShift, error: updateError } = await supabaseAdmin
-        .from("crew_member_shifts")
-        .update({ clock_out_time: new Date().toISOString() })
-        .eq("id", activeShift.id)
-        .select('duration_minutes')
-        .single();
-
-      if (updateError) throw updateError;
-      
-      const duration = updatedShift?.duration_minutes || 0;
-      const hours = Math.floor(duration / 60);
-      const minutes = Math.round(duration % 60);
-
-      await notifyVercel({ chatId, message: `✅ *Смена завершена.*\nПродолжительность: *${hours} ч ${minutes} мин.*\nХорошего отдыха!` });
-      await notifyVercel({ chatId: ownerId, message: `🔴 Участник @${username} завершил смену в экипаже *'${crewName}'*.` });
+    
+    // --- Main Action Logic ---
+    if (action === 'clock_in' && !activeShift) {
+        await supabaseAdmin.from("crew_member_shifts").insert({ member_id: userId, crew_id, shift_type: 'online' });
+        await notifyVercel({ chatId, message: "✅ *Смена начата.* Время пошло. Продуктивной работы!", removeKeyboard: true });
+        await notifyVercel({ chatId: ownerId, message: `🟢 Участник @${username} начал смену в экипаже *'${crewName}'*.` });
+    } else if (action === 'clock_out' && activeShift) {
+        const { data: updated } = await supabaseAdmin.from("crew_member_shifts").update({ clock_out_time: new Date().toISOString() }).eq("id", activeShift.id).select('duration_minutes').single();
+        const duration = updated?.duration_minutes || 0;
+        const hours = Math.floor(duration / 60);
+        const minutes = Math.round(duration % 60);
+        await notifyVercel({ chatId, message: `✅ *Смена завершена.*\nПродолжительность: *${hours} ч ${minutes} мин.*\nХорошего отдыха!`, removeKeyboard: true });
+        await notifyVercel({ chatId: ownerId, message: `🔴 Участник @${username} завершил смену в экипаже *'${crewName}'*.` });
+    } else if (action === 'toggle_ride' && activeShift) {
+        const newShiftType = activeShift.shift_type === 'online' ? 'riding' : 'online';
+        await supabaseAdmin.from("crew_member_shifts").update({ shift_type: newShiftType }).eq("id", activeShift.id);
+        const statusMessage = newShiftType === 'riding' ? "🏍️ Статус изменен на *'На Байке'*. Поездка началась!" : "🏢 Статус изменен на *'Онлайн'*. Вы снова в боксе.";
+        await notifyVercel({ chatId, message: statusMessage, removeKeyboard: true });
+        await notifyVercel({ chatId: ownerId, message: `⚙️ Статус участника @${username} в *'${crewName}'*: ${newShiftType === 'riding' ? "На Байке" : "Онлайн"}` });
     } else {
-      const { error: insertError } = await supabaseAdmin
-        .from("crew_member_shifts")
-        .insert({ member_id: userId, crew_id });
-      
-      if (insertError) throw insertError;
-
-      await notifyVercel({ chatId, message: "✅ *Смена начата.*\nВремя пошло. Продуктивной работы!" });
-      await notifyVercel({ chatId: ownerId, message: `🟢 Участник @${username} начал смену в экипаже *'${crewName}'*.` });
+      // --- Display Keyboard ---
+      let buttons = [];
+      if (activeShift) {
+          const toggleRideLabel = activeShift.shift_type === 'online' ? "🏍️ Начать Поездку" : "🏢 Завершить Поездку";
+          buttons = [ [{ text: toggleRideLabel }], [{ text: "❌ Завершить Смену" }] ];
+      } else {
+          buttons = [ [{ text: "✅ Начать Смену" }] ];
+      }
+      await notifyVercel({ chatId, message: "Выберите действие:", keyboardType: 'reply', buttons });
     }
 
     return new Response("ok");
   } catch (error) {
     console.error("Error in handle-shift-command:", error);
-    await notifyVercel({ chatId, message: `🚨 Произошла системная ошибка при выполнении команды. \`\`\`${error.message}\`\`\`` });
+    await notifyVercel({ chatId, message: `🚨 Системная ошибка: \`\`\`${error.message}\`\`\`` });
     return new Response("error", { status: 500 });
   }
 });

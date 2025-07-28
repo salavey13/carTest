@@ -1,3 +1,4 @@
+// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -301,5 +302,71 @@ export async function updateMapPois(userId: string, mapId: string, newPois: Poin
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         logger.error("[updateMapPois Action] Error:", errorMessage);
         return { success: false, error: errorMessage };
+    }
+}
+
+export async function requestToJoinCrew(userId: string, username: string, crewId: string) {
+    noStore();
+    if (!userId || !crewId) return { success: false, error: "User and Crew ID are required." };
+    try {
+        // Check if user is already in ANY crew
+        const { data: existingMembership, error: checkError } = await supabaseAdmin
+            .from('crew_members')
+            .select('crew_id')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .maybeSingle();
+        if (checkError) throw checkError;
+        if (existingMembership) return { success: false, error: "Вы уже являетесь активным участником другого экипажа." };
+
+        // Upsert the request
+        const { error } = await supabaseAdmin
+            .from('crew_members')
+            .upsert({ user_id: userId, crew_id: crewId, status: 'pending' }, { onConflict: 'crew_id, user_id' });
+        if (error) throw error;
+        
+        // Notify owner
+        const { data: crew, error: crewFetchError } = await supabaseAdmin.from('crews').select('owner_id, name, slug').eq('id', crewId).single();
+        if (crewFetchError || !crew) throw new Error("Could not find crew to notify owner.");
+
+        const confirmationUrl = `${getBaseUrl()}/crews/${crew.slug}?confirm_member=${userId}`;
+        const ownerMessage = `🔔 Новый запрос на вступление в ваш экипаж *'${crew.name}'* от пользователя @${username}.\n\nНажмите кнопку ниже, чтобы рассмотреть заявку.`;
+        await sendComplexMessage(crew.owner_id, ownerMessage, [[{ text: "Рассмотреть Заявку", url: confirmationUrl }]]);
+
+        return { success: true };
+    } catch(e) {
+        logger.error('[requestToJoinCrew]', e);
+        return { success: false, error: e instanceof Error ? e.message : "Unknown error."};
+    }
+}
+
+export async function confirmCrewMember(ownerId: string, newMemberId: string, crewId: string, accept: boolean) {
+    noStore();
+    if (!ownerId || !newMemberId || !crewId) return { success: false, error: "Missing required IDs." };
+    try {
+        const { data: crew, error: crewCheckError } = await supabaseAdmin.from('crews').select('id').eq('id', crewId).eq('owner_id', ownerId).single();
+        if (crewCheckError || !crew) return { success: false, error: "Permission denied. You are not the owner of this crew." };
+
+        const { data: member, error: memberFetchError } = await supabaseAdmin.from('users').select('username').eq('user_id', newMemberId).single();
+        if(memberFetchError || !member) throw new Error("Could not find user to notify.");
+
+        if (accept) {
+            // Remove user from any other crews they might have a pending request for
+            await supabaseAdmin.from('crew_members').delete().eq('user_id', newMemberId);
+            // Add to the new crew as active
+            const { error: updateError } = await supabaseAdmin.from('crew_members').insert({ crew_id: crewId, user_id: newMemberId, status: 'active' });
+            if (updateError) throw updateError;
+            await sendComplexMessage(newMemberId, `🎉 Ваша заявка на вступление в экипаж *'${crew.name}'* была одобрена! Теперь вам доступна команда /shift.`);
+            await sendComplexMessage(ownerId, `✅ Вы приняли @${member.username} в экипаж.`);
+        } else {
+            const { error: deleteError } = await supabaseAdmin.from('crew_members').delete().eq('crew_id', crewId).eq('user_id', newMemberId);
+            if (deleteError) throw deleteError;
+            await sendComplexMessage(newMemberId, `😔 Ваша заявка на вступление в экипаж *'${crew.name}'* была отклонена.`);
+            await sendComplexMessage(ownerId, `❌ Вы отклонили заявку от @${member.username}.`);
+        }
+        return { success: true };
+    } catch(e) {
+        logger.error('[confirmCrewMember]', e);
+        return { success: false, error: e instanceof Error ? e.message : "Unknown error."};
     }
 }
