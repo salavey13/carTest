@@ -1,10 +1,11 @@
 "use client";
 
-import { getPublicCrewInfo, getMapPresets, getUserCrewCommandDeck } from '@/app/rentals/actions';
+import { getPublicCrewInfo, getMapPresets, getUserCrewCommandDeck, requestToJoinCrew, confirmCrewMember } from '@/app/rentals/actions';
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +15,8 @@ import { VibeMap, MapBounds } from '@/components/VibeMap';
 import { Database } from '@/types/database.types';
 import { useAppContext } from '@/contexts/AppContext';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 type CrewDetails = Database['public']['Views']['crew_details']['Row'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
@@ -77,16 +80,41 @@ function CrewOwnerCommandDeck({ commandDeckData }: { commandDeckData: CommandDec
 
 
 function CrewDetailContent({ slug }: { slug: string }) {
-    const { dbUser } = useAppContext();
+    const { dbUser, isLoading: isAppLoading } = useAppContext();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
     const [crew, setCrew] = useState<CrewDetails | null>(null);
     const [commandDeckData, setCommandDeckData] = useState<CommandDeckData | null>(null);
     const [isOwner, setIsOwner] = useState(false);
+    const [isMember, setIsMember] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const [defaultMap, setDefaultMap] = useState<MapPreset>(FALLBACK_MAP);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [action, setAction] = useState<string | null>(null);
+    const [targetMemberId, setTargetMemberId] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState("garage");
+
+    useEffect(() => {
+        const joinAction = searchParams.get('join_crew');
+        const confirmAction = searchParams.get('confirm_member');
+        if (joinAction === 'true') {
+            setAction('join');
+            setActiveTab('roster');
+        } else if (confirmAction) {
+            setAction('confirm');
+            setTargetMemberId(confirmAction);
+            setActiveTab('roster');
+        } else {
+            setAction(null);
+            setTargetMemberId(null);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         async function loadData() {
+            setLoading(true);
             try {
                 const crewResult = await getPublicCrewInfo(slug);
 
@@ -95,7 +123,12 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     setCrew(crewData);
                     
                     const ownerCheck = dbUser?.user_id === crewData.owner.user_id;
+                    const memberCheck = crewData.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'active');
+                    const pendingCheck = crewData.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'pending');
+
                     setIsOwner(ownerCheck);
+                    setIsMember(!!memberCheck);
+                    setIsPending(!!pendingCheck);
 
                     if (ownerCheck) {
                         const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
@@ -103,7 +136,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             setCommandDeckData(deckResult.data);
                         }
                     }
-
                 } else {
                     setError(crewResult.error || "Не удалось загрузить данные экипажа.");
                 }
@@ -114,16 +146,60 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     if (foundDefault) setDefaultMap(foundDefault);
                 }
             } catch (e: any) {
-                setError(e.message || "Неизвестная ошибка на клиенте.");
+                setError(e.message || "Неизвестная ошибка.");
             } finally {
                 setLoading(false);
             }
         }
-        if (dbUser) { 
+        if (dbUser && !isAppLoading) {
             loadData();
+        } else if (!isAppLoading) {
+            setLoading(false); // Stop loading if user is not logged in
         }
-    }, [slug, dbUser]);
+    }, [slug, dbUser, isAppLoading]);
 
+    const handleJoinRequest = async () => {
+        if (!dbUser || !crew) return;
+        const promise = requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id);
+        toast.promise(promise, {
+            loading: 'Отправка заявки...',
+            success: (res) => {
+                if (res.success) {
+                    setIsPending(true);
+                    return "Заявка отправлена владельцу экипажа!";
+                }
+                throw new Error(res.error);
+            },
+            error: (err) => err.message,
+        });
+    };
+
+    const handleConfirmation = async (accept: boolean) => {
+        if (!dbUser || !crew || !targetMemberId) return;
+        const promise = confirmCrewMember(dbUser.user_id, targetMemberId, crew.id, accept);
+        toast.promise(promise, {
+            loading: 'Обработка заявки...',
+            success: (res) => {
+                if (res.success) {
+                    router.replace(`/crews/${slug}`, { scroll: false });
+                    // Manually update state for instant UI feedback
+                    setCrew(prev => {
+                        if (!prev) return null;
+                        return {
+                            ...prev,
+                            members: prev.members.map(m => m.user_id === targetMemberId ? { ...m, status: accept ? 'active' : 'rejected' } : m).filter(m => m.status !== 'rejected')
+                        }
+                    });
+                    setAction(null);
+                    setTargetMemberId(null);
+                    return `Заявка ${accept ? 'принята' : 'отклонена'}.`;
+                }
+                throw new Error(res.error);
+            },
+            error: (err) => err.message,
+        });
+    };
+    
     if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
@@ -138,7 +214,10 @@ function CrewDetailContent({ slug }: { slug: string }) {
         icon: '::FaSkullCrossbones::',
         color: 'bg-brand-pink'
     } : null;
-
+    
+    const pendingMember = action === 'confirm' ? crew.members.find(m => m.user_id === targetMemberId) : null;
+    const isCurrentUserMember = crew.members.some(m => m.user_id === dbUser?.user_id);
+    
     return (
         <>
             <RockstarHeroSection
@@ -152,6 +231,23 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
             <div className="container mx-auto max-w-6xl px-4 py-12 relative z-20">
                 {isOwner && <CrewOwnerCommandDeck commandDeckData={commandDeckData}/>}
+                
+                {action === 'join' && !isCurrentUserMember && !isOwner && (
+                    <motion.div initial={{opacity:0, y:-20}} animate={{opacity:1, y:0}} className="mb-6 bg-brand-blue/20 border border-brand-blue text-center p-4 rounded-lg">
+                        <h3 className="font-bold text-lg">Вы были приглашены в '{crew?.name}'!</h3>
+                        {isPending ? <p className="text-sm text-yellow-400 mt-2">Ваша заявка уже на рассмотрении.</p> : <Button onClick={handleJoinRequest} className="mt-2">Подать заявку на вступление</Button>}
+                    </motion.div>
+                )}
+                {action === 'confirm' && isOwner && pendingMember && (
+                     <motion.div initial={{opacity:0, y:-20}} animate={{opacity:1, y:0}} className="mb-6 bg-brand-green/20 border border-brand-green text-center p-4 rounded-lg">
+                        <h3 className="font-bold text-lg">Подтвердить нового участника?</h3>
+                        <p className="text-sm mb-4">Пользователь <span className="font-mono bg-black/50 p-1 rounded">@{pendingMember.username}</span> хочет присоединиться к вашему экипажу.</p>
+                        <div className="flex justify-center gap-4">
+                            <Button onClick={() => handleConfirmation(true)} className="bg-brand-green hover:bg-brand-green/80">Принять</Button>
+                            <Button onClick={() => handleConfirmation(false)} variant="destructive">Отклонить</Button>
+                        </div>
+                    </motion.div>
+                )}
                 
                 <motion.div 
                     initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
@@ -177,7 +273,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                         </div>
                     </div>
                     <div className="lg:col-span-2">
-                         <Tabs defaultValue="garage" className="w-full">
+                         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-2 bg-card/50">
                                 <TabsTrigger value="garage">Гараж ({crew.vehicles?.length || 0})</TabsTrigger>
                                 <TabsTrigger value="roster">Состав ({crew.members?.length || 0})</TabsTrigger>
@@ -203,6 +299,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                                                 <span className="font-mono font-semibold">@{member.username}</span>
                                                 <p className="text-xs text-brand-cyan uppercase font-mono">{member.role}</p>
                                             </div>
+                                            {member.status === 'pending' && <span className="text-xs font-mono bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">Ожидает</span>}
                                         </div>
                                     )) : <p className="text-muted-foreground font-mono text-center py-8">В этом экипаже пока никого нет.</p>}
                                 </div>
