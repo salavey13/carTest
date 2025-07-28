@@ -1,5 +1,9 @@
 -- Run this in your Supabase SQL Editor
 
+-- Install PostGIS extension in the extensions schema
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
+
+
 -- Add status to crew_members for invite system
 ALTER TABLE public.crew_members
 ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending';
@@ -10,7 +14,7 @@ ADD COLUMN IF NOT EXISTS shift_type TEXT NOT NULL DEFAULT 'online';
 
 -- Add location to crew_members for live tracking
 ALTER TABLE public.crew_members
-ADD COLUMN IF NOT EXISTS last_location GEOGRAPHY(Point, 4326);
+ADD COLUMN IF NOT EXISTS last_location extensions.geography(Point, 4326);
 
 -- Update RLS policies to handle new statuses
 DROP POLICY IF EXISTS "Crew owners can manage their crew members" ON public.crew_members;
