@@ -16,9 +16,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
+import { ru } from 'date-fns/locale';
 import type { Database } from "@/types/database.types";
 
 type VehicleWithStatus = Awaited<ReturnType<typeof getVehiclesWithStatus>>['data'] extends (infer U)[] ? U : never;
+type VehicleWithBookingInfo = VehicleWithStatus & {
+    active_booking_start?: string | null;
+    active_booking_end?: string | null;
+};
+
 
 const SURVEY_TO_BIKE_TYPE_MAP: Record<string, string> = {
   "Агрессивный нейкед (стритфайтер)": "Naked", "Суперспорт (обтекатели, поза эмбриона)": "Supersport",
@@ -47,8 +53,8 @@ const SpecItem = ({ specKey, value }: { specKey: string; value: string | number 
 
 export default function RentBikePage() {
   const { dbUser } = useAppContext();
-  const [vehicles, setVehicles] = useState<VehicleWithStatus[]>([]);
-  const [selectedBike, setSelectedBike] = useState<VehicleWithStatus | null>(null);
+  const [vehicles, setVehicles] = useState<VehicleWithBookingInfo[]>([]);
+  const [selectedBike, setSelectedBike] = useState<VehicleWithBookingInfo | null>(null);
   const [date, setDate] = useState<DateRange | undefined>();
   const [disabledDates, setDisabledDates] = useState<Date[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,13 +75,14 @@ export default function RentBikePage() {
       try {
         const response = await getVehiclesWithStatus();
         if (response.success && response.data) {
-          const bikes = response.data.filter(v => v.type === 'bike');
+          const bikes = response.data.filter(v => v.type === 'bike') as VehicleWithBookingInfo[];
           setVehicles(bikes);
           const types = new Set(bikes.map(b => (b.specs as any)?.type).filter(Boolean));
           setAvailableBikeTypes(["All", ...Array.from(types) as string[]]);
 
           if (recommendedType && bikes.some(b => (b.specs as any)?.type === recommendedType)) {
             setActiveFilter(recommendedType);
+
             setSelectedBike(bikes.find(b => (b.specs as any)?.type === recommendedType && b.availability === 'available') || bikes.find(b => b.availability === 'available') || bikes[0]);
             toast.success(`Подобрали для тебя ${recommendedType} байки!`);
           } else if (bikes.length > 0) {
@@ -172,8 +179,16 @@ export default function RentBikePage() {
   const totalDays = date?.from && date?.to ? Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
   const totalPrice = totalDays * (selectedBike?.daily_price || 0);
 
+  const bookingButtonText = selectedBike ? (
+    isBooking ? 'БРОНИРОВАНИЕ...' :
+    selectedBike.availability === 'taken' && selectedBike.active_booking_end ? `ЗАНЯТ ДО ${format(new Date(selectedBike.active_booking_end), 'd LLL', { locale: ru })}` :
+    selectedBike.availability !== 'available' ? 'НЕДОСТУПЕН' :
+    'ЗАБРОНИРОВАТЬ'
+  ) : 'ЗАБРОНИРОВАТЬ';
+
   return (
     <div className="min-h-screen text-white p-4 pt-24 overflow-hidden relative">
+
       <div className="fixed inset-0 z-[-1] opacity-30">
         <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg" alt="Moto Garage" fill className="object-cover animate-pan-zoom" />
         <div className="absolute inset-0 bg-black/60"></div>
@@ -209,7 +224,12 @@ export default function RentBikePage() {
                         <div>
                             <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
                             <p className="text-sm text-brand-pink font-mono">{bike.daily_price}₽ / день</p>
-                            <p className="text-xs text-muted-foreground font-mono">{bike.crew_name || `Владелец: ${bike.owner_id?.substring(0,6)}...`}</p>
+                            {bike.availability === 'taken' && bike.active_booking_start && bike.active_booking_end && (
+                                <p className="text-xs font-mono text-orange-400">
+                                    Занят: {format(new Date(bike.active_booking_start), 'dd.MM')} - {format(new Date(bike.active_booking_end), 'dd.MM')}
+                                </p>
+                            )}
+                            <p className="text-xs text-muted-foreground font-mono mt-1">{bike.crew_name || `Владелец: ${bike.owner_id?.substring(0,6)}...`}</p>
                         </div>
                     </div>
                     {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-brand-lime shadow-lime-glow"/>}
@@ -217,6 +237,7 @@ export default function RentBikePage() {
                         bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 
                         bike.availability === 'taken' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400')}>
                         {bike.availability === 'available' ? <VibeContentRenderer content="::FaCircleCheck::"/> : bike.availability === 'taken' ? <VibeContentRenderer content="::FaClock::"/> : <VibeContentRenderer content="::FaBan::"/>}
+
                         <span>{bike.availability === 'available' ? 'Свободен' : bike.availability === 'taken' ? 'Занят' : 'Недоступен'}</span>
                     </div>
                      {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-yellow-400 w-4 h-4 text-shadow-brand-yellow"/>}
@@ -250,12 +271,12 @@ export default function RentBikePage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className={cn("w-full justify-start text-left font-normal mt-1 input-cyber", !date && "text-muted-foreground")}>
                             <VibeContentRenderer content="::FaCalendarDays::" className="mr-2 h-4 w-4" />
-                            {date?.from ? (date.to ? `${format(date.from, "d LLL, y")} - ${format(date.to, "d LLL, y")}`: format(date.from, "d LLL, y")) : <span>Выберите даты</span>}
+                            {date?.from ? (date.to ? `${format(date.from, "d LLL, y", { locale: ru })} - ${format(date.to, "d LLL, y", { locale: ru })}`: format(date.from, "d LLL, y", { locale: ru })) : <span>Выберите даты</span>}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           {isCalendarLoading ? <div className="p-4"><Loading text="Загрузка..."/></div> :
-                            <Calendar mode="range" selected={date} onSelect={setDate} initialFocus disabled={[{ before: new Date() }, ...disabledDates]} />
+                            <Calendar mode="range" selected={date} onSelect={setDate} initialFocus disabled={[{ before: new Date() }, ...disabledDates]} locale={ru} />
                           }
                         </PopoverContent>
                       </Popover>
@@ -265,10 +286,11 @@ export default function RentBikePage() {
                    <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center mt-4">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
                       <p className="text-2xl font-orbitron text-brand-yellow font-bold">{totalPrice} ₽</p>
+
                       {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : (totalDays > 1 && totalDays < 5) ? 'дня' : 'дней'})</p>}
                     </div>
                   <Button onClick={handleBooking} disabled={isBooking || selectedBike.availability !== 'available' || !date?.from || !date?.to} className="w-full mt-4 p-4 rounded-xl font-orbitron text-lg font-bold">
-                    {isBooking ? 'БРОНИРОВАНИЕ...' : selectedBike.availability !== 'available' ? selectedBike.availability === 'taken' ? 'ЗАНЯТ' : 'НЕДОСТУПЕН' : 'ЗАБРОНИРОВАТЬ'}
+                    {bookingButtonText}
                   </Button>
                 </div>
               </motion.div>
