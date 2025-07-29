@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -58,7 +59,6 @@ const getThemeForPath = (pathname: string) => {
   }
   return THEME_CONFIG.default;
 };
-
 
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
@@ -132,7 +132,36 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       startParamHandledRef.current = true;
       const lowerStartParam = paramToProcess.toLowerCase();
       let targetPath: string | undefined;
-      // ... (startParam logic remains the same)
+            if (START_PARAM_PAGE_MAP[lowerStartParam]) {
+        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
+      } else if (lowerStartParam.includes('_')) {
+        const [prefix, ...parts] = lowerStartParam.split('_');
+        
+        if (DYNAMIC_ROUTE_PATTERNS[prefix]) {
+            const [basePath, actionParamName] = DYNAMIC_ROUTE_PATTERNS[prefix];
+            if (actionParamName && parts.length > 1) {
+                const action = parts[0];
+                const id = parts.slice(1).join('_');
+                targetPath = `${basePath}/${id}?${actionParamName}=${action}`;
+            } else {
+                const slug = parts.join('-');
+                targetPath = `${basePath}/${slug}`;
+            }
+        }
+      } else if (lowerStartParam.startsWith('viz_')) {
+        const simId = paramToProcess.substring(4);
+        targetPath = `/god-mode-sandbox?simId=${simId}`;
+      } else {
+        targetPath = `/${lowerStartParam}`;
+      }
+
+      if (targetPath) {
+        logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting from '${pathname}'.`);
+        router.replace(targetPath);
+        clearStartParam?.(); 
+      } else {
+        logger.info(`[ClientLayout Logic] Unmapped startParam '${paramToProcess}' on page '${pathname}'. No redirect.`);
+      }
     }
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
