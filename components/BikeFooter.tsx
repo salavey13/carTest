@@ -1,3 +1,4 @@
+// /components/BikeFooter.tsx
 "use client";
 
 import Link from "next/link";
@@ -66,7 +67,7 @@ export default function BikeFooter() {
              </h3>
              <ul className="space-y-2.5">
                 <li><a href="https://t.me/I_O_S_NN" target="_blank" rel="noopener noreferrer" className={footerLinkClass}><FaTelegram className="w-4 h-4" /> @I_O_S_NN</a></li>
-                <li><a href="tel:+79200789888" className={footerLinkClass}><FaPhone className="w-4 h-4" /> +7 (920) 078-98-88</a></li>
+                <li><a href="tel:+79200789888" className={footerLinkClass}><FaPhone className="w-4 h-4" /> +7 9200-789-888</a></li>
                 <li className={`${footerLinkClass} items-start`}>
                     <FaMapLocationDot className="w-4 h-4 mt-1 flex-shrink-0" /> 
                     <span>Н. Н. Стригинский переулок 13Б</span>
