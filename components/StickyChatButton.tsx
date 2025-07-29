@@ -1,3 +1,4 @@
+// /components/StickyChatButton.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -108,7 +109,7 @@ const StickyChatButton: React.FC = () => {
         "StickyChatButton"
     );
 
-    useEffect(() => { 
+    /*useEffect(() => { 
         logger.debug(`[StickyChatButton Effect GitHubProfile] isOpen: ${isOpen}, isAppLoading: ${isAppLoading}, appContextUser: ${!!appContextUser}, githubProfile: ${!!githubProfile}, githubLoading: ${githubLoading}`);
         setPrevGithubLoading(githubLoading); 
         if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) { 
@@ -132,7 +133,7 @@ const StickyChatButton: React.FC = () => {
             setGithubLoading(false); 
             logger.debug("[StickyChatButton Effect GitHubProfile] No appContextUser, cleared GitHub profile state.");
         } 
-    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
+    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);*/
 
     const handleCopyLogs = useCallback(async () => {
         const plannedAction = "[StickyChatButton] Plan: Copy internal logs to clipboard.";
