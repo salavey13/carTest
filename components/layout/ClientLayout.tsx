@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -51,6 +52,8 @@ const THEME_CONFIG = {
     isTransparent: false,
   }
 };
+
+const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
 
 const getThemeForPath = (pathname: string) => {
   if (THEME_CONFIG.bike.paths.some(p => pathname.startsWith(p))) return THEME_CONFIG.bike;
