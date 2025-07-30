@@ -370,3 +370,17 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
         return { success: false, error: e instanceof Error ? e.message : "Unknown error."};
     }
 }
+
+export async function getCrewForInvite(slug: string) {
+    noStore();
+    if (!slug) return { success: false, error: "Crew slug is required" };
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_crew_for_invite', { p_slug: slug });
+        if (error) throw error;
+        if (!data || data.length === 0) return { success: false, error: "Crew not found" };
+        return { success: true, data: data[0] };
+    } catch (error) {
+        logger.error(`[getCrewForInvite] Error:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
