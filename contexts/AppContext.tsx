@@ -64,13 +64,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       
-      const { data: ownedCrew } = await supabaseAdmin.from('crews').select('id, slug, name, logo_url').eq('owner_id', dbUser.user_id).single();
+      // FIX: Use .maybeSingle() to gracefully handle cases where the user is not an owner.
+      const { data: ownedCrew } = await supabaseAdmin.from('crews').select('id, slug, name, logo_url').eq('owner_id', dbUser.user_id).maybeSingle();
       if (ownedCrew) {
         setUserCrewInfo({ ...ownedCrew, is_owner: true });
         return;
       }
       
-      const { data: memberCrew } = await supabaseAdmin.from('crew_members').select('crews(id, slug, name, logo_url)').eq('user_id', dbUser.user_id).eq('status', 'active').single();
+      // FIX: Use .maybeSingle() to gracefully handle cases where the user is not a member.
+      const { data: memberCrew } = await supabaseAdmin.from('crew_members').select('crews(id, slug, name, logo_url)').eq('user_id', dbUser.user_id).eq('status', 'active').maybeSingle();
       if (memberCrew && memberCrew.crews) {
         setUserCrewInfo({ ...(memberCrew.crews as any), is_owner: false });
       } else {
@@ -123,7 +125,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbUserExists: !!contextValue.dbUser,
       isAdmin: typeof contextValue.isAdmin === 'function' ? contextValue.isAdmin() : 'N/A',
       startParamPayload: contextValue.startParamPayload,
-      userCrewInfo: contextValue.userCrewInfo ? { name: contextValue.userCrewInfo.name, is_owner: contextValue.userCrewInfo.is_owner } : null
+      userCrewInfo: contextValue.userCrewInfo ? { name: contextValue.userCrewInfo.name, is_owner: contextValue.userCrewInfo.is_owner } : null,
     });
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.dbUser, contextValue.user, contextValue.startParamPayload, contextValue.isAdmin, contextValue.userCrewInfo]);
 
@@ -155,7 +157,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              toast.dismiss("mock-user-info-toast");
         }
 
-        if (telegramHookData.isAuthenticated && !error) { // Используем isAuthenticated из хука
+        if (telegramHookData.isAuthenticated && !error) {
             toast.dismiss("auth-error-toast");
              if (!isClient || document.visibilityState === 'visible') {
                  toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
@@ -183,12 +185,12 @@ export const useAppContext = (): AppContextData => {
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false,
         isLoading: true, isAuthenticating: true, error: null,
-        isAdmin: () => { return false; },
+        isAdmin: () => false,
         openLink: (url: string) => {},
         close: () => {},
         showPopup: (params: any) => {},
         sendData: (data: string) => {},
-        getInitData: () => { return null; },
+        getInitData: () => null,
         expand: () => {},
         setHeaderColor: (color: string) => {},
         setBackgroundColor: (color: string) => {},
