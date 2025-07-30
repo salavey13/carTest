@@ -18,7 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-type CrewDetails = Database['public']['Views']['crew_details']['Row'];
+type CrewDetails = Awaited<ReturnType<typeof getPublicCrewInfo>>['data'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
 type CommandDeckData = Awaited<ReturnType<typeof getUserCrewCommandDeck>>['data'];
 
@@ -78,13 +78,12 @@ function CrewOwnerCommandDeck({ commandDeckData }: { commandDeckData: CommandDec
     );
 }
 
-
 function CrewDetailContent({ slug }: { slug: string }) {
     const { dbUser, isLoading: isAppLoading } = useAppContext();
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    const [crew, setCrew] = useState<CrewDetails | null>(null);
+    const [crew, setCrew] = useState<CrewDetails>(null);
     const [commandDeckData, setCommandDeckData] = useState<CommandDeckData | null>(null);
     const [isOwner, setIsOwner] = useState(false);
     const [isMember, setIsMember] = useState(false);
@@ -114,6 +113,12 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
     useEffect(() => {
         async function loadData() {
+            // FIX: Guard clause to ensure dbUser exists before proceeding.
+            if (!dbUser) {
+                setError("Не удалось определить пользователя. Попробуйте перезагрузить.");
+                setLoading(false);
+                return;
+            }
             setLoading(true);
             try {
                 const crewResult = await getPublicCrewInfo(slug);
@@ -122,9 +127,9 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     const crewData = crewResult.data;
                     setCrew(crewData);
                     
-                    const ownerCheck = dbUser?.user_id === crewData.owner.user_id;
-                    const memberCheck = crewData.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'active');
-                    const pendingCheck = crewData.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'pending');
+                    const ownerCheck = !!(crewData?.owner && dbUser?.user_id === crewData.owner.user_id);
+                    const memberCheck = crewData?.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'active');
+                    const pendingCheck = crewData?.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'pending');
 
                     setIsOwner(ownerCheck);
                     setIsMember(!!memberCheck);
@@ -132,18 +137,15 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
                     if (ownerCheck) {
                         const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
-                        if (deckResult.success) {
-                            setCommandDeckData(deckResult.data);
-                        }
+                        if (deckResult.success) setCommandDeckData(deckResult.data);
                     }
                 } else {
                     setError(crewResult.error || "Не удалось загрузить данные экипажа.");
                 }
 
                 const mapsResult = await getMapPresets();
-                if (mapsResult.success && mapsResult.data && mapsResult.data.length > 0) {
-                    const foundDefault = mapsResult.data.find(m => m.is_default);
-                    if (foundDefault) setDefaultMap(foundDefault);
+                if (mapsResult.success && mapsResult.data?.length) {
+                    setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
                 }
             } catch (e: any) {
                 setError(e.message || "Неизвестная ошибка.");
@@ -151,10 +153,10 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 setLoading(false);
             }
         }
-        if (dbUser && !isAppLoading) {
+        
+        // FIX: Only run the data loading logic when the app context is no longer loading.
+        if (!isAppLoading) {
             loadData();
-        } else if (!isAppLoading) {
-            setLoading(false); // Stop loading if user is not logged in
         }
     }, [slug, dbUser, isAppLoading]);
 
@@ -182,9 +184,8 @@ function CrewDetailContent({ slug }: { slug: string }) {
             success: (res) => {
                 if (res.success) {
                     router.replace(`/crews/${slug}`, { scroll: false });
-                    // Manually update state for instant UI feedback
                     setCrew(prev => {
-                        if (!prev) return null;
+                        if (!prev || !prev.members) return null;
                         return {
                             ...prev,
                             members: prev.members.map(m => m.user_id === targetMemberId ? { ...m, status: accept ? 'active' : 'rejected' } : m).filter(m => m.status !== 'rejected')
@@ -200,7 +201,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
         });
     };
     
-    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    if (loading || isAppLoading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
@@ -215,15 +216,15 @@ function CrewDetailContent({ slug }: { slug: string }) {
         color: 'bg-brand-pink'
     } : null;
     
-    const pendingMember = action === 'confirm' ? crew.members.find(m => m.user_id === targetMemberId) : null;
-    const isCurrentUserMember = crew.members.some(m => m.user_id === dbUser?.user_id);
+    const pendingMember = action === 'confirm' ? crew.members?.find(m => m.user_id === targetMemberId) : null;
+    const isCurrentUserMember = crew.members?.some(m => m.user_id === dbUser?.user_id);
     
     return (
         <>
             <RockstarHeroSection
                 title={crew.name}
                 subtitle={crew.description || ''}
-                mainBackgroundImageUrl={hasVehicles ? crew.vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"}
+                mainBackgroundImageUrl={hasVehicles && crew.vehicles[0] ? crew.vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"}
                 backgroundImageObjectUrl={crew.logo_url || undefined}
                 triggerElementSelector={`#${heroTriggerId}`}
             />
@@ -261,7 +262,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             <p className="text-sm text-muted-foreground font-mono mt-3 text-center">{crew.description}</p>
                             <div className="mt-4 border-t border-border/50 pt-3 text-center">
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
-                                <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>
+                                <p className="font-semibold text-brand-cyan">@{crew.owner?.username}</p>
                             </div>
                             {hqPoint && (
                                 <div className="mt-4 border-t border-border/50 pt-3">
@@ -280,7 +281,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             </TabsList>
                             <TabsContent value="garage" className="mt-6">
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {hasVehicles ? crew.vehicles.map((vehicle) => (
+                                    {hasVehicles && crew.vehicles[0] ? crew.vehicles.map((vehicle) => (
                                         <Link href={`/rent/${vehicle.id}`} key={vehicle.id} className="bg-card/50 p-4 rounded-lg hover:bg-card transition-colors group">
                                             <div className="relative w-full h-40 rounded-md mb-3 overflow-hidden">
                                                 <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover group-hover:scale-105 transition-transform duration-300"/>
@@ -292,7 +293,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             </TabsContent>
                             <TabsContent value="roster" className="mt-6">
                                 <div className="space-y-3">
-                                    {hasMembers ? crew.members.map((member) => (
+                                    {hasMembers && crew.members[0] ? crew.members.map((member) => (
                                         <div key={member.user_id} className="flex items-center gap-4 bg-card/50 p-3 rounded-lg border border-border">
                                             <Image src={member.avatar_url || '/placeholder.svg'} alt={member.username || member.user_id} width={48} height={48} className="rounded-full" />
                                             <div className="flex-grow">
