@@ -4,7 +4,7 @@ import { getPublicCrewInfo, getMapPresets, getUserCrewCommandDeck, requestToJoin
 import { Loading } from '@/components/Loading';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import RockstarHeroSection from '@/app/tutorials/RockstarHeroSection';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
@@ -18,7 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-type CrewDetails = Awaited<ReturnType<typeof getPublicCrewInfo>>['data'];
+type CrewDetails = Database['public']['Views']['crew_details']['Row'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
 type CommandDeckData = Awaited<ReturnType<typeof getUserCrewCommandDeck>>['data'];
 
@@ -79,14 +79,13 @@ function CrewOwnerCommandDeck({ commandDeckData }: { commandDeckData: CommandDec
 }
 
 function CrewDetailContent({ slug }: { slug: string }) {
-    const { dbUser, isLoading: isAppLoading } = useAppContext();
+    const { dbUser, isLoading: isAppLoading, isAuthenticating } = useAppContext();
     const searchParams = useSearchParams();
     const router = useRouter();
 
-    const [crew, setCrew] = useState<CrewDetails>(null);
+    const [crew, setCrew] = useState<CrewDetails | null>(null);
     const [commandDeckData, setCommandDeckData] = useState<CommandDeckData | null>(null);
     const [isOwner, setIsOwner] = useState(false);
-    const [isMember, setIsMember] = useState(false);
     const [isPending, setIsPending] = useState(false);
     const [defaultMap, setDefaultMap] = useState<MapPreset>(FALLBACK_MAP);
     const [loading, setLoading] = useState(true);
@@ -111,54 +110,46 @@ function CrewDetailContent({ slug }: { slug: string }) {
         }
     }, [searchParams]);
 
-    useEffect(() => {
-        async function loadData() {
-            // FIX: Guard clause to ensure dbUser exists before proceeding.
-            if (!dbUser) {
-                setError("Не удалось определить пользователя. Попробуйте перезагрузить.");
-                setLoading(false);
-                return;
-            }
-            setLoading(true);
-            try {
-                const crewResult = await getPublicCrewInfo(slug);
+    const loadData = useCallback(async () => {
+        if (isAppLoading || isAuthenticating) return; // Wait for auth to complete
+        setLoading(true);
+        try {
+            const crewResult = await getPublicCrewInfo(slug);
 
-                if (crewResult.success && crewResult.data) {
-                    const crewData = crewResult.data;
-                    setCrew(crewData);
-                    
-                    const ownerCheck = !!(crewData?.owner && dbUser?.user_id === crewData.owner.user_id);
-                    const memberCheck = crewData?.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'active');
-                    const pendingCheck = crewData?.members?.some(m => m.user_id === dbUser?.user_id && m.status === 'pending');
-
+            if (crewResult.success && crewResult.data) {
+                const crewData = crewResult.data;
+                setCrew(crewData);
+                
+                if (dbUser) {
+                    const ownerCheck = dbUser.user_id === crewData.owner.user_id;
+                    const pendingCheck = crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending');
                     setIsOwner(ownerCheck);
-                    setIsMember(!!memberCheck);
                     setIsPending(!!pendingCheck);
 
                     if (ownerCheck) {
                         const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
                         if (deckResult.success) setCommandDeckData(deckResult.data);
                     }
-                } else {
-                    setError(crewResult.error || "Не удалось загрузить данные экипажа.");
                 }
-
-                const mapsResult = await getMapPresets();
-                if (mapsResult.success && mapsResult.data?.length) {
-                    setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
-                }
-            } catch (e: any) {
-                setError(e.message || "Неизвестная ошибка.");
-            } finally {
-                setLoading(false);
+            } else {
+                setError(crewResult.error || "Не удалось загрузить данные экипажа.");
             }
+
+            const mapsResult = await getMapPresets();
+            if (mapsResult.success && mapsResult.data && mapsResult.data.length > 0) {
+                setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
+            }
+        } catch (e: any) {
+            setError(e.message || "Неизвестная ошибка.");
+        } finally {
+            setLoading(false);
         }
-        
-        // FIX: Only run the data loading logic when the app context is no longer loading.
-        if (!isAppLoading) {
-            loadData();
-        }
-    }, [slug, dbUser, isAppLoading]);
+    }, [slug, dbUser, isAppLoading, isAuthenticating]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
@@ -184,15 +175,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
             success: (res) => {
                 if (res.success) {
                     router.replace(`/crews/${slug}`, { scroll: false });
-                    setCrew(prev => {
-                        if (!prev || !prev.members) return null;
-                        return {
-                            ...prev,
-                            members: prev.members.map(m => m.user_id === targetMemberId ? { ...m, status: accept ? 'active' : 'rejected' } : m).filter(m => m.status !== 'rejected')
-                        }
-                    });
-                    setAction(null);
-                    setTargetMemberId(null);
+                    loadData(); // Re-fetch all data to ensure UI is consistent
                     return `Заявка ${accept ? 'принята' : 'отклонена'}.`;
                 }
                 throw new Error(res.error);
@@ -201,7 +184,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
         });
     };
     
-    if (loading || isAppLoading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
@@ -216,15 +199,15 @@ function CrewDetailContent({ slug }: { slug: string }) {
         color: 'bg-brand-pink'
     } : null;
     
-    const pendingMember = action === 'confirm' ? crew.members?.find(m => m.user_id === targetMemberId) : null;
-    const isCurrentUserMember = crew.members?.some(m => m.user_id === dbUser?.user_id);
+    const pendingMember = action === 'confirm' ? crew.members.find(m => m.user_id === targetMemberId) : null;
+    const isCurrentUserMember = crew.members.some(m => m.user_id === dbUser?.user_id);
     
     return (
         <>
             <RockstarHeroSection
                 title={crew.name}
                 subtitle={crew.description || ''}
-                mainBackgroundImageUrl={hasVehicles && crew.vehicles[0] ? crew.vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"}
+                mainBackgroundImageUrl={hasVehicles ? crew.vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"}
                 backgroundImageObjectUrl={crew.logo_url || undefined}
                 triggerElementSelector={`#${heroTriggerId}`}
             />
@@ -262,7 +245,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             <p className="text-sm text-muted-foreground font-mono mt-3 text-center">{crew.description}</p>
                             <div className="mt-4 border-t border-border/50 pt-3 text-center">
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
-                                <p className="font-semibold text-brand-cyan">@{crew.owner?.username}</p>
+                                <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>
                             </div>
                             {hqPoint && (
                                 <div className="mt-4 border-t border-border/50 pt-3">
@@ -276,12 +259,12 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     <div className="lg:col-span-2">
                          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-2 bg-card/50">
-                                <TabsTrigger value="garage">Гараж ({crew.vehicles?.length || 0})</TabsTrigger>
-                                <TabsTrigger value="roster">Состав ({crew.members?.length || 0})</TabsTrigger>
+                                <TabsTrigger value="garage">Гараж ({vehicles.length || 0})</TabsTrigger>
+                                <TabsTrigger value="roster">Состав ({members.length || 0})</TabsTrigger>
                             </TabsList>
                             <TabsContent value="garage" className="mt-6">
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {hasVehicles && crew.vehicles[0] ? crew.vehicles.map((vehicle) => (
+                                    {vehicles.length > 0 ? vehicles.map((vehicle) => (
                                         <Link href={`/rent/${vehicle.id}`} key={vehicle.id} className="bg-card/50 p-4 rounded-lg hover:bg-card transition-colors group">
                                             <div className="relative w-full h-40 rounded-md mb-3 overflow-hidden">
                                                 <Image src={vehicle.image_url} alt={vehicle.model} fill className="object-cover group-hover:scale-105 transition-transform duration-300"/>
@@ -293,7 +276,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             </TabsContent>
                             <TabsContent value="roster" className="mt-6">
                                 <div className="space-y-3">
-                                    {hasMembers && crew.members[0] ? crew.members.map((member) => (
+                                    {members.length > 0 ? members.map((member) => (
                                         <div key={member.user_id} className="flex items-center gap-4 bg-card/50 p-3 rounded-lg border border-border">
                                             <Image src={member.avatar_url || '/placeholder.svg'} alt={member.username || member.user_id} width={48} height={48} className="rounded-full" />
                                             <div className="flex-grow">
