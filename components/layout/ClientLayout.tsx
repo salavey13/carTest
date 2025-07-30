@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -53,8 +52,6 @@ const THEME_CONFIG = {
   }
 };
 
-const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
-
 const getThemeForPath = (pathname: string) => {
   if (THEME_CONFIG.bike.paths.some(p => pathname.startsWith(p))) return THEME_CONFIG.bike;
   if (THEME_CONFIG.sauna.paths.some(p => pathname.startsWith(p))) return THEME_CONFIG.sauna;
@@ -98,10 +95,11 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "settings": "/settings", "profile": "/profile",
 };
 
-const DYNAMIC_ROUTE_PREFIXES: Record<string, { basePath: string; action?: string; queryParam?: string }> = {
-    crew: { basePath: "/crews", action: "join_crew" },
-    rental: { basePath: "/rentals", action: "view", queryParam: "action"},
-    rent: { basePath: "/rent" }
+// Simplified parser config
+const DYNAMIC_ROUTE_PARSER_CONFIG: Record<string, { basePath: string; paramMap: Record<string, string> }> = {
+    crew: { basePath: "/crews", paramMap: { join_crew: "join_crew", confirm_member: "confirm_member" } },
+    rental: { basePath: "/rentals", paramMap: { view: "action" } },
+    rent: { basePath: "/rent", paramMap: {} }
 };
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
@@ -128,24 +126,22 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
       } else if (lowerStartParam.includes('_')) {
         const [prefix, ...parts] = lowerStartParam.split('_');
-        const config = DYNAMIC_ROUTE_PREFIXES[prefix];
-
+        const config = DYNAMIC_ROUTE_PARSER_CONFIG[prefix];
         if (config) {
-            const actionIndex = parts.indexOf(config.action || '---');
-            let slugPart, actionPart;
-
-            if (actionIndex !== -1) {
-                slugPart = parts.slice(0, actionIndex).join('_');
-                actionPart = parts.slice(actionIndex).join('_');
-            } else {
-                slugPart = parts.join('_');
+            let slug = parts.join('-');
+            const queryParams = new URLSearchParams();
+            
+            // Check for known actions and extract them
+            for (const [action, queryKey] of Object.entries(config.paramMap)) {
+                const actionWithHyphen = `-${action.replace(/_/g, '-')}`;
+                if (slug.endsWith(actionWithHyphen)) {
+                    slug = slug.slice(0, -actionWithHyphen.length);
+                    const value = parts[parts.length - 1]; // Assumes value is the last part if action is complex
+                    queryParams.set(queryKey, action === 'confirm_member' ? value : 'true');
+                    break;
+                }
             }
-
-            targetPath = `${config.basePath}/${slugPart.replace(/_/g, '-')}`;
-
-            if (actionPart) {
-                targetPath += `?${config.action}=true`;
-            }
+            targetPath = `${config.basePath}/${slug}?${queryParams.toString()}`;
         }
       } else if (lowerStartParam.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
@@ -171,7 +167,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml"));
   }, [pathname]);
 
-  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || theme.isTransparent;
+  const isTransparentPage = THEME_CONFIG.bike.paths.some(p => pathname.startsWith(p));
 
   return (
     <>
