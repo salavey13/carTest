@@ -28,6 +28,7 @@ import Image from "next/image";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
 
+// --- THEME ENGINE ---
 const THEME_CONFIG = {
   bike: {
     paths: ['/vipbikerental', '/rent-bike', '/rent/', "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
@@ -41,20 +42,24 @@ const THEME_CONFIG = {
     Header: SaunaHeader,
     Footer: SaunaFooter,
     BottomNav: BottomNavigationSauna,
-    isTransparent: false,
+    isTransparent: false, // Sauna page has its own opaque background
   },
   default: {
     paths: [],
     Header: Header,
     Footer: Footer,
-    BottomNav: BottomNavigationBike,
+    BottomNav: BottomNavigationBike, // Defaulting to Bike nav for now
     isTransparent: false,
   }
 };
 
 const getThemeForPath = (pathname: string) => {
-  if (THEME_CONFIG.bike.paths.some(p => pathname.startsWith(p))) return THEME_CONFIG.bike;
-  if (THEME_CONFIG.sauna.paths.some(p => pathname.startsWith(p))) return THEME_CONFIG.sauna;
+  if (THEME_CONFIG.bike.paths.some(p => pathname.startsWith(p))) {
+    return THEME_CONFIG.bike;
+  }
+  if (THEME_CONFIG.sauna.paths.some(p => pathname.startsWith(p))) {
+    return THEME_CONFIG.sauna;
+  }
   return THEME_CONFIG.default;
 };
 
@@ -72,9 +77,13 @@ function AppInitializers() {
   const handleScrollForAchievement = useCallback(async () => {
     if (window.scrollY > 1000 && isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
       scrollAchievementUnlockedRef.current = true; 
+      logger.info(`[ClientLayout ScrollAch] User ${dbUser.user_id} scrolled >1000px. Unlocking 'scrolled_like_a_maniac'.`);
       try {
         const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'scrolled_like_a_maniac');
-        newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+        newAchievements?.forEach(ach => {
+            addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+            logger.info(`[ClientLayout ScrollAch] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
+        });
       } catch (error) {
         logger.error("[ClientLayout] Error unlocking achievement:", error);
         scrollAchievementUnlockedRef.current = false;
@@ -83,9 +92,16 @@ function AppInitializers() {
   }, [isAuthenticated, dbUser, addToast]);
 
   useEffect(() => {
-    window.addEventListener('scroll', handleScrollForAchievement, { passive: true });
-    return () => window.removeEventListener('scroll', handleScrollForAchievement);
-  }, [handleScrollForAchievement]);
+    const currentScrollHandler = handleScrollForAchievement;
+    if (isAuthenticated && dbUser?.user_id && !scrollAchievementUnlockedRef.current) {
+      window.addEventListener('scroll', currentScrollHandler, { passive: true });
+    } else {
+      window.removeEventListener('scroll', currentScrollHandler);
+    }
+    return () => {
+      window.removeEventListener('scroll', currentScrollHandler);
+    };
+  }, [isAuthenticated, dbUser, handleScrollForAchievement]);
   
   return null; 
 }
@@ -93,13 +109,6 @@ function AppInitializers() {
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   "elon": "/elon", "musk_market": "/elon", "arbitrage_seeker": "/elon", "topdf_psycho": "/topdf",
   "settings": "/settings", "profile": "/profile",
-};
-
-// Simplified parser config
-const DYNAMIC_ROUTE_PARSER_CONFIG: Record<string, { basePath: string; paramMap: Record<string, string> }> = {
-    crew: { basePath: "/crews", paramMap: { join_crew: "join_crew", confirm_member: "confirm_member" } },
-    rental: { basePath: "/rentals", paramMap: { view: "action" } },
-    rent: { basePath: "/rent", paramMap: {} }
 };
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
@@ -119,43 +128,38 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
      const paramToProcess = startParamPayload || searchParams.get('tgWebAppStartParam');
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
-      const lowerStartParam = paramToProcess.toLowerCase();
       let targetPath: string | undefined;
 
-      if (START_PARAM_PAGE_MAP[lowerStartParam]) {
-        targetPath = START_PARAM_PAGE_MAP[lowerStartParam];
-      } else if (lowerStartParam.includes('_')) {
-        const [prefix, ...parts] = lowerStartParam.split('_');
-        const config = DYNAMIC_ROUTE_PARSER_CONFIG[prefix];
-        if (config) {
-            let slug = parts.join('-');
-            const queryParams = new URLSearchParams();
-            
-            // Check for known actions and extract them
-            for (const [action, queryKey] of Object.entries(config.paramMap)) {
-                const actionWithHyphen = `-${action.replace(/_/g, '-')}`;
-                if (slug.endsWith(actionWithHyphen)) {
-                    slug = slug.slice(0, -actionWithHyphen.length);
-                    const value = parts[parts.length - 1]; // Assumes value is the last part if action is complex
-                    queryParams.set(queryKey, action === 'confirm_member' ? value : 'true');
-                    break;
-                }
+      const parts = paramToProcess.split('_');
+      const prefix = parts[0];
+
+      if (START_PARAM_PAGE_MAP[paramToProcess]) {
+        targetPath = START_PARAM_PAGE_MAP[paramToProcess];
+      } else if (prefix === 'crew' && parts.length > 2) { 
+        const actionIndex = parts.findIndex(p => p === 'join' || p === 'confirm');
+        if (actionIndex > 1) { // Ensure there's a slug before the action
+            const slug = parts.slice(1, actionIndex).join('-');
+            const action = parts[actionIndex]; // 'join' or 'confirm'
+            const actionVerb = parts[actionIndex+1]; // 'crew' or 'member'
+
+            if (action === 'join' && actionVerb === 'crew') {
+                targetPath = `/crews/${slug}?join_crew=true`;
+            } else if (action === 'confirm' && actionVerb === 'member' && parts.length > actionIndex + 2) {
+                const id = parts.slice(actionIndex + 2).join('_');
+                targetPath = `/crews/${slug}?confirm_member=${id}`;
             }
-            targetPath = `${config.basePath}/${slug}?${queryParams.toString()}`;
         }
-      } else if (lowerStartParam.startsWith('viz_')) {
+      } else if (paramToProcess.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       } else {
-        targetPath = `/${lowerStartParam}`;
+        targetPath = `/${paramToProcess}`;
       }
 
       if (targetPath && targetPath !== pathname) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting.`);
         router.replace(targetPath);
         clearStartParam?.(); 
-      } else {
-        logger.info(`[ClientLayout Logic] Unmapped or same-page startParam '${paramToProcess}'. No redirect.`);
       }
     }
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
@@ -167,7 +171,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml"));
   }, [pathname]);
 
-  const isTransparentPage = THEME_CONFIG.bike.paths.some(p => pathname.startsWith(p));
+  const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
+  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || theme.isTransparent;
 
   return (
     <>
