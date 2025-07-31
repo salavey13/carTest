@@ -247,7 +247,19 @@ export async function getAllPublicCrews() {
     }
 }
 
-
+export async function getPublicCrewInfo(slug: string) {
+    noStore();
+    if (!slug) return { success: false, error: "Crew slug is required" };
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
+        if (error) throw error;
+        if (!data) return { success: false, error: "Crew not found" };
+        return { success: true, data };
+    } catch (error) {
+        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
 
 export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
     try {
@@ -292,33 +304,28 @@ export async function updateMapPois(userId: string, mapId: string, newPois: Poin
         return { success: false, error: errorMessage };
     }
 }
+ 
 
 export async function requestToJoinCrew(userId: string, username: string, crewId: string) {
     noStore();
     if (!userId || !crewId) return { success: false, error: "User and Crew ID are required." };
     try {
-        // Check if user is already in ANY crew
         const { data: existingMembership, error: checkError } = await supabaseAdmin
-            .from('crew_members')
-            .select('crew_id')
-            .eq('user_id', userId)
-            .eq('status', 'active')
-            .maybeSingle();
+            .from('crew_members').select('crew_id').eq('user_id', userId).eq('status', 'active').maybeSingle();
         if (checkError) throw checkError;
         if (existingMembership) return { success: false, error: "Вы уже являетесь активным участником другого экипажа." };
 
-        // Upsert the request
         const { error } = await supabaseAdmin
-            .from('crew_members')
-            .upsert({ user_id: userId, crew_id: crewId, status: 'pending' }, { onConflict: 'crew_id, user_id' });
+            .from('crew_members').upsert({ user_id: userId, crew_id: crewId, status: 'pending' }, { onConflict: 'crew_id, user_id' });
         if (error) throw error;
         
-        // Notify owner
         const { data: crew, error: crewFetchError } = await supabaseAdmin.from('crews').select('owner_id, name, slug').eq('id', crewId).single();
         if (crewFetchError || !crew) throw new Error("Could not find crew to notify owner.");
 
-        const confirmationUrl = `${getBaseUrl()}/crews/${crew.slug}?confirm_member=${userId}`;
-        const ownerMessage = `🔔 Новый запрос на вступление в ваш экипаж *'${crew.name}'* от пользователя @${username}.\n\nНажмите кнопку ниже, чтобы рассмотреть заявку.`;
+        const TELEGRAM_BOT_LINK = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
+        // THIS IS THE FIX for the confirmation link
+        const confirmationUrl = `${TELEGRAM_BOT_LINK}?startapp=crew_${crew.slug}_confirm_member_${userId}`;
+        const ownerMessage = `🔔 Новый запрос на вступление в ваш экипаж *'${crew.name}'* от пользователя @${username || 'пользователь'}.\n\nНажмите кнопку ниже, чтобы рассмотреть заявку.`;
         await sendComplexMessage(crew.owner_id, ownerMessage, [[{ text: "Рассмотреть Заявку", url: confirmationUrl }]]);
 
         return { success: true };
@@ -327,6 +334,7 @@ export async function requestToJoinCrew(userId: string, username: string, crewId
         return { success: false, error: e instanceof Error ? e.message : "Unknown error."};
     }
 }
+
 
 export async function confirmCrewMember(ownerId: string, newMemberId: string, crewId: string, accept: boolean) {
     noStore();
@@ -359,18 +367,16 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
     }
 }
 
-
-export async function getPublicCrewInfo(slug: string) {
+export async function getCrewForInvite(slug: string) {
     noStore();
     if (!slug) return { success: false, error: "Crew slug is required" };
     try {
-        // This is now the single source of truth for public crew data.
-        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
+        const { data, error } = await supabaseAdmin.rpc('get_crew_for_invite', { p_slug: slug });
         if (error) throw error;
-        if (!data) return { success: false, error: "Crew not found" };
-        return { success: true, data };
+        if (!data || data.length === 0) return { success: false, error: "Crew not found" };
+        return { success: true, data: data[0] };
     } catch (error) {
-        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
+        logger.error(`[getCrewForInvite] Error:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
