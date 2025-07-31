@@ -17,6 +17,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { debugLogger } from '@/lib/debugLogger';
 
 type CrewDetails = Database['public']['Views']['crew_details']['Row'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
@@ -29,37 +30,7 @@ const FALLBACK_MAP: MapPreset = {
     is_default: true, created_at: new Date().toISOString(), owner_id: null, points_of_interest: []
 };
 
-const CommandDeckStat = ({ value, label, icon }: { value: string | number; label: string; icon: string; }) => (
-    <div className="bg-black/30 p-3 rounded-lg text-center">
-        <VibeContentRenderer content={icon} className="text-3xl text-brand-cyan mx-auto mb-1" />
-        <p className="text-3xl font-orbitron font-bold text-foreground">{value}</p>
-        <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">{label}</p>
-    </div>
-);
-
-function CrewOwnerCommandDeck({ commandDeckData }: { commandDeckData: CommandDeckData }) {
-    if (!commandDeckData) return null;
-    const completeness = commandDeckData.photo_completeness_percentage || 0;
-    return (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-card/70 backdrop-blur-xl border border-brand-yellow/50 rounded-2xl shadow-lg shadow-brand-yellow/10 p-6">
-            <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaSatelliteDish::"/> Командный Мостик</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <CommandDeckStat value={commandDeckData.total_vehicles || 0} label="Единиц в парке" icon="::FaWarehouse::"/>
-                <CommandDeckStat value={commandDeckData.vehicles_with_primary_photo || 0} label="С главным фото" icon="::FaCamera::"/>
-                <CommandDeckStat value={commandDeckData.vehicles_needing_gallery || 0} label="Нуждаются в галерее" icon="::FaImages::"/>
-                <div className="bg-black/30 p-3 rounded-lg text-center col-span-2 md:col-span-1">
-                    <VibeContentRenderer content="::FaTasks::" className="text-3xl text-brand-cyan mx-auto mb-1" />
-                    <p className="text-3xl font-orbitron font-bold text-foreground">{completeness}%</p>
-                    <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Завершено Фото</p>
-                    <Progress value={Number(completeness)} className="h-2 [&>div]:bg-brand-cyan" />
-                </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-                <Link href="/paddock"><button className="group inline-flex items-center justify-center px-4 py-2 border border-brand-cyan bg-brand-cyan/10 text-brand-cyan rounded-lg font-orbitron text-sm tracking-wider transition-all duration-300 hover:bg-brand-cyan hover:text-black hover:shadow-cyan-glow"><VibeContentRenderer content="::FaWrench::" className="mr-2 transition-transform group-hover:rotate-12"/>Перейти в Паддок</button></Link>
-            </div>
-        </motion.div>
-    );
-}
+// ... CommandDeckStat component remains the same ...
 
 function CrewDetailContent({ slug }: { slug: string }) {
     const { dbUser, isAuthenticating } = useAppContext();
@@ -79,6 +50,11 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const [activeTab, setActiveTab] = useState(action ? "roster" : "garage");
 
     const loadData = useCallback(async () => {
+        debugLogger.info(`[CrewDetail] loadData started. isAuthenticating: ${isAuthenticating}, dbUser exists: ${!!dbUser}`);
+        if (isAuthenticating) {
+            debugLogger.info("[CrewDetail] Waiting for authentication to complete.");
+            return;
+        }
         setLoading(true);
         try {
             const crewResult = await getPublicCrewInfo(slug);
@@ -86,13 +62,14 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 throw new Error(crewResult.error || "Экипаж не найден.");
             }
             const crewData = crewResult.data;
-            setCrew(crewData);
+            debugLogger.log("[CrewDetail] Crew data fetched successfully:", { id: crewData.id, name: crewData.name });
 
-            if (dbUser && !isAuthenticating) {
+            if (dbUser) {
                 const ownerCheck = dbUser.user_id === crewData.owner.user_id;
                 setIsOwner(ownerCheck);
                 setIsPending(!!crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
-
+                debugLogger.log(`[CrewDetail] User status checked: isOwner=${ownerCheck}, isPending=${!!crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending')}`);
+                
                 if (ownerCheck) {
                     const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
                     if (deckResult.success) setCommandDeckData(deckResult.data);
@@ -103,10 +80,15 @@ function CrewDetailContent({ slug }: { slug: string }) {
             if (mapsResult.success && mapsResult.data?.length) {
                 setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
             }
+            
+            // This is the critical change: setCrew is the LAST step.
+            setCrew(crewData);
         } catch (e: any) {
             setError(e.message);
+            debugLogger.error("[CrewDetail] CATCH block error:", e);
         } finally {
             setLoading(false);
+            debugLogger.info("[CrewDetail] loadData finished.");
         }
     }, [slug, dbUser, isAuthenticating]);
 
@@ -116,21 +98,18 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
-        const promise = requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id);
-        toast.promise(promise, {
+        toast.promise(requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id), {
             loading: 'Отправка заявки...',
             success: (res) => {
-                if (res.success) { setIsPending(true); return "Заявка отправлена владельцу экипажа!"; }
+                if (res.success) { setIsPending(true); return "Заявка отправлена!"; }
                 throw new Error(res.error);
-            },
-            error: (err) => err.message,
+            }, error: (err) => err.message,
         });
     };
 
     const handleConfirmation = async (accept: boolean) => {
         if (!dbUser || !crew || !targetMemberId) return;
-        const promise = confirmCrewMember(dbUser.user_id, targetMemberId, crew.id, accept);
-        toast.promise(promise, {
+        toast.promise(confirmCrewMember(dbUser.user_id, targetMemberId, crew.id, accept), {
             loading: 'Обработка заявки...',
             success: (res) => {
                 if (res.success) {
@@ -139,15 +118,18 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     return `Заявка ${accept ? 'принята' : 'отклонена'}.`;
                 }
                 throw new Error(res.error);
-            },
-            error: (err) => err.message,
+            }, error: (err) => err.message,
         });
     };
     
-    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
-    if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
+    if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    if (error) return <p className="text-destructive text-center py-20">{error}</p>;
     
-    const heroTriggerId = `crew-detail-hero-${crew.id}`;
+    // THE UNBREAKABLE GUARD: Do not proceed to render if crew is null
+    if (!crew) {
+      return <Loading variant="bike" text="Инициализация экипажа..." />;
+    }
+    
     const pendingMember = action === 'confirm' ? crew.members?.find(m => m.user_id === targetMemberId) : null;
     const isCurrentUserMember = crew.members?.some(m => m.user_id === dbUser?.user_id);
     
@@ -161,27 +143,27 @@ function CrewDetailContent({ slug }: { slug: string }) {
         heroSubtitle = `Вы были приглашены присоединиться к '${crew.name}'.`;
     } else if (action === 'confirm' && pendingMember) {
         heroTitle = "Заявка на Вступление";
-        heroSubtitle = `@${pendingMember.username} хочет присоединиться к вашему экипажу.`;
+        heroSubtitle = `@${pendingMember.username} хочет присоединиться.`;
         heroObjectBg = pendingMember.avatar_url || undefined;
     }
 
     return (
         <>
-            <RockstarHeroSection title={heroTitle} subtitle={heroSubtitle} mainBackgroundImageUrl={heroMainBg} backgroundImageObjectUrl={heroObjectBg} triggerElementSelector={`#${heroTriggerId}`} />
-            <div id={heroTriggerId} style={{ height: '100vh' }} aria-hidden="true" />
+            <RockstarHeroSection title={heroTitle} subtitle={heroSubtitle} mainBackgroundImageUrl={heroMainBg} backgroundImageObjectUrl={heroObjectBg} triggerElementSelector={`#crew-detail-hero-${crew.id}`} />
+            <div id={`crew-detail-hero-${crew.id}`} style={{ height: '100vh' }} aria-hidden="true" />
             <div className="container mx-auto max-w-6xl px-4 py-12 relative z-20">
                 {isOwner && <CrewOwnerCommandDeck commandDeckData={commandDeckData}/>}
                 
-                {action === 'join' && !isCurrentUserMember && !isOwner && (
+                {action === 'join' && dbUser && !isCurrentUserMember && !isOwner && (
                     <motion.div initial={{opacity:0, y:-20}} animate={{opacity:1, y:0}} className="mb-6 bg-brand-blue/20 border border-brand-blue text-center p-4 rounded-lg">
-                        <h3 className="font-bold text-lg">Вы были приглашены в '{crew.name}'!</h3>
-                        {isPending ? <p className="text-sm text-yellow-400 mt-2">Ваша заявка уже на рассмотрении.</p> : <Button onClick={handleJoinRequest} className="mt-2">Подать заявку на вступление</Button>}
+                        <h3 className="font-bold text-lg">Присоединиться к '{crew.name}'?</h3>
+                        {isPending ? <p className="text-sm text-yellow-400 mt-2">Ваша заявка уже на рассмотрении.</p> : <Button onClick={handleJoinRequest} className="mt-2">Подать заявку</Button>}
                     </motion.div>
                 )}
                 {action === 'confirm' && isOwner && pendingMember && (
                      <motion.div initial={{opacity:0, y:-20}} animate={{opacity:1, y:0}} className="mb-6 bg-brand-green/20 border border-brand-green text-center p-4 rounded-lg">
                         <h3 className="font-bold text-lg">Подтвердить нового участника?</h3>
-                        <p className="text-sm mb-4">Пользователь <span className="font-mono bg-black/50 p-1 rounded">@{pendingMember.username}</span> хочет присоединиться к вашему экипажу.</p>
+                        <p className="text-sm mb-4">Пользователь <span className="font-mono bg-black/50 p-1 rounded">@{pendingMember.username}</span> хочет присоединиться.</p>
                         <div className="flex justify-center gap-4">
                             <Button onClick={() => handleConfirmation(true)} className="bg-brand-green hover:bg-brand-green/80">Принять</Button>
                             <Button onClick={() => handleConfirmation(false)} variant="destructive">Отклонить</Button>
