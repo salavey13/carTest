@@ -133,10 +133,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
         toast.promise(promise, {
             loading: 'Отправка заявки...',
             success: (res) => {
-                if (res.success) {
-                    setIsPending(true);
-                    return "Заявка отправлена владельцу экипажа!";
-                }
+                if (res.success) { setIsPending(true); return "Заявка отправлена!"; }
                 throw new Error(res.error);
             },
             error: (err) => err.message,
@@ -162,7 +159,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error) return <p className="text-destructive text-center py-20">{error}</p>;
-    
     if (!crew || !crew.owner) {
       return <Loading variant="bike" text="Инициализация экипажа..." />;
     }

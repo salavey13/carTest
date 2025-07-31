@@ -64,14 +64,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
       
-      // FIX: Use .maybeSingle() to gracefully handle cases where the user is not an owner.
       const { data: ownedCrew } = await supabaseAdmin.from('crews').select('id, slug, name, logo_url').eq('owner_id', dbUser.user_id).maybeSingle();
       if (ownedCrew) {
         setUserCrewInfo({ ...ownedCrew, is_owner: true });
         return;
       }
       
-      // FIX: Use .maybeSingle() to gracefully handle cases where the user is not a member.
       const { data: memberCrew } = await supabaseAdmin.from('crew_members').select('crews(id, slug, name, logo_url)').eq('user_id', dbUser.user_id).eq('status', 'active').maybeSingle();
       if (memberCrew && memberCrew.crews) {
         setUserCrewInfo({ ...(memberCrew.crews as any), is_owner: false });
