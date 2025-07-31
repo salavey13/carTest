@@ -30,7 +30,37 @@ const FALLBACK_MAP: MapPreset = {
     is_default: true, created_at: new Date().toISOString(), owner_id: null, points_of_interest: []
 };
 
-// ... CommandDeckStat component remains the same ...
+const CommandDeckStat = ({ value, label, icon }: { value: string | number; label: string; icon: string; }) => (
+    <div className="bg-black/30 p-3 rounded-lg text-center">
+        <VibeContentRenderer content={icon} className="text-3xl text-brand-cyan mx-auto mb-1" />
+        <p className="text-3xl font-orbitron font-bold text-foreground">{value}</p>
+        <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">{label}</p>
+    </div>
+);
+
+function CrewOwnerCommandDeck({ commandDeckData }: { commandDeckData: CommandDeckData }) {
+    if (!commandDeckData) return null;
+    const completeness = commandDeckData.photo_completeness_percentage || 0;
+    return (
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-card/70 backdrop-blur-xl border border-brand-yellow/50 rounded-2xl shadow-lg shadow-brand-yellow/10 p-6">
+            <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaSatelliteDish::"/> Командный Мостик</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <CommandDeckStat value={commandDeckData.total_vehicles || 0} label="Единиц в парке" icon="::FaWarehouse::"/>
+                <CommandDeckStat value={commandDeckData.vehicles_with_primary_photo || 0} label="С главным фото" icon="::FaCamera::"/>
+                <CommandDeckStat value={commandDeckData.vehicles_needing_gallery || 0} label="Нуждаются в галерее" icon="::FaImages::"/>
+                <div className="bg-black/30 p-3 rounded-lg text-center col-span-2 md:col-span-1">
+                    <VibeContentRenderer content="::FaTasks::" className="text-3xl text-brand-cyan mx-auto mb-1" />
+                    <p className="text-3xl font-orbitron font-bold text-foreground">{completeness}%</p>
+                    <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2">Завершено Фото</p>
+                    <Progress value={Number(completeness)} className="h-2 [&>div]:bg-brand-cyan" />
+                </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+                <Link href="/paddock"><button className="group inline-flex items-center justify-center px-4 py-2 border border-brand-cyan bg-brand-cyan/10 text-brand-cyan rounded-lg font-orbitron text-sm tracking-wider transition-all duration-300 hover:bg-brand-cyan hover:text-black hover:shadow-cyan-glow"><VibeContentRenderer content="::FaWrench::" className="mr-2 transition-transform group-hover:rotate-12"/>Перейти в Паддок</button></Link>
+            </div>
+        </motion.div>
+    );
+}
 
 function CrewDetailContent({ slug }: { slug: string }) {
     const { dbUser, isAuthenticating } = useAppContext();
@@ -81,7 +111,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
             }
             
-            // This is the critical change: setCrew is the LAST step.
             setCrew(crewData);
         } catch (e: any) {
             setError(e.message);
@@ -93,23 +122,31 @@ function CrewDetailContent({ slug }: { slug: string }) {
     }, [slug, dbUser, isAuthenticating]);
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        if (!isAuthenticating) {
+            loadData();
+        }
+    }, [isAuthenticating, loadData]);
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
-        toast.promise(requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id), {
+        const promise = requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id);
+        toast.promise(promise, {
             loading: 'Отправка заявки...',
             success: (res) => {
-                if (res.success) { setIsPending(true); return "Заявка отправлена!"; }
+                if (res.success) {
+                    setIsPending(true);
+                    return "Заявка отправлена владельцу экипажа!";
+                }
                 throw new Error(res.error);
-            }, error: (err) => err.message,
+            },
+            error: (err) => err.message,
         });
     };
 
     const handleConfirmation = async (accept: boolean) => {
         if (!dbUser || !crew || !targetMemberId) return;
-        toast.promise(confirmCrewMember(dbUser.user_id, targetMemberId, crew.id, accept), {
+        const promise = confirmCrewMember(dbUser.user_id, targetMemberId, crew.id, accept);
+        toast.promise(promise, {
             loading: 'Обработка заявки...',
             success: (res) => {
                 if (res.success) {
@@ -118,15 +155,15 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     return `Заявка ${accept ? 'принята' : 'отклонена'}.`;
                 }
                 throw new Error(res.error);
-            }, error: (err) => err.message,
+            },
+            error: (err) => err.message,
         });
     };
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error) return <p className="text-destructive text-center py-20">{error}</p>;
     
-    // THE UNBREAKABLE GUARD: Do not proceed to render if crew is null
-    if (!crew) {
+    if (!crew || !crew.owner) {
       return <Loading variant="bike" text="Инициализация экипажа..." />;
     }
     
