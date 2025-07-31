@@ -79,6 +79,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const [activeTab, setActiveTab] = useState(action ? "roster" : "garage");
 
     const loadData = useCallback(async () => {
+        // This function will only be called once authentication is complete.
         setLoading(true);
         try {
             const crewResult = await getPublicCrewInfo(slug);
@@ -88,7 +89,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
             const crewData = crewResult.data;
             setCrew(crewData);
 
-            if (dbUser && !isAuthenticating) {
+            if (dbUser) {
                 const ownerCheck = dbUser.user_id === crewData.owner.user_id;
                 setIsOwner(ownerCheck);
                 setIsPending(!!crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
@@ -108,11 +109,14 @@ function CrewDetailContent({ slug }: { slug: string }) {
         } finally {
             setLoading(false);
         }
-    }, [slug, dbUser, isAuthenticating]);
+    }, [slug, dbUser]);
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        // The guard: Do not attempt to load data until authentication is finished.
+        if (!isAuthenticating) {
+            loadData();
+        }
+    }, [isAuthenticating, loadData]);
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
@@ -120,7 +124,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
         toast.promise(promise, {
             loading: 'Отправка заявки...',
             success: (res) => {
-                if (res.success) { setIsPending(true); return "Заявка отправлена владельцу экипажа!"; }
+                if (res.success) { setIsPending(true); return "Заявка отправлена!"; }
                 throw new Error(res.error);
             },
             error: (err) => err.message,
@@ -144,7 +148,8 @@ function CrewDetailContent({ slug }: { slug: string }) {
         });
     };
     
-    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    // The unbreakable guard: Show loading until all initial data is present.
+    if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
@@ -161,7 +166,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
         heroSubtitle = `Вы были приглашены присоединиться к '${crew.name}'.`;
     } else if (action === 'confirm' && pendingMember) {
         heroTitle = "Заявка на Вступление";
-        heroSubtitle = `@${pendingMember.username} хочет присоединиться к вашему экипажу.`;
+        heroSubtitle = `@${pendingMember.username} хочет присоединиться.`;
         heroObjectBg = pendingMember.avatar_url || undefined;
     }
 
@@ -172,16 +177,16 @@ function CrewDetailContent({ slug }: { slug: string }) {
             <div className="container mx-auto max-w-6xl px-4 py-12 relative z-20">
                 {isOwner && <CrewOwnerCommandDeck commandDeckData={commandDeckData}/>}
                 
-                {action === 'join' && !isCurrentUserMember && !isOwner && (
+                {action === 'join' && dbUser && !isCurrentUserMember && !isOwner && (
                     <motion.div initial={{opacity:0, y:-20}} animate={{opacity:1, y:0}} className="mb-6 bg-brand-blue/20 border border-brand-blue text-center p-4 rounded-lg">
-                        <h3 className="font-bold text-lg">Вы были приглашены в '{crew.name}'!</h3>
-                        {isPending ? <p className="text-sm text-yellow-400 mt-2">Ваша заявка уже на рассмотрении.</p> : <Button onClick={handleJoinRequest} className="mt-2">Подать заявку на вступление</Button>}
+                        <h3 className="font-bold text-lg">Присоединиться к '{crew.name}'?</h3>
+                        {isPending ? <p className="text-sm text-yellow-400 mt-2">Ваша заявка уже на рассмотрении.</p> : <Button onClick={handleJoinRequest} className="mt-2">Подать заявку</Button>}
                     </motion.div>
                 )}
                 {action === 'confirm' && isOwner && pendingMember && (
                      <motion.div initial={{opacity:0, y:-20}} animate={{opacity:1, y:0}} className="mb-6 bg-brand-green/20 border border-brand-green text-center p-4 rounded-lg">
                         <h3 className="font-bold text-lg">Подтвердить нового участника?</h3>
-                        <p className="text-sm mb-4">Пользователь <span className="font-mono bg-black/50 p-1 rounded">@{pendingMember.username}</span> хочет присоединиться к вашему экипажу.</p>
+                        <p className="text-sm mb-4">Пользователь <span className="font-mono bg-black/50 p-1 rounded">@{pendingMember.username}</span> хочет присоединиться.</p>
                         <div className="flex justify-center gap-4">
                             <Button onClick={() => handleConfirmation(true)} className="bg-brand-green hover:bg-brand-green/80">Принять</Button>
                             <Button onClick={() => handleConfirmation(false)} variant="destructive">Отклонить</Button>
