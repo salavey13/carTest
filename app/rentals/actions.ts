@@ -247,19 +247,7 @@ export async function getAllPublicCrews() {
     }
 }
 
-export async function getPublicCrewInfo(slug: string) {
-    noStore();
-    if (!slug) return { success: false, error: "Crew slug is required" };
-    try {
-        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
-        if (error) throw error;
-        if (!data) return { success: false, error: "Crew not found" };
-        return { success: true, data };
-    } catch (error) {
-        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-}
+
 
 export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
     try {
@@ -371,16 +359,18 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
     }
 }
 
-export async function getCrewForInvite(slug: string) {
+
+export async function getPublicCrewInfo(slug: string) {
     noStore();
     if (!slug) return { success: false, error: "Crew slug is required" };
     try {
-        const { data, error } = await supabaseAdmin.rpc('get_crew_for_invite', { p_slug: slug });
+        // This is now the single source of truth for public crew data.
+        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
         if (error) throw error;
-        if (!data || data.length === 0) return { success: false, error: "Crew not found" };
-        return { success: true, data: data[0] };
+        if (!data) return { success: false, error: "Crew not found" };
+        return { success: true, data };
     } catch (error) {
-        logger.error(`[getCrewForInvite] Error:`, error);
+        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
