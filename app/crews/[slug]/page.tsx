@@ -73,12 +73,13 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const [defaultMap, setDefaultMap] = useState<MapPreset>(FALLBACK_MAP);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [action, setAction] = useState<string | null>(null);
-    const [targetMemberId, setTargetMemberId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState("garage");
+    
+    const action = searchParams.get('join_crew') ? 'join' : searchParams.get('confirm_member') ? 'confirm' : null;
+    const targetMemberId = searchParams.get('confirm_member');
+    const [activeTab, setActiveTab] = useState(action ? "roster" : "garage");
 
     const loadData = useCallback(async () => {
-        if (isAppLoading || isAuthenticating) return;
+        if (isAppLoading) return; // Wait for context to stop loading initially
         setLoading(true);
         try {
             const crewResult = await getPublicCrewInfo(slug);
@@ -98,7 +99,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     if (deckResult.success) setCommandDeckData(deckResult.data);
                 }
             }
-
             const mapsResult = await getMapPresets();
             if (mapsResult.success && mapsResult.data?.length) {
                 setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
@@ -109,22 +109,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
             setLoading(false);
         }
     }, [slug, dbUser, isAppLoading, isAuthenticating]);
-
-    useEffect(() => {
-        const joinAction = searchParams.get('join_crew');
-        const confirmAction = searchParams.get('confirm_member');
-        if (joinAction === 'true') {
-            setAction('join');
-            setActiveTab('roster');
-        } else if (confirmAction) {
-            setAction('confirm');
-            setTargetMemberId(confirmAction);
-            setActiveTab('roster');
-        } else {
-            setAction(null);
-            setTargetMemberId(null);
-        }
-    }, [searchParams]);
 
     useEffect(() => {
         loadData();
@@ -160,14 +144,13 @@ function CrewDetailContent({ slug }: { slug: string }) {
         });
     };
     
-    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    if (loading || (isAppLoading && !crew)) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
     const pendingMember = action === 'confirm' ? crew.members?.find(m => m.user_id === targetMemberId) : null;
     const isCurrentUserMember = crew.members?.some(m => m.user_id === dbUser?.user_id);
     
-    // Dynamic Hero Content Logic
     let heroTitle = crew.name;
     let heroSubtitle = crew.description || '';
     let heroMainBg = crew.vehicles && crew.vehicles.length > 0 ? crew.vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg";
@@ -218,7 +201,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
                                 <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>
                             </div>
-                            {hqPoint && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[hqPoint]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location as string}</p> </div> )}
+                            {crew.hq_location && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, coordinates: (crew.hq_location as string).split(',').map(Number) as [number, number], icon: '::FaSkullCrossbones::', color: 'bg-brand-pink' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location as string}</p> </div> )}
                         </div>
                     </div>
                     <div className="lg:col-span-2">
