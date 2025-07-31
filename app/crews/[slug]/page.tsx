@@ -62,7 +62,7 @@ function CrewOwnerCommandDeck({ commandDeckData }: { commandDeckData: CommandDec
 }
 
 function CrewDetailContent({ slug }: { slug: string }) {
-    const { dbUser, isLoading: isAppLoading, isAuthenticating } = useAppContext();
+    const { dbUser, isAuthenticating } = useAppContext();
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -79,26 +79,14 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const [activeTab, setActiveTab] = useState(action ? "roster" : "garage");
 
     const loadData = useCallback(async () => {
-        if (isAppLoading) return; // Wait for context to stop loading initially
         setLoading(true);
         try {
             const crewResult = await getPublicCrewInfo(slug);
             if (!crewResult.success || !crewResult.data) {
                 throw new Error(crewResult.error || "Экипаж не найден.");
             }
-            const crewData = crewResult.data;
-            setCrew(crewData);
+            setCrew(crewResult.data);
 
-            if (dbUser) {
-                const ownerCheck = dbUser.user_id === crewData.owner.user_id;
-                setIsOwner(ownerCheck);
-                setIsPending(!!crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
-
-                if (ownerCheck) {
-                    const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
-                    if (deckResult.success) setCommandDeckData(deckResult.data);
-                }
-            }
             const mapsResult = await getMapPresets();
             if (mapsResult.success && mapsResult.data?.length) {
                 setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
@@ -108,11 +96,27 @@ function CrewDetailContent({ slug }: { slug: string }) {
         } finally {
             setLoading(false);
         }
-    }, [slug, dbUser, isAppLoading, isAuthenticating]);
+    }, [slug]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        const checkUserStatus = async () => {
+            if (!isAuthenticating && dbUser && crew) {
+                const ownerCheck = dbUser.user_id === crew.owner.user_id;
+                setIsOwner(ownerCheck);
+                setIsPending(!!crew.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
+
+                if (ownerCheck) {
+                    const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
+                    if (deckResult.success) setCommandDeckData(deckResult.data);
+                }
+            }
+        };
+        checkUserStatus();
+    }, [dbUser, crew, isAuthenticating]);
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
@@ -144,7 +148,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
         });
     };
     
-    if (loading || (isAppLoading && !crew)) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    if (loading) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
@@ -159,7 +163,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
     if (action === 'join') {
         heroTitle = "Приглашение в Экипаж";
         heroSubtitle = `Вы были приглашены присоединиться к '${crew.name}'.`;
-        heroObjectBg = crew.logo_url || undefined;
     } else if (action === 'confirm' && pendingMember) {
         heroTitle = "Заявка на Вступление";
         heroSubtitle = `@${pendingMember.username} хочет присоединиться к вашему экипажу.`;
