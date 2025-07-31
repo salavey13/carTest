@@ -247,19 +247,6 @@ export async function getAllPublicCrews() {
     }
 }
 
-export async function getPublicCrewInfo(slug: string) {
-    noStore();
-    if (!slug) return { success: false, error: "Crew slug is required" };
-    try {
-        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
-        if (error) throw error;
-        if (!data) return { success: false, error: "Crew not found" };
-        return { success: true, data };
-    } catch (error) {
-        logger.error(`Error fetching crew info for slug ${slug} via RPC:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-}
 
 export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
     try {
@@ -335,7 +322,6 @@ export async function requestToJoinCrew(userId: string, username: string, crewId
     }
 }
 
-
 export async function confirmCrewMember(ownerId: string, newMemberId: string, crewId: string, accept: boolean) {
     noStore();
     if (!ownerId || !newMemberId || !crewId) return { success: false, error: "Missing required IDs." };
@@ -377,6 +363,25 @@ export async function getCrewForInvite(slug: string) {
         return { success: true, data: data[0] };
     } catch (error) {
         logger.error(`[getCrewForInvite] Error:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+} 
+
+export async function getPublicCrewInfo(slug: string) {
+    noStore();
+    if (!slug) return { success: false, error: "Crew slug is required" };
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
+        if (error) {
+            logger.error(Error in get_public_crew_details RPC for slug ${slug}:, error);
+            throw error;
+        }
+        if (!data) {
+            return { success: false, error: "Crew not found" };
+        }
+        return { success: true, data: data[0] }; // RPC returns an array, we take the first element
+    } catch (error) {
+        logger.error(Error fetching crew info for slug ${slug}:, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
