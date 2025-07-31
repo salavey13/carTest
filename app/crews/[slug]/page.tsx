@@ -85,8 +85,20 @@ function CrewDetailContent({ slug }: { slug: string }) {
             if (!crewResult.success || !crewResult.data) {
                 throw new Error(crewResult.error || "Экипаж не найден.");
             }
-            setCrew(crewResult.data);
+            const crewData = crewResult.data;
+            setCrew(crewData);
 
+            if (dbUser && !isAuthenticating) {
+                const ownerCheck = dbUser.user_id === crewData.owner.user_id;
+                setIsOwner(ownerCheck);
+                setIsPending(!!crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
+
+                if (ownerCheck) {
+                    const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
+                    if (deckResult.success) setCommandDeckData(deckResult.data);
+                }
+            }
+            
             const mapsResult = await getMapPresets();
             if (mapsResult.success && mapsResult.data?.length) {
                 setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0]);
@@ -96,27 +108,11 @@ function CrewDetailContent({ slug }: { slug: string }) {
         } finally {
             setLoading(false);
         }
-    }, [slug]);
+    }, [slug, dbUser, isAuthenticating]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
-
-    useEffect(() => {
-        const checkUserStatus = async () => {
-            if (!isAuthenticating && dbUser && crew) {
-                const ownerCheck = dbUser.user_id === crew.owner.user_id;
-                setIsOwner(ownerCheck);
-                setIsPending(!!crew.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
-
-                if (ownerCheck) {
-                    const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
-                    if (deckResult.success) setCommandDeckData(deckResult.data);
-                }
-            }
-        };
-        checkUserStatus();
-    }, [dbUser, crew, isAuthenticating]);
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
