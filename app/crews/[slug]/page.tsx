@@ -17,7 +17,6 @@ import { useAppContext } from '@/contexts/AppContext';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { debugLogger } from '@/lib/debugLogger';
 
 type CrewDetails = Database['public']['Views']['crew_details']['Row'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
@@ -118,13 +117,36 @@ function CrewDetailContent({ slug }: { slug: string }) {
         }
     }, [isAuthenticating, loadData]);
 
-    const handleJoinRequest = async () => { /* ... unchanged ... */ };
-    const handleConfirmation = async (accept: boolean) => { /* ... unchanged ... */ };
+    const handleJoinRequest = async () => {
+        if (!dbUser || !crew) return;
+        toast.promise(requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id), {
+            loading: 'Отправка заявки...',
+            success: (res) => {
+                if (res.success) { setIsPending(true); return "Заявка отправлена!"; }
+                throw new Error(res.error);
+            }, error: (err) => err.message,
+        });
+    };
+
+    const handleConfirmation = async (accept: boolean) => {
+        if (!dbUser || !crew || !targetMemberId) return;
+        toast.promise(confirmCrewMember(dbUser.user_id, targetMemberId, crew.id, accept), {
+            loading: 'Обработка заявки...',
+            success: (res) => {
+                if (res.success) {
+                    router.replace(`/crews/${slug}`, { scroll: false });
+                    loadData();
+                    return `Заявка ${accept ? 'принята' : 'отклонена'}.`;
+                }
+                throw new Error(res.error);
+            }, error: (err) => err.message,
+        });
+    };
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
-    if (error || !crew) return <p className="text-destructive text-center py-20">{error || "Экипаж не найден."}</p>;
+    if (error) return <p className="text-destructive text-center py-20">{error}</p>;
+    if (!crew) return <Loading variant="bike" text="Инициализация экипажа..." />;
     
-    // THE UNBREAKABLE GUARD
     const members = Array.isArray(crew.members) ? crew.members : [];
     const vehicles = Array.isArray(crew.vehicles) ? crew.vehicles : [];
     
@@ -179,7 +201,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             <p className="text-sm text-muted-foreground font-mono mt-3 text-center">{crew.description}</p>
                             <div className="mt-4 border-t border-border/50 pt-3 text-center">
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
-                                <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>
+                                {crew.owner && <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>}
                             </div>
                             {crew.hq_location && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, coordinates: (crew.hq_location as string).split(',').map(Number) as [number, number], icon: '::FaSkullCrossbones::', color: 'bg-brand-pink' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location as string}</p> </div> )}
                         </div>
@@ -187,8 +209,8 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     <div className="lg:col-span-2">
                          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-2 bg-card/50">
-                                <TabsTrigger value="garage">Гараж ({vehicles.length || 0})</TabsTrigger>
-                                <TabsTrigger value="roster">Состав ({members.length || 0})</TabsTrigger>
+                                <TabsTrigger value="garage">Гараж ({vehicles.length})</TabsTrigger>
+                                <TabsTrigger value="roster">Состав ({members.length})</TabsTrigger>
                             </TabsList>
                             <TabsContent value="garage" className="mt-6">
                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -209,11 +231,11 @@ function CrewDetailContent({ slug }: { slug: string }) {
 }
 
 export default function CrewPage({ params }: { params: { slug: string } }) {
-    return (
-        <div className="min-h-screen text-foreground">
-            <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />}>
-                <CrewDetailContent slug={params.slug} />
-            </Suspense>
-        </div>
-    );
+  return (
+    <div className="min-h-screen text-foreground">
+        <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />}>
+          <CrewDetailContent slug={params.slug} />
+        </Suspense>
+    </div>
+  );
 }
