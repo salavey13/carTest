@@ -367,21 +367,44 @@ export async function getCrewForInvite(slug: string) {
     }
 } 
 
-export async function getPublicCrewInfo(slug: string) {
+export async function getAllPublicCrews() {
     noStore();
-    if (!slug) return { success: false, error: "Crew slug is required" };
     try {
-        const { data, error } = await supabaseAdmin.rpc('get_public_crew_details', { p_slug: slug });
+        // THE REAL FIX: A direct, simple, and robust query. No more broken RPCs.
+        const { data, error } = await supabaseAdmin
+            .from('crews')
+            .select(`
+                id,
+                name,
+                slug,
+                description,
+                logo_url,
+                owner:users ( username ),
+                members:crew_members ( count ),
+                vehicles:cars ( count )
+            `);
+
         if (error) {
-            logger.error(`Error in get_public_crew_details RPC for slug ${slug}:`, error);
+            console.error("Error fetching crews directly:", error);
             throw error;
         }
-        if (!data) {
-            return { success: false, error: "Crew not found" };
-        }
-        return { success: true, data: data[0] }; // RPC returns an array, we take the first element
+
+        // Manually reshape the data to match what the component expects
+        const reshapedData = data.map(crew => ({
+            id: crew.id,
+            name: crew.name,
+            slug: crew.slug,
+            description: crew.description,
+            logo_url: crew.logo_url,
+            owner_username: (crew.owner as any)?.username || 'unknown',
+            member_count: crew.members[0]?.count || 0,
+            vehicle_count: crew.vehicles[0]?.count || 0,
+        }));
+        
+        return { success: true, data: reshapedData };
+
     } catch (error) {
-        logger.error(`Error fetching crew info for slug ${slug}:`, error);
+        logger.error("Error in getAllPublicCrews action:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
