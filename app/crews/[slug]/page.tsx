@@ -17,6 +17,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { debugLogger } from '@/lib/debugLogger';
 
 type CrewDetails = Database['public']['Views']['crew_details']['Row'];
 type MapPreset = Database['public']['Tables']['maps']['Row'];
@@ -92,7 +93,8 @@ function CrewDetailContent({ slug }: { slug: string }) {
             if (dbUser) {
                 const ownerCheck = dbUser.user_id === crewData.owner.user_id;
                 setIsOwner(ownerCheck);
-                setIsPending(!!crewData.members?.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
+                const membersArray = Array.isArray(crewData.members) ? crewData.members : [];
+                setIsPending(!!membersArray.some(m => m.user_id === dbUser.user_id && m.status === 'pending'));
 
                 if (ownerCheck) {
                     const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
@@ -145,8 +147,9 @@ function CrewDetailContent({ slug }: { slug: string }) {
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error) return <p className="text-destructive text-center py-20">{error}</p>;
-    if (!crew) return <Loading variant="bike" text="Инициализация экипажа..." />;
+    if (!crew || !crew.owner) return <Loading variant="bike" text="Инициализация экипажа..." />;
     
+    // THE UNBREAKABLE GUARD - This is the real fix.
     const members = Array.isArray(crew.members) ? crew.members : [];
     const vehicles = Array.isArray(crew.vehicles) ? crew.vehicles : [];
     
@@ -201,7 +204,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                             <p className="text-sm text-muted-foreground font-mono mt-3 text-center">{crew.description}</p>
                             <div className="mt-4 border-t border-border/50 pt-3 text-center">
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
-                                {crew.owner && <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>}
+                                <p className="font-semibold text-brand-cyan">@{crew.owner.username}</p>
                             </div>
                             {crew.hq_location && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, coordinates: (crew.hq_location as string).split(',').map(Number) as [number, number], icon: '::FaSkullCrossbones::', color: 'bg-brand-pink' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location as string}</p> </div> )}
                         </div>
