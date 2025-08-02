@@ -20,7 +20,7 @@ const bottomNavVariants = {
 
 interface NavItemConfig {
   href: string;
-  icon: string; // Changed to string for VibeContentRenderer
+  icon: string;
   label: string;
   color?: string;
   isCentralCandidate?: boolean;
@@ -29,30 +29,21 @@ interface NavItemConfig {
   isActuallyCentral?: boolean;
 }
 
-// Configuration for the bike rental navigation using string icon names
+// Конфигурация с новыми семантическими цветами
 const ALL_POSSIBLE_NAV_ITEMS: NavItemConfig[] = [
-  { href: "/leaderboard", icon: "FaRankingStar", label: "Leaderboard", color: "text-brand-yellow" },
-  { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" },
-  { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true },
-  { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-brand-pink", adminOnly: false },
-  // Central item is defined here, the layout logic will place it in the middle
-  { href: "/rent-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-amber-400 to-orange-500" },
+  { href: "/leaderboard", icon: "FaRankingStar", label: "Leaderboard", color: "text-accent-text" }, // gold
+  { href: "/crews", icon: "FaUsers", label: "Crews", color: "text-brand-green" }, // оставлен зеленый для разнообразия
+  { href: "/paddock", icon: "FaWarehouse", label: "Paddock", color: "text-brand-cyan", adminOnly: true }, // оставлен голубой
+  { href: "/admin", icon: "FaCirclePlus", label: "Admin", color: "text-secondary" }, // indigo
+  { href: "/rent-bike", icon: "FaMotorcycle", label: "Rent", isCentralCandidate: true, centralColor: "from-primary to-accent" }, // red-orange to gold
 ];
 
 const navTranslations: Record<string, Record<string, string>> = {
   en: {
-    "Leaderboard": "Leaders",
-    "Crews": "Crews",
-    "Rent": "Rent",
-    "Paddock": "Paddock",
-    "Admin": "Admin",
+    "Leaderboard": "Leaders", "Crews": "Crews", "Rent": "Rent", "Paddock": "Paddock", "Admin": "Admin",
   },
   ru: {
-    "Leaderboard": "Лидеры",
-    "Crews": "Команды",
-    "Rent": "Аренда",
-    "Paddock": "Паддок",
-    "Admin": "Админ",
+    "Leaderboard": "Лидеры", "Crews": "Команды", "Rent": "Аренда", "Paddock": "Паддок", "Admin": "Админ",
   }
 };
 
@@ -62,55 +53,37 @@ interface BottomNavigationProps {
 
 export default function BottomNavigation({ pathname }: BottomNavigationProps) {
   const { dbUser, isLoading: appCtxLoading, isAuthenticating, isAdmin: isAdminFunc, user: tgUser } = useAppContext();
-
   const currentLang = useMemo(() => (tgUser?.language_code === 'ru' ? 'ru' : 'en'), [tgUser?.language_code]);
-
   const tNav = useCallback((labelKey: string): string => {
     return navTranslations[currentLang]?.[labelKey] || navTranslations['en']?.[labelKey] || labelKey;
   }, [currentLang]);
-
   const isAdmin = useMemo(() => {
     if (typeof isAdminFunc === 'function') return isAdminFunc();
     return false;
   }, [isAdminFunc]);
 
   const navItemsToDisplay = useMemo(() => {
-    if (appCtxLoading || isAuthenticating || !dbUser) {
-      return [];
-    }
-    
-    const availableItems = ALL_POSSIBLE_NAV_ITEMS.filter(item => {
-      return !(item.adminOnly && !isAdmin);
-    });
-
+    if (appCtxLoading || isAuthenticating || !dbUser) return [];
+    const availableItems = ALL_POSSIBLE_NAV_ITEMS.filter(item => !(item.adminOnly && !isAdmin));
     const maxItems = 5;
     const centralItem = availableItems.find(i => i.isCentralCandidate);
     const otherItems = availableItems.filter(i => !i.isCentralCandidate);
-    
     let finalLayout: NavItemConfig[] = [];
-
     if (centralItem) {
       const centralItemWithFlag = { ...centralItem, isActuallyCentral: true };
       const nonCentralCount = Math.min(otherItems.length, maxItems - 1);
       const itemsToDisplay = otherItems.slice(0, nonCentralCount);
-      
       const leftCount = Math.ceil(itemsToDisplay.length / 2);
-      
       finalLayout.push(...itemsToDisplay.slice(0, leftCount));
       finalLayout.push(centralItemWithFlag);
       finalLayout.push(...itemsToDisplay.slice(leftCount));
-
     } else {
       finalLayout = otherItems.slice(0, maxItems);
     }
-    
     return finalLayout;
-
   }, [dbUser, appCtxLoading, isAuthenticating, isAdmin]);
 
-  if (appCtxLoading || isAuthenticating || !dbUser || navItemsToDisplay.length === 0) {
-    return null;
-  }
+  if (appCtxLoading || isAuthenticating || !dbUser || navItemsToDisplay.length === 0) return null;
 
   return (
     <motion.div
@@ -135,8 +108,8 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               asChild
               size="icon"
               className={cn(
-                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor || 'from-gray-700 to-gray-900'} mx-0.5 sm:mx-1`,
-                isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-black shadow-lg shadow-brand-cyan/60"
+                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor || 'from-secondary to-black'} mx-0.5 sm:mx-1`,
+                isActive && "ring-4 ring-primary/80 ring-offset-2 ring-offset-background shadow-lg shadow-primary/60"
               )}
               key={item.label}
               aria-current={isActive ? "page" : undefined}
@@ -151,10 +124,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
             <Button
               asChild
               variant="ghost"
-              className={cn(
-                "bottom-nav-item flex-1 px-0.5 py-1 sm:px-1",
-                isActive && "active-bottom-link"
-              )}
+              className={cn("bottom-nav-item flex-1 px-0.5 py-1 sm:px-1", isActive && "active-bottom-link")}
               key={item.label}
               aria-current={isActive ? "page" : undefined}
               title={tNav(item.label)}

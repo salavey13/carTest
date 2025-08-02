@@ -1,5 +1,6 @@
 type LogLevel = 'log' | 'warn' | 'error' | 'info' | 'debug' | 'fatal';
 
+// Define the structure for log records
 export interface LogRecord {
   id: number;
   level: LogLevel;
@@ -8,9 +9,10 @@ export interface LogRecord {
 }
 
 class DebugLogger {
+  // Store logs as structured records
   private internalLogs: LogRecord[] = [];
-  private logIdCounter = 0;
-  private maxInternalLogs = 500; // INCREASED FROM 200 to 500
+  private logIdCounter = 0; // Counter for unique log IDs
+  private maxInternalLogs = 420; // <--- ИЗМЕНЕНИЕ №1: ЗАДАННОЕ ЧИСЛО
   private readonly isBrowser: boolean = typeof window !== 'undefined'; 
   private isLoggingInternally: boolean = false; 
 
@@ -23,28 +25,33 @@ class DebugLogger {
         const seen = new WeakSet(); 
         const replacer = (key: string, value: any) => {
           if (typeof value === 'object' && value !== null) {
-            if (seen.has(value)) return '[Circular Object]';
+            if (seen.has(value)) {
+              return '[Circular Object]';
+            }
             seen.add(value);
           }
-          if (typeof value === 'bigint') return value.toString() + 'n';
-          if (value instanceof Map) return `[Map (${value.size} entries)]`;
-          if (value instanceof Set) return `[Set (${value.size} entries)]`;
-          if (this.isBrowser && value instanceof HTMLElement) return `[HTMLElement: ${value.tagName}]`;
-          if (this.isBrowser && value instanceof Event) return `[Event: ${value.type}]`;
-          if (value instanceof Function) return `[Function: ${value.name || 'anonymous'}]`;
-          if (value instanceof Error) return `Error: ${value.message}${value.name ? ` (${value.name})` : ''}`; 
+          if (typeof value === 'bigint') { return value.toString() + 'n'; }
+          if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
+          if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
+          if (this.isBrowser && value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
+          if (this.isBrowser && value instanceof Event) { return `[Event: ${value.type}]`; }
+          if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
+          if (value instanceof Error) { return `Error: ${value.message}${value.name ? ` (${value.name})` : ''}`; } 
           return value;
         };
         return JSON.stringify(arg, replacer, 2); 
       }
-      if (typeof arg === 'symbol') return arg.toString();
-      if (arg === undefined) return 'undefined';
-      if (arg === null) return 'null';
-      if (typeof arg === 'function') return `[Function: ${arg.name || 'anonymous'}]`;
+      if (typeof arg === 'symbol') { return arg.toString(); }
+      if (arg === undefined) { return 'undefined'; }
+      if (arg === null) { return 'null'; }
+      if (typeof arg === 'function') { return `[Function: ${arg.name || 'anonymous'}]`; }
       return String(arg);
     } catch (stringifyError) {
-      // Fallback for stringification errors
-      return '[SafelyStringify Error]';
+      let errorMsg = '[SafelyStringify Error]';
+      if (stringifyError instanceof Error) { errorMsg += `: ${stringifyError.message}`; }
+      if (this.isBrowser) { console.warn(errorMsg, stringifyError, "Original Arg:", arg); } 
+      else { process.stderr.write(`${errorMsg} ${stringifyError} Original Arg: ${String(arg)}\n`); }
+      return errorMsg;
     }
   }
 
@@ -55,25 +62,69 @@ class DebugLogger {
     }
     this.isLoggingInternally = true;
 
+    const timestamp = Date.now();
+    let message = '';
     try {
-      const timestamp = Date.now();
-      const message = args.map(this.safelyStringify).join(" "); 
-      const logEntry: LogRecord = { id: this.logIdCounter++, level, message, timestamp };
+      const argsArray = Array.isArray(args) ? args : [args];
+      message = argsArray.map(this.safelyStringify).join(" "); 
+
+      const logEntry: LogRecord = {
+          id: this.logIdCounter++,
+          level,
+          message,
+          timestamp,
+      };
       this.internalLogs.push(logEntry);
       if (this.internalLogs.length > this.maxInternalLogs) {
-        this.internalLogs.shift(); // More efficient than slicing
+        this.internalLogs = this.internalLogs.slice(this.internalLogs.length - this.maxInternalLogs);
       }
+
+      const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
+      const logOutput = `[${level.toUpperCase()}] ${timestampStr}: ${argsArray.map(arg => typeof arg === 'string' ? arg : this.safelyStringify(arg)).join(' ')}`;
+
+
       if (this.isBrowser && typeof console !== 'undefined') {
-        const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
         const prefix = `%c[${level.toUpperCase()}] %c${timestampStr}:`;
-        const color = level === 'error' || level === 'fatal' ? 'color: #FF6B6B; font-weight: bold;' : level === 'warn' ? 'color: #FFA500;' : level === 'info' ? 'color: #1E90FF;' : level === 'debug' ? 'color: #9370DB;' : 'color: #A9A9A9;';
+        let color = 'inherit';
+        switch(level) {
+          case 'error': case 'fatal': color = 'color: #FF6B6B; font-weight: bold;'; break;
+          case 'warn': color = 'color: #FFA500;'; break;
+          case 'info': color = 'color: #1E90FF;'; break;
+          case 'debug': color = 'color: #9370DB;'; break;
+          default: color = 'color: #A9A9A9;'; break;
+        }
+
+        // ====================================================================
+        // ✨ ИЗМЕНЕНИЕ №2: ПУСТОТЫ ДЛЯ КИБЕРСКРОЛЛА (БРАУЗЕР) ✨
+        if (level === 'error' || level === 'fatal') {
+          console.log('\n\n\n');
+        }
+        // ====================================================================
+
         const consoleMethod = (console as any)[level] || console.log;
-        consoleMethod(prefix, color, 'color: inherit;', ...args);
+        try { consoleMethod(prefix, color, 'color: inherit;', ...argsArray); }
+        catch (e) { console.error("[Logger] Error during styled console output:", e); try { console.log(logOutput); } catch {} }
       } else if (!this.isBrowser) {
-        // Server-side logging remains the same
+        // ====================================================================
+        // ✨ ИЗМЕНЕНИЕ №2: ПУСТОТЫ ДЛЯ КИБЕРСКРОЛЛА (СЕРВЕР) ✨
+        if (level === 'error' || level === 'fatal' || level === 'warn') {
+          process.stderr.write('\n\n\n');
+        }
+        // ====================================================================
+        
+        // Server-side logging (ТВОЙ ОРИГИНАЛЬНЫЙ КОД НА МЕСТЕ, НИЧЕГО НЕ ВЫРЕЗАНО)
+        if (level === 'error' || level === 'fatal' || level === 'warn') {
+            process.stderr.write(logOutput + '\n');
+        } else {
+            process.stdout.write(logOutput + '\n');
+        }
       }
     } catch (e) {
-      // Error logging remains the same
+      const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
+      if (this.isBrowser) { console.error(errorMsg); }
+      else { process.stderr.write(`${errorMsg}\n`); }
+      this.internalLogs.push({ id: this.logIdCounter++, level: 'fatal', message: errorMsg, timestamp: Date.now() });
+      if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
     } finally {
       this.isLoggingInternally = false;
     }
@@ -86,9 +137,20 @@ class DebugLogger {
   debug = (...args: any[]) => this.logInternal('debug', ...args);
   fatal = (...args: any[]) => this.logInternal('fatal', ...args);
 
-  getInternalLogRecords = (): ReadonlyArray<LogRecord> => [...this.internalLogs];
-  getInternalLogs = (): string => this.internalLogs.map(log => `${log.level.toUpperCase()} ${new Date(log.timestamp).toISOString()}: ${log.message}`).join("\n");
-  clearInternalLogs = () => { this.internalLogs = []; this.log('info', '[Logger] Internal logs cleared.'); };
+  getInternalLogRecords = (): ReadonlyArray<LogRecord> => {
+      return [...this.internalLogs];
+  };
+
+  getInternalLogs = (): string => {
+      return this.internalLogs
+          .map(log => `${log.level.toUpperCase()} ${new Date(log.timestamp).toISOString()}: ${log.message}`)
+          .join("\n");
+  }
+
+  clearInternalLogs = () => {
+      this.internalLogs = [];
+      this.log('info', '[Logger] Internal logs cleared.'); 
+  };
 }
 
 export const debugLogger = new DebugLogger();

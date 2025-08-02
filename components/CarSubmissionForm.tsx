@@ -44,23 +44,16 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   useEffect(() => {
     if (vehicleToEdit) {
       setFormData({
-        make: vehicleToEdit.make || "",
-        model: vehicleToEdit.model || "",
-        description: vehicleToEdit.description || "",
-        daily_price: vehicleToEdit.daily_price?.toString() || "",
-        image_url: vehicleToEdit.image_url || "",
+        make: vehicleToEdit.make || "", model: vehicleToEdit.model || "", description: vehicleToEdit.description || "",
+        daily_price: vehicleToEdit.daily_price?.toString() || "", image_url: vehicleToEdit.image_url || "",
       });
       setVehicleType(vehicleToEdit.type === 'car' ? 'car' : 'bike');
       setImagePreview(vehicleToEdit.image_url || null);
       setImageFile(null);
-      
       if (vehicleToEdit.specs && typeof vehicleToEdit.specs === 'object') {
         const specEntries = Object.entries(vehicleToEdit.specs);
-        const regularSpecs = specEntries
-          .filter(([key]) => key !== 'gallery')
-          .map(([key, value]) => ({ id: uuidv4(), key, value: String(value) }));
+        const regularSpecs = specEntries.filter(([key]) => key !== 'gallery').map(([key, value]) => ({ id: uuidv4(), key, value: String(value) }));
         setSpecs(regularSpecs);
-
         const galleryUrls = (vehicleToEdit.specs as any).gallery || [];
         setGallery(galleryUrls.map((url: string) => ({ id: uuidv4(), url })));
       } else {
@@ -92,16 +85,13 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   const handleSpecChange = (id: string, field: 'key' | 'value', newValue: string) => {
     setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
   };
-  
   const addNewSpec = () => {
     const currentSpecKeys = specs.map(s => s.key);
     const availableKeys = vehicleType === 'bike' ? bikeSpecKeys : carSpecKeys;
     const nextKey = availableKeys.find(k => !currentSpecKeys.includes(k));
     setSpecs(currentSpecs => [...currentSpecs, { id: uuidv4(), key: nextKey || "", value: "" }]);
   };
-  
   const removeSpec = (id: string) => setSpecs(s => s.filter(spec => spec.id !== id));
-
   const handleGalleryChange = (id: string, url: string) => {
     setGallery(g => g.map(item => item.id === id ? { ...item, url } : item));
   };
@@ -116,7 +106,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
     }
     setIsSubmitting(true);
     toast.info(isEditMode ? "Обновление транспорта..." : "Добавление транспорта...");
-
     try {
       let imageUrl = formData.image_url;
       if (imageFile) {
@@ -128,27 +117,19 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
             throw new Error(uploadResult.error || "Не удалось загрузить изображение.");
         }
       }
-
       if (!imageUrl) throw new Error("Необходимо указать URL изображения или загрузить файл.");
-
       const specsObject = specs.reduce((acc, { key, value }) => {
         if (key) acc[key] = value;
         return acc;
       }, {} as Record<string, any>);
-
       const galleryUrls = gallery.map(item => item.url).filter(Boolean);
       if (galleryUrls.length > 0) {
         specsObject.gallery = galleryUrls;
       }
-
       const vehicleData = {
         make: formData.make, model: formData.model, description: formData.description,
-        specs: specsObject,
-        daily_price: Number(formData.daily_price),
-        image_url: imageUrl,
-        type: vehicleType,
+        specs: specsObject, daily_price: Number(formData.daily_price), image_url: imageUrl, type: vehicleType,
       };
-
       if (isEditMode) {
         const { error } = await supabaseAdmin.from("cars").update(vehicleData).eq('id', vehicleToEdit.id!);
         if (error) throw error;
@@ -159,7 +140,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         if (error) throw error;
         toast.success("Транспорт успешно добавлен в гараж!");
       }
-
       onSuccess?.();
     } catch (error) {
       toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Неизвестная ошибка")}`);
@@ -172,7 +152,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
     <motion.form
       key={formId}
       onSubmit={handleSubmit}
-      className="space-y-6 bg-black/30 p-4 md:p-6 rounded-xl border border-border"
+      className="space-y-6 bg-card/50 p-4 md:p-6 rounded-xl border border-border backdrop-blur-sm"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
     >
@@ -183,21 +163,21 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Марка</Label>
+          <Label className="text-sm font-mono text-accent-text mb-1.5 block">Марка</Label>
           <Input value={formData.make} onChange={e => setFormData(p => ({ ...p, make: e.target.value }))} placeholder={vehicleType === 'bike' ? 'Ducati' : 'Tesla'} className="input-cyber" required/>
         </div>
         <div>
-          <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Модель</Label>
+          <Label className="text-sm font-mono text-accent-text mb-1.5 block">Модель</Label>
           <Input value={formData.model} onChange={e => setFormData(p => ({ ...p, model: e.target.value }))} placeholder={vehicleType === 'bike' ? 'Panigale V4' : 'Cybertruck'} className="input-cyber" required/>
         </div>
       </div>
       <div>
-        <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Описание</Label>
+        <Label className="text-sm font-mono text-accent-text mb-1.5 block">Описание</Label>
         <Textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder="Краткое, но зажигательное описание..." className="textarea-cyber" required/>
       </div>
 
       <div>
-        <h3 className="text-lg font-mono text-brand-purple mb-2">Характеристики</h3>
+        <h3 className="text-lg font-mono text-accent-text mb-2">Характеристики</h3>
         <div className="space-y-2">
           {specs.map((spec) => (
             <motion.div key={spec.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
@@ -212,11 +192,11 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
 
       {isEditMode && (
       <div>
-        <h3 className="text-lg font-mono text-brand-cyan mb-2">Фотогалерея</h3>
+        <h3 className="text-lg font-mono text-primary mb-2">Фотогалерея</h3>
         <div className="space-y-2">
           {gallery.map(item => (
             <motion.div key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
-              <div className="w-10 h-10 flex-shrink-0 bg-black/20 rounded border border-border flex items-center justify-center">
+              <div className="w-10 h-10 flex-shrink-0 bg-card/50 rounded border border-border flex items-center justify-center">
                 <Image src={item.url || 'https://placehold.co/36x36/000000/31343C/png?text=??'} alt="Gallery preview" width={36} height={36} className="object-cover rounded-sm" />
               </div>
               <Input value={item.url} onChange={e => handleGalleryChange(item.id, e.target.value)} placeholder="https://.../image.jpg" className="input-cyber" />
@@ -230,11 +210,11 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Цена за день (₽)</Label>
+              <Label className="text-sm font-mono text-accent-text mb-1.5 block">Цена за день (₽)</Label>
               <Input type="number" value={formData.daily_price} onChange={e => setFormData(p => ({ ...p, daily_price: e.target.value }))} placeholder="999" className="input-cyber" required />
           </div>
           <div>
-              <Label className="text-sm font-mono text-brand-purple mb-1.5 block">Главное изображение</Label>
+              <Label className="text-sm font-mono text-accent-text mb-1.5 block">Главное изображение</Label>
               <div className="flex gap-2">
                   <Input value={formData.image_url} onChange={e => {setFormData(p => ({ ...p, image_url: e.target.value })); setImagePreview(e.target.value); setImageFile(null);}} placeholder="https://..." className="input-cyber" />
                   <Button asChild variant="outline" className="flex-shrink-0"><Label htmlFor="image-upload" className="cursor-pointer"><VibeContentRenderer content="::FaUpload::" /></Label></Button>

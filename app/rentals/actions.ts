@@ -9,6 +9,83 @@ import { getBaseUrl } from "@/lib/utils";
 import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { createInvoice, sendTelegramInvoice } from "@/app/actions";
+import { CrewWithCounts, CrewDetails } from '@/lib/types'; // Типы нам все еще нужны для помощи
+
+/**
+ * Получает список всех публичных команд с подсчетом участников и техники.
+ */
+export async function getAllPublicCrews(): Promise<{ 
+    success: boolean; 
+    data?: CrewWithCounts[];
+    error?: string; 
+}> {
+    noStore();
+
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_public_crews');
+        if (error) {
+            logger.error("Error calling get_public_crews RPC:", error);
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+        return { success: true, data: data || [] };
+    } catch (error) {
+        logger.error("Critical failure in getAllPublicCrews action:", error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : "An unknown error occurred fetching crews." 
+        };
+    }
+}
+
+
+/**
+ * НОВЫЙ ЭКШЕН
+ * Получает полную информацию об одной команде по ее 'slug'.
+ */
+export async function getPublicCrewInfo(slug: string): Promise<{
+    success: boolean;
+    data?: CrewDetails;
+    error?: string;
+}> {
+    noStore();
+
+    if (!slug) {
+        logger.warn("getPublicCrewInfo called without a slug.");
+        return { success: false, error: "No slug provided." };
+    }
+
+    try {
+        // Вызываем RPC для деталей ОДНОЙ команды
+        const { data, error } = await supabaseAdmin
+            .rpc('get_public_crew_details', { p_slug: slug })
+            .single(); // .single() важен - он ждет один результат
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                logger.warn(`Crew with slug '${slug}' not found.`);
+                return { success: false, error: "Crew not found." };
+            }
+            logger.error(`Error calling get_public_crew_details RPC for slug: ${slug}`, error);
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+
+        if (!data) {
+             logger.warn(`No data returned for crew slug '${slug}', though no error was thrown.`);
+             return { success: false, error: "Crew not found." };
+        }
+
+        return { success: true, data: data as CrewDetails };
+
+    } catch (error) {
+        logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
+        };
+    }
+}
+
+
 
 type MapBounds = { top: number; bottom: number; left: number; right: number; };
 type PointOfInterest = { id: string; name: string; type: 'point' | 'path' | 'loop'; icon: string; color: string; coords: [number, number][]; };
@@ -235,19 +312,6 @@ export async function getTopCrews() {
     }
 }
 
-export async function getAllPublicCrews() {
-    noStore();
-    try {
-        const { data, error } = await supabaseAdmin.rpc('get_public_crews');
-        if (error) throw error;
-        return { success: true, data };
-    } catch (error) {
-        logger.error("Error fetching all crews via RPC:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-}
-
-
 export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
     try {
         const { data, error } = await supabaseAdmin.from('maps').select('*');
@@ -363,48 +427,6 @@ export async function getCrewForInvite(slug: string) {
         return { success: true, data: data[0] };
     } catch (error) {
         logger.error(`[getCrewForInvite] Error:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-} 
-
-export async function getAllPublicCrews() {
-    noStore();
-    try {
-        // THE REAL FIX: A direct, simple, and robust query. No more broken RPCs.
-        const { data, error } = await supabaseAdmin
-            .from('crews')
-            .select(`
-                id,
-                name,
-                slug,
-                description,
-                logo_url,
-                owner:users ( username ),
-                members:crew_members ( count ),
-                vehicles:cars ( count )
-            `);
-
-        if (error) {
-            console.error("Error fetching crews directly:", error);
-            throw error;
-        }
-
-        // Manually reshape the data to match what the component expects
-        const reshapedData = data.map(crew => ({
-            id: crew.id,
-            name: crew.name,
-            slug: crew.slug,
-            description: crew.description,
-            logo_url: crew.logo_url,
-            owner_username: (crew.owner as any)?.username || 'unknown',
-            member_count: crew.members[0]?.count || 0,
-            vehicle_count: crew.vehicles[0]?.count || 0,
-        }));
-        
-        return { success: true, data: reshapedData };
-
-    } catch (error) {
-        logger.error("Error in getAllPublicCrews action:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }

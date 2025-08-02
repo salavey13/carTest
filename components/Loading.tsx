@@ -1,4 +1,3 @@
-// /components/Loading.tsx
 "use client";
 
 import Image from "next/image";
@@ -24,7 +23,8 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
                 unoptimized
             />
          </div>
-        <p className='font-mono text-black dark:text-brand-cyan mt-4 animate-pulse'>
+         {/* ИЗМЕНЕНО: Возвращаем к чистому черному/белому для монохромного стиля */}
+        <p className='font-mono text-black dark:text-white mt-4 animate-pulse'>
           {text || 'ЗАГРУЗКА ГАРАЖА...'}
         </p>
       </div>
@@ -35,13 +35,14 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
   return (
     <div className={cn("min-h-screen bg-black flex flex-col items-center justify-center", className)}>
         <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-4 border-brand-purple/30 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-t-brand-cyan border-l-brand-cyan/0 border-r-brand-cyan/0 border-b-brand-cyan/0 rounded-full animate-spin"></div>
+            {/* ИЗМЕНЕНО: Возвращаем к монохромному стилю с акцентом */}
+            <div className="absolute inset-0 border-4 border-gray-800 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-t-white border-l-transparent border-r-transparent border-b-transparent rounded-full animate-spin"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-                 <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow text-xl animate-pulse"/>
+                 <VibeContentRenderer content="::FaBolt::" className="text-white text-xl animate-pulse"/>
             </div>
         </div>
-      <p className='font-mono text-brand-cyan mt-4 animate-pulse'>
+      <p className='font-mono text-white mt-4 animate-pulse'>
         {text || 'ИНИЦИАЛИЗАЦИЯ VIBE OS...'}
       </p>
     </div>
