@@ -235,7 +235,7 @@ export async function getTopCrews() {
     }
 }
 
-export async function getAllPublicCrews() {
+/*export async function getAllPublicCrews() {
     noStore();
     try {
         const { data, error } = await supabaseAdmin.rpc('get_public_crews');
@@ -245,7 +245,7 @@ export async function getAllPublicCrews() {
         logger.error("Error fetching all crews via RPC:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
-}
+}*/
 
 
 export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
