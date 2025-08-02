@@ -33,7 +33,8 @@ type Crew = {
     debug_info?: DebugInfo;
 };
 
-const trophyColors = ["text-yellow-400", "text-gray-400", "text-yellow-600"];
+// ИЗМЕНЕНО: Используем семантические цвета, а не хардкод
+const trophyColors = ["text-accent", "text-muted-foreground", "text-yellow-600"]; // 1-е место - золото, 2-е - серый, 3-е - бронза
 
 export default function LeaderboardPage() {
     const [topFleets, setTopFleets] = useState<Fleet[]>([]);
@@ -78,7 +79,7 @@ export default function LeaderboardPage() {
     }
 
     return (
-        <div className="min-h-screen text-foreground p-4 pt-24 relative overflow-hidden">
+        <div className="min-h-screen text-foreground p-4 pt-24 relative overflow-hidden dark">
              <div className="fixed inset-0 z-[-1] opacity-20">
                 <Image
                 src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg"
@@ -106,23 +107,23 @@ export default function LeaderboardPage() {
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: index * 0.1 }}
-                                    className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg hover:bg-card hover:border-brand-lime transition-all duration-300"
+                                    className="flex items-center gap-4 p-3 bg-card/70 border border-border rounded-lg hover:bg-card hover:border-accent transition-all duration-300"
                                 >
                                     <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
                                     <Image src={crew.logo_url || '/placeholder.svg'} alt={crew.crew_name} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                     <div className="flex-grow">
-                                        <p className="font-semibold text-brand-lime">{crew.crew_name ?? 'N/A'}</p>
+                                        <p className="font-semibold text-accent-text">{crew.crew_name ?? 'N/A'}</p>
                                         <p className="text-xs text-muted-foreground">@{crew.owner_username ?? 'N/A'}</p>
 
                                     </div>
                                     <div className="text-right flex-shrink-0">
-                                        <p className="font-mono font-bold text-brand-yellow">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
+                                        <p className="font-mono font-bold text-accent">{(crew.total_fleet_value ?? 0).toLocaleString()} XTR</p>
                                         <p className="text-xs text-muted-foreground">{(crew.total_members ?? 0)} участников</p>
                                     </div>
                                 </motion.div>
                             </Link>
                         )) : <p className="text-muted-foreground text-center col-span-full">Нет данных</p>}
-                        <Link href="/crews/create" className="block text-center text-sm text-brand-cyan hover:underline mt-4">Создать свой экипаж</Link>
+                        <Link href="/crews/create" className="block text-center text-sm text-primary hover:underline mt-4">Создать свой экипаж</Link>
                     </LeaderboardSection>
 
                     <LeaderboardSection title="Топ Владельцы" icon="::FaUserSecret::">
@@ -137,11 +138,11 @@ export default function LeaderboardPage() {
                                 <span className={`text-2xl font-bold w-8 text-center ${trophyColors[index] || "text-muted-foreground"}`}>{index + 1}</span>
                                 <Image src={fleet.avatar_url || '/placeholder.svg'} alt={fleet.username || 'avatar'} width={48} height={48} className="rounded-full flex-shrink-0 bg-muted" />
                                 <div className="flex-grow">
-                                    <p className="font-semibold text-brand-lime">@{fleet.username ?? 'N/A'}</p>
+                                    <p className="font-semibold text-accent-text">@{fleet.username ?? 'N/A'}</p>
                                     <p className="text-xs text-muted-foreground">{(fleet.total_vehicles ?? 0)} ед. транспорта</p>
                                 </div>
                                 <div className="text-right flex-shrink-0">
-                                    <p className="font-mono font-bold text-brand-yellow">{(fleet.total_revenue ?? 0).toLocaleString()} XTR</p>
+                                    <p className="font-mono font-bold text-accent">{(fleet.total_revenue ?? 0).toLocaleString()} XTR</p>
                                     <p className="text-xs text-muted-foreground">Доход</p>
                                 </div>
                             </motion.div>
@@ -159,14 +160,14 @@ const LeaderboardSection = ({ title, icon, children, actionLink, actionText }: {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="bg-card/50 backdrop-blur-sm border border-brand-purple/50 p-6 rounded-2xl shadow-lg shadow-brand-purple/10"
+        className="bg-card/50 backdrop-blur-sm border border-secondary/50 p-6 rounded-2xl shadow-lg shadow-secondary/10"
     >
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-3xl font-orbitron text-brand-purple flex items-center gap-3">
+            <h2 className="text-3xl font-orbitron text-secondary flex items-center gap-3">
                 <VibeContentRenderer content={icon} /> {title}
             </h2>
             {actionLink && actionText && (
-                <Link href={actionLink} className="text-xs font-mono text-brand-cyan hover:underline">
+                <Link href={actionLink} className="text-xs font-mono text-primary hover:underline">
                     {actionText} →
                 </Link>
             )}
@@ -202,7 +203,6 @@ const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
         augmentedInfo.crew_engagement = engagement.toFixed(2);
     }
 
-
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -210,8 +210,8 @@ const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="mt-12"
         >
-            <div className="bg-card/30 backdrop-blur-sm border border-brand-purple/20 rounded-lg p-4 transition-colors">
-                <div className="font-orbitron text-brand-yellow flex items-center gap-2 text-xl mb-4">
+            <div className="bg-card/30 backdrop-blur-sm border border-secondary/20 rounded-lg p-4 transition-colors">
+                <div className="font-orbitron text-accent flex items-center gap-2 text-xl mb-4">
                     <FaBug />
                     <span>СИСТЕМНАЯ ТЕЛЕМЕТРИЯ</span>
                 </div>
@@ -222,9 +222,9 @@ const DebugInfoSection = ({ info }: { info: DebugInfo }) => {
                             <motion.div 
                                 key={key}
                                 whileHover={{ y: -5, scale: 1.05 }}
-                                className="bg-card/50 backdrop-blur-sm p-4 rounded-md flex flex-col items-center text-center border border-brand-purple/20 transition-all duration-300 hover:border-brand-lime/50 hover:shadow-lg hover:shadow-brand-lime/10"
+                                className="bg-card/50 backdrop-blur-sm p-4 rounded-md flex flex-col items-center text-center border border-secondary/20 transition-all duration-300 hover:border-accent/50 hover:shadow-lg hover:shadow-yellow-glow"
                             >
-                                <VibeContentRenderer content={meta.icon} className="text-4xl text-brand-lime mb-2" />
+                                <VibeContentRenderer content={meta.icon} className="text-4xl text-accent-text mb-2" />
                                 <span className="text-foreground font-bold text-3xl font-orbitron">{Number(value).toLocaleString()}</span>
                                 <span className="text-muted-foreground text-xs uppercase tracking-wider font-mono mt-1">{meta.title}</span>
                             </motion.div>
