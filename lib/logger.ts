@@ -16,24 +16,22 @@ class Logger {
     const timestamp = new Date().toISOString()
     const logMessage: LogMessage = { level, message, args, timestamp }
 
-    // ✨ МАГИЯ ПУСТОТЫ ВОКРУГ ОШИБОК ✨
-    const isCritical = level === 'error';
-    if (isCritical && typeof console !== 'undefined') {
-        console.log('');
+    // ====================================================================
+    // ✨ ХИРУРГИЧЕСКОЕ ВМЕШАТЕЛЬСТВО ✨
+    if (level === 'error' && typeof console !== 'undefined') {
+      console.log('\n\n\n');
     }
+    // ====================================================================
 
-    if (typeof console !== 'undefined' && console[level]) {
+    // Use the correct console method based on level
+    if (console[level]) {
         console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
-    } else if (typeof console !== 'undefined') {
-        // Fallback для сред, где может не быть .warn или .error
+    } else {
+        // Fallback to console.log if the level method doesn't exist (shouldn't happen for info/warn/error)
         console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
     }
 
-    if (isCritical && typeof console !== 'undefined') {
-        console.log('');
-    }
-    // ✨ КОНЕЦ МАГИИ ✨
-
+    // Notify all subscribed listeners
     this.listeners.forEach((listener) => listener(logMessage))
   }
 
@@ -42,7 +40,7 @@ class Logger {
   }
 
   warn(message: string, ...args: any[]) {
-    this.log("warn", message, ...args)
+    this.log("warn", message, ...args) // Correctly logs with "warn" level now
   }
 
   error(message: string, ...args: any[]) {
@@ -51,6 +49,8 @@ class Logger {
 
   subscribe(listener: LogListener) {
     this.listeners.push(listener)
+
+    // Return an unsubscribe function
     return {
       unsubscribe: () => {
         this.listeners = this.listeners.filter((l) => l !== listener)
@@ -59,5 +59,4 @@ class Logger {
   }
 }
 
-// ВОТ ОН, СТАРЫЙ ДОБРЫЙ ЭКСПОРТ. НИКАКОЙ СИНГЛ-ХУИНГЛТОНОВ.
 export const logger = new Logger()
