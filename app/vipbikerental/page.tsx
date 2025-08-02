@@ -8,6 +8,7 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { BikeShowcase } from '@/components/BikeShowcase';
+import { cn } from "@/lib/utils";
 
 const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode }) => (
     <div className="flex items-start gap-3">
