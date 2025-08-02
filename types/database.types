@@ -9,54 +9,80 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      cars: {
+      answers: {
         Row: {
-          availability_rules: Json | null
-          crew_id: string | null
-          daily_price: number | null
-          description: string | null
-          embedding: string | null
-          id: string
-          image_url: string | null
-          is_test_result: boolean
-          make: string | null
-          model: string | null
-          owner_id: string | null
-          rent_link: string | null
-          specs: Json | null
-          type: string | null
+          id: number
+          question_id: number | null
+          text: string
+          next_question: number | null
         }
         Insert: {
-          availability_rules?: Json | null
-          crew_id?: string | null
-          daily_price?: number | null
-          description?: string | null
-          embedding?: string | null
-          id: string
-          image_url?: string | null
-          is_test_result?: boolean
-          make?: string | null
-          model?: string | null
-          owner_id?: string | null
-          rent_link?: string | null
-          specs?: Json | null
-          type?: string | null
+          id?: number
+          question_id?: number | null
+          text: string
+          next_question?: number | null
         }
         Update: {
-          availability_rules?: Json | null
-          crew_id?: string | null
-          daily_price?: number | null
-          description?: string | null
+          id?: number
+          question_id?: number | null
+          text?: string
+          next_question?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cars: {
+        Row: {
+          id: string
+          make: string
+          model: string
+          description: string
+          embedding: string | null
+          daily_price: number
+          image_url: string
+          rent_link: string
+          is_test_result: boolean
+          type: string
+          specs: Json | null
+          owner_id: string | null
+          crew_id: string | null
+        }
+        Insert: {
+          id: string
+          make: string
+          model: string
+          description: string
           embedding?: string | null
-          id?: string
-          image_url?: string | null
+          daily_price: number
+          image_url: string
+          rent_link: string
           is_test_result?: boolean
-          make?: string | null
-          model?: string | null
-          owner_id?: string | null
-          rent_link?: string | null
+          type?: string
           specs?: Json | null
-          type?: string | null
+          owner_id?: string | null
+          crew_id?: string | null
+        }
+        Update: {
+          id?: string
+          make?: string
+          model?: string
+          description?: string
+          embedding?: string | null
+          daily_price?: number
+          image_url?: string
+          rent_link?: string
+          is_test_result?: boolean
+          type?: string
+          specs?: Json | null
+          owner_id?: string | null
+          crew_id?: string | null
         }
         Relationships: [
           {
@@ -66,85 +92,29 @@ export interface Database {
             referencedRelation: "crews"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "cars_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          }
-        ]
-      }
-      crew_member_shifts: {
-        Row: {
-          clock_in_time: string
-          clock_out_time: string | null
-          crew_id: string
-          duration_minutes: number | null
-          id: string
-          member_id: string
-          shift_type: string
-        }
-        Insert: {
-          clock_in_time?: string
-          clock_out_time?: string | null
-          crew_id: string
-          id?: string
-          member_id: string
-          shift_type?: string
-        }
-        Update: {
-          clock_in_time?: string
-          clock_out_time?: string | null
-          crew_id?: string
-          id?: string
-          member_id?: string
-          shift_type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "crew_member_shifts_crew_id_fkey"
-            columns: ["crew_id"]
-            isOneToOne: false
-            referencedRelation: "crews"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "crew_member_shifts_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          }
         ]
       }
       crew_members: {
         Row: {
-          crew_id: string
           id: string
-          joined_at: string
-          last_location: unknown | null
-          role: string
-          status: string
+          crew_id: string
           user_id: string
+          role: string
+          joined_at: string
         }
         Insert: {
-          crew_id: string
           id?: string
-          joined_at?: string
-          last_location?: unknown | null
-          role?: string
-          status?: string
+          crew_id: string
           user_id: string
+          role?: string
+          joined_at?: string
         }
         Update: {
-          crew_id?: string
           id?: string
-          joined_at?: string
-          last_location?: unknown | null
-          role?: string
-          status?: string
+          crew_id?: string
           user_id?: string
+          role?: string
+          joined_at?: string
         }
         Relationships: [
           {
@@ -160,42 +130,42 @@ export interface Database {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["user_id"]
-          }
+          },
         ]
       }
       crews: {
         Row: {
-          created_at: string
-          description: string | null
-          hq_location: string | null
           id: string
-          logo_url: string | null
           name: string
+          description: string | null
+          logo_url: string | null
           owner_id: string
-          slug: string
+          created_at: string
           updated_at: string
+          slug: string | null
+          hq_location: string | null
         }
         Insert: {
-          created_at?: string
-          description?: string | null
-          hq_location?: string | null
           id?: string
-          logo_url?: string | null
           name: string
+          description?: string | null
+          logo_url?: string | null
           owner_id: string
-          slug: string
+          created_at?: string
           updated_at?: string
+          slug?: string | null
+          hq_location?: string | null
         }
         Update: {
-          created_at?: string
-          description?: string | null
-          hq_location?: string | null
           id?: string
-          logo_url?: string | null
           name?: string
+          description?: string | null
+          logo_url?: string | null
           owner_id?: string
-          slug?: string
+          created_at?: string
           updated_at?: string
+          slug?: string | null
+          hq_location?: string | null
         }
         Relationships: [
           {
@@ -204,264 +174,117 @@ export interface Database {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["user_id"]
-          }
+          },
         ]
       }
-      equipment_types: {
+      questions: {
         Row: {
-          category: string
-          description: string | null
-          id: string
-          image_url: string | null
-          name: string
-          rarity: string
+          id: number
+          text: string
+          theme: string
+          position: number
         }
         Insert: {
-          category?: string
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          name: string
-          rarity?: string
+          id?: number
+          text: string
+          theme: string
+          position: number
         }
         Update: {
-          category?: string
-          description?: string | null
-          id?: string
-          image_url?: string | null
-          name?: string
-          rarity?: string
+          id?: number
+          text?: string
+          theme?: string
+          position?: number
         }
         Relationships: []
       }
-      events: {
+      user_results: {
         Row: {
+          user_id: string
+          car_id: string
           created_at: string
-          created_by: string
-          id: string
-          payload: Json | null
-          rental_id: string
-          status: string
-          type: string
         }
         Insert: {
+          user_id: string
+          car_id: string
           created_at?: string
-          created_by: string
-          id?: string
-          payload?: Json | null
-          rental_id: string
-          status?: string
-          type: string
         }
         Update: {
-          created_at?: string
-          created_by?: string
-          id?: string
-          payload?: Json | null
-          rental_id?: string
-          status?: string
-          type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "events_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "events_rental_id_fkey"
-            columns: ["rental_id"]
-            isOneToOne: false
-            referencedRelation: "rentals"
-            referencedColumns: ["rental_id"]
-          }
-        ]
-      }
-      rentals: {
-        Row: {
-          agreed_end_date: string | null
-          agreed_start_date: string | null
-          created_at: string
-          interest_amount: number | null
-          owner_id: string
-          payment_status: string
-          rental_id: string
-          requested_end_date: string
-          requested_start_date: string
-          status: string
-          total_cost: number | null
-          updated_at: string
-          user_id: string
-          vehicle_id: string
-        }
-        Insert: {
-          agreed_end_date?: string | null
-          agreed_start_date?: string | null
-          created_at?: string
-          interest_amount?: number | null
-          owner_id: string
-          payment_status?: string
-          rental_id?: string
-          requested_end_date: string
-          requested_start_date: string
-          status?: string
-          total_cost?: number | null
-          updated_at?: string
-          user_id: string
-          vehicle_id: string
-        }
-        Update: {
-          agreed_end_date?: string | null
-          agreed_start_date?: string | null
-          created_at?: string
-          interest_amount?: number | null
-          owner_id?: string
-          payment_status?: string
-          rental_id?: string
-          requested_end_date?: string
-          requested_start_date?: string
-          status?: string
-          total_cost?: number | null
-          updated_at?: string
           user_id?: string
-          vehicle_id?: string
+          car_id?: string
+          created_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "rentals_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "rentals_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "rentals_vehicle_id_fkey"
-            columns: ["vehicle_id"]
+            foreignKeyName: "user_results_car_id_fkey"
+            columns: ["car_id"]
             isOneToOne: false
             referencedRelation: "cars"
             referencedColumns: ["id"]
-          }
-        ]
-      }
-      user_equipment: {
-        Row: {
-          equipment_id: string
-          id: string
-          unlocked_at: string
-          user_id: string
-        }
-        Insert: {
-          equipment_id: string
-          id?: string
-          unlocked_at?: string
-          user_id: string
-        }
-        Update: {
-          equipment_id?: string
-          id?: string
-          unlocked_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_equipment_equipment_id_fkey"
-            columns: ["equipment_id"]
-            isOneToOne: false
-            referencedRelation: "equipment_types"
-            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "user_equipment_user_id_fkey"
+            foreignKeyName: "user_results_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["user_id"]
-          }
-        ]
-      }
-      user_vehicle_history: {
-        Row: {
-          created_at: string
-          id: string
-          notes: string | null
-          ownership_type: string
-          user_id: string
-          vehicle_details: Json
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          notes?: string | null
-          ownership_type?: string
-          user_id: string
-          vehicle_details: Json
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          notes?: string | null
-          ownership_type?: string
-          user_id?: string
-          vehicle_details?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_vehicle_history_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          }
+          },
         ]
       }
       users: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          full_name: string | null
-          language_code: string | null
-          metadata: Json | null
-          role: string | null
-          status: string | null
-          subscription_id: string | null
-          updated_at: string
           user_id: string
           username: string | null
+          full_name: string | null
+          avatar_url: string | null
+          website: string | null
+          language_code: string | null
+          subscription_id: string | null
+          status: string | null
+          role: string | null
+          created_at: string
+          updated_at: string
+          active_organizer_id: string | null
+          metadata: Json
+          description: string | null
+          badges: Json | null
+          test_progress: Json | null
         }
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          language_code?: string | null
-          metadata?: Json | null
-          role?: string | null
-          status?: string | null
-          subscription_id?: string | null
-          updated_at?: string
           user_id: string
           username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          website?: string | null
+          language_code?: string | null
+          subscription_id?: string | null
+          status?: string | null
+          role?: string | null
+          created_at?: string
+          updated_at?: string
+          active_organizer_id?: string | null
+          metadata?: Json
+          description?: string | null
+          badges?: Json | null
+          test_progress?: Json | null
         }
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          full_name?: string | null
-          language_code?: string | null
-          metadata?: Json | null
-          role?: string | null
-          status?: string | null
-          subscription_id?: string | null
-          updated_at?: string
           user_id?: string
           username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          website?: string | null
+          language_code?: string | null
+          subscription_id?: string | null
+          status?: string | null
+          role?: string | null
+          created_at?: string
+          updated_at?: string
+          active_organizer_id?: string | null
+          metadata?: Json
+          description?: string | null
+          badges?: Json | null
+          test_progress?: Json | null
         }
         Relationships: []
       }
@@ -470,7 +293,28 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_public_crews: {
+        Args: Record<string, unknown>
+        Returns: {
+          id: string
+          name: string
+          slug: string
+          description: string
+          logo_url: string
+          owner_username: string
+          member_count: number
+          vehicle_count: number
+        }[]
+      }
+      get_public_crew_details: {
+        Args: {
+          p_slug: string
+        }
+        Returns: Json
+      }
+      // Add other functions if needed, for example:
+      // search_cars: { ... }
+      // similar_cars: { ... }
     }
     Enums: {
       [_ in never]: never
