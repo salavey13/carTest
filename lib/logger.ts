@@ -16,14 +16,28 @@ class Logger {
     const timestamp = new Date().toISOString()
     const logMessage: LogMessage = { level, message, args, timestamp }
 
-    // Use the correct console method based on level
+    // ====================================================================
+    // ✨ МАГИЯ: СОЗДАНИЕ ПУСТОТЫ ВОКРУГ ОШИБОК ДЛЯ КИБЕРСКРОЛЛА ✨
+    // ====================================================================
+    const isCritical = level === 'error';
+    if (isCritical && console) {
+        console.log(''); // Пустота сверху
+        console.log('');
+    }
+
     if (console[level]) {
         console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
     } else {
-        // Fallback to console.log if the level method doesn't exist (shouldn't happen for info/warn/error)
         console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
     }
 
+    if (isCritical && console) {
+        console.log(''); // Пустота снизу
+        console.log('');
+    }
+    // ====================================================================
+    // ✨ КОНЕЦ МАГИИ ✨
+    // ====================================================================
 
     // Notify all subscribed listeners
     this.listeners.forEach((listener) => listener(logMessage))
@@ -34,7 +48,7 @@ class Logger {
   }
 
   warn(message: string, ...args: any[]) {
-    this.log("warn", message, ...args) // Correctly logs with "warn" level now
+    this.log("warn", message, ...args)
   }
 
   error(message: string, ...args: any[]) {
