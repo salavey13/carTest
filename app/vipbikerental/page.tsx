@@ -8,11 +8,10 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { BikeShowcase } from '@/components/BikeShowcase';
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // <-- ВОТ ОН, ИСПРАВЛЕННЫЙ ИМПОРТ
 
 const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode }) => (
     <div className="flex items-start gap-3">
-        {/* ИЗМЕНЕНО: brand-green -> accent-text */}
         <VibeContentRenderer content={icon} className="text-xl text-accent-text mt-1 flex-shrink-0" />
         <p className="text-foreground/90">{children}</p>
     </div>
@@ -20,7 +19,6 @@ const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode 
 
 const StepItem = ({ num, title, icon, children }: { num: string, title: string, icon: string, children: React.ReactNode }) => (
     <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative h-full backdrop-blur-sm">
-        {/* ИЗМЕНЕНО: brand-pink -> primary */}
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-orbitron font-bold">{num}</div>
         <VibeContentRenderer content={icon} className="text-4xl text-primary mx-auto my-4" />
         <h4 className="font-orbitron text-lg mb-2">{title}</h4>
@@ -51,6 +49,8 @@ const ServiceCard = ({ title, icon, items, imageUrl, borderColorClass }: { title
 );
 
 export default function HomePage() {
+  const titleText = "АРЕНДА МОТОЦИКЛОВ VIPBIKE";
+
   return (
     <div className="relative min-h-screen bg-background overflow-hidden text-foreground dark">
         <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center text-center text-white p-4">
@@ -63,11 +63,20 @@ export default function HomePage() {
                 transition={{ duration: 0.8 }}
                 className="relative z-10"
             >
-                <h1 className="text-4xl md:text-6xl font-orbitron font-bold text-shadow-neon">АРЕНДА МОТОЦИКЛОВ VIPBIKE</h1>
+                {/* ==================================================================== */}
+                {/* ✨ НОВЫЙ АНИМИРОВАННЫЙ ЗАГОЛОВОК ✨ */}
+                {/* ==================================================================== */}
+                <h1 className="text-4xl md:text-6xl text-shadow-neon title-wheelie-effect">
+                  {titleText.split("").map((char, i) => (
+                    <span key={i} style={{ transitionDelay: `${i * 20}ms` }}>
+                      {char === " " ? "\u00A0" : char}
+                    </span>
+                  ))}
+                </h1>
+                {/* ==================================================================== */}
                 <p className="max-w-2xl mx-auto mt-4 text-lg text-foreground/80">Твой байк на любой вкус: от круизеров до спортбайков. Выбери свой вайб и покори город. Лидеры проката в Нижнем Новгороде!</p>
                 <div className="mt-8">
                     <Link href="/rent-bike">
-                        {/* ИЗМЕНЕНО: brand-lime -> accent */}
                         <Button size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
                             <VibeContentRenderer content="::FaMotorcycle:: ВЫБРАТЬ БАЙК" />
                         </Button>
@@ -80,7 +89,6 @@ export default function HomePage() {
 
         <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
-                {/* ИЗМЕНЕНО: brand-pink -> secondary */}
                 <ServiceCard 
                     title="Требования"
                     icon="::FaClipboardList::"
@@ -92,7 +100,6 @@ export default function HomePage() {
                         { icon: "::FaCreditCard::", text: "Оплата любым удобным способом" }
                     ]}
                 />
-                 {/* ИЗМЕНЕНО: brand-green -> accent */}
                  <ServiceCard 
                     title="Что вы получаете"
                     icon="::FaGift::"
@@ -105,7 +112,6 @@ export default function HomePage() {
                         { icon: "::FaTag::", text: "Скидка 10% на первую аренду по промокоду 'ЛЕТО2025'" }
                     ]}
                 />
-                {/* ИЗМЕНЕНО: brand-cyan -> primary */}
                 <ServiceCard 
                     title="Наши Услуги"
                     icon="::FaWrench::"
@@ -123,7 +129,6 @@ export default function HomePage() {
             <section>
                 <h2 className="text-4xl font-orbitron text-center mb-10">Как это работает</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    {/* ИЗМЕНЕНО: brand-cyan -> accent-text */}
                     <StepItem num="1" title="Бронь" icon="::FaCalendarCheck::">Выберите модель в нашем <Link href="/rent-bike" className="text-accent-text hover:underline">каталоге</Link> и оформите бронь онлайн.</StepItem>
                     <StepItem num="2" title="Подтверждение" icon="::FaPaperPlane::">Свяжитесь с нами для подтверждения. Возьмите с собой оригиналы документов и залог.</StepItem>
                     <StepItem num="3" title="Получение" icon="::FaKey::">Приезжайте в наш новый дом на Стригинском переулке 13Б, подписываем договор и забираете байк.</StepItem>
