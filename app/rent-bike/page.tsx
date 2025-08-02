@@ -25,7 +25,6 @@ type VehicleWithBookingInfo = VehicleWithStatus & {
     active_booking_end?: string | null;
 };
 
-
 const SURVEY_TO_BIKE_TYPE_MAP: Record<string, string> = {
   "Агрессивный нейкед (стритфайтер)": "Naked", "Суперспорт (обтекатели, поза эмбриона)": "Supersport",
   "Спорт-турист (мощность и комфорт)": "Sport-tourer", "Нео-ретро (стиль и харизма)": "Neo-retro"
@@ -44,7 +43,8 @@ const SpecItem = ({ specKey, value }: { specKey: string; value: string | number 
     const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaCirclequestion::' };
     return (
         <div className="bg-muted/10 p-3 rounded-lg border border-border">
-            <VibeContentRenderer content={specInfo.icon} className="h-6 w-6 mx-auto text-brand-cyan mb-1" />
+            {/* ИЗМЕНЕНО: brand-cyan -> accent-text (золотой) */}
+            <VibeContentRenderer content={specInfo.icon} className="h-6 w-6 mx-auto text-accent-text mb-1" />
             <p className="text-xs text-muted-foreground font-mono uppercase">{specInfo.label}</p>
             <p className="text-sm font-semibold font-orbitron">{value}</p>
         </div>
@@ -82,7 +82,6 @@ export default function RentBikePage() {
 
           if (recommendedType && bikes.some(b => (b.specs as any)?.type === recommendedType)) {
             setActiveFilter(recommendedType);
-
             setSelectedBike(bikes.find(b => (b.specs as any)?.type === recommendedType && b.availability === 'available') || bikes.find(b => b.availability === 'available') || bikes[0]);
             toast.success(`Подобрали для тебя ${recommendedType} байки!`);
           } else if (bikes.length > 0) {
@@ -187,27 +186,29 @@ export default function RentBikePage() {
   ) : 'ЗАБРОНИРОВАТЬ';
 
   return (
-    <div className="min-h-screen text-white p-4 pt-24 overflow-hidden relative">
-
+    <div className="min-h-screen p-4 pt-24 overflow-hidden relative dark">
       <div className="fixed inset-0 z-[-1] opacity-30">
         <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg" alt="Moto Garage" fill className="object-cover animate-pan-zoom" />
         <div className="absolute inset-0 bg-black/60"></div>
       </div>
       <motion.header initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-        <h1 className="text-5xl md:text-7xl font-bold font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-brand-yellow" data-text="MOTO-GARAGE">MOTO-GARAGE</h1>
+        {/* ИЗМЕНЕНО: градиент на семантические переменные */}
+        <h1 className="text-5xl md:text-7xl font-bold font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent" data-text="MOTO-GARAGE">MOTO-GARAGE</h1>
         <p className="text-muted-foreground font-mono mt-2">{recommendedType ? `Рекомендуем для тебя: ${recommendedType}` : "Выбери своего зверя"}</p>
       </motion.header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0, x: -100 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-1 space-y-6">
-          <div className="flex flex-wrap gap-2 p-2 bg-dark-card/50 border border-border rounded-lg backdrop-blur-sm">
+          <div className="flex flex-wrap gap-2 p-2 bg-card/80 border border-border rounded-lg backdrop-blur-sm">
             {availableBikeTypes.map(type => (
               <button key={type} onClick={() => setActiveFilter(type)}
                 className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative",
-                  activeFilter === type ? "bg-brand-cyan text-black shadow-[0_0_10px_theme(colors.brand.cyan)]" : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  /* ИЗМЕНЕНО: brand-cyan -> primary */
+                  activeFilter === type ? "bg-primary text-primary-foreground shadow-[0_0_10px_theme(colors.primary)]" : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 )}>
                 {type}
-                {type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute -top-1 -right-1 text-yellow-400 w-3 h-3"/>}
+                 {/* ИЗМЕНЕНО: text-yellow-400 -> text-accent */}
+                {type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute -top-1 -right-1 text-accent w-3 h-3"/>}
               </button>
             ))}
           </div>
@@ -215,32 +216,37 @@ export default function RentBikePage() {
             <AnimatePresence>
               {filteredBikes.map(bike => (
                 <motion.div key={bike.id} layout initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} onClick={() => setSelectedBike(bike)}
-                  className={cn("p-3 rounded-lg border-2 cursor-pointer transition-all bg-dark-card/70 hover:bg-dark-card backdrop-blur-sm relative",
-                    selectedBike?.id === bike.id ? "border-brand-cyan shadow-lg shadow-brand-cyan/20" : "border-border hover:border-brand-cyan/50",
+                  className={cn("p-3 rounded-lg border-2 cursor-pointer transition-all bg-card/70 hover:bg-card backdrop-blur-sm relative",
+                    /* ИЗМЕНЕНО: brand-cyan -> primary */
+                    selectedBike?.id === bike.id ? "border-primary shadow-lg shadow-primary/20" : "border-border hover:border-primary/50",
                     bike.availability !== 'available' && 'opacity-50'
                   )}>
                     <div className="flex items-center gap-4">
                         <Image src={bike.image_url!} alt={bike.model!} width={80} height={80} className="rounded-md object-cover aspect-square" />
                         <div>
                             <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
-                            <p className="text-sm text-brand-pink font-mono">{bike.daily_price}₽ / день</p>
+                            {/* ИЗМЕНЕНО: brand-pink -> accent-text (золотой) */}
+                            <p className="text-sm text-accent-text font-mono">{bike.daily_price}₽ / день</p>
+                            {/* ИЗМЕНЕНО: orange-400 -> destructive */}
                             {bike.availability === 'taken' && bike.active_booking_start && bike.active_booking_end && (
-                                <p className="text-xs font-mono text-orange-400">
+                                <p className="text-xs font-mono text-destructive">
                                     Занят: {format(new Date(bike.active_booking_start), 'dd.MM')} - {format(new Date(bike.active_booking_end), 'dd.MM')}
                                 </p>
                             )}
                             <p className="text-xs text-muted-foreground font-mono mt-1">{bike.crew_name || `Владелец: ${bike.owner_id?.substring(0,6)}...`}</p>
                         </div>
                     </div>
-                    {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-brand-lime shadow-lime-glow"/>}
+                    {/* ИЗМЕНЕНО: brand-lime -> accent, shadow-lime-glow -> shadow-yellow-glow */}
+                    {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-accent shadow-yellow-glow"/>}
                     <div className={cn("absolute bottom-2 right-2 text-xs font-mono flex items-center gap-1 p-1 rounded",
-                        bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 
+                        /* ИЗМЕНЕНО: хардкод на семантику (зеленый/оранжевый/серый) */
+                        bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : // Оставлено как есть для явного статуса
                         bike.availability === 'taken' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400')}>
                         {bike.availability === 'available' ? <VibeContentRenderer content="::FaCircleCheck::"/> : bike.availability === 'taken' ? <VibeContentRenderer content="::FaClock::"/> : <VibeContentRenderer content="::FaBan::"/>}
-
                         <span>{bike.availability === 'available' ? 'Свободен' : bike.availability === 'taken' ? 'Занят' : 'Недоступен'}</span>
                     </div>
-                     {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-yellow-400 w-4 h-4 text-shadow-brand-yellow"/>}
+                     {/* ИЗМЕНЕНО: text-yellow-400 -> text-accent */}
+                     {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-accent w-4 h-4 text-shadow-brand-yellow"/>}
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -250,12 +256,14 @@ export default function RentBikePage() {
           <AnimatePresence mode="wait">
             {selectedBike && (
               <motion.div key={selectedBike.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="sticky top-24">
-                <div className="bg-dark-card/80 border border-border rounded-xl shadow-2xl backdrop-blur-sm p-6">
+                <div className="bg-card/80 border border-border rounded-xl shadow-2xl backdrop-blur-sm p-6">
                   <motion.div layoutId={`bike-image-${selectedBike.id}`} className="relative h-64 md:h-80 w-full mb-6 rounded-lg overflow-hidden">
                     <Image src={selectedBike.image_url!} alt={selectedBike.model!} fill className="object-cover" priority />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
-                    <h2 className="absolute bottom-4 left-4 text-4xl font-orbitron font-bold drop-shadow-lg">{selectedBike.make} <span className="text-brand-cyan">{selectedBike.model}</span></h2>
-                     {selectedBike.crew_logo_url && <Image src={selectedBike.crew_logo_url} alt={selectedBike.crew_name || 'Crew Logo'} width={48} height={48} className="absolute top-4 right-4 rounded-full border-2 border-brand-lime shadow-lime-glow"/>}
+                    {/* ИЗМЕНЕНО: brand-cyan -> primary */}
+                    <h2 className="absolute bottom-4 left-4 text-4xl font-orbitron font-bold drop-shadow-lg">{selectedBike.make} <span className="text-primary">{selectedBike.model}</span></h2>
+                     {/* ИЗМЕНЕНО: brand-lime -> accent, shadow-lime-glow -> shadow-yellow-glow */}
+                     {selectedBike.crew_logo_url && <Image src={selectedBike.crew_logo_url} alt={selectedBike.crew_name || 'Crew Logo'} width={48} height={48} className="absolute top-4 right-4 rounded-full border-2 border-accent shadow-yellow-glow"/>}
                   </motion.div>
                   
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-center">
@@ -285,8 +293,8 @@ export default function RentBikePage() {
                   </div>
                    <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center mt-4">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
-                      <p className="text-2xl font-orbitron text-brand-yellow font-bold">{totalPrice} ₽</p>
-
+                      {/* ИЗМЕНЕНО: brand-yellow -> accent-text (золотой) */}
+                      <p className="text-2xl font-orbitron text-accent-text font-bold">{totalPrice} ₽</p>
                       {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : (totalDays > 1 && totalDays < 5) ? 'дня' : 'дней'})</p>}
                     </div>
                   <Button onClick={handleBooking} disabled={isBooking || selectedBike.availability !== 'available' || !date?.from || !date?.to} className="w-full mt-4 p-4 rounded-xl font-orbitron text-lg font-bold">

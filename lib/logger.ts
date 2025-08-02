@@ -16,6 +16,13 @@ class Logger {
     const timestamp = new Date().toISOString()
     const logMessage: LogMessage = { level, message, args, timestamp }
 
+    // ====================================================================
+    // ✨ ХИРУРГИЧЕСКОЕ ВМЕШАТЕЛЬСТВО ✨
+    if (level === 'error' && typeof console !== 'undefined') {
+      console.log('\n\n\n');
+    }
+    // ====================================================================
+
     // Use the correct console method based on level
     if (console[level]) {
         console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
@@ -23,7 +30,6 @@ class Logger {
         // Fallback to console.log if the level method doesn't exist (shouldn't happen for info/warn/error)
         console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
     }
-
 
     // Notify all subscribed listeners
     this.listeners.forEach((listener) => listener(logMessage))
