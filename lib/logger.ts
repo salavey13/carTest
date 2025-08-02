@@ -16,30 +16,24 @@ class Logger {
     const timestamp = new Date().toISOString()
     const logMessage: LogMessage = { level, message, args, timestamp }
 
-    // ====================================================================
-    // ✨ МАГИЯ: СОЗДАНИЕ ПУСТОТЫ ВОКРУГ ОШИБОК ДЛЯ КИБЕРСКРОЛЛА ✨
-    // ====================================================================
+    // ✨ МАГИЯ ПУСТОТЫ ВОКРУГ ОШИБОК ✨
     const isCritical = level === 'error';
-    if (isCritical && console) {
-        console.log(''); // Пустота сверху
+    if (isCritical && typeof console !== 'undefined') {
         console.log('');
     }
 
-    if (console[level]) {
+    if (typeof console !== 'undefined' && console[level]) {
         console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
-    } else {
+    } else if (typeof console !== 'undefined') {
+        // Fallback для сред, где может не быть .warn или .error
         console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
     }
 
-    if (isCritical && console) {
-        console.log(''); // Пустота снизу
+    if (isCritical && typeof console !== 'undefined') {
         console.log('');
     }
-    // ====================================================================
     // ✨ КОНЕЦ МАГИИ ✨
-    // ====================================================================
 
-    // Notify all subscribed listeners
     this.listeners.forEach((listener) => listener(logMessage))
   }
 
@@ -57,8 +51,6 @@ class Logger {
 
   subscribe(listener: LogListener) {
     this.listeners.push(listener)
-
-    // Return an unsubscribe function
     return {
       unsubscribe: () => {
         this.listeners = this.listeners.filter((l) => l !== listener)
@@ -67,4 +59,5 @@ class Logger {
   }
 }
 
+// ВОТ ОН, СТАРЫЙ ДОБРЫЙ ЭКСПОРТ. НИКАКОЙ СИНГЛ-ХУИНГЛТОНОВ.
 export const logger = new Logger()

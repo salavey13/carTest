@@ -9,7 +9,81 @@ import { getBaseUrl } from "@/lib/utils";
 import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { createInvoice, sendTelegramInvoice } from "@/app/actions";
-import { CrewWithCounts } from '@/lib/types'; // <-- ИМПОРТИРУЕМ НАШ НОВЫЙ МОЩНЫЙ ТИП
+import { CrewWithCounts, CrewDetails } from '@/lib/types'; // Типы нам все еще нужны для помощи
+
+/**
+ * Получает список всех публичных команд с подсчетом участников и техники.
+ */
+export async function getAllPublicCrews(): Promise<{ 
+    success: boolean; 
+    data?: CrewWithCounts[];
+    error?: string; 
+}> {
+    noStore();
+
+    try {
+        const { data, error } = await supabaseAdmin.rpc('get_public_crews');
+        if (error) {
+            logger.error("Error calling get_public_crews RPC:", error);
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+        return { success: true, data: data || [] };
+    } catch (error) {
+        logger.error("Critical failure in getAllPublicCrews action:", error);
+        return { 
+            success: false, 
+            error: error instanceof Error ? error.message : "An unknown error occurred fetching crews." 
+        };
+    }
+}
+
+
+/**
+ * НОВЫЙ ЭКШЕН
+ * Получает полную информацию об одной команде по ее 'slug'.
+ */
+export async function getPublicCrewInfo(slug: string): Promise<{
+    success: boolean;
+    data?: CrewDetails;
+    error?: string;
+}> {
+    noStore();
+
+    if (!slug) {
+        logger.warn("getPublicCrewInfo called without a slug.");
+        return { success: false, error: "No slug provided." };
+    }
+
+    try {
+        // Вызываем RPC для деталей ОДНОЙ команды
+        const { data, error } = await supabaseAdmin
+            .rpc('get_public_crew_details', { p_slug: slug })
+            .single(); // .single() важен - он ждет один результат
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                logger.warn(`Crew with slug '${slug}' not found.`);
+                return { success: false, error: "Crew not found." };
+            }
+            logger.error(`Error calling get_public_crew_details RPC for slug: ${slug}`, error);
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+
+        if (!data) {
+             logger.warn(`No data returned for crew slug '${slug}', though no error was thrown.`);
+             return { success: false, error: "Crew not found." };
+        }
+
+        return { success: true, data: data as CrewDetails };
+
+    } catch (error) {
+        logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
+        };
+    }
+}
 
 
 
@@ -354,40 +428,5 @@ export async function getCrewForInvite(slug: string) {
     } catch (error) {
         logger.error(`[getCrewForInvite] Error:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-} 
-
-
-
-export async function getAllPublicCrews(): Promise<{ 
-    success: boolean; 
-    data?: CrewWithCounts[];
-    error?: string; 
-}> {
-    noStore();
-
-    try {
-        // Вызываем RPC. Это самый надежный способ, который избегает ошибки PGRST200,
-        // потому что он не полагается на кэш связей PostgREST, а выполняет прямой SQL-запрос.
-        const { data, error } = await supabaseAdmin.rpc('get_public_crews');
-
-        if (error) {
-            // Ошибка в самой RPC? Наш логгер создаст вакуум в консоли.
-            logger.error("Error calling get_public_crews RPC:", error);
-            throw new Error(`Supabase RPC Error: ${error.message}`);
-        }
-
-        // Данные уже типизированы благодаря `database.types`, но для полной уверенности
-        // мы приводим их к нашему типу. Если данные null, возвращаем пустой массив.
-        const typedData: CrewWithCounts[] = data || [];
-        
-        return { success: true, data: typedData };
-
-    } catch (error) {
-        logger.error("Critical failure in getAllPublicCrews action:", error);
-        return { 
-            success: false, 
-            error: error instanceof Error ? error.message : "An unknown error occurred fetching crews." 
-        };
     }
 }
