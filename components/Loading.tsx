@@ -13,7 +13,7 @@ interface LoadingProps {
 export function Loading({ variant = 'generic', text, className }: LoadingProps) {
   if (variant === 'bike') {
     return (
-      <div className={cn("min-h-screen bg-background flex flex-col items-center justify-center", className)}>
+      <div className={cn("min-h-screen bg-white flex flex-col items-center justify-center dark:bg-black", className)}>
          <div className="dark:invert">
             <Image 
                 src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Loader-S1000RR-8cb0319b-acf7-4ed9-bfd2-97b4b3e2c6fc.gif"
@@ -23,7 +23,8 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
                 unoptimized
             />
          </div>
-        <p className='font-mono text-foreground dark:text-accent-text mt-4 animate-pulse'>
+         {/* ИЗМЕНЕНО: Возвращаем к чистому черному/белому для монохромного стиля */}
+        <p className='font-mono text-black dark:text-white mt-4 animate-pulse'>
           {text || 'ЗАГРУЗКА ГАРАЖА...'}
         </p>
       </div>
@@ -32,15 +33,16 @@ export function Loading({ variant = 'generic', text, className }: LoadingProps) 
 
   // Generic loader
   return (
-    <div className={cn("min-h-screen bg-background flex flex-col items-center justify-center", className)}>
+    <div className={cn("min-h-screen bg-black flex flex-col items-center justify-center", className)}>
         <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-4 border-secondary/30 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-t-primary border-l-primary/0 border-r-primary/0 border-b-primary/0 rounded-full animate-spin"></div>
+            {/* ИЗМЕНЕНО: Возвращаем к монохромному стилю с акцентом */}
+            <div className="absolute inset-0 border-4 border-gray-800 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-t-white border-l-transparent border-r-transparent border-b-transparent rounded-full animate-spin"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-                 <VibeContentRenderer content="::FaBolt::" className="text-accent text-xl animate-pulse"/>
+                 <VibeContentRenderer content="::FaBolt::" className="text-white text-xl animate-pulse"/>
             </div>
         </div>
-      <p className='font-mono text-accent-text mt-4 animate-pulse'>
+      <p className='font-mono text-white mt-4 animate-pulse'>
         {text || 'ИНИЦИАЛИЗАЦИЯ VIBE OS...'}
       </p>
     </div>
