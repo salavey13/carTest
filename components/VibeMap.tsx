@@ -103,6 +103,7 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
     const mapY = (clickY - viewState.y) / viewState.scale;
 
     const xPercent = (mapX / rect.width) * 100;
+
     const yPercent = (mapY / rect.height) * 100;
     
     const coords = unproject(xPercent, yPercent, bounds, imageSize, rect);
@@ -133,7 +134,7 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
               />
               <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`} preserveAspectRatio="xMidYMid meet">
                   {points.map(point => {
-                      if (point.type === 'point' || point.coords.length < 2) return null;
+                      if (point.type === 'point' || !point.coords || point.coords.length < 2) return null;
                       const pathPoints = point.coords.map(c => project(c[0], c[1], bounds)).filter(p => p !== null) as {x: number, y: number}[];
                       if (pathPoints.length < 2) return null;
                       const pathData = pathPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x/100 * imageSize.width} ${p.y/100 * imageSize.height}`).join(' ');
@@ -156,9 +157,15 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
 
               {points.map((point) => {
                 const isSinglePoint = point.type === 'point' || point.coords.length === 1;
+                
+                // --- CRITICAL FIX: Ensure coords exist and are not empty before proceeding ---
+                if (!isSinglePoint || !point.coords || point.coords.length === 0) {
+                    return null;
+                }
+
                 const positionCoords = point.coords[0];
                 const projected = project(positionCoords[0], positionCoords[1], bounds);
-                if (!projected || !isSinglePoint) return null;
+                if (!projected) return null;
 
                 const isHighlighted = highlightedPointId === point.id;
 
@@ -174,6 +181,7 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
                         <div className={cn("w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300", point.color)}>
                            <div className="absolute inset-0 bg-current rounded-full animate-pulse opacity-50"/>
                            <VibeContentRenderer content={point.icon} className="relative z-10 w-4 h-4 text-white drop-shadow-lg"/>
+
                         </div>
                       </motion.div>
                     </TooltipTrigger>

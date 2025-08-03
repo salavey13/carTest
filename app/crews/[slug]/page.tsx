@@ -118,7 +118,8 @@ function CrewDetailContent({ slug }: { slug: string }) {
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
     if (error) return <p className="text-destructive text-center py-20">{error}</p>;
-    if (!crew || !crew.owner) return <Loading variant="bike" text="Инициализация экипажа..." />;
+    if (!crew) return <p className="text-destructive text-center py-20">{error || "Не удалось загрузить данные экипажа. Объект crew пуст."}</p>;
+    if (!crew.owner) return <Loading variant="bike" text="Инициализация экипажа..." />;
     
     const members = Array.isArray(crew.members) ? crew.members : [];
     const vehicles = Array.isArray(crew.vehicles) ? crew.vehicles : [];
@@ -127,7 +128,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
     const isCurrentUserMember = members.some(m => m.user_id === dbUser?.user_id);
     let heroTitle = crew.name;
     let heroSubtitle = crew.description || '';
-    let heroMainBg = vehicles.length > 0 ? vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg";
+    let heroMainBg = vehicles.length > 0 && vehicles[0].image_url ? vehicles[0].image_url : "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg";
     let heroObjectBg = crew.logo_url || undefined;
     if (action === 'join') { heroTitle = "Приглашение в Экипаж"; heroSubtitle = `Вы были приглашены присоединиться к '${crew.name}'.`; } 
     else if (action === 'confirm' && pendingMember) { heroTitle = "Заявка на Вступление"; heroSubtitle = `@${pendingMember.username} хочет присоединиться.`; heroObjectBg = pendingMember.avatar_url || undefined; }
@@ -167,7 +168,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
                                 <p className="font-semibold text-accent-text">@{crew.owner.username}</p>
                             </div>
-                            {crew.hq_location && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, coordinates: (crew.hq_location as string).split(',').map(Number) as [number, number], icon: '::FaSkullCrossbones::', color: 'bg-primary' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location as string}</p> </div> )}
+                            {typeof crew.hq_location === 'string' && crew.hq_location.includes(',') && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, type: 'point', coordinates: [(crew.hq_location).split(',').map(Number) as [number, number]], icon: '::FaSkullCrossbones::', color: 'bg-primary' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location}</p> </div> )}
                         </div>
                     </div>
                     <div className="lg:col-span-2">
