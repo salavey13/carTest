@@ -1,4 +1,3 @@
-// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -54,6 +53,9 @@ export async function getPublicCrewInfo(slug: string): Promise<{
         return { success: false, error: "No slug provided." };
     }
 
+// --- МАЯК. ЭТО ЕДИНСТВЕННОЕ, ЧТО ИМЕЕТ ЗНАЧЕНИЕ ЗДЕСЬ. ---
+    logger.warn(`[HEARTBEAT] getPublicCrewInfo invoked for slug: "${slug}". Timestamp: ${new Date().toISOString()}`);
+
     try {
         // Вызываем RPC для деталей ОДНОЙ команды
         const { data, error } = await supabaseAdmin
@@ -78,6 +80,11 @@ export async function getPublicCrewInfo(slug: string): Promise<{
 
     } catch (error) {
         logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
+// --- ВОТ ОНО. НАША ЛОВУШКА. ---
+        // Мы ловим ошибку, которую бросает сам await, до любой другой обработки.
+        // Используем logger.error, чтобы гарантированно увидеть это в логах Vercel.
+        logger.error('[CRITICAL RPC FAILURE] The call to supabaseAdmin.rpc itself threw an exception. Raw error:', error);
+
         return {
             success: false,
             error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
@@ -109,6 +116,7 @@ export async function getVehiclesWithStatus() {
     noStore();
     try {
         const { data, error } = await supabaseAdmin.rpc('get_vehicles_with_status');
+
         if (error) {
             logger.error('Error calling get_vehicles_with_status RPC:', error);
             throw error;
@@ -198,6 +206,7 @@ export async function getRentalDetails(rentalId: string, userId: string) {
     if (!rentalId) return { success: false, error: "Missing rental ID." };
     if (!userId) return { success: false, error: "Unauthorized." };
     try {
+
         const { data, error } = await supabaseAdmin.from('rentals').select(`*, vehicle:cars(*), renter:users!rentals_user_id_fkey(*), owner:users!rentals_owner_id_fkey(*)`).eq('rental_id', rentalId).single();
         if (error) throw error;
         if (data.user_id !== userId && data.owner_id !== userId) return { success: false, error: "Unauthorized access to rental details." };
@@ -263,6 +272,7 @@ export async function uploadSingleImage(formData: FormData): Promise<{ success: 
         const { error: uploadError } = await supabaseAdmin.storage.from(bucketName).upload(filePath, file, { cacheControl: '604800', upsert: false });
         if (uploadError) throw uploadError;
         const { data: urlData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filePath);
+
         if (!urlData?.publicUrl) throw new Error("Could not get public URL after upload.");
         return { success: true, url: urlData.publicUrl };
     } catch (error) {
@@ -344,6 +354,7 @@ export async function saveMapPreset(userId: string, name: string, map_image_url:
 
 export async function updateMapPois(userId: string, mapId: string, newPois: PointOfInterest[]): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
      try {
+
         const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
         if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) throw new Error("Unauthorized: Only admins can edit maps.");
         const { data, error } = await supabaseAdmin.from('maps').update({ points_of_interest: newPois as any }).eq('id', mapId).select().single();
@@ -405,6 +416,7 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
             await sendComplexMessage(newMemberId, `🎉 Ваша заявка на вступление в экипаж *'${crew.name}'* была одобрена! Теперь вам доступна команда /shift.`);
             await sendComplexMessage(ownerId, `✅ Вы приняли @${member.username} в экипаж.`);
         } else {
+
             const { error: deleteError } = await supabaseAdmin.from('crew_members').delete().eq('crew_id', crewId).eq('user_id', newMemberId);
             if (deleteError) throw deleteError;
             await sendComplexMessage(newMemberId, `😔 Ваша заявка на вступление в экипаж *'${crew.name}'* была отклонена.`);
