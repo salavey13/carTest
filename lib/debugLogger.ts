@@ -12,7 +12,7 @@ class DebugLogger {
   // Store logs as structured records
   private internalLogs: LogRecord[] = [];
   private logIdCounter = 0; // Counter for unique log IDs
-  private maxInternalLogs = 420; // <--- ИЗМЕНЕНИЕ №1: ЗАДАННОЕ ЧИСЛО
+  private maxInternalLogs = 420;
   private readonly isBrowser: boolean = typeof window !== 'undefined'; 
   private isLoggingInternally: boolean = false; 
 
@@ -56,17 +56,18 @@ class DebugLogger {
   }
 
   private logInternal(level: LogLevel, ...args: any[]) {
-    if (this.isLoggingInternally) {
-      if (this.isBrowser) console.warn("[Logger] Recursive log attempt detected, skipping:", level, args);
-      return;
-    }
-    this.isLoggingInternally = true;
-
-    const timestamp = Date.now();
-    let message = '';
+    // --- CRITICAL FIX: Wrap the entire logging logic in a try...catch block ---
+    // This ensures that the logger itself can never crash the application.
     try {
+      if (this.isLoggingInternally) {
+        if (this.isBrowser) console.warn("[Logger] Recursive log attempt detected, skipping:", level, args);
+        return;
+      }
+      this.isLoggingInternally = true;
+
+      const timestamp = Date.now();
       const argsArray = Array.isArray(args) ? args : [args];
-      message = argsArray.map(this.safelyStringify).join(" "); 
+      const message = argsArray.map(this.safelyStringify).join(" "); 
 
       const logEntry: LogRecord = {
           id: this.logIdCounter++,
@@ -82,7 +83,6 @@ class DebugLogger {
       const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
       const logOutput = `[${level.toUpperCase()}] ${timestampStr}: ${argsArray.map(arg => typeof arg === 'string' ? arg : this.safelyStringify(arg)).join(' ')}`;
 
-
       if (this.isBrowser && typeof console !== 'undefined') {
         const prefix = `%c[${level.toUpperCase()}] %c${timestampStr}:`;
         let color = 'inherit';
@@ -94,37 +94,31 @@ class DebugLogger {
           default: color = 'color: #A9A9A9;'; break;
         }
 
-        // ====================================================================
-        // ✨ ИЗМЕНЕНИЕ №2: ПУСТОТЫ ДЛЯ КИБЕРСКРОЛЛА (БРАУЗЕР) ✨
         if (level === 'error' || level === 'fatal') {
           console.log('\n\n\n');
         }
-        // ====================================================================
 
         const consoleMethod = (console as any)[level] || console.log;
         try { consoleMethod(prefix, color, 'color: inherit;', ...argsArray); }
         catch (e) { console.error("[Logger] Error during styled console output:", e); try { console.log(logOutput); } catch {} }
       } else if (!this.isBrowser) {
-        // ====================================================================
-        // ✨ ИЗМЕНЕНИЕ №2: ПУСТОТЫ ДЛЯ КИБЕРСКРОЛЛА (СЕРВЕР) ✨
         if (level === 'error' || level === 'fatal' || level === 'warn') {
           process.stderr.write('\n\n\n');
-        }
-        // ====================================================================
-        
-        // Server-side logging (ТВОЙ ОРИГИНАЛЬНЫЙ КОД НА МЕСТЕ, НИЧЕГО НЕ ВЫРЕЗАНО)
-        if (level === 'error' || level === 'fatal' || level === 'warn') {
-            process.stderr.write(logOutput + '\n');
+          process.stderr.write(logOutput + '\n');
         } else {
             process.stdout.write(logOutput + '\n');
         }
       }
     } catch (e) {
-      const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
+      const errorMsg = `[CRITICAL LOGGER FAILURE: ${this.safelyStringify(e)}]`;
       if (this.isBrowser) { console.error(errorMsg); }
       else { process.stderr.write(`${errorMsg}\n`); }
-      this.internalLogs.push({ id: this.logIdCounter++, level: 'fatal', message: errorMsg, timestamp: Date.now() });
-      if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
+      // Log its own failure without recursion
+      const failureEntry: LogRecord = { id: this.logIdCounter++, level: 'fatal', message: errorMsg, timestamp: Date.now() };
+      if (!this.isLoggingInternally) { // a failsafe for the failsafe
+          this.internalLogs.push(failureEntry);
+          if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
+      }
     } finally {
       this.isLoggingInternally = false;
     }
