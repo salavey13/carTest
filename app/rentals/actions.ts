@@ -1,4 +1,3 @@
-// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -10,6 +9,65 @@ import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { createInvoice, sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails } from '@/lib/types'; // Типы нам все еще нужны для помощи
+
+/**
+ * НОВЫЙ ЭКШЕН
+ * Получает полную информацию об одной команде по ее 'slug'.
+ */
+export async function getPublicCrewInfo(slug: string): Promise<{
+    success: boolean;
+    data?: CrewDetails;
+    error?: string;
+}> {
+    noStore();
+
+    // --- LOG #1: Что пришло на вход? ---
+    console.log(`[INTERROGATION] getPublicCrewInfo CALLED WITH SLUG: "${slug}"`);
+
+    if (!slug) {
+        logger.warn("getPublicCrewInfo called without a slug.");
+        return { success: false, error: "No slug provided." };
+    }
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .rpc('get_public_crew_details', { p_slug: slug })
+            .single();
+
+        // --- LOG #2: Что вернула база данных? ---
+        console.log('[INTERROGATION] Supabase RPC Response:', { data, error: error ? { code: error.code, message: error.message } : null });
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                logger.warn(`Crew with slug '${slug}' not found.`);
+                return { success: false, error: "Crew not found." };
+            }
+            logger.error(`Error calling get_public_crew_details RPC for slug: ${slug}`, error);
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+
+        if (!data) {
+             logger.warn(`No data returned for crew slug '${slug}', though no error was thrown.`);
+             return { success: false, error: "Crew not found." };
+        }
+        
+        const response = { success: true, data: data as CrewDetails };
+        // --- LOG #3: Что уходит на клиент? ---
+        console.log('[INTERROGATION] Final response to client:', response);
+
+        return response;
+
+    } catch (error) {
+        logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
+        const errorResponse = {
+            success: false,
+            error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
+        };
+        // --- LOG (на случай крэша): Что уходит на клиент при ошибке? ---
+        console.log('[INTERROGATION] Error response to client:', errorResponse);
+        return errorResponse;
+    }
+}
 
 /**
  * Получает список всех публичных команд с подсчетом участников и техники.
@@ -38,53 +96,6 @@ export async function getAllPublicCrews(): Promise<{
 }
 
 
-/**
- * НОВЫЙ ЭКШЕН
- * Получает полную информацию об одной команде по ее 'slug'.
- */
-export async function getPublicCrewInfo(slug: string): Promise<{
-    success: boolean;
-    data?: CrewDetails;
-    error?: string;
-}> {
-    noStore();
-
-    if (!slug) {
-        logger.warn("getPublicCrewInfo called without a slug.");
-        return { success: false, error: "No slug provided." };
-    }
-
-    try {
-        // Вызываем RPC для деталей ОДНОЙ команды
-        const { data, error } = await supabaseAdmin
-            .rpc('get_public_crew_details', { p_slug: slug })
-            .single(); // .single() важен - он ждет один результат
-
-        if (error) {
-            if (error.code === 'PGRST116') {
-                logger.warn(`Crew with slug '${slug}' not found.`);
-                return { success: false, error: "Crew not found." };
-            }
-            logger.error(`Error calling get_public_crew_details RPC for slug: ${slug}`, error);
-            throw new Error(`Supabase RPC Error: ${error.message}`);
-        }
-
-        if (!data) {
-             logger.warn(`No data returned for crew slug '${slug}', though no error was thrown.`);
-             return { success: false, error: "Crew not found." };
-        }
-
-        return { success: true, data: data as CrewDetails };
-
-    } catch (error) {
-        logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
-        };
-    }
-}
-
 
 
 type MapBounds = { top: number; bottom: number; left: number; right: number; };
@@ -109,6 +120,7 @@ export async function getVehiclesWithStatus() {
     noStore();
     try {
         const { data, error } = await supabaseAdmin.rpc('get_vehicles_with_status');
+
         if (error) {
             logger.error('Error calling get_vehicles_with_status RPC:', error);
             throw error;
@@ -198,6 +210,7 @@ export async function getRentalDetails(rentalId: string, userId: string) {
     if (!rentalId) return { success: false, error: "Missing rental ID." };
     if (!userId) return { success: false, error: "Unauthorized." };
     try {
+
         const { data, error } = await supabaseAdmin.from('rentals').select(`*, vehicle:cars(*), renter:users!rentals_user_id_fkey(*), owner:users!rentals_owner_id_fkey(*)`).eq('rental_id', rentalId).single();
         if (error) throw error;
         if (data.user_id !== userId && data.owner_id !== userId) return { success: false, error: "Unauthorized access to rental details." };
@@ -263,6 +276,7 @@ export async function uploadSingleImage(formData: FormData): Promise<{ success: 
         const { error: uploadError } = await supabaseAdmin.storage.from(bucketName).upload(filePath, file, { cacheControl: '604800', upsert: false });
         if (uploadError) throw uploadError;
         const { data: urlData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(filePath);
+
         if (!urlData?.publicUrl) throw new Error("Could not get public URL after upload.");
         return { success: true, url: urlData.publicUrl };
     } catch (error) {
@@ -344,6 +358,7 @@ export async function saveMapPreset(userId: string, name: string, map_image_url:
 
 export async function updateMapPois(userId: string, mapId: string, newPois: PointOfInterest[]): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row']; error?: string; }> {
      try {
+
         const { data: user, error: userError } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
         if (userError || !['admin', 'vprAdmin'].includes(user?.role || '')) throw new Error("Unauthorized: Only admins can edit maps.");
         const { data, error } = await supabaseAdmin.from('maps').update({ points_of_interest: newPois as any }).eq('id', mapId).select().single();
@@ -405,6 +420,7 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
             await sendComplexMessage(newMemberId, `🎉 Ваша заявка на вступление в экипаж *'${crew.name}'* была одобрена! Теперь вам доступна команда /shift.`);
             await sendComplexMessage(ownerId, `✅ Вы приняли @${member.username} в экипаж.`);
         } else {
+
             const { error: deleteError } = await supabaseAdmin.from('crew_members').delete().eq('crew_id', crewId).eq('user_id', newMemberId);
             if (deleteError) throw deleteError;
             await sendComplexMessage(newMemberId, `😔 Ваша заявка на вступление в экипаж *'${crew.name}'* была отклонена.`);
@@ -416,6 +432,21 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
         return { success: false, error: e instanceof Error ? e.message : "Unknown error."};
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export async function getCrewForInvite(slug: string) {
     noStore();
