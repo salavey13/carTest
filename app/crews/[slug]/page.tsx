@@ -117,6 +117,12 @@ function CrewDetailContent({ slug }: { slug: string }) {
     };
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
+    // --- НОВЫЙ БРОНЕЖИЛЕТ ---
+    // Если произошла ошибка или данные по какой-то причине не загрузились,
+    // мы останавливаем рендер здесь, не давая ему упасть ниже.
+    if (!crew) {
+        return <p className="text-destructive text-center py-20">{error || "Не удалось загрузить данные экипажа. Объект crew пуст."}</p>;
+    }
     if (error) return <p className="text-destructive text-center py-20">{error}</p>;
     if (!crew || !crew.owner) return <Loading variant="bike" text="Инициализация экипажа..." />;
     
