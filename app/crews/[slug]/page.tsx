@@ -117,14 +117,9 @@ function CrewDetailContent({ slug }: { slug: string }) {
     };
     
     if (loading || isAuthenticating) return <Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />;
-    // --- НОВЫЙ БРОНЕЖИЛЕТ ---
-    // Если произошла ошибка или данные по какой-то причине не загрузились,
-    // мы останавливаем рендер здесь, не давая ему упасть ниже.
-    if (!crew) {
-        return <p className="text-destructive text-center py-20">{error || "Не удалось загрузить данные экипажа. Объект crew пуст."}</p>;
-    }
     if (error) return <p className="text-destructive text-center py-20">{error}</p>;
-    if (!crew || !crew.owner) return <Loading variant="bike" text="Инициализация экипажа..." />;
+    if (!crew) return <p className="text-destructive text-center py-20">{error || "Не удалось загрузить данные экипажа. Объект crew пуст."}</p>;
+    if (!crew.owner) return <Loading variant="bike" text="Инициализация экипажа..." />;
     
     const members = Array.isArray(crew.members) ? crew.members : [];
     const vehicles = Array.isArray(crew.vehicles) ? crew.vehicles : [];
@@ -173,7 +168,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                                 <p className="text-xs text-muted-foreground font-mono">Владелец:</p>
                                 <p className="font-semibold text-accent-text">@{crew.owner.username}</p>
                             </div>
-                            {typeof crew.hq_location === 'string' && crew.hq_location.includes(',') && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, coordinates: (crew.hq_location).split(',').map(Number) as [number, number], icon: '::FaSkullCrossbones::', color: 'bg-primary' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location}</p> </div> )}
+                            {typeof crew.hq_location === 'string' && crew.hq_location.includes(',') && ( <div className="mt-4 border-t border-border/50 pt-3"> <h4 className="text-center font-mono text-xs text-muted-foreground mb-2">Штаб-квартира</h4> <VibeMap points={[{ id: crew.id, name: `${crew.name} HQ`, type: 'point', coordinates: [(crew.hq_location).split(',').map(Number) as [number, number]], icon: '::FaSkullCrossbones::', color: 'bg-primary' }]} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-48"/> <p className="text-center text-xs font-mono text-muted-foreground mt-2">{crew.hq_location}</p> </div> )}
                         </div>
                     </div>
                     <div className="lg:col-span-2">
