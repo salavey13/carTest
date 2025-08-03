@@ -1,4 +1,3 @@
-// /components/RepoTxtFetcher.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback, useRef } from "react"; 
@@ -526,7 +525,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error');
                        }}
                       disabled={isFetchDisabled} 
-                      className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-primary-foreground bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-destructive to-orange-500 hover:from-destructive/90 hover:to-orange-600' : 'from-neon-lime to-brand-cyan'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
+                      className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-primary-foreground bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-destructive to-orange-500 hover:from-destructive/90 hover:to-orange-600' : 'from-brand-red-orange to-brand-deep-indigo'} transition-all shadow-lg ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'shadow-orange-500/30' : 'shadow-brand-red-orange/30 hover:shadow-brand-deep-indigo/40'} ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
                       whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
                       whileTap={{ scale: isFetchDisabled ? 1 : 0.97 }}
                       title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}${currentVisualTask ? ` (для задачи замены ${imageReplaceTask ? 'картинки' : 'иконки'})` : ''}`}
