@@ -11,65 +11,6 @@ import { createInvoice, sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails } from '@/lib/types'; // Типы нам все еще нужны для помощи
 
 /**
- * НОВЫЙ ЭКШЕН
- * Получает полную информацию об одной команде по ее 'slug'.
- */
-export async function getPublicCrewInfo(slug: string): Promise<{
-    success: boolean;
-    data?: CrewDetails;
-    error?: string;
-}> {
-    noStore();
-
-    // --- LOG #1: Что пришло на вход? ---
-    console.log(`[INTERROGATION] getPublicCrewInfo CALLED WITH SLUG: "${slug}"`);
-
-    if (!slug) {
-        logger.warn("getPublicCrewInfo called without a slug.");
-        return { success: false, error: "No slug provided." };
-    }
-
-    try {
-        const { data, error } = await supabaseAdmin
-            .rpc('get_public_crew_details', { p_slug: slug })
-            .single();
-
-        // --- LOG #2: Что вернула база данных? ---
-        console.log('[INTERROGATION] Supabase RPC Response:', { data, error: error ? { code: error.code, message: error.message } : null });
-
-        if (error) {
-            if (error.code === 'PGRST116') {
-                logger.warn(`Crew with slug '${slug}' not found.`);
-                return { success: false, error: "Crew not found." };
-            }
-            logger.error(`Error calling get_public_crew_details RPC for slug: ${slug}`, error);
-            throw new Error(`Supabase RPC Error: ${error.message}`);
-        }
-
-        if (!data) {
-             logger.warn(`No data returned for crew slug '${slug}', though no error was thrown.`);
-             return { success: false, error: "Crew not found." };
-        }
-        
-        const response = { success: true, data: data as CrewDetails };
-        // --- LOG #3: Что уходит на клиент? ---
-        console.log('[INTERROGATION] Final response to client:', response);
-
-        return response;
-
-    } catch (error) {
-        logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
-        const errorResponse = {
-            success: false,
-            error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
-        };
-        // --- LOG (на случай крэша): Что уходит на клиент при ошибке? ---
-        console.log('[INTERROGATION] Error response to client:', errorResponse);
-        return errorResponse;
-    }
-}
-
-/**
  * Получает список всех публичных команд с подсчетом участников и техники.
  */
 export async function getAllPublicCrews(): Promise<{ 
@@ -95,6 +36,61 @@ export async function getAllPublicCrews(): Promise<{
     }
 }
 
+
+/**
+ * НОВЫЙ ЭКШЕН
+ * Получает полную информацию об одной команде по ее 'slug'.
+ */
+export async function getPublicCrewInfo(slug: string): Promise<{
+    success: boolean;
+    data?: CrewDetails;
+    error?: string;
+}> {
+    noStore();
+
+    if (!slug) {
+        logger.warn("getPublicCrewInfo called without a slug.");
+        return { success: false, error: "No slug provided." };
+    }
+
+// --- МАЯК. ЭТО ЕДИНСТВЕННОЕ, ЧТО ИМЕЕТ ЗНАЧЕНИЕ ЗДЕСЬ. ---
+    logger.warn(`[HEARTBEAT] getPublicCrewInfo invoked for slug: "${slug}". Timestamp: ${new Date().toISOString()}`);
+
+    try {
+        // Вызываем RPC для деталей ОДНОЙ команды
+        const { data, error } = await supabaseAdmin
+            .rpc('get_public_crew_details', { p_slug: slug })
+            .single(); // .single() важен - он ждет один результат
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                logger.warn(`Crew with slug '${slug}' not found.`);
+                return { success: false, error: "Crew not found." };
+            }
+            logger.error(`Error calling get_public_crew_details RPC for slug: ${slug}`, error);
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+
+        if (!data) {
+             logger.warn(`No data returned for crew slug '${slug}', though no error was thrown.`);
+             return { success: false, error: "Crew not found." };
+        }
+
+        return { success: true, data: data as CrewDetails };
+
+    } catch (error) {
+        logger.error(`Critical failure in getPublicCrewInfo for slug: ${slug}`, error);
+// --- ВОТ ОНО. НАША ЛОВУШКА. ---
+        // Мы ловим ошибку, которую бросает сам await, до любой другой обработки.
+        // Используем logger.error, чтобы гарантированно увидеть это в логах Vercel.
+        logger.error('[CRITICAL RPC FAILURE] The call to supabaseAdmin.rpc itself threw an exception. Raw error:', error);
+
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "An unknown error occurred fetching crew details."
+        };
+    }
+}
 
 
 
@@ -432,21 +428,6 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
         return { success: false, error: e instanceof Error ? e.message : "Unknown error."};
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export async function getCrewForInvite(slug: string) {
     noStore();
