@@ -16,7 +16,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { CrewDetails, MapPreset as VibeMapPreset, CommandDeckData } from '@/lib/types';
+import { CrewDetails, MapPreset as VibeMapPreset, CommandDeckData, CrewMember } from '@/lib/types';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 const FALLBACK_MAP: VibeMapPreset = {
     id: 'fallback-map', name: 'Стандартная Карта', map_image_url: 'https://i.imgur.com/22n6k1V.png',
@@ -60,13 +61,13 @@ const MemberStatusIndicator = ({ status }: { status: string }) => {
         offline: { icon: "::FaMoon::", label: "Не в сети", color: "text-muted-foreground" },
         online: { icon: "::FaSun::", label: "Онлайн", color: "text-brand-green" },
         riding: { icon: "::FaMotorcycle::", label: "На байке", color: "text-brand-yellow animate-pulse" }
-    }[status] || { icon: "::FaCircleQuestion::", label: "Неизвестно", color: "text-muted-foreground" };
+    }[status] || { icon: "::FaQuestionCircle::", label: "Неизвестно", color: "text-muted-foreground" };
 
     return <div className={cn("flex items-center gap-1.5 text-xs font-mono", config.color)}><VibeContentRenderer content={config.icon}/> {config.label}</div>
 };
 
 function CrewDetailContent({ slug }: { slug: string }) {
-    const { dbUser, isAuthenticating } = useAppContext();
+    const { dbUser, isAuthenticating, supabase } = useAppContext(); // ИСПОЛЬЗУЕМ КЛИЕНТ ИЗ КОНТЕКСТА
     const searchParams = useSearchParams();
     const router = useRouter();
     const [crew, setCrew] = useState<CrewDetails | null>(null);
@@ -79,46 +80,80 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
     const targetMemberIdFromUrl = searchParams.get('confirm_member');
     const action = searchParams.get('join_crew') ? 'join' : targetMemberIdFromUrl ? 'confirm' : null;
-    const [activeTab, setActiveTab] = useState(action === 'confirm' ? "roster" : "garage");
+    const [activeTab, setActiveTab] = useState("roster");
 
     const loadData = useCallback(async () => {
         if (isAuthenticating) return;
-        setLoading(true);
-        setError(null);
+        setLoading(true); setError(null);
         try {
             const crewResult = await getCrewLiveDetails(slug);
             if (!crewResult.success || !crewResult.data) { throw new Error(crewResult.error || "Экипаж не найден."); }
-            const crewData = crewResult.data;
-            setCrew(crewData);
-            
+            const crewData = crewResult.data; setCrew(crewData);
             if (dbUser) {
-                const ownerCheck = dbUser.user_id === crewData.owner.user_id;
-                setIsOwner(ownerCheck);
+                const ownerCheck = dbUser.user_id === crewData.owner.user_id; setIsOwner(ownerCheck);
                 const membersArray = Array.isArray(crewData.members) ? crewData.members : [];
-                setIsPending(!!membersArray.some(m => m.user_id === dbUser.user_id && m.join_status === 'pending'));
-                if (ownerCheck) {
-                    const deckResult = await getUserCrewCommandDeck(dbUser.user_id);
-                    if (deckResult.success) setCommandDeckData(deckResult.data);
-                }
-            } else {
-                setIsOwner(false);
-                setIsPending(false);
-            }
-            
+                setIsPending(!!membersArray.some(m => m.user_id === dbUser.user_id && m.membership_status === 'pending'));
+                if (ownerCheck) { const deckResult = await getUserCrewCommandDeck(dbUser.user_id); if (deckResult.success) setCommandDeckData(deckResult.data); }
+            } else { setIsOwner(false); setIsPending(false); }
             const mapsResult = await getMapPresets();
-            if (mapsResult.success && mapsResult.data?.length) {
-                setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0] || FALLBACK_MAP);
-            }
+            if (mapsResult.success && mapsResult.data?.length) { setDefaultMap(mapsResult.data.find(m => m.is_default) || mapsResult.data[0] || FALLBACK_MAP); }
         } catch (e: any) { setError(e.message); } finally { setLoading(false); }
     }, [slug, dbUser, isAuthenticating]);
 
-    useEffect(() => { if (!isAuthenticating) { loadData(); } }, [isAuthenticating, loadData]);
+    useEffect(() => {
+        if (!isAuthenticating) {
+            loadData();
+        }
+    }, [isAuthenticating, loadData]);
+
+    useEffect(() => {
+        if (!crew?.id || !supabase) return;
+
+        const handleRealtimeUpdate = (payload: any) => {
+            setCrew(currentCrew => {
+                if (!currentCrew) return null;
+                let updatedMembers = [...(currentCrew.members || [])];
+                const eventType = payload.eventType;
+
+                if (eventType === 'INSERT' || eventType === 'DELETE') {
+                    toast.info("Состав экипажа изменился. Обновляем...");
+                    loadData();
+                    return currentCrew;
+                } 
+                
+                if (eventType === 'UPDATE') {
+                    const updatedRecord = payload.new as Partial<CrewMember> & { user_id: string };
+                    const memberIndex = updatedMembers.findIndex(m => m.user_id === updatedRecord.user_id);
+                    if (memberIndex !== -1) {
+                        const existingMemberData = updatedMembers[memberIndex];
+                        updatedMembers[memberIndex] = { ...existingMemberData, ...updatedRecord };
+                         toast.info(`Статус @${existingMemberData.username} обновлен.`);
+                    }
+                     return { ...currentCrew, members: updatedMembers };
+                }
+                return currentCrew;
+            });
+        };
+
+        const channel: RealtimeChannel = supabase
+            .channel(`crew-members-updates-${crew.id}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'crew_members', filter: `crew_id=eq.${crew.id}` },
+                handleRealtimeUpdate
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [crew?.id, supabase, loadData]);
 
     const handleJoinRequest = async () => {
         if (!dbUser || !crew) return;
         toast.promise(requestToJoinCrew(dbUser.user_id, dbUser.username || 'unknown', crew.id), {
             loading: 'Отправка заявки...',
-            success: (res) => { if (res.success) { setIsPending(true); loadData(); return "Заявка отправлена!"; } throw new Error(res.error); }, error: (err) => err.message,
+            success: (res) => { if (res.success) { setIsPending(true); return "Заявка отправлена! Ожидайте подтверждения."; } throw new Error(res.error); }, error: (err) => err.message,
         });
     };
 
@@ -131,7 +166,6 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     if (memberIdToConfirm === targetMemberIdFromUrl) {
                         router.replace(`/crews/${slug}`, { scroll: false });
                     }
-                    loadData();
                     return `Заявка ${accept ? 'принята' : 'отклонена'}.`;
                 }
                 throw new Error(res.error);
@@ -155,9 +189,9 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     if (parsedLocation && parsedLocation.type === 'Point' && Array.isArray(parsedLocation.coordinates)) {
                          points.push({
                             id: member.user_id, name: `@${member.username}`, type: 'point',
-                            coords: [[parsedLocation.coordinates[1], parsedLocation.coordinates[0]]], // GeoJSON is [lon, lat], we need [lat, lon]
+                            coords: [[parsedLocation.coordinates[1], parsedLocation.coordinates[0]]],
                             icon: `image:${member.avatar_url || '/placeholder.svg'}`,
-                            color: '' // Color is not used for image icons
+                            color: ''
                         });
                     }
                 } catch (e) { console.error(`Failed to parse location for member ${member.username}:`, e); }
@@ -166,14 +200,13 @@ function CrewDetailContent({ slug }: { slug: string }) {
         return points;
     }, [crew, members]);
 
-
     if (loading || isAuthenticating) return <Loading variant="bike" text="СИНХРОНИЗАЦИЯ С КОМАНДНЫМ ЦЕНТРОМ..." />;
     if (error) return <p className="text-destructive text-center py-20 font-mono text-lg">{error}</p>;
     if (!crew || !crew.owner) return <p className="text-destructive text-center py-20 font-mono text-lg">НЕ УДАЛОСЬ ЗАГРУЗИТЬ ДАННЫЕ ЭКИПАЖА</p>;
     
     const heroTriggerId = `crew-detail-hero-${crew.id}`;
     const pendingMemberFromUrl = action === 'confirm' ? members.find(m => m.user_id === targetMemberIdFromUrl) : null;
-    const isCurrentUserMember = members.some(m => m.user_id === dbUser?.user_id && m.join_status === 'active');
+    const isCurrentUserMember = members.some(m => m.user_id === dbUser?.user_id && m.membership_status === 'active');
     
     let heroTitle = crew.name;
     let heroSubtitle = crew.description || `Под предводительством @${crew.owner.username}`;
@@ -229,12 +262,12 @@ function CrewDetailContent({ slug }: { slug: string }) {
                                                 <span className="font-mono font-semibold">@{member.username}</span>
                                                 <p className="text-xs text-accent-text uppercase font-mono">{member.role}</p>
                                             </div>
-                                            {member.join_status === 'pending' && isOwner ? (
+                                            {member.membership_status === 'pending' && isOwner ? (
                                                 <div className="flex gap-2 shrink-0">
                                                     <Button onClick={() => handleConfirmation(true, member.user_id)} size="sm" className="bg-green-600 hover:bg-green-500 h-8 px-3">Принять</Button>
                                                     <Button onClick={() => handleConfirmation(false, member.user_id)} size="sm" variant="destructive" className="h-8 px-2">Откл.</Button>
                                                 </div>
-                                            ) : member.join_status === 'pending' ? (
+                                            ) : member.membership_status === 'pending' ? (
                                                 <span className="text-xs font-mono bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full shrink-0">Ожидает</span>
                                             ) : (
                                                 <div className="shrink-0">
@@ -261,7 +294,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
 export default function CrewPage({ params }: { params: { slug: string } }) {
   return (
     <div className="min-h-screen text-foreground dark">
-        <Suspense fallback={<Loading variant="bike" text="ЗАГРУЗКА ДАННЫХ ЭКИПАЖА..." />}>
+        <Suspense fallback={<Loading variant="bike" text="ПОДКЛЮЧЕНИЕ К ЖИВОМУ ПОТОКУ ДАННЫХ..." />}>
           <CrewDetailContent slug={params.slug} />
         </Suspense>
     </div>
