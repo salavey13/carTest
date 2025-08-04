@@ -21,7 +21,38 @@ import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
 
+async function handleLocationUpdate(userId: string, location: { latitude: number; longitude: number; }) {
+    try {
+        const { data: member } = await supabaseAdmin
+            .from('crew_members')
+            .select('live_status')
+            .eq('user_id', userId)
+            .eq('membership_status', 'active')
+            .single();
+        
+        // Обновляем локацию, только если он сейчас "На Байке"
+        if (member && member.live_status === 'riding') {
+            const { error } = await supabaseAdmin
+                .from('crew_members')
+                .update({ last_location: `POINT(${location.longitude} ${location.latitude})` })
+                .eq('user_id', userId);
+            
+            if (error) throw error;
+            logger.info(`[Location Update] Updated location for riding user ${userId}`);
+        }
+    } catch (error) {
+        logger.error(`[Location Update] Failed for user ${userId}`, error);
+    }
+}
+
 export async function handleCommand(update: any) {
+    if (update.message?.location) {
+        const userId: string = String(update.message.from.id);
+        const location = update.message.location;
+        await handleLocationUpdate(userId, location);
+        return;
+    }
+
     if (update.message?.text) {
         const text: string = update.message.text;
         const chatId: number = update.message.chat.id;
@@ -37,7 +68,7 @@ export async function handleCommand(update: any) {
         const commandMap: { [key: string]: Function } = {
             "/start": () => startCommand(chatId, userId, update.message.from, text),
             "/help": () => helpCommand(chatId, userId),
-            "/shift": () => shiftCommand(chatId, userIdStr, username), // Вызывает без action для получения клавиатуры
+            "/shift": () => shiftCommand(chatId, userIdStr, username),
             "/actions": () => actionsCommand(chatId, userIdStr),
             "/sos": () => sosCommand(chatId, userIdStr),
             "/rage": () => rageCommand(chatId, userId),
@@ -63,21 +94,15 @@ export async function handleCommand(update: any) {
         if (commandFunction) {
             await commandFunction();
         } else {
-            // --- CORE FIX: ОБРАБОТЧИК ДЛЯ КНОПОК /shift ---
             const shiftActionMap: { [key: string]: string } = {
-                "✅ Начать Смену": "clock_in",
-                "❌ Завершить Смену": "clock_out",
-                "🏍️ На Байке": "toggle_ride",
-                "🏢 В Боксе": "toggle_ride",
+                "✅ Начать Смену": "clock_in", "❌ Завершить Смену": "clock_out",
+                "🏍️ На Байке": "toggle_ride", "🏢 В Боксе": "toggle_ride",
             };
-
             if (shiftActionMap[text]) {
                 await shiftCommand(chatId, userIdStr, username, shiftActionMap[text]);
                 return;
             }
-            // --- END OF CORE FIX ---
             
-            // Priority handlers for other reply keyboard presses
             if (text.startsWith('⛽️') || text.startsWith('🛠️') || text.startsWith('🙏')) {
                 await handleSosPaymentChoice(chatId, userIdStr, text); return;
             }
