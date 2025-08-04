@@ -60,7 +60,7 @@ const MemberStatusIndicator = ({ status }: { status: string }) => {
         offline: { icon: "::FaMoon::", label: "Не в сети", color: "text-muted-foreground" },
         online: { icon: "::FaSun::", label: "Онлайн", color: "text-brand-green" },
         riding: { icon: "::FaMotorcycle::", label: "На байке", color: "text-brand-yellow animate-pulse" }
-    }[status] || { icon: "::FaQuestionCircle::", label: "Неизвестно", color: "text-muted-foreground" };
+    }[status] || { icon: "::FaCircleQuestion::", label: "Неизвестно", color: "text-muted-foreground" };
 
     return <div className={cn("flex items-center gap-1.5 text-xs font-mono", config.color)}><VibeContentRenderer content={config.icon}/> {config.label}</div>
 };
