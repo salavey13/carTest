@@ -17,8 +17,6 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { CrewDetails, MapPreset as VibeMapPreset, CommandDeckData, CrewMember } from '@/lib/types';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/database.types';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
 const FALLBACK_MAP: VibeMapPreset = {
@@ -69,8 +67,7 @@ const MemberStatusIndicator = ({ status }: { status: string }) => {
 };
 
 function CrewDetailContent({ slug }: { slug: string }) {
-    const { dbUser, isAuthenticating } = useAppContext();
-    const supabase = createClientComponentClient<Database>();
+    const { dbUser, isAuthenticating, supabase } = useAppContext(); // ИСПОЛЬЗУЕМ КЛИЕНТ ИЗ КОНТЕКСТА
     const searchParams = useSearchParams();
     const router = useRouter();
     const [crew, setCrew] = useState<CrewDetails | null>(null);
@@ -83,7 +80,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
 
     const targetMemberIdFromUrl = searchParams.get('confirm_member');
     const action = searchParams.get('join_crew') ? 'join' : targetMemberIdFromUrl ? 'confirm' : null;
-    const [activeTab, setActiveTab] = useState(action === 'confirm' ? "roster" : "roster");
+    const [activeTab, setActiveTab] = useState("roster");
 
     const loadData = useCallback(async () => {
         if (isAuthenticating) return;
@@ -103,10 +100,14 @@ function CrewDetailContent({ slug }: { slug: string }) {
         } catch (e: any) { setError(e.message); } finally { setLoading(false); }
     }, [slug, dbUser, isAuthenticating]);
 
-    useEffect(() => { if (!isAuthenticating) { loadData(); } }, [isAuthenticating, loadData]);
+    useEffect(() => {
+        if (!isAuthenticating) {
+            loadData();
+        }
+    }, [isAuthenticating, loadData]);
 
     useEffect(() => {
-        if (!crew?.id) return;
+        if (!crew?.id || !supabase) return;
 
         const handleRealtimeUpdate = (payload: any) => {
             setCrew(currentCrew => {
@@ -115,9 +116,9 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 const eventType = payload.eventType;
 
                 if (eventType === 'INSERT' || eventType === 'DELETE') {
-                    // Easiest way to get full data (with username etc.) is to refetch
+                    toast.info("Состав экипажа изменился. Обновляем...");
                     loadData();
-                    return currentCrew; // Return current state while refetching
+                    return currentCrew;
                 } 
                 
                 if (eventType === 'UPDATE') {
@@ -126,10 +127,10 @@ function CrewDetailContent({ slug }: { slug: string }) {
                     if (memberIndex !== -1) {
                         const existingMemberData = updatedMembers[memberIndex];
                         updatedMembers[memberIndex] = { ...existingMemberData, ...updatedRecord };
+                         toast.info(`Статус @${existingMemberData.username} обновлен.`);
                     }
                      return { ...currentCrew, members: updatedMembers };
                 }
-
                 return currentCrew;
             });
         };
@@ -141,14 +142,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 { event: '*', schema: 'public', table: 'crew_members', filter: `crew_id=eq.${crew.id}` },
                 handleRealtimeUpdate
             )
-            .subscribe((status, err) => {
-                if (status === 'SUBSCRIBED') {
-                    console.log(`Realtime channel subscribed for crew ${crew.id}`);
-                }
-                if (err) {
-                    console.error('Realtime subscription error:', err);
-                }
-            });
+            .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
