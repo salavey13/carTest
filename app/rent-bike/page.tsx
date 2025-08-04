@@ -80,7 +80,6 @@ export default function RentBikePage() {
           setVehicles(bikes);
           const types = new Set(bikes.map(b => (b.specs as any)?.type).filter(Boolean));
           setAvailableBikeTypes(["All", ...Array.from(types) as string[]]);
-
           const initialBike = bikes.find(b => b.availability === 'available') || bikes[0];
           setActiveBike(initialBike);
           setSelectedBike(initialBike);
@@ -135,7 +134,7 @@ export default function RentBikePage() {
     }
     return bikesToShow;
   }, [activeFilter, vehicles, recommendedType]);
-  
+
   const handleBikeClick = (bike: VehicleWithBookingInfo) => {
     if (activeBike?.id === bike.id) {
         setSelectedBike(bike);
@@ -158,7 +157,7 @@ export default function RentBikePage() {
       }, 100);
     }
   };
-
+  
   const handleBooking = async () => {
       if (!selectedBike || !date?.from || !date?.to || !dbUser?.user_id) {
           toast.error("Выберите байк и даты для бронирования.");
@@ -192,16 +191,9 @@ export default function RentBikePage() {
   };
 
   if (loading) return <Loading variant="bike" />;
-
   const totalDays = date?.from && date?.to ? Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
   const totalPrice = totalDays * (selectedBike?.daily_price || 0);
-
-  const bookingButtonText = selectedBike ? (
-    isBooking ? 'БРОНИРОВАНИЕ...' :
-    selectedBike.availability === 'taken' && selectedBike.active_booking_end ? `ЗАНЯТ ДО ${format(new Date(selectedBike.active_booking_end), 'd LLL', { locale: ru })}` :
-    selectedBike.availability !== 'available' ? 'НЕДОСТУПЕН' :
-    'ЗАБРОНИРОВАТЬ'
-  ) : 'ЗАБРОНИРОВАТЬ';
+  const bookingButtonText = selectedBike ? ( isBooking ? 'БРОНИРОВАНИЕ...' : selectedBike.availability === 'taken' && selectedBike.active_booking_end ? `ЗАНЯТ ДО ${format(new Date(selectedBike.active_booking_end), 'd LLL', { locale: ru })}` : selectedBike.availability !== 'available' ? 'НЕДОСТУПЕН' : 'ЗАБРОНИРОВАТЬ' ) : 'ЗАБРОНИРОВАТЬ';
 
   return (
     <div className="min-h-screen p-4 pt-24 overflow-hidden relative dark">
@@ -219,9 +211,7 @@ export default function RentBikePage() {
           <div className="flex flex-wrap gap-2 p-2 bg-card/80 border border-border rounded-lg backdrop-blur-sm">
             {availableBikeTypes.map(type => (
               <button key={type} onClick={() => setActiveFilter(type)}
-                className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative",
-                  activeFilter === type ? "bg-primary text-primary-foreground shadow-[0_0_10px_theme(colors.primary)]" : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                )}>
+                className={cn( "px-3 py-1.5 text-sm font-semibold rounded-md transition-all duration-200 font-mono relative", activeFilter === type ? "bg-primary text-primary-foreground shadow-[0_0_10px_theme(colors.primary)]" : "bg-muted/50 text-muted-foreground hover:bg-muted" )}>
                 {type}
                 {type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute -top-1 -right-1 text-accent w-3 h-3"/>}
               </button>
@@ -247,15 +237,24 @@ export default function RentBikePage() {
                         isActive ? "border-accent/70" : "border-border hover:border-primary/50",
                         bike.availability !== 'available' && 'opacity-50'
                     )}>
-                    <div className="flex items-center gap-4">
-                        <Image src={bike.image_url!} alt={bike.model!} width={80} height={80} className="rounded-md object-cover aspect-square" />
-                        <div>
+                    <div className="flex items-start gap-4">
+                        <Image src={bike.image_url!} alt={bike.model!} width={80} height={80} className="rounded-md object-cover aspect-square flex-shrink-0" />
+                        <div className="flex-grow">
                             <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
                             <p className="text-sm text-accent-text font-mono">{bike.daily_price}₽ / день</p>
+                            <AnimatePresence>
+                               {isActive && (
+                                <motion.p 
+                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                    className="text-xs text-muted-foreground font-mono mt-1">
+                                    {bike.crew_name || `Владелец: ${bike.owner_id?.substring(0,6)}...`}
+                                </motion.p>
+                               )}
+                            </AnimatePresence>
                         </div>
                     </div>
-                    {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-accent shadow-yellow-glow"/>}
-                    <div className={cn("absolute bottom-2 right-2 text-xs font-mono flex items-center gap-1 p-1 rounded",
+
+                    <div className={cn("absolute top-2 right-2 text-xs font-mono flex items-center gap-1.5 px-2 py-1 rounded-full",
                         bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 
                         bike.availability === 'taken' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400')}>
                         <VibeContentRenderer content={bike.availability === 'available' ? "::FaCircleCheck::" : bike.availability === 'taken' ? "::FaClock::" : "::FaBan::"}/>
@@ -269,6 +268,7 @@ export default function RentBikePage() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto', marginTop: '12px' }}
                             exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
                         >
                             <Button onClick={(e) => handleSelectButtonClick(e, bike)} className="w-full h-8">Выбрать</Button>
                         </motion.div>
