@@ -158,7 +158,37 @@ export default function RentBikePage() {
     }
   };
   
-  const handleBooking = async () => { /* ... unchanged ... */ };
+  const handleBooking = async () => {
+      if (!selectedBike || !date?.from || !date?.to || !dbUser?.user_id) {
+          toast.error("Выберите байк и даты для бронирования.");
+          return;
+      }
+      setIsBooking(true);
+      const totalDays = Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const totalPrice = totalDays * (selectedBike?.daily_price || 0);
+
+      const result = await createBooking(dbUser.user_id, selectedBike.id, date.from, date.to, totalPrice);
+      if (result.success) {
+          toast.success("Запрос на бронирование отправлен! Ожидайте счет на оплату залога в Telegram.");
+          setDate(undefined);
+          const calendarResult = await getVehicleCalendar(selectedBike.id);
+          if (calendarResult.success && calendarResult.data) {
+             const bookedDates: Date[] = [];
+             calendarResult.data.forEach(booking => {
+                 let currentDate = new Date(booking.start_date!);
+                 const endDate = new Date(booking.end_date!);
+                 while (currentDate <= endDate) {
+                     bookedDates.push(new Date(currentDate));
+                     currentDate.setDate(currentDate.getDate() + 1);
+                 }
+             });
+             setDisabledDates(bookedDates);
+          }
+      } else {
+          toast.error(`Ошибка бронирования: ${result.error}`);
+      }
+      setIsBooking(false);
+  };
 
   if (loading) return <Loading variant="bike" />;
   const totalDays = date?.from && date?.to ? Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
@@ -214,6 +244,7 @@ export default function RentBikePage() {
                             <p className="text-sm text-accent-text font-mono">{bike.daily_price}₽ / день</p>
                         </div>
                     </div>
+
                     {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-accent shadow-yellow-glow"/>}
                     {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-accent w-4 h-4 text-shadow-brand-yellow"/>}
 
@@ -226,15 +257,14 @@ export default function RentBikePage() {
                             transition={{ duration: 0.2, ease: "easeInOut" }}
                             className="flex flex-col gap-2"
                         >
-                            <p className="text-xs text-muted-foreground font-mono">{bike.crew_name || `Владелец: ${bike.owner_id?.substring(0,6)}...`}</p>
+                             <div className={cn("text-xs font-mono flex items-center gap-1.5 p-1 rounded",
+                                bike.availability === 'available' ? 'text-green-400' : 
+                                bike.availability === 'taken' ? 'text-orange-400' : 'text-gray-400')}>
+                                <VibeContentRenderer content={bike.availability === 'available' ? "::FaCircleCheck::" : bike.availability === 'taken' ? "::FaClock::" : "::FaBan::"}/>
+                                <span>{bike.availability === 'available' ? 'Свободен' : bike.availability === 'taken' && bike.active_booking_end ? `Занят до ${format(new Date(bike.active_booking_end), 'd LLL', { locale: ru })}` : 'Занят'}</span>
+                            </div>
                             {!isSelected && (
-                                <Button onClick={(e) => handleSelectButtonClick(e, bike)} className={cn(
-                                    "w-full h-8 font-semibold flex items-center gap-2",
-                                    bike.availability === 'available' ? 'bg-green-600 hover:bg-green-500' : 'bg-orange-600 hover:bg-orange-500'
-                                )}>
-                                    <VibeContentRenderer content={bike.availability === 'available' ? "::FaCircleCheck::" : "::FaClock::"}/>
-                                    {bike.availability === 'available' ? 'Подробнее' : 'Занят'}
-                                </Button>
+                                <Button onClick={(e) => handleSelectButtonClick(e, bike)} className="w-full h-8 font-semibold">Подробнее</Button>
                             )}
                         </motion.div>
                     )}
