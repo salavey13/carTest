@@ -13,7 +13,7 @@ export interface PointOfInterest {
   id: string;
   name: string;
   type: 'point' | 'path' | 'loop';
-  icon: string;
+  icon: string; // Can be '::FaIcon::' or 'image:http://...'
   color: string;
   coords: [number, number][]; // Array of [lat, lon]
 }
@@ -73,7 +73,6 @@ const unproject = (xPercent: number, yPercent: number, bounds: MapBounds, imageS
     return [lat, lon];
 }
 
-
 export function VibeMap({ points, bounds, imageUrl, highlightedPointId, className, isEditable = false, onMapClick }: VibeMapProps) {
   const [viewState, setViewState] = useState({ x: 0, y: 0, scale: 1 });
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -85,8 +84,8 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
   }, { 
       target: mapContainerRef, 
       eventOptions: { passive: false },
-      drag: { preventDefault: true },
-      pinch: { preventDefault: true }
+      drag: { preventDefault: true, from: () => [viewState.x, viewState.y] },
+      pinch: { from: () => [viewState.scale, 0] }
   });
   
   const handleZoom = (direction: 'in' | 'out', factor = 1.5) => {
@@ -103,7 +102,6 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
     const mapY = (clickY - viewState.y) / viewState.scale;
 
     const xPercent = (mapX / rect.width) * 100;
-
     const yPercent = (mapY / rect.height) * 100;
     
     const coords = unproject(xPercent, yPercent, bounds, imageSize, rect);
@@ -115,7 +113,7 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
       <div 
         ref={mapContainerRef} 
         className={cn("relative w-full h-full bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30 shadow-lg shadow-brand-purple/20 cursor-grab active:cursor-grabbing", className)}
-        style={{ touchAction: 'none' }} // This is the key to prevent page scroll on mobile
+        style={{ touchAction: 'none' }}
       >
         <motion.div
             className="relative w-full h-full"
@@ -157,32 +155,39 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
 
               {points.map((point) => {
                 const isSinglePoint = point.type === 'point' || point.coords.length === 1;
-                
-                // --- CRITICAL FIX: Ensure coords exist and are not empty before proceeding ---
-                if (!isSinglePoint || !point.coords || point.coords.length === 0) {
-                    return null;
-                }
+                if (!isSinglePoint || !point.coords || point.coords.length === 0) return null;
 
                 const positionCoords = point.coords[0];
                 const projected = project(positionCoords[0], positionCoords[1], bounds);
                 if (!projected) return null;
 
                 const isHighlighted = highlightedPointId === point.id;
+                const isImage = point.icon.startsWith('image:');
+                const imageUrl = isImage ? point.icon.replace('image:', '') : '';
 
                 return (
                   <Tooltip key={point.id}>
                     <TooltipTrigger asChild>
                       <motion.div
-                        className="absolute transform -translate-x-1/2 -translate-y-1/2"
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
                         style={{ left: `${projected.x}%`, top: `${projected.y}%`, zIndex: isHighlighted ? 10 : 5 }}
                         animate={{ scale: (isHighlighted ? 1.5 : 1) / viewState.scale }}
                         transition={{ type: 'spring', stiffness: 300 }}
                       >
-                        <div className={cn("w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300", point.color)}>
-                           <div className="absolute inset-0 bg-current rounded-full animate-pulse opacity-50"/>
-                           <VibeContentRenderer content={point.icon} className="relative z-10 w-4 h-4 text-white drop-shadow-lg"/>
-
-                        </div>
+                        {isImage ? (
+                            <Image
+                                src={imageUrl}
+                                alt={point.name}
+                                width={28}
+                                height={28}
+                                className="rounded-full border-2 border-white/80 object-cover shadow-lg bg-black/50"
+                            />
+                        ) : (
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300", point.color)}>
+                               <div className="absolute inset-0 bg-current rounded-full animate-pulse opacity-50"/>
+                               <VibeContentRenderer content={point.icon} className="relative z-10 w-4 h-4 text-white drop-shadow-lg"/>
+                            </div>
+                        )}
                       </motion.div>
                     </TooltipTrigger>
                     <TooltipContent className="bg-dark-card border-brand-lime text-foreground font-mono"><p>{point.name}</p></TooltipContent>
