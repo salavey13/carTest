@@ -19,7 +19,7 @@ import { simGodCommand } from "./sim_god";
 import { leaderboardCommand } from "./leaderboard";
 import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
-import { shiftCommand } from "./shift"; // NEW IMPORT
+import { shiftCommand } from "./shift"; 
 
 export async function handleCommand(update: any) {
     if (update.message?.text) {
@@ -37,7 +37,7 @@ export async function handleCommand(update: any) {
         const commandMap: { [key: string]: Function } = {
             "/start": () => startCommand(chatId, userId, update.message.from, text),
             "/help": () => helpCommand(chatId, userId),
-            "/shift": () => shiftCommand(chatId, userIdStr, username), // NEW COMMAND
+            "/shift": () => shiftCommand(chatId, userIdStr, username), // Вызывает без action для получения клавиатуры
             "/actions": () => actionsCommand(chatId, userIdStr),
             "/sos": () => sosCommand(chatId, userIdStr),
             "/rage": () => rageCommand(chatId, userId),
@@ -63,7 +63,21 @@ export async function handleCommand(update: any) {
         if (commandFunction) {
             await commandFunction();
         } else {
-            // Priority handlers for reply keyboard presses
+            // --- CORE FIX: ОБРАБОТЧИК ДЛЯ КНОПОК /shift ---
+            const shiftActionMap: { [key: string]: string } = {
+                "✅ Начать Смену": "clock_in",
+                "❌ Завершить Смену": "clock_out",
+                "🏍️ На Байке": "toggle_ride",
+                "🏢 В Боксе": "toggle_ride",
+            };
+
+            if (shiftActionMap[text]) {
+                await shiftCommand(chatId, userIdStr, username, shiftActionMap[text]);
+                return;
+            }
+            // --- END OF CORE FIX ---
+            
+            // Priority handlers for other reply keyboard presses
             if (text.startsWith('⛽️') || text.startsWith('🛠️') || text.startsWith('🙏')) {
                 await handleSosPaymentChoice(chatId, userIdStr, text); return;
             }

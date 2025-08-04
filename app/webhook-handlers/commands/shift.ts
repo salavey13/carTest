@@ -4,15 +4,16 @@ import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 
-export async function shiftCommand(chatId: number, userId: string, username?: string) {
-    logger.info(`[Shift Command] User ${userId} initiated /shift.`);
+// Добавляем опциональный параметр action
+export async function shiftCommand(chatId: number, userId: string, username?: string, action?: string) {
+    logger.info(`[Shift Command] User ${userId} initiated /shift. Action: ${action || 'request_keyboard'}`);
     try {
-        // Invoke the Edge Function securely from the Vercel backend.
+        // Передаем action в теле запроса к Edge-функции
         const { error } = await supabaseAdmin.functions.invoke('handle-shift-command', {
-            body: { userId, chatId, username },
+            body: { userId, chatId, username, action },
         });
         if (error) throw error;
-        // The Edge Function now handles sending messages, so no message is needed here on success.
+        // Edge-функция сама отправляет все ответы, поэтому здесь ничего не делаем в случае успеха.
     } catch (e) {
         logger.error(`[Shift Command] Error invoking edge function for user ${userId}:`, e);
         await sendComplexMessage(chatId, "Не удалось связаться с системой учета времени. Попробуйте позже.", []);
