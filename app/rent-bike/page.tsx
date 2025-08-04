@@ -134,7 +134,7 @@ export default function RentBikePage() {
     }
     return bikesToShow;
   }, [activeFilter, vehicles, recommendedType]);
-
+  
   const handleBikeClick = (bike: VehicleWithBookingInfo) => {
     if (activeBike?.id === bike.id) {
         setSelectedBike(bike);
@@ -242,7 +242,7 @@ export default function RentBikePage() {
                         <div className="flex-grow">
                             <h3 className="font-bold font-orbitron">{bike.make} {bike.model}</h3>
                             <p className="text-sm text-accent-text font-mono">{bike.daily_price}₽ / день</p>
-                            <AnimatePresence>
+                             <AnimatePresence>
                                {isActive && (
                                 <motion.p 
                                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -254,13 +254,16 @@ export default function RentBikePage() {
                         </div>
                     </div>
 
-                    <div className={cn("absolute top-2 right-2 text-xs font-mono flex items-center gap-1.5 px-2 py-1 rounded-full",
-                        bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 
-                        bike.availability === 'taken' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400')}>
-                        <VibeContentRenderer content={bike.availability === 'available' ? "::FaCircleCheck::" : bike.availability === 'taken' ? "::FaClock::" : "::FaBan::"}/>
-                        {isActive && <span>{bike.availability === 'available' ? 'Свободен' : bike.availability === 'taken' ? 'Занят' : 'Недоступен'}</span>}
-                    </div>
-                     {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-accent w-4 h-4 text-shadow-brand-yellow"/>}
+                    {bike.crew_logo_url && <Image src={bike.crew_logo_url} alt={bike.crew_name || 'Crew Logo'} width={24} height={24} className="absolute top-2 right-2 rounded-full border border-accent shadow-yellow-glow"/>}
+                    {(isActive || isSelected) && (
+                        <div className={cn("absolute bottom-2 left-2 text-xs font-mono flex items-center gap-1.5 px-2 py-1 rounded-full",
+                            bike.availability === 'available' ? 'bg-green-500/20 text-green-400' : 
+                            bike.availability === 'taken' ? 'bg-orange-500/20 text-orange-400' : 'bg-gray-500/20 text-gray-400')}>
+                            <VibeContentRenderer content={bike.availability === 'available' ? "::FaCircleCheck::" : bike.availability === 'taken' ? "::FaClock::" : "::FaBan::"}/>
+                            <span>{bike.availability === 'available' ? 'Свободен' : bike.availability === 'taken' ? 'Занят' : 'Недоступен'}</span>
+                        </div>
+                    )}
+                    {(bike.specs as any)?.type === recommendedType && <VibeContentRenderer content="::FaStar::" className="absolute top-2 left-2 text-accent w-4 h-4 text-shadow-brand-yellow"/>}
 
                     <AnimatePresence>
                     {isActive && !isSelected && (
@@ -270,7 +273,7 @@ export default function RentBikePage() {
                             exit={{ opacity: 0, height: 0, marginTop: 0 }}
                             transition={{ duration: 0.2, ease: "easeInOut" }}
                         >
-                            <Button onClick={(e) => handleSelectButtonClick(e, bike)} className="w-full h-8">Выбрать</Button>
+                            <Button onClick={(e) => handleSelectButtonClick(e, bike)} className="w-full h-8 font-semibold">Подробнее</Button>
                         </motion.div>
                     )}
                     </AnimatePresence>
@@ -320,7 +323,7 @@ export default function RentBikePage() {
                         </PopoverContent>
                       </Popover>
                     </div>
-                     <Link href={`/rent/${selectedBike.id}`} className="w-full"><Button variant="outline" className="w-full h-10">Подробнее</Button></Link>
+                     <Link href={`/rent/${selectedBike.id}`} className="w-full"><Button variant="outline" className="w-full h-10">Больше фото и инфо</Button></Link>
                   </div>
                    <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center mt-4">
                       <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
