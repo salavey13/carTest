@@ -61,7 +61,7 @@ export function BikeShowcase() {
                 <p className="text-lg text-gray-300 max-w-xl mx-auto my-4">{bike.description}</p>
                 <Link href="/rent-bike" passHref>
                   <Button size="lg" variant="outline" className="bg-transparent border-2 border-brand-lime text-brand-lime hover:bg-brand-lime hover:text-black font-orbitron text-lg backdrop-blur-sm">
-                    <VibeContentRenderer content="::FaMotorcycle:: Смотреть весь парк" />
+                    <VibeContentRenderer content="::FaMotorcycle:: Смотреть весь парк" classname="mr-2" />
                   </Button>
                 </Link>
               </motion.div>
