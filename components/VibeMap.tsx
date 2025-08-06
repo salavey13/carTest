@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { useGesture } from '@use-gesture/react';
+import { debugLogger as logger } from '@/lib/debugLogger';
 
 export interface PointOfInterest {
   id: string;
@@ -42,37 +43,6 @@ const project = (lat: number, lon: number, bounds: MapBounds): { x: number; y: n
   return { x, y };
 };
 
-const unproject = (xPercent: number, yPercent: number, bounds: MapBounds, imageSize: {width: number, height: number}, containerSize: {width: number, height: number}): [number, number] => {
-    const aspectRatio = imageSize.width / imageSize.height;
-    const containerRatio = containerSize.width / containerSize.height;
-
-    let renderWidth, renderHeight, offsetX = 0, offsetY = 0;
-
-    if (aspectRatio > containerRatio) { // Image is wider than container
-        renderWidth = containerSize.width;
-        renderHeight = renderWidth / aspectRatio;
-        offsetY = (containerSize.height - renderHeight) / 2;
-    } else { // Image is taller or same ratio
-        renderHeight = containerSize.height;
-        renderWidth = renderHeight * aspectRatio;
-        offsetX = (containerSize.width - renderWidth) / 2;
-    }
-
-    const xOnContainer = (xPercent / 100) * containerSize.width;
-    const yOnContainer = (yPercent / 100) * containerSize.height;
-    
-    const xOnImage = xOnContainer - offsetX;
-    const yOnImage = yOnContainer - offsetY;
-
-    const xImagePercent = (xOnImage / renderWidth) * 100;
-    const yImagePercent = (yOnImage / renderHeight) * 100;
-    
-    const lon = (xImagePercent / 100) * (bounds.right - bounds.left) + bounds.left;
-    const lat = bounds.top - (yImagePercent / 100) * (bounds.top - bounds.bottom);
-    
-    return [lat, lon];
-}
-
 export function VibeMap({ points, bounds, imageUrl, highlightedPointId, className, isEditable = false, onMapClick }: VibeMapProps) {
   const [viewState, setViewState] = useState({ x: 0, y: 0, scale: 1 });
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -93,19 +63,51 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
   };
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!onMapClick || !mapContainerRef.current) return;
-    const rect = mapContainerRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    
-    const mapX = (clickX - viewState.x) / viewState.scale;
-    const mapY = (clickY - viewState.y) / viewState.scale;
+    if (!onMapClick || !mapContainerRef.current || !imageSize) return;
 
-    const xPercent = (mapX / rect.width) * 100;
-    const yPercent = (mapY / rect.height) * 100;
+    const containerRect = mapContainerRef.current.getBoundingClientRect();
     
-    const coords = unproject(xPercent, yPercent, bounds, imageSize, rect);
-    onMapClick(coords);
+    // 1. Calculate the rendered image dimensions and offsets inside the container
+    const containerRatio = containerRect.width / containerRect.height;
+    const imageRatio = imageSize.width / imageSize.height;
+    let renderWidth, renderHeight, offsetX = 0, offsetY = 0;
+
+    if (imageRatio > containerRatio) { // Image is wider, letterboxed top/bottom
+        renderWidth = containerRect.width;
+        renderHeight = renderWidth / imageRatio;
+        offsetY = (containerRect.height - renderHeight) / 2;
+    } else { // Image is taller, letterboxed left/right
+        renderHeight = containerRect.height;
+        renderWidth = renderHeight * imageRatio;
+        offsetX = (containerRect.width - renderWidth) / 2;
+    }
+
+    // 2. Get click position relative to the container
+    const clickInContainerX = e.clientX - containerRect.left;
+    const clickInContainerY = e.clientY - containerRect.top;
+
+    // 3. Reverse the pan and zoom transformation to find where the click would be on an un-transformed map plane
+    const clickOnPlaneX = (clickInContainerX - viewState.x) / viewState.scale;
+    const clickOnPlaneY = (clickInContainerY - viewState.y) / viewState.scale;
+    
+    // 4. Adjust for letterboxing to get the click position on the image itself
+    const clickOnImageX = clickOnPlaneX - offsetX;
+    const clickOnImageY = clickOnPlaneY - offsetY;
+
+    // 5. Check if the click was outside the rendered image area
+    if (clickOnImageX < 0 || clickOnImageX > renderWidth || clickOnImageY < 0 || clickOnImageY > renderHeight) {
+      return; // Click was in the letterboxed area, ignore it
+    }
+
+    // 6. Convert pixel position on image to percentage
+    const xPercent = (clickOnImageX / renderWidth);
+    const yPercent = (clickOnImageY / renderHeight);
+
+    // 7. Unproject percentage to geographical coordinates
+    const lon = xPercent * (bounds.right - bounds.left) + bounds.left;
+    const lat = bounds.top - (yPercent * (bounds.top - bounds.bottom));
+    
+    onMapClick([lat, lon]);
   }
 
   return (
@@ -181,6 +183,7 @@ export function VibeMap({ points, bounds, imageUrl, highlightedPointId, classNam
                                 width={28}
                                 height={28}
                                 className="rounded-full border-2 border-white/80 object-cover shadow-lg bg-black/50"
+                                unoptimized
                             />
                         ) : (
                             <div className={cn("w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300", point.color)}>

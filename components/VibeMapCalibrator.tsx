@@ -11,6 +11,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { saveMapPreset } from '@/app/rentals/actions';
 import { cn } from '@/lib/utils';
 import { Loading } from './Loading';
+import Image from 'next/image'; // Vibe Architect: Switched to next/image for reliability
 
 interface Bounds { top: number; bottom: number; left: number; right: number; }
 interface Point { id: string; name: string; coords: [number, number]; }
@@ -159,7 +160,20 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
         </div>
         <div ref={mapContainerRef} className="relative w-full aspect-[16/10] bg-black/50 rounded-lg overflow-hidden border-2 border-brand-purple/30">
           {isImageLoading && <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/50"><Loading text="ЗАГРУЗКА КАРТЫ..." /></div>}
-          {mapUrl && <img src={mapUrl} alt="Map Background" className={cn("absolute inset-0 w-full h-full object-contain pointer-events-none", isImageLoading ? "opacity-0" : "opacity-50")} onLoadingComplete={(img) => { setImageSize({width: img.naturalWidth, height: img.naturalHeight}); setIsImageLoading(false); }} />}
+          {mapUrl && 
+            <Image 
+                src={mapUrl} 
+                alt="Map Background" 
+                layout="fill"
+                objectFit="contain"
+                className={cn("pointer-events-none transition-opacity duration-300", isImageLoading ? "opacity-0" : "opacity-50")} 
+                onLoadingComplete={(img) => { 
+                    setImageSize({width: img.naturalWidth, height: img.naturalHeight}); 
+                    setIsImageLoading(false); 
+                }}
+                unoptimized
+            />
+          }
           <div style={calibrationBoxStyle()} className="absolute bg-brand-cyan/10 border-2 border-dashed border-brand-cyan pointer-events-none" />
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
