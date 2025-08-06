@@ -146,7 +146,7 @@ export async function createBooking(userId: string, vehicleId: string, startDate
 
         const description = `Бронь: ${vehicle.make} ${vehicle.model}\nДаты: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}\nСумма залога: ${interestAmount} ₽`;
         
-        await sendTelegramInvoice(userId, "Подтверждение бронирования", description, invoiceId, interestAmount * 100, undefined, vehicle.image_url);
+        await sendTelegramInvoice(userId, "Подтверждение бронирования", description, invoiceId, interestAmount / 100, undefined, vehicle.image_url);
         
         await sendComplexMessage(vehicle.owner_id!, `Новый запрос на бронирование для вашего транспорта (ID: ${vehicleId}) с ${startDate.toLocaleDateString()} по ${endDate.toLocaleDateString()}. Ожидается оплата залога от арендатора.`);
 
