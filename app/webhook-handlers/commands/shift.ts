@@ -58,10 +58,11 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     updateData = { live_status: 'online' };
                     userMessage = "✅ *Смена начата\\.* Время пошло\\.";
                     ownerMessage = `🟢 @${safeUsername} начал смену в экипаже *'${safeCrewName}'*\\.`;
+                    // FIX: Changed start_time to clock_in_time to match schema
                     shiftLogAction = () => supabaseAdmin.from('crew_member_shifts').insert({
-                        member_id: userId, // Assuming member_id is the user_id
+                        member_id: userId,
                         crew_id: crew_id,
-                        start_time: new Date().toISOString()
+                        clock_in_time: new Date().toISOString()
                     });
                 }
                 break;
@@ -70,16 +71,17 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     updateData = { live_status: 'offline', last_location: null };
                     userMessage = `✅ *Смена завершена\\.*\nХорошего отдыха\\!`;
                     ownerMessage = `🔴 @${safeUsername} завершил смену в экипаже *'${safeCrewName}'*\\.`;
+                    // FIX: Changed end_time and start_time to clock_out_time and clock_in_time
                     shiftLogAction = async () => {
                         const { data: latestShift } = await supabaseAdmin.from('crew_member_shifts')
                             .select('id')
                             .eq('member_id', userId)
-                            .is('end_time', null)
-                            .order('start_time', { ascending: false })
+                            .is('clock_out_time', null)
+                            .order('clock_in_time', { ascending: false })
                             .limit(1)
                             .single();
                         if (latestShift) {
-                            return supabaseAdmin.from('crew_member_shifts').update({ end_time: new Date().toISOString() }).eq('id', latestShift.id);
+                            return supabaseAdmin.from('crew_member_shifts').update({ clock_out_time: new Date().toISOString() }).eq('id', latestShift.id);
                         }
                     };
                 }
