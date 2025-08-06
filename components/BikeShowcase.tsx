@@ -1,3 +1,4 @@
+// /components/BikeShowcase.tsx
 "use client";
 
 import React from 'react';
@@ -18,17 +19,17 @@ const bikes: ShowcaseBike[] = [
     { 
         name: "VOGE 525 ACX", 
         description: "Абсолютно новый, потрясающе удобный и маневренный мотоцикл. Доступен уже сегодня!",
-        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/voge-525-acx-2023-a.jpg"
+        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033151-e9dcdbf2-03c3-45a2-87b0-4b22f1a9a084.jpg"
     },
     { 
         name: "Harley-Davidson Fat Boy", 
         description: "Байк в максимальном тюнинге для истинных ценителей. Такого в Нижнем Новгороде еще не было!",
-        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/harley-davidson-fat-boy.jpg"
+        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/fat-1b4c292d-0c2d-452e-8139-93abc671df2d.webp"
     },
     { 
         name: "Ducati X-Diavel", 
         description: "Крутейший пауэр-круизер, который дарит невероятные эмоции. Один из флагманов нашего парка.",
-        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/diavel_v4_p_01_hero.jpg"
+        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250725_233954_223-9d491e27-ba4a-4bcd-8c1d-23e426e1fdd5.jpg"
     }
 ];
 
