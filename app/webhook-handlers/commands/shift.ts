@@ -14,12 +14,11 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
     logger.info(`[Shift Command EXEC] User ${userId}, Action: ${action || 'request_keyboard'}`);
     
     try {
-        // ШАГ 1: Проверяем, что пользователь является АКТИВНЫМ участником
         const { data: crewMember, error: crewError } = await supabaseAdmin
             .from("crew_members")
             .select("crew_id, live_status, crews(owner_id, name)")
             .eq("user_id", userId)
-            .eq("membership_status", "active") // ПРОВЕРЯЕМ ПРАВИЛЬНЫЙ СТАТУС
+            .eq("membership_status", "active")
             .single();
 
         if (crewError || !crewMember) {
@@ -27,12 +26,11 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
             return;
         }
 
-        const { crews: crew, live_status } = crewMember;
+        const { crew_id, crews: crew, live_status } = crewMember;
         if (!crew) throw new Error(`Критическая ошибка: отсутствуют данные экипажа для участника ${userId}`);
         
         const { owner_id: ownerId, name: crewName } = crew;
 
-        // ШАГ 2: Если действия нет - отправляем клавиатуру на основе ЖИВОГО СТАТУСА
         if (!action) {
             let buttons;
             if (live_status === 'offline') {
@@ -46,13 +44,13 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
             return;
         }
 
-        // ШАГ 3: Если действие есть - обрабатываем его
         let updateData: any = {};
         let userMessage = "";
         let ownerMessage = "";
         
         const safeUsername = escapeTelegramMarkdown(username || 'user');
         const safeCrewName = escapeTelegramMarkdown(crewName);
+        let shiftLogAction: (() => Promise<any>) | null = null;
 
         switch (action) {
             case 'clock_in':
@@ -60,6 +58,11 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     updateData = { live_status: 'online' };
                     userMessage = "✅ *Смена начата\\.* Время пошло\\.";
                     ownerMessage = `🟢 @${safeUsername} начал смену в экипаже *'${safeCrewName}'*\\.`;
+                    shiftLogAction = () => supabaseAdmin.from('crew_member_shifts').insert({
+                        member_id: userId, // Assuming member_id is the user_id
+                        crew_id: crew_id,
+                        start_time: new Date().toISOString()
+                    });
                 }
                 break;
             case 'clock_out':
@@ -67,6 +70,18 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     updateData = { live_status: 'offline', last_location: null };
                     userMessage = `✅ *Смена завершена\\.*\nХорошего отдыха\\!`;
                     ownerMessage = `🔴 @${safeUsername} завершил смену в экипаже *'${safeCrewName}'*\\.`;
+                    shiftLogAction = async () => {
+                        const { data: latestShift } = await supabaseAdmin.from('crew_member_shifts')
+                            .select('id')
+                            .eq('member_id', userId)
+                            .is('end_time', null)
+                            .order('start_time', { ascending: false })
+                            .limit(1)
+                            .single();
+                        if (latestShift) {
+                            return supabaseAdmin.from('crew_member_shifts').update({ end_time: new Date().toISOString() }).eq('id', latestShift.id);
+                        }
+                    };
                 }
                 break;
             case 'toggle_ride':
@@ -75,7 +90,7 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                     updateData = { live_status: newStatus };
                     if (newStatus === 'riding') {
                         userMessage = "🏍️ Статус: *На Байке*\\. Теперь отправьте свою геолокацию, чтобы появиться на карте экипажа\\.";
-                    } else { // 'online'
+                    } else {
                         updateData.last_location = null;
                         userMessage = "🏢 Статус: *Онлайн*\\. Снова в боксе, с карты убраны\\.";
                     }
@@ -84,9 +99,9 @@ export async function shiftCommand(chatId: number, userId: string, username?: st
                 break;
         }
         
-        // ШАГ 4: Выполняем изменения в БД и отправляем сообщения
         if (Object.keys(updateData).length > 0) {
             await supabaseAdmin.from("crew_members").update(updateData).eq("user_id", userId).eq("membership_status", "active");
+            if (shiftLogAction) await shiftLogAction();
             
             await sendComplexMessage(chatId, userMessage, [], { removeKeyboard: true, parseMode: 'MarkdownV2' });
 
