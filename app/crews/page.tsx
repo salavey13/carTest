@@ -171,7 +171,10 @@ function CrewsList() {
                         )}
                     </div>
                     <div className="absolute bottom-4 left-4 bg-card/50 backdrop-blur-sm p-2 rounded-lg text-xs font-mono flex items-center gap-2">
-                        <VibeContentRenderer content="::FaSkullCrossbones::" className="text-primary"/> <span>Штаб Экипажа</span>
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center bg-primary">
+                            <VibeContentRenderer content="::FaSkullCrossbones::" className="w-4 h-4 text-white"/>
+                        </div>
+                        <span>Штаб Экипажа</span>
                     </div>
                 </div>
             </div>
