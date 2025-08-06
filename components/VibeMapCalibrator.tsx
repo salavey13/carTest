@@ -11,7 +11,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { saveMapPreset } from '@/app/rentals/actions';
 import { cn } from '@/lib/utils';
 import { Loading } from './Loading';
-import Image from 'next/image'; // Vibe Architect: Switched to next/image for reliability
+import Image from 'next/image';
 
 interface Bounds { top: number; bottom: number; left: number; right: number; }
 interface Point { id: string; name: string; coords: [number, number]; }
@@ -85,6 +85,8 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
     const p2 = REFERENCE_POINTS[1]; // airport
     const pos1 = positions[p1.id];
     const pos2 = positions[p2.id];
+
+    if(!pos1 || !pos2) return;
 
     const containerSize = { width: mapContainerRef.current.offsetWidth, height: mapContainerRef.current.offsetHeight };
     const aspectRatio = imageSize.width / imageSize.height;
@@ -185,6 +187,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
                       left: `${positions[point.id]?.x ?? 50}%`,
                       top: `${positions[point.id]?.y ?? 50}%`,
                       transform: 'translate(-50%, -50%)',
+                      zIndex: 10
                   }}
               >
                 <motion.div
@@ -205,7 +208,7 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
 
                         setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
                     }}
-                    className="w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50 z-10"
+                    className="w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50"
                     whileDrag={{ scale: 1.2 }}
                 >
                     <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
