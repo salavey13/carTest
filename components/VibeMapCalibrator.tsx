@@ -188,7 +188,11 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
                   setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
                 }}
                 className="absolute w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50 z-10"
-                initial={{ x: `${positions[point.id]?.x}%`, y: `${positions[point.id]?.y}%`, translateX: '-50%', translateY: '-50%' }}
+                style={{
+                  left: `${positions[point.id]?.x ?? 50}%`,
+                  top: `${positions[point.id]?.y ?? 50}%`,
+                  transform: 'translate(-50%, -50%)'
+                }}
                 whileDrag={{ scale: 1.2 }}
               >
                 <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
