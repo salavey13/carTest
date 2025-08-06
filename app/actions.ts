@@ -225,14 +225,54 @@ export async function sendTelegramDocument(chatId: string, fileContent: string, 
 
 export async function sendTelegramInvoice(chatId: string, title: string, description: string, payload: string, amount: number, subscription_id: number = 0, photo_url?: string): Promise<{ success: boolean; data?: any; error?: string }> {
   if (!TELEGRAM_BOT_TOKEN) { return { success: false, error: "Telegram bot token not configured" }; }
-  const PROVIDER_TOKEN = ""; const currency = "XTR"; const prices = [{ label: title, amount: amount }]; 
+
+  // Vibe Architect's intervention: Ensure amount is a valid integer for Telegram.
+  // We round up as requested by the user ("please round up the interest amount calculation").
+  const finalAmount = Math.ceil(amount);
+  
+  // Telegram's constraints for XTR currency
+  const MIN_AMOUNT = 1;
+  const MAX_AMOUNT = 10000;
+
+  if (finalAmount < MIN_AMOUNT || finalAmount > MAX_AMOUNT) {
+    const errorMsg = `Calculated amount ${finalAmount} is outside the valid range of ${MIN_AMOUNT}-${MAX_AMOUNT} for XTR currency. Original amount: ${amount}.`;
+    logger.error(`[sendTelegramInvoice] ${errorMsg}`);
+    return { success: false, error: errorMsg };
+  }
+
+  const PROVIDER_TOKEN = ""; 
+  const currency = "XTR"; 
+  // Use the validated & rounded integer amount
+  const prices = [{ label: title, amount: finalAmount }]; 
+  
   const requestBody: Record<string, any> = { chat_id: chatId, title, description, payload, provider_token: PROVIDER_TOKEN, currency, prices, start_parameter: "pay" };
   if (photo_url) Object.assign(requestBody, { photo_url, photo_size: 600, photo_width: 600, photo_height: 400 });
+
   try {
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendInvoice`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
     const data: TelegramApiResponse = await response.json();
-    if (!data.ok) { logger.error(`Telegram API error (sendInvoice): ${data.description || "Unknown error"}`, { chatId, payload, errorCode: data.error_code }); throw new Error(`Telegram API error: ${data.description || "Failed to send invoice"}`);}
-    try { await supabaseAdmin.from("invoices").insert({ id: payload, user_id: chatId, amount: amount, type: payload.split("_")[0], status: "pending", metadata: { description, title }, subscription_id: subscription_id || null }); } catch (dbError: any) { logger.error(`Failed to save invoice ${payload} to DB after sending: ${dbError.message}`); }
+    if (!data.ok) { 
+        // Log the exact payload that failed for easier debugging
+        logger.error(`Telegram API error (sendInvoice): ${data.description || "Unknown error"}`, { chatId, payload, errorCode: data.error_code, bodySent: requestBody }); 
+        throw new Error(`Telegram API error: ${data.description || "Failed to send invoice"}`);
+    }
+    
+    // Attempt to save the invoice to the DB after it's been sent
+    try { 
+      await supabaseAdmin.from("invoices").insert({ 
+        id: payload, 
+        user_id: chatId, 
+        amount: finalAmount, // Save the amount that was actually billed
+        type: payload.split("_")[0], 
+        status: "pending", 
+        metadata: { description, title, original_unrounded_amount: amount }, // Store original amount for reference
+        subscription_id: subscription_id || null 
+      }); 
+    } catch (dbError: any) { 
+      // This is not a fatal error for the user, but should be logged.
+      logger.error(`Failed to save invoice ${payload} to DB after sending: ${dbError.message}`); 
+    }
+    
     return { success: true, data: data.result };
   } catch (error) {
     logger.error("Error in sendTelegramInvoice:", error);
@@ -730,7 +770,6 @@ export async function getUserPaddockData(userId: string) {
         return { success: false, error: error instanceof Error ? error.message : "Unknown error fetching paddock data" };
     }
 }
-
 
 export async function getMapPresets(): Promise<{ success: boolean; data?: Database['public']['Tables']['maps']['Row'][]; error?: string; }> {
     try {
