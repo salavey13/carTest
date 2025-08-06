@@ -11,7 +11,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { saveMapPreset } from '@/app/rentals/actions';
 import { cn } from '@/lib/utils';
 import { Loading } from './Loading';
-import Image from 'next/image'; // Vibe Architect: Switched to next/image for reliability
+import Image from 'next/image';
 
 interface Bounds { top: number; bottom: number; left: number; right: number; }
 interface Point { id: string; name: string; coords: [number, number]; }
@@ -86,6 +86,8 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
     const pos1 = positions[p1.id];
     const pos2 = positions[p2.id];
 
+    if(!pos1 || !pos2) return;
+
     const containerSize = { width: mapContainerRef.current.offsetWidth, height: mapContainerRef.current.offsetHeight };
     const aspectRatio = imageSize.width / imageSize.height;
     const containerRatio = containerSize.width / containerSize.height;
@@ -140,16 +142,17 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
   };
 
   const calibrationBoxStyle = () => {
-    if (!isCalibrating || Object.keys(positions).length < 2) return { display: 'none' };
+    if (!isCalibrating || Object.keys(positions).length < 2 || !positions[REFERENCE_POINTS[0].id] || !positions[REFERENCE_POINTS[1].id]) {
+        return { display: 'none' };
+    }
     const pos1 = positions[REFERENCE_POINTS[0].id];
     const pos2 = positions[REFERENCE_POINTS[1].id];
-    if (!pos1 || !pos2) return { display: 'none' };
     const left = Math.min(pos1.x, pos2.x);
     const top = Math.min(pos1.y, pos2.y);
     const width = Math.abs(pos1.x - pos2.x);
     const height = Math.abs(pos1.y - pos2.y);
     return { left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%` };
-  };
+};
 
   return (
     <TooltipProvider>
@@ -177,26 +180,40 @@ export function VibeMapCalibrator({ initialBounds }: { initialBounds: Bounds }) 
           <div style={calibrationBoxStyle()} className="absolute bg-brand-cyan/10 border-2 border-dashed border-brand-cyan pointer-events-none" />
           {isCalibrating ? (
             REFERENCE_POINTS.map(point => (
-              <motion.div
-                key={point.id}
-                drag dragMomentum={false} dragConstraints={mapContainerRef}
-                onDragEnd={(_, info) => {
-                  if (!mapContainerRef.current) return;
-                  const rect = mapContainerRef.current.getBoundingClientRect();
-                  const newX = Math.max(0, Math.min(100, ((info.point.x - rect.left) / rect.width) * 100));
-                  const newY = Math.max(0, Math.min(100, ((info.point.y - rect.top) / rect.height) * 100));
-                  setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
-                }}
-                className="absolute w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50 z-10"
-                style={{
-                  left: `${positions[point.id]?.x ?? 50}%`,
-                  top: `${positions[point.id]?.y ?? 50}%`,
-                  transform: 'translate(-50%, -50%)'
-                }}
-                whileDrag={{ scale: 1.2 }}
+              <div
+                  key={point.id}
+                  className="absolute"
+                  style={{
+                      left: `${positions[point.id]?.x ?? 50}%`,
+                      top: `${positions[point.id]?.y ?? 50}%`,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: 10
+                  }}
               >
-                <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
-              </motion.div>
+                <motion.div
+                    drag
+                    dragMomentum={false}
+                    dragConstraints={mapContainerRef}
+                    onDragEnd={(_, info) => {
+                        if (!mapContainerRef.current) return;
+                        const rect = mapContainerRef.current.getBoundingClientRect();
+                        const parentPos = positions[point.id]
+                        if(!parentPos) return;
+
+                        const deltaXPercent = (info.offset.x / rect.width) * 100;
+                        const deltaYPercent = (info.offset.y / rect.height) * 100;
+
+                        const newX = Math.max(0, Math.min(100, parentPos.x + deltaXPercent));
+                        const newY = Math.max(0, Math.min(100, parentPos.y + deltaYPercent));
+
+                        setPositions(prev => ({ ...prev, [point.id]: { x: newX, y: newY } }));
+                    }}
+                    className="w-8 h-8 bg-brand-lime rounded-full cursor-grab active:cursor-grabbing flex items-center justify-center text-black shadow-lg shadow-brand-lime/50"
+                    whileDrag={{ scale: 1.2 }}
+                >
+                    <Tooltip><TooltipTrigger asChild><span><VibeContentRenderer content="::FaLocationDot::" /></span></TooltipTrigger><TooltipContent><p>{point.name}</p></TooltipContent></Tooltip>
+                </motion.div>
+              </div>
             ))
           ) : (
             imageSize && mapContainerRef.current && REFERENCE_POINTS.map(point => {
