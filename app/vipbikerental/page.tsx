@@ -67,7 +67,7 @@ export default function HomePage() {
                 {/* ==================================================================== */}
                 {/* ✨ НОВЫЙ АНИМИРОВАННЫЙ ЗАГОЛОВОК ✨ */}
                 {/* ==================================================================== */}
-                <h1 className="text-2xl md:text-6xl title-wheelie-effect">
+                <h1 className="text-lg title-wheelie-effect">
                   {titleText.split("").map((char, i) => (
                     <span key={i} style={{ transitionDelay: `${i * 20}ms` }}>
                       {char === " " ? "\u00A0" : char}
