@@ -1,3 +1,4 @@
+// /components/BikeShowcase.tsx
 "use client";
 
 import React from 'react';
@@ -16,7 +17,7 @@ type ShowcaseBike = {
 
 const bikes: ShowcaseBike[] = [
     {
-        name: "MV Agusta Brutale & BMW S1000RR HP4",
+        name: "MV Agusta Brutale & BMW HP4",
         description: "Два титана нашего парка. Необузданный итальянский нейкед и ультимативный немецкий гиперспорт. Выбор за тобой.",
         imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1-bfd373e6-8e1e-4570-ba5a-53e909b968e8.jpg"
     },
