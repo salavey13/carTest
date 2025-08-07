@@ -1,3 +1,4 @@
+// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
@@ -66,7 +67,7 @@ export default function HomePage() {
                 {/* ==================================================================== */}
                 {/* ✨ НОВЫЙ АНИМИРОВАННЫЙ ЗАГОЛОВОК ✨ */}
                 {/* ==================================================================== */}
-                <h1 className="text-4xl md:text-6xl text-shadow-neon title-wheelie-effect">
+                <h1 className="text-lg title-wheelie-effect">
                   {titleText.split("").map((char, i) => (
                     <span key={i} style={{ transitionDelay: `${i * 20}ms` }}>
                       {char === " " ? "\u00A0" : char}
@@ -78,7 +79,7 @@ export default function HomePage() {
                 <div className="mt-8">
                     <Link href="/rent-bike">
                         <Button size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
-                            <VibeContentRenderer content="::FaMotorcycle:: ВЫБРАТЬ БАЙК" />
+                            <VibeContentRenderer content="::FaMotorcycle className='mr-2':: ВЫБРАТЬ БАЙК" />
                         </Button>
                     </Link>
                 </div>
