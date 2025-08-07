@@ -117,7 +117,7 @@ export default function HomePage() {
                     title="Наши Услуги"
                     icon="::FaWrench::"
                     borderColorClass="border-primary text-primary"
-                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/servicefplaceholder.jpg"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_bg-cf31dc2b-291b-440b-953b-6e1b4a838e4e.jpg"
                     items={[
                         { icon: "::FaTools::", text: "Обслуживание и ремонт вашего мотоцикла" },
                         { icon: "::FaGamepad::", text: "Лаунж-зона с кальяном и игровыми приставками" },
