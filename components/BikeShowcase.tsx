@@ -1,4 +1,3 @@
-// /components/BikeShowcase.tsx
 "use client";
 
 import React from 'react';
@@ -16,20 +15,20 @@ type ShowcaseBike = {
 };
 
 const bikes: ShowcaseBike[] = [
-    { 
-        name: "VOGE 525 ACX", 
-        description: "Абсолютно новый, потрясающе удобный и маневренный мотоцикл. Доступен уже сегодня!",
-        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/1000033151-e9dcdbf2-03c3-45a2-87b0-4b22f1a9a084.jpg"
+    {
+        name: "Ducati Diavel & BMW S1000RR HP4",
+        description: "Два титана нашего парка в одном кадре. Брутальный итальянский пауэр-круизер и ультимативный немецкий гиперспорт. Выбор за тобой.",
+        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1-bfd373e6-8e1e-4570-ba5a-53e909b968e8.jpg"
     },
-    { 
-        name: "Harley-Davidson Fat Boy", 
-        description: "Байк в максимальном тюнинге для истинных ценителей. Такого в Нижнем Новгороде еще не было!",
-        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/fat-1b4c292d-0c2d-452e-8139-93abc671df2d.webp"
+    {
+        name: "BMW F800R",
+        description: "Надежный и сбалансированный нейкед от BMW. Идеален как для города, так и для динамичных прохватов по извилистым дорогам.",
+        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/2-af1aa642-520c-45ad-a9e7-8430a2fbd183.jpg"
     },
-    { 
-        name: "Ducati X-Diavel", 
-        description: "Крутейший пауэр-круизер, который дарит невероятные эмоции. Один из флагманов нашего парка.",
-        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250725_233954_223-9d491e27-ba4a-4bcd-8c1d-23e426e1fdd5.jpg"
+    {
+        name: "Harley-Davidson Custom",
+        description: "Легенда в кастомном исполнении. Этот байк - чистое заявление о себе на дороге. Для тех, кто ценит стиль и мощь.",
+        imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/3-3134724b-2b60-4113-a748-fcd4b5dadd40.jpg"
     }
 ];
 
