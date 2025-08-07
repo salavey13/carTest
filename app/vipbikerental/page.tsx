@@ -1,4 +1,3 @@
-// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
@@ -9,7 +8,7 @@ import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { BikeShowcase } from '@/components/BikeShowcase';
-import { cn } from "@/lib/utils"; // <-- ВОТ ОН, ИСПРАВЛЕННЫЙ ИМПОРТ
+import { cn } from "@/lib/utils";
 
 const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode }) => (
     <div className="flex items-start gap-3">
@@ -50,32 +49,42 @@ const ServiceCard = ({ title, icon, items, imageUrl, borderColorClass }: { title
 );
 
 export default function HomePage() {
-  const titleText = "АРЕНДА МОТОЦИКЛОВ VIPBIKE";
+  // const titleText = "АРЕНДА МОТОЦИКЛОВ VIPBIKE"; // Больше не используется
 
   return (
     <div className="relative min-h-screen bg-background overflow-hidden text-foreground dark">
-        <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center text-center text-white p-4">
+        {/* ==================================================================== */}
+        {/* ✨ HERO-СЕКЦИЯ ОБНОВЛЕНА ✨ */}
+        {/* ==================================================================== */}
+        <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white p-4">
             <div className="absolute inset-0 z-0">
-                <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/c968f2ac-0e6d-4c9f-b3f5-668b5a0349f7-72ba0076-a077-4c3d-9d41-3b7640c4f8d4.jpg" alt="Motorcycles lineup" layout="fill" objectFit="cover" className="brightness-50" priority />
+                <Image 
+                  src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/hero-4f94e671-c5c8-4405-ab08-8f9a47e1ad69.jpg" 
+                  alt="Мотоциклист делает вилли на фоне заката" 
+                  layout="fill" 
+                  objectFit="cover" 
+                  className="brightness-50 animate-pan-zoom" // Добавлена анимация для динамики
+                  priority 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
             </div>
             <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8 }}
-                className="relative z-10"
+                className="relative z-10 flex flex-col items-center"
             >
                 {/* ==================================================================== */}
-                {/* ✨ НОВЫЙ АНИМИРОВАННЫЙ ЗАГОЛОВОК ✨ */}
+                {/* ✨ НОВЫЙ БОЛЬШОЙ И СМЕЛЫЙ ЗАГОЛОВОК ✨ */}
                 {/* ==================================================================== */}
-                <h1 className="text-lg title-wheelie-effect">
-                  {titleText.split("").map((char, i) => (
-                    <span key={i} style={{ transitionDelay: `${i * 20}ms` }}>
-                      {char === " " ? "\u00A0" : char}
-                    </span>
-                  ))}
+                <h1 className="font-orbitron font-black uppercase text-shadow-neon text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
+                    <span className="block drop-shadow-lg">Твоя Свобода</span>
+                    <span className="block text-primary drop-shadow-lg">В Движении</span>
                 </h1>
                 {/* ==================================================================== */}
-                <p className="max-w-2xl mx-auto mt-4 text-lg text-foreground/80">Твой байк на любой вкус: от круизеров до спортбайков. Выбери свой вайб и покори город. Лидеры проката в Нижнем Новгороде!</p>
+                <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-foreground/80 font-light">
+                    VIPBIKE: Лидеры проката мотоциклов в Нижнем Новгороде. <br/>От брутальных круизеров до яростных спортбайков — выбери свой вайб.
+                </p>
                 <div className="mt-8">
                     <Link href="/rent-bike">
                         <Button size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
