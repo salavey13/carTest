@@ -1,3 +1,4 @@
+// /app/actions.ts
 "use server"; 
 
 import {
@@ -78,6 +79,8 @@ interface CreateCrewArgs {
   hq_location: string;
 }
 
+// /app/actions.ts
+
 export async function createCrew({ name, description, logo_url, owner_id, slug, hq_location }: CreateCrewArgs): Promise<{
   success: boolean;
   data?: Database['public']['Tables']['crews']['Row'];
@@ -98,6 +101,7 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
     if (slugError) throw slugError;
     if (existingCrew) throw new Error(`Экипаж с таким slug (${slug}) уже существует.`);
 
+    // --- Step 1: Create the crew ---
     const { data, error } = await supabaseAdmin
       .from("crews")
       .insert([{
@@ -112,7 +116,44 @@ export async function createCrew({ name, description, logo_url, owner_id, slug, 
       .single();
 
     if (error) throw error;
+    
+    // Vibe Architect's Fix: Start of new logic after successful crew creation
+    
+    // --- Step 2: Add the owner as the first member of the crew ---
+    const { error: memberError } = await supabaseAdmin
+      .from('crew_members')
+      .insert({
+        crew_id: data.id,
+        user_id: owner_id,
+        role: 'owner', // Assign the 'owner' role
+      });
 
+    if (memberError) {
+      // If we can't add the owner, this is a critical failure.
+      logger.error(`[createCrew Action] Failed to add owner ${owner_id} to new crew ${data.id}:`, memberError);
+      // Optional: attempt to delete the orphaned crew record here
+      await supabaseAdmin.from('crews').delete().eq('id', data.id);
+      throw new Error("Не удалось назначить владельца экипажа. Создание отменено.");
+    }
+    logger.info(`[createCrew Action] Owner ${owner_id} successfully added to crew ${data.id}.`);
+
+    // --- Step 3: Update all of the owner's bikes to belong to the new crew ---
+    const { error: updateBikesError } = await supabaseAdmin
+      .from('cars') // 'cars' is the table for all vehicles
+      .update({ crew_id: data.id })
+      .eq('owner_id', owner_id)
+      .eq('type', 'bike'); // Specifically target vehicles of type 'bike'
+
+    if (updateBikesError) {
+      // This is not a critical failure, but we should log it. The crew is still valid.
+      logger.error(`[createCrew Action] Failed to assign bikes of owner ${owner_id} to new crew ${data.id}:`, updateBikesError);
+      // We don't throw an error here, but we could add a warning to the return message.
+    } else {
+      logger.info(`[createCrew Action] Successfully assigned bikes for owner ${owner_id} to new crew ${data.id}.`);
+    }
+    
+    // End of new logic
+    
     return { success: true, data: data };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
