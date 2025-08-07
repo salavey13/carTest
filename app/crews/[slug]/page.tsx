@@ -1,3 +1,4 @@
+// /app/crews/[slug]/page.tsx
 "use client";
 
 import { getCrewLiveDetails, getMapPresets, getUserCrewCommandDeck, requestToJoinCrew, confirmCrewMember } from '@/app/rentals/actions';
@@ -243,7 +244,7 @@ function CrewDetailContent({ slug }: { slug: string }) {
                 <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-1 space-y-6">
                         <div className="bg-card/70 backdrop-blur-sm border border-border p-4 rounded-xl sticky top-24">
-                            <h2 className="text-2xl font-orbitron text-secondary mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaMapMarkedAlt::"/> Карта Экипажа</h2>
+                            <h2 className="text-2xl font-orbitron text-secondary mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaMapLocationDot::"/> Карта Экипажа</h2>
                             <VibeMap points={mapPoints} bounds={defaultMap.bounds as MapBounds} imageUrl={defaultMap.map_image_url} className="h-96"/>
                         </div>
                     </div>
