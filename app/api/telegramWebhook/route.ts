@@ -77,19 +77,51 @@ async function handlePhotoMessage(message: any) {
     }
 }
 
+// --- ИЗМЕНЕНО: Эта функция теперь является универсальным обработчиком геолокации ---
 async function handleLocationMessage(message: any) {
     const userId = message.from.id.toString();
     const chatId = message.chat.id;
     const { latitude, longitude } = message.location;
 
+    // --- ДОБАВЛЕНО: Сценарий 1 - Обновление геолокации члена экипажа на смене ---
+    try {
+        const { data: member, error: memberError } = await supabaseAdmin
+            .from('crew_members')
+            .select('live_status')
+            .eq('user_id', userId)
+            .eq('membership_status', 'active')
+            .single();
+        
+        if (memberError && memberError.code !== 'PGRST116') throw memberError;
+
+        // Если участник в статусе 'riding', обновляем его геолокацию и прекращаем дальнейшую обработку.
+        if (member && member.live_status === 'riding') {
+            const { error: updateError } = await supabaseAdmin
+                .from('crew_members')
+                .update({ last_location: `POINT(${longitude} ${latitude})` })
+                .eq('user_id', userId);
+            
+            if (updateError) throw updateError;
+            logger.info(`[Shift Location Update] Updated location for riding user ${userId}`);
+            // Важно: выходим из функции, так как задача выполнена.
+            return; 
+        }
+    } catch (error) {
+        // Не фатально. Просто логируем и позволяем коду перейти к проверке состояний.
+        logger.error(`[Shift Location Check] Could not check/update rider status for user ${userId}`, error);
+    }
+
+    // --- Сценарий 2 и 3: Обработка на основе состояния пользователя (user_states) ---
     const { data: userState, error: stateError } = await supabaseAdmin
         .from('user_states').select('*').eq('user_id', userId).single();
 
+    // Если состояния нет (и это не райдер на смене), то игнорируем.
     if (stateError || !userState) {
-        logger.info(`[Webhook] Location from user ${userId} received without any state. Ignoring.`);
+        logger.info(`[Webhook] Location from user ${userId} received without any state or active 'riding' status. Ignoring.`);
         return;
     }
     
+    // Сценарий 2: Пользователь отправляет геоточку для SOS
     if (userState.state === 'awaiting_sos_geotag') {
         const { rental_id, crew_id } = userState.context as { rental_id: string, crew_id: string };
         
@@ -124,7 +156,8 @@ async function handleLocationMessage(message: any) {
             await sendComplexMessage(chatId, `🚨 Ошибка при обработке геотега. Пожалуйста, попробуйте снова.`, [], undefined);
         }
 
-    } else if (userState.state === 'awaiting_geotag') { // Original Drop Anywhere logic
+    // Сценарий 3: Пользователь отправляет геоточку для "Бросить где угодно"
+    } else if (userState.state === 'awaiting_geotag') { 
         const { rental_id, event_id } = userState.context as { rental_id: string, event_id: string };
         try {
             const { error: eventUpdateError } = await supabaseAdmin
@@ -143,7 +176,6 @@ async function handleLocationMessage(message: any) {
     }
 }
 
-
 export async function POST(request: Request) {
   try {
     const update = await request.json();
@@ -155,6 +187,9 @@ export async function POST(request: Request) {
       await handlePhotoMessage(update.message);
     } else if (update.message?.location) {
       await handleLocationMessage(update.message);
+    // --- ЗАКОММЕНТИРОВАНО: Обработка "живых" геоточек отключена для экономии ресурсов Supabase ---
+    // } else if (update.edited_message?.location) {
+    //   await handleLocationMessage(update.edited_message);
     } else if (update.message?.text || update.callback_query) {
       await handleCommand(update);
     } else {
