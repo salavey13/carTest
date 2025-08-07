@@ -16,8 +16,8 @@ type ShowcaseBike = {
 
 const bikes: ShowcaseBike[] = [
     {
-        name: "Ducati Diavel & BMW S1000RR HP4",
-        description: "Два титана нашего парка в одном кадре. Брутальный итальянский пауэр-круизер и ультимативный немецкий гиперспорт. Выбор за тобой.",
+        name: "MV Agusta Brutale & BMW S1000RR HP4",
+        description: "Два титана нашего парка. Необузданный итальянский нейкед и ультимативный немецкий гиперспорт. Выбор за тобой.",
         imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1-bfd373e6-8e1e-4570-ba5a-53e909b968e8.jpg"
     },
     {
@@ -45,10 +45,11 @@ export function BikeShowcase() {
               alt={bike.name}
               layout="fill"
               objectFit="cover"
-              className="brightness-75"
+              className="brightness-50"
               priority={index === 0}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+            {/* ✨ ГРАДИЕНТ КАК НА HERO-СЕКЦИИ ✨ */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
             <div className="absolute inset-0 flex flex-col justify-end items-center text-center text-white p-8">
               <motion.div
                 initial={{ opacity: 0, y: 50 }}
