@@ -21,6 +21,8 @@ import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
 
+// --- УДАЛЕНО: Вся эта функция больше не нужна. Логика перенесена в /app/api/telegramWebhook/route.ts ---
+/*
 async function handleLocationUpdate(userId: string, location: { latitude: number; longitude: number; }) {
     try {
         const { data: member } = await supabaseAdmin
@@ -44,21 +46,26 @@ async function handleLocationUpdate(userId: string, location: { latitude: number
         logger.error(`[Location Update] Failed for user ${userId}`, error);
     }
 }
+*/
 
 export async function handleCommand(update: any) {
+    // --- УДАЛЕНО: Этот блок `if` теперь обрабатывается в /app/api/telegramWebhook/route.ts ---
+    /*
     if (update.message?.location) {
         const userId: string = String(update.message.from.id);
         const location = update.message.location;
         await handleLocationUpdate(userId, location);
         return;
     }
+    */
 
-    if (update.message?.text) {
-        const text: string = update.message.text;
-        const chatId: number = update.message.chat.id;
-        const userId: number = update.message.from.id;
+    // --- ИЗМЕНЕНО: условие теперь проверяет только текстовые сообщения и колбэки ---
+    if (update.message?.text || update.callback_query) {
+        const text: string = update.message?.text || update.callback_query?.data;
+        const chatId: number = update.message?.chat.id || update.callback_query?.message.chat.id;
+        const userId: number = update.message?.from.id || update.callback_query?.from.id;
         const userIdStr = String(userId);
-        const username: string | undefined = update.message.from.username;
+        const username: string | undefined = update.message?.from.username || update.callback_query?.from.username;
         const parts = text.split(' ');
         const command = parts[0].toLowerCase();
         const args = parts.slice(1);
@@ -66,7 +73,7 @@ export async function handleCommand(update: any) {
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
 
         const commandMap: { [key: string]: Function } = {
-            "/start": () => startCommand(chatId, userId, update.message.from, text),
+            "/start": () => startCommand(chatId, userId, update.message?.from || update.callback_query?.from, text),
             "/help": () => helpCommand(chatId, userId),
             "/shift": () => shiftCommand(chatId, userIdStr, username),
             "/actions": () => actionsCommand(chatId, userIdStr),
@@ -118,7 +125,7 @@ export async function handleCommand(update: any) {
             }
 
             const { data: activeSurvey } = await supabaseAdmin.from("user_survey_state").select('user_id').eq('user_id', String(userId)).maybeSingle();
-            if (activeSurvey) {
+            if (activeSurvey && update.message?.from) {
                 await startCommand(chatId, userId, update.message.from, text);
             } else {
                 logger.warn(`[Command Handler] Unknown command for user ${userId}. Text: '${text}'`);
