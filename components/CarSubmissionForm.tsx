@@ -3,7 +3,7 @@ import React, { useState, useEffect, useId } from "react";
 import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { X, Car, Bike, PlusCircle, Image as ImageIcon } from "lucide-react";
+// ИЗМЕНЕНИЕ: Полностью удален импорт из 'lucide-react'
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import type { Database } from "@/types/database.types";
 type VehicleData = Partial<Database['public']['Tables']['cars']['Row']>;
 type SpecItem = { id: string; key: string; value: string };
 type GalleryItem = { id: string; url: string };
-type VehicleType = 'car' | 'bike';
+type BikeSubtype = 'road' | 'enduro'; // Визуальный подтип для формы
 
 interface CarSubmissionFormProps {
   ownerId?: string;
@@ -25,13 +25,15 @@ interface CarSubmissionFormProps {
   onSuccess?: () => void;
 }
 
-const carSpecKeys = ["version", "electric", "color", "theme", "horsepower", "torque", "acceleration", "topSpeed"];
-const bikeSpecKeys = ["engine_cc", "horsepower", "weight_kg", "top_speed_kmh", "type", "seat_height_mm"];
+// Оригинальные спеки для шоссейных мотоциклов
+const roadBikeSpecKeys = ["engine_cc", "horsepower", "weight_kg", "top_speed_kmh", "type", "seat_height_mm"];
+// Новые спеки для эндуро/кросс
+const enduroBikeSpecKeys = ["engine_cc", "dry_weight_kg", "seat_height_mm", "suspension_travel_mm", "ground_clearance_mm", "bike_class", "horsepower", "fuel_tank_capacity_l"];
 
 export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubmissionFormProps) {
   const isEditMode = !!vehicleToEdit;
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [vehicleType, setVehicleType] = useState<VehicleType>('bike');
+  const [bikeSubtype, setBikeSubtype] = useState<BikeSubtype>('road'); // Состояние для подтипа
   const [formData, setFormData] = useState({
     make: "", model: "", description: "", daily_price: "", image_url: "",
   });
@@ -47,18 +49,27 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         make: vehicleToEdit.make || "", model: vehicleToEdit.model || "", description: vehicleToEdit.description || "",
         daily_price: vehicleToEdit.daily_price?.toString() || "", image_url: vehicleToEdit.image_url || "",
       });
-      setVehicleType(vehicleToEdit.type === 'car' ? 'car' : 'bike');
       setImagePreview(vehicleToEdit.image_url || null);
       setImageFile(null);
+      
       if (vehicleToEdit.specs && typeof vehicleToEdit.specs === 'object') {
         const specEntries = Object.entries(vehicleToEdit.specs);
         const regularSpecs = specEntries.filter(([key]) => key !== 'gallery').map(([key, value]) => ({ id: uuidv4(), key, value: String(value) }));
         setSpecs(regularSpecs);
+
+        const vehicleKeys = Object.keys(vehicleToEdit.specs);
+        if (vehicleKeys.some(key => ['suspension_travel_mm', 'ground_clearance_mm', 'bike_class'].includes(key))) {
+            setBikeSubtype('enduro');
+        } else {
+            setBikeSubtype('road');
+        }
+
         const galleryUrls = (vehicleToEdit.specs as any).gallery || [];
         setGallery(galleryUrls.map((url: string) => ({ id: uuidv4(), url })));
       } else {
         setSpecs([]);
         setGallery([]);
+        setBikeSubtype('road');
       }
     } else {
       setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
@@ -66,7 +77,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       setGallery([]);
       setImageFile(null);
       setImagePreview(null);
-      setVehicleType('bike');
+      setBikeSubtype('road');
     }
   }, [vehicleToEdit]);
 
@@ -85,12 +96,14 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
   const handleSpecChange = (id: string, field: 'key' | 'value', newValue: string) => {
     setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
   };
+
   const addNewSpec = () => {
     const currentSpecKeys = specs.map(s => s.key);
-    const availableKeys = vehicleType === 'bike' ? bikeSpecKeys : carSpecKeys;
+    const availableKeys = bikeSubtype === 'enduro' ? enduroBikeSpecKeys : roadBikeSpecKeys;
     const nextKey = availableKeys.find(k => !currentSpecKeys.includes(k));
     setSpecs(currentSpecs => [...currentSpecs, { id: uuidv4(), key: nextKey || "", value: "" }]);
   };
+
   const removeSpec = (id: string) => setSpecs(s => s.filter(spec => spec.id !== id));
   const handleGalleryChange = (id: string, url: string) => {
     setGallery(g => g.map(item => item.id === id ? { ...item, url } : item));
@@ -105,7 +118,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         return;
     }
     setIsSubmitting(true);
-    toast.info(isEditMode ? "Обновление транспорта..." : "Добавление транспорта...");
+    toast.info(isEditMode ? "Обновление техники..." : "Добавление техники...");
     try {
       let imageUrl = formData.image_url;
       if (imageFile) {
@@ -118,27 +131,31 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         }
       }
       if (!imageUrl) throw new Error("Необходимо указать URL изображения или загрузить файл.");
+      
       const specsObject = specs.reduce((acc, { key, value }) => {
         if (key) acc[key] = value;
         return acc;
       }, {} as Record<string, any>);
+      
       const galleryUrls = gallery.map(item => item.url).filter(Boolean);
       if (galleryUrls.length > 0) {
         specsObject.gallery = galleryUrls;
       }
+
       const vehicleData = {
         make: formData.make, model: formData.model, description: formData.description,
-        specs: specsObject, daily_price: Number(formData.daily_price), image_url: imageUrl, type: vehicleType,
+        specs: specsObject, daily_price: Number(formData.daily_price), image_url: imageUrl, type: 'bike',
       };
+
       if (isEditMode) {
         const { error } = await supabaseAdmin.from("cars").update(vehicleData).eq('id', vehicleToEdit.id!);
         if (error) throw error;
-        toast.success("Транспорт успешно обновлен!");
+        toast.success("Техника успешно обновлена!");
       } else {
         const id = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}-${uuidv4().substring(0,8)}`;
         const { error } = await supabaseAdmin.from("cars").insert([{ ...vehicleData, id, owner_id: ownerId! }]);
         if (error) throw error;
-        toast.success("Транспорт успешно добавлен в гараж!");
+        toast.success("Техника успешно добавлена в гараж!");
       }
       onSuccess?.();
     } catch (error) {
@@ -157,18 +174,23 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       animate={{ opacity: 1, scale: 1 }}
     >
       <div className="flex justify-center gap-4 p-2 bg-input/50 rounded-lg border border-dashed border-border">
-          <Button type="button" onClick={() => setVehicleType('bike')} variant={vehicleType === 'bike' ? 'secondary' : 'ghost'} className="gap-2"><Bike /> Мотоцикл</Button>
-          <Button type="button" onClick={() => setVehicleType('car')} variant={vehicleType === 'car' ? 'secondary' : 'ghost'} className="gap-2"><Car /> Автомобиль</Button>
+          {/* ИЗМЕНЕНИЕ: Lucide иконки заменены на VibeContentRenderer */}
+          <Button type="button" onClick={() => setBikeSubtype('road')} variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} className="gap-2">
+            <VibeContentRenderer content="::FaRoad::"/> Шоссейный
+          </Button>
+          <Button type="button" onClick={() => setBikeSubtype('enduro')} variant={bikeSubtype === 'enduro' ? 'secondary' : 'ghost'} className="gap-2">
+            <VibeContentRenderer content="::FaMountain::"/> Эндуро/Кросс
+          </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label className="text-sm font-mono text-accent-text mb-1.5 block">Марка</Label>
-          <Input value={formData.make} onChange={e => setFormData(p => ({ ...p, make: e.target.value }))} placeholder={vehicleType === 'bike' ? 'Ducati' : 'Tesla'} className="input-cyber" required/>
+          <Input value={formData.make} onChange={e => setFormData(p => ({ ...p, make: e.target.value }))} placeholder={bikeSubtype === 'road' ? 'Ducati' : 'KTM'} className="input-cyber" required/>
         </div>
         <div>
           <Label className="text-sm font-mono text-accent-text mb-1.5 block">Модель</Label>
-          <Input value={formData.model} onChange={e => setFormData(p => ({ ...p, model: e.target.value }))} placeholder={vehicleType === 'bike' ? 'Panigale V4' : 'Cybertruck'} className="input-cyber" required/>
+          <Input value={formData.model} onChange={e => setFormData(p => ({ ...p, model: e.target.value }))} placeholder={bikeSubtype === 'road' ? 'Panigale V4' : '300 EXC'} className="input-cyber" required/>
         </div>
       </div>
       <div>
@@ -178,15 +200,24 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
 
       <div>
         <h3 className="text-lg font-mono text-accent-text mb-2">Характеристики</h3>
+        <p className="text-xs text-muted-foreground mb-3 -mt-2">
+            {bikeSubtype === 'road' ? 'Спецификации для шоссейных мотоциклов.' : 'Спецификации для внедорожной техники.'}
+        </p>
         <div className="space-y-2">
           {specs.map((spec) => (
             <motion.div key={spec.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
               <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder="Ключ" className="input-cyber flex-[2]" />
               <Input value={spec.value} onChange={e => handleSpecChange(spec.id, 'value', e.target.value)} placeholder="Значение" className="input-cyber flex-[3]" />
-              <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
+              {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+              <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0">
+                <VibeContentRenderer content="::FaXmark::" className="h-4 w-4" />
+              </Button>
             </motion.div>
           ))}
-          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить характеристику</Button>
+          {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2">
+            <VibeContentRenderer content="::FaCirclePlus::" className="h-4 w-4" /> Добавить характеристику
+          </Button>
         </div>
       </div>
 
@@ -200,10 +231,16 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
                 <Image src={item.url || 'https://placehold.co/36x36/000000/31343C/png?text=??'} alt="Gallery preview" width={36} height={36} className="object-cover rounded-sm" />
               </div>
               <Input value={item.url} onChange={e => handleGalleryChange(item.id, e.target.value)} placeholder="https://.../image.jpg" className="input-cyber" />
-              <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
+              {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+              <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0">
+                <VibeContentRenderer content="::FaXmark::" className="h-4 w-4" />
+              </Button>
             </motion.div>
           ))}
-          <Button type="button" onClick={addNewGalleryItem} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить фото в галерею</Button>
+          {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+          <Button type="button" onClick={addNewGalleryItem} variant="outline" className="w-full gap-2">
+            <VibeContentRenderer content="::FaCirclePlus::" className="h-4 w-4" /> Добавить фото в галерею
+          </Button>
         </div>
       </div>
       )}
@@ -229,12 +266,13 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
           </div>
       )}
 
+      {/* Блок кнопки отправки теперь использует корректные имена иконок fa6 */}
       <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
         {isSubmitting 
           ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обработка..." /> 
           : isEditMode
-            ? <VibeContentRenderer content="::FaSave:: Обновить Данные" />
-            : <VibeContentRenderer content="::FaPlusCircle:: Добавить в Гараж" />
+            ? <VibeContentRenderer content="::FaFloppyDisk:: Обновить Данные" />
+            : <VibeContentRenderer content="::FaCirclePlus:: Добавить в Гараж" />
         }
       </Button>
     </motion.form>

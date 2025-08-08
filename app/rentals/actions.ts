@@ -1,3 +1,4 @@
+// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
@@ -387,5 +388,62 @@ export async function getCrewForInvite(slug: string) {
     } catch (error) {
         logger.error(`[getCrewForInvite] Error:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+}
+
+
+
+/**
+ * Получает всю технику, доступную пользователю для редактирования:
+ * его личную технику и технику его команды.
+ */
+export async function getEditableVehiclesForUser(userId: string): Promise<{ 
+    success: boolean; 
+    data?: Vehicle[];
+    error?: string; 
+}> {
+    noStore();
+    if (!userId) {
+        return { success: false, error: "User ID is required." };
+    }
+
+    try {
+        // 1. Найти команду пользователя
+        const { data: memberData, error: memberError } = await supabaseAdmin
+            .from('crew_members')
+            .select('crew_id')
+            .eq('user_id', userId)
+            .eq('status', 'active') // Убедимся, что он активный член команды
+            .single();
+
+        if (memberError && memberError.code !== 'PGRST116') { // PGRST116 - это "not found", это не ошибка
+            throw new Error(`Failed to check crew membership: ${memberError.message}`);
+        }
+        
+        const userCrewId = memberData?.crew_id || null;
+
+        // 2. Создаем запрос к таблице 'cars'
+        let query = supabaseAdmin.from('cars').select('*');
+
+        if (userCrewId) {
+            // Если пользователь в команде, ищем его технику ИЛИ технику команды
+            query = query.or(`owner_id.eq.${userId},crew_id.eq.${userCrewId}`);
+        } else {
+            // Если он не в команде, ищем только его личную технику
+            query = query.eq('owner_id', userId);
+        }
+
+        const { data, error } = await query;
+        
+        if (error) {
+            logger.error("Error fetching editable vehicles:", error);
+            throw new Error(`Supabase query error: ${error.message}`);
+        }
+        
+        return { success: true, data: data || [] };
+
+    } catch (error) {
+        logger.error("Critical failure in getEditableVehiclesForUser action:", error);
+        return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred." };
     }
 }
