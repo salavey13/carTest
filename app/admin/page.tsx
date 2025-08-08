@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, Suspense } from "react";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation'; // Добавлен useRouter
 import { useAppContext } from "@/contexts/AppContext";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { Loading } from "@/components/Loading";
 import Image from "next/image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { getEditableVehiclesForUser } from "@/app/rentals/actions"; // ИЗМЕНЕНИЕ: импортируем новую функцию
 import type { Database } from "@/types/database.types";
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
@@ -19,6 +19,7 @@ type Vehicle = Database['public']['Tables']['cars']['Row'];
 function AdminPageContent() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const searchParams = useSearchParams();
+  const router = useRouter(); // Инициализируем роутер
   const editId = searchParams.get('edit');
 
   const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
@@ -26,27 +27,35 @@ function AdminPageContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
 
+  // ИЗМЕНЕНИЕ: Функция загрузки техники теперь использует server action
   const fetchUserVehicles = useCallback(async () => {
     if (!dbUser?.user_id) return;
     setIsFetchingVehicles(true);
     try {
-      const { data, error } = await supabaseAdmin.from('cars').select('*').eq('owner_id', dbUser.user_id);
-      if (error) throw error;
-      setUserVehicles(data || []);
+      // Используем новую, более мощную функцию
+      const { data, error, success } = await getEditableVehiclesForUser(dbUser.user_id);
       
-      // If an edit ID is in the URL, find and set that vehicle
+      if (!success || error) {
+        throw new Error(error || "Не удалось получить список техники.");
+      }
+      
+      // Фильтруем, чтобы показывать только мотоциклы, как и было задумано
+      setUserVehicles(data?.filter(v => v.type === 'bike') || []);
+      
+      // Логика выбора техники для редактирования по ID из URL остается
       if(editId) {
         const vehicleToEdit = data?.find(v => v.id === editId);
         if (vehicleToEdit) {
             setSelectedVehicle(vehicleToEdit);
             toast.info(`Загружен для редактирования: ${vehicleToEdit.make} ${vehicleToEdit.model}`);
         } else {
-            toast.error(`Транспорт с ID ${editId} не найден в вашем гараже.`);
+            // Сообщение об ошибке стало более точным
+            toast.error(`Транспорт с ID ${editId} не найден в вашем гараже или команде.`);
         }
       }
 
     } catch (error) {
-      toast.error("Не удалось загрузить ваш транспорт.");
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить вашу технику.");
     } finally {
       setIsFetchingVehicles(false);
     }
@@ -56,9 +65,9 @@ function AdminPageContent() {
     if (!appContextLoading && typeof isAdmin === 'function') {
       const adminStatus = isAdmin();
       setIsTrulyAdmin(adminStatus);
-      if (adminStatus) {
-        fetchUserVehicles();
-      }
+      // Убрали проверку adminStatus, так как теперь любой член команды может зайти
+      // Теперь любой пользователь, который заходит на эту страницу, может видеть свою/командную технику
+      fetchUserVehicles();
     }
   }, [appContextLoading, isAdmin, fetchUserVehicles]);
 
@@ -103,7 +112,7 @@ function AdminPageContent() {
             <VibeContentRenderer content="::FaSatelliteDish::" className="h-8 w-8 animate-pulse text-shadow-cyber" /> VIBE CONTROL CENTER
           </h2>
           <p className="text-brand-orange mb-8 text-base font-mono text-center">
-            {selectedVehicle ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` : 'Добавь свой транспорт в систему и стань частью флота.'}
+            {selectedVehicle ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` : 'Добавь свой байк в систему и стань частью флота.'}
           </p>
 
           <div className="mb-6 space-y-2">
@@ -111,7 +120,7 @@ function AdminPageContent() {
             <div className="flex gap-2">
                 <Select onValueChange={handleVehicleSelect} value={selectedVehicle?.id || ""} disabled={isFetchingVehicles || !!editId}>
                     <SelectTrigger className="input-cyber flex-1">
-                        <SelectValue placeholder="Выберите транспорт для редактирования..." />
+                        <SelectValue placeholder="Выберите байк для редактирования..." />
                     </SelectTrigger>
                     <SelectContent>
                         {userVehicles.map(v => (
@@ -151,7 +160,6 @@ function AdminPageContent() {
     </div>
   );
 }
-
 
 export default function AdminPage() {
     return (
