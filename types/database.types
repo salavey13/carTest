@@ -101,9 +101,9 @@ export interface Database {
           user_id: string
           role: string
           joined_at: string
-          membership_status: string | null // ИЗМЕНЕНО
-          last_location: string | null     // ДОБАВЛЕНО
-          live_status: string | null       // ДОБАВЛЕНО
+          membership_status: string | null // ОБНОВЛЕНО
+          last_location: string | null     // ОБНОВЛЕНО
+          live_status: string | null       // ОБНОВЛЕНО
         }
         Insert: {
           id?: string
@@ -111,9 +111,9 @@ export interface Database {
           user_id: string
           role?: string
           joined_at?: string
-          membership_status?: string | null // ИЗМЕНЕНО
-          last_location?: string | null     // ДОБАВЛЕНО
-          live_status?: string | null       // ДОБАВЛЕНО
+          membership_status?: string | null // ОБНОВЛЕНО
+          last_location?: string | null     // ОБНОВЛЕНО
+          live_status?: string | null       // ОБНОВЛЕНО
         }
         Update: {
           id?: string
@@ -121,9 +121,9 @@ export interface Database {
           user_id?: string
           role?: string
           joined_at?: string
-          membership_status?: string | null // ИЗМЕНЕНО
-          last_location?: string | null     // ДОБАВЛЕНО
-          live_status?: string | null       // ДОБАВЛЕНО
+          membership_status?: string | null // ОБНОВЛЕНО
+          last_location?: string | null     // ОБНОВЛЕНО
+          live_status?: string | null       // ОБНОВЛЕНО
         }
         Relationships: [
           {
