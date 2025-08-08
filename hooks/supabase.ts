@@ -548,34 +548,19 @@ export const updateUserSubscription = async (
     }
 };
 
-export const getUserSubscription = async (
-  userId: string
-): Promise<{ success: boolean; data?: string | null; error?: string }> => { 
-    if (!userId) return { success: false, error: "User ID is required." };
-    if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    logger.info(`Fetching subscription_id for user ${userId} from users table.`);
-    try {
-        const { data: userData, error: userError } = await supabaseAdmin
-            .from("users")
-            .select("subscription_id")
-            .eq("user_id", userId)
-            .maybeSingle();
 
-        if (userError) {
-            logger.error(`Error fetching user ${userId} for subscription_id:`, userError);
-            throw userError;
-        }
-        
-        const subIdFromDb = userData?.subscription_id; 
-        logger.info(`User ${userId} current subscription_id from DB: ${subIdFromDb}`);
-        return { success: true, data: subIdFromDb ?? null };
 
-    } catch (error) {
-        logger.error(`Exception in getUserSubscription for ${userId}:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch subscription-related info" };
-    }
-};
+
+
+
+
+
+
+
+
+
+
 
 export const createInvoice = async (
     type: string,
@@ -956,6 +941,33 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
     } catch (error) {
         logger.error(`Error saving user result for ${userId}:`, error);
         return { success: false, error: error instanceof Error ? error.message : "Failed to save user result" };
+    }
+};
+
+export const getUserSubscription = async (
+  userId: string
+): Promise<{ success: boolean; data?: string | null; error?: string }> => { 
+    if (!userId) return { success: false, error: "User ID is required." };
+    if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
+
+    try {
+        const { data: userData, error: userError } = await supabaseAdmin
+            .from("users")
+            .select("subscription_id")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+        if (userError) {
+            logger.error(`[getUserSubscription] Error fetching user ${userId} for subscription_id:`, userError);
+            throw userError;
+        }
+        
+        const subIdFromDb = userData?.subscription_id; 
+        return { success: true, data: subIdFromDb ?? null };
+
+    } catch (error) {
+        logger.error(`[getUserSubscription] Exception for user ${userId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch subscription-related info" };
     }
 };
 
