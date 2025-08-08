@@ -1,3 +1,4 @@
+// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
@@ -141,9 +142,16 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         const interestAmount = data.interest_amount || 1000;
         const invoiceId = `rental_interest_${data.rental_id}`;
         
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        // Мы должны передать ID транспорта в метаданные инвойса,
+        // чтобы вебхук знал, к какому транспорту относится платеж.
         await createInvoice("car_rental", invoiceId, userId, interestAmount, data.rental_id, {
-            rental_id: data.rental_id, booking: true, car_make: vehicle.make,
-            car_model: vehicle.model, image_url: vehicle.image_url,
+            rental_id: data.rental_id,
+            car_id: vehicleId, // <--- ДОБАВЛЕНА ЭТА КЛЮЧЕВАЯ СТРОКА
+            booking: true,
+            car_make: vehicle.make,
+            car_model: vehicle.model,
+            image_url: vehicle.image_url,
         });
 
         const description = `Бронь: ${vehicle.make} ${vehicle.model}\nДаты: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}\nСумма залога: ${interestAmount} ₽`;
