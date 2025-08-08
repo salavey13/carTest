@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, Suspense } from "react";
-import { useSearchParams, useRouter } from 'next/navigation'; // Добавлен useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAppContext } from "@/contexts/AppContext";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { Loading } from "@/components/Loading";
 import Image from "next/image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { getEditableVehiclesForUser } from "@/app/rentals/actions"; // ИЗМЕНЕНИЕ: импортируем новую функцию
+import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import type { Database } from "@/types/database.types";
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
@@ -19,7 +19,7 @@ type Vehicle = Database['public']['Tables']['cars']['Row'];
 function AdminPageContent() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const searchParams = useSearchParams();
-  const router = useRouter(); // Инициализируем роутер
+  const router = useRouter();
   const editId = searchParams.get('edit');
 
   const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
@@ -27,29 +27,24 @@ function AdminPageContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
 
-  // ИЗМЕНЕНИЕ: Функция загрузки техники теперь использует server action
-  const fetchUserVehicles = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+  const fetchUserVehicles = useCallback(async (userId: string) => {
+    // Убираем проверку отсюда, так как теперь она будет в useEffect
     setIsFetchingVehicles(true);
     try {
-      // Используем новую, более мощную функцию
-      const { data, error, success } = await getEditableVehiclesForUser(dbUser.user_id);
+      const { data, error, success } = await getEditableVehiclesForUser(userId);
       
       if (!success || error) {
         throw new Error(error || "Не удалось получить список техники.");
       }
       
-      // Фильтруем, чтобы показывать только мотоциклы, как и было задумано
       setUserVehicles(data?.filter(v => v.type === 'bike') || []);
       
-      // Логика выбора техники для редактирования по ID из URL остается
       if(editId) {
         const vehicleToEdit = data?.find(v => v.id === editId);
         if (vehicleToEdit) {
             setSelectedVehicle(vehicleToEdit);
             toast.info(`Загружен для редактирования: ${vehicleToEdit.make} ${vehicleToEdit.model}`);
         } else {
-            // Сообщение об ошибке стало более точным
             toast.error(`Транспорт с ID ${editId} не найден в вашем гараже или команде.`);
         }
       }
@@ -59,17 +54,19 @@ function AdminPageContent() {
     } finally {
       setIsFetchingVehicles(false);
     }
-  }, [dbUser?.user_id, editId]);
+  }, [editId]); // dbUser?.user_id убран из зависимостей, так как передается как аргумент
 
+  // ИЗМЕНЕНИЕ: Этот useEffect теперь зависит от dbUser
   useEffect(() => {
-    if (!appContextLoading && typeof isAdmin === 'function') {
-      const adminStatus = isAdmin();
-      setIsTrulyAdmin(adminStatus);
-      // Убрали проверку adminStatus, так как теперь любой член команды может зайти
-      // Теперь любой пользователь, который заходит на эту страницу, может видеть свою/командную технику
-      fetchUserVehicles();
+    // Ждем окончания загрузки контекста И наличия пользователя
+    if (!appContextLoading && dbUser?.user_id) {
+      if (typeof isAdmin === 'function') {
+        setIsTrulyAdmin(isAdmin());
+      }
+      // Вызываем загрузку, только когда уверены, что есть ID пользователя
+      fetchUserVehicles(dbUser.user_id);
     }
-  }, [appContextLoading, isAdmin, fetchUserVehicles]);
+  }, [appContextLoading, dbUser, isAdmin, fetchUserVehicles]); // Добавили dbUser в зависимости
 
   const handleVehicleSelect = (vehicleId: string) => {
     const vehicle = userVehicles.find(v => v.id === vehicleId);
@@ -77,8 +74,10 @@ function AdminPageContent() {
   };
   
   const handleFormSuccess = () => {
-      fetchUserVehicles();
-      if (!editId) { // Only reset to create mode if not coming from a direct edit link
+      if (dbUser?.user_id) {
+        fetchUserVehicles(dbUser.user_id);
+      }
+      if (!editId) {
           setSelectedVehicle(null);
       }
   };
