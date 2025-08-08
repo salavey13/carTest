@@ -30,17 +30,25 @@ const SURVEY_TO_BIKE_TYPE_MAP: Record<string, string> = {
   "Спорт-турист (мощность и комфорт)": "Sport-tourer", "Нео-ретро (стиль и харизма)": "Neo-retro"
 };
 
+// ИЗМЕНЕНИЕ: Расширенный список спецификаций для всех типов мотоциклов
 const SPEC_LABELS_AND_ICONS: Record<string, { label: string; icon: string }> = {
+    // Общие и шоссейные
     engine_cc: { label: "Двигатель", icon: "::FaGears::" },
     horsepower: { label: "Мощность", icon: "::FaHorseHead::" },
     weight_kg: { label: "Вес", icon: "::FaWeightHanging::" },
     top_speed_kmh: { label: "Макс. скорость", icon: "::FaGaugeHigh::" },
     type: { label: "Класс", icon: "::FaShieldHalved::" },
     seat_height_mm: { label: "Высота по седлу", icon: "::FaRulerVertical::" },
+    // Эндуро / Кросс
+    dry_weight_kg: { label: "Сухой вес", icon: "::FaWeightHanging::" },
+    suspension_travel_mm: { label: "Ход подвески", icon: "::FaArrowDownUpAcrossLine::" },
+    ground_clearance_mm: { label: "Клиренс", icon: "::FaRulerHorizontal::" },
+    bike_class: { label: "Класс", icon: "::FaShieldHalved::" },
+    fuel_tank_capacity_l: { label: "Бак", icon: "::FaGasPump::" },
 };
 
 const SpecItem = ({ specKey, value }: { specKey: string; value: string | number }) => {
-    const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaCirclequestion::' };
+    const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaCircleQuestion::' };
     return (
         <div className="bg-muted/10 p-3 rounded-lg border border-border">
             <VibeContentRenderer content={specInfo.icon} className="h-6 w-6 mx-auto text-accent-text mb-1" />
@@ -78,7 +86,7 @@ export default function RentBikePage() {
         if (response.success && response.data) {
           const bikes = response.data.filter(v => v.type === 'bike') as VehicleWithBookingInfo[];
           setVehicles(bikes);
-          const types = new Set(bikes.map(b => (b.specs as any)?.type).filter(Boolean));
+          const types = new Set(bikes.map(b => (b.specs as any)?.type || (b.specs as any)?.bike_class).filter(Boolean));
           setAvailableBikeTypes(["All", ...Array.from(types) as string[]]);
           const initialBike = bikes.find(b => b.availability === 'available') || bikes[0];
           setActiveBike(initialBike);
@@ -120,7 +128,7 @@ export default function RentBikePage() {
   const filteredBikes = useMemo(() => {
     let bikesToShow = vehicles;
     if (activeFilter !== "All") {
-      bikesToShow = vehicles.filter(bike => (bike.specs as any)?.type === activeFilter);
+      bikesToShow = vehicles.filter(bike => (bike.specs as any)?.type === activeFilter || (bike.specs as any)?.bike_class === activeFilter);
     }
     if (recommendedType) {
       bikesToShow.sort((a,b) => {

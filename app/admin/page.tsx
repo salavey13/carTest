@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, Suspense } from "react";
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useAppContext } from "@/contexts/AppContext";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { Loading } from "@/components/Loading";
 import Image from "next/image";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { getEditableVehiclesForUser } from "@/app/rentals/actions";
 import type { Database } from "@/types/database.types";
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
@@ -19,6 +19,7 @@ type Vehicle = Database['public']['Tables']['cars']['Row'];
 function AdminPageContent() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const editId = searchParams.get('edit');
 
   const [isTrulyAdmin, setIsTrulyAdmin] = useState<boolean>(false);
@@ -26,41 +27,46 @@ function AdminPageContent() {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
 
-  const fetchUserVehicles = useCallback(async () => {
-    if (!dbUser?.user_id) return;
+  const fetchUserVehicles = useCallback(async (userId: string) => {
+    // Убираем проверку отсюда, так как теперь она будет в useEffect
     setIsFetchingVehicles(true);
     try {
-      const { data, error } = await supabaseAdmin.from('cars').select('*').eq('owner_id', dbUser.user_id);
-      if (error) throw error;
-      setUserVehicles(data || []);
+      const { data, error, success } = await getEditableVehiclesForUser(userId);
       
-      // If an edit ID is in the URL, find and set that vehicle
+      if (!success || error) {
+        throw new Error(error || "Не удалось получить список техники.");
+      }
+      
+      setUserVehicles(data?.filter(v => v.type === 'bike') || []);
+      
       if(editId) {
         const vehicleToEdit = data?.find(v => v.id === editId);
         if (vehicleToEdit) {
             setSelectedVehicle(vehicleToEdit);
             toast.info(`Загружен для редактирования: ${vehicleToEdit.make} ${vehicleToEdit.model}`);
         } else {
-            toast.error(`Транспорт с ID ${editId} не найден в вашем гараже.`);
+            toast.error(`Транспорт с ID ${editId} не найден в вашем гараже или команде.`);
         }
       }
 
     } catch (error) {
-      toast.error("Не удалось загрузить ваш транспорт.");
+      toast.error(error instanceof Error ? error.message : "Не удалось загрузить вашу технику.");
     } finally {
       setIsFetchingVehicles(false);
     }
-  }, [dbUser?.user_id, editId]);
+  }, [editId]); // dbUser?.user_id убран из зависимостей, так как передается как аргумент
 
+  // ИЗМЕНЕНИЕ: Этот useEffect теперь зависит от dbUser
   useEffect(() => {
-    if (!appContextLoading && typeof isAdmin === 'function') {
-      const adminStatus = isAdmin();
-      setIsTrulyAdmin(adminStatus);
-      if (adminStatus) {
-        fetchUserVehicles();
+    // Ждем окончания загрузки контекста И наличия пользователя
+    if (!appContextLoading && dbUser?.user_id) {
+      if (typeof isAdmin === 'function') {
+        setIsTrulyAdmin(isAdmin());
       }
+      // Вызываем загрузку, только когда уверены, что есть ID пользователя
+      fetchUserVehicles(dbUser.user_id);
     }
-  }, [appContextLoading, isAdmin, fetchUserVehicles]);
+  }, [appContextLoading, dbUser, isAdmin, fetchUserVehicles]); // Добавили dbUser в зависимости
 
   const handleVehicleSelect = (vehicleId: string) => {
     const vehicle = userVehicles.find(v => v.id === vehicleId);
@@ -68,8 +74,10 @@ function AdminPageContent() {
   };
   
   const handleFormSuccess = () => {
-      fetchUserVehicles();
-      if (!editId) { // Only reset to create mode if not coming from a direct edit link
+      if (dbUser?.user_id) {
+        fetchUserVehicles(dbUser.user_id);
+      }
+      if (!editId) {
           setSelectedVehicle(null);
       }
   };
@@ -103,7 +111,7 @@ function AdminPageContent() {
             <VibeContentRenderer content="::FaSatelliteDish::" className="h-8 w-8 animate-pulse text-shadow-cyber" /> VIBE CONTROL CENTER
           </h2>
           <p className="text-brand-orange mb-8 text-base font-mono text-center">
-            {selectedVehicle ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` : 'Добавь свой транспорт в систему и стань частью флота.'}
+            {selectedVehicle ? `Редактирование: ${selectedVehicle.make} ${selectedVehicle.model}` : 'Добавь свой байк в систему и стань частью флота.'}
           </p>
 
           <div className="mb-6 space-y-2">
@@ -111,7 +119,7 @@ function AdminPageContent() {
             <div className="flex gap-2">
                 <Select onValueChange={handleVehicleSelect} value={selectedVehicle?.id || ""} disabled={isFetchingVehicles || !!editId}>
                     <SelectTrigger className="input-cyber flex-1">
-                        <SelectValue placeholder="Выберите транспорт для редактирования..." />
+                        <SelectValue placeholder="Выберите байк для редактирования..." />
                     </SelectTrigger>
                     <SelectContent>
                         {userVehicles.map(v => (
@@ -151,7 +159,6 @@ function AdminPageContent() {
     </div>
   );
 }
-
 
 export default function AdminPage() {
     return (
