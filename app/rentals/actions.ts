@@ -1,4 +1,3 @@
-// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
@@ -10,6 +9,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithStatus, VehicleCalendar, RentalDetails, UserRentalDashboard, TopFleet, TopCrew } from '@/lib/types';
+
+type Vehicle = Database['public']['Tables']['cars']['Row'];
 
 /**
  * Получает список всех публичных команд с подсчетом участников и техники.
@@ -326,11 +327,13 @@ export async function requestToJoinCrew(userId: string, username: string, crewId
     noStore();
     if (!userId || !crewId) return { success: false, error: "User and Crew ID are required." };
     try {
-        const { data: existingMembership, error: checkError } = await supabaseAdmin.from('crew_members').select('crew_id').eq('user_id', userId).eq('status', 'active').maybeSingle();
+        // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
+        const { data: existingMembership, error: checkError } = await supabaseAdmin.from('crew_members').select('crew_id').eq('user_id', userId).eq('membership_status', 'active').maybeSingle();
         if (checkError) throw checkError;
         if (existingMembership) return { success: false, error: "Вы уже являетесь активным участником другого экипажа." };
 
-        const { error } = await supabaseAdmin.from('crew_members').upsert({ user_id: userId, crew_id: crewId, status: 'pending', role: 'member' }, { onConflict: 'crew_id, user_id' });
+        // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
+        const { error } = await supabaseAdmin.from('crew_members').upsert({ user_id: userId, crew_id: crewId, membership_status: 'pending', role: 'member' }, { onConflict: 'crew_id, user_id' });
         if (error) throw error;
         
         const { data: crew, error: crewFetchError } = await supabaseAdmin.from('crews').select('owner_id, name, slug').eq('id', crewId).single();
@@ -360,7 +363,8 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
 
         if (accept) {
             await supabaseAdmin.from('crew_members').delete().eq('user_id', newMemberId);
-            const { error: updateError } = await supabaseAdmin.from('crew_members').insert({ crew_id: crewId, user_id: newMemberId, status: 'active', role: 'member' });
+            // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
+            const { error: updateError } = await supabaseAdmin.from('crew_members').insert({ crew_id: crewId, user_id: newMemberId, membership_status: 'active', role: 'member' });
             if (updateError) throw updateError;
             await sendComplexMessage(newMemberId, `🎉 Ваша заявка на вступление в экипаж *'${crew.name}'* была одобрена! Теперь вам доступна команда /shift.`);
             await sendComplexMessage(ownerId, `✅ Вы приняли @${member.username} в экипаж.`);
@@ -391,8 +395,6 @@ export async function getCrewForInvite(slug: string) {
     }
 }
 
-
-
 /**
  * Получает всю технику, доступную пользователю для редактирования:
  * его личную технику и технику его команды.
@@ -413,10 +415,12 @@ export async function getEditableVehiclesForUser(userId: string): Promise<{
             .from('crew_members')
             .select('crew_id')
             .eq('user_id', userId)
-            .eq('status', 'active') // Убедимся, что он активный член команды
+            // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
+            .eq('membership_status', 'active') 
             .single();
 
         if (memberError && memberError.code !== 'PGRST116') { // PGRST116 - это "not found", это не ошибка
+            // Ошибка теперь будет более точной, если возникнет
             throw new Error(`Failed to check crew membership: ${memberError.message}`);
         }
         
