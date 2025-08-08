@@ -3,7 +3,7 @@ import React, { useState, useEffect, useId } from "react";
 import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { X, Bike, PlusCircle, Mountain, Road } from "lucide-react"; // Добавили иконки для подтипов
+import { X, Bike, PlusCircle, Mountain, Road } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -254,12 +254,13 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
           </div>
       )}
 
+      {/* --- ИСПРАВЛЕННЫЙ БЛОК --- */}
       <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
         {isSubmitting 
           ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обработка..." /> 
           : isEditMode
-            ? <VibeContentRenderer content="::FaSave:: Обновить Данные" />
-            : <VibeContentRenderer content="::FaCirclePlus:: Добавить в Гараж" />
+            ? <VibeContentRenderer content="::Save:: Обновить Данные" />
+            : <VibeContentRenderer content="::PlusCircle:: Добавить в Гараж" />
         }
       </Button>
     </motion.form>
