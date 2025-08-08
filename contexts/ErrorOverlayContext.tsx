@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { ErrorInfo as ReactErrorInfo } from 'react';
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
+import { toastHistoryManager } from '@/lib/toastHistoryManager'; // ИМПОРТИРУЕМ МЕНЕДЖЕР
 
 // --- Types ---
 
@@ -57,7 +58,30 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
         logger.info("[ErrorOverlayProvider Effect] Client is ready, Provider mounted.");
     }, []);
 
-    // Update showOverlay flag when errorInfo changes
+    // ИЗМЕНЕНИЕ: Подписываемся на события от toastHistoryManager
+    useEffect(() => {
+        const handleNewToast = (record: Omit<ToastRecord, 'id'>) => {
+             logger.debug("[ErrorOverlayProvider <Listener>] Received toast from manager", { type: record.type });
+             setToastHistoryState(prev => {
+                const newHistory = [...prev, { ...record, id: Date.now() + Math.random() }];
+                const MAX_TOASTS = 20;
+                if (newHistory.length > MAX_TOASTS) {
+                    return newHistory.slice(newHistory.length - MAX_TOASTS);
+                }
+                return newHistory;
+            });
+        };
+
+        const unsubscribe = toastHistoryManager.subscribe(handleNewToast);
+        logger.info("[ErrorOverlayProvider Effect] Subscribed to toastHistoryManager.");
+
+        // Отписываемся при размонтировании компонента
+        return () => {
+            unsubscribe();
+            logger.info("[ErrorOverlayProvider Effect] Unsubscribed from toastHistoryManager.");
+        };
+    }, []); // Пустой массив зависимостей, чтобы подписка была одна на весь жизненный цикл
+
     useEffect(() => {
         const shouldShow = errorInfoState !== null;
         if (showOverlayState !== shouldShow) {
@@ -66,45 +90,29 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
     }, [errorInfoState, showOverlayState]);
 
-    // Stable callback using useCallback
+    // Эта функция теперь просто прокси, на случай если она используется где-то еще
     const addToastToHistoryStable = useCallback((toast: Omit<ToastRecord, 'id'>) => {
-        logger.debug("[ErrorOverlayContext CB] addToastToHistory", { type: toast.type, msg: String(toast.message)?.substring(0, 30) });
-        setToastHistoryState(prev => {
-            const newHistory = [...prev, { ...toast, id: Date.now() + Math.random() }];
-            const MAX_TOASTS = 20;
-            if (newHistory.length > MAX_TOASTS) {
-                return newHistory.slice(newHistory.length - MAX_TOASTS);
-            }
-            return newHistory;
-        });
+        logger.debug("[ErrorOverlayContext CB] addToastToHistory (proxying to manager)", { type: toast.type });
+        toastHistoryManager.addToast(toast);
     }, []);
 
-    // Stable callback using useCallback - Modified to handle null for clearing
     const addErrorInfoStable = useCallback((errorDetails: ErrorInfo | null) => {
          if (errorDetails === null) {
-             // Clear the error
              logger.info("[ErrorOverlayContext CB] addErrorInfo(null) called, clearing error.");
-             setErrorInfoState(null); // This will trigger showOverlay=false effect
+             setErrorInfoState(null);
          } else {
-             // Set a new error
-             const newErrorInfo = {
-                 ...errorDetails,
-                 timestamp: errorDetails.timestamp || Date.now(), // Ensure timestamp exists
-             };
+             const newErrorInfo = { ...errorDetails, timestamp: errorDetails.timestamp || Date.now() };
              logger.error("[ErrorOverlayContext CB] addErrorInfo (setting error, will trigger overlay)", newErrorInfo);
-             setErrorInfoState(newErrorInfo); // This will trigger showOverlay=true effect
+             setErrorInfoState(newErrorInfo);
          }
-     }, []); // No dependencies needed if only using setErrorInfoState
+     }, []);
 
-    // Stable callback using useCallback
     const clearHistoryStable = useCallback(() => {
         logger.info("[ErrorOverlayContext CB] clearHistory called.");
         setToastHistoryState([]);
-        setErrorInfoState(null); // This will trigger showOverlay=false effect
+        setErrorInfoState(null);
     }, []);
 
-
-    // Memoize the context value, depends on state values and stable callbacks
     const contextValue = useMemo((): ErrorOverlayContextType => {
         logger.debug("[ErrorOverlayProvider] Memoizing context value.");
         return {

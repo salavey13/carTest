@@ -1,6 +1,8 @@
 "use client";
 import { toast as sonnerToast } from 'sonner';
-import { useErrorOverlay } from '@/contexts/ErrorOverlayContext';
+// УДАЛЯЕМ ЗАВИСИМОСТЬ ОТ UI-КОНТЕКСТА
+// import { useErrorOverlay } from '@/contexts/ErrorOverlayContext'; 
+import { toastHistoryManager } from '@/lib/toastHistoryManager'; // ДОБАВЛЯЕМ НЕЗАВИСИМЫЙ МЕНЕДЖЕР
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { useCallback, useMemo } from 'react';
@@ -8,19 +10,18 @@ import { useCallback, useMemo } from 'react';
 type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' | 'custom';
 
 export const useAppToast = () => {
-    const errorOverlay = useErrorOverlay();
+    // УДАЛЯЕМ ВЫЗОВ ХУКА
+    // const errorOverlay = useErrorOverlay();
 
     const showToast = useCallback((
         type: ToastType,
         message: string | React.ReactNode,
         options?: any
     ) => {
-        const isContextReadyNow = !!errorOverlay && typeof errorOverlay.addToastToHistory === 'function';
-        const addToastToHistoryFunc = isContextReadyNow ? errorOverlay.addToastToHistory : null;
-
-        if (!isContextReadyNow) {
-            logger.warn("useAppToast: Context not ready at time of toast call, logging to history will be skipped.", { type, messageString: typeof message === 'string' ? message : '[ReactNode]' });
-        }
+        // УДАЛЯЕМ ПРОВЕРКИ КОНТЕКСТА
+        // const isContextReadyNow = !!errorOverlay && typeof errorOverlay.addToastToHistory === 'function';
+        // const addToastToHistoryFunc = isContextReadyNow ? errorOverlay.addToastToHistory : null;
+        // if (!isContextReadyNow) { ... }
 
         try {
             const messageString = typeof message === 'string' ? message : (type === 'custom' ? '[Custom Component]' : '[ReactNode]');
@@ -45,16 +46,17 @@ export const useAppToast = () => {
                     toastId = sonnerToast.message(message, options); break;
             }
 
-             if (messageString !== '[ReactNode]' && messageString !== '[Custom Component]' && addToastToHistoryFunc) {
+            // ИЗМЕНЕНИЕ: Отправляем запись в наш новый менеджер
+             if (messageString !== '[ReactNode]' && messageString !== '[Custom Component]') {
                 try {
                     const record: Omit<ToastRecord, 'id'> = {
                         message: messageString, 
                         type: type === 'custom' ? 'info' : type, 
                         timestamp: Date.now(),
                     };
-                    addToastToHistoryFunc(record);
+                    toastHistoryManager.addToast(record); // ВЫЗЫВАЕМ МЕНЕДЖЕР
                 } catch (loggingError) { 
-                    logger.error("useAppToast: Failed to add toast to history", loggingError);
+                    logger.error("useAppToast: Failed to add toast to history manager", loggingError);
                 }
             }
             return toastId;
@@ -65,10 +67,10 @@ export const useAppToast = () => {
             } catch {  }
             return undefined;
         }
-    }, [errorOverlay]); // Dependency on errorOverlay ensures stability if context reference itself doesn't change.
+    }, []); // УБИРАЕМ ЗАВИСИМОСТЬ ОТ errorOverlay
 
+    // Этот хук теперь полностью независим и не вызовет цикла
     return useMemo(() => {
-        // logger.debug("useAppToast: Re-memoizing returned functions object."); // This log can be very noisy
         return {
             success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
             error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
