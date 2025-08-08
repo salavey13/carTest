@@ -30,7 +30,6 @@ const roadBikeSpecKeys = ["engine_cc", "horsepower", "weight_kg", "top_speed_kmh
 // Новые спеки для эндуро/кросс
 const enduroBikeSpecKeys = ["engine_cc", "dry_weight_kg", "seat_height_mm", "suspension_travel_mm", "ground_clearance_mm", "bike_class", "horsepower", "fuel_tank_capacity_l"];
 
-
 export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubmissionFormProps) {
   const isEditMode = !!vehicleToEdit;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,7 +57,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         const regularSpecs = specEntries.filter(([key]) => key !== 'gallery').map(([key, value]) => ({ id: uuidv4(), key, value: String(value) }));
         setSpecs(regularSpecs);
 
-        // Определяем подтип мотоцикла по наличию уникальных ключей
         const vehicleKeys = Object.keys(vehicleToEdit.specs);
         if (vehicleKeys.some(key => ['suspension_travel_mm', 'ground_clearance_mm', 'bike_class'].includes(key))) {
             setBikeSubtype('enduro');
@@ -71,16 +69,15 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       } else {
         setSpecs([]);
         setGallery([]);
-        setBikeSubtype('road'); // Сброс на дефолт
+        setBikeSubtype('road');
       }
     } else {
-      // Сброс формы для создания новой записи
       setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
       setSpecs([]);
       setGallery([]);
       setImageFile(null);
       setImagePreview(null);
-      setBikeSubtype('road'); // Дефолтный подтип при создании
+      setBikeSubtype('road');
     }
   }, [vehicleToEdit]);
 
@@ -102,7 +99,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
 
   const addNewSpec = () => {
     const currentSpecKeys = specs.map(s => s.key);
-    // Выбираем список ключей в зависимости от подтипа
     const availableKeys = bikeSubtype === 'enduro' ? enduroBikeSpecKeys : roadBikeSpecKeys;
     const nextKey = availableKeys.find(k => !currentSpecKeys.includes(k));
     setSpecs(currentSpecs => [...currentSpecs, { id: uuidv4(), key: nextKey || "", value: "" }]);
@@ -146,7 +142,6 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         specsObject.gallery = galleryUrls;
       }
 
-      // Вне зависимости от подтипа в форме, в БД всегда идет type: 'bike'
       const vehicleData = {
         make: formData.make, model: formData.model, description: formData.description,
         specs: specsObject, daily_price: Number(formData.daily_price), image_url: imageUrl, type: 'bike',
@@ -259,8 +254,8 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
         {isSubmitting 
           ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обработка..." /> 
           : isEditMode
-            ? <VibeContentRenderer content="::Save:: Обновить Данные" />
-            : <VibeContentRenderer content="::PlusCircle:: Добавить в Гараж" />
+            ? <VibeContentRenderer content="::FaFloppyDisk:: Обновить Данные" />
+            : <VibeContentRenderer content="::FaCirclePlus:: Добавить в Гараж" />
         }
       </Button>
     </motion.form>
