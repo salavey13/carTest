@@ -3,7 +3,7 @@ import React, { useState, useEffect, useId } from "react";
 import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { X, Bike, PlusCircle, Mountain, Road } from "lucide-react";
+// ИЗМЕНЕНИЕ: Полностью удален импорт из 'lucide-react'
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -174,8 +174,13 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
       animate={{ opacity: 1, scale: 1 }}
     >
       <div className="flex justify-center gap-4 p-2 bg-input/50 rounded-lg border border-dashed border-border">
-          <Button type="button" onClick={() => setBikeSubtype('road')} variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} className="gap-2"><Road /> Шоссейный</Button>
-          <Button type="button" onClick={() => setBikeSubtype('enduro')} variant={bikeSubtype === 'enduro' ? 'secondary' : 'ghost'} className="gap-2"><Mountain /> Эндуро/Кросс</Button>
+          {/* ИЗМЕНЕНИЕ: Lucide иконки заменены на VibeContentRenderer */}
+          <Button type="button" onClick={() => setBikeSubtype('road')} variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} className="gap-2">
+            <VibeContentRenderer content="::FaRoad::"/> Шоссейный
+          </Button>
+          <Button type="button" onClick={() => setBikeSubtype('enduro')} variant={bikeSubtype === 'enduro' ? 'secondary' : 'ghost'} className="gap-2">
+            <VibeContentRenderer content="::FaMountain::"/> Эндуро/Кросс
+          </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -203,10 +208,16 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
             <motion.div key={spec.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
               <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder="Ключ" className="input-cyber flex-[2]" />
               <Input value={spec.value} onChange={e => handleSpecChange(spec.id, 'value', e.target.value)} placeholder="Значение" className="input-cyber flex-[3]" />
-              <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
+              {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+              <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0">
+                <VibeContentRenderer content="::FaXmark::" className="h-4 w-4" />
+              </Button>
             </motion.div>
           ))}
-          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить характеристику</Button>
+          {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2">
+            <VibeContentRenderer content="::FaCirclePlus::" className="h-4 w-4" /> Добавить характеристику
+          </Button>
         </div>
       </div>
 
@@ -220,10 +231,16 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
                 <Image src={item.url || 'https://placehold.co/36x36/000000/31343C/png?text=??'} alt="Gallery preview" width={36} height={36} className="object-cover rounded-sm" />
               </div>
               <Input value={item.url} onChange={e => handleGalleryChange(item.id, e.target.value)} placeholder="https://.../image.jpg" className="input-cyber" />
-              <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0"><X className="h-4 w-4" /></Button>
+              {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+              <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0">
+                <VibeContentRenderer content="::FaXmark::" className="h-4 w-4" />
+              </Button>
             </motion.div>
           ))}
-          <Button type="button" onClick={addNewGalleryItem} variant="outline" className="w-full gap-2"><PlusCircle className="h-4 w-4" /> Добавить фото в галерею</Button>
+          {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
+          <Button type="button" onClick={addNewGalleryItem} variant="outline" className="w-full gap-2">
+            <VibeContentRenderer content="::FaCirclePlus::" className="h-4 w-4" /> Добавить фото в галерею
+          </Button>
         </div>
       </div>
       )}
@@ -249,7 +266,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
           </div>
       )}
 
-      {/* --- ИСПРАВЛЕННЫЙ БЛОК --- */}
+      {/* Блок кнопки отправки теперь использует корректные имена иконок fa6 */}
       <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
         {isSubmitting 
           ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обработка..." /> 
