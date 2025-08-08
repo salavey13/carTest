@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useAppContext } from "@/contexts/AppContext";
 import { createBooking, getVehicleCalendar } from "@/app/rentals/actions";
-import { fetchCarById } from "@/hooks/supabase";
+import { fetchCarById, getUserSubscription } from "@/hooks/supabase";
 import { Loading } from "@/components/Loading";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Label } from "@/components/ui/label";
@@ -22,27 +22,23 @@ import { ru } from "date-fns/locale";
 
 interface Vehicle {
   id: string; make: string; model: string; daily_price: number; image_url: string; type: 'car' | 'bike';
-  description: string; owner_id: string;
+  description: string; owner_id: string | null;
   specs?: { gallery?: string[]; [key: string]: any; };
 }
 
-// ИЗМЕНЕНИЕ: Расширенный список спецификаций для всех типов мотоциклов
 const SPEC_LABELS_AND_ICONS: Record<string, { label: string; icon: string }> = {
-    // Общие и шоссейные
     engine_cc: { label: "Двигатель", icon: "::FaGears::" },
     horsepower: { label: "Мощность", icon: "::FaHorseHead::" },
     weight_kg: { label: "Вес", icon: "::FaWeightHanging::" },
     top_speed_kmh: { label: "Макс. скорость", icon: "::FaGaugeHigh::" },
     type: { label: "Класс", icon: "::FaShieldHalved::" },
     seat_height_mm: { label: "Высота по седлу", icon: "::FaRulerVertical::" },
-    // Эндуро / Кросс
     dry_weight_kg: { label: "Сухой вес", icon: "::FaWeightHanging::" },
     suspension_travel_mm: { label: "Ход подвески", icon: "::FaArrowDownUpAcrossLine::" },
     ground_clearance_mm: { label: "Клиренс", icon: "::FaRulerHorizontal::" },
     bike_class: { label: "Класс", icon: "::FaShieldHalved::" },
     fuel_tank_capacity_l: { label: "Бак", icon: "::FaGasPump::" },
 };
-
 
 const SpecItem = ({ specKey, value }: { specKey: string; value: string | number }) => {
     const specInfo = SPEC_LABELS_AND_ICONS[specKey] || { label: specKey, icon: '::FaCircleQuestion::' };
@@ -55,10 +51,6 @@ const SpecItem = ({ specKey, value }: { specKey: string; value: string | number 
     );
 };
 
-// NOTE: getUserSubscription is not in the provided actions, assuming it exists elsewhere
-// For now, I'm removing the subscription logic to prevent compilation errors.
-// You can re-add it if you have the action defined.
-
 export default function VehicleDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { dbUser } = useAppContext();
@@ -68,7 +60,7 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
   const [date, setDate] = useState<DateRange | undefined>();
   const [disabledDates, setDisabledDates] = useState<Date[]>([]);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
-  // const [hasSubscription, setHasSubscription] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
@@ -111,20 +103,19 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
     fetchCalendar();
   }, [params.id]);
 
-  // useEffect(() => {
-  //   const checkSubscription = async () => {
-  //     if (dbUser?.user_id) {
-  //       const subResult = await getUserSubscription(dbUser.user_id);
-  //       if(subResult.success) { setHasSubscription(!!subResult.data); }
-  //     }
-  //   };
-  //   checkSubscription();
-  // }, [dbUser]);
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (dbUser?.user_id) {
+        const subResult = await getUserSubscription(dbUser.user_id);
+        if(subResult.success) { setHasSubscription(!!subResult.data); }
+      }
+    };
+    checkSubscription();
+  }, [dbUser]);
 
   const totalDays = date?.from && date?.to ? Math.round((date.to.getTime() - date.from.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 0;
   const totalPrice = totalDays * (vehicle?.daily_price || 0);
-  // const finalPrice = hasSubscription ? Math.round(totalPrice * 0.9) : totalPrice;
-  const finalPrice = totalPrice; // Simplified price without subscription logic
+  const finalPrice = hasSubscription ? Math.round(totalPrice * 0.9) : totalPrice;
 
   const handleRent = async () => {
     if (!vehicle || !dbUser?.user_id || !date?.from || !date.to) {
@@ -239,10 +230,11 @@ export default function VehicleDetailPage({ params }: { params: { id: string } }
                         </div>
                         <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center mt-4">
                             <p className="text-sm font-mono text-muted-foreground">ИТОГО К ОПЛАТЕ</p>
+                            {hasSubscription && totalPrice > 0 && <p className="text-base font-orbitron text-muted-foreground line-through">{totalPrice} ₽</p>}
                             <p className="text-2xl font-orbitron text-accent-text font-bold">{finalPrice} ₽</p>
                             {totalDays > 0 && <p className="text-xs text-muted-foreground">({totalDays} {totalDays === 1 ? 'день' : (totalDays > 1 && totalDays < 5) ? 'дня' : 'дней'})</p>}
                         </div>
-                        {/* {hasSubscription && <p className="text-xs text-green-400 text-center mt-2">(Ваша скидка 10% применена)</p>} */}
+                        {hasSubscription && totalDays > 0 && <p className="text-xs text-brand-green text-center mt-2">(Ваша скидка 10% применена)</p>}
                          <button
                             onClick={handleRent}
                             disabled={invoiceLoading || !date?.from || !date?.to}
