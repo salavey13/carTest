@@ -259,7 +259,7 @@ export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubm
           ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обработка..." /> 
           : isEditMode
             ? <VibeContentRenderer content="::FaSave:: Обновить Данные" />
-            : <VibeContentRenderer content="::FaPlusCircle:: Добавить в Гараж" />
+            : <VibeContentRenderer content="::FaCirclePlus:: Добавить в Гараж" />
         }
       </Button>
     </motion.form>
