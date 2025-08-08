@@ -124,6 +124,13 @@ export async function getVehicleCalendar(vehicleId: string): Promise<{ success: 
     }
 }
 
+
+
+
+
+
+
+
 export async function createBooking(userId: string, vehicleId: string, startDate: Date, endDate: Date, totalPrice: number) {
     noStore();
     try {
@@ -143,11 +150,11 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         const invoiceId = `rental_interest_${data.rental_id}`;
         
         // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Мы должны передать ID транспорта в метаданные инвойса,
-        // чтобы вебхук знал, к какому транспорту относится платеж.
-        await createInvoice("car_rental", invoiceId, userId, interestAmount, data.rental_id, {
+        // Пятый аргумент - это subscriptionId. Для аренды он должен быть null.
+        // Мы передавали rental_id, что вызывало ошибку типа данных/внешнего ключа в БД.
+        await createInvoice("car_rental", invoiceId, userId, interestAmount, null, {
             rental_id: data.rental_id,
-            car_id: vehicleId, // <--- ДОБАВЛЕНА ЭТА КЛЮЧЕВАЯ СТРОКА
+            car_id: vehicleId,
             booking: true,
             car_make: vehicle.make,
             car_model: vehicle.model,
@@ -166,6 +173,12 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         return { success: false, error: error instanceof Error ? error.message : "Failed to create booking." };
     }
 }
+
+
+
+
+
+
 
 export async function getRentalDetails(rentalId: string, userId: string): Promise<{ success: boolean; data?: RentalDetails; error?: string }> {
     noStore();
