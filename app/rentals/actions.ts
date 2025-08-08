@@ -1,4 +1,3 @@
-// /app/rentals/actions.ts
 "use server";
 
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
@@ -124,13 +123,6 @@ export async function getVehicleCalendar(vehicleId: string): Promise<{ success: 
     }
 }
 
-
-
-
-
-
-
-
 export async function createBooking(userId: string, vehicleId: string, startDate: Date, endDate: Date, totalPrice: number) {
     noStore();
     try {
@@ -149,9 +141,9 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         const interestAmount = data.interest_amount || 1000;
         const invoiceId = `rental_interest_${data.rental_id}`;
         
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Пятый аргумент - это subscriptionId. Для аренды он должен быть null.
-        // Мы передавали rental_id, что вызывало ошибку типа данных/внешнего ключа в БД.
+        // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ---
+        // 1. Пятый аргумент `subscriptionId` должен быть null для аренды.
+        // 2. В `metadata` ОБЯЗАТЕЛЬНО добавляем `car_id` и `rental_id`.
         await createInvoice("car_rental", invoiceId, userId, interestAmount, null, {
             rental_id: data.rental_id,
             car_id: vehicleId,
@@ -173,12 +165,6 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         return { success: false, error: error instanceof Error ? error.message : "Failed to create booking." };
     }
 }
-
-
-
-
-
-
 
 export async function getRentalDetails(rentalId: string, userId: string): Promise<{ success: boolean; data?: RentalDetails; error?: string }> {
     noStore();
@@ -348,12 +334,10 @@ export async function requestToJoinCrew(userId: string, username: string, crewId
     noStore();
     if (!userId || !crewId) return { success: false, error: "User and Crew ID are required." };
     try {
-        // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
         const { data: existingMembership, error: checkError } = await supabaseAdmin.from('crew_members').select('crew_id').eq('user_id', userId).eq('membership_status', 'active').maybeSingle();
         if (checkError) throw checkError;
         if (existingMembership) return { success: false, error: "Вы уже являетесь активным участником другого экипажа." };
 
-        // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
         const { error } = await supabaseAdmin.from('crew_members').upsert({ user_id: userId, crew_id: crewId, membership_status: 'pending', role: 'member' }, { onConflict: 'crew_id, user_id' });
         if (error) throw error;
         
@@ -384,7 +368,6 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
 
         if (accept) {
             await supabaseAdmin.from('crew_members').delete().eq('user_id', newMemberId);
-            // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
             const { error: updateError } = await supabaseAdmin.from('crew_members').insert({ crew_id: crewId, user_id: newMemberId, membership_status: 'active', role: 'member' });
             if (updateError) throw updateError;
             await sendComplexMessage(newMemberId, `🎉 Ваша заявка на вступление в экипаж *'${crew.name}'* была одобрена! Теперь вам доступна команда /shift.`);
@@ -416,10 +399,6 @@ export async function getCrewForInvite(slug: string) {
     }
 }
 
-/**
- * Получает всю технику, доступную пользователю для редактирования:
- * его личную технику и технику его команды.
- */
 export async function getEditableVehiclesForUser(userId: string): Promise<{ 
     success: boolean; 
     data?: Vehicle[];
@@ -431,30 +410,23 @@ export async function getEditableVehiclesForUser(userId: string): Promise<{
     }
 
     try {
-        // 1. Найти команду пользователя
         const { data: memberData, error: memberError } = await supabaseAdmin
             .from('crew_members')
             .select('crew_id')
             .eq('user_id', userId)
-            // ИСПРАВЛЕНИЕ: Используем правильное имя колонки `membership_status`
             .eq('membership_status', 'active') 
             .single();
 
-        if (memberError && memberError.code !== 'PGRST116') { // PGRST116 - это "not found", это не ошибка
-            // Ошибка теперь будет более точной, если возникнет
+        if (memberError && memberError.code !== 'PGRST116') {
             throw new Error(`Failed to check crew membership: ${memberError.message}`);
         }
         
         const userCrewId = memberData?.crew_id || null;
-
-        // 2. Создаем запрос к таблице 'cars'
         let query = supabaseAdmin.from('cars').select('*');
 
         if (userCrewId) {
-            // Если пользователь в команде, ищем его технику ИЛИ технику команды
             query = query.or(`owner_id.eq.${userId},crew_id.eq.${userCrewId}`);
         } else {
-            // Если он не в команде, ищем только его личную технику
             query = query.eq('owner_id', userId);
         }
 
@@ -472,3 +444,81 @@ export async function getEditableVehiclesForUser(userId: string): Promise<{
         return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred." };
     }
 }
+
+// VVV --- НОВЫЙ ДВИЖОК ЦЕНООБРАЗОВАНИЯ --- VVV
+const PRICING_CONFIG = {
+    weekday: { day: 1.0, night: 0.75 }, // 9:00 - 20:59, 21:00 - 8:59
+    weekend: { day: 1.25, night: 1.0 }
+};
+const DAY_START_HOUR = 9;
+const DAY_END_HOUR = 21;
+
+export async function calculateDynamicPrice(vehicleId: string, startDateIso: string, endDateIso: string) {
+    noStore();
+    try {
+        const { data: vehicle, error } = await supabaseAdmin.from('cars').select('daily_price').eq('id', vehicleId).single();
+        if (error || !vehicle) throw new Error("Транспорт не найден или ошибка получения цены.");
+
+        const baseHourlyRate = vehicle.daily_price / 24;
+        let totalPrice = 0;
+        const breakdown = {
+            weekday: { dayHours: 0, nightHours: 0, cost: 0 },
+            weekend: { dayHours: 0, nightHours: 0, cost: 0 },
+        };
+
+        const start = new Date(startDateIso);
+        const end = new Date(endDateIso);
+        
+        let currentHour = new Date(start.getTime());
+
+        while (currentHour < end) {
+            const dayOfWeek = currentHour.getDay();
+            const hour = currentHour.getHours();
+
+            const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+            const isDay = (hour >= DAY_START_HOUR && hour < DAY_END_HOUR);
+
+            let rateMultiplier: number;
+            
+            if (isWeekend) {
+                if (isDay) {
+                    rateMultiplier = PRICING_CONFIG.weekend.day;
+                    breakdown.weekend.dayHours++;
+                } else {
+                    rateMultiplier = PRICING_CONFIG.weekend.night;
+                    breakdown.weekend.nightHours++;
+                }
+            } else {
+                if (isDay) {
+                    rateMultiplier = PRICING_CONFIG.weekday.day;
+                    breakdown.weekday.dayHours++;
+                } else {
+                    rateMultiplier = PRICING_CONFIG.weekday.night;
+                    breakdown.weekday.nightHours++;
+                }
+            }
+            
+            const hourCost = baseHourlyRate * rateMultiplier;
+            totalPrice += hourCost;
+
+            if (isWeekend) breakdown.weekend.cost += hourCost;
+            else breakdown.weekday.cost += hourCost;
+
+            currentHour.setHours(currentHour.getHours() + 1);
+        }
+
+        return { 
+            success: true, 
+            data: {
+                totalPrice: Math.ceil(totalPrice),
+                breakdown,
+                baseDailyPrice: vehicle.daily_price
+            } 
+        };
+
+    } catch (error) {
+        logger.error('[calculateDynamicPrice] Error:', error);
+        return { success: false, error: error instanceof Error ? error.message : "Не удалось рассчитать цену." };
+    }
+}
+// ^^^ --- КОНЕЦ НОВОГО ДВИЖКА --- ^^^
