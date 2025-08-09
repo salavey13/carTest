@@ -522,17 +522,24 @@ export async function addRentalPhoto(rentalId: string, userId: string, photoUrl:
 export async function confirmVehiclePickup(rentalId: string, userId: string) {
     noStore();
     try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id').eq('rental_id', rentalId).single();
+        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id, metadata').eq('rental_id', rentalId).single();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
         if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить получение." };
-
+        
         // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Шаг 1: Обновляем основную запись аренды
+        // Шаг 1: Обновляем JSON metadata и статус в ОДНОМ запросе
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const newMetadata = {
+            ...currentMetadata,
+            pickup_confirmed_at: new Date().toISOString()
+        };
+
         const { error: updateError } = await supabaseAdmin
             .from('rentals')
             .update({ 
-                pickup_confirmed_at: new Date().toISOString(),
-                status: 'active' 
+                status: 'active',
+                metadata: newMetadata,
+                updated_at: new Date().toISOString()
             })
             .eq('rental_id', rentalId);
         
@@ -555,18 +562,25 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
 export async function confirmVehicleReturn(rentalId: string, userId: string) {
     noStore();
     try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id').eq('rental_id', rentalId).single();
+        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id, metadata').eq('rental_id', rentalId).single();
         if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
         if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить возврат." };
 
         // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Шаг 1: Обновляем основную запись аренды
+        // Шаг 1: Обновляем JSON metadata и статус в ОДНОМ запросе
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const newMetadata = {
+            ...currentMetadata,
+            return_confirmed_at: new Date().toISOString()
+        };
+
         const { error: updateError } = await supabaseAdmin
             .from('rentals')
             .update({ 
-                return_confirmed_at: new Date().toISOString(),
                 status: 'completed',
-                payment_status: 'fully_paid' // Считаем, что на этом этапе все расчеты завершены
+                payment_status: 'fully_paid', // Считаем, что на этом этапе все расчеты завершены
+                metadata: newMetadata,
+                updated_at: new Date().toISOString()
             })
             .eq('rental_id', rentalId);
 
@@ -584,8 +598,4 @@ export async function confirmVehicleReturn(rentalId: string, userId: string) {
         return { success: false, error: e.message };
     }
 }
-
-
-
-
 // ^^^ --- КОНЕЦ НОВОГО ДВИЖКА --- ^^^
