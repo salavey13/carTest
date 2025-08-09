@@ -1,5 +1,5 @@
+// /app/rentals/actions.ts
 "use server";
-
 
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
@@ -11,9 +11,7 @@ import { Database } from "@/types/database.types";
 import { sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithStatus, VehicleCalendar, RentalDetails, UserRentalDashboard, TopFleet, TopCrew } from '@/lib/types';
 
-
 type Vehicle = Database['public']['Tables']['cars']['Row'];
-
 
 /**
  * Получает список всех публичных команд с подсчетом участников и техники.
@@ -36,7 +34,6 @@ export async function getAllPublicCrews(): Promise<{
         return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred fetching crews." };
     }
 }
-
 
 /**
  * Получает ПОЛНУЮ И АКТУАЛЬНУЮ информацию об одной команде, включая живые статусы участников.
@@ -79,10 +76,8 @@ export async function getCrewLiveDetails(slug: string): Promise<{
     }
 }
 
-
 type MapBounds = { top: number; bottom: number; left: number; right: number; };
 type PointOfInterest = { id: string; name: string; type: 'point' | 'path' | 'loop'; icon: string; color: string; coords: [number, number][]; };
-
 
 export async function getUserCrewCommandDeck(userId: string): Promise<{ success: boolean; data?: CommandDeckData | null; error?: string; }> {
     noStore();
@@ -97,7 +92,6 @@ export async function getUserCrewCommandDeck(userId: string): Promise<{ success:
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
-
 
 export async function getVehiclesWithStatus(): Promise<{ success: boolean; data?: VehicleWithStatus[]; error?: string }> {
     noStore();
@@ -114,7 +108,6 @@ export async function getVehiclesWithStatus(): Promise<{ success: boolean; data?
     }
 }
 
-
 export async function getVehicleCalendar(vehicleId: string): Promise<{ success: boolean; data?: VehicleCalendar[]; error?: string }> {
     noStore();
     if (!vehicleId) return { success: false, error: "Vehicle ID is required." };
@@ -130,7 +123,6 @@ export async function getVehicleCalendar(vehicleId: string): Promise<{ success: 
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
-
 
 export async function createBooking(userId: string, vehicleId: string, startDate: Date, endDate: Date, totalPrice: number) {
     noStore();
@@ -176,7 +168,6 @@ export async function createBooking(userId: string, vehicleId: string, startDate
     }
 }
 
-
 export async function getRentalDetails(rentalId: string, userId: string): Promise<{ success: boolean; data?: RentalDetails; error?: string }> {
     noStore();
     if (!rentalId) return { success: false, error: "Missing rental ID." };
@@ -192,21 +183,6 @@ export async function getRentalDetails(rentalId: string, userId: string): Promis
     }
 }
 
-
-export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
-    noStore();
-    try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('user_id, owner_id').eq('rental_id', rentalId).single();
-        if (fetchError || !rental) return { success: false, error: "Rental not found." };
-        if (rental.user_id !== userId) return { success: false, error: "Only the renter can add photos." };
-        const { error: eventError } = await supabaseAdmin.from('events').insert({ rental_id: rentalId, type: `photo_${photoType}`, created_by: userId, payload: { photo_url: photoUrl } });
-        if(eventError) throw eventError;
-        return { success: true, data: 'OK' };
-    } catch (e: any) {
-        logger.error(`[addRentalPhoto] Error:`, e);
-        return { success: false, error: e.message };
-    }
-}
 
 
 export async function confirmVehiclePickup(rentalId: string, userId: string) {
@@ -224,7 +200,6 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
     }
 }
 
-
 export async function confirmVehicleReturn(rentalId: string, userId: string) {
     noStore();
     try {
@@ -239,7 +214,6 @@ export async function confirmVehicleReturn(rentalId: string, userId: string) {
         return { success: false, error: e.message };
     }
 }
-
 
 export async function uploadSingleImage(formData: FormData): Promise<{ success: boolean; url?: string; error?: string; }> {
     const file = formData.get("file") as File;
@@ -260,7 +234,6 @@ export async function uploadSingleImage(formData: FormData): Promise<{ success: 
     }
 }
 
-
 export async function getUserRentals(userId: string): Promise<{ success: boolean; data?: UserRentalDashboard[]; error?: string }> {
     noStore();
     if (!userId) return { success: false, error: "User ID is required." };
@@ -277,7 +250,6 @@ export async function getUserRentals(userId: string): Promise<{ success: boolean
     }
 }
 
-
 export async function getTopFleets(): Promise<{ success: boolean; data?: TopFleet[]; error?: string }> {
     noStore();
     try {
@@ -289,7 +261,6 @@ export async function getTopFleets(): Promise<{ success: boolean; data?: TopFlee
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
-
 
 export async function getTopCrews(): Promise<{ success: boolean; data?: TopCrew[]; error?: string }> {
     noStore();
@@ -303,7 +274,6 @@ export async function getTopCrews(): Promise<{ success: boolean; data?: TopCrew[
     }
 }
 
-
 export async function getMapPresets(): Promise<{ success: boolean; data?: MapPreset[]; error?: string; }> {
     noStore();
     try {
@@ -316,7 +286,6 @@ export async function getMapPresets(): Promise<{ success: boolean; data?: MapPre
         return { success: false, error: errorMessage };
     }
 }
-
 
 export async function saveMapPreset(userId: string, name: string, map_image_url: string, bounds: MapBounds, is_default: boolean = false): Promise<{ success: boolean; data?: MapPreset; error?: string; }> {
     try {
@@ -335,7 +304,6 @@ export async function saveMapPreset(userId: string, name: string, map_image_url:
         return { success: false, error: errorMessage };
     }
 }
-
 
 export async function updateMapPois(userId: string, mapId: string, newPois: PointOfInterest[]): Promise<{ success: boolean; data?: MapPreset; error?: string; }> {
      try {
@@ -377,7 +345,6 @@ export async function requestToJoinCrew(userId: string, username: string, crewId
     }
 }
 
-
 export async function confirmCrewMember(ownerId: string, newMemberId: string, crewId: string, accept: boolean) {
     noStore();
     if (!ownerId || !newMemberId || !crewId) return { success: false, error: "Missing required IDs." };
@@ -407,7 +374,6 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
     }
 }
 
-
 export async function getCrewForInvite(slug: string) {
     noStore();
     if (!slug) return { success: false, error: "Crew slug is required" };
@@ -421,7 +387,6 @@ export async function getCrewForInvite(slug: string) {
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
-
 
 export async function getEditableVehiclesForUser(userId: string): Promise<{ 
     success: boolean; 
@@ -469,7 +434,6 @@ export async function getEditableVehiclesForUser(userId: string): Promise<{
     }
 }
 
-
 // VVV --- НОВЫЙ ДВИЖОК ЦЕНООБРАЗОВАНИЯ --- VVV
 const PRICING_CONFIG = {
     weekday: { day: 1.0, night: 0.75 }, // 9:00 - 20:59, 21:00 - 8:59
@@ -477,7 +441,6 @@ const PRICING_CONFIG = {
 };
 const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 21;
-
 
 export async function calculateDynamicPrice(vehicleId: string, startDateIso: string, endDateIso: string) {
     noStore();
@@ -545,6 +508,64 @@ export async function calculateDynamicPrice(vehicleId: string, startDateIso: str
     } catch (error) {
         logger.error('[calculateDynamicPrice] Error:', error);
         return { success: false, error: error instanceof Error ? error.message : "Не удалось рассчитать цену." };
+    }
+}
+
+export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
+    noStore();
+    try {
+        // Шаг 1: Получаем текущую аренду, чтобы проверить права и получить существующие метаданные
+        const { data: rental, error: fetchError } = await supabaseAdmin
+            .from('rentals')
+            .select('user_id, metadata')
+            .eq('rental_id', rentalId)
+            .single();
+
+        if (fetchError || !rental) {
+            return { success: false, error: "Аренда не найдена." };
+        }
+        if (rental.user_id !== userId) {
+            return { success: false, error: "Только арендатор может добавлять фото." };
+        }
+
+        // Шаг 2: Обновляем метаданные, добавляя новую ссылку на фото
+        const currentMetadata = (rental.metadata as Record<string, any>) || {};
+        const newMetadata = {
+            ...currentMetadata,
+            [photoType === 'start' ? 'start_photo_url' : 'end_photo_url']: photoUrl
+        };
+
+        const { error: updateError } = await supabaseAdmin
+            .from('rentals')
+            .update({ metadata: newMetadata, updated_at: new Date().toISOString() })
+            .eq('rental_id', rentalId);
+        
+        if (updateError) {
+            logger.error(`[addRentalPhoto] Failed to update rental metadata for ${rentalId}:`, updateError);
+            throw updateError;
+        }
+        
+        logger.info(`[addRentalPhoto] Metadata updated successfully for rental ${rentalId}.`);
+
+        // Шаг 3: Только после успешного обновления, создаем событие для уведомления
+        const { error: eventError } = await supabaseAdmin
+            .from('events')
+            .insert({ 
+                rental_id: rentalId, 
+                type: `photo_${photoType}`, 
+                created_by: userId, 
+                payload: { photo_url: photoUrl } 
+            });
+
+        if(eventError) {
+            // Это некритично, так как основная задача выполнена. Просто логируем.
+            logger.error(`[addRentalPhoto] Rental updated but failed to create event for rental ${rentalId}:`, eventError);
+        }
+
+        return { success: true, data: 'OK' };
+    } catch (e: any) {
+        logger.error(`[addRentalPhoto] Critical Error:`, e);
+        return { success: false, error: e.message };
     }
 }
 // ^^^ --- КОНЕЦ НОВОГО ДВИЖКА --- ^^^
