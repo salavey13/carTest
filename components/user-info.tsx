@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { User, Bot, LogIn } from "lucide-react"; // AlertTriangle removed
+import { User, Bot } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button"; 
-import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Added VibeContentRenderer
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
 export default function UserInfo() {
   const { dbUser, user, isInTelegramContext, isLoading, error } = useAppContext();
@@ -96,7 +96,8 @@ export default function UserInfo() {
             </div>
           )}
           {isInTelegramContext && (
-            <span className="absolute -top-0.5 -right-0.5 bg-brand-blue text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-md border-2 border-dark-bg">TG</span>
+             // --- УЛУЧШЕННАЯ ИКОНКА ---
+            <VibeContentRenderer content="::FaTelegram::" className="absolute -bottom-1 -right-1 h-5 w-5 text-[#2AABEE] bg-white rounded-full p-0.5 border border-dark-bg shadow-lg" />
           )}
           {isMock && (
             <Bot className="absolute -bottom-1 -right-1 h-4 w-4 text-brand-yellow shadow-[0_0_8px_rgba(var(--brand-yellow-rgb),0.7)] bg-dark-bg/50 p-0.5 rounded-full" />
