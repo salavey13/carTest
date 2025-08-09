@@ -1,4 +1,3 @@
-// /hooks/supabase.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
@@ -548,26 +547,12 @@ export const updateUserSubscription = async (
     }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export const createInvoice = async (
     type: string,
     id: string, 
     userId: string,
     amount: number,
-    subscriptionId?: string | null, 
+    subscriptionId?: string | null | number, 
     metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
