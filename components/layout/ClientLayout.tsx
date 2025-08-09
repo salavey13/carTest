@@ -24,7 +24,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next"; 
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
-import { useTelegramBackButton } from '@/hooks/useTelegramBackButton'; // ИМПОРТ НОВОГО ХУКА
+import { useTelegramBackButton } from '@/hooks/useTelegramBackButton';
 import Image from "next/image";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
@@ -43,13 +43,13 @@ const THEME_CONFIG = {
     Header: SaunaHeader,
     Footer: SaunaFooter,
     BottomNav: BottomNavigationSauna,
-    isTransparent: false, // Sauna page has its own opaque background
+    isTransparent: false,
   },
   default: {
     paths: [],
     Header: Header,
     Footer: Footer,
-    BottomNav: BottomNavigationBike, // Defaulting to Bike nav for now
+    BottomNav: BottomNavigationBike,
     isTransparent: false,
   }
 };
@@ -69,7 +69,6 @@ function AppInitializers() {
   const { success: addToast } = useAppToast();
   const scrollAchievementUnlockedRef = useRef(false);
 
-  // ВЫЗЫВАЕМ ХУК ДЛЯ УПРАВЛЕНИЯ НАТИВНОЙ КНОПКОЙ "НАЗАД" В TELEGRAM
   useTelegramBackButton();
   
   useFocusTimeTracker({
@@ -139,15 +138,25 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
       if (START_PARAM_PAGE_MAP[paramToProcess]) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
-      } else if (prefix === 'rentals' && parts.length > 1) { // <--- ИСПРАВЛЕНИЕ ЗДЕСЬ
-        const rentalId = parts.slice(1).join('_');
-        targetPath = `/rentals/${rentalId}`;
+      } else if (prefix === 'rental' || prefix === 'rentals') {
+          // --- МОДЕРНИЗИРОВАННАЯ ЛОГИКА ---
+          // Проверяем на простую ссылку: rentals_[ID]
+          if (parts.length === 2) {
+              const rentalId = parts[1];
+              targetPath = `/rentals/${rentalId}`;
+          } 
+          // Проверяем на сложную ссылку: rental_[action]_[ID]
+          else if (parts.length > 2) {
+              const action = parts[1]; // e.g., 'confirm-pickup'
+              const rentalId = parts.slice(2).join('_'); // UUID
+              targetPath = `/rentals/${rentalId}?action=${action}`; // Передаем действие как query-параметр
+          }
       } else if (prefix === 'crew' && parts.length > 2) { 
         const actionIndex = parts.findIndex(p => p === 'join' || p === 'confirm');
-        if (actionIndex > 1) { // Ensure there's a slug before the action
+        if (actionIndex > 1) {
             const slug = parts.slice(1, actionIndex).join('-');
-            const action = parts[actionIndex]; // 'join' or 'confirm'
-            const actionVerb = parts[actionIndex+1]; // 'crew' or 'member'
+            const action = parts[actionIndex];
+            const actionVerb = parts[actionIndex+1];
 
             if (action === 'join' && actionVerb === 'crew') {
                 targetPath = `/crews/${slug}?join_crew=true`;
