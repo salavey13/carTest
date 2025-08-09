@@ -24,6 +24,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next"; 
 import { checkAndUnlockFeatureAchievement } from '@/hooks/cyberFitnessSupabase';
 import { useAppToast } from "@/hooks/useAppToast";
+import { useTelegramBackButton } from '@/hooks/useTelegramBackButton'; // ИМПОРТ НОВОГО ХУКА
 import Image from "next/image";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,9 @@ function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
   const { addToast } = useAppToast();
   const scrollAchievementUnlockedRef = useRef(false);
+
+  // ВЫЗЫВАЕМ ХУК ДЛЯ УПРАВЛЕНИЯ НАТИВНОЙ КНОПКОЙ "НАЗАД" В TELEGRAM
+  useTelegramBackButton();
   
   useFocusTimeTracker({
     inactiveTimeout: 60 * 1000, 
