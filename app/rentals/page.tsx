@@ -14,12 +14,10 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Database } from '@/types/database.types';
 
-type RentalDashboardItem = (Database['public']['Views']['rentals_view']['Row']) & {
-    user_role: 'renter' | 'owner' | 'crew_owner';
-};
+type RentalDashboardItem = Awaited<ReturnType<typeof getUserRentals>>['data'] extends (infer U)[] ? U : never;
 
 const statusConfig = {
-    pending: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow" },
+    pending_confirmation: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow" },
     active: { label: "Активна", icon: "::FaPlayCircle::", color: "text-brand-green" },
     completed: { label: "Завершена", icon: "::FaCheckCircle::", color: "text-muted-foreground" },
     cancelled: { label: "Отменена", icon: "::FaCircleXmark::", color: "text-destructive" },
@@ -94,8 +92,8 @@ export default function FindRentalPage() {
                 >
                     <div className="text-center mb-6">
                         <VibeContentRenderer content="::FaTicket::" className="text-5xl text-brand-cyan mx-auto mb-4" />
-                        <h1 className="text-3xl font-orbitron text-foreground">Найти Аренду</h1>
-                        <p className="text-muted-foreground mt-2 font-mono text-sm">Введите ID для поиска или выберите из списка ниже.</p>
+                        <h1 className="text-3xl font-orbitron text-foreground">Центр Управления Арендами</h1>
+                        <p className="text-muted-foreground mt-2 font-mono text-sm">Найдите сделку по ID или выберите из списков ниже.</p>
                     </div>
                     <form onSubmit={handleSubmit} className="flex gap-2">
                         <Input type="text" value={rentalId} onChange={(e) => setRentalId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className="input-cyber h-12 text-center text-base tracking-wider flex-grow" />
@@ -107,24 +105,24 @@ export default function FindRentalPage() {
                     <div className="space-y-6">
                         {categorizedRentals.asRenter.length > 0 && (
                             <section>
-                                <h2 className="font-orbitron text-xl mb-3 text-brand-pink">::FaKey:: Мои Аренды</h2>
+                                <h2 className="font-orbitron text-xl mb-3 text-brand-pink"><VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды</h2>
                                 <div className="space-y-2">{categorizedRentals.asRenter.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
                             </section>
                         )}
                         {categorizedRentals.asOwner.length > 0 && (
                             <section>
-                                <h2 className="font-orbitron text-xl mb-3 text-brand-lime">::FaCar:: Мой Транспорт в Аренде</h2>
+                                <h2 className="font-orbitron text-xl mb-3 text-brand-lime"><VibeContentRenderer content="::FaCar::" className="mr-2"/>Мой Транспорт в Аренде</h2>
                                 <div className="space-y-2">{categorizedRentals.asOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
                             </section>
                         )}
                         {categorizedRentals.asCrewOwner.length > 0 && (
                             <section>
-                                <h2 className="font-orbitron text-xl mb-3 text-brand-orange">::FaUsers:: Аренды Экипажа</h2>
+                                <h2 className="font-orbitron text-xl mb-3 text-brand-orange"><VibeContentRenderer content="::FaUsers::" className="mr-2"/>Аренды Экипажа</h2>
                                 <div className="space-y-2">{categorizedRentals.asCrewOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
                             </section>
                         )}
                          {rentals.length === 0 && !loading && (
-                            <p className="text-center text-muted-foreground font-mono py-8">Активных аренд не найдено.</p>
+                            <p className="text-center text-muted-foreground font-mono py-8">Активных или завершенных аренд не найдено.</p>
                         )}
                     </div>
                 )}
