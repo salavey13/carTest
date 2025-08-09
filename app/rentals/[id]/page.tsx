@@ -19,17 +19,23 @@ type Rental = Database['public']['Tables']['rentals']['Row'] & {
     vehicle: Database['public']['Tables']['cars']['Row'] | null;
     renter: Database['public']['Tables']['users']['Row'] | null;
     owner: Database['public']['Tables']['users']['Row'] | null;
+    // Определяем более точный тип для метаданных
     metadata: {
+        start_photo_url?: string;
+        end_photo_url?: string;
         eventLog?: {
             timestamp: string;
             actor: string;
             event: string;
             details?: Record<string, any>;
         }[];
+        [key: string]: any; // Для остальных полей
     } | null;
 };
+
 type UserRole = 'renter' | 'owner' | 'other';
 type StepState = 'completed' | 'current' | 'locked' | 'skipped';
+
 
 const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string) => void }) => {
     const [file, setFile] = useState<File | null>(null);
@@ -76,10 +82,15 @@ const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string)
     );
 };
 
+
 const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     const states: StepState[] = Array(5).fill('locked');
     if (!rental) return [0, states];
     
+    const metadata = (rental.metadata as Record<string, any>) || {};
+    const startPhotoUrl = metadata.start_photo_url;
+    const endPhotoUrl = metadata.end_photo_url;
+
     let currentStep = 1;
 
     // Step 1: Payment
@@ -92,7 +103,7 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     }
 
     // Step 2: Start Photo (Optional, can be skipped)
-    if (rental.start_photo_url) {
+    if (startPhotoUrl) {
         states[1] = 'completed';
     } else if (rental.pickup_confirmed_at) {
         states[1] = 'skipped';
@@ -109,7 +120,7 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     }
 
     // Step 4: End Photo (Optional, can be skipped)
-    if (rental.end_photo_url) {
+    if (endPhotoUrl) {
         states[3] = 'completed';
     } else if (rental.return_confirmed_at) {
         states[3] = 'skipped';
@@ -128,6 +139,7 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     return [currentStep, states];
 };
 
+
 const StepCard = ({ title, icon, stepState, children, content }: { title: string; icon: string; stepState: StepState; children?: React.ReactNode; content?: React.ReactNode; }) => (
     <div className="flex gap-4">
         <div className="flex flex-col items-center">
@@ -145,19 +157,20 @@ const StepCard = ({ title, icon, stepState, children, content }: { title: string
             <h3 className={cn("font-orbitron text-xl pt-3 transition-colors", stepState === 'locked' ? "text-muted-foreground opacity-70" : "text-foreground")}>{title}</h3>
             <AnimatePresence>
             {(stepState !== 'locked') && (
-                 <motion.div
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className={cn("border p-4 rounded-lg mt-2 transition-all",
-                        stepState === 'current' ? "bg-card/80 border-brand-cyan/50" : "bg-card/50 border-border/70 opacity-80"
-                    )}
-                >
-                    {stepState === 'current' ? children : content}
-                </motion.div>
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className={cn("border p-4 rounded-lg mt-2 transition-all",
+                            stepState === 'current' ? "bg-card/80 border-brand-cyan/50" : "bg-card/50 border-border/70 opacity-80"
+                        )}
+                    >
+                        {stepState === 'current' ? children : content}
+                    </motion.div>
             )}
             </AnimatePresence>
         </div>
     </div>
 );
+
 
 export default function RentalJourneyPage({ params }: { params: { id: string } }) {
     const { dbUser, isLoading: isAppLoading } = useAppContext();
@@ -185,7 +198,7 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
         fetchData();
     }, [params.id, dbUser, isAppLoading, refreshRentalData]);
     
-    const [, stepStates] = useMemo(() => getRentalStepStates(rental), [rental]);
+    const [currentStep, stepStates] = useMemo(() => getRentalStepStates(rental), [rental]);
     const userRole: UserRole = useMemo(() => rental?.user_id === dbUser?.user_id ? 'renter' : rental?.owner_id === dbUser?.user_id ? 'owner' : 'other', [rental, dbUser]);
     
     const handleAction = async (action: () => Promise<any>, successMessage: string) => {
@@ -209,36 +222,31 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
     if (error) return <div className="text-center p-8 text-destructive">{error}</div>;
     if (!rental) return <div className="text-center p-8 text-muted-foreground">Аренда не найдена.</div>;
 
-    const eventLog = rental.metadata?.eventLog || [];
+    const metadata = (rental.metadata as Record<string, any>) || {};
+    const startPhotoUrl = metadata.start_photo_url;
+    const endPhotoUrl = metadata.end_photo_url;
+    const eventLog = metadata.eventLog || [];
+
     const stepsConfig = [
         { title: "Оплата", icon: "::FaFileInvoiceDollar::", content: <p className="text-sm">Оплачено <VibeContentRenderer content="::FaCheck::" /></p>, actionContent: <p className="text-sm text-brand-yellow">Проверьте уведомления в боте для оплаты.</p> },
-        { title: "Фото 'ДО'", icon: "::FaCameraRetro::", content: rental.start_photo_url ? <Image src={rental.start_photo_url} alt="Start" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Шаг пропущен.</p>, actionContent: userRole === 'renter' ? <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'start')} /> : <p className="text-sm">Ожидаем фото от арендатора...</p> },
-        { title: "Подтверждение Получения", icon: "::FaHandshake::", content: <p className="text-sm">Получено</p>, actionContent: userRole === 'owner' ? <Button onClick={() => handleAction(() => confirmVehiclePickup(params.id, dbUser!.user_id), "Получение подтверждено!")}>::FaCheckCircle:: Подтвердить</Button> : <p className="text-sm">Ожидаем подтверждения от владельца...</p> },
-        { title: "Фото 'ПОСЛЕ'", icon: "::FaCamera::", content: rental.end_photo_url ? <Image src={rental.end_photo_url} alt="End" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Шаг пропущен.</p>, actionContent: userRole === 'renter' ? <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'end')} /> : <p className="text-sm">Ожидаем фото от арендатора.</p> },
-        { title: "Подтверждение Возврата", icon: "::FaFlagCheckered::", content: <p className="text-sm">Возвращено</p>, actionContent: userRole === 'owner' ? <Button onClick={() => handleAction(() => confirmVehicleReturn(params.id, dbUser!.user_id), "Возврат подтвержден!")}>::FaCheckDouble:: Подтвердить</Button> : <p className="text-sm">Ожидаем подтверждения от владельца.</p> },
+        { title: "Фото 'ДО'", icon: "::FaCameraRetro::", content: startPhotoUrl ? <Image src={startPhotoUrl} alt="Start" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Шаг пропущен.</p>, actionContent: userRole === 'renter' ? <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'start')} /> : <p className="text-sm">Ожидаем фото от арендатора...</p> },
+        { title: "Подтверждение Получения", icon: "::FaHandshake::", content: <p className="text-sm">Получено</p>, actionContent: userRole === 'owner' ? <Button onClick={() => handleAction(() => confirmVehiclePickup(params.id, dbUser!.user_id), "Получение подтверждено!")}><VibeContentRenderer content="::FaCheckCircle::" className="mr-2"/>Подтвердить</Button> : <p className="text-sm">Ожидаем подтверждения от владельца...</p> },
+        { title: "Фото 'ПОСЛЕ'", icon: "::FaCamera::", content: endPhotoUrl ? <Image src={endPhotoUrl} alt="End" width={150} height={150} className="rounded-lg"/> : <p className="text-sm">Шаг пропущен.</p>, actionContent: userRole === 'renter' ? <PhotoUploader onUploadConfirmed={(url) => handlePhotoUpload(url, 'end')} /> : <p className="text-sm">Ожидаем фото от арендатора.</p> },
+        { title: "Подтверждение Возврата", icon: "::FaFlagCheckered::", content: <p className="text-sm">Возвращено</p>, actionContent: userRole === 'owner' ? <Button onClick={() => handleAction(() => confirmVehicleReturn(params.id, dbUser!.user_id), "Возврат подтвержден!")}><VibeContentRenderer content="::FaCheckDouble::" className="mr-2"/>Подтвердить</Button> : <p className="text-sm">Ожидаем подтверждения от владельца.</p> },
     ];
     
     return (
         <div className="min-h-screen bg-background text-foreground p-4 pt-24"><div className="fixed inset-0 z-[-1] opacity-20"><Image src={rental.vehicle?.image_url || "/placeholder.svg"} alt="BG" fill className="object-cover animate-pan-zoom" /><div className="absolute inset-0 bg-background/70 backdrop-blur-sm"></div></div>
             <div className="container mx-auto max-w-2xl relative z-10">
                 <div className="bg-card/70 backdrop-blur-xl border border-border p-6 rounded-2xl mb-8">
-                     <h1 className="text-3xl font-orbitron text-brand-cyan mb-2">Путь Арендатора</h1>
+                    <h1 className="text-3xl font-orbitron text-brand-cyan mb-2">Путь Арендатора</h1>
                     <p className="text-sm font-mono text-muted-foreground mb-6">ID: {rental.rental_id}</p>
                     {rental.vehicle && (<Link href={`/rent/${rental.vehicle.id}`} className="flex items-center gap-4 bg-card/50 p-3 rounded-lg hover:bg-card/80 transition-colors"><Image src={rental.vehicle.image_url || '/placeholder.svg'} alt={rental.vehicle.model || 'V'} width={80} height={80} className="rounded-lg object-cover aspect-square" /><div><p className="font-bold text-xl">{rental.vehicle.make} {rental.vehicle.model}</p><p className="text-muted-foreground">{rental.vehicle.type === 'bike' ? 'Мотоцикл' : 'Автомобиль'}</p></div></Link>)}
                 </div>
                 <div className="relative">
                     {stepsConfig.map((step, index) => (
-                        <StepCard key={index} title={step.title} icon={step.icon} stepState={stepStates[index]}>
-                            {stepStates[index] === 'current' ? step.actionContent : (
-                                <div className="text-sm space-y-2 text-muted-foreground">
-                                    {stepStates[index] === 'skipped' ? <p>Шаг пропущен</p> : step.content}
-                                    {eventLog.filter(e => e.event.toLowerCase().includes(step.title.toLowerCase().split("'")[0])).map(log => (
-                                        <p key={log.timestamp} className="text-xs font-mono">
-                                            - {new Date(log.timestamp).toLocaleString()}: {log.event} by {log.actor === rental.user_id ? "Арендатор" : "Владелец"}
-                                        </p>
-                                    ))}
-                                </div>
-                            )}
+                        <StepCard key={index} title={step.title} icon={step.icon} stepState={stepStates[index]} content={stepsConfig[index].content}>
+                            {stepStates[index] === 'current' && stepsConfig[index].actionContent}
                         </StepCard>
                     ))}
                     {stepStates[4] === 'completed' && (<StepCard title="Аренда Завершена" icon="::FaThumbsUp::" stepState="completed" content={<p className="text-sm text-brand-green">Эта аренда успешно завершена!</p>} />)}
