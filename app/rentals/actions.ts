@@ -1,5 +1,6 @@
 "use server";
 
+
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
@@ -10,7 +11,9 @@ import { Database } from "@/types/database.types";
 import { sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithStatus, VehicleCalendar, RentalDetails, UserRentalDashboard, TopFleet, TopCrew } from '@/lib/types';
 
+
 type Vehicle = Database['public']['Tables']['cars']['Row'];
+
 
 /**
  * Получает список всех публичных команд с подсчетом участников и техники.
@@ -33,6 +36,7 @@ export async function getAllPublicCrews(): Promise<{
         return { success: false, error: error instanceof Error ? error.message : "An unknown error occurred fetching crews." };
     }
 }
+
 
 /**
  * Получает ПОЛНУЮ И АКТУАЛЬНУЮ информацию об одной команде, включая живые статусы участников.
@@ -63,8 +67,8 @@ export async function getCrewLiveDetails(slug: string): Promise<{
         }
 
         if (!data) {
-             logger.warn(`[Data Core] No data returned for crew slug '${slug}', though no error was thrown.`);
-             return { success: false, error: "Экипаж не найден (нет данных)." };
+            logger.warn(`[Data Core] No data returned for crew slug '${slug}', though no error was thrown.`);
+            return { success: false, error: "Экипаж не найден (нет данных)." };
         }
 
         return { success: true, data: data as CrewDetails };
@@ -75,8 +79,10 @@ export async function getCrewLiveDetails(slug: string): Promise<{
     }
 }
 
+
 type MapBounds = { top: number; bottom: number; left: number; right: number; };
 type PointOfInterest = { id: string; name: string; type: 'point' | 'path' | 'loop'; icon: string; color: string; coords: [number, number][]; };
+
 
 export async function getUserCrewCommandDeck(userId: string): Promise<{ success: boolean; data?: CommandDeckData | null; error?: string; }> {
     noStore();
@@ -91,6 +97,7 @@ export async function getUserCrewCommandDeck(userId: string): Promise<{ success:
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
 
 export async function getVehiclesWithStatus(): Promise<{ success: boolean; data?: VehicleWithStatus[]; error?: string }> {
     noStore();
@@ -107,6 +114,7 @@ export async function getVehiclesWithStatus(): Promise<{ success: boolean; data?
     }
 }
 
+
 export async function getVehicleCalendar(vehicleId: string): Promise<{ success: boolean; data?: VehicleCalendar[]; error?: string }> {
     noStore();
     if (!vehicleId) return { success: false, error: "Vehicle ID is required." };
@@ -122,6 +130,7 @@ export async function getVehicleCalendar(vehicleId: string): Promise<{ success: 
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
 
 export async function createBooking(userId: string, vehicleId: string, startDate: Date, endDate: Date, totalPrice: number) {
     noStore();
@@ -141,12 +150,12 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         const interestAmount = data.interest_amount || 1000;
         const invoiceId = `rental_interest_${data.rental_id}`;
         
-        // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ---
-        // 1. Пятый аргумент `subscriptionId` НЕ должен быть null для аренды: 0 - нет подписки, 2 - про подписка (ToDo).
-        // 2. В `metadata` ОБЯЗАТЕЛЬНО добавляем `car_id` и `rental_id`.
-        await createInvoice("car_rental", invoiceId, userId, interestAmount, 0, {
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        // 1. Передаем "0" как ID подписки по умолчанию для аренды, чтобы избежать ошибки NOT NULL.
+        // 2. В `metadata` ОБЯЗАТЕЛЬНО добавляем `car_id` и `rental_id` для вебхука.
+        await createInvoice("car_rental", invoiceId, userId, interestAmount, "0", {
             rental_id: data.rental_id,
-            car_id: vehicleId,
+            car_id: vehicleId, // <--- КРИТИЧЕСКОЕ ДОБАВЛЕНИЕ
             booking: true,
             car_make: vehicle.make,
             car_model: vehicle.model,
@@ -155,7 +164,8 @@ export async function createBooking(userId: string, vehicleId: string, startDate
 
         const description = `Бронь: ${vehicle.make} ${vehicle.model}\nДаты: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}\nСумма залога: ${interestAmount} ₽`;
         
-        await sendTelegramInvoice(userId, "Подтверждение бронирования", description, invoiceId, interestAmount / 100, undefined, vehicle.image_url);
+        // Примечание: Telegram ожидает сумму в копейках/центах, поэтому делим на 100
+        await sendTelegramInvoice(userId, "Подтверждение бронирования", description, invoiceId, interestAmount / 100, 0, vehicle.image_url);
         
         await sendComplexMessage(vehicle.owner_id!, `Новый запрос на бронирование для вашего транспорта (ID: ${vehicleId}) с ${startDate.toLocaleDateString()} по ${endDate.toLocaleDateString()}. Ожидается оплата залога от арендатора.`);
 
@@ -165,6 +175,7 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         return { success: false, error: error instanceof Error ? error.message : "Failed to create booking." };
     }
 }
+
 
 export async function getRentalDetails(rentalId: string, userId: string): Promise<{ success: boolean; data?: RentalDetails; error?: string }> {
     noStore();
@@ -181,6 +192,7 @@ export async function getRentalDetails(rentalId: string, userId: string): Promis
     }
 }
 
+
 export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
     noStore();
     try {
@@ -195,6 +207,7 @@ export async function addRentalPhoto(rentalId: string, userId: string, photoUrl:
         return { success: false, error: e.message };
     }
 }
+
 
 export async function confirmVehiclePickup(rentalId: string, userId: string) {
     noStore();
@@ -211,6 +224,7 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
     }
 }
 
+
 export async function confirmVehicleReturn(rentalId: string, userId: string) {
     noStore();
     try {
@@ -225,6 +239,7 @@ export async function confirmVehicleReturn(rentalId: string, userId: string) {
         return { success: false, error: e.message };
     }
 }
+
 
 export async function uploadSingleImage(formData: FormData): Promise<{ success: boolean; url?: string; error?: string; }> {
     const file = formData.get("file") as File;
@@ -245,6 +260,7 @@ export async function uploadSingleImage(formData: FormData): Promise<{ success: 
     }
 }
 
+
 export async function getUserRentals(userId: string): Promise<{ success: boolean; data?: UserRentalDashboard[]; error?: string }> {
     noStore();
     if (!userId) return { success: false, error: "User ID is required." };
@@ -261,6 +277,7 @@ export async function getUserRentals(userId: string): Promise<{ success: boolean
     }
 }
 
+
 export async function getTopFleets(): Promise<{ success: boolean; data?: TopFleet[]; error?: string }> {
     noStore();
     try {
@@ -272,6 +289,7 @@ export async function getTopFleets(): Promise<{ success: boolean; data?: TopFlee
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
 
 export async function getTopCrews(): Promise<{ success: boolean; data?: TopCrew[]; error?: string }> {
     noStore();
@@ -285,6 +303,7 @@ export async function getTopCrews(): Promise<{ success: boolean; data?: TopCrew[
     }
 }
 
+
 export async function getMapPresets(): Promise<{ success: boolean; data?: MapPreset[]; error?: string; }> {
     noStore();
     try {
@@ -297,6 +316,7 @@ export async function getMapPresets(): Promise<{ success: boolean; data?: MapPre
         return { success: false, error: errorMessage };
     }
 }
+
 
 export async function saveMapPreset(userId: string, name: string, map_image_url: string, bounds: MapBounds, is_default: boolean = false): Promise<{ success: boolean; data?: MapPreset; error?: string; }> {
     try {
@@ -315,6 +335,7 @@ export async function saveMapPreset(userId: string, name: string, map_image_url:
         return { success: false, error: errorMessage };
     }
 }
+
 
 export async function updateMapPois(userId: string, mapId: string, newPois: PointOfInterest[]): Promise<{ success: boolean; data?: MapPreset; error?: string; }> {
      try {
@@ -356,6 +377,7 @@ export async function requestToJoinCrew(userId: string, username: string, crewId
     }
 }
 
+
 export async function confirmCrewMember(ownerId: string, newMemberId: string, crewId: string, accept: boolean) {
     noStore();
     if (!ownerId || !newMemberId || !crewId) return { success: false, error: "Missing required IDs." };
@@ -385,6 +407,7 @@ export async function confirmCrewMember(ownerId: string, newMemberId: string, cr
     }
 }
 
+
 export async function getCrewForInvite(slug: string) {
     noStore();
     if (!slug) return { success: false, error: "Crew slug is required" };
@@ -398,6 +421,7 @@ export async function getCrewForInvite(slug: string) {
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
+
 
 export async function getEditableVehiclesForUser(userId: string): Promise<{ 
     success: boolean; 
@@ -445,6 +469,7 @@ export async function getEditableVehiclesForUser(userId: string): Promise<{
     }
 }
 
+
 // VVV --- НОВЫЙ ДВИЖОК ЦЕНООБРАЗОВАНИЯ --- VVV
 const PRICING_CONFIG = {
     weekday: { day: 1.0, night: 0.75 }, // 9:00 - 20:59, 21:00 - 8:59
@@ -452,6 +477,7 @@ const PRICING_CONFIG = {
 };
 const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 21;
+
 
 export async function calculateDynamicPrice(vehicleId: string, startDateIso: string, endDateIso: string) {
     noStore();
