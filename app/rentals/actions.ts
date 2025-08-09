@@ -142,9 +142,9 @@ export async function createBooking(userId: string, vehicleId: string, startDate
         const invoiceId = `rental_interest_${data.rental_id}`;
         
         // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ---
-        // 1. Пятый аргумент `subscriptionId` должен быть null для аренды.
+        // 1. Пятый аргумент `subscriptionId` НЕ должен быть null для аренды: 0 - нет подписки, 2 - про подписка (ToDo).
         // 2. В `metadata` ОБЯЗАТЕЛЬНО добавляем `car_id` и `rental_id`.
-        await createInvoice("car_rental", invoiceId, userId, interestAmount, null, {
+        await createInvoice("car_rental", invoiceId, userId, interestAmount, 0, {
             rental_id: data.rental_id,
             car_id: vehicleId,
             booking: true,
