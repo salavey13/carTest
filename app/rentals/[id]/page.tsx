@@ -19,7 +19,6 @@ type Rental = Database['public']['Tables']['rentals']['Row'] & {
     vehicle: Database['public']['Tables']['cars']['Row'] | null;
     renter: Database['public']['Tables']['users']['Row'] | null;
     owner: Database['public']['Tables']['users']['Row'] | null;
-    // Определяем более точный тип для метаданных
     metadata: {
         start_photo_url?: string;
         end_photo_url?: string;
@@ -29,13 +28,12 @@ type Rental = Database['public']['Tables']['rentals']['Row'] & {
             event: string;
             details?: Record<string, any>;
         }[];
-        [key: string]: any; // Для остальных полей
+        [key: string]: any;
     } | null;
 };
 
 type UserRole = 'renter' | 'owner' | 'other';
 type StepState = 'completed' | 'current' | 'locked' | 'skipped';
-
 
 const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string) => void }) => {
     const [file, setFile] = useState<File | null>(null);
@@ -73,7 +71,15 @@ const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string)
 
     return (
         <div className="space-y-3">
-            <Input id="photo-upload" type="file" accept="image/*" onChange={handleFileChange} className="input-cyber" />
+            {/* --- ИЗМЕНЕНИЕ ЗДЕСЬ: ФОРСИРОВАНИЕ КАМЕРЫ --- */}
+            <Input 
+                id="photo-upload" 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={handleFileChange} 
+                className="input-cyber" 
+            />
             <Button onClick={handleUpload} disabled={!file || isUploading} className="w-full">
                 {isUploading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaUpload::" />}
                 Подтвердить
@@ -81,7 +87,6 @@ const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string)
         </div>
     );
 };
-
 
 const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     const states: StepState[] = Array(5).fill('locked');
@@ -102,7 +107,7 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
         return [1, states];
     }
 
-    // Step 2: Start Photo (Optional, can be skipped)
+    // Step 2: Start Photo
     if (startPhotoUrl) {
         states[1] = 'completed';
     } else if (rental.pickup_confirmed_at) {
@@ -113,13 +118,13 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     if (rental.pickup_confirmed_at) {
         states[2] = 'completed';
         currentStep = 4;
-    } else if (states[0] === 'completed') { // Unlocks after payment
+    } else if (states[0] === 'completed') {
         if (states[1] === 'locked') states[1] = 'current';
         if (states[1] === 'completed' || states[1] === 'skipped') states[2] = 'current';
         return [states[2] === 'current' ? 3 : 2, states];
     }
 
-    // Step 4: End Photo (Optional, can be skipped)
+    // Step 4: End Photo
     if (endPhotoUrl) {
         states[3] = 'completed';
     } else if (rental.return_confirmed_at) {
@@ -130,7 +135,7 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     if (rental.return_confirmed_at) {
         states[4] = 'completed';
         currentStep = 6;
-    } else if (states[2] === 'completed') { // Unlocks after pickup
+    } else if (states[2] === 'completed') {
         if (states[3] === 'locked') states[3] = 'current';
         if (states[3] === 'completed' || states[3] === 'skipped') states[4] = 'current';
         return [states[4] === 'current' ? 5 : 4, states];
@@ -138,7 +143,6 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
 
     return [currentStep, states];
 };
-
 
 const StepCard = ({ title, icon, stepState, children, content }: { title: string; icon: string; stepState: StepState; children?: React.ReactNode; content?: React.ReactNode; }) => (
     <div className="flex gap-4">
@@ -171,7 +175,6 @@ const StepCard = ({ title, icon, stepState, children, content }: { title: string
     </div>
 );
 
-
 export default function RentalJourneyPage({ params }: { params: { id: string } }) {
     const { dbUser, isLoading: isAppLoading } = useAppContext();
     const [rental, setRental] = useState<Rental | null>(null);
@@ -181,33 +184,49 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
     const refreshRentalData = useCallback(async () => {
         if (!dbUser?.user_id) return;
         const res = await getRentalDetails(params.id, dbUser.user_id);
-        if (res.success && res.data) setRental(res.data as Rental);
-        else setError(res.error || "Failed to refresh data.");
+        if (res.success && res.data) {
+            setRental(res.data as Rental);
+        } else {
+            setError(res.error || "Failed to refresh data.");
+        }
     }, [params.id, dbUser]);
 
     useEffect(() => {
         if (isAppLoading) return;
         if (!dbUser?.user_id) { setLoading(false); setError("Пользователь не авторизован."); return; }
+        
         const fetchData = async () => {
             setLoading(true);
             const res = await getRentalDetails(params.id, dbUser.user_id);
-            if (res.success && res.data) setRental(res.data as Rental);
-            else setError(res.error || "Аренда не найдена или у вас нет доступа.");
+            if (res.success && res.data) {
+                setRental(res.data as Rental);
+            } else {
+                setError(res.error || "Аренда не найдена или у вас нет доступа.");
+            }
             setLoading(false);
         };
         fetchData();
-    }, [params.id, dbUser, isAppLoading, refreshRentalData]);
+    }, [params.id, dbUser, isAppLoading]);
     
     const [currentStep, stepStates] = useMemo(() => getRentalStepStates(rental), [rental]);
-    const userRole: UserRole = useMemo(() => rental?.user_id === dbUser?.user_id ? 'renter' : rental?.owner_id === dbUser?.user_id ? 'owner' : 'other', [rental, dbUser]);
+    const userRole: UserRole = useMemo(() => {
+        if (!dbUser || !rental) return 'other';
+        if (rental.user_id === dbUser.user_id) return 'renter';
+        if (rental.owner_id === dbUser.user_id) return 'owner';
+        return 'other';
+    }, [rental, dbUser]);
     
     const handleAction = async (action: () => Promise<any>, successMessage: string) => {
         const promise = action();
         toast.promise(promise, {
             loading: 'Выполняется...',
             success: (data) => {
-                if(data.success) { refreshRentalData(); return successMessage; } 
-                else { throw new Error(data.error || "Произошла ошибка"); }
+                if(data.success) { 
+                    refreshRentalData(); 
+                    return successMessage; 
+                } else { 
+                    throw new Error(data.error || "Произошла ошибка"); 
+                }
             },
             error: (err) => err.message,
         });
@@ -215,7 +234,7 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
     
     const handlePhotoUpload = (photoUrl: string, photoType: 'start' | 'end') => {
         if (!dbUser?.user_id) return;
-        handleAction(() => addRentalPhoto(params.id, dbUser.user_id, photoUrl, photoType), `Фото '${photoType === 'start' ? "ДО" : "ПОСЛЕ"}' успешно добавлено!`);
+        handleAction(() => addRentalPhoto(params.id, dbUser!.user_id, photoUrl, photoType), `Фото '${photoType === 'start' ? "ДО" : "ПОСЛЕ"}' успешно добавлено!`);
     };
 
     if (loading) return <Loading text="Загрузка деталей аренды..." />;
@@ -225,7 +244,6 @@ export default function RentalJourneyPage({ params }: { params: { id: string } }
     const metadata = (rental.metadata as Record<string, any>) || {};
     const startPhotoUrl = metadata.start_photo_url;
     const endPhotoUrl = metadata.end_photo_url;
-    const eventLog = metadata.eventLog || [];
 
     const stepsConfig = [
         { title: "Оплата", icon: "::FaFileInvoiceDollar::", content: <p className="text-sm">Оплачено <VibeContentRenderer content="::FaCheck::" /></p>, actionContent: <p className="text-sm text-brand-yellow">Проверьте уведомления в боте для оплаты.</p> },

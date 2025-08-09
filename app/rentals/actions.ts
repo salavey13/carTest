@@ -185,35 +185,7 @@ export async function getRentalDetails(rentalId: string, userId: string): Promis
 
 
 
-export async function confirmVehiclePickup(rentalId: string, userId: string) {
-    noStore();
-    try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id').eq('rental_id', rentalId).single();
-        if (fetchError || !rental) return { success: false, error: "Rental not found." };
-        if (rental.owner_id !== userId) return { success: false, error: "Only the owner can confirm pickup." };
-        const { error: eventError } = await supabaseAdmin.from('events').insert({ rental_id: rentalId, type: 'pickup_confirmed', created_by: userId });
-        if(eventError) throw eventError;
-        return { success: true, data: 'OK' };
-    } catch (e: any) {
-        logger.error(`[confirmVehiclePickup] Error:`, e);
-        return { success: false, error: e.message };
-    }
-}
 
-export async function confirmVehicleReturn(rentalId: string, userId: string) {
-    noStore();
-    try {
-        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id').eq('rental_id', rentalId).single();
-        if (fetchError || !rental) return { success: false, error: "Rental not found." };
-        if (rental.owner_id !== userId) return { success: false, error: "Only the owner can confirm return." };
-        const { error: eventError } = await supabaseAdmin.from('events').insert({ rental_id: rentalId, type: 'return_confirmed', created_by: userId });
-        if(eventError) throw eventError;
-        return { success: true, data: 'OK' };
-    } catch (e: any) {
-        logger.error(`[confirmVehicleReturn] Error:`, e);
-        return { success: false, error: e.message };
-    }
-}
 
 export async function uploadSingleImage(formData: FormData): Promise<{ success: boolean; url?: string; error?: string; }> {
     const file = formData.get("file") as File;
@@ -511,24 +483,15 @@ export async function calculateDynamicPrice(vehicleId: string, startDateIso: str
     }
 }
 
+
+
 export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
     noStore();
     try {
-        // Шаг 1: Получаем текущую аренду, чтобы проверить права и получить существующие метаданные
-        const { data: rental, error: fetchError } = await supabaseAdmin
-            .from('rentals')
-            .select('user_id, metadata')
-            .eq('rental_id', rentalId)
-            .single();
+        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('user_id, metadata').eq('rental_id', rentalId).single();
+        if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
+        if (rental.user_id !== userId) return { success: false, error: "Только арендатор может добавлять фото." };
 
-        if (fetchError || !rental) {
-            return { success: false, error: "Аренда не найдена." };
-        }
-        if (rental.user_id !== userId) {
-            return { success: false, error: "Только арендатор может добавлять фото." };
-        }
-
-        // Шаг 2: Обновляем метаданные, добавляя новую ссылку на фото
         const currentMetadata = (rental.metadata as Record<string, any>) || {};
         const newMetadata = {
             ...currentMetadata,
@@ -540,32 +503,89 @@ export async function addRentalPhoto(rentalId: string, userId: string, photoUrl:
             .update({ metadata: newMetadata, updated_at: new Date().toISOString() })
             .eq('rental_id', rentalId);
         
-        if (updateError) {
-            logger.error(`[addRentalPhoto] Failed to update rental metadata for ${rentalId}:`, updateError);
-            throw updateError;
-        }
+        if (updateError) throw updateError;
         
-        logger.info(`[addRentalPhoto] Metadata updated successfully for rental ${rentalId}.`);
+        const { error: eventError } = await supabaseAdmin.from('events').insert({ 
+            rental_id: rentalId, type: `photo_${photoType}`, created_by: userId, payload: { photo_url: photoUrl } 
+        });
 
-        // Шаг 3: Только после успешного обновления, создаем событие для уведомления
-        const { error: eventError } = await supabaseAdmin
-            .from('events')
-            .insert({ 
-                rental_id: rentalId, 
-                type: `photo_${photoType}`, 
-                created_by: userId, 
-                payload: { photo_url: photoUrl } 
-            });
-
-        if(eventError) {
-            // Это некритично, так как основная задача выполнена. Просто логируем.
-            logger.error(`[addRentalPhoto] Rental updated but failed to create event for rental ${rentalId}:`, eventError);
-        }
+        if(eventError) logger.error(`[addRentalPhoto] Rental updated but failed to create event for rental ${rentalId}:`, eventError);
 
         return { success: true, data: 'OK' };
     } catch (e: any) {
-        logger.error(`[addRentalPhoto] Critical Error:`, e);
+        logger.error(`[addRentalPhoto] Error:`, e);
         return { success: false, error: e.message };
     }
 }
+
+
+export async function confirmVehiclePickup(rentalId: string, userId: string) {
+    noStore();
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id').eq('rental_id', rentalId).single();
+        if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
+        if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить получение." };
+
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        // Шаг 1: Обновляем основную запись аренды
+        const { error: updateError } = await supabaseAdmin
+            .from('rentals')
+            .update({ 
+                pickup_confirmed_at: new Date().toISOString(),
+                status: 'active' 
+            })
+            .eq('rental_id', rentalId);
+        
+        if (updateError) throw updateError;
+
+        // Шаг 2: Создаем событие для уведомления
+        const { error: eventError } = await supabaseAdmin.from('events').insert({ 
+            rental_id: rentalId, type: 'pickup_confirmed', created_by: userId 
+        });
+        if(eventError) logger.error(`[confirmVehiclePickup] Rental updated but failed to create event for ${rentalId}:`, eventError);
+
+        return { success: true, data: 'OK' };
+    } catch (e: any) {
+        logger.error(`[confirmVehiclePickup] Error:`, e);
+        return { success: false, error: e.message };
+    }
+}
+
+
+export async function confirmVehicleReturn(rentalId: string, userId: string) {
+    noStore();
+    try {
+        const { data: rental, error: fetchError } = await supabaseAdmin.from('rentals').select('owner_id').eq('rental_id', rentalId).single();
+        if (fetchError || !rental) return { success: false, error: "Аренда не найдена." };
+        if (rental.owner_id !== userId) return { success: false, error: "Только владелец может подтвердить возврат." };
+
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        // Шаг 1: Обновляем основную запись аренды
+        const { error: updateError } = await supabaseAdmin
+            .from('rentals')
+            .update({ 
+                return_confirmed_at: new Date().toISOString(),
+                status: 'completed',
+                payment_status: 'fully_paid' // Считаем, что на этом этапе все расчеты завершены
+            })
+            .eq('rental_id', rentalId);
+
+        if (updateError) throw updateError;
+
+        // Шаг 2: Создаем событие для уведомления
+        const { error: eventError } = await supabaseAdmin.from('events').insert({ 
+            rental_id: rentalId, type: 'return_confirmed', created_by: userId 
+        });
+        if(eventError) logger.error(`[confirmVehicleReturn] Rental updated but failed to create event for ${rentalId}:`, eventError);
+        
+        return { success: true, data: 'OK' };
+    } catch (e: any) {
+        logger.error(`[confirmVehicleReturn] Error:`, e);
+        return { success: false, error: e.message };
+    }
+}
+
+
+
+
 // ^^^ --- КОНЕЦ НОВОГО ДВИЖКА --- ^^^
