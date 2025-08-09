@@ -22,6 +22,8 @@ type Rental = Database['public']['Tables']['rentals']['Row'] & {
     metadata: {
         start_photo_url?: string;
         end_photo_url?: string;
+        pickup_confirmed_at?: string; // Ожидаем эти поля в метаданных
+        return_confirmed_at?: string; // Ожидаем эти поля в метаданных
         eventLog?: {
             timestamp: string;
             actor: string;
@@ -71,7 +73,6 @@ const PhotoUploader = ({ onUploadConfirmed }: { onUploadConfirmed: (url: string)
 
     return (
         <div className="space-y-3">
-            {/* --- ИЗМЕНЕНИЕ ЗДЕСЬ: ФОРСИРОВАНИЕ КАМЕРЫ --- */}
             <Input 
                 id="photo-upload" 
                 type="file" 
@@ -92,13 +93,15 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
     const states: StepState[] = Array(5).fill('locked');
     if (!rental) return [0, states];
     
+    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ: Читаем все из metadata ---
     const metadata = (rental.metadata as Record<string, any>) || {};
     const startPhotoUrl = metadata.start_photo_url;
     const endPhotoUrl = metadata.end_photo_url;
+    const pickupConfirmedAt = metadata.pickup_confirmed_at;
+    const returnConfirmedAt = metadata.return_confirmed_at;
 
     let currentStep = 1;
 
-    // Step 1: Payment
     if (rental.payment_status === 'fully_paid' || rental.payment_status === 'interest_paid') {
         states[0] = 'completed';
         currentStep = 2;
@@ -107,15 +110,13 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
         return [1, states];
     }
 
-    // Step 2: Start Photo
     if (startPhotoUrl) {
         states[1] = 'completed';
-    } else if (rental.pickup_confirmed_at) {
+    } else if (pickupConfirmedAt) {
         states[1] = 'skipped';
     }
 
-    // Step 3: Pickup Confirmation
-    if (rental.pickup_confirmed_at) {
+    if (pickupConfirmedAt) {
         states[2] = 'completed';
         currentStep = 4;
     } else if (states[0] === 'completed') {
@@ -124,15 +125,13 @@ const getRentalStepStates = (rental: Rental | null): [number, StepState[]] => {
         return [states[2] === 'current' ? 3 : 2, states];
     }
 
-    // Step 4: End Photo
     if (endPhotoUrl) {
         states[3] = 'completed';
-    } else if (rental.return_confirmed_at) {
+    } else if (returnConfirmedAt) {
         states[3] = 'skipped';
     }
 
-    // Step 5: Return Confirmation
-    if (rental.return_confirmed_at) {
+    if (returnConfirmedAt) {
         states[4] = 'completed';
         currentStep = 6;
     } else if (states[2] === 'completed') {
