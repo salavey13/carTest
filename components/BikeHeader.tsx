@@ -4,12 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import UserInfo from "@/components/user-info";
-import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { FaTelegram } from "react-icons/fa6";
 import { useAppContext } from "@/contexts/AppContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator"; // <-- ИМПОРТ НОВОГО КОМПОНЕНТА
 
 export default function BikeHeader() {
   const { tg, isInTelegramContext, userCrewInfo } = useAppContext();
@@ -50,9 +49,10 @@ export default function BikeHeader() {
                 <span className="gta-vibe-text-effect">BIKE</span>
               </div>
             </Link>
-            <div className="flex items-center gap-1.5 md:gap-2">
-                <ThemeToggleButton />
-                
+            <div className="flex items-center gap-2 md:gap-3">
+                {/* --- ИЗМЕНЕНИЯ ЗДЕСЬ --- */}
+                <ActiveRentalsIndicator />
+
                 {userCrewInfo ? (
                     <>
                         <Tooltip>
@@ -73,11 +73,7 @@ export default function BikeHeader() {
                         </Tooltip>
                     </>
                 ) : (
-                    <a href="https://t.me/oneBikePlsBot" target="_blank" rel="noopener noreferrer" title="Telegram Bot">
-                        <button className="p-2 text-brand-cyan hover:text-brand-cyan/70 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-cyan/10">
-                            <FaTelegram className="h-5 w-5 sm:h-6 sm:w-6" />
-                        </button>
-                    </a>
+                   null // Убрали иконку-ссылку на бота, так как она не нужна постоянно
                 )}
 
                 <UserInfo />
