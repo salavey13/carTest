@@ -1,4 +1,3 @@
-// /app/actions.ts
 "use server"; 
 
 import {
@@ -307,7 +306,8 @@ export async function sendTelegramInvoice(chatId: string, title: string, descrip
         type: payload.split("_")[0], 
         status: "pending", 
         metadata: { description, title, original_unrounded_amount: amount }, // Store original amount for reference
-        subscription_id: subscription_id || null 
+        // ПРОАКТИВНОЕ ИСПРАВЛЕНИЕ: Используем `??` вместо `||` чтобы 0 не превращался в null
+        subscription_id: subscription_id ?? null 
       }); 
     } catch (dbError: any) { 
       // This is not a fatal error for the user, but should be logged.
