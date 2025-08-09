@@ -552,7 +552,7 @@ export const createInvoice = async (
     id: string, 
     userId: string,
     amount: number,
-    subscriptionId?: string | null | number, 
+    subscriptionId?: number, 
     metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
