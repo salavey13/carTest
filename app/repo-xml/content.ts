@@ -11,24 +11,23 @@ export const XUINITY_EMBLEM_URL = "https://github.com/user-attachments/assets/91
 export const onboardingContent = {
   en: {
     title: "🧬 Welcome to CYBERVIBE STUDIO /repo-xml 🧬",
-    intro: `If you’re reading this, you’re not lost. You’re exactly where the next level starts.\nThis is not a regular dev page. This is your portal to the SUPERVIBE ENGINE:\n- AI-powered\n- Gamified\n- 100% WTF\n- Built for devs, dreamers, and reality remixers`,
+    intro: `You landed exactly where the next level starts.\nThis isn't a boring dev page — it's a live studio that turns tiny ideas into real, deployable changes. Paste a link, type an idea, and watch the engine do the heavy lifting.\nNo installs. No git voodoo. Immediate results.`,
     tldr: [
-      "<strong>Scroll.</strong> Let your brain catch up—yes, it’s a lot.",
-      "<strong>Click “Extract Files”.</strong> Instantly fetch source code to remix, patch, or build on.",
-      "<strong>Drop your AI request or idea.</strong> Use the text box. Think: “Add dark mode”, “Fix this error”, “Make it cyberpunk”.",
-      "<strong>AI + YOU = PR</strong> The bot will generate code, explain it, and let you instantly create a PR—no local setup, no git voodoo.",
-      "<strong>Level Up.</strong> Every action unlocks perks, quests, and new features (tracked in your CyberFitness profile). See your progress, unlock achievements, and flex with the VIBE TRIBE."
+      "<strong>Scroll.</strong> Get the vibe.",
+      "<strong>Click “Extract Files”.</strong> Pull the code you want to edit.",
+      "<strong>Paste your idea.</strong> Type: “Replace image”, “Change button text”, “Make it dark”.",
+      "<strong>AI + You = PR</strong> The bot crafts the code and prepares a Pull Request. You review, merge, deploy.",
+      "<strong>Level Up.</strong> Each action unlocks perks and new abilities. From one-click fixes to multi-file refactors — you’ll see progress."
     ],
-    whatisit: `/repo-xml = AI-powered remix lab for this project.\nSUPERVIBE ENGINE: Recursive workflow: Extract context → Feed to AI → Build, patch, merge → Repeat\nNo install, no gatekeeping, just instant hacking and learning.`,
-    youare: `You’re not just using a tool.  \nYou’re co-piloting an AI-powered, cyberpunk, recursive dev studio.  \nYou’re not asking “how do I code this?”  \nYou’re asking “how do I LEVEL UP?”`,
+    whatisit: `/repo-xml = an AI-powered remix lab.\nFlow: Extract → Prompt → AI generates → PR → Merge. Fast, verifiable, repeat.`,
+    youare: `You’re not tinkering in private. \nYou’re leveling up on real projects — small steps, visible wins, and real deploys. \nThis is about getting hands-on and improving, not theory.`,
     levelsTitle: "🏆 BADGES, LEVELS, & QUESTS",
-    levels: `- Every PR, code fetch, or AI action = progress\n- Quests like “Fix a broken image”, “Ship an idea”, “Remix the matrix”, “Inception Swap”\n- Your CyberFitness Profile evolves: Level up, unlock perks, collect badges, and see your “Cognitive OS Version” change as you grow.`,
+    levels: `Start with one-click fixes and climb to full multi-file orchestration. Every PR, every fix, every merge = XP. Unlock perks, claim badges, and join the VIBE TRIBE.`,
     faq: [
-      { q: "Why does this look like a game?", a: "Because learning, shipping, and leveling up should feel like one." },
-      { q: "Why is there a DNA helix and neon everywhere?", a: "Because you’re hacking the code of your DEV DNA—and it should look awesome." },
-      { q: "Why is this better than a regular code editor?", a: "No setup, no fear, no gatekeeping. Just create, remix, and WIN." },
-      { q: "What if I break something?", a: "You can’t. Everything is sandboxed, safe, and tracked. Every PR is reviewed before merging." },
-      { q: `"I still don’t get it."`, a: "Scroll back up. Click something. You’ll get it once you vibe." },
+      { q: "Why does this look like a game?", a: "Because earning real outcomes should be fun and motivating." },
+      { q: "Who is this for?", a: "Anyone who wants to actually ship — designers, juniors, curious devs, and folks who hate setup." },
+      { q: "What if I break something?", a: "Sandbox + PR flow. You review before merge. Rollbacks available." },
+      { q: "How fast can I level?", a: "From zero to useful in minutes. From newbie to confident in a few days of actual edits." },
     ],
     tribe: [
       { label: "CYBERVIBE Sandbox (this page)", url: "/repo-xml" },
@@ -36,28 +35,27 @@ export const onboardingContent = {
       { label: "CYBERFITNESS Engine (Gamified)", url: "https://t.me/oneSitePlsBot/app" },
       { label: "Full achievement history, perks, and code", url: "https://github.com/salavey13/carTest/blob/main/hooks/cyberFitnessSupabase.ts" },
     ],
-    ready: "Ready? Let’s f*cking go. Welcome to CYBERVIBE."
+    ready: "Ready? Say “I’m in” and let’s ship."
   },
   ru: {
     title: "🧬 Добро пожаловать в CYBERVIBE STUDIO /repo-xml 🧬",
-    intro: `Если ты это читаешь – ты не потерялся. Ты именно там, где начинается следующий уровень.\nЭто не обычная страница для разработчиков. Это твой портал в SUPERVIBE ENGINE:\n- ИИ внутри\n- Геймифицировано\n- 100% WTF\n- Для кодеров, мечтателей и всех, кто хочет создавать без барьеров`,
+    intro: `Ты попал ровно туда, где начинается апгрейд. Это не скучный дев-пейдж — это живая студия, где идея → код → деплой за несколько кликов. Вставил ссылку, написал, нажал — и сайт обновился.\nБез установки, без гит-магии, только результат.`,
     tldr: [
-      "<strong>Прокрути вниз.</strong> Пусть мозг привыкнет – да, тут много нового.",
-      "<strong>Жми “Извлечь файлы”.</strong> Мгновенно получи исходники этого репозитория для экспериментов, фиксов и апгрейдов.",
-      "<strong>Опиши свою идею или вопрос для ИИ.</strong> Просто напиши: “Добавь темную тему”, “Исправь ошибку”, “Сделай по-киберпанковски”.",
-      "<strong>ИИ + ТЫ = PR</strong> Бот сгенерирует код, объяснит, и даст сразу создать Pull Request — без локальной сборки, без гита-колдунства.",
-      "<strong>Прокачка!</strong> Любое действие открывает новые перки, квесты и фичи (всё записывается в твой профиль CyberFitness). Следи за прогрессом, собирай ачивки, и становись частью VIBE TRIBE."
+      "<strong>Прокрути вниз.</strong> Поймай вайб.",
+      "<strong>Жми “Извлечь файлы”.</strong> Затащи код, с которым хочешь работать.",
+      "<strong>Опиши задачу.</strong> Напиши: «Поменять картинку», «Изменить текст кнопки», «Добавить тёмную тему».",
+      "<strong>ИИ + ТЫ = PR</strong> Бот генерит изменения и формирует Pull Request. Ты проверяешь, мёрдишь, деплоишь.",
+      "<strong>Прокачка!</strong> Каждый PR и правка дают XP. Начни с одного клика — вырастешь до оркестра из 20+ файлов."
     ],
-    whatisit: `/repo-xml = лаборатория ремиксов на базе ИИ для этого проекта.\nSUPERVIBE ENGINE: Рекурсивный воркфлоу: Извлекай контекст → Кидай в ИИ → Собирай, чини, мержи → Повтори\nБез установки, без барьеров, мгновенный старт и обучение.`,
-    youare: `Ты не просто пользуешься тулзой.  \nТы ко-пилотируешь ИИ-киберпанк студию, где каждое действие — новый левел.  \nТут не спрашивают “как это закодить”,  \nтут спрашивают “как ПРОКАЧАТЬСЯ?”`,
-    levelsTitle: "🏆 АЧИВКИ, УРОВНИ И КВЕСТЫ",
-    levels: `- Любой PR, файл или запрос к ИИ = прогресс\n- Квесты: “Почини картинку”, “Запусти идею”, “Ремиксуй матрицу”, “Inception Swap” и другие\n- Твой CyberFitness профиль растет: Новый уровень, перки, ачивки, и “Cognitive OS Version” — как у персонажа.`,
+    whatisit: `/repo-xml = лаборатория ремиксов с ИИ.\nВоркфлоу: Извлекаем → Промптим → AI пишет → PR → Мёржим. Быстро, безопасно, наглядно.`,
+    youare: `Ты не просто правишь сайт. \nТы прокачиваешь скилл на реальном проекте — шаг за шагом, с видимым результатом. \nНе теория, а реальные правки и деплой.`,
+    levelsTitle: "🏆 УРОВНИ, АЧИВКИ И КВЕСТЫ",
+    levels: `От одного клика до мультифайлового рефактора. Любой PR = прогресс. Открывай перки, собери ачивки, войди в VIBE TRIBE.`,
     faq: [
-      { q: "Почему это похоже на игру?", a: "Потому что учиться, пилить и прокачиваться — должно быть весело." },
-      { q: "Зачем ДНК и неон?", a: "Ты реально меняешь свой кодовый ДНК, и пусть это будет красиво." },
-      { q: "Это лучше обычного редактора?", a: "Да — не нужно ничего ставить, бояться и разбираться. Просто создавай, ремиксуй и выигрывай." },
-      { q: "А если я что-то сломаю?", a: "Не бойся — всё работает в песочнице, ничего не сломать. Каждый PR проходит ревью." },
-      { q: "Всё равно не понял(а)!", a: "Пролистай вверх. Кликни. Попробуй. Ты поймешь, когда начнешь вайбить." },
+      { q: "Почему тут ощущение игры?", a: "Потому что реальные результаты и прокачка должны приносить кайф." },
+      { q: "Кому это подходит?", a: "Дизайнерам, джунам, тимлидам и всем, кто хочет реально доставлять, а не настраивать среду." },
+      { q: "А если я что-то сломаю?", a: "Песочница + PR-поток. Ты всегда проверяешь перед мержем. Откат есть." },
+      { q: "Сколько времени займет прокачка?", a: "От нуля до полезного правки — минуты. До уверенности — несколько дней правок на реальных задачах." },
     ],
     tribe: [
       { label: "CYBERVIBE Sandbox (эта страница)", url: "/repo-xml" },
@@ -65,7 +63,7 @@ export const onboardingContent = {
       { label: "CYBERFITNESS Engine (Геймифицировано)", url: "https://t.me/oneSitePlsBot/app" },
       { label: "Вся история ачивок, перков и кода", url: "https://github.com/salavey13/carTest/blob/main/hooks/cyberFitnessSupabase.ts" },
     ],
-    ready: "Готов(а)? Погнали! Добро пожаловать в CYBERVIBE."
+    ready: "Готов(а)? Напиши «я в деле» — и мы тебя поднимем. Простые шаги → реальные правки → реальные деплои."
   }
 };
 
