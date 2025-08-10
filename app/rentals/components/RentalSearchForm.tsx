@@ -29,7 +29,7 @@ export function RentalSearchForm() {
             />
             <Button 
                 type="submit" 
-                className="h-12 w-12 text-lg font-orbitron" 
+                className="h-12 w-12 text-lg font-orbitron hover:bg-primary/90" 
                 disabled={!rentalId.trim()} 
                 size="icon"
             >
