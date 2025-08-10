@@ -132,7 +132,6 @@
   --accent-text: hsl(var(--brand-gold)); 
 }
 
-
             
 
 @layer base {
@@ -460,6 +459,28 @@ input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-cl
   overflow: hidden;
   pointer-events: none; 
 }
+
+@keyframes pulse-lightbulb {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 3px #ffeb3b); }
+  50% { transform: scale(1.2); filter: drop-shadow(0 0 6px #fff176); }
+}
+
+@keyframes zap-bolt {
+  0% { transform: rotate(0deg) scale(1); filter: drop-shadow(0 0 3px #ffd54f); }
+  25% { transform: rotate(-15deg) scale(1.1); filter: drop-shadow(0 0 6px #ffca28); }
+  50% { transform: rotate(10deg) scale(1); filter: drop-shadow(0 0 8px #ffc107); }
+  75% { transform: rotate(-5deg) scale(1.05); filter: drop-shadow(0 0 6px #ffca28); }
+  100% { transform: rotate(0deg) scale(1); filter: drop-shadow(0 0 3px #ffd54f); }
+}
+
+.icon-animate-light {
+  animation: pulse-lightbulb 1.5s ease-in-out infinite;
+}
+
+.icon-animate-bolt {
+  animation: zap-bolt 1.2s ease-in-out infinite;
+}
+
 
 @keyframes pan-zoom {
   0% { transform: scale(1) translate(0, 0); }
