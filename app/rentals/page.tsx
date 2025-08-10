@@ -10,7 +10,6 @@ import { cn, formatDate } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RentalSearchForm } from "./components/RentalSearchForm";
-import { AuthButton } from "@/components/AuthButton";
 
 // --- КОНФИГУРАЦИЯ СТАТУСОВ (ОСТАЕТСЯ ПРЕЖНЕЙ) ---
 const statusConfig = {
@@ -138,7 +137,7 @@ export default async function RentalsPage() {
                     title="Доступ ограничен"
                     description="Пожалуйста, войдите в систему, чтобы просмотреть свои аренды."
                 />
-                <AuthButton className="mt-6" />
+                
             </div>
         )
     }
