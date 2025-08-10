@@ -13,8 +13,6 @@ import { cn } from "@/lib/utils";
 
 export default function BikeFooter() {
   const { dbUser, refreshDbUser } = useAppContext();
-  // *** ИСПРАВЛЕНИЕ ЛОГИКИ: theme - главный источник правды для UI ***
-  // Локальное состояние `currentTheme` больше не нужно.
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   // Этот useEffect синхронизирует тему из БД при первой загрузке
@@ -36,7 +34,6 @@ export default function BikeFooter() {
     
     // 3. Асинхронно сохраняем выбор в БД
     const currentMetadata = dbUser.metadata || {};
-    // Не сохраняем, если тема уже такая
     if (currentMetadata.theme === newTheme) return;
 
     const updatedMetadata = { ...currentMetadata, theme: newTheme };
@@ -44,12 +41,10 @@ export default function BikeFooter() {
 
     if (success) {
       toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
-      // Обновляем данные пользователя в контексте, чтобы metadata была актуальной
       await refreshDbUser();
     } else {
       toast.error(`Ошибка сохранения темы: ${error}`);
-      // Если сохранение не удалось, откатываем тему обратно
-      setTheme(theme || 'dark');
+      setTheme(theme || 'dark'); // Откатываем тему обратно в случае ошибки
     }
   };
 
@@ -61,8 +56,7 @@ export default function BikeFooter() {
   const footerLinkClass = "text-sm text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2";
   
   return (
-    // *** ГЛАВНОЕ ИСПРАВЛЕНИЕ СТИЛЕЙ ***
-    // Заменяем `bg-dark-bg` на `bg-card` и `border-brand-orange` на `border-border`
+    // *** ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ ПОДДЕРЖКИ ТЕМ ***
     <footer className={cn(
         "bg-card py-10 md:py-12 border-t border-border",
         "mb-16 sm:mb-0" // Отступ от нижнего навбара на мобильных
