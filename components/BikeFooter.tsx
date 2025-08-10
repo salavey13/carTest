@@ -1,12 +1,12 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react"; // <-- Добавляем useRef
 import Link from "next/link";
 import { FaInstagram, FaTelegram, FaVk, FaPhone, FaMapLocationDot } from "react-icons/fa6";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useTheme } from "next-themes";
 import { useAppContext } from "@/contexts/AppContext";
 import { updateUserMetadata } from "@/hooks/supabase";
-import { useEffect, useState } from "react"; // <-- Добавляем useState
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -16,44 +16,48 @@ export default function BikeFooter() {
   const { dbUser, refreshDbUser } = useAppContext();
   const { theme, setTheme, resolvedTheme } = useTheme();
   
-  // *** УЛУЧШЕНИЕ #1: Состояние для блокировки кнопки на время сохранения ***
   const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const isInitialThemeSet = useRef(false); // Флаг, чтобы useEffect сработал только один раз
 
+  // ИСПРАВЛЕННЫЙ useEffect: Устанавливает тему из БД только один раз при загрузке
   useEffect(() => {
-    const userTheme = dbUser?.metadata?.theme as 'light' | 'dark' | undefined;
-    if (userTheme && userTheme !== theme) {
-      setTheme(userTheme);
+    if (dbUser && !isInitialThemeSet.current) {
+      const userTheme = dbUser.metadata?.theme as 'light' | 'dark' | undefined;
+      if (userTheme && userTheme !== resolvedTheme) {
+        setTheme(userTheme);
+      }
+      isInitialThemeSet.current = true; // Отмечаем, что начальная тема установлена
     }
-  }, [dbUser, theme, setTheme]);
+  }, [dbUser, setTheme, resolvedTheme]);
 
-  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
-    if (isSavingTheme) return; // Не даем запустить сохранение, если оно уже идет
-    
+  // Отполированный обработчик: теперь он надежен
+  const handleThemeToggle = async () => {
+    if (isSavingTheme) return;
+
+    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
     const oldTheme = resolvedTheme;
-    setTheme(newTheme); // Сразу меняем тему в UI для мгновенной реакции
-    
+
+    // 1. Мгновенно меняем тему в UI
+    setTheme(newTheme);
+
+    // 2. Если нет пользователя, просто меняем тему и выходим
     if (!dbUser?.user_id) return;
     
-    setIsSavingTheme(true); // Блокируем кнопку
-
-    const currentMetadata = dbUser.metadata || {};
-    const updatedMetadata = { ...currentMetadata, theme: newTheme };
+    // 3. Сохраняем в БД
+    setIsSavingTheme(true);
+    const updatedMetadata = { ...(dbUser.metadata || {}), theme: newTheme };
     const { success, error } = await updateUserMetadata(dbUser.user_id, updatedMetadata);
 
     if (success) {
       toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
-      await refreshDbUser();
+      // refreshDbUser() здесь больше не нужен, он вызывал конфликт.
+      // Контекст обновится сам, когда пользователь перейдет на другую страницу.
     } else {
       toast.error(`Ошибка сохранения: ${error}`);
       setTheme(oldTheme || 'dark'); // В случае ошибки откатываем тему обратно
     }
     
-    setIsSavingTheme(false); // Разблокируем кнопку
-  };
-
-  const toggleTheme = () => {
-    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
-    handleThemeChange(newTheme);
+    setIsSavingTheme(false);
   };
   
   const footerLinkClass = "text-sm text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2";
@@ -61,7 +65,6 @@ export default function BikeFooter() {
   return (
     <footer className={cn("bg-card py-10 md:py-12 border-t border-border", "mb-16 sm:mb-0")}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* ... остальная часть футера без изменений ... */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           <div><h3 className="text-xl font-orbitron font-semibold text-brand-orange cyber-text glitch mb-4" data-text="VIP BIKE RENTAL">VIP BIKE RENTAL</h3><p className="text-xs text-muted-foreground font-mono leading-relaxed">Аренда мотоциклов в Нижнем Новгороде. Твой байк на любой вкус: от дерзких нейкедов до спортбайков. Выбери свой вайб и покори город.</p></div>
           <div><h3 className="text-xl font-orbitron font-semibold text-brand-cyan cyber-text glitch mb-4" data-text="РАЗДЕЛЫ">РАЗДЕЛЫ</h3><ul className="space-y-3"><li><Link href="/rent-bike" className={`${footerLinkClass} text-base font-semibold`}><VibeContentRenderer content="::FaMotorcycle::" /> Мотопарк</Link></li><li><Link href="/leaderboard" className={footerLinkClass}><VibeContentRenderer content="::FaTrophy::" /> Зал Славы</Link></li><li><Link href="/crews" className={footerLinkClass}><VibeContentRenderer content="::FaUsers::" /> Экипажи</Link></li><li><Link href="/vipbikerental" className={footerLinkClass}><VibeContentRenderer content="::FaCircleInfo::" /> О Нас</Link></li></ul></div>
@@ -80,18 +83,18 @@ export default function BikeFooter() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                          onClick={toggleTheme}
-                          disabled={isSavingTheme} // *** УЛУЧШЕНИЕ #2: Блокируем кнопку ***
+                          onClick={handleThemeToggle}
+                          disabled={isSavingTheme}
                           className="p-2 rounded-full hover:bg-muted transition-all duration-200 active:scale-90 disabled:cursor-not-allowed disabled:opacity-50"
                           aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
                       >
                           <AnimatePresence mode="wait" initial={false}>
                               <motion.span
-                                  key={isSavingTheme ? 'saving' : resolvedTheme} // Меняем ключ для анимации
-                                  initial={{ y: -10, opacity: 0 }}
-                                  animate={{ y: 0, opacity: 1 }}
-                                  exit={{ y: 10, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
+                                  key={isSavingTheme ? 'saving' : resolvedTheme}
+                                  initial={{ y: -10, opacity: 0, rotate: -30 }}
+                                  animate={{ y: 0, opacity: 1, rotate: 0 }}
+                                  exit={{ y: 10, opacity: 0, rotate: 30 }}
+                                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
                                   className="inline-block"
                               >
                                 {isSavingTheme ? 
