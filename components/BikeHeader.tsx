@@ -28,7 +28,7 @@ export default function BikeHeader() {
   return (
     <TooltipProvider>
       <motion.header
-        // *** ГЛАВНОЕ ИСПРАВЛЕНИЕ: Используем переменные темы ***
+        // *** ИСПРАВЛЕНИЕ: Используем переменные темы ***
         className={cn(
             "fixed top-0 left-0 right-0 z-40 bg-background/80 border-b border-border shadow-md backdrop-blur-md"
         )}
@@ -54,7 +54,6 @@ export default function BikeHeader() {
             </Link>
             <div className="flex items-center gap-2 md:gap-3">
                 <ActiveRentalsIndicator />
-
                 {userCrewInfo && (
                     <>
                         <Tooltip>
@@ -75,7 +74,6 @@ export default function BikeHeader() {
                         </Tooltip>
                     </>
                 )}
-
                 <UserInfo />
             </div>
           </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FaInstagram, FaTelegram, FaVk, FaPhone, FaMapLocationDot } from "react-icons/fa6";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
-import { ThemeToggleButton } from "@/components/ThemeToggleButton"; // <-- ИМПОРТИРУЕМ НАШ НОВЫЙ КОМПОНЕНТ
+import { ThemeToggleButton } from "@/components/ThemeToggleButton"; // <-- ИМПОРТИРУЕМ НАШ УНИФИЦИРОВАННЫЙ КОМПОНЕНТ
 import { cn } from "@/lib/utils";
 
 export default function BikeFooter() {
@@ -12,7 +12,6 @@ export default function BikeFooter() {
   return (
     <footer className={cn("bg-card py-10 md:py-12 border-t border-border", "mb-16 sm:mb-0")}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* ... остальная часть разметки футера без изменений ... */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           <div><h3 className="text-xl font-orbitron font-semibold text-brand-orange cyber-text glitch mb-4" data-text="VIP BIKE RENTAL">VIP BIKE RENTAL</h3><p className="text-xs text-muted-foreground font-mono leading-relaxed">Аренда мотоциклов в Нижнем Новгороде. Твой байк на любой вкус: от дерзких нейкедов до спортбайков. Выбери свой вайб и покори город.</p></div>
           <div><h3 className="text-xl font-orbitron font-semibold text-brand-cyan cyber-text glitch mb-4" data-text="РАЗДЕЛЫ">РАЗДЕЛЫ</h3><ul className="space-y-3"><li><Link href="/rent-bike" className={`${footerLinkClass} text-base font-semibold`}><VibeContentRenderer content="::FaMotorcycle::" /> Мотопарк</Link></li><li><Link href="/leaderboard" className={footerLinkClass}><VibeContentRenderer content="::FaTrophy::" /> Зал Славы</Link></li><li><Link href="/crews" className={footerLinkClass}><VibeContentRenderer content="::FaUsers::" /> Экипажи</Link></li><li><Link href="/vipbikerental" className={footerLinkClass}><VibeContentRenderer content="::FaCircleInfo::" /> О Нас</Link></li></ul></div>
