@@ -1,3 +1,4 @@
+// /components/BikeFooter.tsx
 "use client";
 
 import Link from "next/link";
@@ -128,12 +129,19 @@ export default function BikeFooter() {
                             className="inline-block"
                         >
                            {currentTheme === 'dark' ? 
-                             <VibeContentRenderer content="::FaBolt::" className="text-brand-yellow group-hover:text-yellow-300 transition-colors h-4 w-4" /> : 
-                             <VibeContentRenderer content="::FaLightbulb::" className="text-brand-deep-indigo group-hover:text-black transition-colors h-4 w-4" />
-                           }
+  <VibeContentRenderer 
+    content="::FaBolt::" 
+    className="icon-animate-bolt text-brand-yellow group-hover:text-yellow-300 transition-colors h-4 w-4" 
+  /> : 
+  <VibeContentRenderer 
+    content="::FaLightbulb::" 
+    className="icon-animate-light text-brand-deep-indigo group-hover:text-black transition-colors h-4 w-4" 
+  />
+}
+
                         </motion.span>
                     </AnimatePresence>
-                    <p className="transition-colors group-hover:text-brand-cyan">Powered by <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-brand-cyan hover:text-glow hover:underline">oneSitePls</a> :: @SALAVEY13</p>
+                    <p className="transition-colors group-hover:text-brand-cyan">Powered by <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-brand-green hover:text-glow hover:underline">oneSitePls</a> :: @SALAVEY13</p>
                 </button>
             </div>
           </div>
