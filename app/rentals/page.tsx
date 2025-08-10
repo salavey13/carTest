@@ -13,7 +13,6 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RentalSearchForm } from "./components/RentalSearchForm";
 import { Loading } from '@/components/Loading';
-import { AuthButton } from "@/components/AuthButton";
 
 // --- КОНФИГУРАЦИЯ СТАТУСОВ ---
 const statusConfig = {
@@ -134,7 +133,7 @@ export default function RentalsPage() {
                     title="Доступ ограничен"
                     description="Пожалуйста, войдите в систему, чтобы просмотреть свои аренды."
                 />
-                <AuthButton className="mt-6" />
+                
             </main>
         );
     }
@@ -168,14 +167,14 @@ export default function RentalsPage() {
                     <Tabs defaultValue="renter" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="renter"><VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды</TabsTrigger>
-                            <TabsTrigger value="owner"><VibeContentRenderer content="::FaCar::" className="mr-2"/>Мой Транспорт</TabsTrigger>
+                            <TabsTrigger value="owner"><VibeContentRenderer content="::FaBike::" className="mr-2"/>Мой Транспорт</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="renter" className="mt-6">
                             {asRenter.length > 0 ? (
                                 <div className="space-y-4">{asRenter.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
                             ) : (
-                                <EmptyState icon="::FaSearch::" title="Вы пока ничего не арендовали" description="Найдите подходящий транспорт и начните свое приключение."/>
+                                <EmptyState icon="::FaSearchDollar::" title="Вы пока ничего не арендовали" description="Найдите подходящий транспорт и начните свое приключение."/>
                             )}
                         </TabsContent>
                         <TabsContent value="owner" className="mt-6">
