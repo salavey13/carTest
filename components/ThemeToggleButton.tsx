@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { FaMoon, FaSun, FaSpinner } from 'react-icons/fa6';
 import { useAppContext } from '@/contexts/AppContext';
-import { saveThemePreference } from '@/app/actions'; // <-- ИСПОЛЬЗУЕМ НОВЫЙ ЭКШЕН
+import { updateUserSettings } from '@/app/actions'; // <-- ИСПОЛЬЗУЕМ СУЩЕСТВУЮЩИЙ ЭКШЕН
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { debugLogger as logger } from '@/lib/debugLogger';
@@ -32,9 +32,16 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
       return;
     }
 
-    // 3. Сохранение в БД
+    // 3. Сохранение в БД с помощью существующего экшена
     setIsSaving(true);
-    const result = await saveThemePreference(dbUser.user_id, newTheme);
+    
+    // Подготовка данных для updateUserSettings
+    const currentMetadata = dbUser.metadata || {};
+    const currentSettings = (currentMetadata.settings_profile || {}) as Record<string, any>;
+    const newSettingsProfile = { ...currentSettings, dark_mode_enabled: newTheme === 'dark' };
+    const updatedMetadata = { ...currentMetadata, settings_profile: newSettingsProfile };
+
+    const result = await updateUserSettings(dbUser.user_id, updatedMetadata);
 
     if (result.success) {
       toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
@@ -48,7 +55,7 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   }, [resolvedTheme, dbUser, isSaving, setTheme]);
 
   if (!isMounted) {
-    return <div className={cn("bg-muted/50 rounded-md animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8")} />;
+    return <div className={cn("bg-muted/50 rounded-full animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8")} />;
   }
   
   const iconSizeClass = size === 'md' ? "h-5 w-5" : "h-4 w-4";
