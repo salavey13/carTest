@@ -6,9 +6,11 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
 import { toast } from "sonner";
-import { fetchUserData as dbFetchUserData, supabaseAdmin } from "@/hooks/supabase"; 
-import type { Database } from "@/types/database.types"; 
+import type { Database } from "@/types/database.types";
+// *** БЕЗОПАСНЫЕ ИМПОРТЫ ***
+import { refreshDbUserAction, fetchUserCrewInfoAction } from "./actions";
 
+// Этот тип теперь импортируется в actions.ts
 export type UserCrewInfo = {
   id: string;
   slug: string;
@@ -42,45 +44,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDbUserInternal(initialDbUser);
   }, [initialDbUser]);
 
+  // *** ИЗМЕНЕНИЕ: Используем безопасный Server Action ***
   const refreshDbUser = useCallback(async () => {
     if (user?.id) {
       debugLogger.info(`[AppContext refreshDbUser] Refreshing dbUser for user ID: ${user.id}`);
-      try {
-        const freshDbUser = await dbFetchUserData(String(user.id));
-        setDbUserInternal(freshDbUser); 
-        debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
-      } catch (e) {
-        globalLogger.error("[AppContext refreshDbUser] Error refreshing dbUser:", e);
-      }
+      // Вызываем наш новый безопасный экшен
+      const freshDbUser = await refreshDbUserAction(String(user.id));
+      setDbUserInternal(freshDbUser); 
+      debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
     } else {
       debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user.id is not available.");
     }
   }, [user?.id]);
 
+  // *** ИЗМЕНЕНИЕ: Используем безопасный Server Action ***
   useEffect(() => {
-    const fetchUserCrewInfo = async () => {
+    const fetchCrewInfo = async () => {
       if (!dbUser?.user_id) {
         setUserCrewInfo(null);
         return;
       }
-      
-      const { data: ownedCrew } = await supabaseAdmin.from('crews').select('id, slug, name, logo_url').eq('owner_id', dbUser.user_id).maybeSingle();
-      if (ownedCrew) {
-        setUserCrewInfo({ ...ownedCrew, is_owner: true });
-        return;
-      }
-      
-      const { data: memberCrew } = await supabaseAdmin.from('crew_members').select('crews(id, slug, name, logo_url)').eq('user_id', dbUser.user_id).eq('status', 'active').maybeSingle();
-      if (memberCrew && memberCrew.crews) {
-        setUserCrewInfo({ ...(memberCrew.crews as any), is_owner: false });
-      } else {
-        setUserCrewInfo(null);
-      }
+      // Вызываем наш новый безопасный экшен
+      const crewInfo = await fetchUserCrewInfoAction(dbUser.user_id);
+      setUserCrewInfo(crewInfo);
     };
     
-    fetchUserCrewInfo();
+    fetchCrewInfo();
   }, [dbUser]);
   
+  // ... остальная часть компонента AppProvider остается без изменений ...
   const clearStartParam = useCallback(() => {
     debugLogger.info("[AppContext] Clearing startParamPayload.");
     setStartParamPayload(null);
@@ -175,6 +167,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 };
 
 export const useAppContext = (): AppContextData => {
+  // ... хук useAppContext остается без изменений ...
   const context = useContext(AppContext);
   const defaultRefreshDbUser = useCallback(async () => { debugLogger.warn("refreshDbUser() called on SKELETON AppContext"); }, []);
   const defaultClearStartParam = useCallback(() => { debugLogger.warn("clearStartParam() called on SKELETON AppContext"); }, []);
