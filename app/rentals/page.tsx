@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
-import { createServerSupabaseClient } from "@/hooks/supabase-server";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { getUserRentals } from "./actions";
 import type { UserRentalDashboard } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
@@ -126,7 +126,7 @@ const RentalsDashboardClient = ({ rentals }: { rentals: UserRentalDashboard[] })
 
 // --- ГЛАВНЫЙ СЕРВЕРНЫЙ КОМПОНЕНТ СТРАНИЦЫ ---
 export default async function RentalsPage() {
-    const supabase = createServerSupabaseClient();
+    const supabase = supabaseAdmin();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
