@@ -10,12 +10,13 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // <-- Добавляем Tooltip
 
 export default function BikeFooter() {
   const { dbUser, refreshDbUser } = useAppContext();
   const { theme, setTheme, resolvedTheme } = useTheme();
 
-  // Этот useEffect синхронизирует тему из БД при первой загрузке
+  // Синхронизирует тему из БД при первой загрузке
   useEffect(() => {
     const userTheme = dbUser?.metadata?.theme as 'light' | 'dark' | undefined;
     if (userTheme && userTheme !== theme) {
@@ -23,16 +24,11 @@ export default function BikeFooter() {
     }
   }, [dbUser, theme, setTheme]);
 
+  // Обрабатывает смену темы: меняет в UI и сохраняет в БД
   const handleThemeChange = async (newTheme: 'light' | 'dark') => {
-    // 1. Мгновенно меняем тему в UI
     setTheme(newTheme);
-
-    // 2. Если пользователь не авторизован, просто выходим
-    if (!dbUser?.user_id) {
-      return;
-    }
+    if (!dbUser?.user_id) return;
     
-    // 3. Асинхронно сохраняем выбор в БД
     const currentMetadata = dbUser.metadata || {};
     if (currentMetadata.theme === newTheme) return;
 
@@ -44,7 +40,7 @@ export default function BikeFooter() {
       await refreshDbUser();
     } else {
       toast.error(`Ошибка сохранения темы: ${error}`);
-      setTheme(theme || 'dark'); // Откатываем тему обратно в случае ошибки
+      setTheme(theme || 'dark');
     }
   };
 
@@ -56,10 +52,9 @@ export default function BikeFooter() {
   const footerLinkClass = "text-sm text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2";
   
   return (
-    // *** ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ ПОДДЕРЖКИ ТЕМ ***
     <footer className={cn(
         "bg-card py-10 md:py-12 border-t border-border",
-        "mb-16 sm:mb-0" // Отступ от нижнего навбара на мобильных
+        "mb-16 sm:mb-0"
     )}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
@@ -103,32 +98,45 @@ export default function BikeFooter() {
         </div>
 
         <div className="mt-10 md:mt-12 pt-6 border-t border-border/50">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-muted-foreground font-mono text-xs">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-muted-foreground font-mono text-xs">
             <p>© {new Date().getFullYear()} Vip Bike Rental NN</p>
             
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={toggleTheme}
-                    className="flex items-center gap-2 cursor-pointer group"
-                    aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
-                >
-                    <AnimatePresence mode="wait" initial={false}>
-                        <motion.span
-                            key={resolvedTheme}
-                            initial={{ y: -10, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ y: 10, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="inline-block"
-                        >
-                           {resolvedTheme === 'dark' ? 
-                                <VibeContentRenderer content="::FaBolt::" className="icon-animate-bolt text-brand-yellow group-hover:text-yellow-300 transition-colors h-4 w-4" />
-                                : <VibeContentRenderer content="::FaLightbulb::" className="icon-animate-light text-brand-deep-indigo group-hover:text-foreground transition-colors h-4 w-4" />
-                            }
-                        </motion.span>
-                    </AnimatePresence>
-                    <p className="transition-colors group-hover:text-primary">Powered by <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-brand-green hover:text-glow hover:underline">oneSitePls</a> :: @SALAVEY13</p>
-                </button>
+            {/* *** ИСПРАВЛЕННЫЙ БЛОК: КНОПКА И ТЕКСТ ТЕПЕРЬ РАЗДЕЛЬНЫ *** */}
+            <div className="flex items-center gap-4">
+                <p>
+                    Powered by <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-brand-green hover:text-glow hover:underline">oneSitePls</a> :: @SALAVEY13
+                </p>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                          onClick={toggleTheme}
+                          className="p-2 rounded-full hover:bg-muted transition-colors"
+                          aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+                      >
+                          <AnimatePresence mode="wait" initial={false}>
+                              <motion.span
+                                  key={resolvedTheme}
+                                  initial={{ y: -10, opacity: 0 }}
+                                  animate={{ y: 0, opacity: 1 }}
+                                  exit={{ y: 10, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="inline-block"
+                              >
+                                {resolvedTheme === 'dark' ? 
+                                      <VibeContentRenderer content="::FaBolt::" className="icon-animate-bolt text-brand-yellow h-4 w-4" />
+                                      : <VibeContentRenderer content="::FaLightbulb::" className="icon-animate-light text-brand-deep-indigo h-4 w-4" />
+                                  }
+                              </motion.span>
+                          </AnimatePresence>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Сменить тему</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
             </div>
           </div>
         </div>
