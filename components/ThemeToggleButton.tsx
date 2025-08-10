@@ -2,114 +2,85 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaMoon, FaSun } from 'react-icons/fa6';
+import { useTheme } from 'next-themes';
+import { FaMoon, FaSun, FaSpinner } from 'react-icons/fa6';
 import { useAppContext } from '@/contexts/AppContext';
-import { updateUserSettings } from '@/app/actions';
+import { saveThemePreference } from '@/app/actions'; // <-- ИСПОЛЬЗУЕМ НОВЫЙ ЭКШЕН
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { debugLogger as logger } from '@/lib/debugLogger';
 
-export function ThemeToggleButton() {
-  const { dbUser, isLoading: isAppContextLoading } = useAppContext();
-  
-  // Default to dark mode if no user or setting is found
-  const [isDarkMode, setIsDarkMode] = useState(true);
+export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const { dbUser } = useAppContext();
+  const { resolvedTheme, setTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    if (!isAppContextLoading && dbUser?.metadata?.settings_profile) {
-      const userPrefersDark = dbUser.metadata.settings_profile.dark_mode_enabled;
-      // Check if it's explicitly defined, otherwise default to true
-      const newIsDarkMode = typeof userPrefersDark === 'boolean' ? userPrefersDark : true;
-      setIsDarkMode(newIsDarkMode);
-    } else if (!isAppContextLoading && !dbUser) {
-      // For logged-out users, check local storage or default to dark
-      const savedTheme = localStorage.getItem('theme');
-      setIsDarkMode(savedTheme ? savedTheme === 'dark' : true);
-    }
-  }, [dbUser, isAppContextLoading]);
+  useEffect(() => setIsMounted(true), []);
 
-  useEffect(() => {
-    if (isMounted) {
-      document.documentElement.classList.toggle('dark', isDarkMode);
-      // For logged-out users, persist choice in local storage
-      if (!dbUser) {
-        localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-      }
-    }
-  }, [isDarkMode, isMounted, dbUser]);
+  const handleToggle = useCallback(async () => {
+    if (isSaving) return;
 
-  const handleToggleTheme = useCallback(async () => {
-    const newIsDarkMode = !isDarkMode;
-    setIsDarkMode(newIsDarkMode);
+    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
+    
+    // 1. Оптимистичное обновление UI
+    setTheme(newTheme);
 
+    // 2. Если нет пользователя, просто выходим
     if (!dbUser?.user_id) {
-      logger.debug("[ThemeToggle] User not logged in, saving theme to localStorage.");
+      logger.debug("[ThemeToggle] User not logged in, theme changed locally.");
       return;
     }
 
-    logger.debug(`[ThemeToggle] Toggling theme for user ${dbUser.user_id} to ${newIsDarkMode ? 'dark' : 'light'}`);
+    // 3. Сохранение в БД
+    setIsSaving(true);
+    const result = await saveThemePreference(dbUser.user_id, newTheme);
 
-    try {
-      const currentMetadata = dbUser.metadata || {};
-      const currentSettings = (currentMetadata.settings_profile || {}) as Record<string, any>;
-      
-      const newSettingsProfile = {
-        ...currentSettings,
-        dark_mode_enabled: newIsDarkMode,
-      };
-
-      const newMetadata = {
-        ...currentMetadata,
-        settings_profile: newSettingsProfile,
-      };
-      
-      const result = await updateUserSettings(dbUser.user_id, newMetadata);
-
-      if (result.success) {
-        toast.success(`Тема изменена на ${newIsDarkMode ? 'темную' : 'светлую'}`);
-      } else {
-        toast.error("Ошибка сохранения темы");
-        logger.error("[ThemeToggle] Failed to save theme setting", result.error);
-        // Revert UI on failure
-        setIsDarkMode(!newIsDarkMode);
-      }
-    } catch (error) {
-      toast.error("Критическая ошибка при смене темы");
-      logger.error("[ThemeToggle] Critical error on theme toggle", error);
-      // Revert UI on failure
-      setIsDarkMode(!newIsDarkMode);
+    if (result.success) {
+      toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
+    } else {
+      toast.error("Ошибка сохранения темы");
+      logger.error("[ThemeToggle] Failed to save theme setting", result.error);
+      // Откатываем UI в случае ошибки
+      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
     }
-  }, [isDarkMode, dbUser]);
+    setIsSaving(false);
+  }, [resolvedTheme, dbUser, isSaving, setTheme]);
 
   if (!isMounted) {
-    return (
-      <div className="p-2 w-[34px] h-[34px] sm:w-[36px] sm:h-[36px] bg-black/10 rounded-md animate-pulse" />
-    );
+    return <div className={cn("bg-muted/50 rounded-md animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8")} />;
   }
+  
+  const iconSizeClass = size === 'md' ? "h-5 w-5" : "h-4 w-4";
 
   return (
     <button
-      onClick={handleToggleTheme}
+      onClick={handleToggle}
+      disabled={isSaving}
       className={cn(
-        "p-1.5 sm:p-2 relative flex items-center justify-center rounded-md transition-all duration-300 focus:outline-none focus:ring-1 focus:ring-offset-2 focus:ring-offset-black",
-        "w-[34px] h-[34px] sm:w-[36px] sm:h-[36px]",
-        "text-brand-yellow hover:bg-brand-yellow/10 focus:ring-brand-yellow"
+        "relative flex items-center justify-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background",
+        "hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 active:scale-90",
+        size === 'md' ? "w-9 h-9" : "w-8 h-8",
+        "text-brand-yellow focus:ring-brand-yellow"
       )}
-      aria-label="Toggle dark mode"
+      aria-label="Переключить тему"
     >
-      <AnimatePresence initial={false} mode="wait">
-        <motion.div
-          key={isDarkMode ? 'moon' : 'sun'}
-          initial={{ y: -20, opacity: 0, scale: 0.5, rotate: -90 }}
-          animate={{ y: 0, opacity: 1, scale: 1, rotate: 0 }}
-          exit={{ y: 20, opacity: 0, scale: 0.5, rotate: 90 }}
-          transition={{ duration: 0.25, type: 'tween', ease: 'easeInOut' }}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={isSaving ? 'saving' : resolvedTheme}
+          initial={{ y: -15, opacity: 0, rotate: -45 }}
+          animate={{ y: 0, opacity: 1, rotate: 0 }}
+          exit={{ y: 15, opacity: 0, rotate: 45 }}
+          transition={{ duration: 0.2, type: 'tween', ease: 'easeInOut' }}
           className="absolute"
         >
-          {isDarkMode ? <FaMoon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" /> : <FaSun className="h-4 w-4 sm:h-5 sm:w-5" />}
-        </motion.div>
+          {isSaving 
+            ? <FaSpinner className={cn("animate-spin text-muted-foreground", iconSizeClass)} />
+            : resolvedTheme === 'dark' 
+              ? <FaMoon className={cn(iconSizeClass)} /> 
+              : <FaSun className={cn(iconSizeClass, "text-brand-deep-indigo dark:text-brand-yellow")} />
+          }
+        </motion.span>
       </AnimatePresence>
     </button>
   );
