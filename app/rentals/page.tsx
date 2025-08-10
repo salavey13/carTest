@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 
 import { useAppContext } from "@/contexts/AppContext";
-import { getUserRentals } from "./actions"; // <-- ВАШ ПРАВИЛЬНЫЙ СЕРВЕРНЫЙ ЭКШЕН
+import { getUserRentals } from "./actions";
 import type { UserRentalDashboard } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
@@ -70,7 +70,8 @@ const RentalListItem = ({ rental }: { rental: UserRentalDashboard }) => {
                     </div>
                     {startDate && (
                         <div className="mt-3 pt-2 border-t border-dashed border-border text-sm text-muted-foreground flex items-center gap-2">
-                             <VibeContentRenderer content="::FaCalendarAlt::" />
+                             {/* ИСПРАВЛЕНИЕ #1: Заменил FaCalendarAlt на FaCalendar */}
+                             <VibeContentRenderer content="::FaCalendar::" />
                              <span>Начало: {formatDate(startDate)}</span>
                         </div>
                     )}
@@ -82,29 +83,16 @@ const RentalListItem = ({ rental }: { rental: UserRentalDashboard }) => {
 
 // --- ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ---
 export default function RentalsPage() {
-    // 1. Получаем пользователя и статус загрузки из контекста
     const { dbUser, isLoading: isAppLoading } = useAppContext();
-    
-    // 2. Состояние для данных и для процесса загрузки ИМЕННО ДАННЫХ
     const [rentals, setRentals] = useState<UserRentalDashboard[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
 
-    // 3. Эффект для загрузки данных, когда пользователь доступен
     useEffect(() => {
-        // Если контекст еще грузится, ничего не делаем
-        if (isAppLoading) {
-            return;
-        }
-        
-        // Если пользователя нет, то и грузить нечего
-        if (!dbUser) {
-            setIsLoadingData(false);
-            return;
-        }
+        if (isAppLoading) return;
+        if (!dbUser) { setIsLoadingData(false); return; }
 
         const loadRentals = async () => {
             setIsLoadingData(true);
-            // Вызываем серверный экшен, который использует вашу RPC-функцию
             const result = await getUserRentals(dbUser.user_id);
             if (result.success && result.data) {
                 setRentals(result.data as UserRentalDashboard[]);
@@ -113,18 +101,13 @@ export default function RentalsPage() {
             }
             setIsLoadingData(false);
         };
-
         loadRentals();
-    }, [dbUser, isAppLoading]); // Зависимости: dbUser и статус загрузки контекста
+    }, [dbUser, isAppLoading]);
 
-    // 4. Обработка состояний отображения
-    
-    // Пока грузится контекст (первичная загрузка)
     if (isAppLoading) {
         return <Loading text="Инициализация приложения..." />;
     }
 
-    // Если после загрузки пользователя нет
     if (!dbUser) {
         return (
             <main className="min-h-screen flex flex-col items-center justify-center text-center p-4">
@@ -133,7 +116,6 @@ export default function RentalsPage() {
                     title="Доступ ограничен"
                     description="Пожалуйста, войдите в систему, чтобы просмотреть свои аренды."
                 />
-                
             </main>
         );
     }
@@ -141,7 +123,6 @@ export default function RentalsPage() {
     const asRenter = rentals.filter(r => r.user_role === 'renter');
     const asOwner = rentals.filter(r => r.user_role === 'owner' || r.user_role === 'crew_owner');
 
-    // Основное отображение страницы
     return (
         <main className="min-h-screen bg-background text-foreground p-4 pt-24">
             <div className="fixed inset-0 z-[-1] bg-grid-pattern opacity-50" />
@@ -154,7 +135,8 @@ export default function RentalsPage() {
                     className="w-full bg-card/70 backdrop-blur-xl border border-border rounded-2xl shadow-lg shadow-primary/10 p-6 mb-8"
                 >
                     <div className="text-center mb-6">
-                        <VibeContentRenderer content="::FaTicketAlt::" className="text-5xl text-primary mx-auto mb-4 text-shadow-brand-yellow" />
+                        {/* ИСПРАВЛЕНИЕ #2: Заменил FaTicketAlt на FaTicket */}
+                        <VibeContentRenderer content="::FaTicket::" className="text-5xl text-primary mx-auto mb-4 text-shadow-brand-yellow" />
                         <h1 className="text-3xl font-orbitron text-foreground">Центр Управления</h1>
                         <p className="text-muted-foreground mt-2 font-mono text-sm">Найдите сделку по ID или просмотрите свои списки.</p>
                     </div>
@@ -167,7 +149,8 @@ export default function RentalsPage() {
                     <Tabs defaultValue="renter" className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="renter"><VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды</TabsTrigger>
-                            <TabsTrigger value="owner"><VibeContentRenderer content="::FaBike::" className="mr-2"/>Мой Транспорт</TabsTrigger>
+                            {/* ИСПРАВЛЕНИЕ #3: Заменил FaBike на FaMotorcycle для стиля */}
+                            <TabsTrigger value="owner"><VibeContentRenderer content="::FaMotorcycle::" className="mr-2"/>Мой Транспорт</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="renter" className="mt-6">
