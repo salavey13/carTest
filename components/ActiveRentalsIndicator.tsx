@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
-import { supabase } from "@/lib/supabaseClient";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export const ActiveRentalsIndicator = () => {
           ? [userCrewInfo.id]
           : [];
 
-      const { data, error } = await supabase.rpc("get_user_rentals_dashboard", {
+      const { data, error } = await supabaseAdmin.rpc("get_user_rentals_dashboard", {
         p_owned_crew_ids: crewIds,
         p_user_id: dbUser.user_id,
         p_minimal: true
