@@ -1,22 +1,25 @@
-// /app/rentals/page.tsx
+"use client"
+
+import { useState, useEffect } from 'react';
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 
-import { supabaseAdmin } from "@/hooks/supabase";
-import { getUserRentals } from "./actions";
+import { useAppContext } from "@/contexts/AppContext";
+import { getUserRentals } from "./actions"; // <-- ВАШ ПРАВИЛЬНЫЙ СЕРВЕРНЫЙ ЭКШЕН
 import type { UserRentalDashboard } from "@/lib/types";
 import { cn, formatDate } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RentalSearchForm } from "./components/RentalSearchForm";
+import { Loading } from '@/components/Loading';
+import { AuthButton } from "@/components/AuthButton";
 
-// --- КОНФИГУРАЦИЯ СТАТУСОВ (ОСТАЕТСЯ ПРЕЖНЕЙ) ---
+// --- КОНФИГУРАЦИЯ СТАТУСОВ ---
 const statusConfig = {
   pending_confirmation: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow", ring: "ring-brand-yellow/50" },
   active: { label: "Активна", icon: "::FaPlayCircle::", color: "text-brand-green", ring: "ring-brand-green/50" },
-  completed: { label: "Завершена", icon: "::FaCircleCheck::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
+  completed: { label: "Завершена", icon: "::FaCheckCircle::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
   cancelled: { label: "Отменена", icon: "::FaCircleXmark::", color: "text-destructive", ring: "ring-destructive/40" },
   default: { label: "Неизвестно", icon: "::FaQuestionCircle::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
 };
@@ -78,88 +81,70 @@ const RentalListItem = ({ rental }: { rental: UserRentalDashboard }) => {
     );
 };
 
-// --- КЛИЕНТСКИЙ КОМПОНЕНТ ДЛЯ ОТОБРАЖЕНИЯ ВКЛАДОК ---
-const RentalsDashboardClient = ({ rentals }: { rentals: UserRentalDashboard[] }) => {
-    const asRenter = rentals.filter(r => r.user_role === 'renter');
-    const asOwner = rentals.filter(r => r.user_role === 'owner' || r.user_role === 'crew_owner');
-
-    return (
-        <Tabs defaultValue="renter" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="renter">
-                    <VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды
-                </TabsTrigger>
-                <TabsTrigger value="owner">
-                    <VibeContentRenderer content="::FaCar::" className="mr-2"/>Мой Транспорт
-                </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="renter" className="mt-6">
-                {asRenter.length > 0 ? (
-                    <div className="space-y-4">
-                        {asRenter.map(r => <RentalListItem key={r.rental_id} rental={r} />)}
-                    </div>
-                ) : (
-                    <EmptyState 
-                        icon="::FaSearch::"
-                        title="Вы пока ничего не арендовали"
-                        description="Найдите подходящий транспорт и начните свое приключение."
-                    />
-                )}
-            </TabsContent>
-
-            <TabsContent value="owner" className="mt-6">
-                {asOwner.length > 0 ? (
-                    <div className="space-y-4">
-                        {asOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}
-                    </div>
-                ) : (
-                    <EmptyState 
-                        icon="::FaPlusCircle::"
-                        title="Ваш транспорт еще не сдавался"
-                        description="Добавьте свой транспорт в систему, чтобы начать зарабатывать."
-                    />
-                )}
-            </TabsContent>
-        </Tabs>
-    );
-};
-
-// --- ГЛАВНЫЙ СЕРВЕРНЫЙ КОМПОНЕНТ СТРАНИЦЫ ---
-export default async function RentalsPage() {
+// --- ОСНОВНОЙ КОМПОНЕНТ СТРАНИЦЫ ---
+export default function RentalsPage() {
+    // 1. Получаем пользователя и статус загрузки из контекста
+    const { dbUser, isLoading: isAppLoading } = useAppContext();
     
-    const { data: { user } } = await supabaseAdmin().auth.getUser();
+    // 2. Состояние для данных и для процесса загрузки ИМЕННО ДАННЫХ
+    const [rentals, setRentals] = useState<UserRentalDashboard[]>([]);
+    const [isLoadingData, setIsLoadingData] = useState(true);
 
-    if (!user) {
+    // 3. Эффект для загрузки данных, когда пользователь доступен
+    useEffect(() => {
+        // Если контекст еще грузится, ничего не делаем
+        if (isAppLoading) {
+            return;
+        }
+        
+        // Если пользователя нет, то и грузить нечего
+        if (!dbUser) {
+            setIsLoadingData(false);
+            return;
+        }
+
+        const loadRentals = async () => {
+            setIsLoadingData(true);
+            // Вызываем серверный экшен, который использует вашу RPC-функцию
+            const result = await getUserRentals(dbUser.user_id);
+            if (result.success && result.data) {
+                setRentals(result.data as UserRentalDashboard[]);
+            } else {
+                console.error("Ошибка загрузки аренд:", result.error);
+            }
+            setIsLoadingData(false);
+        };
+
+        loadRentals();
+    }, [dbUser, isAppLoading]); // Зависимости: dbUser и статус загрузки контекста
+
+    // 4. Обработка состояний отображения
+    
+    // Пока грузится контекст (первичная загрузка)
+    if (isAppLoading) {
+        return <Loading text="Инициализация приложения..." />;
+    }
+
+    // Если после загрузки пользователя нет
+    if (!dbUser) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
-                <EmptyState 
+            <main className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+                 <EmptyState 
                     icon="::FaLock::"
                     title="Доступ ограничен"
                     description="Пожалуйста, войдите в систему, чтобы просмотреть свои аренды."
                 />
-                
-            </div>
-        )
+                <AuthButton className="mt-6" />
+            </main>
+        );
     }
 
-    const { success, data: rentals, error } = await getUserRentals(user.id);
-    
-    if (!success || error) {
-        return (
-             <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
-                 <EmptyState 
-                    icon="::FaExclamationTriangle::"
-                    title="Ошибка при загрузке"
-                    description={error || "Не удалось загрузить данные об арендах. Попробуйте позже."}
-                />
-            </div>
-        )
-    }
+    const asRenter = rentals.filter(r => r.user_role === 'renter');
+    const asOwner = rentals.filter(r => r.user_role === 'owner' || r.user_role === 'crew_owner');
 
+    // Основное отображение страницы
     return (
         <main className="min-h-screen bg-background text-foreground p-4 pt-24">
-            {/* Адаптивный фон с паттерном */}
             <div className="fixed inset-0 z-[-1] bg-grid-pattern opacity-50" />
             <div className="fixed inset-0 z-[-2] bg-gradient-to-br from-background via-muted to-background" />
             
@@ -174,12 +159,34 @@ export default async function RentalsPage() {
                         <h1 className="text-3xl font-orbitron text-foreground">Центр Управления</h1>
                         <p className="text-muted-foreground mt-2 font-mono text-sm">Найдите сделку по ID или просмотрите свои списки.</p>
                     </div>
-                    {/* Форма поиска вынесена в отдельный клиентский компонент */}
                     <RentalSearchForm />
                 </motion.div>
 
-                {/* Клиентский компонент для отображения данных */}
-                <RentalsDashboardClient rentals={rentals as UserRentalDashboard[]} />
+                {isLoadingData ? (
+                    <Loading text="Загрузка ваших аренд..." />
+                ) : (
+                    <Tabs defaultValue="renter" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="renter"><VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды</TabsTrigger>
+                            <TabsTrigger value="owner"><VibeContentRenderer content="::FaCar::" className="mr-2"/>Мой Транспорт</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="renter" className="mt-6">
+                            {asRenter.length > 0 ? (
+                                <div className="space-y-4">{asRenter.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
+                            ) : (
+                                <EmptyState icon="::FaSearch::" title="Вы пока ничего не арендовали" description="Найдите подходящий транспорт и начните свое приключение."/>
+                            )}
+                        </TabsContent>
+                        <TabsContent value="owner" className="mt-6">
+                            {asOwner.length > 0 ? (
+                                <div className="space-y-4">{asOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
+                            ) : (
+                                <EmptyState icon="::FaPlusCircle::" title="Ваш транспорт еще не сдавался" description="Добавьте свой транспорт в систему, чтобы начать зарабатывать."/>
+                            )}
+                        </TabsContent>
+                    </Tabs>
+                )}
             </div>
         </main>
     );
