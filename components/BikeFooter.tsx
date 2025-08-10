@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react"; // <-- Добавляем useRef
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { FaInstagram, FaTelegram, FaVk, FaPhone, FaMapLocationDot } from "react-icons/fa6";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
@@ -13,24 +13,24 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function BikeFooter() {
-  const { dbUser, refreshDbUser } = useAppContext();
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { dbUser } = useAppContext();
+  const { setTheme, resolvedTheme } = useTheme();
   
   const [isSavingTheme, setIsSavingTheme] = useState(false);
-  const isInitialThemeSet = useRef(false); // Флаг, чтобы useEffect сработал только один раз
+  const isInitialThemeSet = useRef(false);
 
-  // ИСПРАВЛЕННЫЙ useEffect: Устанавливает тему из БД только один раз при загрузке
+  // Устанавливает тему из БД только один раз при первой загрузке
   useEffect(() => {
     if (dbUser && !isInitialThemeSet.current) {
       const userTheme = dbUser.metadata?.theme as 'light' | 'dark' | undefined;
       if (userTheme && userTheme !== resolvedTheme) {
         setTheme(userTheme);
       }
-      isInitialThemeSet.current = true; // Отмечаем, что начальная тема установлена
+      isInitialThemeSet.current = true;
     }
   }, [dbUser, setTheme, resolvedTheme]);
 
-  // Отполированный обработчик: теперь он надежен
+  // Надежный обработчик смены темы
   const handleThemeToggle = async () => {
     if (isSavingTheme) return;
 
@@ -50,8 +50,6 @@ export default function BikeFooter() {
 
     if (success) {
       toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
-      // refreshDbUser() здесь больше не нужен, он вызывал конфликт.
-      // Контекст обновится сам, когда пользователь перейдет на другую страницу.
     } else {
       toast.error(`Ошибка сохранения: ${error}`);
       setTheme(oldTheme || 'dark'); // В случае ошибки откатываем тему обратно
