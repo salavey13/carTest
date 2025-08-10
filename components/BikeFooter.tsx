@@ -1,4 +1,3 @@
-// /components/BikeFooter.tsx
 "use client";
 
 import Link from "next/link";
@@ -7,67 +6,67 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { useTheme } from "next-themes";
 import { useAppContext } from "@/contexts/AppContext";
 import { updateUserMetadata } from "@/hooks/supabase";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export default function BikeFooter() {
   const { dbUser, refreshDbUser } = useAppContext();
-  const { theme, setTheme } = useTheme();
-  const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>('dark');
+  // *** ИСПРАВЛЕНИЕ ЛОГИКИ: theme - главный источник правды для UI ***
+  // Локальное состояние `currentTheme` больше не нужно.
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
+  // Этот useEffect синхронизирует тему из БД при первой загрузке
   useEffect(() => {
     const userTheme = dbUser?.metadata?.theme as 'light' | 'dark' | undefined;
-    const initialTheme = userTheme || 'dark';
-    
-    setCurrentTheme(initialTheme);
-    
-    if (theme !== initialTheme) {
-      setTheme(initialTheme);
-    }
-
-    if (!userTheme && dbUser?.user_id) {
-      handleThemeChange(initialTheme, true);
+    if (userTheme && userTheme !== theme) {
+      setTheme(userTheme);
     }
   }, [dbUser, theme, setTheme]);
 
-  const handleThemeChange = async (newTheme: 'light' | 'dark', isSilent = false) => {
+  const handleThemeChange = async (newTheme: 'light' | 'dark') => {
+    // 1. Мгновенно меняем тему в UI
+    setTheme(newTheme);
+
+    // 2. Если пользователь не авторизован, просто выходим
     if (!dbUser?.user_id) {
-      if (!isSilent) toast.error("Не удалось сохранить тему: пользователь не авторизован.");
       return;
     }
     
-    setCurrentTheme(newTheme);
-    setTheme(newTheme);
-
+    // 3. Асинхронно сохраняем выбор в БД
     const currentMetadata = dbUser.metadata || {};
-    const updatedMetadata = { ...currentMetadata, theme: newTheme };
+    // Не сохраняем, если тема уже такая
+    if (currentMetadata.theme === newTheme) return;
 
+    const updatedMetadata = { ...currentMetadata, theme: newTheme };
     const { success, error } = await updateUserMetadata(dbUser.user_id, updatedMetadata);
 
     if (success) {
-      if (!isSilent) toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
+      toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
+      // Обновляем данные пользователя в контексте, чтобы metadata была актуальной
       await refreshDbUser();
     } else {
-      if (!isSilent) toast.error(`Ошибка сохранения темы: ${error}`);
-      const oldTheme = newTheme === 'dark' ? 'light' : 'dark';
-      setCurrentTheme(oldTheme);
-      setTheme(oldTheme);
+      toast.error(`Ошибка сохранения темы: ${error}`);
+      // Если сохранение не удалось, откатываем тему обратно
+      setTheme(theme || 'dark');
     }
   };
 
   const toggleTheme = () => {
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
     handleThemeChange(newTheme);
   };
   
-  const footerLinkClass = "text-sm text-muted-foreground hover:text-brand-cyan font-mono flex items-center gap-2 transition-colors duration-200 hover:text-glow";
+  const footerLinkClass = "text-sm text-muted-foreground hover:text-primary transition-colors duration-200 flex items-center gap-2";
   
   return (
-    // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
-    // Добавляем mb-16 (margin-bottom: 4rem) на мобильных, чтобы был отступ от навбара
-    <footer className={cn("bg-dark-bg py-10 md:py-12 border-t-2 border-brand-orange/30 mb-16 sm:mb-0")}>
+    // *** ГЛАВНОЕ ИСПРАВЛЕНИЕ СТИЛЕЙ ***
+    // Заменяем `bg-dark-bg` на `bg-card` и `border-brand-orange` на `border-border`
+    <footer className={cn(
+        "bg-card py-10 md:py-12 border-t border-border",
+        "mb-16 sm:mb-0" // Отступ от нижнего навбара на мобильных
+    )}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
           
@@ -109,7 +108,7 @@ export default function BikeFooter() {
           </div>
         </div>
 
-        <div className="mt-10 md:mt-12 pt-6 border-t border-brand-orange/20">
+        <div className="mt-10 md:mt-12 pt-6 border-t border-border/50">
           <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-muted-foreground font-mono text-xs">
             <p>© {new Date().getFullYear()} Vip Bike Rental NN</p>
             
@@ -117,31 +116,24 @@ export default function BikeFooter() {
                 <button
                     onClick={toggleTheme}
                     className="flex items-center gap-2 cursor-pointer group"
-                    aria-label={`Switch to ${currentTheme === 'dark' ? 'light' : 'dark'} mode`}
+                    aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
                 >
                     <AnimatePresence mode="wait" initial={false}>
                         <motion.span
-                            key={currentTheme}
+                            key={resolvedTheme}
                             initial={{ y: -10, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: 10, opacity: 0 }}
                             transition={{ duration: 0.2 }}
                             className="inline-block"
                         >
-                           {currentTheme === 'dark' ? 
-  <VibeContentRenderer 
-    content="::FaBolt::" 
-    className="icon-animate-bolt text-brand-yellow group-hover:text-yellow-300 transition-colors h-4 w-4" 
-  /> : 
-  <VibeContentRenderer 
-    content="::FaLightbulb::" 
-    className="icon-animate-light text-brand-deep-indigo group-hover:text-black transition-colors h-4 w-4" 
-  />
-}
-
+                           {resolvedTheme === 'dark' ? 
+                                <VibeContentRenderer content="::FaBolt::" className="icon-animate-bolt text-brand-yellow group-hover:text-yellow-300 transition-colors h-4 w-4" />
+                                : <VibeContentRenderer content="::FaLightbulb::" className="icon-animate-light text-brand-deep-indigo group-hover:text-foreground transition-colors h-4 w-4" />
+                            }
                         </motion.span>
                     </AnimatePresence>
-                    <p className="transition-colors group-hover:text-brand-cyan">Powered by <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-brand-green hover:text-glow hover:underline">oneSitePls</a> :: @SALAVEY13</p>
+                    <p className="transition-colors group-hover:text-primary">Powered by <a href="https://t.me/oneSitePlsBot" target="_blank" rel="noopener noreferrer" className="text-brand-green hover:text-glow hover:underline">oneSitePls</a> :: @SALAVEY13</p>
                 </button>
             </div>
           </div>
