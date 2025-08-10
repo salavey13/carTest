@@ -1,3 +1,4 @@
+// /app/rent-bike/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -86,7 +87,7 @@ const ActiveRentalsTicker = ({ userId }: { userId: string }) => {
             <Link href="/rentals">
                 <div className="bg-gradient-to-r from-brand-cyan/20 to-brand-purple/20 border-2 border-brand-cyan/50 rounded-lg p-4 text-center cursor-pointer hover:border-brand-cyan transition-all group">
                     <p className="font-orbitron font-bold text-lg text-brand-cyan text-shadow-cyber animate-pulse">
-                        <VibeContentRenderer content="::FaExclamationTriangle::" /> У вас {activeRentals.length} активных сделок!
+                        <VibeContentRenderer content="::FaTriangleExclamation::" /> У вас {activeRentals.length} активных сделок!
                     </p>
                     <p className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Нажмите, чтобы перейти в Центр Управления.</p>
                 </div>
