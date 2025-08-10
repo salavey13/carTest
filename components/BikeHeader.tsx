@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator"; // <-- ИМПОРТ НОВОГО КОМПОНЕНТА
+import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator";
 
 export default function BikeHeader() {
   const { tg, isInTelegramContext, userCrewInfo } = useAppContext();
@@ -28,36 +28,44 @@ export default function BikeHeader() {
   return (
     <TooltipProvider>
       <motion.header
-        className={cn("fixed top-0 left-0 right-0 z-40 bg-black/80 border-b border-brand-orange/40 shadow-md backdrop-blur-md")}
+        // *** ГЛАВНОЕ ИЗМЕНЕНИЕ: АДАПТИВНЫЕ СТИЛИ ДЛЯ ТЕМ ***
+        // bg-background/90 - фон автоматически станет светлым или темным
+        // border-border - граница также адаптируется под тему
+        className={cn(
+            "fixed top-0 left-0 right-0 z-40 bg-background/90 border-b border-border shadow-md backdrop-blur-md"
+        )}
         initial={{ y: -100 }} animate={{ y: 0 }} transition={{ type: "tween", duration: 0.3 }}
       >
         <div className="container mx-auto px-4 py-2.5 sm:py-3">
           <div className="flex items-center justify-between">
             <Link
               href="/vipbikerental"
-              className={cn("text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider", "transition-all duration-300 hover:brightness-125 flex items-center gap-3")}
+              className="group flex items-center gap-3 transition-all duration-300 hover:brightness-125"
             >
               <Image 
                 src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250725_233953_793-f4d8a590-5d2c-4416-9969-c8f9a4627eb5.jpg" 
                 alt="Vip Bike Rental Logo" 
                 width={36} 
                 height={36} 
-                className="rounded-full"
+                className="rounded-full transition-transform duration-300 group-hover:scale-110"
               />
-              <div className="flex items-baseline">
+              <div className="flex items-baseline text-2xl font-bold uppercase tracking-wider font-orbitron md:text-3xl">
                 <span className="text-brand-orange glitch" data-text="VIP">VIP</span>
                 <span className="gta-vibe-text-effect">BIKE</span>
               </div>
             </Link>
-            <div className="flex items-center gap-2 md:gap-3">
-                {/* --- ИЗМЕНЕНИЯ ЗДЕСЬ --- */}
+            <div className="flex items-center gap-1 md:gap-2">
                 <ActiveRentalsIndicator />
 
-                {userCrewInfo ? (
+                {userCrewInfo && (
                     <>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button onClick={handleInvite} className="p-2 text-brand-lime hover:text-brand-lime/70 focus:outline-none focus:ring-2 focus:ring-brand-lime focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-lime/10">
+                                <button 
+                                  onClick={handleInvite} 
+                                  // ИЗМЕНЕНИЕ: ring-offset-background для адаптивного фокуса
+                                  className="p-2 text-brand-lime rounded-md transition-all duration-200 hover:bg-brand-lime/10 hover:text-brand-lime/70 focus:outline-none focus:ring-2 focus:ring-brand-lime focus:ring-offset-2 focus:ring-offset-background"
+                                >
                                     <VibeContentRenderer content="::FaUserPlus::" className="h-5 w-5 sm:h-6 sm:w-6" />
                                 </button>
                             </TooltipTrigger>
@@ -65,15 +73,13 @@ export default function BikeHeader() {
                         </Tooltip>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                 <Link href={`/crews/${userCrewInfo.slug}`}>
-                                    <Image src={userCrewInfo.logo_url} alt={userCrewInfo.name} width={32} height={32} className="rounded-full border-2 border-brand-green/50 hover:border-brand-green transition-colors"/>
+                                 <Link href={`/crews/${userCrewInfo.slug}`} className="p-1 block">
+                                    <Image src={userCrewInfo.logo_url} alt={userCrewInfo.name} width={32} height={32} className="rounded-full border-2 border-brand-green/50 transition-colors hover:border-brand-green"/>
                                  </Link>
                             </TooltipTrigger>
                             <TooltipContent><p>Мой Экипаж: {userCrewInfo.name}</p></TooltipContent>
                         </Tooltip>
                     </>
-                ) : (
-                   null // Убрали иконку-ссылку на бота, так как она не нужна постоянно
                 )}
 
                 <UserInfo />
