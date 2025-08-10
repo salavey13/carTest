@@ -28,9 +28,6 @@ export default function BikeHeader() {
   return (
     <TooltipProvider>
       <motion.header
-        // *** ГЛАВНОЕ ИЗМЕНЕНИЕ: АДАПТИВНЫЕ СТИЛИ ДЛЯ ТЕМ ***
-        // bg-background/90 - фон автоматически станет светлым или темным
-        // border-border - граница также адаптируется под тему
         className={cn(
             "fixed top-0 left-0 right-0 z-40 bg-background/90 border-b border-border shadow-md backdrop-blur-md"
         )}
@@ -63,7 +60,6 @@ export default function BikeHeader() {
                             <TooltipTrigger asChild>
                                 <button 
                                   onClick={handleInvite} 
-                                  // ИЗМЕНЕНИЕ: ring-offset-background для адаптивного фокуса
                                   className="p-2 text-brand-lime rounded-md transition-all duration-200 hover:bg-brand-lime/10 hover:text-brand-lime/70 focus:outline-none focus:ring-2 focus:ring-brand-lime focus:ring-offset-2 focus:ring-offset-background"
                                 >
                                     <VibeContentRenderer content="::FaUserPlus::" className="h-5 w-5 sm:h-6 sm:w-6" />
