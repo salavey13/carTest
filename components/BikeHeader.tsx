@@ -29,8 +29,6 @@ export default function BikeHeader() {
     <TooltipProvider>
       <motion.header
         // *** ГЛАВНОЕ ИСПРАВЛЕНИЕ: Используем переменные темы ***
-        // БЫЛО: "bg-black/80 border-b border-brand-orange/40"
-        // СТАЛО: "bg-background/80 border-b border-border"
         className={cn(
             "fixed top-0 left-0 right-0 z-40 bg-background/80 border-b border-border shadow-md backdrop-blur-md"
         )}
