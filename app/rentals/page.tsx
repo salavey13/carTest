@@ -1,3 +1,4 @@
+// /app/rentals/page.tsx
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -126,8 +127,8 @@ const RentalsDashboardClient = ({ rentals }: { rentals: UserRentalDashboard[] })
 
 // --- ГЛАВНЫЙ СЕРВЕРНЫЙ КОМПОНЕНТ СТРАНИЦЫ ---
 export default async function RentalsPage() {
-    const supabase = supabaseAdmin();
-    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { data: { user } } = await supabaseAdmin().auth.getUser();
 
     if (!user) {
         return (
