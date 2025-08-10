@@ -1,132 +1,186 @@
-"use client";
-
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import Image from "next/image";
-import { motion } from "framer-motion";
-import { getUserRentals } from './actions';
-import { useAppContext } from '@/contexts/AppContext';
-import { Loading } from '@/components/Loading';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { Database } from '@/types/database.types';
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 
-type RentalDashboardItem = Awaited<ReturnType<typeof getUserRentals>>['data'] extends (infer U)[] ? U : never;
+import { createServerSupabaseClient } from "@/hooks/supabase-server";
+import { getUserRentals } from "./actions";
+import type { UserRentalDashboard } from "@/lib/types";
+import { cn, formatDate } from "@/lib/utils";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RentalSearchForm } from "./components/RentalSearchForm";
+import { AuthButton } from "@/components/AuthButton";
 
+// --- КОНФИГУРАЦИЯ СТАТУСОВ (ОСТАЕТСЯ ПРЕЖНЕЙ) ---
 const statusConfig = {
-    pending_confirmation: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow" },
-    active: { label: "Активна", icon: "::FaPlayCircle::", color: "text-brand-green" },
-    completed: { label: "Завершена", icon: "::FaCheckCircle::", color: "text-muted-foreground" },
-    cancelled: { label: "Отменена", icon: "::FaCircleXmark::", color: "text-destructive" },
-    default: { label: "Неизвестно", icon: "::FaQuestionCircle::", color: "text-muted-foreground" },
+  pending_confirmation: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow", ring: "ring-brand-yellow/50" },
+  active: { label: "Активна", icon: "::FaPlayCircle::", color: "text-brand-green", ring: "ring-brand-green/50" },
+  completed: { label: "Завершена", icon: "::FaCheckCircle::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
+  cancelled: { label: "Отменена", icon: "::FaCircleXmark::", color: "text-destructive", ring: "ring-destructive/40" },
+  default: { label: "Неизвестно", icon: "::FaQuestionCircle::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
 };
 
-const RentalListItem = ({ rental }: { rental: RentalDashboardItem }) => {
+// --- КОМПОНЕНТ ДЛЯ ПУСТОГО СОСТОЯНИЯ ---
+const EmptyState = ({ icon, title, description }: { icon: string; title: string; description: string; }) => (
+    <div className="text-center py-12 px-6 bg-card/50 border border-dashed border-border rounded-xl">
+        <VibeContentRenderer content={icon} className="text-5xl text-muted-foreground mx-auto mb-4" />
+        <h3 className="font-orbitron text-lg font-semibold">{title}</h3>
+        <p className="text-sm text-muted-foreground mt-1">{description}</p>
+    </div>
+);
+
+// --- ОБНОВЛЕННЫЙ КОМПОНЕНТ КАРТОЧКИ АРЕНДЫ ---
+const RentalListItem = ({ rental }: { rental: UserRentalDashboard }) => {
     const config = statusConfig[rental.status as keyof typeof statusConfig] || statusConfig.default;
     const roleText = rental.user_role === 'renter' ? 'Вы арендатор' : rental.user_role === 'owner' ? 'Вы владелец' : 'Экипаж';
-    
+    const startDate = rental.agreed_start_date || rental.requested_start_date;
+
     return (
-        <Link href={`/rentals/${rental.rental_id}`} className="block">
+        <Link href={`/rentals/${rental.rental_id}`} className="block group">
             <motion.div 
-                whileHover={{ scale: 1.02, y: -2 }}
-                className="bg-card/50 p-3 rounded-lg flex items-center gap-4 border border-border hover:border-brand-cyan transition-colors"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -4, boxShadow: "var(--shadow-yellow-glow)" }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className={cn(
+                    "bg-card/80 p-4 rounded-xl flex items-start gap-4 border border-border transition-all duration-300",
+                    "group-hover:border-primary"
+                )}
             >
-                <Image src={rental.vehicle_image_url || '/placeholder.svg'} alt={rental.vehicle_model || "Vehicle"} width={64} height={64} className="rounded-md object-cover aspect-square" />
+                <Image 
+                    src={rental.vehicle_image_url || '/placeholder.svg'} 
+                    alt={rental.vehicle_model || "Vehicle"} 
+                    width={80} 
+                    height={80} 
+                    className="rounded-lg object-cover aspect-square border border-border" 
+                />
                 <div className="flex-grow">
-                    <p className="font-bold">{rental.vehicle_make} {rental.vehicle_model}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{roleText}</p>
-                </div>
-                <div className={cn("flex items-center gap-2 text-sm font-mono", config.color)}>
-                    <VibeContentRenderer content={config.icon} />
-                    <span>{config.label}</span>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="font-bold text-lg leading-tight">{rental.vehicle_make} {rental.vehicle_model}</p>
+                            <p className="text-xs text-muted-foreground font-mono mt-1">{roleText}</p>
+                        </div>
+                        <div className={cn("hidden sm:flex items-center gap-2 text-sm font-mono whitespace-nowrap py-1 px-2.5 rounded-full ring-1 ring-inset", config.color, config.ring)}>
+                            <VibeContentRenderer content={config.icon} />
+                            <span className="font-semibold">{config.label}</span>
+                        </div>
+                    </div>
+                    {startDate && (
+                        <div className="mt-3 pt-2 border-t border-dashed border-border text-sm text-muted-foreground flex items-center gap-2">
+                             <VibeContentRenderer content="::FaCalendarAlt::" />
+                             <span>Начало: {formatDate(startDate)}</span>
+                        </div>
+                    )}
                 </div>
             </motion.div>
         </Link>
     );
 };
 
-export default function FindRentalPage() {
-    const [rentalId, setRentalId] = useState('');
-    const router = useRouter();
-    const { dbUser, isLoading: isAppLoading } = useAppContext();
-    const [rentals, setRentals] = useState<RentalDashboardItem[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (isAppLoading) return;
-        if (!dbUser) { setLoading(false); return; }
-        
-        async function loadRentals() {
-            const result = await getUserRentals(dbUser.user_id);
-            if (result.success && result.data) {
-                setRentals(result.data as RentalDashboardItem[]);
-            }
-            setLoading(false);
-        }
-        loadRentals();
-    }, [dbUser, isAppLoading]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (rentalId.trim()) {
-            router.push(`/rentals/${rentalId.trim()}`);
-        }
-    };
-    
-    const categorizedRentals = {
-        asRenter: rentals.filter(r => r.user_role === 'renter'),
-        asOwner: rentals.filter(r => r.user_role === 'owner'),
-        asCrewOwner: rentals.filter(r => r.user_role === 'crew_owner'),
-    };
+// --- КЛИЕНТСКИЙ КОМПОНЕНТ ДЛЯ ОТОБРАЖЕНИЯ ВКЛАДОК ---
+const RentalsDashboardClient = ({ rentals }: { rentals: UserRentalDashboard[] }) => {
+    const asRenter = rentals.filter(r => r.user_role === 'renter');
+    const asOwner = rentals.filter(r => r.user_role === 'owner' || r.user_role === 'crew_owner');
 
     return (
-        <div className="min-h-screen bg-background text-foreground p-4 pt-24">
-             <div className="fixed inset-0 z-[-1] opacity-20"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/21a9e79f-ab43-41dd-9603-4586fabed2cb-158b7f8c-86c6-42c8-8903-563ffcd61213.jpg" alt="BG" fill className="object-cover animate-pan-zoom" /><div className="absolute inset-0 bg-background/70 backdrop-blur-sm"></div></div>
-            <div className="container mx-auto max-w-2xl">
+        <Tabs defaultValue="renter" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="renter">
+                    <VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды
+                </TabsTrigger>
+                <TabsTrigger value="owner">
+                    <VibeContentRenderer content="::FaCar::" className="mr-2"/>Мой Транспорт
+                </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="renter" className="mt-6">
+                {asRenter.length > 0 ? (
+                    <div className="space-y-4">
+                        {asRenter.map(r => <RentalListItem key={r.rental_id} rental={r} />)}
+                    </div>
+                ) : (
+                    <EmptyState 
+                        icon="::FaSearch::"
+                        title="Вы пока ничего не арендовали"
+                        description="Найдите подходящий транспорт и начните свое приключение."
+                    />
+                )}
+            </TabsContent>
+
+            <TabsContent value="owner" className="mt-6">
+                {asOwner.length > 0 ? (
+                    <div className="space-y-4">
+                        {asOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}
+                    </div>
+                ) : (
+                    <EmptyState 
+                        icon="::FaPlusCircle::"
+                        title="Ваш транспорт еще не сдавался"
+                        description="Добавьте свой транспорт в систему, чтобы начать зарабатывать."
+                    />
+                )}
+            </TabsContent>
+        </Tabs>
+    );
+};
+
+// --- ГЛАВНЫЙ СЕРВЕРНЫЙ КОМПОНЕНТ СТРАНИЦЫ ---
+export default async function RentalsPage() {
+    const supabase = createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+                <EmptyState 
+                    icon="::FaLock::"
+                    title="Доступ ограничен"
+                    description="Пожалуйста, войдите в систему, чтобы просмотреть свои аренды."
+                />
+                <AuthButton className="mt-6" />
+            </div>
+        )
+    }
+
+    const { success, data: rentals, error } = await getUserRentals(user.id);
+    
+    if (!success || error) {
+        return (
+             <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+                 <EmptyState 
+                    icon="::FaExclamationTriangle::"
+                    title="Ошибка при загрузке"
+                    description={error || "Не удалось загрузить данные об арендах. Попробуйте позже."}
+                />
+            </div>
+        )
+    }
+
+    return (
+        <main className="min-h-screen bg-background text-foreground p-4 pt-24">
+            {/* Адаптивный фон с паттерном */}
+            <div className="fixed inset-0 z-[-1] bg-grid-pattern opacity-50" />
+            <div className="fixed inset-0 z-[-2] bg-gradient-to-br from-background via-muted to-background" />
+            
+            <div className="container mx-auto max-w-3xl">
                 <motion.div
-                    initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-                    className="w-full bg-card/70 backdrop-blur-xl border border-brand-purple/30 rounded-2xl shadow-lg shadow-brand-purple/10 p-6 mb-8"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="w-full bg-card/70 backdrop-blur-xl border border-border rounded-2xl shadow-lg shadow-primary/10 p-6 mb-8"
                 >
                     <div className="text-center mb-6">
-                        <VibeContentRenderer content="::FaTicket::" className="text-5xl text-brand-cyan mx-auto mb-4" />
-                        <h1 className="text-3xl font-orbitron text-foreground">Центр Управления Арендами</h1>
-                        <p className="text-muted-foreground mt-2 font-mono text-sm">Найдите сделку по ID или выберите из списков ниже.</p>
+                        <VibeContentRenderer content="::FaTicketAlt::" className="text-5xl text-primary mx-auto mb-4 text-shadow-brand-yellow" />
+                        <h1 className="text-3xl font-orbitron text-foreground">Центр Управления</h1>
+                        <p className="text-muted-foreground mt-2 font-mono text-sm">Найдите сделку по ID или просмотрите свои списки.</p>
                     </div>
-                    <form onSubmit={handleSubmit} className="flex gap-2">
-                        <Input type="text" value={rentalId} onChange={(e) => setRentalId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" className="input-cyber h-12 text-center text-base tracking-wider flex-grow" />
-                        <Button type="submit" className="h-12 text-lg font-orbitron" disabled={!rentalId.trim()} size="icon"><VibeContentRenderer content="::FaMagnifyingGlass::" /></Button>
-                    </form>
+                    {/* Форма поиска вынесена в отдельный клиентский компонент */}
+                    <RentalSearchForm />
                 </motion.div>
 
-                {loading ? <Loading text="Загрузка ваших аренд..." /> : (
-                    <div className="space-y-6">
-                        {categorizedRentals.asRenter.length > 0 && (
-                            <section>
-                                <h2 className="font-orbitron text-xl mb-3 text-brand-pink"><VibeContentRenderer content="::FaKey::" className="mr-2"/>Мои Аренды</h2>
-                                <div className="space-y-2">{categorizedRentals.asRenter.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
-                            </section>
-                        )}
-                        {categorizedRentals.asOwner.length > 0 && (
-                            <section>
-                                <h2 className="font-orbitron text-xl mb-3 text-brand-lime"><VibeContentRenderer content="::FaCar::" className="mr-2"/>Мой Транспорт в Аренде</h2>
-                                <div className="space-y-2">{categorizedRentals.asOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
-                            </section>
-                        )}
-                        {categorizedRentals.asCrewOwner.length > 0 && (
-                            <section>
-                                <h2 className="font-orbitron text-xl mb-3 text-brand-orange"><VibeContentRenderer content="::FaUsers::" className="mr-2"/>Аренды Экипажа</h2>
-                                <div className="space-y-2">{categorizedRentals.asCrewOwner.map(r => <RentalListItem key={r.rental_id} rental={r} />)}</div>
-                            </section>
-                        )}
-                         {rentals.length === 0 && !loading && (
-                            <p className="text-center text-muted-foreground font-mono py-8">Активных или завершенных аренд не найдено.</p>
-                        )}
-                    </div>
-                )}
+                {/* Клиентский компонент для отображения данных */}
+                <RentalsDashboardClient rentals={rentals as UserRentalDashboard[]} />
             </div>
-        </div>
+        </main>
     );
 }
