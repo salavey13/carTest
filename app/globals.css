@@ -1,4 +1,3 @@
-/* /app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,70 +12,65 @@
 }
 
 :root {
-  /* NEW COLOR PALETTE - VIBECODE THEME */
-  /* HEX: #ECE6CD -> HSL: 48 43% 86% (Cream Beige) */
-  /* HEX: #3A3F58 -> HSL: 228 19% 29% (Deep Indigo) */
-  /* HEX: #EE6A59 -> HSL: 7 85% 64% (Vibrant Red-Orange) */
-  /* HEX: #F9AC67 -> HSL: 34 92% 70% (Warm Gold) */
+  /* ИЗМЕНЕНИЕ: Улучшенная светлая тема для контрастности */
+  /* HEX: #F9F9F9 -> HSL: 0 0% 98% (Почти белый) */
+  /* HEX: #1A1A1A -> HSL: 0 0% 10% (Очень темный серый) */
 
-  /* Core Theme Colors (Light Mode Default) */
-  --background: 48 43% 86%;        /* Cream Beige */
-  --foreground: 228 19% 29%;        /* Deep Indigo for text */
-  --card: 48 40% 92%;                /* Lighter, softer beige for cards */
-  --card-foreground: 228 19% 29%;
-  --popover: 48 50% 95%;             /* Very light beige for popovers */
-  --popover-foreground: 228 19% 29%;
-  --muted: 48 25% 80%;             /* Muted beige */
-  --muted-foreground: 228 15% 45%;    /* Muted indigo */
-  --destructive: 0 80% 60%;          /* Classic vibrant red */
+  /* Core Theme Colors (Light Mode) */
+  --background: 0 0% 98%;        /* Почти белый фон */
+  --foreground: 0 0% 10%;        /* Почти черный текст */
+  --card: 0 0% 100%;               /* Чисто белый для карточек */
+  --card-foreground: 0 0% 10%;
+  --popover: 0 0% 100%;            /* Чисто белый для поповеров */
+  --popover-foreground: 0 0% 10%;
+  --muted: 0 0% 94%;             /* Светло-серый */
+  --muted-foreground: 0 0% 40%;    /* Темно-серый текст */
+  --destructive: 0 80% 60%;          
   --destructive-foreground: 0 0% 98%;
   --radius: 0.75rem;
 
-  /* Brand Colors - NEW PALETTE */
+  /* Brand Colors - остаются без изменений, они должны быть яркими */
   --brand-red-orange: 7 85% 64%;
   --brand-deep-indigo: 228 19% 29%;
   --brand-gold: 34 92% 70%;
   --brand-beige: 48 43% 86%;
-  /* Kept for variety in charts/effects */
   --brand-cyan: 180 70% 55%;
   --brand-green: 145 60% 50%;
   --brand-purple: 270 70% 60%;
   --brand-pink: 330 80% 65%;
 
   /* Derived UI Element Colors (for Light Theme) */
-  --primary: 7 85% 64%;             /* Vibrant Red-Orange */
-  --primary-foreground: 0 0% 100%;    /* White text */
-  --secondary: 228 19% 29%;           /* Deep Indigo */
-  --secondary-foreground: 0 0% 100%;   /* White text */
-  --accent: 34 92% 70%;               /* Warm Gold */
-  --accent-foreground: 228 19% 20%;   /* Darker indigo for contrast on gold */
+  --primary: 7 85% 60%;             /* Чуть темнее для лучшего контраста */
+  --primary-foreground: 0 0% 100%;   
+  --secondary: 228 19% 29%;          
+  --secondary-foreground: 0 0% 100%;
+  --accent: 34 92% 65%;               /* Чуть темнее для контраста */
+  --accent-foreground: 0 0% 10%;   /* Темный текст для акцента */
   
-  --border: 48 30% 78%;              /* Beige border */
-  --input: 48 40% 94%;                 /* Light beige for inputs */
-  --input-border: 48 30% 75%;         /* Slightly darker beige border */
+  --border: 0 0% 90%;              /* Светло-серая граница */
+  --input: 0 0% 96%;                 /* Светло-серый для инпутов */
+  --input-border: 0 0% 85%;         /* Более темная граница для инпутов */
   --ring: var(--primary);
 
-  /* RGB Versions for Shadows/Gradients - NEW PALETTE */
+  /* RGB Versions - обновляем для соответствия */
   --red-orange-rgb: 238, 106, 89;
   --deep-indigo-rgb: 58, 63, 88;
   --gold-rgb: 249, 172, 103;
   --beige-rgb: 236, 230, 205;
   --black-rgb: 0,0,0;
-
-  /* For compatibility with old shadow names, mapping to new palette */
+  
   --purple-rgb: var(--deep-indigo-rgb);
   --pink-rgb: var(--red-orange-rgb);
-  --cyan-rgb: 100, 180, 200; /* A compatible cyan */
+  --cyan-rgb: 100, 180, 200;
   --blue-rgb: var(--deep-indigo-rgb);
   --yellow-rgb: var(--gold-rgb);
-  --green-rgb: 100, 160, 120; /* A compatible green */
+  --green-rgb: 100, 160, 120;
   --orange-rgb: var(--red-orange-rgb);
-  --lime-rgb: 180, 220, 100; /* A compatible lime */
+  --lime-rgb: 180, 220, 100;
   --neon-lime-rgb: var(--lime-rgb);
-
-  /* Static Background RGB Values */
-  --bg-rgb: 236, 230, 205;
-  --card-rgb: 240, 237, 224;
+  
+  --bg-rgb: 250, 250, 250;
+  --card-rgb: 255, 255, 255;
   --default-glow-rgb: var(--gold-rgb); 
 
   /* Chart Colors */
@@ -86,7 +80,7 @@
   --chart-4: hsl(var(--brand-deep-indigo));
   --chart-5: hsl(var(--brand-cyan));
 
-  /* Sidebar Colors (assuming sidebar might remain dark) */
+  /* Sidebar Colors (остаются темными для контраста) */
   --sidebar-background: 228 20% 10%; 
   --sidebar-foreground: 48 40% 88%;   
   --sidebar-primary: hsl(var(--brand-gold) / 0.9); 
@@ -96,17 +90,16 @@
   --sidebar-border: hsl(var(--brand-gold) / 0.25);    
   --sidebar-ring: hsl(var(--brand-red-orange) / 0.95);       
 
-  /* Standard colors RGB for shadows */
   --red-500-rgb: 239, 68, 68; 
   --gray-500-rgb: 107, 114, 128; 
 
-  /* Text Colors (for Light Theme) */
+  /* Text Colors (Light Theme) */
   --light-text: hsl(var(--foreground)); 
-  --accent-text: hsl(var(--brand-red-orange)); 
+  --accent-text: hsl(var(--primary)); 
 }
 
 .dark {
-  /* Core Theme Colors (Dark Mode) */
+  /* Core Theme Colors (Dark Mode) - теперь это дефолт */
   --background: 228 20% 8%;         
   --foreground: 48 43% 86%;         
   --card: 228 20% 12%;           
@@ -118,23 +111,13 @@
   --destructive: 0 80% 60%;     
   --destructive-foreground: 0 0% 98%;
   
-  /* Brand Colors (Dark Mode uses the same core brand colors) */
-  --brand-red-orange: 7 85% 64%;
-  --brand-deep-indigo: 228 19% 29%;
-  --brand-gold: 34 92% 70%;
-  --brand-beige: 48 43% 86%;
-  --brand-cyan: 180 70% 55%;
-  --brand-green: 145 60% 50%;
-  --brand-purple: 270 70% 60%;
-  --brand-pink: 330 80% 65%;
-
   /* Derived UI Element Colors (for Dark Theme) */
-  --primary: var(--brand-gold);            /* Warm Gold */
-  --primary-foreground: 228 19% 15%;       /* Dark indigo text for gold primary */
-  --secondary: var(--brand-red-orange);    /* Vibrant Red-Orange */
-  --secondary-foreground: 0 0% 100%;     /* White text */
-  --accent: var(--brand-beige);             /* Cream Beige */
-  --accent-foreground: 228 20% 8%;         /* Dark bg color for text on beige accent */
+  --primary: var(--brand-gold);
+  --primary-foreground: 228 19% 15%;
+  --secondary: var(--brand-red-orange);
+  --secondary-foreground: 0 0% 100%;
+  --accent: var(--brand-beige);
+  --accent-foreground: 228 20% 8%;
 
   --border: 228 20% 20%;
   --input: 228 20% 15%;
@@ -147,16 +130,10 @@
   
   --light-text: hsl(var(--foreground)); 
   --accent-text: hsl(var(--brand-gold)); 
-
-  --sidebar-background: 228 20% 10%; 
-  --sidebar-foreground: 48 40% 88%;   
-  --sidebar-primary: hsl(var(--brand-gold) / 0.9); 
-  --sidebar-primary-foreground: 34 90% 15%; 
-  --sidebar-accent: hsl(var(--brand-red-orange) / 0.9);     
-  --sidebar-accent-foreground: 7 80% 98%;
-  --sidebar-border: hsl(var(--brand-gold) / 0.25);    
-  --sidebar-ring: hsl(var(--brand-red-orange) / 0.95);
 }
+
+
+            
 
 @layer base {
   body {
