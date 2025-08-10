@@ -15,7 +15,7 @@ import { RentalSearchForm } from "./components/RentalSearchForm";
 const statusConfig = {
   pending_confirmation: { label: "Ожидание", icon: "::FaHourglassHalf::", color: "text-brand-yellow", ring: "ring-brand-yellow/50" },
   active: { label: "Активна", icon: "::FaPlayCircle::", color: "text-brand-green", ring: "ring-brand-green/50" },
-  completed: { label: "Завершена", icon: "::FaCheckCircle::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
+  completed: { label: "Завершена", icon: "::FaCircleCheck::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
   cancelled: { label: "Отменена", icon: "::FaCircleXmark::", color: "text-destructive", ring: "ring-destructive/40" },
   default: { label: "Неизвестно", icon: "::FaQuestionCircle::", color: "text-muted-foreground", ring: "ring-muted-foreground/30" },
 };
