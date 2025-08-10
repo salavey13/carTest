@@ -13,6 +13,46 @@ import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithSta
 
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
+
+type MinimalRental = {
+  rental_id: string;
+  status: string;
+};
+
+/**
+ * БЕЗОПАСНО и ЭФФЕКТИВНО получает минимальный список аренд для UI индикаторов.
+ * Использует существующую RPC функцию с флагом p_minimal: true.
+ */
+export async function getMinimalRentalsForIndicator(userId: string, crewIds: string[]): Promise<{ 
+  success: boolean; 
+  data?: MinimalRental[]; 
+  error?: string; 
+}> {
+    noStore(); // Гарантирует получение свежих данных
+    if (!userId) {
+        return { success: false, error: "User ID is required." };
+    }
+
+    try {
+        const { data, error } = await supabaseAdmin.rpc("get_user_rentals_dashboard", {
+            p_user_id: userId,
+            p_owned_crew_ids: crewIds.length > 0 ? crewIds : null,
+            p_minimal: true // <--- Ключевой параметр для легковесности
+        });
+
+        if (error) {
+            throw new Error(`Supabase RPC Error: ${error.message}`);
+        }
+
+        return { success: true, data: data as MinimalRental[] };
+
+    } catch (e) {
+        const message = e instanceof Error ? e.message : "An unknown error occurred.";
+        logger.error(`[getMinimalRentalsForIndicator] Critical failure for user ${userId}:`, e);
+        return { success: false, error: message };
+    }
+}
+
 /**
  * Получает список всех публичных команд с подсчетом участников и техники.
  */
@@ -182,10 +222,6 @@ export async function getRentalDetails(rentalId: string, userId: string): Promis
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
 }
-
-
-
-
 
 export async function uploadSingleImage(formData: FormData): Promise<{ success: boolean; url?: string; error?: string; }> {
     const file = formData.get("file") as File;
@@ -483,8 +519,6 @@ export async function calculateDynamicPrice(vehicleId: string, startDateIso: str
     }
 }
 
-
-
 export async function addRentalPhoto(rentalId: string, userId: string, photoUrl: string, photoType: 'start' | 'end') {
     noStore();
     try {
@@ -517,7 +551,6 @@ export async function addRentalPhoto(rentalId: string, userId: string, photoUrl:
         return { success: false, error: e.message };
     }
 }
-
 
 export async function confirmVehiclePickup(rentalId: string, userId: string) {
     noStore();
@@ -557,7 +590,6 @@ export async function confirmVehiclePickup(rentalId: string, userId: string) {
         return { success: false, error: e.message };
     }
 }
-
 
 export async function confirmVehicleReturn(rentalId: string, userId: string) {
     noStore();

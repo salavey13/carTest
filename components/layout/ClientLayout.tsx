@@ -139,17 +139,14 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       if (START_PARAM_PAGE_MAP[paramToProcess]) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } else if (prefix === 'rental' || prefix === 'rentals') {
-          // --- МОДЕРНИЗИРОВАННАЯ ЛОГИКА ---
-          // Проверяем на простую ссылку: rentals_[ID]
           if (parts.length === 2) {
               const rentalId = parts[1];
               targetPath = `/rentals/${rentalId}`;
           } 
-          // Проверяем на сложную ссылку: rental_[action]_[ID]
           else if (parts.length > 2) {
-              const action = parts[1]; // e.g., 'confirm-pickup'
-              const rentalId = parts.slice(2).join('_'); // UUID
-              targetPath = `/rentals/${rentalId}?action=${action}`; // Передаем действие как query-параметр
+              const action = parts[1];
+              const rentalId = parts.slice(2).join('_');
+              targetPath = `/rentals/${rentalId}?action=${action}`;
           }
       } else if (prefix === 'crew' && parts.length > 2) { 
         const actionIndex = parts.findIndex(p => p === 'join' || p === 'confirm');

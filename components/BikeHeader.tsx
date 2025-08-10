@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator"; // <-- ИМПОРТ НОВОГО КОМПОНЕНТА
+import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator";
 
 export default function BikeHeader() {
   const { tg, isInTelegramContext, userCrewInfo } = useAppContext();
@@ -28,7 +28,12 @@ export default function BikeHeader() {
   return (
     <TooltipProvider>
       <motion.header
-        className={cn("fixed top-0 left-0 right-0 z-40 bg-black/80 border-b border-brand-orange/40 shadow-md backdrop-blur-md")}
+        // *** ГЛАВНОЕ ИСПРАВЛЕНИЕ: Используем переменные темы ***
+        // БЫЛО: "bg-black/80 border-b border-brand-orange/40"
+        // СТАЛО: "bg-background/80 border-b border-border"
+        className={cn(
+            "fixed top-0 left-0 right-0 z-40 bg-background/80 border-b border-border shadow-md backdrop-blur-md"
+        )}
         initial={{ y: -100 }} animate={{ y: 0 }} transition={{ type: "tween", duration: 0.3 }}
       >
         <div className="container mx-auto px-4 py-2.5 sm:py-3">
@@ -50,14 +55,13 @@ export default function BikeHeader() {
               </div>
             </Link>
             <div className="flex items-center gap-2 md:gap-3">
-                {/* --- ИЗМЕНЕНИЯ ЗДЕСЬ --- */}
                 <ActiveRentalsIndicator />
 
-                {userCrewInfo ? (
+                {userCrewInfo && (
                     <>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button onClick={handleInvite} className="p-2 text-brand-lime hover:text-brand-lime/70 focus:outline-none focus:ring-2 focus:ring-brand-lime focus:ring-offset-2 focus:ring-offset-black rounded-md transition-all duration-200 hover:bg-brand-lime/10">
+                                <button onClick={handleInvite} className="p-2 text-brand-lime hover:text-brand-lime/70 focus:outline-none focus:ring-2 focus:ring-brand-lime focus:ring-offset-2 focus:ring-offset-background rounded-md transition-all duration-200 hover:bg-brand-lime/10">
                                     <VibeContentRenderer content="::FaUserPlus::" className="h-5 w-5 sm:h-6 sm:w-6" />
                                 </button>
                             </TooltipTrigger>
@@ -72,8 +76,6 @@ export default function BikeHeader() {
                             <TooltipContent><p>Мой Экипаж: {userCrewInfo.name}</p></TooltipContent>
                         </Tooltip>
                     </>
-                ) : (
-                   null // Убрали иконку-ссылку на бота, так как она не нужна постоянно
                 )}
 
                 <UserInfo />
