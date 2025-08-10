@@ -1,6 +1,33 @@
+// /lib/utils.ts
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { logger } from "./logger"; // Import logger for warnings
+
+/**
+ * Formats a date into a readable string like "10.08.2025".
+ * @param dateInput - The date to format (Date object, ISO string, or timestamp number).
+ * @param locale - The locale string (e.g., 'ru-RU').
+ * @returns A formatted date string or "Invalid Date".
+ */
+export function formatDate(dateInput: Date | string | number, locale: string = 'ru-RU'): string {
+    try {
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) {
+            return "Invalid Date";
+        }
+        // Используем опции для получения формата ДД.ММ.ГГГГ
+        const options: Intl.DateTimeFormatOptions = {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        };
+        return new Intl.DateTimeFormat(locale, options).format(date);
+    } catch (e) {
+        logger.error("Error formatting date:", e);
+        return "Error";
+    }
+}
+
 
 /**
  * Combines Tailwind CSS class names intelligently.
