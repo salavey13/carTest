@@ -213,7 +213,7 @@ export default function SaunaRentMegaPage() {
       {/* STICKY top bar inside page (not global header) */}
       <div className="sticky top-2 z-40 mx-auto container px-4">
         <div className="backdrop-blur-sm bg-[#00000040] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-[#ffe9c7]">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ffd29b] to-[#ff8a00] flex items-center justify-center text-black font-bold">LÖ</div>
             <div>
               <div className="text-xs text-[#ffe9c7] font-mono">Löyly Vibe — Tibetan Edition</div>
@@ -248,6 +248,20 @@ export default function SaunaRentMegaPage() {
         <section id="hero" className="rounded-2xl overflow-hidden relative grid grid-cols-1 lg:grid-cols-2 gap-6 items-center bg-gradient-to-br from-[#2b1b12]/40 to-[#1d2b26]/20 p-6">
           <div className="space-y-4">
             <h2 className="text-3xl md:text-4xl font-orbitron leading-tight">Тибетская Löyly — Перезагрузка</h2>
+            <div className="tibetan-ornament mt-3">
+              <svg width="100%" height="28" viewBox="0 0 800 28" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="orn1" x1="0" x2="1">
+                    <stop offset="0" stopColor="#ffd29b" stopOpacity="0.06"/>
+                    <stop offset="1" stopColor="#bde0fe" stopOpacity="0.04"/>
+                  </linearGradient>
+                </defs>
+                <rect width="800" height="28" fill="url(#orn1)"/>
+                <g fill="none" stroke="#ffd29b" strokeOpacity="0.12" strokeWidth="1">
+                  <path d="M10 14 q30 -12 60 0 q30 12 60 0 q30 -12 60 0 q30 12 60 0"/>
+                </g>
+              </svg>
+            </div>
             <p className="text-sm text-[#e7dfd1] max-w-xl">Комната на 15 человек, парилка на 6, бассейн 3x3 (глубина 1.5—2м), джакузи на 2, стол на 10. Ночная сессия — особенный режим: тёплый свет, кино и лаунж.</p>
 
             <div className="flex gap-3 mt-4 flex-wrap">
@@ -279,7 +293,7 @@ export default function SaunaRentMegaPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaHotTubPerson::" /> Парилка</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-[#ffe9c7]"><VibeContentRenderer content="::FaHotTubPerson::" /> Парилка</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Каменная парилка — сухой жар, эфирные масла по желанию. Места: 6.</p>
@@ -288,7 +302,7 @@ export default function SaunaRentMegaPage() {
 
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaSwimmingPool::" /> Бассейн</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-[#ffe9c7]"><VibeContentRenderer content="::FaWater::" /> Бассейн</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">3m × 3m, глубина до 2м, опция охлаждения после парилки.</p>
@@ -297,7 +311,7 @@ export default function SaunaRentMegaPage() {
 
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaPeopleArrows::" /> Зона на компанию</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-[#ffe9c7]"><VibeContentRenderer content="::FaPeopleArrows::" /> Зона на компанию</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Стол на 10 персон, лаунж, нарды, покер, джакузи на 2 — полный уют.</p>
@@ -343,21 +357,21 @@ export default function SaunaRentMegaPage() {
           <h3 className="text-2xl font-orbitron">Дополнительные услуги</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaFilm::" /> Кинотеатр + приставка</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Выбирай фильм/подключи свою приставку — можем привезти контроллеры. Flat fee {BASE_PRICING.cinemaFlat} ₽.</p>
               </CardContent>
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaSpa::" /> Джакузи</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Две независимые камеры джакузи, идеальны для пар и релаксации. {BASE_PRICING.jacuzziFlat} ₽.</p>
               </CardContent>
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaDice::" /> Игры: нарды, покер</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Комплекты нард, карты, стол, фишки — всё для вечеринки.</p>
               </CardContent>
@@ -370,7 +384,7 @@ export default function SaunaRentMegaPage() {
           <h3 className="text-2xl font-orbitron">Crew & Cleaning — как это работает</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaPeopleCarry::" /> Клин-тим и персонал</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Владелец может назначать клинеров/пассажиров-байкеров для логистики: уборка между сменами, подвоз гостей, проверка оборудования.</p>
                 <ol className="list-decimal list-inside text-sm text-[#ddd] mt-2">
@@ -385,7 +399,7 @@ export default function SaunaRentMegaPage() {
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaHandSparkles::" /> Программа мотивации</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">За каждую аренду, уборку или полезное действие начисляются звезды. Они конвертируются в скидки для следующей аренды.</p>
                 <ul className="list-disc list-inside text-sm mt-2 text-[#ddd]">
@@ -404,7 +418,7 @@ export default function SaunaRentMegaPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <Card className="bg-[#0b0b0b] border-border">
-                <CardHeader><CardTitle>Форма брони</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label className="text-xs font-mono">Дата
@@ -464,7 +478,7 @@ export default function SaunaRentMegaPage() {
 
               {/* Booking history */}
               <Card className="mt-6 bg-[#080707] border-border">
-                <CardHeader><CardTitle>История броней</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
                 <CardContent>
                   {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">Пока что пусто — твои брони появятся здесь.</div> : (
                     <ul className="space-y-2">
@@ -486,7 +500,7 @@ export default function SaunaRentMegaPage() {
             {/* Right column - support / loyalty shop */}
             <aside>
               <Card className="bg-[#0b0b0b] border-border md:sticky md:top-24">
-                <CardHeader><CardTitle>Система звёзд</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
                 <CardContent>
                   <p className="text-sm text-[#d9d6cd] mb-2">Твои звёзды — внутренняя валюта. Трать их на скидки или копи для будущих броней.</p>
                   <div className="p-3 bg-[#060606] rounded border border-[#2b1b12]">
@@ -535,7 +549,7 @@ export default function SaunaRentMegaPage() {
           <h3 className="text-2xl font-orbitron">Поддержка и заказ услуг</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle>Заявки / Саппорт</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#d9d6cd]">Если хочешь заказать комплексную организацию мероприятия, напиши: администрирование, доп. персонал, закупки, кейтеринг.</p>
                 <div className="mt-3"><SupportForm /></div>
@@ -543,7 +557,7 @@ export default function SaunaRentMegaPage() {
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle>Маркетинг и байк-креатив</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#ffe9c7]">$1</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#d9d6cd]">Идеи: комбинировать байк-тур + сауна (crew mobility). Промо: ночной пакет + кино + бар — лимитированные места.</p>
                 <p className="text-xs text-[#cfc6b8] mt-2">TODO: expose API to schedule bike->sauna pickups, crew assignments and promo codes.</p>
@@ -589,7 +603,11 @@ export default function SaunaRentMegaPage() {
       <style jsx>{`
         /* small tweaks for tibetan vibe font/contrast */
         .font-orbitron { font-family: 'Orbitron', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-      `}</style>
+      `}  .tibetan-ornament svg { filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6)); }
+        .tibetan-ornament path { mix-blend-mode: screen; }
+        .card-title-highlight { color: #ffe9c7 !important; }
+        @media (max-width: 640px) { .tibetan-ornament { display:block; } .container { padding-left:12px; padding-right:12px; } }
+      </style>
     </div>
   );
 }
