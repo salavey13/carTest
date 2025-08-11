@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -177,11 +178,11 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     }
   }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
 
-  const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals", "/vipbikerental", "/sauna-rent" ];
+  const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals", "/vipbikerental" ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)) || pathname === "/";
   
   useEffect(() => {
-    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml"));
+    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent"));
   }, [pathname]);
 
   const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
