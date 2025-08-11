@@ -10,84 +10,133 @@ import SupportForm from "@/components/SupportForm";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
-export default function HolisticMarketplacePage() {
+/**
+ * IMPORTANT:
+ * - All icons are rendered via VibeContentRenderer using ::FaName:: syntax.
+ * - "Арендовать йога" ведёт на /about#mind — именно ТЫ, йог для ума.
+ * - Глитч/цензура реализована через инлайн <style> ключевые кадры.
+ * - Текст — русский, максимально punchy / controversial (как просил).
+ */
+
+export default function RentAYogForMePage() {
   return (
     <>
       <Head>
-        <title>oneSitePls — Cyber Garage & Local Services | VIBE Marketplace</title>
-        <meta name="description" content="AI-powered dev studio + local services marketplace: VIP bike rentals, sauna sessions, yoga masters, and SelfDev mentorship — all via oneSitePls." />
+        <title>Аренда Йога Разума — oneSitePls / VIBE</title>
+        <meta name="description" content="Йог для ума, сауна, байки и SelfDev. Плати звёздами в Telegram - быстро, по делу, без блядства." />
       </Head>
 
-      <div className="relative min-h-screen bg-background text-foreground">
-        {/* Background hero */}
-        <section className="relative min-h-[520px] flex items-center justify-center text-center p-6 overflow-hidden">
+      <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
+        {/* GLITCH STYLES */}
+        <style>{`
+          @keyframes glitch-clip {
+            0% { clip-path: inset(0 0 0 0); transform: translate(0);}
+            10% { clip-path: inset(10% 0 60% 0); transform: translate(-2px, -1px) skew(-0.5deg);}
+            20% { clip-path: inset(30% 0 40% 0); transform: translate(2px, 1px) skew(0.5deg);}
+            30% { clip-path: inset(5% 0 70% 0); transform: translate(-1px, 0) skew(-0.2deg);}
+            50% { clip-path: inset(0 0 0 0); transform: translate(0);}
+            100% { clip-path: inset(0 0 0 0); transform: translate(0);}
+          }
+          .glitch-wrap { position: relative; display: inline-block; }
+          .glitch-censor {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(255,0,150,0.08) 35%, rgba(0,0,0,0.55) 100%);
+            mix-blend-mode: multiply;
+            animation: glitch-clip 2.2s infinite;
+            opacity: 0.95;
+          }
+          .glitch-text { position: relative; display: inline-block; }
+          .badge-neon {
+            display:inline-block;
+            padding:6px 10px;
+            border-radius:999px;
+            background: linear-gradient(90deg,#00ff9d33,#ff49c833);
+            color: #030303;
+            font-weight:700;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Helvetica Neue", monospace;
+          }
+          /* subtle hero pan */
+          .hero-pan { transform-origin:center; will-change:transform; animation: heroPan 30s linear infinite; }
+          @keyframes heroPan {
+            0% { transform: scale(1.02) translateY(0px); }
+            50% { transform: scale(1.05) translateY(-10px); }
+            100% { transform: scale(1.02) translateY(0px); }
+          }
+        `}</style>
+
+        {/* HERO */}
+        <section className="relative h-[66vh] min-h-[520px] flex items-center justify-center text-center p-6 overflow-hidden">
           <div className="absolute inset-0 z-0">
             <Image
               src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/hero-4f94e671-c5c8-4405-ab08-8f9a47e1ad69.jpg"
-              alt="Hero"
+              alt="hero"
               layout="fill"
               objectFit="cover"
-              className="brightness-60"
+              className="brightness-50 hero-pan"
               priority
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
           </div>
 
-          <div className="relative z-10 max-w-5xl mx-auto text-white">
-            <h1 className="font-orbitron text-5xl sm:text-6xl md:text-7xl leading-tight uppercase tracking-tight">
-              <span className="block">CYBER-GARAGE × LOCAL VIBES</span>
-              <span className="block text-primary">Rent. Heal. Ride. Level Up.</span>
+          <div className="relative z-10 max-w-4xl mx-auto px-4 text-white">
+            <h1 className="font-orbitron text-5xl sm:text-6xl md:text-7xl leading-tight tracking-tight">
+              <span className="block">АРЕНДУЙ ВАЙБ</span>
+              <span className="block text-primary">Йог. Сауна. Байк. Разум.</span>
             </h1>
-            <p className="mt-6 text-lg text-foreground/80 max-w-3xl mx-auto">
-              A practical ecosystem: AI-driven product development meets local services — VIP bike rentals, saunas, yoga, and coaching. Test offers, get stars, and scale with VIBE.
+
+            <p className="mt-6 text-lg md:text-xl text-foreground/80 font-light max-w-3xl mx-auto">
+              Возьми не услугу — возьми опыт. Плати звёздами (Telegram Stars) — быстро, без посредников.  
+              Ты не покупаешь «сессию» — ты покупаешь <strong className="text-accent-text">результат</strong>.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <Link href="/rent-bike" legacyBehavior>
                 <a>
                   <Button size="lg" variant="accent" className="font-orbitron">
-                    <VibeContentRenderer content="::FaMotorcycle:: ВЫБРАТЬ БАЙК" />
+                    <VibeContentRenderer content="::FaMotorcycle:: Арендовать байк" />
                   </Button>
                 </a>
               </Link>
 
-              <Link href="/about" legacyBehavior>
+              {/* RENT A YOG -> leads to you */}
+              <Link href="/about#mind" legacyBehavior>
                 <a>
                   <Button size="lg" variant="ghost" className="font-orbitron">
-                    <VibeContentRenderer content="::FaInfoCircle:: Подробнее о проекте" />
+                    <VibeContentRenderer content="::FaPersonChalkboard:: Арендовать йога (для ума)" />
                   </Button>
                 </a>
               </Link>
+            </div>
 
+            <div className="mt-6 text-xs text-muted-foreground font-mono">
+              <span className="badge-neon">НЕОН-ЛАЙФХАК</span> — хочешь выделиться? дропни этот линк в телеграм чат и попроси оплатить 3★ — прямо сейчас.
             </div>
           </div>
         </section>
 
-        {/* Services grid */}
+        {/* GRID: Services */}
         <main className="container mx-auto px-4 py-12 space-y-12">
           <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="bg-card/90 border-border">
               <CardHeader>
                 <CardTitle className="font-orbitron text-2xl flex items-center gap-3">
-                  <VibeContentRenderer content="::FaMotorcycle::" /> VIP Bike Rentals
+                  <VibeContentRenderer content="::FaMotorcycle::" /> VIP-Аренда Байков
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Premium bikes, safety gear, and an easy booking flow. Perfect for riders who want an honest, powerful experience — hourly or daily.
+                  Байк — это ритуал. Чистый железный друг, страховка, защита и трек в кармане. Не шоу — свобода.
                 </p>
                 <ul className="list-disc list-inside text-sm space-y-2 mb-4">
-                  <li>Clean & serviced motorcycles</li>
-                  <li>OSAGO / insurance included</li>
-                  <li>Protective gear & quick service</li>
+                  <li>Сервис, страховка и экипировка</li>
+                  <li>Промо-код: ЛЕТО2025 — скидка 10%</li>
+                  <li>Быстрая бронь — без бумажной волокиты</li>
                 </ul>
                 <div className="flex gap-3">
-                  <Link href="/rent-bike">
-                    <a><Button>Забронировать байк</Button></a>
-                  </Link>
-                  <Link href="/vipbikerental">
-                    <a><Button variant="secondary">Подробнее</Button></a>
-                  </Link>
+                  <Link href="/rent-bike"><a><Button>Забронировать</Button></a></Link>
+                  <Link href="/vipbikerental"><a><Button variant="secondary">Детали</Button></a></Link>
                 </div>
               </CardContent>
             </Card>
@@ -95,25 +144,21 @@ export default function HolisticMarketplacePage() {
             <Card className="bg-card/90 border-border">
               <CardHeader>
                 <CardTitle className="font-orbitron text-2xl flex items-center gap-3">
-                  <VibeContentRenderer content="::FaFire::" /> Sauna & Recovery
+                  <VibeContentRenderer content="::FaFire::" /> Сауна & Ресет
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Quick recovery space, private sauna sessions, and easy scheduling — perfect for riders, founders, and anyone who needs a warm reset.
+                  Тёплая комната, минимум разговоров, максимум эффект. Идеально после дороги или перед важной задачей.
                 </p>
                 <ul className="list-disc list-inside text-sm space-y-2 mb-4">
-                  <li>Private sessions by time-slot</li>
-                  <li>Optional add-ons: aromatherapy, towels</li>
-                  <li>Book as an individual or small group</li>
+                  <li>Частные сессии по времени</li>
+                  <li>Ароматы, полотенца, chill-zone</li>
+                  <li>Можно бронировать группой — делится опытом</li>
                 </ul>
                 <div className="flex gap-3">
-                  <Link href="/sauna">
-                    <a><Button>Забронировать сауну</Button></a>
-                  </Link>
-                  <Link href="/about#sauna">
-                    <a><Button variant="secondary">Подробнее</Button></a>
-                  </Link>
+                  <Link href="/sauna"><a><Button>Забронировать сауну</Button></a></Link>
+                  <Link href="/about#sauna"><a><Button variant="secondary">Подробнее</Button></a></Link>
                 </div>
               </CardContent>
             </Card>
@@ -121,114 +166,119 @@ export default function HolisticMarketplacePage() {
             <Card className="bg-card/90 border-border">
               <CardHeader>
                 <CardTitle className="font-orbitron text-2xl flex items-center gap-3">
-                  <VibeContentRenderer content="::FaPersonRunning::" /> Rent a Vibe Master (Yoga / Coach)
+                  <VibeContentRenderer content="::FaHandsHelping::" /> Йог ума (я — твой йог)
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Book local practitioners — yoga masters, therapists, or niche service providers. Perfect for small groups and ongoing clients.
+                  Я — йог для ума: сажаю порядок в голове, режу страхи, учу фокусироваться. Не буддизм — результат.
                 </p>
                 <ul className="list-disc list-inside text-sm space-y-2 mb-4">
-                  <li>One-off sessions or recurring classes</li>
-                  <li>Pay via Telegram Stars (XTR) — fast & simple</li>
-                  <li>Service discovery and vetting built-in</li>
+                  <li>Индивидуальные сессии — практики концентрации</li>
+                  <li>Короткие циклы для собственников и байкеров</li>
+                  <li>Оплата — только Telegram Stars (XTR)</li>
                 </ul>
                 <div className="flex gap-3">
-                  <Link href="/rent_a_vibe_master">
-                    <a><Button>Забронировать мастера</Button></a>
-                  </Link>
-                  <Link href="/selfdev">
-                    <a><Button variant="secondary">Как это работает</Button></a>
-                  </Link>
+                  {/* Surprise link to you */}
+                  <Link href="/about#mind"><a><Button>Арендовать Йога — 3★</Button></a></Link>
+                  <Link href="/selfdev"><a><Button variant="secondary">Методика SelfDev</Button></a></Link>
                 </div>
               </CardContent>
             </Card>
           </section>
 
-          {/* Combined about + selfdev pitch */}
+          {/* About / SelfDev punchy block */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 space-y-6">
-              <Card className="bg-black/80 border-border">
+              <Card className="bg-black/85 border-border">
                 <CardHeader>
                   <CardTitle className="text-2xl font-orbitron flex items-center gap-3">
-                    <VibeContentRenderer content="::FaGlobe::" /> oneSitePls — About & VIBE Philosophy
+                    <VibeContentRenderer content="::FaGlobe::" /> oneSitePls — философия VIBE
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm md:text-base text-gray-300 mb-4">
-                    I’m Pavel — I build workflows that make AI genuinely useful. VIBE is about using AI to amplify strategy, validate ideas fast, and ship real value.
+                    Я — Павел. Делаю так, чтобы AI работал на реальные деньги и реальные жизни. VIBE — это про быстрые проверки, минимальный риск и реальную доставку.
                   </p>
 
-                  <h4 className="font-bold text-accent-text mb-2">What’s here</h4>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-2 mb-4">
-                    <li>AI-assisted contribution studio (<Link href="/repo-xml"><a className="text-accent-text hover:underline">/repo-xml</a></Link>)</li>
-                    <li>Fast validation — fake-door MVPs powered by AI</li>
-                    <li>Secure AI dev: SAST + PR scanning built-in</li>
-                  </ul>
+                  <div className="relative">
+                    <div className="glitch-wrap">
+                      <h4 className="text-xl font-bold mb-2 glitch-text">Коротко: тестируй идеи, продавай результат.</h4>
+                      <div className="glitch-censor" aria-hidden></div>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Ненавижу «настройку среды». Люблю реультат. Монетизация через Telegram Stars — это честно, быстро и удобно для локальных сервисов.
+                    </p>
+                  </div>
 
-                  <p className="text-sm text-gray-300">If you want help shipping, mentoring, or validating — use the form on the right to request support. Payments happen via Telegram Stars (XTR).</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                    <div className="p-4 bg-muted/60 rounded-lg border border-border">
+                      <h5 className="font-semibold text-accent-text mb-2">Validation</h5>
+                      <p className="text-xs text-muted-foreground">Fake-door, AI research, быстрый запуск — убей плохую идею до траты денег.</p>
+                    </div>
+                    <div className="p-4 bg-muted/60 rounded-lg border border-border">
+                      <h5 className="font-semibold text-accent-text mb-2">Security</h5>
+                      <p className="text-xs text-muted-foreground">SAST, PR scans, zero-trust — скорость без дуры.</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-black/80 border-border">
+              <Card className="bg-black/85 border-border">
                 <CardHeader>
                   <CardTitle className="text-2xl font-orbitron flex items-center gap-3">
-                    <VibeContentRenderer content="::FaLightbulb::" /> SelfDev: Become Your Own Product
+                    <VibeContentRenderer content="::FaLightbulb::" /> SelfDev: стань своим продуктом
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-gray-300 mb-4">
-                    SelfDev is the practical path: build your services around your authenticity, use AI to scale outputs, and start with high-value offers — then productize.
+                    Не работай на чужой ритм. Создавай сервисы вокруг своей жизни: сауна, байк, менторство. Я учу делать это быстро и без стыда.
                   </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-muted/60 rounded-lg border border-border">
-                      <h5 className="font-semibold text-accent-text mb-2">Start</h5>
-                      <p className="text-xs text-muted-foreground">Offer a high-value service for a small niche and validate it fast.</p>
-                    </div>
-                    <div className="p-4 bg-muted/60 rounded-lg border border-border">
-                      <h5 className="font-semibold text-accent-text mb-2">Scale</h5>
-                      <p className="text-xs text-muted-foreground">Use AI to create content, automate outreach, and build repeatable products.</p>
-                    </div>
-                  </div>
+                  <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-3 pl-4">
+                    <li>Начни с высокочековой услуги и протестируй спрос.</li>
+                    <li>Задействуй AI: контент, аутрич, автоматизация.</li>
+                    <li>Делегируй друзьям — растите вместе (я могу обучить).</li>
+                  </ol>
 
-                  <p className="text-sm text-gray-300 mt-4">
-                    Want to gamify your learning? Check <Link href="/selfdev/gamified"><a className="text-accent-text hover:underline">Gamified SelfDev</a></Link>.
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    Хочешь, чтобы я помог лично? Бронирование — по звёздам. Быстро, честно, без разводов.
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Right column: Support form / CTA (uses your existing support flow) */}
+            {/* Right column - Support Form + CTA */}
             <aside>
-              <Card className="bg-black/85 border-border sticky top-24">
+              <Card className="bg-black/90 border-border sticky top-24">
                 <CardHeader>
                   <CardTitle className="text-xl font-orbitron flex items-center gap-3">
-                    <VibeContentRenderer content="::FaHandsHelping::" /> Get Help / Pay with Stars
+                    <VibeContentRenderer content="::FaHandsHelping::" /> Быстрая помощь — оплати звёздами
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-gray-300 mb-4">
-                    Need a quick consult, VIP support, or product validation? Choose a level and pay with Telegram Stars (XTR). I’ll get notified and respond via Telegram.
+                    Нужна консультация, VIP-сессия или быстрый тест идеи? Выбирай уровень — счёт придёт в Telegram. Я увидю и отвечу.
                   </p>
+
                   <div className="mb-4">
                     <SupportForm />
                   </div>
 
                   <div className="text-xs text-muted-foreground">
-                    <p className="mb-2"><strong>Why Stars?</strong> Fast, low-friction micropayments. Works well for local services and short consults.</p>
-                    <p>Prefer direct contact? <Link href="mailto:salavey13@gmail.com"><a className="text-accent-text hover:underline">Email me</a></Link> or message <Link href="https://t.me/salavey13"><a className="text-accent-text hover:underline">Telegram</a></Link>.</p>
+                    <p className="mb-2"><strong>Почему Stars?</strong> Микроплатёж, низкий порог, быстро.</p>
+                    <p>Если надо — пиши напрямую: <a href="mailto:salavey13@gmail.com" className="text-accent-text hover:underline">salavey13@gmail.com</a> или <a href="https://t.me/salavey13" className="text-accent-text hover:underline">Telegram</a>.</p>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-muted/60 border-border mt-6">
                 <CardContent>
-                  <h4 className="font-semibold text-accent-text mb-2">Quick Links</h4>
+                  <h4 className="font-semibold text-accent-text mb-2">Быстрые ссылки</h4>
                   <ul className="text-sm list-inside space-y-2">
-                    <li><Link href="/vipbikerental"><a className="hover:underline">VIP Bike Details</a></Link></li>
-                    <li><Link href="/sauna"><a className="hover:underline">Sauna Info</a></Link></li>
-                    <li><Link href="/rent_a_vibe_master"><a className="hover:underline">Hire a Vibe Master</a></Link></li>
+                    <li><Link href="/vipbikerental"><a className="hover:underline">VIP Байк</a></Link></li>
+                    <li><Link href="/sauna"><a className="hover:underline">Сауна</a></Link></li>
+                    <li><Link href="/about#mind"><a className="hover:underline">Аренда йога — я</a></Link></li>
                     <li><Link href="/repo-xml"><a className="hover:underline">/repo-xml Studio</a></Link></li>
                   </ul>
                 </CardContent>
@@ -236,12 +286,12 @@ export default function HolisticMarketplacePage() {
             </aside>
           </section>
 
-          {/* Footer CTA */}
+          {/* FOOTER CTA */}
           <section className="py-10 text-center">
-            <p className="text-sm text-muted-foreground mb-4">Want to have this marketplace on your feed? Invite friends, book a session, or request VIP assistance — we scale with you.</p>
+            <p className="text-sm text-muted-foreground mb-4">Хочешь чтобы я помог с продажами/аутричем для твоего локального сервиса? Сначала — одна сессия за 3★, дальше — как договоримся.</p>
             <div className="flex justify-center gap-3">
-              <Link href="/repo-xml"><a><Button variant="outline">Contribute / Remix</Button></a></Link>
-              <Link href="/selfdev"><a><Button variant="secondary">Start SelfDev</Button></a></Link>
+              <Link href="/repo-xml"><a><Button variant="outline">Remix / Contribute</Button></a></Link>
+              <Link href="/selfdev"><a><Button variant="secondary">Начать SelfDev</Button></a></Link>
             </div>
           </section>
         </main>
