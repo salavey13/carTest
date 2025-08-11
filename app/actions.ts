@@ -1,3 +1,4 @@
+// /app/actions.ts
 "use server"; 
 
 import {
@@ -78,7 +79,38 @@ interface CreateCrewArgs {
   hq_location: string;
 }
 
-// /app/actions.ts
+/**
+ * Безопасно обновляет предпочтительную тему пользователя в его метаданных.
+ */
+export async function saveThemePreference(userId: string, theme: 'light' | 'dark'): Promise<{ success: boolean; error?: string }> {
+  if (!userId) {
+    return { success: false, error: "User ID is required." };
+  }
+  
+  try {
+    const { data: user, error: fetchError } = await dbFetchUserData(userId);
+    if (fetchError || !user) {
+      throw new Error(fetchError?.message || "User not found.");
+    }
+    
+    const currentMetadata = user.metadata || {};
+    const updatedMetadata = { ...currentMetadata, theme: theme };
+
+    // Используем существующую функцию для обновления метаданных
+    const result = await dbUpdateUserMetadata(userId, updatedMetadata);
+    
+    if (!result.success) {
+      throw new Error(result.error || "Failed to update user metadata with new theme.");
+    }
+
+    logger.info(`[saveThemePreference] Successfully saved theme '${theme}' for user ${userId}.`);
+    return { success: true };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "An unknown error occurred.";
+    logger.error(`[saveThemePreference] Failed for user ${userId}:`, e);
+    return { success: false, error };
+  }
+}
 
 export async function createCrew({ name, description, logo_url, owner_id, slug, hq_location }: CreateCrewArgs): Promise<{
   success: boolean;
