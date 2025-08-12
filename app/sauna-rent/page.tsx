@@ -8,17 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import SupportForm from "@/components/SupportForm";
 import { cn } from "@/lib/utils";
+import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator"; // restore indicator (named export)
+import { useAppContext } from "@/contexts/AppContext";
 
-// Server action - MUST be exported from app/rentals/actions.ts as a server action wrapper.
+// Server action - MUST be exported as a server action wrapper in app/rentals/actions.ts
 // Example wrapper signature expected:
-// export async function createSaunaBooking(payload: { saunaVehicleId: string; startIso: string; endIso: string; price: number; extras?: string[]; starsUsed?: number; }) { "use server"; ... }
-import { createSaunaBooking } from "@/app/rentals/actions"; // <-- ensure this exists (server action wrapper)
+// export async function createSaunaBooking(payload: { saunaVehicleId: string; startIso: string; endIso: string; price: number; extras?: string[]; starsUsed?: number; userId?: string; }) { "use server"; ... }
+import { createSaunaBooking } from "@/app/rentals/actions"; // <-- make sure this exists and is a server action
 
 // -----------------------------------------------------------------------------
-// MEGA Sauna-Rent Page — "Tibetan Vibe" edition (single-file client page)
-// - Uses VibeContentRenderer for all icons
-// - Wired to createSaunaBooking server action (see TODOs below)
-// - Contrast fixes, steam animation, mobile-friendly actions
+// MEGA Sauna-Rent Page — "Tibetan Vibe" edition
 // -----------------------------------------------------------------------------
 
 type Booking = {
@@ -43,21 +42,20 @@ const BASE_PRICING = {
   cleaningFlat: 500,
 };
 
-// Utility: check weekend
 function isWeekend(date: Date) {
   const d = date.getDay();
   return d === 0 || d === 6;
 }
-
 function isFriday(date: Date) {
   return date.getDay() === 5;
 }
 
 export default function SaunaRentMegaPage() {
-  // Local state (replace with server calls via hooks in next iteration)
-  const [starsBalance, setStarsBalance] = useState(120);
+  const { dbUser } = useAppContext(); // for server action / debug (if needed)
+  const [starsBalance, setStarsBalance] = useState<number>(120);
   const [bookings, setBookings] = useState<Booking[]>([]);
 
+  // Form state
   const [date, setDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -69,21 +67,21 @@ export default function SaunaRentMegaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Sticky nav & sections
+  // Sticky nav & active section
   const sections = [
-    { id: 'hero', label: 'Главная' },
-    { id: 'cabins', label: 'Парилки' },
-    { id: 'pricing', label: 'Цены' },
-    { id: 'extras', label: 'Услуги' },
-    { id: 'staff', label: 'Crew' },
-    { id: 'booking', label: 'Бронирование' },
-    { id: 'support', label: 'Саппорт' },
+    { id: "hero", label: "Главная" },
+    { id: "cabins", label: "Парилки" },
+    { id: "pricing", label: "Цены" },
+    { id: "extras", label: "Услуги" },
+    { id: "staff", label: "Crew" },
+    { id: "booking", label: "Бронирование" },
+    { id: "support", label: "Саппорт" },
   ];
-  const [activeId, setActiveId] = useState('hero');
+  const [activeId, setActiveId] = useState("hero");
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
-    const opts = { root: null, rootMargin: '0px', threshold: 0.45 };
+    const opts = { root: null, rootMargin: "0px", threshold: 0.45 };
     observerRef.current = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
         if (e.isIntersecting && e.target.id) setActiveId(e.target.id);
@@ -95,25 +93,21 @@ export default function SaunaRentMegaPage() {
       if (el) observerRef.current?.observe(el);
     });
 
-    return () => {
-      observerRef.current?.disconnect();
-    };
+    return () => observerRef.current?.disconnect();
   }, []);
 
-  // Pricing calculation
+  // Pricing calc
   const totalPrice = useMemo(() => {
-    const d = new Date(date + 'T00:00:00');
+    const d = new Date(date + "T00:00:00");
     const weekend = isWeekend(d);
     const friday = isFriday(d);
     const isEvening = startHour >= 18 || startHour < 6;
     const basePerHour = weekend ? (isEvening ? BASE_PRICING.weekendEvening : BASE_PRICING.weekendDay) : (isEvening ? BASE_PRICING.weekdayEvening : BASE_PRICING.weekdayDay);
     let price = basePerHour * durationHours;
     if (friday) price = Math.round(price * BASE_PRICING.fridayExtendedMultiplier);
-
     if (selectedExtras.cinema) price += BASE_PRICING.cinemaFlat;
     if (selectedExtras.jacuzzi) price += BASE_PRICING.jacuzziFlat;
     if (selectedExtras.cleaning) price += BASE_PRICING.cleaningFlat;
-
     return price;
   }, [date, startHour, durationHours, selectedExtras]);
 
@@ -124,13 +118,12 @@ export default function SaunaRentMegaPage() {
     setSelectedExtras((s) => ({ ...s, [key]: !s[key] }));
   }
 
-  // Format hour
   function formatHour(h: number) {
-    const s = (h % 24).toString().padStart(2, '0');
+    const s = (h % 24).toString().padStart(2, "0");
     return `${s}:00`;
   }
 
-  // Generate ISO with local timezone (avoid naive "Z" mistakes)
+  // compute start/end ISO with local timezone corrected to ISO
   function computeStartEndIso(selectedDate: string, hour: number, duration: number) {
     const start = new Date(selectedDate);
     start.setHours(hour, 0, 0, 0);
@@ -139,28 +132,29 @@ export default function SaunaRentMegaPage() {
     return { startIso: start.toISOString(), endIso: end.toISOString() };
   }
 
-  // Handle booking via server action createSaunaBooking
+  // Create booking via server action
   async function handleCreateBooking() {
     setIsSubmitting(true);
-    setMessage('');
+    setMessage("");
 
-    // compute ISO times in local-to-UTC conversion via Date.toISOString()
     const { startIso, endIso } = computeStartEndIso(date, startHour, durationHours);
 
     const payload = {
-      saunaVehicleId: "sauna_1", // single sauna placeholder - server should treat as type='sauna'
+      saunaVehicleId: "sauna_1", // single sauna id
       startIso,
       endIso,
       price: totalPrice,
-      extras: Object.keys(selectedExtras).filter(k => selectedExtras[k as keyof typeof selectedExtras]),
+      extras: Object.keys(selectedExtras).filter((k) => (selectedExtras as any)[k]),
       starsUsed: Math.min(starsBalance, starsCost),
+      // optionally include user id if needed by server action:
+      userId: dbUser?.user_id ?? undefined,
     };
 
     try {
-      // createSaunaBooking MUST be a server action exported from app/rentals/actions.ts
-      // that wraps the original createBooking and correctly sets metadata: { type: 'sauna', car_id: saunaVehicleId, ... }
+      // IMPORTANT: createSaunaBooking is expected to be a server action (use server) that
+      // creates a rental row in `rentals` table with metadata.type = 'sauna' OR uses car_rental flow.
+      // If it doesn't exist yet, implement it as a wrapper over createBooking/createInvoice on server.
       const res = await createSaunaBooking(payload as any);
-      // Expected return: { success: true, data: { rental_id | id } } or similar.
       if (!res || !res.success) {
         throw new Error(res?.error || "Server failed to create sauna booking");
       }
@@ -181,16 +175,16 @@ export default function SaunaRentMegaPage() {
       setBookings((b) => [newBooking, ...b]);
       setStarsBalance((prev) => Math.max(0, prev - (payload.starsUsed || 0) + starsEarned));
 
-      setMessage('Бронь создана — счёт отправлен в Telegram (проверь бот).');
+      setMessage("Бронь создана — счёт отправлен в Telegram (проверь бота).");
     } catch (err: any) {
-      console.error(err);
-      setMessage('Ошибка при создании брони. Попробуйте позже.');
+      console.error("Booking error:", err);
+      setMessage("Ошибка при создании брони. Попробуй ещё раз.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  // steam/ghost animation elements for main title
+  // Decorative tibetan background (SVG)
   const tibetanBg = (
     <svg className="absolute inset-0 w-full h-full opacity-6" preserveAspectRatio="none" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -211,18 +205,31 @@ export default function SaunaRentMegaPage() {
     <div className="relative min-h-screen bg-gradient-to-b from-[#030203] via-[#101217] to-[#1b1512] text-[#f6f1ea] antialiased overflow-x-hidden">
       <div className="absolute inset-0 z-0 overflow-hidden">{tibetanBg}</div>
 
-      {/* STICKY top bar */}
+      {/* STICKY top bar (inline header for this page) */}
       <div className="sticky top-2 z-40 mx-auto container px-4">
         <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#ffd29b] to-[#ff8a00] flex items-center justify-center text-black font-bold">LÖ</div>
             <div>
               <div className="text-xs text-[#ffe9c7] font-mono">Löyly Vibe — Tibetan Edition</div>
-              <div className="text-sm font-semibold">Резерв и управление</div>
+              <div className="text-sm font-semibold text-[#fff]">Резерв и управление</div>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Active rentals indicator restored - this is clickable and shows minimal indicator UI */}
+            <div className="flex items-center gap-3">
+              <Link href="#booking">
+                <a className="px-3 py-1 rounded-md bg-[#ffd29b] text-[#120800] font-semibold text-sm mr-2">Бронь</a>
+              </Link>
+
+              {/* Indicator (clicks to /rentals) */}
+              <div className="hidden sm:block">
+                <ActiveRentalsIndicator />
+              </div>
+            </div>
+
+            {/* Balance - make contrast strong */}
             <div className="flex flex-col items-end">
               <div className="text-xs text-[#ffe9c7]">Твой баланс</div>
               <div className="text-lg font-bold flex items-center gap-2 text-[#fff]">
@@ -230,12 +237,7 @@ export default function SaunaRentMegaPage() {
               </div>
             </div>
 
-            <nav className="hidden sm:flex items-center gap-3">
-              {sections.map((s) => (
-                <a key={s.id} href={`#${s.id}`} className={cn('px-3 py-1 rounded-md text-sm font-mono', activeId === s.id ? 'bg-[#ffefdd] text-[#221b10]' : 'text-[#ffefddcc] hover:bg-[#ffffff10]')}>{s.label}</a>
-              ))}
-            </nav>
-
+            {/* mobile quick booking */}
             <div className="sm:hidden">
               <Link href="#booking"><a className="px-3 py-1 rounded-md bg-[#ffd29b] text-[#120800] font-semibold text-sm">Бронь</a></Link>
             </div>
@@ -244,23 +246,23 @@ export default function SaunaRentMegaPage() {
       </div>
 
       <main className="container mx-auto px-4 py-8 space-y-12 relative z-10">
-        {/* HERO - taller */}
+        {/* HERO (taller) */}
         <section id="hero" className="rounded-2xl overflow-hidden relative grid grid-cols-1 lg:grid-cols-2 gap-6 items-center bg-gradient-to-br from-[#22180f]/40 to-[#0f1a16]/20 p-8 min-h-[740px]">
-          <div className="space-y-6 z-10">
+          <div className="space-y-6 z-10 relative">
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-orbitron leading-tight relative">
-              <span className="block text-[#ffeccf]">Тибетская Löyly</span>
+              <span className="block text-[#ffffff]">Тибетская Löyly</span>
               <span className="block text-[#ffd29b]">Перезагрузка тела и ума</span>
 
-              {/* steam overlays */}
+              {/* steam wisps — presentational only */}
               <span className="steam top-0 left-0 -translate-y-6" aria-hidden />
               <span className="steam-delay top-0 left-0 -translate-y-6" aria-hidden />
             </h1>
 
-            <p className="text-sm text-[#e7dfd1] max-w-xl">Комната на до 15 человек, парилка на 6, бассейн 3×3 (1.5—2 м), джакузи на 2, стол на 10. Ночная сессия — особый режим: тёплый свет, кино, лаунж и душевный вайб.</p>
+            <p className="text-sm text-[#e7dfd1] max-w-xl">Комната до 15 человек, парилка на 6, бассейн 3×3 (1.5—2 м), джакузи на 2, стол на 10 — ночные сессии с кино и лаунжем.</p>
 
             <div className="flex gap-3 mt-4 flex-wrap">
-              <Button onClick={() => document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })} className="bg-[#ffd29b] text-[#241309]">Забронировать сейчас</Button>
-              <Button variant="ghost" onClick={() => document.getElementById('extras')?.scrollIntoView({ behavior: 'smooth' })}>Услуги</Button>
+              <Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })} className="bg-[#ffd29b] text-[#241309]">Забронировать сейчас</Button>
+              <Button variant="ghost" onClick={() => document.getElementById("extras")?.scrollIntoView({ behavior: "smooth" })}>Услуги</Button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-6">
@@ -277,17 +279,17 @@ export default function SaunaRentMegaPage() {
 
           <div className="relative h-96 md:h-[520px] rounded-lg overflow-hidden shadow-lg">
             <Image src="https://images.unsplash.com/photo-1556020685-8e4d2f4e6e8b?q=80&w=2000&auto=format&fit=crop" alt="sauna" layout="fill" objectFit="cover" className="object-cover brightness-90" />
-            <div className="absolute bottom-4 left-4 p-2 bg-[#00000066] rounded-lg text-xs">Кинотеатр — доп. опция</div>
+            <div className="absolute bottom-4 left-4 p-2 bg-[#00000066] rounded-lg text-xs text-[#fff]">Кинотеатр — доп. опция</div>
           </div>
         </section>
 
-        {/* CABINS / features */}
+        {/* CABINS */}
         <section id="cabins" className="space-y-6">
           <h3 className="text-2xl font-orbitron text-[#fff]">Наши зоны</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaHotTubPerson::" /> Парилка</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-[#fff]"><VibeContentRenderer content="::FaHotTubPerson::" /> Парилка</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Каменная парилка — сухой жар, эфирные масла по желанию. Места: 6.</p>
@@ -296,7 +298,7 @@ export default function SaunaRentMegaPage() {
 
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaWater::" /> Бассейн</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-[#fff]"><VibeContentRenderer content="::FaWater::" /> Бассейн</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">3m × 3m, глубина до 2m, опция охлаждения после парилки.</p>
@@ -305,10 +307,10 @@ export default function SaunaRentMegaPage() {
 
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaUsers::" /> Зона на компанию</CardTitle>
+                <CardTitle className="flex items-center gap-3 text-[#fff]"><VibeContentRenderer content="::FaUsers::" /> Зона на компанию</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-[#ddd]">Стол на 10, лаунж, нарды, покер, джакузи — все для вечеринки.</p>
+                <p className="text-sm text-[#ddd]">Стол на 10, лаунж, нарды, покер, джакузи — всё для вечеринки.</p>
               </CardContent>
             </Card>
           </div>
@@ -351,27 +353,21 @@ export default function SaunaRentMegaPage() {
           <h3 className="text-2xl font-orbitron text-[#fff]">Дополнительные услуги</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaFilm::" /> Кинотеатр + приставка</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]"><VibeContentRenderer content="::FaFilm::" /> Кинотеатр + приставка</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Выбирай фильм/подключай приставку — можем привезти контроллеры. Flat fee {BASE_PRICING.cinemaFlat} ₽.</p>
               </CardContent>
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaSpa::" /> Джакузи</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]"><VibeContentRenderer content="::FaSpa::" /> Джакузи</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Две камеры джакузи, идеальны для пар и релаксации. {BASE_PRICING.jacuzziFlat} ₽.</p>
               </CardContent>
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><VibeContentRenderer content="::FaDice::" /> Игры: нарды, покер</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]"><VibeContentRenderer content="::FaDice::" /> Игры: нарды, покер</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Комплекты нард, карты, фишки — всё для вечеринки.</p>
               </CardContent>
@@ -384,20 +380,20 @@ export default function SaunaRentMegaPage() {
           <h3 className="text-2xl font-orbitron text-[#fff]">Crew & Cleaning — как это работает</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaUsers::" /> Клин-тим и персонал</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]"><VibeContentRenderer content="::FaUsers::" /> Клин-тим и персонал</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">Назначай клинеров/байкер-курьеров: уборка между сменами, подвоз гостей, проверка оборудования.</p>
                 <ol className="list-decimal list-inside text-sm text-[#ddd] mt-2">
                   <li>План уборок после каждой смены — опция для заказчика.</li>
                   <li>Клин-тим получает звезды за выполненную уборку (геймификация).</li>
-                  <li>Можно синхронизировать байк-прохваты между локациями (crew mobility).</li>
+                  <li>Синхронизировать байк-прохваты между локациями (crew mobility).</li>
                 </ol>
-                <p className="text-xs text-[#cfc6b8] mt-3">TODO: API to assign shifts, send notifications via Telegram bot and track stars payments.</p>
+                <p className="text-xs text-[#cfc6b8] mt-3">TODO: API to assign shifts, Telegram notifications and stars accounting.</p>
               </CardContent>
             </Card>
 
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle><VibeContentRenderer content="::FaHandSparkles::" /> Программа мотивации</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]"><VibeContentRenderer content="::FaHandSparkles::" /> Программа мотивации</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#ddd]">За аренду, уборку или полезные действия начисляем звезды. Используй их как скидку при будущих бронированиях.</p>
                 <ul className="list-disc list-inside text-sm mt-2 text-[#ddd]">
@@ -419,33 +415,33 @@ export default function SaunaRentMegaPage() {
                 <CardHeader><CardTitle className="text-[#fff]">Форма брони</CardTitle></CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="text-xs font-mono text-[#f2eadc]">Дата
-                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe7d8]" />
+                    <label className="text-xs font-mono text-[#fff]">Дата
+                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" />
                     </label>
 
-                    <label className="text-xs font-mono text-[#f2eadc]">Время начала
-                      <select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe7d8]">
+                    <label className="text-xs font-mono text-[#fff]">Время начала
+                      <select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
                         {Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}
                       </select>
                     </label>
 
-                    <label className="text-xs font-mono text-[#f2eadc]">Длительность (часы)
-                      <input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe7d8]" />
+                    <label className="text-xs font-mono text-[#fff]">Длительность (часы)
+                      <input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" />
                     </label>
 
-                    <div className="text-xs font-mono text-[#f2eadc]">Скидки и звезды
-                      <div className="mt-1 text-sm text-[#efe7d8]">Баланс: <strong className="text-[#fff]">{starsBalance}★</strong> • Стоимость в звёздах: <strong className="text-[#fff]">{starsCost}★</strong></div>
+                    <div className="text-xs font-mono text-[#fff]">Скидки и звезды
+                      <div className="mt-1 text-sm text-[#fff]">Баланс: <strong className="text-[#ffd879]">{starsBalance}★</strong> • Стоимость в звёздах: <strong className="text-[#ffd879]">{starsCost}★</strong></div>
                     </div>
 
                     <div className="col-span-1 sm:col-span-2 mt-2">
                       <div className="flex gap-2 flex-wrap">
-                        <label className="inline-flex items-center gap-2 text-[#efe7d8]">
+                        <label className="inline-flex items-center gap-2 text-[#fff]">
                           <input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra('cinema' as any)} /> <span className="text-sm">Кинотеатр</span>
                         </label>
-                        <label className="inline-flex items-center gap-2 text-[#efe7d8]">
+                        <label className="inline-flex items-center gap-2 text-[#fff]">
                           <input type="checkbox" checked={selectedExtras.jacuzzi} onChange={() => toggleExtra('jacuzzi' as any)} /> <span className="text-sm">Джакузи</span>
                         </label>
-                        <label className="inline-flex items-center gap-2 text-[#efe7d8]">
+                        <label className="inline-flex items-center gap-2 text-[#fff]">
                           <input type="checkbox" checked={selectedExtras.cleaning} onChange={() => toggleExtra('cleaning' as any)} /> <span className="text-sm">Проф. уборка</span>
                         </label>
                       </div>
@@ -454,7 +450,7 @@ export default function SaunaRentMegaPage() {
                     <div className="col-span-1 sm:col-span-2 mt-3">
                       <div className="p-3 rounded bg-[#080707] border border-[#2b1b12]">
                         <div className="flex justify-between items-center">
-                          <div className="text-sm text-[#efe7d8]">Итого</div>
+                          <div className="text-sm text-[#fff]">Итого</div>
                           <div className="text-lg font-bold text-[#fff]">{totalPrice} ₽</div>
                         </div>
                         <div className="text-xs text-[#d9d6cd] mt-1">Или ~ {starsCost}★ (прибл.). При оплате — начислим {starsEarned}★ cashback.</div>
@@ -462,27 +458,31 @@ export default function SaunaRentMegaPage() {
                     </div>
 
                     <div className="col-span-1 sm:col-span-2 mt-3">
-                      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Доп. пожелания (обогрев, музыка, фильм)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#efe7d8]" />
+                      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Доп. пожелания (обогрев, музыка, фильм)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" />
                     </div>
 
-                    {/* Buttons - mobile friendly: stack on small screens */}
+                    {/* Buttons — stacked on mobile, row on desktop */}
                     <div className="col-span-1 sm:col-span-2 mt-2">
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button onClick={handleCreateBooking} disabled={isSubmitting} className="flex-1">
-                          {isSubmitting ? 'Обработка...' : 'Создать бронь и получить счёт в Telegram'}
+                          {isSubmitting ? "Обработка..." : "Создать бронь и получить счёт в Telegram"}
                         </Button>
 
-                        {/* Reset button styled more visible / destructive-ish */}
                         <Button
                           variant="ghost"
-                          onClick={() => { setDate(new Date(Date.now()+24*3600*1000).toISOString().slice(0,10)); setMessage(''); setSelectedExtras({ cinema: false, jacuzzi: false, cleaning: false }); setDurationHours(3); setStartHour(18); }}
+                          onClick={() => {
+                            setDate(new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10));
+                            setMessage("");
+                            setSelectedExtras({ cinema: false, jacuzzi: false, cleaning: false });
+                            setDurationHours(3);
+                            setStartHour(18);
+                          }}
                           className="w-full sm:w-auto border border-[#ff6b6b] text-[#ffb6b6] hover:bg-[#2a0c0c]"
                         >
                           Сброс
                         </Button>
                       </div>
                     </div>
-
                   </div>
                 </CardContent>
               </Card>
@@ -493,13 +493,13 @@ export default function SaunaRentMegaPage() {
                 <CardContent>
                   {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">Пока что пусто — твои брони появятся здесь.</div> : (
                     <ul className="space-y-2">
-                      {bookings.map(b => (
+                      {bookings.map((b) => (
                         <li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]">
                           <div className="flex justify-between items-center">
-                            <div className="text-sm text-[#efe7d8]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч</div>
+                            <div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч</div>
                             <div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div>
                           </div>
-                          <div className="text-xs text-[#d9d6cd] mt-1">Экстры: {b.extras.join(', ') || '—'}</div>
+                          <div className="text-xs text-[#d9d6cd] mt-1">Экстры: {b.extras.join(", ") || "—"}</div>
                         </li>
                       ))}
                     </ul>
@@ -533,8 +533,8 @@ export default function SaunaRentMegaPage() {
                     <div className="text-xs text-[#ffd29b] mb-2">Подпишись на оповещения уборки</div>
                     <p className="text-xs text-[#d9d6cd]">После аренды можно подписаться на короткий shift уборки: за работу платят звёздами.</p>
                     <div className="mt-2 flex gap-2">
-                      <Button onClick={() => alert('TODO: send subscription to /api/notify-cleanup')}>Подписаться</Button>
-                      <Button variant="ghost" onClick={() => alert('TODO: show cleaning schedule')} className="border border-[#2b1b12] text-[#efe7d8]">График</Button>
+                      <Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")}>Подписаться</Button>
+                      <Button variant="ghost" onClick={() => alert("TODO: show cleaning schedule")} className="border border-[#2b1b12] text-[#fff]">График</Button>
                     </div>
                   </div>
                 </CardContent>
@@ -544,9 +544,9 @@ export default function SaunaRentMegaPage() {
                 <CardContent>
                   <h4 className="font-semibold text-accent-text mb-2 text-[#fff]">Быстрые ссылки</h4>
                   <ul className="text-sm list-inside space-y-2 text-[#d9d6cd]">
-                    <li><Link href="/vipbikerental"><a className="hover:underline">VIP Байк</a></Link></li>
-                    <li><Link href="/repo-xml"><a className="hover:underline">/repo-xml Studio</a></Link></li>
-                    <li><Link href="/selfdev"><a className="hover:underline">SelfDev</a></Link></li>
+                    <li><Link href="/vipbikerental"><a className="text-[#fff] hover:underline">VIP Байк</a></Link></li>
+                    <li><Link href="/repo-xml"><a className="text-[#fff] hover:underline">/repo-xml Studio</a></Link></li>
+                    <li><Link href="/selfdev"><a className="text-[#fff] hover:underline">SelfDev</a></Link></li>
                   </ul>
                 </CardContent>
               </Card>
@@ -561,7 +561,7 @@ export default function SaunaRentMegaPage() {
             <Card className="bg-[#0b0b0b] border-border">
               <CardHeader><CardTitle className="text-[#fff]">Заявки / Саппорт</CardTitle></CardHeader>
               <CardContent>
-                <p className="text-sm text-[#d9d6cd]">Если хочешь заказать комплексную организацию мероприятия, напиши: администрирование, доп. персонал, закупки, кейтеринг.</p>
+                <p className="text-sm text-[#d9d6cd]">Если хочешь заказать комплексную организацию мероприятия: администрирование, доп. персонал, закупки, кейтеринг — оставь заявку.</p>
                 <div className="mt-3"><SupportForm /></div>
               </CardContent>
             </Card>
@@ -570,7 +570,7 @@ export default function SaunaRentMegaPage() {
               <CardHeader><CardTitle className="text-[#fff]">Маркетинг и байк-креатив</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-sm text-[#d9d6cd]">Идеи: комбинировать байк-тур + сауна (crew mobility). Промо: ночной пакет + кино + бар — лимитированные места.</p>
-                <p className="text-xs text-[#cfc6b8] mt-2">TODO: expose API to schedule bike->sauna pickups, crew assignments and promo codes.</p>
+                <p className="text-xs text-[#cfc6b8] mt-2">TODO: expose API to schedule bike→sauna pickups, crew assignments and promo codes.</p>
               </CardContent>
             </Card>
           </div>
@@ -582,18 +582,18 @@ export default function SaunaRentMegaPage() {
             <h4 className="text-xl font-orbitron mb-2 text-[#fff]">Готов взять ВАЙБ на себя?</h4>
             <p className="text-sm text-[#d9d6cd] mb-4">Бронируй сейчас — счёт в Telegram. Плати звёздами. Я вижу оплату и подтверждаю вручную.</p>
             <div className="flex justify-center gap-3">
-              <Button onClick={() => document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth' })}>Забронировать</Button>
-              <Button variant="ghost" onClick={() => document.getElementById('support')?.scrollIntoView({ behavior: 'smooth' })}>Саппорт</Button>
+              <Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })}>Забронировать</Button>
+              <Button variant="ghost" onClick={() => document.getElementById("support")?.scrollIntoView({ behavior: "smooth" })}>Саппорт</Button>
             </div>
           </div>
         </section>
       </main>
 
-      {/* Floating mobile nav */}
+      {/* Mobile floating nav */}
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 w-[92%] sm:w-[640px] md:hidden">
         <div className="bg-[#0b0b0b] border border-[#2b1b12] rounded-full p-2 flex justify-between items-center shadow-lg">
-          {sections.map(s => (
-            <a key={s.id} href={`#${s.id}`} className={cn('flex-1 text-center p-2 rounded-full text-xs', activeId === s.id ? 'bg-[#ffd29b] text-[#120800]' : 'text-[#fff]')}>{s.label}</a>
+          {sections.map((s) => (
+            <a key={s.id} href={`#${s.id}`} className={cn("flex-1 text-center p-2 rounded-full text-xs", activeId === s.id ? "bg-[#ffd29b] text-[#120800]" : "text-[#fff]")}>{s.label}</a>
           ))}
         </div>
       </div>
@@ -603,8 +603,8 @@ export default function SaunaRentMegaPage() {
         <div className="bg-[#0b0b0b] border border-[#2b1b12] rounded-xl p-2 w-44 shadow-xl">
           <div className="text-xs text-[#ffd29b] mb-2">Навигация</div>
           <div className="flex flex-col gap-2">
-            {sections.map(s => (
-              <a key={s.id} href={`#${s.id}`} className={cn('p-2 rounded-md text-sm', activeId === s.id ? 'bg-[#ffd29b] text-[#120800]' : 'text-[#fff] hover:bg-[#ffffff10]')}>{s.label}</a>
+            {sections.map((s) => (
+              <a key={s.id} href={`#${s.id}`} className={cn("p-2 rounded-md text-sm", activeId === s.id ? "bg-[#ffd29b] text-[#120800]" : "text-[#fff] hover:bg-[#ffffff10]")}>{s.label}</a>
             ))}
           </div>
         </div>
@@ -613,7 +613,7 @@ export default function SaunaRentMegaPage() {
       <style jsx>{`
         .font-orbitron { font-family: 'Orbitron', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
 
-        /* Steam animation: subtle wisps rising near title */
+        /* Steam wisps */
         .steam, .steam-delay {
           position: absolute;
           display: block;
@@ -644,7 +644,6 @@ export default function SaunaRentMegaPage() {
           100% { transform: translateY(-60px) scaleX(1.12); opacity: 0; }
         }
 
-        /* small responsiveness tweaks */
         @media (max-width: 640px) {
           main { padding-bottom: 140px; }
         }

@@ -10,9 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithStatus, VehicleCalendar, RentalDetails, UserRentalDashboard, TopFleet, TopCrew } from '@/lib/types';
-
+import type { BookingInput, BookingResult } from './types'; // adjust to match your local types
 type Vehicle = Database['public']['Tables']['cars']['Row'];
-
 
 type MinimalRental = {
   rental_id: string;
@@ -631,3 +630,40 @@ export async function confirmVehicleReturn(rentalId: string, userId: string) {
     }
 }
 // ^^^ --- КОНЕЦ НОВОГО ДВИЖКА --- ^^^
+
+
+
+
+
+/**
+ * Creates a sauna booking using the existing booking flow.
+ * Injects `metadata.type = 'sauna'` so downstream webhook handlers
+ * and business logic treat it as a sauna rental without requiring new endpoints.
+ *
+ * @param input - Base booking data (customer info, dates, price, etc.)
+ * @returns Promise<BookingResult> from the standard booking flow
+ */
+export async function createSaunaBooking(
+  input: Omit<BookingInput, 'metadata'> & {
+    metadata?: Record<string, unknown>;
+  }
+): Promise<BookingResult> {
+  try {
+    // Merge provided metadata with sauna type
+    const metadata = {
+      ...(input.metadata ?? {}),
+      type: 'sauna', // 👈 key flag for webhook handlers
+    };
+
+    // Pass through to the standard booking creation function
+    // If your system uses `createInvoice` instead of `createBooking`,
+    // swap the import and call accordingly.
+    return await createBooking({
+      ...input,
+      metadata,
+    });
+  } catch (err) {
+    console.error('[createSaunaBooking] Failed:', err);
+    throw err;
+  }
+}
