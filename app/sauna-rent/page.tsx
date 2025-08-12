@@ -335,7 +335,299 @@ export default function SaunaRentMegaPage() {
           </div>
         </section>
 
-        {/* ... rest of sections unchanged (cabins/pricing/extras/staff/booking/support) ... */}
+        {/* CABINS */}
+        <section id="cabins" className="space-y-6">
+          <h3 className="text-2xl font-orbitron text-[#fffaf0]">Наши зоны</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-[#fffaf0]"><VibeContentRenderer content="::FaHotTubPerson::" /> Парилка</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative h-36 rounded overflow-hidden">
+                  <Image src="https://images.unsplash.com/photo-1506629082955-511b1e1d9c2a?q=80&w=1200&auto=format&fit=crop" alt="parilka" layout="fill" objectFit="cover" className="opacity-80" />
+                </div>
+                <p className="text-sm text-[#e6dfd1] mt-3">Каменная парилка — сухой жар, эфирные масла по желанию. Места: 6.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-[#fffaf0]"><VibeContentRenderer content="::FaWater::" /> Бассейн</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative h-36 rounded overflow-hidden">
+                  <Image src={poolBg} alt="pool" layout="fill" objectFit="cover" className="opacity-85" />
+                </div>
+                <p className="text-sm text-[#e6dfd1] mt-3">3×3, глубина до 2м, опция охлаждения после парилки.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-[#fffaf0]"><VibeContentRenderer content="::FaUsers::" /> Зона на компанию</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#e6dfd1]">Стол на 10 персон, лаунж, нарды, покер, джакузи на 2 — полный уют.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section id="pricing" className="space-y-6">
+          <h3 className="text-2xl font-orbitron text-[#fffaf0]">Цены и режимы</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 rounded-lg bg-[#0b0b0b] border-border">
+              <div className="text-xs text-[#ffd29b]">Дневной</div>
+              <div className="text-xl font-bold text-[#fffaf0]">{BASE_PRICING.weekdayDay} ₽ / час</div>
+              <div className="text-sm text-[#e6dfd1] mt-2">Пн—Чт 08:00—18:00</div>
+            </div>
+            <div className="p-4 rounded-lg bg-[#0b0b0b] border-border">
+              <div className="text-xs text-[#ffd29b]">Вечерний</div>
+              <div className="text-xl font-bold text-[#fffaf0]">{BASE_PRICING.weekdayEvening} ₽ / час</div>
+              <div className="text-sm text-[#e6dfd1] mt-2">Каждый день 18:00—02:00</div>
+            </div>
+            <div className="p-4 rounded-lg bg-[#0b0b0b] border-border">
+              <div className="text-xs text-[#ffd29b]">Выходные</div>
+              <div className="text-xl font-bold text-[#fffaf0]">{BASE_PRICING.weekendDay}—{BASE_PRICING.weekendEvening} ₽ / час</div>
+              <div className="text-sm text-[#e6dfd1] mt-2">Повышенный тариф в пт-вс</div>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-[#080707] rounded-lg border-border">
+            <h4 className="font-semibold text-[#fffaf0]">Особые правила</h4>
+            <ul className="list-disc list-inside mt-2 text-sm text-[#e6dfd1]">
+              <li>Минимальная аренда — 2 часа.</li>
+              <li>Пятница — удлинённый режим, люди часто остаются до утра.</li>
+              <li>Максимум — 15 человек (одна сауна в локации).</li>
+              <li>Кинотеатр и приставки — по запросу как доп. услуга.</li>
+            </ul>
+          </div>
+        </section>
+
+        {/* Extras */}
+        <section id="extras" className="space-y-6">
+          <h3 className="text-2xl font-orbitron text-[#fffaf0]">Дополнительные услуги</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="text-[#fffaf0]"><VibeContentRenderer content="::FaFilm::" /> Кинотеатр + приставка</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#e6dfd1]">Выбирай фильм/подключи приставку — контроллеры по запросу. Flat fee {BASE_PRICING.cinemaFlat} ₽.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="text-[#fffaf0]"><VibeContentRenderer content="::FaSpa::" /> Джакузи</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#e6dfd1]">Две камеры джакузи, идеально для релакса. {BASE_PRICING.jacuzziFlat} ₽.</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="text-[#fffaf0]"><VibeContentRenderer content="::FaDice::" /> Игры: нарды, покер</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#e6dfd1]">Наборы нард, карты, фишки, стол — всё для вечеринки.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* STAFF */}
+        <section id="staff" className="space-y-6">
+          <h3 className="text-2xl font-orbitron text-[#fffaf0]">Crew & Cleaning — как это работает</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="text-[#fffaf0]"><VibeContentRenderer content="::FaUsers::" /> Клин-тим и персонал</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#e6dfd1]">Назначай клинеров/байк-корре для логистики: уборка между сменами, подвоз гостей и проч.</p>
+                <ol className="list-decimal list-inside text-sm text-[#e6dfd1] mt-2">
+                  <li>План уборок после смен — опция.</li>
+                  <li>Клин-тим получает звезды за выполнение — геймификация.</li>
+                  <li>Можно синхронизировать байк-прохваты между саунами.</li>
+                </ol>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader>
+                <CardTitle className="text-[#fffaf0]"><VibeContentRenderer content="::FaHandSparkles::" /> Программа мотивации</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#e6dfd1]">За аренды, уборки и полезные дела начисляются звёзды — скидки на будущие брони.</p>
+                <ul className="list-disc list-inside text-sm mt-2 text-[#e6dfd1]">
+                  <li>Clean+ — бонус 5★ за качественную уборку.</li>
+                  <li>Referral — привёл друга — 2★.</li>
+                  <li>Сезонные кампании и промо для байк-крузов.</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* BOOKING FORM */}
+        <section id="booking" className="space-y-6">
+          <h3 className="text-2xl font-orbitron text-[#fffaf0]">Бронирование (Демо)</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card className="bg-[#0b0b0b] border-border">
+                <CardHeader>
+                  <CardTitle className="text-[#fffaf0]">Форма брони</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-xs font-mono">
+                      Дата
+                      <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                        className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe8da]" />
+                    </label>
+
+                    <label className="text-xs font-mono">
+                      Время начала
+                      <select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))}
+                        className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe8da]">
+                        {Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}
+                      </select>
+                    </label>
+
+                    <label className="text-xs font-mono">
+                      Длительность (часы)
+                      <input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))}
+                        className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe8da]" />
+                    </label>
+
+                    <div className="text-xs font-mono">
+                      Скидки и звезды
+                      <div className="mt-1 text-sm text-[#efe8da]">Баланс: <strong>{starsBalance}★</strong> • Стоимость в звёздах: <strong>{starsCost}★</strong></div>
+                    </div>
+
+                    <div className="col-span-1 sm:col-span-2 mt-2">
+                      <div className="flex gap-2 flex-wrap text-[#efe8da]">
+                        <label className="inline-flex items-center gap-2"><input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra("cinema" as any)} /> <span className="text-sm">Кинотеатр</span></label>
+                        <label className="inline-flex items-center gap-2"><input type="checkbox" checked={selectedExtras.jacuzzi} onChange={() => toggleExtra("jacuzzi" as any)} /> <span className="text-sm">Джакузи</span></label>
+                        <label className="inline-flex items-center gap-2"><input type="checkbox" checked={selectedExtras.cleaning} onChange={() => toggleExtra("cleaning" as any)} /> <span className="text-sm">Проф. уборка</span></label>
+                      </div>
+                    </div>
+
+                    <div className="col-span-1 sm:col-span-2 mt-3">
+                      <div className="p-3 rounded bg-[#080707] border border-[#2b1b12]">
+                        <div className="flex justify-between items-center">
+                          <div className="text-sm text-[#efe8da]">Итого</div>
+                          <div className="text-lg font-bold text-[#fffaf0]">{totalPrice} ₽</div>
+                        </div>
+                        <div className="text-xs text-[#d9d6cd] mt-1">Или ~ {starsCost}★. При оплате — начислим {starsEarned}★ cashback.</div>
+                      </div>
+                    </div>
+
+                    <div className="col-span-1 sm:col-span-2 mt-3">
+                      <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Доп. пожелания (обогрев, музыка, фильм)"
+                        className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#efe8da] h-24" />
+                    </div>
+
+                    <div className="col-span-1 sm:col-span-2 flex gap-3 mt-2">
+                      <Button onClick={handleCreateBooking} disabled={isSubmitting} className="w-full">{isSubmitting ? "Обработка..." : "Создать бронь и получить счёт в Telegram"}</Button>
+                      <Button variant="ghost" onClick={() => { setDate(new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10)); setMessage(""); }}>Сброс</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mt-6 bg-[#080707] border-border">
+                <CardHeader><CardTitle className="text-[#fffaf0]">История броней</CardTitle></CardHeader>
+                <CardContent>
+                  {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">Пока что пусто — твои брони появятся здесь.</div> : (
+                    <ul className="space-y-2">
+                      {bookings.map(b => (
+                        <li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]">
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm text-[#efe8da]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч</div>
+                            <div className="text-sm font-semibold text-[#fffaf0]">{b.price} ₽</div>
+                          </div>
+                          <div className="text-xs text-[#d9d6cd] mt-1">Экстры: {b.extras.join(', ') || '—'}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <aside>
+              <Card className="bg-[#0b0b0b] border-border md:sticky md:top-24">
+                <CardHeader><CardTitle className="text-[#fffaf0]">Система звёзд</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="text-sm text-[#d9d6cd] mb-2">Твои звёзды — внутренняя валюта. Трать их на скидки или копи для будущих броней.</p>
+                  <div className="p-3 bg-[#060606] rounded border border-[#2b1b12]">
+                    <div className="text-xs text-[#efe8da]">Баланс</div>
+                    <div className="text-3xl font-bold flex items-center gap-2 text-[#fffaf0]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div>
+                    <div className="text-xs text-[#d9d6cd] mt-2">Начисления за предыдущие действия, рефералы, уборки.</div>
+
+                    <div className="mt-3">
+                      <div className="text-xs text-[#ffd29b]">Магазин скидок</div>
+                      <ul className="mt-1 text-sm list-inside list-disc text-[#efe8da]">
+                        <li>50★ — 500 ₽ скидка</li>
+                        <li>100★ — 1200 ₽ скидка</li>
+                        <li>200★ — 3000 ₽ скидка + VIP вечер</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-xs text-[#ffd29b] mb-2">Подпишись на оповещения уборки</div>
+                    <p className="text-xs text-[#d9d6cd]">После аренд можешь подписаться на короткий shift уборки: люди получают задачу — чисто и получают звёзды.</p>
+                    <div className="mt-2 flex gap-2">
+                      <Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")}>Подписаться</Button>
+                      <Button variant="ghost" onClick={() => alert("TODO: show cleaning schedule")} className="text-[#fffaf0]">График</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-[#070707] border-border mt-6">
+                <CardContent>
+                  <h4 className="font-semibold text-[#fffaf0] mb-2">Быстрые ссылки</h4>
+                  <ul className="text-sm list-inside space-y-2 text-[#e6dfd1]">
+                    <li><Link href="/vipbikerental"><a className="hover:underline">VIP Байк</a></Link></li>
+                    <li><Link href="/repo-xml"><a className="hover:underline">/repo-xml Studio</a></Link></li>
+                    <li><Link href="/selfdev"><a className="hover:underline">SelfDev</a></Link></li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
+        </section>
+
+        {/* SUPPORT */}
+        <section id="support" className="space-y-6">
+          <h3 className="text-2xl font-orbitron text-[#fffaf0]">Поддержка и заказ услуг</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader><CardTitle className="text-[#fffaf0]">Заявки / Саппорт</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#d9d6cd]">Заказ мероприятия: администрирование, доп. персонал, кейтеринг.</p>
+                <div className="mt-3"><SupportForm /></div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0b0b0b] border-border">
+              <CardHeader><CardTitle className="text-[#fffaf0]">Маркетинг и байк-креатив</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-[#d9d6cd]">Комбинируй байк-тур + сауна. Ночной пакет + кино — лимитированные места.</p>
+                <p className="text-xs text-[#cfc6b8] mt-2">TODO: API для bike->sauna pickups, crew assignments, promo codes.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+
 
         {/* CTA */}
         <section className="py-8 text-center">
