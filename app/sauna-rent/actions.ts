@@ -1,23 +1,17 @@
 "use server";
 
+import { createBooking } from "@/app/rentals/actions"; // existing server action in your repo
 import { supabaseAdmin } from "@/hooks/supabase";
-// If you have local types, uncomment/adjust this import:
-// import type { BookingInput, BookingResult } from "./types";
-
-// Import your existing createBooking flow — this file expects the createBooking
-// function to be available from app/rentals/actions and to accept positional args:
-// createBooking(userId, vehicleId, startDate, endDate, price)
-import { createBooking } from "@/app/rentals/actions";
 
 type SaunaPayload = {
-  saunaVehicleId: string; // e.g. 'sauna-001'
+  saunaVehicleId: string; // 'sauna-001'
   startIso: string;
   endIso: string;
   price: number;
   extras?: string[];
   starsUsed?: number;
-  userId?: string; // optional — but we require it here by default
-  notes?: string;
+  userId?: string;
+  notes?: string | null;
 };
 
 export async function createSaunaBooking(payload: SaunaPayload) {
@@ -26,39 +20,33 @@ export async function createSaunaBooking(payload: SaunaPayload) {
 
   try {
     if (!payload.userId) {
-      // If you want to allow anonymous bookings, remove this check and adapt createBooking call
-      throw new Error("User ID required for booking.");
+      // You may want to allow anonymous bookings, but currently require userId
+      throw new Error("User ID required for sauna booking.");
     }
 
     const startDate = new Date(payload.startIso);
     const endDate = new Date(payload.endIso);
 
-    // === CALL YOUR EXISTING createBooking FLOW ===
-    // This is the positional style you used in your example:
+    // Call shared booking flow — adjust signature call if necessary for your codebase
     const res = await createBooking(payload.userId, vehicleId, startDate, endDate, payload.price);
-
-    // If your createBooking expects a BookingInput object instead, replace above with:
-    // const res = await createBooking({ user_id: payload.userId, vehicle_id: vehicleId, start_iso: payload.startIso, end_iso: payload.endIso, price: payload.price, metadata: {...} })
-
     if (!res || !res.success) {
       return res;
     }
 
-    // Expect res.data.rental_id from createBooking
     const rentalId = res?.data?.rental_id;
     if (!rentalId) {
       return { success: false, error: "No rental_id returned from createBooking." };
     }
 
-    // --- Update rentals.metadata to include sauna-specific info ---
+    // Update rentals.metadata to include sauna info
     try {
-      const { data: existingRental, error: rFetchErr } = await supabaseAdmin
+      const { data: existingRental } = await supabaseAdmin
         .from("rentals")
         .select("metadata")
         .eq("rental_id", rentalId)
         .single();
 
-      let existingMetadata = (existingRental?.metadata as Record<string, any>) || {};
+      const existingMetadata = (existingRental?.metadata as Record<string, any>) || {};
       const newMetadata = {
         ...existingMetadata,
         type: "sauna",
@@ -73,17 +61,14 @@ export async function createSaunaBooking(payload: SaunaPayload) {
         .update({ metadata: newMetadata, updated_at: new Date().toISOString() })
         .eq("rental_id", rentalId);
 
-      if (rUpdateErr) {
-        console.warn("[createSaunaBooking] Failed to update rental metadata:", rUpdateErr);
-        // don't fail the whole flow — booking exists already
-      }
-    } catch (e) {
-      console.warn("[createSaunaBooking] rental metadata patch error:", e);
+      if (rUpdateErr) console.warn("[createSaunaBooking] rental metadata update error:", rUpdateErr);
+    } catch (err) {
+      console.warn("[createSaunaBooking] rental metadata patch error:", err);
     }
 
-    // --- Also patch invoice metadata if invoice was created with naming scheme used in createBooking ---
+    // Try to patch invoice metadata if exists (non-fatal)
     try {
-      const invoiceId = `rental_interest_${rentalId}`; // adapt if your invoice naming differs
+      const invoiceId = `rental_interest_${rentalId}`;
       const { data: invRow, error: invFetchErr } = await supabaseAdmin
         .from("invoices")
         .select("metadata")
@@ -93,23 +78,18 @@ export async function createSaunaBooking(payload: SaunaPayload) {
       if (!invFetchErr && invRow) {
         const existingInvMeta = (invRow?.metadata as Record<string, any>) || {};
         const newInvMeta = { ...existingInvMeta, type: "sauna", sauna_id: vehicleId };
-
         const { error: invUpdateErr } = await supabaseAdmin
           .from("invoices")
           .update({ metadata: newInvMeta, updated_at: new Date().toISOString() })
           .eq("id", invoiceId);
 
-        if (invUpdateErr) {
-          console.warn("[createSaunaBooking] Failed to update invoice metadata:", invUpdateErr);
-        }
+        if (invUpdateErr) console.warn("[createSaunaBooking] invoice update error:", invUpdateErr);
       }
-      // If invoice not present — fine, not fatal
-    } catch (e) {
-      console.warn("[createSaunaBooking] invoice patch error:", e);
+    } catch (err) {
+      console.warn("[createSaunaBooking] invoice patch error:", err);
     }
 
-    // Optionally notify sauna owner via a Telegram helper function (if available)
-    // e.g. await notifyOwnerSaunaBooking(ownerId, rentalId, payload);
+    // Optionally: send Telegram notification to ownerId (left to your existing infra)
 
     return res;
   } catch (e: any) {
