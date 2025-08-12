@@ -540,7 +540,7 @@ export default function SaunaRentMegaPage() {
 
               <Card className="bg-[#070707] border-border mt-6">
                 <CardContent>
-                  <h4 className="font-semibold text-accent-text mb-2 text-[#fff]">Быстрые ссылки</h4>
+                  <h4 className="font-semibold mb-2 text-[#fff]">Быстрые ссылки</h4>
                   <ul className="text-sm list-inside space-y-2 text-[#d9d6cd]">
                     <li><Link href="/vipbikerental"><a className="text-[#fff] hover:underline">VIP Байк</a></Link></li>
                     <li><Link href="/repo-xml"><a className="text-[#fff] hover:underline">/repo-xml Studio</a></Link></li>
