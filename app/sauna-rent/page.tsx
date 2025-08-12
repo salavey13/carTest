@@ -11,10 +11,10 @@ import { cn } from "@/lib/utils";
 import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator"; // restore indicator (named export)
 import { useAppContext } from "@/contexts/AppContext";
 
-// Server action - MUST be exported as a server action wrapper in app/sauna-rent/actions.ts
+// Server action - MUST be exported as a server action wrapper in app/rentals/actions.ts
 // Example wrapper signature expected:
 // export async function createSaunaBooking(payload: { saunaVehicleId: string; startIso: string; endIso: string; price: number; extras?: string[]; starsUsed?: number; userId?: string; }) { "use server"; ... }
-import { createSaunaBooking } from "@/app/sauna-rent/actions"; // <-- NEW FILE exists and is a server action
+import { createSaunaBooking } from "@/app/sauna-rent/actions"; // <-- make sure this exists and is a server action
 
 // -----------------------------------------------------------------------------
 // MEGA Sauna-Rent Page — "Tibetan Vibe" edition
@@ -140,7 +140,7 @@ export default function SaunaRentMegaPage() {
     const { startIso, endIso } = computeStartEndIso(date, startHour, durationHours);
 
     const payload = {
-      saunaVehicleId: "sauna_1", // single sauna id
+      saunaVehicleId: "sauna-001", // canonical sauna id
       startIso,
       endIso,
       price: totalPrice,
