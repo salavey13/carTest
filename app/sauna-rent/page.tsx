@@ -11,10 +11,10 @@ import { cn } from "@/lib/utils";
 import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator"; // restore indicator (named export)
 import { useAppContext } from "@/contexts/AppContext";
 
-// Server action - MUST be exported as a server action wrapper in app/rentals/actions.ts
+// Server action - MUST be exported as a server action wrapper in app/sauna-rent/actions.ts
 // Example wrapper signature expected:
 // export async function createSaunaBooking(payload: { saunaVehicleId: string; startIso: string; endIso: string; price: number; extras?: string[]; starsUsed?: number; userId?: string; }) { "use server"; ... }
-import { createSaunaBooking } from "@/app/rentals/actions"; // <-- make sure this exists and is a server action
+import { createSaunaBooking } from "@/app/sauna-rent/actions"; // <-- NEW FILE exists and is a server action
 
 // -----------------------------------------------------------------------------
 // MEGA Sauna-Rent Page — "Tibetan Vibe" edition
@@ -219,9 +219,7 @@ export default function SaunaRentMegaPage() {
           <div className="flex items-center gap-4">
             {/* Active rentals indicator restored - this is clickable and shows minimal indicator UI */}
             <div className="flex items-center gap-3">
-              <Link href="#booking">
-                <a className="px-3 py-1 rounded-md bg-[#ffd29b] text-[#120800] font-semibold text-sm mr-2">Бронь</a>
-              </Link>
+              
 
               {/* Indicator (clicks to /rentals) */}
               <div className="hidden sm:block">
