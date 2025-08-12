@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Database } from "@/types/database.types";
 import { sendTelegramInvoice } from "@/app/actions";
 import { CrewWithCounts, CrewDetails, CommandDeckData, MapPreset, VehicleWithStatus, VehicleCalendar, RentalDetails, UserRentalDashboard, TopFleet, TopCrew } from '@/lib/types';
-import type { BookingInput, BookingResult } from './types'; // adjust to match your local types
+import type { BookingInput, BookingResult } from './types';
+
 type Vehicle = Database['public']['Tables']['cars']['Row'];
 
 type MinimalRental = {
