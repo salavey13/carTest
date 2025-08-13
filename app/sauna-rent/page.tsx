@@ -194,8 +194,8 @@ export default function SaunaRentMegaPage() {
   return (
     <div className="relative min-h-screen bg-[#030203] text-[#f6f1ea] antialiased overflow-x-hidden">
       <RockstarHeroSection
-        title="САУНА-ВОЛНА"
-        subtitle="Финская сауна • до 12 человек • парилка 6 • джакузи • стол 6"
+        title=""
+        subtitle=””//"Финская сауна • до 12 человек • парилка 6 • джакузи • стол 6"
         mainBackgroundImageUrl={heroImage}
         backgroundImageObjectUrl={objectImage}
         triggerElementSelector={`#${heroTriggerId}`}
@@ -213,7 +213,7 @@ export default function SaunaRentMegaPage() {
       <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
 
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
-        <div id="home" className="absolute -top-[150vh]" aria-hidden="true" />
+        <div id="home" className="absolute" aria-hidden="true" />
         
         <div className="sticky top-4 z-40 mx-auto container px-4 -mt-16 mb-16">
           <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
