@@ -130,9 +130,351 @@ export async function fetchRepoTree(repoUrl: string, branchName?: string | null)
     }
 }
 
+
+export async function fetchRepoContents(
+  repoUrl: string,
+  customToken?: string,
+  branchName?: string | null
+) {
+  const startTime = Date.now();
+  let owner: string | undefined;
+  let repo: string | undefined;
+  let targetBranch = branchName;
+  let isDefaultFetched = false;
+
+  try {
+    const token = customToken || process.env.GITHUB_TOKEN;
+    if (!token) throw new Error("GH token missing");
+
+    const { owner: o, repo: r } = parseRepoUrl(repoUrl);
+    owner = o;
+    repo = r;
+
+    const octokit = new Octokit({ auth: token });
+
+    const allowedRootFiles = new Set([
+      "package.json",
+      "tailwind.config.ts",
+      "tsconfig.json",
+      "next.config.js",
+      "next.config.mjs",
+      "vite.config.ts",
+      "vite.config.js",
+      "README.md",
+      "seed.sql"
+    ]);
+
+    const allowedPrefixes = [
+      "app/",
+      "components/",
+      "contexts/",
+      "hooks/",
+      "lib/",
+      "supabase/",
+      "types/",
+      "utils/",
+      "data/"
+    ];
+
+    const excludedExactPaths = new Set<string>([]);
+    const excludedPrefixes = [
+      ".git/",
+      "node_modules/",
+      ".next/",
+      "dist/",
+      "build/",
+      "out/",
+      "public/",
+      "supabase/migrations/",
+      "Configame/",
+      "components/ui/",
+      ".vscode/",
+      ".idea/",
+      "coverage/",
+      "storybook-static/",
+      "docs/",
+      "examples/",
+      "test/",
+      "tests/",
+      "__tests__/",
+      "cypress/",
+      "prisma/migrations/",
+      "assets/",
+      "static/",
+      "images/"
+    ];
+
+    const excludedExtensions = [
+      ".pl",
+      ".json",
+      ".png",
+      ".jpg",
+      ".jpeg",
+      ".gif",
+      ".svg",
+      ".ico",
+      ".webp",
+      ".avif",
+      ".mp4",
+      ".webm",
+      ".mov",
+      ".mp3",
+      ".wav",
+      ".ogg",
+      ".pdf",
+      ".woff",
+      ".woff2",
+      ".ttf",
+      ".otf",
+      ".eot",
+      ".zip",
+      ".gz",
+      ".tar",
+      ".rar",
+      ".env",
+      ".lock",
+      ".log",
+      ".DS_Store",
+      ".md",
+      ".csv",
+      ".xlsx",
+      ".xls",
+      ".yaml",
+      ".yml",
+      ".bak",
+      ".tmp",
+      ".swp",
+      ".map",
+      ".dll",
+      ".exe",
+      ".so",
+      ".dylib"
+    ];
+
+    // Get default branch if needed
+    if (!targetBranch || targetBranch === "default") {
+      try {
+        const { data: repoData } = await octokit.repos.get({ owner, repo });
+        targetBranch = repoData.default_branch;
+        isDefaultFetched = true;
+      } catch (repoGetError: any) {
+        console.error("Failed to get default branch:", repoGetError);
+        if (
+          repoGetError.status === 403 &&
+          repoGetError.message?.includes("rate limit")
+        ) {
+          await notifyAdmin(
+            `⏳ Rate Limit getting default branch ${owner}/${repo}.`
+          );
+          throw new Error("API rate limit hit checking default branch.");
+        }
+        if (!branchName) {
+          throw new Error(`Failed determine default: ${repoGetError.message}`);
+        }
+        targetBranch = "default";
+      }
+    }
+
+    if (!targetBranch) throw new Error("Target branch undetermined.");
+
+    // Get latest commit SHA
+    let latestCommitSha: string;
+    try {
+      const { data: refData } = await octokit.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${targetBranch}`
+      });
+      latestCommitSha = refData.object.sha;
+    } catch (refError: any) {
+      if (refError.status === 404) {
+        try {
+          const { data: commitDataFallback } = await octokit.repos.getCommit({
+            owner,
+            repo,
+            ref: targetBranch
+          });
+          latestCommitSha = commitDataFallback.sha;
+        } catch (commitError: any) {
+          const bType = isDefaultFetched ? "default" : "branch";
+          throw new Error(`Cannot find ${bType} '${targetBranch}' (404).`);
+        }
+      } else if (
+        refError.status === 403 &&
+        refError.message?.includes("rate limit")
+      ) {
+        await notifyAdmin(
+          `⏳ Rate Limit getRef ${owner}/${repo} ${targetBranch}.`
+        );
+        throw new Error("API rate limit hit fetching branch details.");
+      } else {
+        throw new Error(`Failed get git ref ${targetBranch}: ${refError.message}`);
+      }
+    }
+
+    // Get tree
+    const { data: commitData } = await octokit.git.getCommit({
+      owner,
+      repo,
+      commit_sha: latestCommitSha
+    });
+    const treeSha = commitData.tree.sha;
+
+    let treeData: GitTreeResponseData;
+    try {
+      const res = await octokit.git.getTree({
+        owner,
+        repo,
+        tree_sha: treeSha,
+        recursive: "1"
+      });
+      treeData = res.data as GitTreeResponseData;
+      if (treeData?.truncated) {
+        console.warn("Tree truncated.");
+        await notifyAdmin(`⚠️ Tree truncated ${owner}/${repo} ${targetBranch}.`);
+      }
+      if (!treeData || !Array.isArray(treeData.tree)) {
+        throw new Error(`Invalid tree structure.`);
+      }
+    } catch (treeError: any) {
+      throw new Error(`Failed getTree: ${treeError.message || treeError}`);
+    }
+
+    // Filter files
+    let filesToFetch = treeData.tree.filter(
+      (item): item is GitTreeFile => {
+        if (item.type !== "blob" || !item.path || !item.sha) return false;
+        const pL = item.path.toLowerCase();
+        if (excludedExactPaths.has(item.path)) return false;
+        if (excludedPrefixes.some((p) => pL.startsWith(p))) return false;
+        if (excludedExtensions.some((e) => pL.endsWith(e)))
+          return item.path === "README.md" || allowedRootFiles.has(item.path);
+        if (allowedRootFiles.has(item.path)) return true;
+        if (allowedPrefixes.some((p) => pL.startsWith(p))) return true;
+        return false;
+      }
+    );
+
+    const MAX_FILES_TO_FETCH = 500;
+    if (filesToFetch.length > MAX_FILES_TO_FETCH) {
+      console.warn(`File count > limit. Truncating to ${MAX_FILES_TO_FETCH}`);
+      await notifyAdmin(
+        `⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`
+      );
+      filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH);
+    }
+
+    if (filesToFetch.length === 0) {
+      return { success: true, files: [] };
+    }
+
+    // Fetch file contents
+    const allFiles: FileNode[] = [];
+    for (let i = 0; i < filesToFetch.length; i += BATCH_SIZE) {
+      const batch = filesToFetch.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (file) => {
+          try {
+            const { data: blob } = await octokit.git.getBlob({
+              owner: owner!,
+              repo: repo!,
+              file_sha: file.sha!
+            });
+            if (typeof blob.content !== "string") return null;
+            let content: string;
+            if (blob.encoding === "base64") {
+              content = Buffer.from(blob.content, "base64").toString("utf-8");
+            } else if (blob.encoding === "utf-8") {
+              content = blob.content;
+            } else {
+              return null;
+            }
+            const MAX_BYTES = 750 * 1024;
+            if (Buffer.byteLength(content, "utf8") > MAX_BYTES) {
+              console.warn(`Skip large file: ${file.path}`);
+              return null;
+            }
+            const ext = file.path.split(".").pop()?.toLowerCase() || "";
+            const commentMap: Record<string, string> = {
+              ts: "//",
+              tsx: "//",
+              js: "//",
+              jsx: "//",
+              css: "/*",
+              scss: "/*",
+              sql: "--",
+              py: "#",
+              rb: "#",
+              sh: "#",
+              yml: "#",
+              yaml: "#",
+              env: "#",
+              html: "<!--",
+              xml: "<!--",
+              vue: "<!--",
+              svelte: "<!--",
+              md: "<!--"
+            };
+            let prefix = commentMap[ext] || "//";
+            let comment =
+              prefix === "/*" || prefix === "<!--"
+                ? `${prefix} /${file.path} ${prefix === "<!--" ? "-->" : "*/"}`
+                : `${prefix} /${file.path}`;
+            if (content.trim() && !content.trimStart().startsWith(prefix)) {
+              content = `${comment}\n${content}`;
+            } else if (!content.trim()) {
+              content = comment;
+            }
+            return { path: file.path, content };
+          } catch {
+            return null;
+          }
+        })
+      );
+      allFiles.push(...results.filter((x): x is FileNode => x !== null));
+      if (i + BATCH_SIZE < filesToFetch.length) {
+        await delay(DELAY_BETWEEN_BATCHES_MS);
+      }
+    }
+
+    return { success: true, files: allFiles };
+  } catch (error: any) {
+    const repoId = owner && repo ? `${owner}/${repo}` : repoUrl;
+    const bInfo = targetBranch ? ` on ${targetBranch}` : "";
+    console.error(`CRITICAL Error fetch ${repoId}${bInfo}:`, error);
+
+    if (error.status === 403 && error.message?.includes("rate limit")) {
+      await notifyAdmin(`⏳ Rate Limit ${repoId}${bInfo}.`);
+      return { success: false, error: "GitHub API rate limit exceeded." };
+    }
+    if (error.status === 404 || error.message?.includes("not found")) {
+      await notifyAdmin(`❌ 404 Not Found ${repoId}${bInfo}.`);
+      return {
+        success: false,
+        error: `Repo, branch ('${targetBranch}'), or resource not found.`
+      };
+    }
+    if (error.status === 401 || error.status === 403) {
+      await notifyAdmin(
+        `❌ Auth Error (${error.status}) ${repoId}${bInfo}.`
+      );
+      return { success: false, error: `GitHub Auth error (${error.status}).` };
+    }
+    if (error.message?.startsWith("Too many files")) {
+      await notifyAdmin(`❌ Too many files ${repoId}${bInfo}.`);
+      return { success: false, error: error.message };
+    }
+    await notifyAdmin(
+      `❌ Ошибка извлечения ${repoId}${bInfo}:\n${error.message}`
+    );
+    return { success: false, error: `Fetch failed: ${error.message}` };
+  }
+}
+
+
 // --- fetchRepoContents turbo ---
-async function fetchRepoContents(
-  octokit: any,
+async function fetchRepoContents_hz(
+ // octokit: any,
   owner: string,
   repo: string,
   branch: string
