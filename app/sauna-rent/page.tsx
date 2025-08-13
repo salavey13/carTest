@@ -188,7 +188,7 @@ export default function SaunaRentMegaPage() {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/herrrro-422a28c8-b5e5-4a13-ab50-ae5d4e473cda.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/herrrrrrrrrrro-671503ee-840f-441c-a0c7-6a2992b128ca.jpg";
   const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
 
   return (
@@ -212,7 +212,7 @@ export default function SaunaRentMegaPage() {
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
         <div id="home" className="absolute -top-[110vh]" aria-hidden="true" />
         
-        <div className="fixed top-4 right-4 z-40 mx-auto container px-4 -mt-16 mb-16">
+        <div className="fixed -top-4 left-4 z-40 mx-auto container px-4 -mt-16 mb-16">
           <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
             
             <div className="flex items-center gap-6">
