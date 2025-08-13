@@ -192,10 +192,10 @@ export default function SaunaRentMegaPage() {
   const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
 
   return (
-    <div className="relative min-h-screen bg-[#030203] text-[#f6f1ea] antialiased overflow-x-hidden">
+    <div className="relative min-h-[80vh] bg-[#030203] antialiased overflow-x-hidden">
       <RockstarHeroSection
         title=""
-        subtitle=””//"Финская сауна • до 12 человек • парилка 6 • джакузи • стол 6"
+        subtitle=""//text-[#f6f1ea] "Финская сауна • до 12 человек • парилка 6 • джакузи • стол 6"
         mainBackgroundImageUrl={heroImage}
         backgroundImageObjectUrl={objectImage}
         triggerElementSelector={`#${heroTriggerId}`}
