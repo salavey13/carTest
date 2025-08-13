@@ -188,7 +188,7 @@ export default function SaunaRentMegaPage() {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/gpt5hero-4b597148-9c56-4600-baa7-fa81713b9eb0.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/Screenshot_2025-08-14-01-05-19-432_org.telegram.messenger-10edcf23-6041-4261-93c9-776e41f710f8.jpg";
   const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
 
   return (
@@ -210,7 +210,7 @@ export default function SaunaRentMegaPage() {
         </div>
       </RockstarHeroSection>
 
-      <div id={heroTriggerId} style={{ height: '150vh' }} aria-hidden="true" />
+      <div id={heroTriggerId} style={{ height: '50vh' }} aria-hidden="true" />
 
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
         <div id="home" className="absolute" aria-hidden="true" />
