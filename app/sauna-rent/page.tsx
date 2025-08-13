@@ -178,15 +178,15 @@ export default function SaunaRentMegaPage() {
   }
 
   // Hero images
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/boardGamesPokerJenga.jpg";
-  const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/map3d.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/projector-7bf08305-f9c9-461c-9ab9-6b3661fd458a.jpg";
+  const objectImage = "";
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-[#030203] via-[#101217] to-[#1b1512] text-[#f6f1ea] antialiased overflow-x-hidden">
       {/* Fixed hero (using RockstarHeroSection). Note: triggerElementSelector intentionally invalid to keep hero static (no scroll transform). */}
       <RockstarHeroSection
         title="САУНА-ВОЛНА"
-        subtitle="Финская сауна • до 12 человек • парилка 6 • джакузи 1 (2 чел) • стол 8"
+        subtitle="Финская сауна • до 12 человек • парилка 6 • джакузи • стол 6"
         mainBackgroundImageUrl={heroImage}
         backgroundImageObjectUrl={objectImage}
         triggerElementSelector="#no-trigger"
@@ -263,7 +263,7 @@ export default function SaunaRentMegaPage() {
 
             {/* 3. Гостиная (was 'зона на компанию') */}
             <Card className="bg-[#0b0b0b] border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Гостиная — стол на 8</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]">Гостиная — стол на 6</CardTitle></CardHeader>
               <CardContent>
                 <div className="relative h-44 rounded overflow-hidden mb-3">
                   <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/sofaAndTable.jpg" alt="гостиная" layout="fill" objectFit="cover" />
