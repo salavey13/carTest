@@ -130,9 +130,127 @@ export async function fetchRepoTree(repoUrl: string, branchName?: string | null)
     }
 }
 
-// --- fetchRepoContents ---
+// --- fetchRepoContents turbo ---
+async function fetchRepoContents(
+  octokit: any,
+  owner: string,
+  repo: string,
+  branch: string
+): Promise<void> {
+  //const BATCH_SIZE = 12; // файлов в батче
+  const MAX_PARALLEL_BATCHES = 3; // одновременно активных батчей
+  const BASE_DELAY_MS = 1500; // между батчами
+  const MAX_RETRIES = 2;
 
-export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
+  function delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function fetchWithRetry<T>(
+    fn: () => Promise<T>,
+    retries = MAX_RETRIES,
+    delayMs = 1000
+  ): Promise<T> {
+    let lastErr: any;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (attempt < retries) {
+          console.warn(
+            `[Retry] Attempt ${attempt + 1} failed, retrying in ${delayMs}ms...`
+          );
+          await delay(delayMs * Math.pow(2, attempt));
+        }
+      }
+    }
+    throw lastErr;
+  }
+
+  console.log(`📥 Fetching repo tree for ${owner}/${repo} on branch ${branch}`);
+
+  const { data: tD } = await fetchWithRetry(() =>
+    octokit.git.getTree({ owner, repo, tree_sha: branch, recursive: "1" })
+  );
+
+  const filesToFetch = tD.tree.filter(
+    (f: any) =>
+      f.type === "blob" &&
+      f.size <= 750000 &&
+      !f.path.match(/\.(png|jpg|jpeg|gif|mp4|mov|zip|exe)$/i)
+  );
+
+  console.log(`📄 ${filesToFetch.length} files to fetch`);
+
+  filesToFetch.sort(() => Math.random() - 0.5);
+
+  const batches = [];
+  for (let i = 0; i < filesToFetch.length; i += BATCH_SIZE) {
+    batches.push(filesToFetch.slice(i, i + BATCH_SIZE));
+  }
+
+  console.log(`🔹 Total batches: ${batches.length}`);
+
+  let active = 0;
+  let index = 0;
+
+  return new Promise<void>((resolve) => {
+    const next = async () => {
+      if (index >= batches.length) {
+        if (active === 0) {
+          console.log(`✅ All files fetched for ${owner}/${repo}`);
+          resolve();
+        }
+        return;
+      }
+
+      const batchIndex = index++;
+      const batch = batches[batchIndex];
+      active++;
+
+      const totalBatchSize = batch.reduce((sum, f) => sum + (f.size || 0), 0);
+      const delayMs =
+        BASE_DELAY_MS + Math.floor(totalBatchSize / 50000) * 500;
+
+      console.log(
+        `🚀 Starting batch ${batchIndex + 1}/${batches.length} — ${batch.length} files, ${totalBatchSize} bytes`
+      );
+
+      await Promise.all(
+        batch.map(async (fI) => {
+          try {
+            const { data: bD } = await fetchWithRetry(() =>
+              octokit.git.getBlob({
+                owner,
+                repo,
+                file_sha: fI.sha!,
+              })
+            );
+            // Здесь можно сохранять
+            return { path: fI.path, content: Buffer.from(bD.content, "base64").toString("utf-8") };
+          } catch (err) {
+            console.error(`❌ Failed to fetch ${fI.path}: ${err}`);
+            return null;
+          }
+        })
+      );
+
+      console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
+      await delay(delayMs);
+
+      active--;
+      next();
+    };
+
+    // Запускаем первые N батчей
+    for (let i = 0; i < MAX_PARALLEL_BATCHES; i++) {
+      next();
+    }
+  });
+}
+
+export async function fetchRepoContentsnotturbo(repoUrl: string, customToken?: string, branchName?: string | null) {
   console.log(`[Action] Fetching: ${repoUrl}${branchName ? ` @ ${branchName}` : ' (default)'}`);
   const startTime = Date.now(); let owner: string | undefined, repo: string | undefined; let targetBranch = branchName; let isDefaultFetched = false;
   try {
