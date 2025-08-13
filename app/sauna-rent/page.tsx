@@ -188,7 +188,7 @@ export default function SaunaRentMegaPage() {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/boardGamesPokerJenga-b7089101-8472-4b8c-850a-ea01ccbf6a1b.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/gpt5hero-4b597148-9c56-4600-baa7-fa81713b9eb0.jpg";
   const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
 
   return (
@@ -204,7 +204,7 @@ export default function SaunaRentMegaPage() {
           <Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })} className="bg-[#ffd29b] text-[#241309] px-6 py-3 font-bold transition-transform transform hover:scale-105">
             БРОНИРОВАНИЕ
           </Button>
-          <Button variant="outline" onClick={() => document.getElementById("extras")?.scrollIntoView({ behavior: "smooth" })} className="text-white border-white/50 hover:bg-white/10 hover:text-white transition-transform transform hover:scale-105 backdrop-blur-sm">
+          <Button variant="accent" onClick={() => document.getElementById("extras")?.scrollIntoView({ behavior: "smooth" })} className="text-white border-white/50 hover:bg-white/10 hover:text-white transition-transform transform hover:scale-105 backdrop-blur-sm">
             УСЛУГИ
           </Button>
         </div>
