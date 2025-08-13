@@ -188,7 +188,7 @@ export default function SaunaRentMegaPage() {
     }
   }
 
-  const heroImage = "";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/herro-4bdd3c99-ff57-41f3-8c27-9021fb3f852b.jpg";
   const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
 
   return (
