@@ -178,7 +178,7 @@ export default function SaunaRentMegaPage() {
   }
 
   // Hero images
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/projector-7bf08305-f9c9-461c-9ab9-6b3661fd458a.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/boardGamesPokerJenga.jpg";
   const objectImage = "";
 
   return (
@@ -296,7 +296,7 @@ export default function SaunaRentMegaPage() {
               <CardHeader><CardTitle className="text-[#fff]">Кинотеатр & приставки</CardTitle></CardHeader>
               <CardContent>
                 <div className="relative h-44 rounded overflow-hidden mb-3">
-                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/projector.jpg" alt="кино" layout="fill" objectFit="cover" />
+                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/projector-7bf08305-f9c9-461c-9ab9-6b3661fd458a.jpg" alt="кино" layout="fill" objectFit="cover" />
                 </div>
                 <p className="text-sm text-[#ddd]">Большой экран, проектор, приставки — можно подключать свои аккаунты и контроллеры. Идеально для вечеринок и просмотра матчей.</p>
               </CardContent>
