@@ -188,7 +188,7 @@ export default function SaunaRentMegaPage() {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/herro-4bdd3c99-ff57-41f3-8c27-9021fb3f852b.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/herrrro-422a28c8-b5e5-4a13-ab50-ae5d4e473cda.jpg";
   const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
 
   return (
@@ -204,9 +204,6 @@ export default function SaunaRentMegaPage() {
           <Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })} className="bg-[#ffd29b] text-[#241309] px-6 py-3 font-bold transition-transform transform hover:scale-105">
             БРОНИРОВАНИЕ
           </Button>
-          <Button variant="accent" onClick={() => document.getElementById("extras")?.scrollIntoView({ behavior: "smooth" })} className="text-white border-white/50 hover:bg-white/10 hover:text-white transition-transform transform hover:scale-105 backdrop-blur-sm">
-            УСЛУГИ
-          </Button>
         </div>
       </RockstarHeroSection>
 
@@ -215,15 +212,9 @@ export default function SaunaRentMegaPage() {
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
         <div id="home" className="absolute -top-[110vh]" aria-hidden="true" />
         
-        <div className="sticky top-4 z-40 mx-auto container px-4 -mt-16 mb-16">
+        <div className="fixed top-4 right-4 z-40 mx-auto container px-4 -mt-16 mb-16">
           <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-14 h-10 rounded-md bg-gradient-to-br from-[#ffd29b] to-[#ff8a00] flex items-center justify-center text-black font-bold text-sm">САУНА</div>
-              <div>
-                <div className="text-xs text-[#ffe9c7] font-mono">САУНА-ВОЛНА</div>
-                <div className="text-sm font-semibold text-[#fff]">Резерв и управление</div>
-              </div>
-            </div>
+            
             <div className="flex items-center gap-6">
               <div className="hidden sm:flex items-center gap-4">
                 <ActiveRentalsIndicator />
