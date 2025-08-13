@@ -178,7 +178,7 @@ export default function SaunaRentMegaPage() {
   }
 
   // Hero images
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/boardGamesPokerJenga.jpg";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/boardGamesPokerJenga-b7089101-8472-4b8c-850a-ea01ccbf6a1b.jpg";
   const objectImage = "";
 
   return (
