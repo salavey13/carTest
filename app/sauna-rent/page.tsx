@@ -283,7 +283,7 @@ export default function SaunaRentMegaPage() {
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
               <CardHeader><CardTitle className="text-[#fff]">Парилка</CardTitle></CardHeader>
               <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/parilka2girls-41b9b5e0-ecf6-4f60-957e-8d7e5bd0c815.jpg" alt="парилка" layout="fill" objectFit="cover" /></div>
+                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/parilka2-61257e59-971c-4b21-bb32-650ba72e4ae3.jpg" alt="парилка" layout="fill" objectFit="cover" /></div>
                 <p className="text-sm text-[#ddd]">Жаркая финская парная. Места: 6. Доп. услуги парильщика — индивидуальные сессии, веник, ароматерапия.</p>
                 <ul className="text-sm text-[#d9d6cd] mt-3 list-inside list-disc"><li>Парильщик — от {BASE_PRICING.parilshchikFlat} ₽ (за сессию).</li><li>Веники и масла можно добрать на стойке в прихожей.</li></ul>
               </CardContent>
@@ -292,7 +292,7 @@ export default function SaunaRentMegaPage() {
               <CardHeader><CardTitle className="text-[#fff]">Бассейн / Джакузи / Душ</CardTitle></CardHeader>
               <CardContent>
                 <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/pool4girls-5ae07070-499e-4a17-98da-9072298652ef.jpg" alt="бассейн" layout="fill" objectFit="cover" /></div>
-                 <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhakuzy2-fe783cbe-8eb0-434b-9369-8683376a5e5a.jpg" alt="джакузи" layout="fill" objectFit="cover" /></div>
+                 <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhacuzy2-96f492d4-498f-4973-bb38-6ad827f237cb.jpg" alt="джакузи" layout="fill" objectFit="cover" /></div>
                 <p className="text-sm text-[#ddd]">Прохладный бассейн 3×3, джакузи на 2 человека, отдельные душевые кабины.</p>
                 <div className="text-sm text-[#d9d6cd] mt-3">В зоне предоставляются: шампуни, одноразовые тапочки, полотенца (по запросу) — удобно для гостей.</div>
               </CardContent>
