@@ -38,9 +38,16 @@ const RockstarHeroSection: React.FC<RockstarHeroSectionProps> = ({
             const progress = Math.max(0, Math.min(1, (viewportHeight - rect.top) / (viewportHeight + rect.height)));
             setScrollProgress(progress);
         } else {
-            const rect = entry.boundingClientRect;
-            if (rect.bottom < 0) setScrollProgress(1);
-            else if (rect.top > window.innerHeight) setScrollProgress(0);
+            // [ARCHITECT'S FIX]: More robust logic to reset scroll progress.
+            // This ensures that when scrolling back up and the element is below the viewport,
+            // the progress is definitively set to 0, restoring full brightness.
+            if (entry.boundingClientRect.bottom < 0) {
+                // Scrolled past it (downwards) -> progress is 1
+                setScrollProgress(1);
+            } else if (entry.boundingClientRect.top > 0) {
+                // Scrolled back before it (upwards) -> progress is 0
+                setScrollProgress(0);
+            }
         }
       }, { rootMargin: '0px 0px 0px 0px', threshold: Array.from({ length: 101 }, (_, i) => i / 100) } 
     );
