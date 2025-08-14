@@ -153,7 +153,7 @@ export default function SaunaOccupancyChart({
                   cap: {capacity}
                 </div>
                 <Button
-                  variant="ghost"
+                  variant="accent"
                   size="sm"
                   onClick={() => setOpen(false)}
                   aria-label="Закрыть"
@@ -232,6 +232,7 @@ export default function SaunaOccupancyChart({
             <div className="mt-3 flex items-center justify-end">
               <Button
                 size="sm"
+variant="accent"
                 className="bg-amber-600 text-black hover:bg-amber-700"
                 onClick={() => setOpen(false)}
               >
