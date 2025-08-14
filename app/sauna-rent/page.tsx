@@ -1,3 +1,4 @@
+// /app/sauna-rent/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, useId, useCallback } from "react";
@@ -317,7 +318,7 @@ export default function SaunaRentMegaPage() {
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
               <CardHeader><CardTitle className="text-[#fff]">Кинотеатр & приставки</CardTitle></CardHeader>
               <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/projector-7bf08305-f9c9-461c-9ab9-6b3661fd458a.jpg" alt="кино" layout="fill" objectFit="cover" /></div>
+                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250814_230533_963-d86832d1-60d3-4380-9518-a5e6bb2fd98b.jpg" alt="кино" layout="fill" objectFit="cover" /></div>
                 <p className="text-sm text-[#ddd]">Большой экран, проектор, приставки — можно подключать свои аккаунты и контроллеры. Идеально для вечеринок и просмотра матчей.</p>
               </CardContent>
             </Card>
