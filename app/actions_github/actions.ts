@@ -10,8 +10,8 @@ interface GitTreeResponseData { sha: string; url: string; tree: GitTreeFile[]; t
 interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; base: { ref: string }; updated_at: string; } // Added base ref
 
 // --- Константы ---
-const BATCH_SIZE = 13;
-const DELAY_BETWEEN_BATCHES_MS = 2000;
+const BATCH_SIZE = 130;
+const DELAY_BETWEEN_BATCHES_MS = 1013;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- Улучшенная parseRepoUrl ---
@@ -150,9 +150,9 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
 
     // Фильтры из оригинала
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','seed.sql']);
-    const allowedPrefixes = ['app/','src/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/'];
+    const allowedPrefixes = ['app/','components/','contexts/','hooks/','lib/','types/','utils/'];
     const excludedExactPaths = new Set([]);
-    const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/migrations/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','docs/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/'];
+    const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','docs/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/'];
     const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.md','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
 
     // Определяем ветку
