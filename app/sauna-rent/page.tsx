@@ -243,7 +243,7 @@ export default function SaunaRentMegaPage() {
     <div className="relative min-h-[80vh] bg-[#030203] antialiased overflow-x-hidden">
       <RockstarHeroSection
         title=""
-        subtitle="Проспект Ленина 98, Нижний Новгород Гостиница Волна"
+        subtitle="Проспект Ленина 98, Нижний Новгород Гостиница Волна"//text-[#f6f1ea] "Финская сауна • до 12 человек • парилка 6 • джакузи • стол 6"
         mainBackgroundImageUrl={heroImage}
         backgroundImageObjectUrl={objectImage}
         triggerElementSelector={`#${heroTriggerId}`}
@@ -262,7 +262,7 @@ export default function SaunaRentMegaPage() {
         
         {/* Адаптивная панель баланса, справа. Ширина откалибрована. */}
         <div className="fixed top-6 right-6 z-40">
-          <div className="w-44 backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
+          <div className="w-30 backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
             <div className="hidden sm:flex items-center gap-4">
               <ActiveRentalsIndicator />
             </div>
