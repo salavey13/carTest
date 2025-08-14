@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 /**
  * SaunaOccupancyChart
@@ -18,7 +19,7 @@ import React, { useMemo, useState } from "react";
  *
  * Небольшой хард-виртуал: capacity = 6 по умолчанию (подправь при необходимости).
  *
- * Сделано: адаптивность, touch-friendly tooltip, aria, кнопки.
+ * Сделано: адаптивность, touch-friendly tooltip, aria, кнопки унифицированы с ui/button.
  */
 
 // Типы
@@ -110,14 +111,15 @@ export default function SaunaOccupancyChart({
 
   return (
     <div className="inline-block">
-      <button
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen(true)}
-        className="px-3 py-1 rounded bg-white/6 hover:bg-white/10 text-sm transition"
         aria-expanded={open}
         aria-controls="sauna-occupancy-modal"
       >
         Показать график
-      </button>
+      </Button>
 
       {/* Modal */}
       {open ? (
@@ -150,13 +152,14 @@ export default function SaunaOccupancyChart({
                 <div className="text-sm text-neutral-400 mr-2">
                   cap: {capacity}
                 </div>
-                <button
-                  className="px-3 py-1 rounded bg-white/6 hover:bg-white/10 text-sm"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setOpen(false)}
                   aria-label="Закрыть"
                 >
                   Закрыть
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -227,12 +230,13 @@ export default function SaunaOccupancyChart({
 
             {/* footer actions */}
             <div className="mt-3 flex items-center justify-end">
-              <button
-                className="px-3 py-1 rounded bg-amber-600 text-black text-sm"
+              <Button
+                size="sm"
+                className="bg-amber-600 text-black hover:bg-amber-700"
                 onClick={() => setOpen(false)}
               >
                 Закрыть
-              </button>
+              </Button>
             </div>
           </div>
         </div>
