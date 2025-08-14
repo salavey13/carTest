@@ -1,3 +1,4 @@
+// /app/sauna-rent/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, useId } from "react";
@@ -212,7 +213,7 @@ export default function SaunaRentMegaPage() {
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
         <div id="home" className="absolute -top-[110vh]" aria-hidden="true" />
         
-        <div className="fixed top-16 left-4 z-40 mx-auto container px-4 -mt-16 mb-16">
+        <div className="fixed top-20 w-24 z-40 mx-auto container px-4 -mt-16 mb-16">
           <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
             
             <div className="flex items-center gap-6">
