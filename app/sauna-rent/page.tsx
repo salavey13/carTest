@@ -260,7 +260,7 @@ export default function SaunaRentMegaPage() {
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
         <div id="home" className="absolute -top-[110vh]" aria-hidden="true" />
         
-        <div className="fixed top-20 w-32 z-40 right-4 mx-auto container px-4 -mt-16 mb-16">
+        <div className="fixed top-20 w-32 z-40 mx-auto container px-4 -mt-16 mb-16">
           <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
             
             <div className="flex items-center gap-6">
@@ -292,7 +292,7 @@ export default function SaunaRentMegaPage() {
               <CardHeader><CardTitle className="text-[#fff]">Бассейн / Джакузи / Душ</CardTitle></CardHeader>
               <CardContent>
                 <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/pool4girls-5ae07070-499e-4a17-98da-9072298652ef.jpg" alt="бассейн" layout="fill" objectFit="cover" /></div>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhakuzy2-fe783cbe-8eb0-434b-9369-8683376a5e5a.jpg" alt="джакузи" layout="fill" objectFit="cover" /></div>
+                 <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhakuzy2-fe783cbe-8eb0-434b-9369-8683376a5e5a.jpg" alt="джакузи" layout="fill" objectFit="cover" /></div>
                 <p className="text-sm text-[#ddd]">Прохладный бассейн 3×3, джакузи на 2 человека, отдельные душевые кабины.</p>
                 <div className="text-sm text-[#d9d6cd] mt-3">В зоне предоставляются: шампуни, одноразовые тапочки, полотенца (по запросу) — удобно для гостей.</div>
               </CardContent>
@@ -350,7 +350,6 @@ export default function SaunaRentMegaPage() {
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Клин-тим и персонал</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Назначай клинеров: уборка между сменами, проверка оборудования, прием гостей.</p><ol className="list-decimal list-inside text-sm text-[#ddd] mt-2"><li>План уборок после каждой смены — опция для админов.</li><li>Клин-тим получает звёзды за выполненную работу.</li><li>График и подписка — интерфейс для участников.</li></ol></CardContent></Card>
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Программа мотивации</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">За уборку, приводы гостей и полезные действия начисляются звёзды.</p><ul className="list-disc list-inside text-sm mt-2 text-[#ddd]"><li>Clean+ — бонус 5★ за качественную уборку.</li><li>Referral — 2★ за привлечение друга.</li></ul></CardContent></Card>
           </div>
-          <Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Система звёзд и график</CardTitle></CardHeader><CardContent><div className="text-sm text-[#d9d6cd]">Твои звёзды — внутренняя валюта: трать на скидки или копи для бонусов.</div><div className="mt-3 p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Баланс</div><div className="text-2xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-6 h-6" /> {starsBalance}★</div></div><div className="mt-4"><div className="text-sm text-[#fff]">График бронирований</div><div className="mt-2 text-sm text-[#d9d6cd]">(placeholder — здесь можно встроить календарь / timeline с забронированными слотами и датами)</div></div></CardContent></Card>
         </section>
 
         <section id="booking" className="py-10 space-y-6 scroll-mt-24">
