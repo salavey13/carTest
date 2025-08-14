@@ -293,7 +293,7 @@ export default function SaunaRentMegaPage() {
               <CardHeader><CardTitle className="text-[#fff]">Бассейн / Джакузи / Душ</CardTitle></CardHeader>
               <CardContent>
                 <div className="relative h-44 rounded overflow-hidden mb-3">
-                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhakuzy2-fe783cbe-8eb0-434b-9369-8683376a5e5a.jpg" alt="джакузи и бассейн" layout="fill" objectFit="cover" />
+                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhacuzy2-d65ade9c-8a01-40ab-80d9-0e0e58a80e2b.jpg" alt="джакузи и бассейн" layout="fill" objectFit="cover" />
                 </div>
                 <p className="text-sm text-[#ddd]">Прохладный бассейн 3×3, джакузи на 2 человека, отдельные душевые кабины.</p>
                 <div className="text-sm text-[#d9d6cd] mt-3">В зоне предоставляются: шампуни, одноразовые тапочки, полотенца (по запросу) — удобно для гостей.</div>
