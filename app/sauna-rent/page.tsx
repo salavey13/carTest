@@ -16,10 +16,9 @@ import { toast } from "sonner";
 
 // Server actions
 import { createSaunaBooking } from "@/app/sauna-rent/actions";
-import { updateUserSettings } from "@/app/actions"; // Используем существующий экшен
+import { updateUserSettings } from "@/app/actions"; // Используем существующий центральный экшен
 
 // ----------------------------- types -----------------------------
-// Приводим тип Booking в соответствие с обоими источниками
 type Booking = {
   id: string;
   date: string; // ISO date
@@ -62,7 +61,6 @@ export default function SaunaRentMegaPage() {
   const [showHistory, setShowHistory] = useState(false);
   const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
   
-  // -- ИНТЕГРАЦИЯ НОВОЙ ЛОГИКИ --
   const [bookings, setBookings] = useState<Booking[]>([]);
 
   // State для баланса звезд, синхронизированный с dbUser.metadata
@@ -142,7 +140,7 @@ export default function SaunaRentMegaPage() {
         observerRef.current?.disconnect();
         window.removeEventListener('scroll', handleScroll);
     }
-  }, [sections]);
+  }, []);
 
   // Pricing calc
   const totalPrice = useMemo(() => {
@@ -262,13 +260,13 @@ export default function SaunaRentMegaPage() {
       <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
         <div id="home" className="absolute -top-[110vh]" aria-hidden="true" />
         
-        {/* Адаптивная панель баланса, справа */}
+        {/* Адаптивная панель баланса, справа. Ширина откалибрована. */}
         <div className="fixed top-6 right-6 z-40">
-          <div className="max-w-[320px] w-auto min-w-[160px] backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-end gap-4">
+          <div className="w-44 backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
             <div className="hidden sm:flex items-center gap-4">
               <ActiveRentalsIndicator />
             </div>
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-end w-full">
               <div className="text-xs text-[#ffe9c7]">Твой баланс</div>
               <div className="text-lg font-bold flex items-center gap-2 text-[#fff]">
                 <VibeContentRenderer content="::FaStar::" className="w-5 h-5 text-yellow-400 inline" /> {starsBalance}★
@@ -277,10 +275,10 @@ export default function SaunaRentMegaPage() {
           </div>
         </div>
 
+        {/* Секция зон восстановлена к оригиналу с обновленными фото */}
         <section id="zones" className="py-10 space-y-8 scroll-mt-24">
           <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Наши зоны</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Парилка (новая фотка) */}
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
               <CardHeader><CardTitle className="text-[#fff]">Парилка</CardTitle></CardHeader>
               <CardContent>
@@ -288,26 +286,41 @@ export default function SaunaRentMegaPage() {
                   <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/parilka2girls-41b9b5e0-ecf6-4f60-957e-8d7e5bd0c815.jpg" alt="парилка" layout="fill" objectFit="cover" />
                 </div>
                 <p className="text-sm text-[#ddd]">Жаркая финская парная. Места: 6. Доп. услуги парильщика — индивидуальные сессии, веник, ароматерапия.</p>
+                <ul className="text-sm text-[#d9d6cd] mt-3 list-inside list-disc"><li>Парильщик — от {BASE_PRICING.parilshchikFlat} ₽ (за сессию).</li><li>Веники и масла можно добрать на стойке в прихожей.</li></ul>
               </CardContent>
             </Card>
-            {/* Бассейн */}
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Бассейн</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]">Бассейн / Джакузи / Душ</CardTitle></CardHeader>
               <CardContent>
                 <div className="relative h-44 rounded overflow-hidden mb-3">
-                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/pool4girls-5ae07070-499e-4a17-98da-9072298652ef.jpg" alt="бассейн" layout="fill" objectFit="cover" />
+                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhakuzy2-fe783cbe-8eb0-434b-9369-8683376a5e5a.jpg" alt="джакузи и бассейн" layout="fill" objectFit="cover" />
                 </div>
-                <p className="text-sm text-[#ddd]">Прохладный бассейн 3×3, душевые кабины — отлично освежиться после парилки.</p>
+                <p className="text-sm text-[#ddd]">Прохладный бассейн 3×3, джакузи на 2 человека, отдельные душевые кабины.</p>
+                <div className="text-sm text-[#d9d6cd] mt-3">В зоне предоставляются: шампуни, одноразовые тапочки, полотенца (по запросу) — удобно для гостей.</div>
               </CardContent>
             </Card>
-            {/* Джакузи — новая карточка */}
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Джакузи</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-[#fff]">Гостиная — стол на 6</CardTitle></CardHeader>
               <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3">
-                  <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhakuzy-1b917147-8c92-43c9-955d-6630c32f22d2.jpg" alt="джакузи" layout="fill" objectFit="cover" />
-                </div>
-                <p className="text-sm text-[#ddd]">Джакузи на 2 человека — небольшая зона релакса с гидромассажем.</p>
+                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/sofaAndTable.jpg" alt="гостиная" layout="fill" objectFit="cover" /></div>
+                <p className="text-sm text-[#ddd]">Уютная гостиная с столом на 8, лаунж-зона. Игры: нарды, покер, дженга — по желанию.</p>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:col-span-1">
+              <CardHeader><CardTitle className="text-[#fff]">Прихожая — магазин</CardTitle></CardHeader>
+              <CardContent>
+                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/map3d.jpg" alt="прилавок" layout="fill" objectFit="cover" /></div>
+                <p className="text-sm text-[#ddd]">Прилавок с аксессуарами: веники, тапочки, полотенца, халаты, эфирные масла, свечи — всё для комфортного сеанса и приятных покупок.</p>
+                <ul className="text-sm text-[#d9d6cd] mt-3 list-disc list-inside"><li>Веники — 300 ₽</li><li>Тапочки — 400 ₽</li><li>Полотенца — 700 ₽</li><li>Халаты — 1500 ₽</li></ul>
+              </CardContent>
+            </Card>
+            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
+              <CardHeader><CardTitle className="text-[#fff]">Кинотеатр & приставки</CardTitle></CardHeader>
+              <CardContent>
+                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/projector-7bf08305-f9c9-461c-9ab9-6b3661fd458a.jpg" alt="кино" layout="fill" objectFit="cover" /></div>
+                <p className="text-sm text-[#ddd]">Большой экран, проектор, приставки — можно подключать свои аккаунты и контроллеры. Идеально для вечеринок и просмотра матчей.</p>
               </CardContent>
             </Card>
           </div>
@@ -320,6 +333,7 @@ export default function SaunaRentMegaPage() {
             <div className="p-4 rounded-lg bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><div className="text-xs text-[#ffd29b]">Будни — вечер / ночь</div><div className="text-xl font-bold text-[#fff]">{BASE_PRICING.weekdayEveningPerHour} ₽ / час</div><div className="text-sm text-[#ddd] mt-2">Пн—Пт 15:00—02:00 • Часто удлинённая пятница</div></div>
             <div className="p-4 rounded-lg bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><div className="text-xs text-[#ffd29b]">Выходные</div><div className="text-xl font-bold text-[#fff]">{BASE_PRICING.weekendDayPerHour}—{BASE_PRICING.weekendNightPerHour} ₽ / час</div><div className="text-sm text-[#ddd] mt-2">Сб—Вс 09:00—05:00 (ночной тариф выше)</div></div>
           </div>
+          <div className="mt-6 p-4 bg-[#080707]/60 backdrop-blur-sm rounded-lg border-border"><h4 className="font-semibold text-[#fff]">Особые правила</h4><ul className="list-disc list-inside mt-2 text-sm text-[#ddd]"><li>Минимальная аренда — 2 часа.</li><li>Максимум — 12 человек.</li><li>Гостям отеля «Волна» — скидки 20–30% (в зависимости от частоты посещений и загрузки).</li></ul></div>
         </section>
 
         <section id="extras" className="py-10 space-y-6 scroll-mt-24">
@@ -329,44 +343,39 @@ export default function SaunaRentMegaPage() {
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Кино + приставка</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Flat fee {BASE_PRICING.cinemaFlat} ₽ — проектор, звук, контроллеры.</p></CardContent></Card>
             <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Парильщик</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Опытный парильщик проведёт индивидуальную сессию, веник и ароматерапия — от {BASE_PRICING.parilshchikFlat} ₽.</p></CardContent></Card>
           </div>
+          <div className="mt-4 text-sm text-[#d9d6cd]">Также в наличии — магазин аксессуаров (веники, тапочки, полотенца и т.д.).</div>
         </section>
 
         <section id="work" className="py-10 space-y-6 scroll-mt-24">
           <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Работа — клининг, мотивация, график</h2>
-          <div className="mt-3">
-            <div className="text-sm text-[#fff]">Открытые уборки (оплачено):</div>
-            <div className="mt-2">
-              <SaunaOccupancyChart bookings={cleaningOpportunities} title="Cleaning opportunities" />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Клин-тим и персонал</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Назначай клинеров: уборка между сменами, проверка оборудования, прием гостей.</p><ol className="list-decimal list-inside text-sm text-[#ddd] mt-2"><li>План уборок после каждой смены — опция для админов.</li><li>Клин-тим получает звёзды за выполненную работу.</li><li>График и подписка — интерфейс для участников.</li></ol></CardContent></Card>
+            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Программа мотивации</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">За уборку, приводы гостей и полезные действия начисляются звёзды.</p><ul className="list-disc list-inside text-sm mt-2 text-[#ddd]"><li>Clean+ — бонус 5★ за качественную уборку.</li><li>Referral — 2★ за привлечение друга.</li></ul></CardContent></Card>
           </div>
+          <Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Система звёзд и график</CardTitle></CardHeader><CardContent><div className="text-sm text-[#d9d6cd]">Твои звёзды — внутренняя валюта: трать на скидки или копи для бонусов.</div><div className="mt-3 p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Баланс</div><div className="text-2xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-6 h-6" /> {starsBalance}★</div></div><div className="mt-4"><div className="text-sm text-[#fff]">График бронирований</div><div className="mt-2 text-sm text-[#d9d6cd]"><SaunaOccupancyChart bookings={cleaningOpportunities} title="Cleaning opportunities" /></div></div></CardContent></Card>
         </section>
 
         <section id="booking" className="py-10 space-y-6 scroll-mt-24">
           <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Бронирование</h2>
-          <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-            <CardHeader><CardTitle className="text-[#fff]">Форма брони</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="text-xs font-mono text-[#fff]">Дата<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
-                <label className="text-xs font-mono text-[#fff]">Время начала<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label>
-                <label className="text-xs font-mono text-[#fff]">Длительность (часы)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
-                <div className="text-xs font-mono text-[#fff]">Скидки и звезды<div className="mt-1 text-sm text-[#fff]">Баланс: <strong className="text-[#ffd879]">{starsBalance}★</strong> • Стоимость в звёздах: <strong className="text-[#ffd879]">{starsCost}★</strong></div></div>
-                <div className="col-span-1 sm:col-span-2 mt-2"><div className="flex gap-2 flex-wrap"><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra('cinema' as any)} /> <span className="text-sm">Кино + приставка</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.parilshchik} onChange={() => toggleExtra('parilshchik' as any)} /> <span className="text-sm">Парильщик</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.shop} onChange={() => toggleExtra('shop' as any)} /> <span className="text-sm">Покупки на стойке</span></label></div></div>
-                <div className="col-span-1 sm:col-span-2 mt-3"><div className="p-3 rounded bg-[#080707] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">Итого</div><div className="text-lg font-bold text-[#fff]">{totalPrice} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Или ~ {starsCost}★ (прибл.). При оплате — начислим {starsEarned}★ cashback.</div></div></div>
-                {/* График — быстрый просмотр занятости для выбранной даты (Форма брони) */}
-                <div className="mt-4 col-span-1 sm:col-span-2">
-                  <SaunaOccupancyChart bookings={bookings} date={date} title="График занятости — выбранная дата" />
-                </div>
-                <div className="col-span-1 sm:col-span-2 mt-3"><textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Доп. пожелания (обогрев, музыка, фильм, просьба для парильщика)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" /></div>
-                <div className="col-span-1 sm:col-span-2 mt-2"><div className="flex flex-col sm:flex-row gap-3"><Button onClick={handleCreateBooking} disabled={isSubmitting} className="flex-1 bg-[#ffd29b] text-[#241309] hover:bg-white">{isSubmitting ? "Обработка..." : "Создать бронь и получить счёт в Telegram"}</Button><Button variant="ghost" onClick={() => { setDate(new Date(Date.now() + 864e5).toISOString().slice(0, 10)); setMessage(""); setSelectedExtras({ cinema: false, parilshchik: false, shop: false }); setDurationHours(3); setStartHour(18); }} className="w-full sm:w-auto border border-[#ff6b6b] text-[#ffb6b6] hover:bg-[#2a0c0c]">Сброс</Button></div></div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Форма брони</CardTitle></CardHeader><CardContent><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><label className="text-xs font-mono text-[#fff]">Дата<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><label className="text-xs font-mono text-[#fff]">Время начала<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label><label className="text-xs font-mono text-[#fff]">Длительность (часы)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><div className="text-xs font-mono text-[#fff]">Скидки и звезды<div className="mt-1 text-sm text-[#fff]">Баланс: <strong className="text-[#ffd879]">{starsBalance}★</strong> • Стоимость в звёздах: <strong className="text-[#ffd879]">{starsCost}★</strong></div></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex gap-2 flex-wrap"><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra('cinema' as any)} /> <span className="text-sm">Кино + приставка</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.parilshchik} onChange={() => toggleExtra('parilshchik' as any)} /> <span className="text-sm">Парильщик</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.shop} onChange={() => toggleExtra('shop' as any)} /> <span className="text-sm">Покупки на стойке</span></label></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="p-3 rounded bg-[#080707] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">Итого</div><div className="text-lg font-bold text-[#fff]">{totalPrice} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Или ~ {starsCost}★ (прибл.). При оплате — начислим {starsEarned}★ cashback.</div></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="mt-4"><SaunaOccupancyChart bookings={bookings} date={date} title="График занятости — выбранная дата" /></div></div><div className="col-span-1 sm:col-span-2 mt-3"><textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Доп. пожелания (обогрев, музыка, фильм, просьба для парильщика)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" /></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex flex-col sm:flex-row gap-3"><Button onClick={handleCreateBooking} disabled={isSubmitting} className="flex-1 bg-[#ffd29b] text-[#241309] hover:bg-white">{isSubmitting ? "Обработка..." : "Создать бронь и получить счёт в Telegram"}</Button><Button variant="ghost" onClick={() => { setDate(new Date(Date.now() + 864e5).toISOString().slice(0, 10)); setMessage(""); setSelectedExtras({ cinema: false, parilshchik: false, shop: false }); setDurationHours(3); setStartHour(18); }} className="w-full sm:w-auto border border-[#ff6b6b] text-[#ffb6b6] hover:bg-[#2a0c0c]">Сброс</Button></div></div><div className="col-span-1 sm:col-span-2 mt-1"><div className="flex gap-3 items-center"><Button variant="ghost" onClick={() => setShowHistory((s) => !s)} className="border border-[#2b1b12]">{showHistory ? "Скрыть историю" : "Показать историю броней"}</Button><div className="text-sm text-[#d9d6cd]">{bookings.length} броней в истории</div></div></div></div></CardContent></Card>
+              {showHistory && (<Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">История броней</CardTitle></CardHeader><CardContent>{bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">Пока что пусто — твои брони появятся здесь.</div> : (<ul className="space-y-2">{bookings.map((b) => (<li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч</div><div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Экстры: {b.extras.join(", ") || "—"}</div></li>))}</ul>)}</CardContent></Card>)}
+            </div>
+            <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Система звёзд</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Твои звезды — внутренняя валюта. Трать их на скидки или копи для будущих броней.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Баланс</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Суммарно: начисления за действия, рефералы, уборки.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Подпишись на оповещения уборки</div><p className="text-xs text-[#d9d6cd]">После аренды можно подписаться на короткий shift уборки: за работу платят звёздами.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Подписаться</Button><Button variant="ghost" onClick={() => alert("TODO: show cleaning schedule")} className="border border-[#2b1b12] text-[#fff]">График</Button></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Быстрые ссылки</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP Байк</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
+          </div>
         </section>
 
         <section id="other" className="py-10 space-y-6 scroll-mt-24">
           <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Прочее / Поддержка</h2>
-          <SupportForm />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Заявки / Саппорт</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd]">Если нужно организовать мероприятие, доп. персонал, кейтеринг — оставь заявку.</p><div className="mt-3"><SupportForm /></div></CardContent></Card>
+            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Отель «Волна» — скидки</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd]">Гостям отеля предоставляем скидки 20–30% в зависимости от частоты посещений и загрузки. Рекомендуем интеграцию с ресепшеном отеля для подтверждений и штрих-кодов.</p></CardContent></Card>
+          </div>
+        </section>
+
+        <section className="py-8 text-center">
+          <div className="max-w-2xl mx-auto"><h4 className="text-xl font-orbitron mb-2 text-[#fff]">Готов взять ВАЙБ на себя?</h4><p className="text-sm text-[#d9d6cd] mb-4">Бронируй сейчас — счёт в Telegram. Плати звёздами. Я вижу оплату и подтверждаю вручную.</p><div className="flex justify-center gap-3"><Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Забронировать</Button><Button variant="ghost" onClick={() => document.getElementById("other")?.scrollIntoView({ behavior: "smooth" })} className="border border-white/50 text-white hover:bg-white/10">Саппорт</Button></div></div>
         </section>
       </main>
 
