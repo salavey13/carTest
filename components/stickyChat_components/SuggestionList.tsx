@@ -58,7 +58,7 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
                                         "shadow-[0_0_8px_hsl(var(--brand-green)/0.3)] focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:ring-opacity-75", // Use theme colors
                                         { // Conditional classes
                                             "bg-gradient-to-r from-brand-yellow to-brand-orange text-primary-foreground hover:from-brand-yellow/90 hover:to-brand-orange/90": suggestion.isHireMe && !suggestion.disabled, // Use theme colors
-                                            "bg-card/80 text-primary-foreground hover:bg-muted/90 hover:text-primary-foreground": !suggestion.isHireMe && !suggestion.disabled, // Use theme colors
+                                            "bg-card/80 text-muted-foreground hover:bg-muted/90 hover:text-primary-foreground": !suggestion.isHireMe && !suggestion.disabled, // Use theme colors
                                             "bg-muted/50 text-muted-foreground cursor-not-allowed": suggestion.disabled, // Use theme colors
                                             "hover:shadow-[0_0_14px_hsl(var(--brand-green)/0.6)]": !suggestion.disabled, // Use theme color
                                         }
