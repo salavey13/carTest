@@ -9,13 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 /**
- * Простая страница стримера.
- * Предполагаем, что текущий залогиненный пользователь - стример (dbUser.user_id).
- * Если это публичная страница для другого стримера, можно расширить до dynamic route.
+ * Streamer page — client.
+ * Uses AppContext (dbUser) as primary source.
  */
 
 export default function StreamerPage() {
-  const { dbUser, isLoading } = useAppContext();
+  const { dbUser, isLoading, refreshDbUser } = useAppContext();
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -24,16 +23,17 @@ export default function StreamerPage() {
 
   if (isLoading || !profile) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-live="polite">
         <div className="loading-spinner-cyber w-16 h-16 rounded-full" />
+        <span className="sr-only">Загрузка профиля стримера...</span>
       </div>
     );
   }
 
   const streamerId = profile.user_id;
+  const schedule = Array.isArray(profile.metadata?.streamSchedule) ? profile.metadata.streamSchedule : [];
 
-  // schedule stored in metadata.streamSchedule (array of {day, time, title})
-  const schedule = profile.metadata?.streamSchedule ?? [];
+  const isOwner = dbUser?.user_id === streamerId;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -42,18 +42,31 @@ export default function StreamerPage() {
           <Card className="p-0">
             <CardHeader>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full overflow-hidden">
-                  <Image src={profile.avatar_url || "/logo.png"} alt={profile.username || profile.full_name || "streamer"} width={64} height={64} />
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-muted">
+                  <Image
+                    src={profile.avatar_url || "/logo.png"}
+                    alt={profile.username || profile.full_name || "Стример"}
+                    width={64}
+                    height={64}
+                  />
                 </div>
+
                 <div>
                   <CardTitle className="text-2xl">{profile.username || profile.full_name || "Стример"}</CardTitle>
                   <div className="text-sm text-muted-foreground">{profile.description || "Профиль стримера"}</div>
                 </div>
-                <div className="ml-auto">
-                  <Button variant="secondary" onClick={() => window.location.reload()}>Обновить</Button>
+
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>
+                    Обновить
+                  </Button>
+                  {!isOwner && (
+                    <span className="text-xs text-muted-foreground">Вы просматриваете публичную страницу</span>
+                  )}
                 </div>
               </div>
             </CardHeader>
+
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -65,9 +78,9 @@ export default function StreamerPage() {
                     <div className="p-3 bg-card rounded-md border border-border">
                       <h5 className="font-semibold mb-2">Быстрые фичи</h5>
                       <ul className="text-sm list-disc list-inside text-muted-foreground">
-                        <li>Настроить страницы для конкретных игр (в будущем).</li>
-                        <li>Сертификация VIP: управлять доступом и ролями.</li>
-                        <li>Импорт/экспорт фанат-листа.</li>
+                        <li>Настроить страницы для конкретных игр (в будущем)</li>
+                        <li>Сертификация VIP: управлять доступом и ролями</li>
+                        <li>Импорт/экспорт фанат-листа</li>
                       </ul>
                     </div>
                   </div>
@@ -75,8 +88,9 @@ export default function StreamerPage() {
 
                 <div>
                   <h4 className="font-semibold mb-2">Расписание</h4>
-                  {Array.isArray(schedule) && schedule.length > 0 ? (
-                    <ul className="list-inside space-y-2">
+
+                  {schedule.length > 0 ? (
+                    <ul className="list-inside space-y-2" aria-live="polite">
                       {schedule.map((s: any, idx: number) => (
                         <li key={idx} className="p-2 rounded bg-muted/60 border border-border">
                           <div className="text-sm font-medium">{s.title}</div>
@@ -102,7 +116,10 @@ export default function StreamerPage() {
               <CardTitle>Вся история пожертвований</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground">Полная история донатов доступна в таблице invoices. Можно расширить фильтрацию и экспорт в CSV.</div>
+              <div className="text-sm text-muted-foreground">
+                Полная история донатов хранится в таблице <code className="bg-muted px-1 rounded">invoices</code>.
+                Можно добавить фильтрацию, CSV-экспорт и webhooks для external payments.
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -112,7 +129,11 @@ export default function StreamerPage() {
             <h4 className="font-semibold mb-2">VIP Fan Management</h4>
             <p className="text-sm text-muted-foreground">Список VIP, уведомления, быстрые шаблоны сообщений.</p>
             <div className="mt-3">
-              <Button onClick={() => alert("TODO: open VIP panel")} className="w-full">Открыть VIP панель</Button>
+              {isOwner ? (
+                <Button onClick={() => alert("Открываю VIP панель (TODO)")} className="w-full">Открыть VIP панель</Button>
+              ) : (
+                <div className="text-xs text-muted-foreground">Только владелец может открыть панель управления</div>
+              )}
             </div>
           </Card>
 
