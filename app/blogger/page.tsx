@@ -3,158 +3,107 @@
 import React, { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { fetchBloggerArticles } from "@/lib/blog/fetchBloggerArticles";
-import { debugLogger as logger } from "@/lib/debugLogger";
 import ArticleCard from "@/components/blog/ArticleCard";
-import DonationForm from "@/components/streamer/DonationForm";
-import DonationFeed from "@/components/streamer/DonationFeed";
-import Leaderboard from "@/components/streamer/Leaderboard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { use } from "react";
 
-export const dynamic = "force-dynamic";
+// helper: random unsplash pic
+function randomUnsplash(seed: string) {
+  const collections = [
+    "gaming", "music", "technology", "cyberpunk", "neon", "community", "party", "sauna"
+  ];
+  const query = collections[Math.floor(Math.random() * collections.length)];
+  return `https://source.unsplash.com/random/800x600/?${query}&sig=${seed}`;
+}
 
-export default async function BloggerPage() {
-  const res = await fetchBloggerArticles({ limit: 12 });
+export default function BloggerPageWrapper() {
+  // Next.js 13 app dir → can’t use async directly with motion easily
+  const dataPromise = fetchBloggerArticles({ limit: 24 });
+  const res = use(dataPromise);
 
-  if (!res.success) {
-    logger.error("[BloggerPage] Failed to load posts", res.error);
-  }
+  const posts = useMemo(() => {
+    return (res.data || []).map((p, i) => ({
+      ...p,
+      cover_url: p.cover_url || randomUnsplash(String(i)),
+    }));
+  }, [res]);
 
-  const posts = res.data || [];
+  return <BloggerPage posts={posts} usedFallback={res.meta?.usedFallback} />;
+}
 
-  // Рандомные картинки Unsplash для обновления при каждом заходе
-  const heroUrl = useMemo(() => {
-    const seed = Math.floor(Math.random() * 9999);
-    return `https://source.unsplash.com/random/1200x400/?tech,cyber,${seed}`;
-  }, []);
+interface Props {
+  posts: Awaited<ReturnType<typeof fetchBloggerArticles>>["data"];
+  usedFallback?: boolean;
+}
 
-  const sideImg = useMemo(() => {
-    const seed = Math.floor(Math.random() * 9999);
-    return `https://source.unsplash.com/random/600x400/?startup,future,${seed}`;
-  }, []);
-
+function BloggerPage({ posts, usedFallback }: Props) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-gray-100 text-black">
-      <div className="container mx-auto px-4 py-8">
-        {/* HERO */}
-        <header className="rounded-2xl overflow-hidden shadow-xl mb-10">
-          <div className="relative w-full h-52 md:h-72">
-            <Image
-              src={heroUrl}
-              alt="Hero"
-              fill
-              className="object-cover"
-              priority
-            />
-          </div>
-          <div className="p-6 bg-white">
-            <h1 className="font-orbitron text-3xl md:text-4xl font-bold text-gray-900">
-              Блогерский портал
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Добро пожаловать в белую (white-label) зону CyberVibe. Здесь мы тестим
-              наш движ, пишем статьи, публикуем обновления и прокачиваем идеи,
-              которые потом двигаем на уровни Lvl2 (Сауна), Lvl3 (VIP Bike Rentals) и агрегатор.
-            </p>
-          </div>
-        </header>
+    <div className="container mx-auto px-4 py-10">
+      <motion.header
+        initial={{ opacity: 0, y: -40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="mb-10 flex items-center gap-4"
+      >
+        <div className="relative h-12 w-12 rounded-full overflow-hidden ring-2 ring-brand-cyan/50 shadow-md">
+          <Image src="/logo.png" alt="Blogger" fill className="object-cover" />
+        </div>
+        <div>
+          <h1 className="font-orbitron text-3xl md:text-4xl tracking-wider text-brand-cyan drop-shadow-lg">
+            Блоггер Демо (Level 1)
+          </h1>
+          <p className="text-sm text-gray-600">
+            Здесь мы тестим VIP фан менеджмент, донаты и фановый движ
+          </p>
+        </div>
+        <div className="ml-auto">
+          <Link
+            href="/"
+            className="text-brand-purple hover:text-brand-purple/80 text-sm underline underline-offset-4"
+          >
+            На главную
+          </Link>
+        </div>
+      </motion.header>
 
-        {/* Статьи */}
-        {posts.length === 0 ? (
-          <div className="text-center text-gray-500 py-20">
-            Постов пока нет. Подключи таблицу <code>blog_posts</code>.
-          </div>
-        ) : (
-          <section className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-            {posts.map((post) => (
-              <ArticleCard key={post.slug} post={post} />
-            ))}
-          </section>
-        )}
+      {usedFallback && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-50 p-3 text-sm text-yellow-800"
+        >
+          ⚠️ Внимание: пока что это <b>демо</b>. Подключи таблицу{" "}
+          <code>blog_posts</code> в Supabase, и статьи будут подгружаться
+          автоматически.
+        </motion.div>
+      )}
 
-        {/* Врезка про движ */}
-        <section className="mt-12 grid md:grid-cols-2 gap-6">
-          <Card className="bg-white border shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-gray-800">
-                Наш движ в действии
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-600 space-y-3">
-              <p>
-                Тут мы показываем, как работает экосистема: блогер получает донаты
-                через ту же механику, что и стример. Поддержка фанатов превращается
-                в реальные «плюшки»: цифровые мерчи, доступ в VIP и т.д.
-              </p>
-              <p>
-                Пример: как в «сауна паке» мы продавали тапки и полотенце, так здесь
-                можно придумать свой набор «цифровых сувениров» для подписчиков.
-              </p>
-              <DonationForm streamerId="blogger-demo" />
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border shadow-lg">
-            <div className="relative w-full h-48 md:h-64 rounded-t-xl overflow-hidden">
-              <Image src={sideImg} alt="Наш движ" fill className="object-cover" />
-            </div>
-            <CardContent className="p-4 text-gray-600">
-              <p>
-                В реальном времени видно, как двигаются донаты, кто поддерживает
-                проект — и формируется лидерборд.
-              </p>
-              <div className="mt-3">
-                <Leaderboard streamerId="blogger-demo" />
-              </div>
-              <div className="mt-3">
-                <DonationFeed streamerId="blogger-demo" />
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* White-label CTA */}
-        <section className="mt-12 grid md:grid-cols-2 gap-6">
-          <Card className="bg-white border shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-gray-900">
-                Подписка
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-600">
-              <p className="mb-4">
-                Включи премиум-доступ: эксклюзивные материалы, закулисье и ранний
-                доступ к новому функционалу.
-              </p>
-              <Link href="/buy-subscription">
-                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                  Купить подписку
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-gray-900">
-                Партнёрка
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-gray-600">
-              <p className="mb-4">
-                Двигай наш движ вместе с нами — подключай партнёрку и зарабатывай
-                бонусы, приглашая друзей.
-              </p>
-              <Link href="/partner">
-                <Button className="bg-green-600 hover:bg-green-700 text-white">
-                  В партнёрку
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
+      {(!posts || posts.length === 0) ? (
+        <div className="text-center text-gray-500 py-20">
+          Постов пока нет.
+        </div>
+      ) : (
+        <motion.section
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: { opacity: 0, y: 40 },
+            show: { opacity: 1, y: 0, transition: { staggerChildren: 0.1 } },
+          }}
+          className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
+          {posts.map((post, i) => (
+            <motion.div
+              key={post.slug}
+              whileHover={{ scale: 1.05, rotate: -1 }}
+              className="transition"
+            >
+              <ArticleCard post={post} />
+            </motion.div>
+          ))}
+        </motion.section>
+      )}
     </div>
   );
 }

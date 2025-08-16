@@ -1,30 +1,36 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { fetchBloggerArticleBySlug } from "@/lib/blog/fetchBloggerArticles";
-import { debugLogger as logger } from "@/lib/debugLogger";
+import { use } from "react";
 
-interface PageProps {
-  params: { slug: string };
+function randomUnsplash(seed: string) {
+  const collections = [
+    "streamer", "community", "gaming", "sauna", "cyberpunk", "future"
+  ];
+  const query = collections[Math.floor(Math.random() * collections.length)];
+  return `https://source.unsplash.com/random/1200x800/?${query}&sig=${seed}`;
 }
 
-export const dynamic = "force-dynamic";
+export default function BloggerPostPageWrapper({ params }: { params: { slug: string } }) {
+  const res = use(fetchBloggerArticleBySlug(params.slug));
+  return <BloggerPostPage post={res.data} usedFallback={res.meta?.usedFallback} />;
+}
 
-export default async function BloggerPostPage({ params }: PageProps) {
-  const { slug } = params;
-  const res = await fetchBloggerArticleBySlug(slug);
+interface Props {
+  post: Awaited<ReturnType<typeof fetchBloggerArticleBySlug>>["data"];
+  usedFallback?: boolean;
+}
 
-  if (!res.success) {
-    logger.error("[BloggerPostPage] Failed to load post", { slug, error: res.error });
-  }
-
-  const post = res.data;
-
+function BloggerPostPage({ post, usedFallback }: Props) {
   if (!post) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <h1 className="font-orbitron text-2xl md:text-3xl mb-2">Пост не найден</h1>
-        <p className="text-muted-foreground mb-6">
+        <p className="text-gray-500 mb-6">
           Возможно, он был удалён или адрес введён неверно.
         </p>
         <Link href="/blogger" className="text-brand-cyan underline underline-offset-4">
@@ -34,22 +40,30 @@ export default async function BloggerPostPage({ params }: PageProps) {
     );
   }
 
+  const cover = post.cover_url || randomUnsplash(post.slug);
+
   return (
-    <article className="container mx-auto px-4 py-6 md:py-10 max-w-3xl">
-      <header className="mb-6 md:mb-8">
-        <div className="flex items-center gap-3 md:gap-4 mb-3">
-          <div className="relative h-10 w-10 md:h-12 md:w-12 rounded-xl overflow-hidden ring-2 ring-brand-cyan/50">
+    <article className="container mx-auto px-4 py-10 max-w-3xl">
+      <motion.header
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="mb-8"
+      >
+        <div className="flex items-center gap-4 mb-4">
+          <div className="relative h-12 w-12 rounded-full overflow-hidden ring-2 ring-brand-purple/40">
             <Image
               src={post.author_avatar || "/logo.png"}
               alt={post.author || "Author"}
               fill
-              sizes="48px"
               className="object-cover"
             />
           </div>
           <div>
-            <h1 className="font-orbitron text-2xl md:text-3xl">{post.title}</h1>
-            <p className="text-xs md:text-sm text-muted-foreground">
+            <h1 className="font-orbitron text-3xl md:text-4xl text-brand-purple">
+              {post.title}
+            </h1>
+            <p className="text-xs md:text-sm text-gray-500">
               {post.author || "Автор"} • {post.published_at?.slice(0, 10) || "—"}
             </p>
           </div>
@@ -63,33 +77,29 @@ export default async function BloggerPostPage({ params }: PageProps) {
           </div>
         </div>
 
-        {post.cover_url && (
-          <div className="relative w-full h-48 md:h-72 rounded-2xl overflow-hidden ring-2 ring-brand-purple/40 shadow-lg mb-4 md:mb-6">
-            <Image
-              src={post.cover_url}
-              alt={post.title}
-              fill
-              sizes="(max-width: 768px) 100vw, 768px"
-              className="object-cover"
-              priority
-            />
-          </div>
-        )}
-      </header>
-
-      <div className="prose prose-invert max-w-none prose-p:my-3 prose-headings:font-orbitron">
-        {/* В реальном проекте здесь можно рендерить Markdown/MDX.
-            Для безопасности уже приходящий из БД HTML можно пропускать через санитайзер. */}
-        {post.content ? (
-          <div
-            dangerouslySetInnerHTML={{ __html: post.content }}
+        <div className="relative w-full h-56 md:h-80 rounded-2xl overflow-hidden ring-2 ring-brand-purple/40 shadow-lg">
+          <Image
+            src={cover}
+            alt={post.title}
+            fill
+            className="object-cover"
+            priority
           />
+        </div>
+      </motion.header>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="prose max-w-none prose-p:my-3 prose-headings:font-orbitron prose-img:rounded-xl prose-img:shadow-md"
+      >
+        {post.content ? (
+          <div dangerouslySetInnerHTML={{ __html: post.content }} />
         ) : (
-          <p className="text-muted-foreground">
-            Контент временно недоступен.
-          </p>
+          <p className="text-gray-500">Контент временно недоступен.</p>
         )}
-      </div>
+      </motion.div>
 
       {post.tags?.length ? (
         <div className="mt-6 flex flex-wrap gap-2">
@@ -103,6 +113,12 @@ export default async function BloggerPostPage({ params }: PageProps) {
           ))}
         </div>
       ) : null}
+
+      {usedFallback && (
+        <p className="mt-6 text-xs text-yellow-700">
+          ⚠️ Пост загружен из демонстрационной коллекции.
+        </p>
+      )}
     </article>
   );
 }
