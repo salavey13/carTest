@@ -1,9 +1,10 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 const QUICK_AMOUNTS = [50, 100, 200, 500];
 
@@ -15,6 +16,9 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [invoice, setInvoice] = useState<any | null>(null);
+  const [paid, setPaid] = useState<boolean>(false);
+  const supabaseRef = useRef<any>(null);
+  const supabase = getSupabaseBrowserClient();
 
   async function handleDonate(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +52,8 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
       } else {
         setInvoice(res.invoice);
         toast.success("Инвойс создан. Откройте платёж или поделитесь ссылкой.");
+        // start a lightweight listener for this invoice -> paid
+        watchInvoicePaid(res.invoice.id);
       }
     } catch (err: any) {
       toast.error(err?.message || "Ошибка сети");
@@ -76,6 +82,46 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
     const link = `${appLink}?start=pay_inv_${invoice.id}`;
     window.open(link, "_blank");
   }
+
+  // watch invoice by id until it becomes paid (best-effort)
+  function watchInvoicePaid(invoiceId: string) {
+    if (!invoiceId || !supabase) return;
+    try {
+      const chan = supabase.channel(`public:invoices:watch-${invoiceId}`);
+      chan.on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "invoices", filter: `id=eq.${invoiceId}` },
+        (payload: any) => {
+          const rec = payload?.new;
+          if (!rec) return;
+          if (String(rec.status) === "paid") {
+            setPaid(true);
+            toast.success(`Платёж получен: +${rec.amount} XTR`);
+            // cleanup this channel after we got paid
+            try {
+              if (typeof chan.unsubscribe === "function") chan.unsubscribe();
+              else if (typeof (supabase as any).removeChannel === "function") (supabase as any).removeChannel(chan);
+            } catch {}
+          }
+        }
+      );
+      chan.subscribe();
+      supabaseRef.current = chan;
+    } catch (e) {
+      // ignore realtime errors — server webhook will still mark invoice paid
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (supabaseRef.current) {
+          if (typeof supabaseRef.current.unsubscribe === "function") supabaseRef.current.unsubscribe();
+          else if (typeof (supabase as any).removeChannel === "function") (supabase as any).removeChannel(supabaseRef.current);
+        }
+      } catch {}
+    };
+  }, []);
 
   return (
     <form onSubmit={handleDonate} className="space-y-3 p-3 bg-card rounded-md border border-border" aria-live="polite">
@@ -122,9 +168,10 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">Средства — XTR (внутренняя валюта). После оплаты — звезды зачисляются автоматически.</div>
         {invoice && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button size="sm" onClick={copyInvoiceLink}>Копировать ссылку</Button>
             <Button size="sm" variant="secondary" onClick={openInTelegram}>Открыть в Telegram</Button>
+            <div className="text-xs text-muted-foreground">{paid ? <span className="text-primary">✅ Оплачен</span> : <span>Ожидание оплаты</span>}</div>
           </div>
         )}
       </div>
