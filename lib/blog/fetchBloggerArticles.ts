@@ -1,4 +1,3 @@
-// /lib/blog/fetchBloggerArticles.ts
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -41,7 +40,6 @@ interface FetchResult<T> {
   meta?: { usedFallback?: boolean };
 }
 
-/** Fallback demo data if table is absent/unavailable */
 /** Fallback demo data if table is absent/unavailable */
 function fallbackPosts(): BloggerPostRecord[] {
   return [
@@ -131,9 +129,37 @@ function fallbackPosts(): BloggerPostRecord[] {
       tags: ["vip", "геймификация", "донаты", "игра"],
       is_test_result: true,
     },
+    {
+      id: "goal-profit",
+      slug: "goal-profit",
+      title: "Цель и профит: зачем мы строим эту экосистему?",
+      excerpt: "Не просто заработать. Создать движ, где профит рождается сам.",
+      cover_url: "https://images.unsplash.com/photo-1531297484001-80022131f5a1",
+      author: "VibeStrategist",
+      author_avatar: "/logo.png",
+      published_at: new Date(Date.now() - 3600 * 1000 * 96).toISOString(),
+      content: `
+        <p>Многие спрашивают: "Зачем вам всё это? Не проще ли сразу рвануть
+        в байк-аренду или другие хайповые сервисы?"</p>
+        <p>Ответ прост: <b>мы строим фундамент</b>. 
+        Блог стримера (Level 1) — это тест-песочница. 
+        Здесь мы проверяем механики донатов, VIP-управления, вовлечения фанатов.</p>
+        <p>На <a href="/sauna-rent">Level 2 (сауна)</a> и 
+        <a href="/vipbikerentals">VIP-байках</a> мы уже выходим в реальный мир: 
+        даём фанам не только цифровые, но и IRL бонусы.</p>
+        <p>А <a href="/about_en">Level 3</a> — это когда вся движуха собирается 
+        в одной точке. Там и появляется настоящий профит: от синергии фанатов, 
+        сервисов и создателей контента.</p>
+        <p>Так что цель у нас не "срубить кэш", а <b>создать игру</b>, 
+        в которой выигрывают все. 
+        <br/>🚀 И да, мы делаем это с юмором и в кайф, потому что по-другому 
+        у нас просто не получается.</p>
+      `,
+      tags: ["цель", "профит", "roadmap", "экосистема"],
+      is_test_result: true,
+    },
   ];
 }
-
 
 /** Fetch list of posts */
 export async function fetchBloggerArticles(options?: {
@@ -148,9 +174,8 @@ export async function fetchBloggerArticles(options?: {
   }
 
   try {
-    // Ожидаем таблицу public.blog_posts
     const { data, error } = await supabase
-      .from("blog_posts" as any) // тип в Database не описан — приводим к any
+      .from("blog_posts" as any)
       .select(
         "id, slug, title, excerpt, cover_url, author, author_avatar, published_at, tags"
       )
