@@ -11,17 +11,30 @@ import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
+/**
+ * Streamer page — full file, dark hero background, parallax on mouse,
+ * improved contrast for H1 titles (set to `text-primary`).
+ *
+ * Notes:
+ * - Make sure Tailwind has `text-primary` (or adapt to your color token).
+ * - Ensure external Unsplash domains are allowed in next.config.js.
+ */
+
 export default function StreamerPage() {
   const { dbUser, isLoading, refreshDbUser } = useAppContext();
   const [profile, setProfile] = useState<any>(null);
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
   const supabase = getSupabaseBrowserClient();
 
+  // Parallax mouse state
+  const [mouse, setMouse] = useState({ x: 0.5, y: 0.5 });
+
   useEffect(() => {
     setProfile(dbUser);
     setLiveBalance(Number(dbUser?.metadata?.starsBalance ?? null));
   }, [dbUser]);
 
+  // subscribe to user's metadata.starsBalance changes (best-effort client-side)
   useEffect(() => {
     if (!profile?.user_id || !supabase) return;
     let chan: any;
@@ -40,7 +53,9 @@ export default function StreamerPage() {
       );
       channel.subscribe();
       chan = channel;
-    } catch (e) {}
+    } catch (e) {
+      // ignore realtime errors
+    }
     return () => {
       try {
         if (chan) {
@@ -50,6 +65,14 @@ export default function StreamerPage() {
       } catch {}
     };
   }, [profile?.user_id, supabase]);
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      setMouse({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
+    };
+    window.addEventListener("mousemove", handleMove, { passive: true });
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, []);
 
   if (isLoading || !profile) {
     return (
@@ -65,20 +88,22 @@ export default function StreamerPage() {
   const isOwner = dbUser?.user_id === streamerId;
 
   // Background hero image (Unsplash) — full URL
-  const heroUrl =
-    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80";
+  const heroUrl = "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80";
+  const bgPos = `${50 + (mouse.x - 0.5) * 6}% ${50 + (mouse.y - 0.5) * 4}%`;
 
   return (
     <div
-      className="min-h-screen pb-12"
+      className="min-h-screen pb-12 text-white"
       style={{
-        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.75), rgba(5,10,22,0.92)), url(${heroUrl})`,
+        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.85), rgba(5,10,22,0.96)), url(${heroUrl})`,
         backgroundBlendMode: "overlay",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+        backgroundSize: "140%",
+        backgroundPosition: bgPos,
+        transition: "background-position 400ms linear",
       }}
     >
       <div className="container mx-auto px-4 py-8">
+        {/* Header / hero card */}
         <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a20,#001d2a40)] border border-border shadow-2xl">
           <div className="flex items-center gap-4">
             <div className={cn("w-20 h-20 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-primary/40")}>
@@ -92,25 +117,31 @@ export default function StreamerPage() {
             </div>
 
             <div className="flex-1 min-w-0">
-              <h1 className="text-3xl font-extrabold">{profile.username || profile.full_name || "Стример"}</h1>
+              {/* H1 title — fixed color to `text-primary` for high contrast on dark background */}
+              <h1 className="text-3xl font-extrabold text-primary leading-tight">{profile.username || profile.full_name || "Стример"}</h1>
               <p className="text-sm text-muted-foreground mt-1">{profile.description || "Профиль стримера"}</p>
+
               <div className="mt-2 flex items-center gap-4">
                 <div className="text-sm text-muted-foreground">Баланс</div>
                 <div className="text-xl font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</div>
+
                 <div>
                   <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>Обновить</Button>
                 </div>
+
                 {!isOwner && <div className="text-xs text-muted-foreground ml-2">Вы просматриваете публичную страницу</div>}
               </div>
             </div>
           </div>
         </div>
 
+        {/* Main layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
           <div className="lg:col-span-2 space-y-4">
             <Card className="p-0 bg-transparent border-transparent">
               <CardHeader>
                 <div className="flex items-center gap-4">
+                  {/* CardTitle remains semantic; H1 color fix applied to main page H1 above */}
                   <CardTitle className="text-2xl">VIP Dashboard</CardTitle>
                   <div className="text-xs text-muted-foreground">Управление донатами и наградами</div>
                 </div>
@@ -196,6 +227,9 @@ export default function StreamerPage() {
           </aside>
         </div>
       </div>
+
+      {/* Extra small enhancement: subtle vignette */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: 'multiply' }} />
     </div>
   );
 }
