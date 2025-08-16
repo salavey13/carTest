@@ -11,11 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
+import StreamManager from "@/components/streamer/StreamManager";
 
 /**
- * Страница стримера (уровень 1).
- * Демонстрация VIP-донатов, лидербордов, расписания и VIP Fan Management.
- * Тексты специально расширены, чтобы объяснить суть демо и роадмапы.
+ * Streamer page — Level 1 demo (fixed JSX + StreamManager integration)
  */
 
 export default function StreamerPage() {
@@ -24,7 +23,7 @@ export default function StreamerPage() {
   const [liveBalance, setLiveBalance] = useState<number | null>(null);
   const supabase = getSupabaseBrowserClient();
 
-  // Parallax state
+  // Parallax (mouse + device orientation)
   const [pos, setPos] = useState({ x: 0.5, y: 0.5 });
 
   useEffect(() => {
@@ -32,7 +31,7 @@ export default function StreamerPage() {
     setLiveBalance(Number(dbUser?.metadata?.starsBalance ?? null));
   }, [dbUser]);
 
-  // subscribe to balance updates
+  // Realtime balance updates
   useEffect(() => {
     if (!profile?.user_id || !supabase) return;
     let chan: any;
@@ -44,14 +43,16 @@ export default function StreamerPage() {
         (payload: any) => {
           const rec = payload?.new;
           if (!rec) return;
-          const meta = rec.metadata || {};
-          const bal = Number(meta?.starsBalance ?? null);
+          const bal = Number(rec?.metadata?.starsBalance ?? null);
           setLiveBalance(Number.isFinite(bal) ? bal : null);
         }
       );
       channel.subscribe();
       chan = channel;
-    } catch {}
+    } catch (e) {
+      // ignore
+      console.warn("realtime subscribe failed", e);
+    }
     return () => {
       try {
         if (chan) {
@@ -62,7 +63,7 @@ export default function StreamerPage() {
     };
   }, [profile?.user_id, supabase]);
 
-  // Mouse parallax for desktop
+  // Mouse parallax
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
       setPos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
@@ -74,16 +75,16 @@ export default function StreamerPage() {
   // Gyro parallax for mobile
   useEffect(() => {
     const handleGyro = (e: DeviceOrientationEvent) => {
-      if (e.gamma === null || e.beta === null) return;
+      if (e.gamma == null || e.beta == null) return;
       setPos({
         x: (e.gamma + 90) / 180,
         y: (e.beta + 90) / 180,
       });
     };
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener("deviceorientation", handleGyro, true);
+    if (typeof window !== "undefined" && "DeviceOrientationEvent" in window) {
+      window.addEventListener("deviceorientation", handleGyro as any, true);
     }
-    return () => window.removeEventListener("deviceorientation", handleGyro);
+    return () => window.removeEventListener("deviceorientation", handleGyro as any);
   }, []);
 
   if (isLoading || !profile) {
@@ -99,7 +100,6 @@ export default function StreamerPage() {
   const schedule = Array.isArray(profile.metadata?.streamSchedule) ? profile.metadata.streamSchedule : [];
   const isOwner = dbUser?.user_id === streamerId;
 
-  // Background hero image
   const heroUrl =
     "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80";
   const bgPos = `${50 + (pos.x - 0.5) * 6}% ${50 + (pos.y - 0.5) * 4}%`;
@@ -117,15 +117,12 @@ export default function StreamerPage() {
       }}
     >
       <div className="container mx-auto px-4 py-8">
-        {/* Header / hero card */}
+        {/* Header card */}
         <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a20,#001d2a40)] border border-border shadow-2xl">
           <div className="flex items-center gap-4">
             <div className={cn("w-20 h-20 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-primary/40")}>
               <Image
-                src={
-                  profile.avatar_url ||
-                  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80"
-                }
+                src={profile.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80"}
                 alt={profile.username || profile.full_name || "Стример"}
                 width={80}
                 height={80}
@@ -143,25 +140,26 @@ export default function StreamerPage() {
 
               <div className="mt-2 flex items-center gap-4">
                 <div className="text-sm text-muted-foreground">Баланс</div>
-                <div className="text-xl font-semibold">
-                  {liveBalance !== null ? `${liveBalance}★` : "—"}
-                </div>
-
+                <div className="text-xl font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</div>
                 <div>
                   <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>
                     Обновить
                   </Button>
                 </div>
 
-                {!isOwner && (
-                  <div className="text-xs text-muted-foreground ml-2">
-                    Вы просматриваете публичную страницу
-                  </div>
-                )}
+                {!isOwner && <div className="text-xs text-muted-foreground ml-2">Вы просматриваете публичную страницу</div>}
               </div>
             </div>
           </div>
         </div>
+
+        {/* StreamManager only for owner */}
+        {isOwner && (
+          <div className="mt-6">
+            <h3 className="font-semibold mb-3">Stream Overlay — редактор (Level 1)</h3>
+            <StreamManager />
+          </div>
+        )}
 
         {/* Main layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
@@ -170,9 +168,7 @@ export default function StreamerPage() {
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <CardTitle className="text-2xl text-white">VIP Dashboard</CardTitle>
-                  <div className="text-xs text-muted-foreground">
-                    Управление донатами, наградами и VIP фан-базой
-                  </div>
+                  <div className="text-xs text-muted-foreground">Управление донатами, наградами и VIP фан-базой</div>
                 </div>
               </CardHeader>
 
@@ -183,10 +179,7 @@ export default function StreamerPage() {
                     <div className="p-3 rounded-md border border-border bg-card/60 mt-3">
                       <h5 className="font-semibold mb-2 text-white">Почему донат = мерч?</h5>
                       <p className="text-sm text-muted-foreground">
-                        Для теста мы используем аналогию: как в сауне есть «пакет с тапками и полотенцем», 
-                        так и у стримера донат может превращаться в «цифровой мерч» — 
-                        уникальные карточки, бонусы или доступ в VIP-чат. 
-                        Всё это хранится в Supabase и обновляется в реальном времени.
+                        Эксперимент: донат превращается в цифровой/IRL пакет (Sauna Pack и т.п.). Всё хранится в БД и может быть управляемо.
                       </p>
                     </div>
                   </div>
@@ -196,21 +189,14 @@ export default function StreamerPage() {
                     {schedule.length > 0 ? (
                       <ul className="list-inside space-y-2" aria-live="polite">
                         {schedule.map((s: any, idx: number) => (
-                          <li
-                            key={idx}
-                            className="p-2 rounded bg-muted/60 border border-border"
-                          >
+                          <li key={idx} className="p-2 rounded bg-muted/60 border border-border">
                             <div className="text-sm font-medium">{s.title}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {s.day} — {s.time}
-                            </div>
+                            <div className="text-xs text-muted-foreground">{s.day} — {s.time}</div>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.
-                      </div>
+                      <div className="text-sm text-muted-foreground">Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.</div>
                     )}
 
                     <div className="mt-4 space-y-4">
@@ -232,9 +218,7 @@ export default function StreamerPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Полная история хранится в таблице{" "}
-                  <code className="bg-muted px-1 rounded">invoices</code>.
-                  Здесь можно будет добавить фильтрацию, CSV-экспорт и webhooks для внешних платежей.
+                  Полная история хранится в таблице <code className="bg-muted px-1 rounded">invoices</code>.
                 </p>
               </CardContent>
             </Card>
@@ -243,53 +227,23 @@ export default function StreamerPage() {
           <aside className="space-y-4">
             <Card className="p-3">
               <h4 className="font-semibold mb-2 text-white">VIP Fan Management</h4>
-              <p className="text-sm text-muted-foreground">
-                Здесь владелец управляет списком VIP-фанов, 
-                рассылает уведомления и запускает быстрые шаблонные сообщения. 
-                Это демо-панель, которую можно развивать: от ролей до NFT-пропусков.
-              </p>
+              <p className="text-sm text-muted-foreground">Владелец управляет VIP-фанатами и шаблонами уведомлений.</p>
               <div className="mt-3">
                 {isOwner ? (
-                  <Button
-                    onClick={() => alert("Открываю VIP панель (TODO)")}
-                    className="w-full"
-                  >
-                    Открыть VIP панель
-                  </Button>
+                  <Button onClick={() => alert("Открываю VIP панель (TODO)")} className="w-full">Открыть VIP панель</Button>
                 ) : (
-                  <div className="text-xs text-muted-foreground">
-                    Только владелец может открыть панель управления
-                  </div>
+                  <div className="text-xs text-muted-foreground">Только владелец может открыть панель управления</div>
                 )}
               </div>
             </Card>
 
             <Card className="p-3">
-              <h4 className="font-semibold mb-2 text-white">Роадмапа проекта</h4>
+              <h4 className="font-semibold mb-2 text-white">Роадмап проекта</h4>
               <ul className="text-sm list-inside text-muted-foreground space-y-1">
-                <li>
-                  <strong>Lvl1 (стример)</strong> — текущая демо-страница. 
-                  Здесь мы отрабатываем механику донатов, фан-менеджмента и VIP-ролей.
-                </li>
-                <li>
-                  <strong>
-                    <Link href="/sauna-rent" className="underline">Lvl2 (сауна)</Link>
-                  </strong>{" "}
-                  — донаты превращаются в цифровой «пакет услуг» (тапки, полотенце, 
-                  бронь на время).
-                </li>
-                <li>
-                  <strong>
-                    <Link href="/vipbikerentals" className="underline">Lvl3 (VIP Bike Rentals)</Link>
-                  </strong>{" "}
-                  — масштабируем VIP-клиентский менеджмент на реальный бизнес.
-                </li>
-                <li>
-                  <strong>
-                    <Link href="/about_en" className="underline">Агрегация</Link>
-                  </strong>{" "}
-                  — страница, где соединяются все уровни и показывается единая экосистема.
-                </li>
+                <li><strong>Lvl1 (стример)</strong> — текущая демо-страница.</li>
+                <li><strong><Link href="/sauna-rent" className="underline">Lvl2 (сауна)</Link></strong> — IRL бонусы.</li>
+                <li><strong><Link href="/vipbikerentals" className="underline">Lvl3 (VIP Bike Rentals)</Link></strong> — масштабируемый сервис.</li>
+                <li><strong><Link href="/about_en" className="underline">Агрегация</Link></strong> — единый портал всех уровней.</li>
               </ul>
             </Card>
           </aside>
@@ -297,15 +251,7 @@ export default function StreamerPage() {
       </div>
 
       {/* Subtle vignette */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)",
-          mixBlendMode: "multiply",
-        }}
-      />
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
     </div>
   );
 }
