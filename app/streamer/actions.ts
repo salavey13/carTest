@@ -6,6 +6,53 @@ import { sendTelegramMessage } from "@/lib/telegram";
 import { randomUUID } from "crypto";
 
 /**
+ * Canonical tiers & sku pricing (server-side authoritative)
+ */
+const CANONICAL_TIERS: Record<string, number> = {
+  tip: 50,
+  supporter: 150,
+  vip: 300,
+  sauna: 500,
+};
+
+const SKU_TO_PRICE: Record<string, number> = {
+  sauna_pack: 500,
+  flipflops: 200,
+  towel: 150,
+};
+
+function normalizeInvoicePayload(amount: number, metadata: any = {}) {
+  const meta = { ...(metadata || {}) };
+
+  // prefer explicit tierId if present
+  if (meta.tierId && CANONICAL_TIERS[meta.tierId]) {
+    const canonical = CANONICAL_TIERS[meta.tierId];
+    if (Number(amount) !== canonical) {
+      logger.warn("[createStreamerInvoice] amount mismatch with tierId, overriding client amount", { clientAmount: amount, tierId: meta.tierId, canonical });
+      amount = canonical;
+    }
+  }
+
+  // sku mapping (market items)
+  if (meta.sku && SKU_TO_PRICE[meta.sku]) {
+    const skuPrice = SKU_TO_PRICE[meta.sku];
+    if (Number(amount) !== skuPrice) {
+      logger.warn("[createStreamerInvoice] amount mismatch with sku, overriding client amount", { clientAmount: amount, sku: meta.sku, skuPrice });
+      amount = skuPrice;
+      // if sku corresponds to canonical tier, propagate tierId
+      if (meta.sku === "sauna_pack") {
+        meta.tierId = "sauna";
+      }
+    }
+  }
+
+  // ensure amount is integer > 0
+  amount = Math.max(1, Math.floor(Number(amount) || 0));
+
+  return { amount, metadata: meta };
+}
+
+/**
  * Create donation invoice (XTR / stars).
  * Uses supabaseAdmin to insert invoice (admins bypass RLS).
  */
@@ -27,6 +74,11 @@ export async function createStreamerInvoice({
   const invoiceId = `inv_${randomUUID()}`;
 
   try {
+    // Server-side normalization (prevent client spoofing)
+    const normalized = normalizeInvoicePayload(amount, metadata);
+    amount = normalized.amount;
+    metadata = normalized.metadata;
+
     // Prefer RPC if present; fall back to insert
     const { data, error } = await supabaseAdmin
       .from("invoices")
@@ -48,7 +100,7 @@ export async function createStreamerInvoice({
       throw error;
     }
 
-    logger.info("[createStreamerInvoice] created", { invoiceId, payerUserId, streamerId, amount });
+    logger.info("[createStreamerInvoice] created", { invoiceId, payerUserId, streamerId, amount, metadata });
     return { success: true, invoice: data };
   } catch (e) {
     logger.error("[createStreamerInvoice] failed", e);
@@ -61,7 +113,8 @@ export async function createStreamerInvoice({
  * This will:
  *  - update invoices.status -> paid
  *  - increment recipient user's metadata.starsBalance by amount
- *  - send optional Telegram notification to streamer (if user_id equals chat id)
+ *  - apply VIP/market perks from invoice.metadata (best-effort)
+ *  - send optional Telegram notification to streamer (if chat id available)
  */
 export async function markInvoicePaidAndDistribute({ invoiceId }: { invoiceId: string }) {
   if (!invoiceId) throw new Error("invoiceId required");
@@ -108,11 +161,16 @@ export async function markInvoicePaidAndDistribute({ invoiceId }: { invoiceId: s
     }
 
     // 4) read recipient user
-    const { data: streamerUser } = await supabaseAdmin
+    const { data: streamerUser, error: streamerFetchErr } = await supabaseAdmin
       .from("users")
       .select("user_id, metadata")
       .eq("user_id", streamerId)
       .maybeSingle();
+
+    if (streamerFetchErr) {
+      logger.error("[markInvoicePaid] streamer user fetch error", streamerFetchErr);
+      throw streamerFetchErr;
+    }
 
     if (!streamerUser) {
       logger.warn("[markInvoicePaid] streamer user not found", { streamerId });
@@ -123,9 +181,39 @@ export async function markInvoicePaidAndDistribute({ invoiceId }: { invoiceId: s
     const prev = Number(meta?.starsBalance ?? 0);
     const next = prev + amount;
 
+    // prepare updated metadata
+    const newMeta = { ...(meta || {}), starsBalance: next };
+
+    // If invoice has metadata that indicates VIP or market perks — apply them
+    try {
+      const invMeta = invoice.metadata || {};
+      // VIP handling: extend vipExpires by vipDays (default 7)
+      const tierId = invMeta?.tierId ?? invMeta?.kind;
+      if (tierId === "vip" || invMeta?.kind === "vip") {
+        const vipDays = Number(invMeta?.vipDays ?? 7);
+        const now = new Date();
+        const currentExpiry = meta?.vipExpires ? new Date(meta.vipExpires) : now;
+        // if existing expiry in past, start from now
+        const base = isNaN(currentExpiry.getTime()) || currentExpiry < now ? now : currentExpiry;
+        const newExpiry = new Date(base.getTime() + vipDays * 24 * 60 * 60 * 1000);
+        newMeta.vipExpires = newExpiry.toISOString();
+        newMeta.isVip = true;
+        logger.info("[markInvoicePaid] awarding VIP", { streamerId, vipDays, newExpiry: newMeta.vipExpires });
+      }
+
+      // Market SKU handling: record lastPurchasedSku (demo)
+      if (invMeta?.sku) {
+        newMeta.lastPurchasedSku = invMeta.sku;
+        logger.info("[markInvoicePaid] recorded purchased sku", { streamerId, sku: invMeta.sku });
+      }
+    } catch (metaErr) {
+      logger.warn("[markInvoicePaid] failed to process invoice metadata for perks", metaErr);
+    }
+
+    // 5) update user metadata
     const { data: updatedUser, error: userUpdErr } = await supabaseAdmin
       .from("users")
-      .update({ metadata: { ...meta, starsBalance: next } })
+      .update({ metadata: newMeta })
       .eq("user_id", streamerId)
       .select()
       .single();
@@ -135,11 +223,12 @@ export async function markInvoicePaidAndDistribute({ invoiceId }: { invoiceId: s
       throw userUpdErr;
     }
 
-    // 5) send Telegram notification (best-effort)
+    // 6) send Telegram notification (best-effort)
     try {
-      // We assume streamerId may equal Telegram chat id or their stored metadata.chat_id
-      const chatId = String(streamerId);
-      const text = `⭐ Поступление: +${amount} XTR от ${invoice.user_id || "анонимного"}\nБаланс: ${next}★`;
+      // Try to use stored chat id if available in metadata, fallback to streamerId
+      const chatIdCandidate = (updatedUser?.metadata?.chat_id) || streamerId;
+      const chatId = String(chatIdCandidate);
+      const text = `⭐ Поступление: +${amount} XTR от ${invoice.user_id || "анонимного"}\nБаланс: ${newMeta.starsBalance}★`;
       await sendTelegramMessage(chatId, text);
     } catch (tgErr) {
       logger.warn("[markInvoicePaid] telegram notify failed (non-fatal)", tgErr);
@@ -219,6 +308,7 @@ export async function getStreamerProfile({ streamerId }: { streamerId: string })
       .maybeSingle();
     return { success: true, data };
   } catch (e) {
+    logger.error("[getStreamerProfile] error", e);
     return { success: false, error: (e as any).message ?? String(e) };
   }
 }
