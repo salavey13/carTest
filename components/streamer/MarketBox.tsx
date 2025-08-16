@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +11,7 @@ type Item = {
   short: string;
   perks?: string[];
   image?: string;
-  accent?: string;
+  accent?: string; // tailwind bg class or util
 };
 
 const ITEMS: Item[] = [
@@ -18,39 +19,36 @@ const ITEMS: Item[] = [
     id: "sauna_pack",
     title: "Сауна Пак",
     price: 500,
-    short: "Полотенце + шлёпанцы + цифровой бейдж",
-    perks: ["Цифровой стикер полотенца", "Шлёпанцы — упоминание в стриме", "VIP-значок (7 дн)"],
-    image:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1000&q=80",
+    short: "Полотенце + шлёпки (цифровой бейдж)",
+    perks: ["Наклейка полотенца", "Шлёпки-эмоджи в чате", "VIP-метка 7 дней"],
+    image: "https://images.unsplash.com/photo-1522770179533-24471fcdba45?auto=format&fit=crop&w=800&q=80", // spa towels
     accent: "shadow-yellow-glow",
   },
   {
     id: "flipflops",
-    title: "Шлёпанцы",
+    title: "Шлёпки",
     price: 200,
-    short: "Крутой стикер шлёпанцев",
-    perks: ["Стикер", "Имя в оверлее (1x)"],
-    image:
-      "https://images.unsplash.com/photo-1519741491558-0b3f0c1a3a3a?auto=format&fit=crop&w=1000&q=80",
+    short: "Крутые шлёпки-стикер",
+    perks: ["Стикер шлёпок", "Имя в оверлее стрима"],
+    image: "https://images.unsplash.com/photo-1509099836639-18ba58d36f5d?auto=format&fit=crop&w=800&q=80", // flipflops
     accent: "shadow-pink-glow",
   },
   {
     id: "towel",
     title: "Полотенце",
     price: 150,
-    short: "Мягкий цифровой стикер полотенца",
-    perks: ["Стикер", "Спасибо в чате на стриме"],
-    image:
-      "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1000&q=80",
+    short: "Мягкое цифровое полотенце",
+    perks: ["Стикер полотенца", "Спасибо в эфире"],
+    image: "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=800&q=80", // towel
     accent: "shadow-blue-glow",
   },
 ];
 
 export default function MarketBox({ onPick }: { onPick?: (item: Item) => void }) {
   return (
-    <div className="p-3 bg-card/80 dark:bg-card rounded-md border border-border backdrop-blur-sm">
+    <div className="p-3 rounded-md border border-border bg-card/70 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold">Мини-маркет — Сауна</h4>
+        <h4 className="font-semibold">Мини-маркет: Sauna Pack</h4>
         <div className="text-xs text-muted-foreground">Прототип</div>
       </div>
 
@@ -66,10 +64,9 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
             role="group"
           >
             <div className="w-full flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
-                {/* plain img to avoid external host config for next/image */}
+              <div className="w-14 h-14 relative rounded-lg overflow-hidden bg-muted flex-shrink-0">
                 {it.image ? (
-                  <img src={it.image} alt={it.title} className="w-full h-full object-cover" />
+                  <Image src={it.image} alt={it.title} fill style={{ objectFit: "cover" }} />
                 ) : (
                   <div className="flex items-center justify-center text-xs">{it.title[0]}</div>
                 )}
@@ -83,29 +80,15 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
               <div className="text-sm font-semibold">{it.price}★</div>
             </div>
 
-            <ul className="text-xs text-muted-foreground list-disc list-inside mt-1 mb-2">
+            <ul className="text-xs text-muted-foreground list-disc list-inside mt-1 mb-2 w-full">
               {it.perks?.slice(0, 3).map((p, i) => (
                 <li key={i} className="truncate">{p}</li>
               ))}
             </ul>
 
-            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mt-auto">
-              <Button
-                size="sm"
-                className="w-full sm:w-auto"
-                onClick={() => onPick && onPick(it)}
-                aria-label={`Купить ${it.title}`}
-              >
-                Купить
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="w-full sm:w-auto"
-                onClick={() => alert(it.perks?.join("\n") || it.short)}
-              >
-                Подробнее
-              </Button>
+            <div className="w-full flex items-center justify-between mt-auto gap-2">
+              <Button size="sm" onClick={() => onPick && onPick(it)} aria-label={`Купить ${it.title}`} className="flex-1">Купить</Button>
+              <Button size="sm" variant="ghost" onClick={() => alert(it.perks?.join("\n") || it.short)}>Подробнее</Button>
             </div>
           </article>
         ))}

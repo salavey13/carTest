@@ -5,12 +5,12 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback } 
 import { useTelegram } from "@/hooks/useTelegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger as globalLogger } from "@/lib/logger";
-import { toast } from "sonner";
+// removed direct sonner import
+import { useAppToast } from "@/hooks/useAppToast";
 import type { Database } from "@/types/database.types";
-// *** БЕЗОПАСНЫЕ ИМПОРТЫ ***
+// safe server actions
 import { refreshDbUserAction, fetchUserCrewInfoAction } from "./actions";
 
-// Этот тип теперь импортируется в actions.ts
 export type UserCrewInfo = {
   id: string;
   slug: string;
@@ -21,7 +21,7 @@ export type UserCrewInfo = {
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
   startParamPayload: string | null;
-  refreshDbUser: () => Promise<void>; 
+  refreshDbUser: () => Promise<void>;
   clearStartParam: () => void;
   userCrewInfo: UserCrewInfo | null;
 }
@@ -29,13 +29,13 @@ interface AppContextData extends ReturnType<typeof useTelegram> {
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const telegramHookData = useTelegram(); 
+  const telegramHookData = useTelegram();
   const { user, dbUser: initialDbUser, isLoading: isTelegramLoading, isAuthenticating: isTelegramAuthenticating, error: telegramError, ...restTelegramData } = telegramHookData;
 
-  const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(initialDbUser); 
+  const [dbUser, setDbUserInternal] = useState<Database["public"]["Tables"]["users"]["Row"] | null>(initialDbUser);
   const [startParamPayload, setStartParamPayload] = useState<string | null>(null);
   const [userCrewInfo, setUserCrewInfo] = useState<UserCrewInfo | null>(null);
-  
+
   const isLoading = isTelegramLoading;
   const isAuthenticating = isTelegramAuthenticating;
   const error = telegramError;
@@ -44,35 +44,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDbUserInternal(initialDbUser);
   }, [initialDbUser]);
 
-  // *** ИЗМЕНЕНИЕ: Используем безопасный Server Action ***
+  // use your toaster hook
+  const appToast = useAppToast();
+
+  // refreshDbUser action (server)
   const refreshDbUser = useCallback(async () => {
     if (user?.id) {
       debugLogger.info(`[AppContext refreshDbUser] Refreshing dbUser for user ID: ${user.id}`);
-      // Вызываем наш новый безопасный экшен
       const freshDbUser = await refreshDbUserAction(String(user.id));
-      setDbUserInternal(freshDbUser); 
+      setDbUserInternal(freshDbUser);
       debugLogger.info(`[AppContext refreshDbUser] dbUser refreshed successfully.`);
     } else {
       debugLogger.warn("[AppContext refreshDbUser] Cannot refresh, user.id is not available.");
     }
   }, [user?.id]);
 
-  // *** ИЗМЕНЕНИЕ: Используем безопасный Server Action ***
   useEffect(() => {
     const fetchCrewInfo = async () => {
       if (!dbUser?.user_id) {
         setUserCrewInfo(null);
         return;
       }
-      // Вызываем наш новый безопасный экшен
       const crewInfo = await fetchUserCrewInfoAction(dbUser.user_id);
       setUserCrewInfo(crewInfo);
     };
-    
+
     fetchCrewInfo();
   }, [dbUser]);
-  
-  // ... остальная часть компонента AppProvider остается без изменений ...
+
   const clearStartParam = useCallback(() => {
     debugLogger.info("[AppContext] Clearing startParamPayload.");
     setStartParamPayload(null);
@@ -93,16 +92,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const contextValue = useMemo(() => {
     return {
-        ...restTelegramData,
-        user, 
-        dbUser,
-        isLoading, 
-        isAuthenticating, 
-        error, 
-        startParamPayload,
-        refreshDbUser, 
-        clearStartParam,
-        userCrewInfo,
+      ...restTelegramData,
+      user,
+      dbUser,
+      isLoading,
+      isAuthenticating,
+      error,
+      startParamPayload,
+      refreshDbUser,
+      clearStartParam,
+      userCrewInfo,
     };
   }, [restTelegramData, user, dbUser, isLoading, isAuthenticating, error, startParamPayload, refreshDbUser, clearStartParam, userCrewInfo]);
 
@@ -126,52 +125,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const فعلاًЗагружается = isLoading || isAuthenticating;
 
     if (فعلاًЗагружается) {
-       toast.dismiss("auth-success-toast"); toast.dismiss("auth-error-toast"); toast.dismiss("mock-user-info-toast");
+       appToast.dismiss("auth-success-toast"); appToast.dismiss("auth-error-toast"); appToast.dismiss("mock-user-info-toast");
        loadingTimer = setTimeout(() => {
           const stillLoadingInTimeout = isLoading || isAuthenticating;
           if (stillLoadingInTimeout && (!isClient || document.visibilityState === 'visible')) {
-             toast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 });
+             appToast.loading("Авторизация...", { id: "auth-loading-toast", duration: 15000 });
           } else {
-             toast.dismiss("auth-loading-toast");
+             appToast.dismiss("auth-loading-toast");
           }
        }, LOADING_TOAST_DELAY);
     } else {
         if (loadingTimer) clearTimeout(loadingTimer);
-        toast.dismiss("auth-loading-toast");
+        appToast.dismiss("auth-loading-toast");
         if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !telegramHookData.isInTelegramContext) {
              const existingMockToast = isClient ? document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]') : null;
              if (!existingMockToast && (!isClient || document.visibilityState === 'visible')) {
-                toast.info("Внимание: используется тестовый пользователь!", { description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.", duration: 7000, id: "mock-user-info-toast" });
+                appToast.info("Внимание: используется тестовый пользователь!", { description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.", duration: 7000, id: "mock-user-info-toast" });
              }
         } else if (telegramHookData.isInTelegramContext) {
-             toast.dismiss("mock-user-info-toast");
+             appToast.dismiss("mock-user-info-toast");
         }
 
         if (telegramHookData.isAuthenticated && !error) {
-            toast.dismiss("auth-error-toast");
+            appToast.dismiss("auth-error-toast");
              if (!isClient || document.visibilityState === 'visible') {
-                 toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
+                 appToast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2500 });
              }
         } else if (error) {
-            toast.dismiss("auth-success-toast");
+            appToast.dismiss("auth-success-toast");
             if (!isClient || document.visibilityState === 'visible') {
                  globalLogger.error("[APP_CONTEXT EFFECT_TOAST_LOGIC] Auth error. Showing error toast (ID: auth-error-toast). Error:", error.message);
-                 toast.error(`Ошибка авторизации: ${error.message}`, { id: "auth-error-toast", description: "Не удалось войти. Попробуйте перезапустить приложение или обратитесь в поддержку.", duration: 10000 });
+                 appToast.error(`Ошибка авторизации: ${error.message}`, { id: "auth-error-toast", description: "Не удалось войти. Попробуйте перезапустить приложение или обратитесь в поддержку.", duration: 10000 });
             }
         }
     }
     return () => { if (loadingTimer) { clearTimeout(loadingTimer); }};
-  }, [telegramHookData.isAuthenticated, isLoading, isAuthenticating, error, telegramHookData.isInTelegramContext]);
+  }, [telegramHookData.isAuthenticated, isLoading, isAuthenticating, error, telegramHookData.isInTelegramContext, appToast]);
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
 
 export const useAppContext = (): AppContextData => {
-  // ... хук useAppContext остается без изменений ...
   const context = useContext(AppContext);
   const defaultRefreshDbUser = useCallback(async () => { debugLogger.warn("refreshDbUser() called on SKELETON AppContext"); }, []);
   const defaultClearStartParam = useCallback(() => { debugLogger.warn("clearStartParam() called on SKELETON AppContext"); }, []);
-  
+
   if (!context || context.isLoading === undefined || context.isAuthenticating === undefined ) {
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false,

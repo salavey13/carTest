@@ -9,6 +9,7 @@ import DonationFeed from "@/components/streamer/DonationFeed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { cn } from "@/lib/utils";
 
 export default function StreamerPage() {
   const { dbUser, isLoading, refreshDbUser } = useAppContext();
@@ -21,7 +22,6 @@ export default function StreamerPage() {
     setLiveBalance(Number(dbUser?.metadata?.starsBalance ?? null));
   }, [dbUser]);
 
-  // subscribe to user's metadata.starsBalance changes (best-effort client-side)
   useEffect(() => {
     if (!profile?.user_id || !supabase) return;
     let chan: any;
@@ -40,9 +40,7 @@ export default function StreamerPage() {
       );
       channel.subscribe();
       chan = channel;
-    } catch (e) {
-      // ignore realtime errors
-    }
+    } catch (e) {}
     return () => {
       try {
         if (chan) {
@@ -64,128 +62,139 @@ export default function StreamerPage() {
 
   const streamerId = profile.user_id;
   const schedule = Array.isArray(profile.metadata?.streamSchedule) ? profile.metadata.streamSchedule : [];
-
   const isOwner = dbUser?.user_id === streamerId;
 
+  // Background hero image (Unsplash) — full URL
+  const heroUrl =
+    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80";
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <Card className="p-0">
-            <CardHeader>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full overflow-hidden bg-muted">
-                  <Image
-                    src={profile.avatar_url || "/logo.png"}
-                    alt={profile.username || profile.full_name || "Стример"}
-                    width={64}
-                    height={64}
-                  />
-                </div>
+    <div
+      className="min-h-screen pb-12"
+      style={{
+        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.75), rgba(5,10,22,0.92)), url(${heroUrl})`,
+        backgroundBlendMode: "overlay",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      <div className="container mx-auto px-4 py-8">
+        <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a20,#001d2a40)] border border-border shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className={cn("w-20 h-20 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-primary/40")}>
+              <Image
+                src={profile.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80"}
+                alt={profile.username || profile.full_name || "Стример"}
+                width={80}
+                height={80}
+                style={{ objectFit: "cover" }}
+              />
+            </div>
 
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl font-extrabold">{profile.username || profile.full_name || "Стример"}</h1>
+              <p className="text-sm text-muted-foreground mt-1">{profile.description || "Профиль стримера"}</p>
+              <div className="mt-2 flex items-center gap-4">
+                <div className="text-sm text-muted-foreground">Баланс</div>
+                <div className="text-xl font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</div>
                 <div>
-                  <CardTitle className="text-2xl">{profile.username || profile.full_name || "Стример"}</CardTitle>
-                  <div className="text-sm text-muted-foreground">{profile.description || "Профиль стримера"}</div>
-                  <div className="text-sm mt-1">
-                    <span className="text-xs text-muted-foreground mr-2">Баланс:</span>
-                    <span className="font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</span>
-                  </div>
+                  <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>Обновить</Button>
                 </div>
-
-                <div className="ml-auto flex items-center gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>
-                    Обновить
-                  </Button>
-                  {!isOwner && (
-                    <span className="text-xs text-muted-foreground">Вы просматриваете публичную страницу</span>
-                  )}
-                </div>
+                {!isOwner && <div className="text-xs text-muted-foreground ml-2">Вы просматриваете публичную страницу</div>}
               </div>
-            </CardHeader>
+            </div>
+          </div>
+        </div>
 
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="font-semibold mb-2">VIP Dashboard</h4>
-                  <p className="text-sm text-muted-foreground mb-3">Управляй VIP-фанами, настрой донаты и смотри статистику.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="p-0 bg-transparent border-transparent">
+              <CardHeader>
+                <div className="flex items-center gap-4">
+                  <CardTitle className="text-2xl">VIP Dashboard</CardTitle>
+                  <div className="text-xs text-muted-foreground">Управление донатами и наградами</div>
+                </div>
+              </CardHeader>
 
-                  <div className="space-y-3">
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <DonationForm streamerId={streamerId} />
-                    <div className="p-3 bg-card rounded-md border border-border">
+                    <div className="p-3 rounded-md border border-border bg-card/60 mt-3">
                       <h5 className="font-semibold mb-2">Быстрые фичи</h5>
                       <ul className="text-sm list-disc list-inside text-muted-foreground">
-                        <li>Настроить страницы для конкретных игр (в будущем)</li>
-                        <li>Сертификация VIP: управлять доступом и ролями</li>
-                        <li>Импорт/экспорт фанат-листа</li>
+                        <li>Страницы для конкретных игр (в планах)</li>
+                        <li>Управление VIP: роли и доступ</li>
+                        <li>Экспорт фанат-листа в CSV</li>
                       </ul>
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <h4 className="font-semibold mb-2">Расписание</h4>
+                  <div>
+                    <h4 className="font-semibold mb-2">Расписание</h4>
 
-                  {schedule.length > 0 ? (
-                    <ul className="list-inside space-y-2" aria-live="polite">
-                      {schedule.map((s: any, idx: number) => (
-                        <li key={idx} className="p-2 rounded bg-muted/60 border border-border">
-                          <div className="text-sm font-medium">{s.title}</div>
-                          <div className="text-xs text-muted-foreground">{s.day} — {s.time}</div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">Расписание не настроено. Добавьте в профиль metadata.streamSchedule.</div>
-                  )}
+                    {schedule.length > 0 ? (
+                      <ul className="list-inside space-y-2" aria-live="polite">
+                        {schedule.map((s: any, idx: number) => (
+                          <li key={idx} className="p-2 rounded bg-muted/60 border border-border">
+                            <div className="text-sm font-medium">{s.title}</div>
+                            <div className="text-xs text-muted-foreground">{s.day} — {s.time}</div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">Расписание не настроено. Добавьте в profile metadata.streamSchedule.</div>
+                    )}
 
-                  <div className="mt-4 space-y-4">
-                    <h4 className="font-semibold mb-2">Leaderboard Snapshot</h4>
-                    <Leaderboard streamerId={streamerId} />
-                    <div className="mt-4">
-                      <h4 className="font-semibold mb-2">Live Donation Feed</h4>
-                      <DonationFeed streamerId={streamerId} />
+                    <div className="mt-4 space-y-4">
+                      <h4 className="font-semibold mb-2">Leaderboard Snapshot</h4>
+                      <Leaderboard streamerId={streamerId} />
+                      <div className="mt-4">
+                        <h4 className="font-semibold mb-2">Live поток донатов</h4>
+                        <DonationFeed streamerId={streamerId} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Вся история пожертвований</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">
-                Полная история донатов хранится в таблице <code className="bg-muted px-1 rounded">invoices</code>.
-                Можно добавить фильтрацию, CSV-экспорт и webhooks для external payments.
+            <Card>
+              <CardHeader>
+                <CardTitle>Вся история пожертвований</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  Полная история донатов хранится в таблице <code className="bg-muted px-1 rounded">invoices</code>.
+                  Можно добавить фильтрацию, CSV-экспорт и webhooks для external payments.
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <aside className="space-y-4">
+            <Card className="p-3">
+              <h4 className="font-semibold mb-2">VIP Fan Management</h4>
+              <p className="text-sm text-muted-foreground">Список VIP, уведомления и быстрые шаблоны сообщений.</p>
+              <div className="mt-3">
+                {isOwner ? (
+                  <Button onClick={() => alert("Открываю VIP панель (TODO)")} className="w-full">Открыть VIP панель</Button>
+                ) : (
+                  <div className="text-xs text-muted-foreground">Только владелец может открыть панель управления</div>
+                )}
               </div>
-            </CardContent>
-          </Card>
+            </Card>
+
+            <Card className="p-3">
+              <h4 className="font-semibold mb-2">Инструменты</h4>
+              <ul className="text-sm list-inside">
+                <li>Генерация pay-link (через инвойс)</li>
+                <li>Webhook callback & автоматическое зачисление</li>
+                <li>Leaderboards & аналитика</li>
+              </ul>
+            </Card>
+          </aside>
         </div>
-
-        <aside className="space-y-4">
-          <Card className="p-3">
-            <h4 className="font-semibold mb-2">VIP Fan Management</h4>
-            <p className="text-sm text-muted-foreground">Список VIP, уведомления, быстрые шаблоны сообщений.</p>
-            <div className="mt-3">
-              {isOwner ? (
-                <Button onClick={() => alert("Открываю VIP панель (TODO)")} className="w-full">Открыть VIP панель</Button>
-              ) : (
-                <div className="text-xs text-muted-foreground">Только владелец может открыть панель управления</div>
-              )}
-            </div>
-          </Card>
-
-          <Card className="p-3">
-            <h4 className="font-semibold mb-2">Инструменты</h4>
-            <ul className="text-sm list-inside">
-              <li>Генерация pay-link (через инвойс)</li>
-              <li>Webhook callback & автоматическое зачисление</li>
-              <li>Leaderboards & аналитика</li>
-            </ul>
-          </Card>
-        </aside>
       </div>
     </div>
   );

@@ -3,9 +3,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/AppContext";
-import { useAppToast } from "@/hooks/useAppToast";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import MarketBox from "./MarketBox";
+import { useAppToast } from "@/hooks/useAppToast";
 
 type Tier = {
   id: string;
@@ -13,15 +13,15 @@ type Tier = {
   amount: number;
   description: string;
   badge?: string;
-  highlight?: string;
+  highlight?: string; // class for glow
   metadata?: Record<string, any>;
 };
 
 const TIERS: Tier[] = [
-  { id: "tip", label: "Чаевые", amount: 50, description: "Небольшая поддержка", badge: "💖", highlight: "shadow-pink-glow", metadata: { kind: "tip" } },
-  { id: "supporter", label: "Поддержка", amount: 150, description: "Благодарность + имя в списке", badge: "👏", highlight: "shadow-blue-glow", metadata: { kind: "support" } },
-  { id: "vip", label: "VIP", amount: 300, description: "VIP-роль в чате + громкое спасибо", badge: "⭐", highlight: "shadow-purple-glow", metadata: { kind: "vip", vipDays: 7 } },
-  { id: "sauna", label: "Сауна Пак", amount: 500, description: "Полотенце и шлёпанцы + стикер", badge: "🧖", highlight: "shadow-yellow-glow", metadata: { kind: "market", sku: "sauna_pack" } },
+  { id: "tip", label: "Мелкий подарок", amount: 50, description: "Быстрая поддержка", badge: "💖", highlight: "shadow-pink-glow", metadata: { kind: "tip" } },
+  { id: "supporter", label: "Поддержка", amount: 150, description: "Имя в итогах и благодарность", badge: "👏", highlight: "shadow-blue-glow", metadata: { kind: "support" } },
+  { id: "vip", label: "VIP", amount: 300, description: "VIP-метка в чате + шепот", badge: "⭐", highlight: "shadow-purple-glow", metadata: { kind: "vip", vipDays: 7 } },
+  { id: "sauna", label: "Сауна Пак", amount: 500, description: "Цифровое полотенце и шлёпки", badge: "🧖", highlight: "shadow-yellow-glow", metadata: { kind: "market", sku: "sauna_pack" } },
 ];
 
 export default function DonationForm({ streamerId }: { streamerId: string }) {
@@ -29,6 +29,7 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
   const payerUserId = dbUser?.user_id ?? null;
   const supabase = getSupabaseBrowserClient();
   const toast = useAppToast();
+
   const [amount, setAmount] = useState<number>(TIERS[0].amount);
   const [selectedTier, setSelectedTier] = useState<Tier>(TIERS[0]);
   const [note, setNote] = useState("");
@@ -142,115 +143,69 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
       }
     } else {
       setAmount(item.price);
-      toast.success(`Вы выбрали ${item.title}. Введите сообщение и нажмите «Поддержать».`);
+      toast.success(`Вы выбрали ${item.title}. Введите сообщение (опционально) и нажмите «Поддержать».`);
     }
   }
 
-  // background image (dark vibe)
-  const bgUrl = "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1600&q=60";
-
   return (
     <>
-      <form
-        onSubmit={handleDonate}
-        className="space-y-3 p-3 rounded-md border border-border relative overflow-hidden"
-        aria-live="polite"
-        style={{
-          backgroundImage: `linear-gradient(180deg, rgba(6,6,10,0.6) 0%, rgba(20,22,29,0.7) 40%, rgba(10,10,14,0.85) 100%), url('${bgUrl}')`,
-          backgroundBlendMode: "overlay",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+      <form onSubmit={handleDonate} className="space-y-3 p-3 rounded-md border border-border bg-card/80 backdrop-blur-sm" aria-live="polite">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">Поддержать стримера — выберите уровень</div>
+          <div className="text-xs text-muted-foreground">Текущий выбор: <span className="font-semibold ml-1">{selectedTier.label} • {amount}★</span></div>
+        </div>
 
-        <div className="relative z-10">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">Поддержать стримера — выберите уровень</div>
-            <div className="text-xs text-muted-foreground whitespace-nowrap">Выбран: <span className="font-semibold ml-1">{selectedTier.label} • {amount}★</span></div>
-          </div>
-
-          {/* Tiers grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-            {TIERS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={selectedTier.id === t.id}
-                onClick={() => { setSelectedTier(t); setAmount(t.amount); }}
-                className={`p-2 rounded-md text-sm flex flex-col items-start justify-between border transition-shadow duration-200 min-h-[64px] ${selectedTier.id === t.id ? `border-primary bg-primary/10 ${t.highlight}` : "bg-card border-border"}`}
-              >
-                <div className="flex items-center gap-2 w-full">
-                  <div className="text-lg">{t.badge ?? "★"}</div>
-                  <div className="flex-1 text-left min-w-0">
-                    <div className="font-medium text-sm truncate">{t.label}</div>
-                    <div className="text-xs text-muted-foreground truncate">{t.description}</div>
-                  </div>
-                  <div className="font-semibold">{t.amount}★</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="flex gap-2 mt-2 flex-wrap">
-            <Input
-              aria-label="Сумма XTR"
-              type="number"
-              min={1}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value) || 0)}
-              className="flex-1 input-cyber min-w-0"
-            />
-            <Button
-              type="submit"
-              className="whitespace-nowrap shrink-0"
-              disabled={loading || !!invoice}
+        {/* Tiers grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {TIERS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={selectedTier.id === t.id}
+              onClick={() => { setSelectedTier(t); setAmount(t.amount); }}
+              className={`p-2 rounded-md text-sm flex flex-col items-start justify-between border transition-shadow duration-200 ${selectedTier.id === t.id ? `border-primary bg-primary/8 ${t.highlight}` : "bg-card border-border"}`}
             >
-              {loading ? "Создаём..." : invoice ? "Инвойс готов" : "Поддержать"}
-            </Button>
-          </div>
-
-          <div className="mt-2">
-            <Input
-              placeholder="Сообщение (опционально)"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="input-cyber mt-0"
-              aria-label="Сообщение донату"
-            />
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center items-stretch justify-between gap-3 mt-3">
-            <div className="text-xs text-muted-foreground">Средства — XTR. После оплаты звезды зачисляются автоматически.</div>
-
-            {invoice ? (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={copyInvoiceLink}
-                  className="px-3 py-1 rounded-md border border-border text-sm w-full sm:w-auto text-left sm:text-center"
-                >
-                  Копировать ссылку
-                </button>
-                <button
-                  type="button"
-                  onClick={openInTelegram}
-                  className="px-3 py-1 rounded-md border border-border text-sm w-full sm:w-auto text-left sm:text-center"
-                >
-                  Открыть в Telegram
-                </button>
-                <div className="text-xs text-muted-foreground w-full sm:w-auto text-left sm:text-right">
-                  {paid ? <span className="text-primary font-semibold">✅ Оплачен</span> : <span>Ожидание оплаты</span>}
+              <div className="flex items-center gap-2 w-full">
+                <div className="text-lg">{t.badge ?? "★"}</div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="font-medium text-sm truncate">{t.label}</div>
+                  <div className="text-xs text-muted-foreground truncate">{t.description}</div>
                 </div>
+                <div className="font-semibold">{t.amount}★</div>
               </div>
-            ) : (
-              <div className="text-xs text-muted-foreground mt-1 sm:mt-0">Создайте инвойс, чтобы получить ссылку для оплаты.</div>
-            )}
-          </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <Input aria-label="Сумма XTR" type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)} className="flex-1 input-cyber" />
+          <Button type="submit" className="whitespace-nowrap" disabled={loading || !!invoice}>
+            {loading ? "Создаём..." : invoice ? "Инвойс готов" : "Поддержать"}
+          </Button>
+        </div>
+
+        <div>
+          <Input placeholder="Сообщение (опционально)" value={note} onChange={(e) => setNote(e.target.value)} className="input-cyber mt-2" aria-label="Сообщение донату" />
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="text-xs text-muted-foreground">Средства — XTR. После оплаты звезды зачисляются автоматически.</div>
+
+          {invoice && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              <div className="flex gap-2 flex-wrap items-center">
+                <Button size="sm" onClick={copyInvoiceLink}>Копировать ссылку</Button>
+                <Button size="sm" variant="secondary" onClick={openInTelegram}>Открыть в Telegram</Button>
+              </div>
+              <div className="text-xs text-muted-foreground whitespace-nowrap mt-1 sm:mt-0">
+                {paid ? <span className="text-primary">✅ Оплачен</span> : <span>Ожидание оплаты</span>}
+              </div>
+            </div>
+          )}
         </div>
       </form>
 
-      <div className="mt-3 relative z-10">
+      <div className="mt-3">
         <MarketBox onPick={onPickMarketItem} />
       </div>
     </>
