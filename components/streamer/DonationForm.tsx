@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/AppContext";
-import { toast } from "sonner";
+import { useAppToast } from "@/hooks/useAppToast";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import MarketBox from "./MarketBox";
 
@@ -28,6 +28,7 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
   const { dbUser } = useAppContext();
   const payerUserId = dbUser?.user_id ?? null;
   const supabase = getSupabaseBrowserClient();
+  const toast = useAppToast();
   const [amount, setAmount] = useState<number>(TIERS[0].amount);
   const [selectedTier, setSelectedTier] = useState<Tier>(TIERS[0]);
   const [note, setNote] = useState("");
