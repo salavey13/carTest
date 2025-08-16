@@ -1,0 +1,311 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useAppContext } from "@/contexts/AppContext";
+import DonationForm from "@/components/streamer/DonationForm";
+import Leaderboard from "@/components/streamer/Leaderboard";
+import DonationFeed from "@/components/streamer/DonationFeed";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { cn } from "@/lib/utils";
+
+/**
+ * Страница стримера (уровень 1).
+ * Демонстрация VIP-донатов, лидербордов, расписания и VIP Fan Management.
+ * Тексты специально расширены, чтобы объяснить суть демо и роадмапы.
+ */
+
+export default function StreamerPage() {
+  const { dbUser, isLoading, refreshDbUser } = useAppContext();
+  const [profile, setProfile] = useState<any>(null);
+  const [liveBalance, setLiveBalance] = useState<number | null>(null);
+  const supabase = getSupabaseBrowserClient();
+
+  // Parallax state
+  const [pos, setPos] = useState({ x: 0.5, y: 0.5 });
+
+  useEffect(() => {
+    setProfile(dbUser);
+    setLiveBalance(Number(dbUser?.metadata?.starsBalance ?? null));
+  }, [dbUser]);
+
+  // subscribe to balance updates
+  useEffect(() => {
+    if (!profile?.user_id || !supabase) return;
+    let chan: any;
+    try {
+      const channel = supabase.channel(`public:users:balance-${profile.user_id}`);
+      channel.on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "users", filter: `user_id=eq.${profile.user_id}` },
+        (payload: any) => {
+          const rec = payload?.new;
+          if (!rec) return;
+          const meta = rec.metadata || {};
+          const bal = Number(meta?.starsBalance ?? null);
+          setLiveBalance(Number.isFinite(bal) ? bal : null);
+        }
+      );
+      channel.subscribe();
+      chan = channel;
+    } catch {}
+    return () => {
+      try {
+        if (chan) {
+          if (typeof chan.unsubscribe === "function") chan.unsubscribe();
+          else if (typeof (supabase as any).removeChannel === "function") (supabase as any).removeChannel(chan);
+        }
+      } catch {}
+    };
+  }, [profile?.user_id, supabase]);
+
+  // Mouse parallax for desktop
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      setPos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
+    };
+    window.addEventListener("mousemove", handleMove, { passive: true });
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, []);
+
+  // Gyro parallax for mobile
+  useEffect(() => {
+    const handleGyro = (e: DeviceOrientationEvent) => {
+      if (e.gamma === null || e.beta === null) return;
+      setPos({
+        x: (e.gamma + 90) / 180,
+        y: (e.beta + 90) / 180,
+      });
+    };
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener("deviceorientation", handleGyro, true);
+    }
+    return () => window.removeEventListener("deviceorientation", handleGyro);
+  }, []);
+
+  if (isLoading || !profile) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-live="polite">
+        <div className="loading-spinner-cyber w-16 h-16 rounded-full" />
+        <span className="sr-only">Загрузка профиля стримера...</span>
+      </div>
+    );
+  }
+
+  const streamerId = profile.user_id;
+  const schedule = Array.isArray(profile.metadata?.streamSchedule) ? profile.metadata.streamSchedule : [];
+  const isOwner = dbUser?.user_id === streamerId;
+
+  // Background hero image
+  const heroUrl =
+    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80";
+  const bgPos = `${50 + (pos.x - 0.5) * 6}% ${50 + (pos.y - 0.5) * 4}%`;
+
+  return (
+    <div
+      className="min-h-screen pb-12 text-white"
+      style={{
+        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.85), rgba(5,10,22,0.96)), url(${heroUrl})`,
+        backgroundBlendMode: "overlay",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: bgPos,
+        transition: "background-position 400ms linear",
+      }}
+    >
+      <div className="container mx-auto px-4 py-8">
+        {/* Header / hero card */}
+        <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a20,#001d2a40)] border border-border shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className={cn("w-20 h-20 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-primary/40")}>
+              <Image
+                src={
+                  profile.avatar_url ||
+                  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80"
+                }
+                alt={profile.username || profile.full_name || "Стример"}
+                width={80}
+                height={80}
+                style={{ objectFit: "cover" }}
+              />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl font-extrabold text-primary leading-tight">
+                {profile.username || profile.full_name || "Стример"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Демо-страница персонального VIP Dashboard для стримера.
+              </p>
+
+              <div className="mt-2 flex items-center gap-4">
+                <div className="text-sm text-muted-foreground">Баланс</div>
+                <div className="text-xl font-semibold">
+                  {liveBalance !== null ? `${liveBalance}★` : "—"}
+                </div>
+
+                <div>
+                  <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>
+                    Обновить
+                  </Button>
+                </div>
+
+                {!isOwner && (
+                  <div className="text-xs text-muted-foreground ml-2">
+                    Вы просматриваете публичную страницу
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Card className="p-0 bg-transparent border-transparent">
+              <CardHeader>
+                <div className="flex items-center gap-4">
+                  <CardTitle className="text-2xl text-white">VIP Dashboard</CardTitle>
+                  <div className="text-xs text-muted-foreground">
+                    Управление донатами, наградами и VIP фан-базой
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <DonationForm streamerId={streamerId} />
+                    <div className="p-3 rounded-md border border-border bg-card/60 mt-3">
+                      <h5 className="font-semibold mb-2 text-white">Почему донат = мерч?</h5>
+                      <p className="text-sm text-muted-foreground">
+                        Для теста мы используем аналогию: как в сауне есть «пакет с тапками и полотенцем», 
+                        так и у стримера донат может превращаться в «цифровой мерч» — 
+                        уникальные карточки, бонусы или доступ в VIP-чат. 
+                        Всё это хранится в Supabase и обновляется в реальном времени.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold mb-2 text-white">Расписание стримов</h4>
+                    {schedule.length > 0 ? (
+                      <ul className="list-inside space-y-2" aria-live="polite">
+                        {schedule.map((s: any, idx: number) => (
+                          <li
+                            key={idx}
+                            className="p-2 rounded bg-muted/60 border border-border"
+                          >
+                            <div className="text-sm font-medium">{s.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {s.day} — {s.time}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.
+                      </div>
+                    )}
+
+                    <div className="mt-4 space-y-4">
+                      <h4 className="font-semibold mb-2 text-white">Лидерборд фанатов</h4>
+                      <Leaderboard streamerId={streamerId} />
+                      <div className="mt-4">
+                        <h4 className="font-semibold mb-2 text-white">Живой поток донатов</h4>
+                        <DonationFeed streamerId={streamerId} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-white">Вся история донатов</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Полная история хранится в таблице{" "}
+                  <code className="bg-muted px-1 rounded">invoices</code>.
+                  Здесь можно будет добавить фильтрацию, CSV-экспорт и webhooks для внешних платежей.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <aside className="space-y-4">
+            <Card className="p-3">
+              <h4 className="font-semibold mb-2 text-white">VIP Fan Management</h4>
+              <p className="text-sm text-muted-foreground">
+                Здесь владелец управляет списком VIP-фанов, 
+                рассылает уведомления и запускает быстрые шаблонные сообщения. 
+                Это демо-панель, которую можно развивать: от ролей до NFT-пропусков.
+              </p>
+              <div className="mt-3">
+                {isOwner ? (
+                  <Button
+                    onClick={() => alert("Открываю VIP панель (TODO)")}
+                    className="w-full"
+                  >
+                    Открыть VIP панель
+                  </Button>
+                ) : (
+                  <div className="text-xs text-muted-foreground">
+                    Только владелец может открыть панель управления
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-3">
+              <h4 className="font-semibold mb-2 text-white">Роадмапа проекта</h4>
+              <ul className="text-sm list-inside text-muted-foreground space-y-1">
+                <li>
+                  <strong>Lvl1 (стример)</strong> — текущая демо-страница. 
+                  Здесь мы отрабатываем механику донатов, фан-менеджмента и VIP-ролей.
+                </li>
+                <li>
+                  <strong>
+                    <Link href="/sauna-rent" className="underline">Lvl2 (сауна)</Link>
+                  </strong>{" "}
+                  — донаты превращаются в цифровой «пакет услуг» (тапки, полотенце, 
+                  бронь на время).
+                </li>
+                <li>
+                  <strong>
+                    <Link href="/vipbikerentals" className="underline">Lvl3 (VIP Bike Rentals)</Link>
+                  </strong>{" "}
+                  — масштабируем VIP-клиентский менеджмент на реальный бизнес.
+                </li>
+                <li>
+                  <strong>
+                    <Link href="/about_en" className="underline">Агрегация</Link>
+                  </strong>{" "}
+                  — страница, где соединяются все уровни и показывается единая экосистема.
+                </li>
+              </ul>
+            </Card>
+          </aside>
+        </div>
+      </div>
+
+      {/* Subtle vignette */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)",
+          mixBlendMode: "multiply",
+        }}
+      />
+    </div>
+  );
+}
