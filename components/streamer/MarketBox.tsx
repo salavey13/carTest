@@ -1,6 +1,5 @@
 "use client";
 import React from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,44 +10,47 @@ type Item = {
   short: string;
   perks?: string[];
   image?: string;
-  accent?: string; // tailwind bg class or util
+  accent?: string;
 };
 
 const ITEMS: Item[] = [
   {
     id: "sauna_pack",
-    title: "Sauna Pack",
+    title: "Сауна Пак",
     price: 500,
-    short: "Towel + Flipflops (digital badge)",
-    perks: ["Digital towel sticker", "Flipflops emoji shoutout", "VIP chat tag (7d)"],
-    image: "/assets/sauna-pack.png",
+    short: "Полотенце + шлёпанцы + цифровой бейдж",
+    perks: ["Цифровой стикер полотенца", "Шлёпанцы — упоминание в стриме", "VIP-значок (7 дн)"],
+    image:
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1000&q=80",
     accent: "shadow-yellow-glow",
   },
   {
     id: "flipflops",
-    title: "Flipflops",
+    title: "Шлёпанцы",
     price: 200,
-    short: "Cool flipflops sticker",
-    perks: ["Sticker", "Name in stream overlay (1x)"],
-    image: "/assets/flipflops.png",
+    short: "Крутой стикер шлёпанцев",
+    perks: ["Стикер", "Имя в оверлее (1x)"],
+    image:
+      "https://images.unsplash.com/photo-1519741491558-0b3f0c1a3a3a?auto=format&fit=crop&w=1000&q=80",
     accent: "shadow-pink-glow",
   },
   {
     id: "towel",
-    title: "Towel",
+    title: "Полотенце",
     price: 150,
-    short: "Soft towel sticker",
-    perks: ["Sticker", "Thanks on stream"],
-    image: "/assets/towel.png",
+    short: "Мягкий цифровой стикер полотенца",
+    perks: ["Стикер", "Спасибо в чате на стриме"],
+    image:
+      "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1000&q=80",
     accent: "shadow-blue-glow",
   },
 ];
 
 export default function MarketBox({ onPick }: { onPick?: (item: Item) => void }) {
   return (
-    <div className="p-3 bg-card rounded-md border border-border">
+    <div className="p-3 bg-card/80 dark:bg-card rounded-md border border-border backdrop-blur-sm">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold">Мини-маркет: Sauna Pack</h4>
+        <h4 className="font-semibold">Мини-маркет — Сауна</h4>
         <div className="text-xs text-muted-foreground">Прототип</div>
       </div>
 
@@ -64,10 +66,10 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
             role="group"
           >
             <div className="w-full flex items-center gap-3">
-              <div className="w-12 h-12 relative rounded-full overflow-hidden bg-muted flex-shrink-0">
+              <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+                {/* plain img to avoid external host config for next/image */}
                 {it.image ? (
-                  // these are placeholders, add real assets if you like
-                  <Image src={it.image} alt={it.title} fill style={{ objectFit: "cover" }} />
+                  <img src={it.image} alt={it.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="flex items-center justify-center text-xs">{it.title[0]}</div>
                 )}
@@ -87,11 +89,21 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
               ))}
             </ul>
 
-            <div className="w-full flex items-center justify-between mt-auto">
-              <Button size="sm" onClick={() => onPick && onPick(it)} aria-label={`Купить ${it.title}`}>
+            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 mt-auto">
+              <Button
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => onPick && onPick(it)}
+                aria-label={`Купить ${it.title}`}
+              >
                 Купить
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => alert(it.perks?.join("\n") || it.short)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full sm:w-auto"
+                onClick={() => alert(it.perks?.join("\n") || it.short)}
+              >
                 Подробнее
               </Button>
             </div>
