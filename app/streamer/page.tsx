@@ -5,21 +5,53 @@ import Image from "next/image";
 import { useAppContext } from "@/contexts/AppContext";
 import DonationForm from "@/components/streamer/DonationForm";
 import Leaderboard from "@/components/streamer/Leaderboard";
+import DonationFeed from "@/components/streamer/DonationFeed";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
-/**
- * Streamer page — client.
- * Uses AppContext (dbUser) as primary source.
- */
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function StreamerPage() {
   const { dbUser, isLoading, refreshDbUser } = useAppContext();
   const [profile, setProfile] = useState<any>(null);
+  const [liveBalance, setLiveBalance] = useState<number | null>(null);
+  const supabase = getSupabaseBrowserClient();
 
   useEffect(() => {
     setProfile(dbUser);
+    setLiveBalance(Number(dbUser?.metadata?.starsBalance ?? null));
   }, [dbUser]);
+
+  // subscribe to user's metadata.starsBalance changes (best-effort client-side)
+  useEffect(() => {
+    if (!profile?.user_id || !supabase) return;
+    let chan: any;
+    try {
+      const channel = supabase.channel(`public:users:balance-${profile.user_id}`);
+      channel.on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "users", filter: `user_id=eq.${profile.user_id}` },
+        (payload: any) => {
+          const rec = payload?.new;
+          if (!rec) return;
+          const meta = rec.metadata || {};
+          const bal = Number(meta?.starsBalance ?? null);
+          setLiveBalance(Number.isFinite(bal) ? bal : null);
+        }
+      );
+      channel.subscribe();
+      chan = channel;
+    } catch (e) {
+      // ignore realtime errors
+    }
+    return () => {
+      try {
+        if (chan) {
+          if (typeof chan.unsubscribe === "function") chan.unsubscribe();
+          else if (typeof (supabase as any).removeChannel === "function") (supabase as any).removeChannel(chan);
+        }
+      } catch {}
+    };
+  }, [profile?.user_id, supabase]);
 
   if (isLoading || !profile) {
     return (
@@ -54,6 +86,10 @@ export default function StreamerPage() {
                 <div>
                   <CardTitle className="text-2xl">{profile.username || profile.full_name || "Стример"}</CardTitle>
                   <div className="text-sm text-muted-foreground">{profile.description || "Профиль стримера"}</div>
+                  <div className="text-sm mt-1">
+                    <span className="text-xs text-muted-foreground mr-2">Баланс:</span>
+                    <span className="font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</span>
+                  </div>
                 </div>
 
                 <div className="ml-auto flex items-center gap-2">
@@ -102,9 +138,13 @@ export default function StreamerPage() {
                     <div className="text-sm text-muted-foreground">Расписание не настроено. Добавьте в профиль metadata.streamSchedule.</div>
                   )}
 
-                  <div className="mt-4">
+                  <div className="mt-4 space-y-4">
                     <h4 className="font-semibold mb-2">Leaderboard Snapshot</h4>
                     <Leaderboard streamerId={streamerId} />
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-2">Live Donation Feed</h4>
+                      <DonationFeed streamerId={streamerId} />
+                    </div>
                   </div>
                 </div>
               </div>
