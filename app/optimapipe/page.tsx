@@ -11,11 +11,20 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { toast } from "sonner";
 import { getTelegramUser } from "@/lib/telegram";
 
-// /app/optimapipe/page.tsx — оптимизированная версия
-// Улучшено: адаптивность, анимации (framer-motion), accessibility, интеграция с Telegram (клиентская часть), реальная отправка формы на /api/send-contact (server handler должен быть реализован отдельно и вызывать sendComplexMessage)
+/**
+ * /app/optimapipe/page.tsx
+ * Улучшенная версия хиро-секции:
+ * - гарантированно full-screen (min-h-screen),
+ * - Image использует fill + parent height/position корректно,
+ * - unoptimized для внешних URL (dev / при проблемах с next.config),
+ * - кнопки адаптивно стекутся на мобильных (flex-col -> sm:flex-row),
+ * - кнопки становятся full-width на мобильных для UX,
+ * - контент центрируется вертикально,
+ * - лёгкие анимации и улучшения доступности.
+ */
 
 const t = {
-  company: "ООО \"Оптимапайп\"",
+  company: 'ООО "Оптимапайп"',
   subtitle: "Монтаж инженерных сетей — качество и надёжность",
   heroCta: "Заказать оценку проекта",
   servicesTitle: "Наши услуги",
@@ -86,7 +95,9 @@ export default function OptimapipeLandingPage(): JSX.Element {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250817_222630_932-d3181cd6-7fe5-4dcf-94b7-63be826befbf.jpg";
+  const heroImage =
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250817_222630_932-d3181cd6-7fe5-4dcf-94b7-63be826befbf.jpg";
+
   const projects = [
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/5d2ee1919380006ba715e997-4a06c39a-1b5f-4030-a66f-93100060d4ba.jpg",
@@ -94,31 +105,79 @@ export default function OptimapipeLandingPage(): JSX.Element {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground antialiased">
       {/* HERO */}
-      <header className="relative overflow-hidden">
-
-        <div className="absolute inset-0 -z-10">
-          <Image src={heroImage} alt="optimapipe hero" fill style={{ objectFit: "cover" }} priority />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/60" />
+      <header
+        role="banner"
+        className="relative min-h-screen overflow-hidden flex items-center"
+        aria-label="Hero section — Optimapipe"
+      >
+        {/* Background image container — must be absolute and have a positioned parent (header is relative) */}
+        <div className="absolute inset-0 -z-10 bg-gray-900/20">
+          {/* Next Image with fill: parent is absolute inset-0 so Image works.
+              unoptimized added as pragmatic fallback for remote images if next.config.domains not configured.
+              If you have domains added in next.config.js, you can remove unoptimized. */}
+          <Image
+            src={heroImage}
+            alt="Монтаж инженерных сетей — Optimapipe"
+            fill
+            style={{ objectFit: "cover", objectPosition: "center" }}
+            priority
+            unoptimized
+          />
+          {/* gradient overlay for contrast */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/10 to-black/60" aria-hidden />
         </div>
 
-        <div className="container mx-auto px-4 py-24">
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="max-w-4xl text-center mx-auto">
-            <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-bold leading-tight">{t.company}</h1>
-            <p className="mt-4 text-lg text-muted-foreground">{t.subtitle}</p>
-            <div className="mt-8 flex justify-center gap-4">
-              <Button onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })} className="px-6 py-3">
-                <VibeContentRenderer content="::FaPhone::" className="inline mr-2 h-4 w-4" /> {t.heroCta}
-              </Button>
-              <Button variant="ghost" onClick={() => window.scrollTo({ top: 700, behavior: "smooth" })}>
-                Портфолио • Кейсы
-              </Button>
+        {/* Content wrapper — center vertically and horizontally */}
+        <div className="container mx-auto px-4 py-[6vh] md:py-24">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="max-w-4xl mx-auto text-center"
+          >
+            <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white drop-shadow-sm">
+              {t.company}
+            </h1>
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">{t.subtitle}</p>
+
+            {/* Buttons: stack on mobile, row on sm+ */}
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })}
+                  className="w-full sm:w-auto px-6 py-3 font-semibold"
+                  aria-label={t.heroCta}
+                >
+                  <VibeContentRenderer content="::FaPhone::" className="inline mr-2 h-4 w-4 align-text-bottom" />
+                  {t.heroCta}
+                </Button>
+              </motion.div>
+
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    // smooth scroll to projects section if present
+                    const el = document.getElementById("projects");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                    else window.scrollTo({ top: 700, behavior: "smooth" });
+                  }}
+                  className="w-full sm:w-auto px-6 py-3"
+                >
+                  Портфолио • Кейсы
+                </Button>
+              </motion.div>
             </div>
+
+            {/* subtle scroll hint (small) */}
+            <div className="mt-6 text-xs text-muted-foreground opacity-90">Работаем с частными и промышленными объектами — напишите задачу и получите смету</div>
           </motion.div>
         </div>
       </header>
 
+      {/* MAIN */}
       <main className="container mx-auto px-4 py-12 space-y-12">
         {/* SERVICES */}
         <section id="services" className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -127,10 +186,14 @@ export default function OptimapipeLandingPage(): JSX.Element {
           <motion.div whileHover={{ scale: 1.02 }} className="col-span-3 md:col-span-1">
             <Card className="bg-card border-border h-full">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><VibeContentRenderer content="::FaWrench::" /> Монтаж и замена трубопроводов</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <VibeContentRenderer content="::FaWrench::" /> Монтаж и замена трубопроводов
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">Укладка и замена водопроводов, канализации и систем отопления — от частных домов до промышленных объектов.</p>
+                <p className="text-sm text-muted-foreground">
+                  Укладка и замена водопроводов, канализации и систем отопления — от частных домов до промышленных объектов.
+                </p>
                 <ul className="list-inside list-disc mt-3 text-sm text-foreground">
                   <li>Водопровод, канализация, отопление</li>
                   <li>Работа с ПНД, сталью, композитами</li>
@@ -143,10 +206,14 @@ export default function OptimapipeLandingPage(): JSX.Element {
           <motion.div whileHover={{ scale: 1.02 }} className="col-span-3 md:col-span-1">
             <Card className="bg-card border-border h-full">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><VibeContentRenderer content="::FaScrewdriverWrench::" /> Демонтаж и монтаж арматуры</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <VibeContentRenderer content="::FaScrewdriverWrench::" /> Демонтаж и монтаж арматуры
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">Снятие старых коммуникаций, установка и регулировка водозапорной арматуры, обустройство колодцев и КНС.</p>
+                <p className="text-sm text-muted-foreground">
+                  Снятие старых коммуникаций, установка и регулировка водозапорной арматуры, обустройство колодцев и КНС.
+                </p>
                 <ul className="list-inside list-disc mt-3 text-sm text-foreground">
                   <li>Демонтаж старых трубопроводов</li>
                   <li>Монтаж колодцев, септиков и камер</li>
@@ -159,12 +226,15 @@ export default function OptimapipeLandingPage(): JSX.Element {
           <motion.div whileHover={{ scale: 1.02 }} className="col-span-3 md:col-span-1">
             <Card className="bg-card border-border h-full">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><VibeContentRenderer content="::FaLink::" /> Врезки, сварка и соединения</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <VibeContentRenderer content="::FaLink::" /> Врезки, сварка и соединения
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">Точные врезки в существующие сети, сварка ПНД, монтаж муфт и электро-фитингов — без остановки объекта, когда это критично.</p>
+                <p className="text-sm text-muted-foreground">
+                  Точные врезки в существующие сети, сварка ПНД, монтаж муфт и электро-фитингов — без остановки объекта, когда это критично.
+                </p>
                 <ul className="list-inside list-disc mt-3 text-sm text-foreground">
-
                   <li>Бесколодезные задвижки и электро-фитинги</li>
                   <li>Врезка без отключения (если проект позволяет)</li>
                   <li>Контроль качества сварных швов</li>
@@ -178,7 +248,9 @@ export default function OptimapipeLandingPage(): JSX.Element {
         <section id="why" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2">
             <h2 className="text-3xl font-orbitron text-accent">{t.whyTitle}</h2>
-            <p className="mt-3 text-sm text-muted-foreground">Мы объединяем опыт монтажников, инженеров и менеджеров проектов — чтобы ваша стройка шла по плану и без сюрпризов.</p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Мы объединяем опыт монтажников, инженеров и менеджеров проектов — чтобы ваша стройка шла по плану и без сюрпризов.
+            </p>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
@@ -188,7 +260,9 @@ export default function OptimapipeLandingPage(): JSX.Element {
                 { icon: "::FaToolbox::", title: "Технологии", body: "Современные методы сварки, бесшовные врезки и точная исполнительная съемка." },
               ].map((it) => (
                 <div key={it.title} className="p-4 bg-card border border-border rounded">
-                  <h4 className="font-semibold flex items-center gap-2"><VibeContentRenderer content={it.icon} /> {it.title}</h4>
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <VibeContentRenderer content={it.icon} /> {it.title}
+                  </h4>
                   <p className="text-sm text-muted-foreground mt-1">{it.body}</p>
                 </div>
               ))}
@@ -202,12 +276,22 @@ export default function OptimapipeLandingPage(): JSX.Element {
                   <CardTitle>Свяжитесь с нами</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-sm text-foreground mb-3 flex items-center gap-2"><VibeContentRenderer content="::FaPhone::" /> {t.phone}</div>
-                  <div className="text-sm text-foreground mb-3 flex items-center gap-2"><VibeContentRenderer content="::FaEnvelope::" /> {t.email}</div>
-                  <div className="text-sm text-foreground mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaMapLocation::" /> {t.address}</div>
+                  <div className="text-sm text-foreground mb-3 flex items-center gap-2">
+                    <VibeContentRenderer content="::FaPhone::" /> {t.phone}
+                  </div>
+                  <div className="text-sm text-foreground mb-3 flex items-center gap-2">
+                    <VibeContentRenderer content="::FaEnvelope::" /> {t.email}
+                  </div>
+                  <div className="text-sm text-foreground mb-4 flex items-center gap-2">
+                    <VibeContentRenderer content="::FaMapLocation::" /> {t.address}
+                  </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })} className="w-full">Оставить заявку</Button>
-                    <Button variant="ghost" onClick={() => { navigator.clipboard?.writeText(t.phone); setCopied(true); }} className="px-3">{copied ? 'Скопировано' : 'Копировать'}</Button>
+                    <Button onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })} className="w-full">
+                      Оставить заявку
+                    </Button>
+                    <Button variant="ghost" onClick={() => { navigator.clipboard?.writeText(t.phone); setCopied(true); }} className="px-3">
+                      {copied ? "Скопировано" : "Копировать"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -220,18 +304,24 @@ export default function OptimapipeLandingPage(): JSX.Element {
           <h2 className="text-3xl font-orbitron text-accent">Кейсы и проекты</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((src, i) => (
-              <motion.div key={i} whileHover={{ y: -6 }} transition={{ type: 'spring', stiffness: 200 }}>
+              <motion.div key={i} whileHover={{ y: -6 }} transition={{ type: "spring", stiffness: 200 }}>
                 <Card className="bg-card border-border overflow-hidden">
                   <div className="relative h-48 w-full rounded-t overflow-hidden">
-                    <Image src={src} alt={`project-${i}`} fill style={{ objectFit: "cover" }} />
+                    <Image src={src} alt={`project-${i}`} fill style={{ objectFit: "cover" }} unoptimized />
                   </div>
                   <CardContent>
                     <h4 className="font-semibold">Проект #{i + 1} — промышленная сеть</h4>
-
                     <p className="text-sm text-muted-foreground mt-2">Монтаж магистрали, врезки и пуско-наладка. Срок — 6 недель.</p>
                     <div className="mt-4 flex gap-2">
                       <Button variant="ghost">Подробнее</Button>
-                      <Button onClick={() => { navigator.clipboard?.writeText("Контакт: " + t.phone); toast("Скопировано в буфер"); }}>Копировать контакт</Button>
+                      <Button
+                        onClick={() => {
+                          navigator.clipboard?.writeText("Контакт: " + t.phone);
+                          toast.success("Скопировано в буфер обмена");
+                        }}
+                      >
+                        Копировать контакт
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -244,7 +334,9 @@ export default function OptimapipeLandingPage(): JSX.Element {
         <section id="contact" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <h2 className="text-3xl font-orbitron text-accent">{t.contactTitle}</h2>
-            <p className="text-sm text-muted-foreground">Оставьте заявку — менеджер свяжется в рабочее время и подготовит коммерческое предложение.</p>
+            <p className="text-sm text-muted-foreground">
+              Оставьте заявку — менеджер свяжется в рабочее время и подготовит коммерческое предложение.
+            </p>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit} aria-labelledby="contact-title">
               <label className="block">
@@ -268,9 +360,13 @@ export default function OptimapipeLandingPage(): JSX.Element {
                 <Textarea placeholder="Например: замена магистрали 100м, врезка в действующую сеть" value={form.message} onChange={(e) => setForm((s) => ({ ...s, message: e.target.value }))} rows={6} />
               </label>
 
-              <div className="flex gap-3 items-center">
-                <Button type="submit" disabled={sending}>{sending ? "Отправка..." : "Отправить"}</Button>
-                <Button variant="outline" onClick={() => setForm({ name: "", phone: "", email: "", message: "" })}>Очистить</Button>
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                <Button type="submit" disabled={sending} className="w-full sm:w-auto">
+                  {sending ? "Отправка..." : "Отправить"}
+                </Button>
+                <Button variant="outline" onClick={() => setForm({ name: "", phone: "", email: "", message: "" })} className="w-full sm:w-auto">
+                  Очистить
+                </Button>
                 <div className="ml-auto text-sm text-muted-foreground">Мы отвечаем в рабочие часы</div>
               </div>
             </form>
@@ -279,13 +375,19 @@ export default function OptimapipeLandingPage(): JSX.Element {
           <aside className="lg:col-span-1">
             <Card className="bg-card border-border p-6">
               <h4 className="font-semibold">Телефон</h4>
-              <div className="text-sm text-foreground mt-2 flex items-center gap-2"><VibeContentRenderer content="::FaPhone::" /> {t.phone}</div>
+              <div className="text-sm text-foreground mt-2 flex items-center gap-2">
+                <VibeContentRenderer content="::FaPhone::" /> {t.phone}
+              </div>
 
               <h4 className="font-semibold mt-4">Email</h4>
-              <div className="text-sm text-foreground mt-2 flex items-center gap-2"><VibeContentRenderer content="::FaEnvelope::" /> {t.email}</div>
+              <div className="text-sm text-foreground mt-2 flex items-center gap-2">
+                <VibeContentRenderer content="::FaEnvelope::" /> {t.email}
+              </div>
 
               <h4 className="font-semibold mt-4">Адрес</h4>
-              <div className="text-sm text-foreground mt-2 flex items-center gap-2"><VibeContentRenderer content="::FaMapLocation::" /> {t.address}</div>
+              <div className="text-sm text-foreground mt-2 flex items-center gap-2">
+                <VibeContentRenderer content="::FaMapLocation::" /> {t.address}
+              </div>
 
               <div className="mt-6 text-xs text-muted-foreground">Готовы подготовить смету по чертежам или выезду на объект. Работы по договору с актами приёма.</div>
             </Card>
@@ -295,20 +397,27 @@ export default function OptimapipeLandingPage(): JSX.Element {
         {/* FOOTER */}
         <footer className="py-8 text-sm text-muted-foreground">
           <div className="border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
-
             <div>© {new Date().getFullYear()} {t.company} — Все права защищены</div>
             <div className="flex items-center gap-4">
-              <a href={`tel:${t.phone}`} className="hover:underline flex items-center gap-2"><VibeContentRenderer content="::FaPhone::" /> {t.phone}</a>
-              <a href={`mailto:${t.email}`} className="hover:underline flex items-center gap-2"><VibeContentRenderer content="::FaEnvelope::" /> {t.email}</a>
+              <a href={`tel:${t.phone}`} className="hover:underline flex items-center gap-2">
+                <VibeContentRenderer content="::FaPhone::" /> {t.phone}
+              </a>
+              <a href={`mailto:${t.email}`} className="hover:underline flex items-center gap-2">
+                <VibeContentRenderer content="::FaEnvelope::" /> {t.email}
+              </a>
             </div>
           </div>
         </footer>
       </main>
 
       <style jsx>{`
-        .font-orbitron { font-family: 'Orbitron', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+        .font-orbitron {
+          font-family: "Orbitron", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+        }
         @media (max-width: 640px) {
-          main { padding-bottom: 120px; }
+          main {
+            padding-bottom: 120px;
+          }
         }
         /* subtle focus styles for accessibility */
         :global(input:focus, textarea:focus, button:focus) {
