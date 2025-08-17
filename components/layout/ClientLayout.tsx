@@ -112,7 +112,7 @@ function AppInitializers() {
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   "elon": "/elon", "musk_market": "/elon", "arbitrage_seeker": "/elon", "topdf_psycho": "/topdf",
-  "settings": "/settings", "profile": "/profile",
+  "settings": "/settings", "profile": "/profile", "sauna": "/sauna-rent", "streamer": "/streamer", "demo": "/about_en"
 };
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
@@ -182,7 +182,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const showBottomNav = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)) || pathname === "/";
   
   useEffect(() => {
-    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent"));
+    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" || pathname === "/streamer" || pathname === "/blogger" || pathname === "/"));
   }, [pathname]);
 
   const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
