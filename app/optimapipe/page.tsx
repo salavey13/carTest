@@ -14,12 +14,8 @@ import { getTelegramUser } from "@/lib/telegram";
 
 /**
  * /app/optimapipe/page.tsx
- * Исправленный хиро + визуальные улучшения для визитки.
- * - уверенный full-screen хиро,
- * - Image с fill и fallback (если загрузка падает — показываем затемнённый градиент),
- * - контент над картинкой (relative z-10),
- * - улучшенные CTA на мобиле, читабельность текста,
- * - адаптивность и небольшие анимации.
+ * Hero color fix: subtitle and hint changed to light colors so they are readable on dark hero image.
+ * Other small readability tweaks included (stronger translucent backdrop behind heading).
  */
 
 const t = {
@@ -149,19 +145,21 @@ export default function OptimapipeLandingPage(): JSX.Element {
             transition={{ duration: 0.6 }}
             className="max-w-4xl mx-auto text-center"
           >
-            {/* Лёгкий стек и фон за заголовком для читаемости */}
-            <div className="inline-block px-4 py-2 rounded-md bg-black/30 backdrop-blur-sm">
+            {/* Stronger translucent backdrop behind heading to improve contrast */}
+            <div className="inline-block px-5 py-3 rounded-md bg-black/45 backdrop-blur-sm">
               <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white drop-shadow-md">
                 {t.company}
               </h1>
             </div>
 
-            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">{t.subtitle}</p>
+            {/* subtitle: make text light so it's readable on dark hero */}
+            <p className="mt-4 text-lg text-white/90 max-w-2xl mx-auto">{t.subtitle}</p>
 
             {/* Buttons: stack on mobile, row on sm+ */}
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
               <motion.div whileTap={{ scale: 0.98 }}>
                 <Button
+                  variant="primary"
                   onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })}
                   className="w-full sm:w-auto px-6 py-3 font-semibold shadow-lg"
                   aria-label={t.heroCta}
@@ -174,7 +172,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
               <motion.div whileTap={{ scale: 0.98 }}>
                 <Link href="#projects">
                   <a>
-                    <Button variant="ghost" className="w-full sm:w-auto px-6 py-3">
+                    <Button variant="accent" className="w-full sm:w-auto px-6 py-3">
                       Портфолио • Кейсы
                     </Button>
                   </a>
@@ -182,8 +180,8 @@ export default function OptimapipeLandingPage(): JSX.Element {
               </motion.div>
             </div>
 
-            {/* subtle scroll hint (small) */}
-            <div className="mt-6 text-xs text-muted-foreground opacity-90">Работаем с частными и промышленными объектами — напишите задачу и получите смету</div>
+            {/* subtle scroll hint (small) — light color */}
+            <div className="mt-6 text-xs text-white/70 opacity-95">Работаем с частными и промышленными объектами — напишите задачу и получите смету</div>
           </motion.div>
         </div>
       </header>
