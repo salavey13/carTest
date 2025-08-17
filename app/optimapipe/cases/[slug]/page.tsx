@@ -37,8 +37,48 @@ type CaseItem = {
 };
 
 const CASES: CaseItem[] = [
-  // ... same as before
+  {
+    slug: "project-1",
+    title: "Монтаж магистрали — ЖК «Новая Роща»",
+    subtitle: "Прокладка и врезки магистрали под напряжённым графиком",
+    description:
+      "Полный цикл работ: трассировка, прокладка ПНД трубопровода, врезки с минимальным простоем объекта и пусконаладочные работы. Применены бесколодезные врезки, сварка электрофитингов, исполнительная документация.",
+    images: [
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/5d2ee1919380006ba715e997-4a06c39a-1b5f-4030-a66f-93100060d4ba.jpg",
+    ],
+    period: "Май — Июнь 2024",
+    tags: ["ПНД", "врезка", "пусконаладка"],
+    contactNote: "По вопросам аналогичных работ — можно запросить смету по чертежам.",
+  },
+  {
+    slug: "project-2",
+    title: "Реконструкция трубопровода — Завод «СтройМет»",
+    subtitle: "Смена магистрали и монтаж исполнительной схемы",
+    description:
+      "Комплексная замена старой магистрали на современную — включая демонтаж, монтаж, сварочные работы и сдачу объекта по акту. Работы выполнены с учётом требований безопасности и норм.",
+    images: [
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/5d2ee1919380006ba715e997-4a06c39a-1b5f-4030-a66f-93100060d4ba.jpg",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_0455-53b7a2ea-4449-401a-be76-70b786973c73.png",
+    ],
+    period: "Август — Сентябрь 2023",
+    tags: ["демонтаж", "сварка", "индустриальный"],
+  },
+  {
+    slug: "project-3",
+    title: "Врезка в действующую сеть — ЖК «Береговой»",
+    subtitle: "Оперативная врезка без остановки подачи",
+    description:
+      "Точная врезка в действующую сеть с использованием современного оборудования. Работы выполнены в ночные смены для минимизации неудобств и простоев. Контроль качества сварных соединений выполнен по регламенту.",
+    images: [
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_0455-53b7a2ea-4449-401a-be76-70b786973c73.png",
+      "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
+    ],
+    period: "Ноябрь 2022",
+    tags: ["врезка", "ночные работы", "контроль качества"],
+  },
 ];
+
 
 export default function CasePage({ params }: { params: { slug: string } }) {
   const router = useRouter();
