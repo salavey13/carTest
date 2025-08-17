@@ -87,7 +87,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
     }
   }
 
-  const heroImage = "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1600&auto=format&fit=crop&ixlib=rb-4.0.3&s=bd8b1c1d7f8b1b8d2a2b3c4d5e6f7a8b";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250817_222630_932-d3181cd6-7fe5-4dcf-94b7-63be826befbf.jpg";
   const projects = [
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/5d2ee1919380006ba715e997-4a06c39a-1b5f-4030-a66f-93100060d4ba.jpg",
@@ -98,6 +98,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
     <div className="min-h-screen bg-background text-foreground">
       {/* HERO */}
       <header className="relative overflow-hidden">
+
         <div className="absolute inset-0 -z-10">
           <Image src={heroImage} alt="optimapipe hero" fill style={{ objectFit: "cover" }} priority />
           <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/60" />
@@ -164,6 +165,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
               <CardContent>
                 <p className="text-sm text-muted-foreground">Точные врезки в существующие сети, сварка ПНД, монтаж муфт и электро-фитингов — без остановки объекта, когда это критично.</p>
                 <ul className="list-inside list-disc mt-3 text-sm text-foreground">
+
                   <li>Бесколодезные задвижки и электро-фитинги</li>
                   <li>Врезка без отключения (если проект позволяет)</li>
                   <li>Контроль качества сварных швов</li>
@@ -226,6 +228,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
                   </div>
                   <CardContent>
                     <h4 className="font-semibold">Проект #{i + 1} — промышленная сеть</h4>
+
                     <p className="text-sm text-muted-foreground mt-2">Монтаж магистрали, врезки и пуско-наладка. Срок — 6 недель.</p>
                     <div className="mt-4 flex gap-2">
                       <Button variant="ghost">Подробнее</Button>
@@ -293,6 +296,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
         {/* FOOTER */}
         <footer className="py-8 text-sm text-muted-foreground">
           <div className="border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
+
             <div>© {new Date().getFullYear()} {t.company} — Все права защищены</div>
             <div className="flex items-center gap-4">
               <a href={`tel:${t.phone}`} className="hover:underline flex items-center gap-2"><VibeContentRenderer content="::FaPhone::" /> {t.phone}</a>
