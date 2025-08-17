@@ -1,4 +1,3 @@
-// /app/optimapipe/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -91,7 +90,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
   const projects = [
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/5d2ee1919380006ba715e997-4a06c39a-1b5f-4030-a66f-93100060d4ba.jpg",
-    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/c7490ac7de2947b59cbc575aed90e586 (1)-f1fe38a0-1172-43df-927a-14ef84efa5da.png",
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2965769-013f70ea-5a13-479e-9baa-2a75eb972b13.jpg",
   ];
 
   return (
@@ -185,8 +184,8 @@ export default function OptimapipeLandingPage(): JSX.Element {
               {[
                 { icon: "::FaShieldAlt::", title: "Надёжность", body: "Сертифицированное оборудование, трассировка работ и гарантия на монтаж." },
                 { icon: "::FaClock::", title: "Сроки", body: "Планируем работу так, чтобы минимизировать простой объекта и уложиться в бюджет." },
-                { icon: "::FaHardHat::", title: "Безопасность", body: "Полное соблюдение техники безопасности и СНИП / ГОСТ при выполнении работ." },
-                { icon: "::FaCog::", title: "Технологии", body: "Современные методы сварки, бесшовные врезки и точная исполнительная съемка." },
+                { icon: "::FaHelmetSafety::", title: "Безопасность", body: "Полное соблюдение техники безопасности и СНИП / ГОСТ при выполнении работ." },
+                { icon: "::FaToolbox::", title: "Технологии", body: "Современные методы сварки, бесшовные врезки и точная исполнительная съемка." },
               ].map((it) => (
                 <div key={it.title} className="p-4 bg-card border border-border rounded">
                   <h4 className="font-semibold flex items-center gap-2"><VibeContentRenderer content={it.icon} /> {it.title}</h4>
@@ -205,7 +204,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
                 <CardContent>
                   <div className="text-sm text-foreground mb-3 flex items-center gap-2"><VibeContentRenderer content="::FaPhone::" /> {t.phone}</div>
                   <div className="text-sm text-foreground mb-3 flex items-center gap-2"><VibeContentRenderer content="::FaEnvelope::" /> {t.email}</div>
-                  <div className="text-sm text-foreground mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaMapMarkerAlt::" /> {t.address}</div>
+                  <div className="text-sm text-foreground mb-4 flex items-center gap-2"><VibeContentRenderer content="::FaMapLocation::" /> {t.address}</div>
                   <div className="flex gap-2">
                     <Button onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })} className="w-full">Оставить заявку</Button>
                     <Button variant="ghost" onClick={() => { navigator.clipboard?.writeText(t.phone); setCopied(true); }} className="px-3">{copied ? 'Скопировано' : 'Копировать'}</Button>
@@ -286,7 +285,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
               <div className="text-sm text-foreground mt-2 flex items-center gap-2"><VibeContentRenderer content="::FaEnvelope::" /> {t.email}</div>
 
               <h4 className="font-semibold mt-4">Адрес</h4>
-              <div className="text-sm text-foreground mt-2 flex items-center gap-2"><VibeContentRenderer content="::FaMapMarkerAlt::" /> {t.address}</div>
+              <div className="text-sm text-foreground mt-2 flex items-center gap-2"><VibeContentRenderer content="::FaMapLocation::" /> {t.address}</div>
 
               <div className="mt-6 text-xs text-muted-foreground">Готовы подготовить смету по чертежам или выезду на объект. Работы по договору с актами приёма.</div>
             </Card>
