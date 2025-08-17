@@ -1,280 +1,422 @@
 "use client";
-import React, { useState, useEffect, useId } from "react";
-import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
+import React, { useEffect, useId, useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-// ИЗМЕНЕНИЕ: Полностью удален импорт из 'lucide-react'
+import { v4 as uuidv4 } from "uuid";
+
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
-import { v4 as uuidv4 } from 'uuid';
+import { supabaseAdmin, uploadImage } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
 
-type VehicleData = Partial<Database['public']['Tables']['cars']['Row']>;
+type VehicleData = Partial<Database["public"]["Tables"]["cars"]["Row"]>;
+
+type CarType = "car" | "bike" | "cross" | "sauna" | "blog" | "stream";
 type SpecItem = { id: string; key: string; value: string };
 type GalleryItem = { id: string; url: string };
-type BikeSubtype = 'road' | 'enduro'; // Визуальный подтип для формы
 
-interface CarSubmissionFormProps {
-  ownerId?: string;
+/**
+ * Universal CarSubmissionForm (components/CarSubmissionForm.tsx)
+ * - supports types: car, bike, cross, sauna, blog, stream
+ * - writes to public.cars using supabaseAdmin (insert/update)
+ * - for blog & stream stores extra data in specs JSONB
+ */
+
+interface Props {
+  ownerId?: string | null;
   vehicleToEdit?: VehicleData | null;
-  onSuccess?: () => void;
+  onSuccess?: (row?: any) => void;
 }
 
-// Оригинальные спеки для шоссейных мотоциклов
-const roadBikeSpecKeys = ["engine_cc", "horsepower", "weight_kg", "top_speed_kmh", "type", "seat_height_mm"];
-// Новые спеки для эндуро/кросс
-const enduroBikeSpecKeys = ["engine_cc", "dry_weight_kg", "seat_height_mm", "suspension_travel_mm", "ground_clearance_mm", "bike_class", "horsepower", "fuel_tank_capacity_l"];
+export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSuccess }: Props) {
+  const formId = useId();
+  const isEdit = !!vehicleToEdit;
 
-export function CarSubmissionForm({ ownerId, vehicleToEdit, onSuccess }: CarSubmissionFormProps) {
-  const isEditMode = !!vehicleToEdit;
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [bikeSubtype, setBikeSubtype] = useState<BikeSubtype>('road'); // Состояние для подтипа
-  const [formData, setFormData] = useState({
-    make: "", model: "", description: "", daily_price: "", image_url: "",
-  });
+  // core fields
+  const [type, setType] = useState<CarType>((vehicleToEdit?.type as CarType) ?? "bike");
+  const [make, setMake] = useState(vehicleToEdit?.make ?? "");
+  const [model, setModel] = useState(vehicleToEdit?.model ?? "");
+  const [description, setDescription] = useState(vehicleToEdit?.description ?? "");
+  const [dailyPrice, setDailyPrice] = useState<string>(vehicleToEdit?.daily_price ? String(vehicleToEdit.daily_price) : "0");
+  const [imageUrl, setImageUrl] = useState(vehicleToEdit?.image_url ?? "");
+  const [rentLink, setRentLink] = useState(vehicleToEdit?.rent_link ?? "");
+  const [isTest, setIsTest] = useState<boolean>(!!vehicleToEdit?.is_test_result);
+  const [ownerIdState, setOwnerIdState] = useState<string | null>(ownerId ?? (vehicleToEdit?.owner_id ?? null));
+
+  // gallery and specs (for bikes etc.)
   const [specs, setSpecs] = useState<SpecItem[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const formId = useId();
+  const [imagePreview, setImagePreview] = useState<string | null>(vehicleToEdit?.image_url ?? null);
+
+  // blog/stream editors
+  const [blogTitle, setBlogTitle] = useState<string>((vehicleToEdit?.specs as any)?.title ?? "");
+  const [blogSlug, setBlogSlug] = useState<string>(vehicleToEdit?.model ?? "");
+  const [blogExcerpt, setBlogExcerpt] = useState<string>((vehicleToEdit?.specs as any)?.excerpt ?? "");
+  const [blogContent, setBlogContent] = useState<string>((vehicleToEdit?.specs as any)?.content ?? "");
+  const [streamTitle, setStreamTitle] = useState<string>((vehicleToEdit?.specs as any)?.title ?? "");
+  const [streamSlug, setStreamSlug] = useState<string>((vehicleToEdit?.model ?? ""));
+  const [streamSpecsRaw, setStreamSpecsRaw] = useState<string>(() => {
+    if (vehicleToEdit?.specs) return JSON.stringify(vehicleToEdit.specs, null, 2);
+    return "";
+  });
+
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (vehicleToEdit) {
-      setFormData({
-        make: vehicleToEdit.make || "", model: vehicleToEdit.model || "", description: vehicleToEdit.description || "",
-        daily_price: vehicleToEdit.daily_price?.toString() || "", image_url: vehicleToEdit.image_url || "",
-      });
-      setImagePreview(vehicleToEdit.image_url || null);
-      setImageFile(null);
-      
-      if (vehicleToEdit.specs && typeof vehicleToEdit.specs === 'object') {
-        const specEntries = Object.entries(vehicleToEdit.specs);
-        const regularSpecs = specEntries.filter(([key]) => key !== 'gallery').map(([key, value]) => ({ id: uuidv4(), key, value: String(value) }));
-        setSpecs(regularSpecs);
+    // hydrate specs & gallery from edit
+    if (vehicleToEdit?.specs && typeof vehicleToEdit.specs === "object") {
+      const s = vehicleToEdit.specs as Record<string, any>;
+      const entries = Object.entries(s).filter(([k]) => k !== "gallery");
+      setSpecs(entries.map(([key, value]) => ({ id: uuidv4(), key, value: String(value) })));
+      const g = Array.isArray(s.gallery) ? s.gallery.map((url: string) => ({ id: uuidv4(), url })) : [];
+      setGallery(g);
 
-        const vehicleKeys = Object.keys(vehicleToEdit.specs);
-        if (vehicleKeys.some(key => ['suspension_travel_mm', 'ground_clearance_mm', 'bike_class'].includes(key))) {
-            setBikeSubtype('enduro');
-        } else {
-            setBikeSubtype('road');
-        }
-
-        const galleryUrls = (vehicleToEdit.specs as any).gallery || [];
-        setGallery(galleryUrls.map((url: string) => ({ id: uuidv4(), url })));
-      } else {
-        setSpecs([]);
-        setGallery([]);
-        setBikeSubtype('road');
+      // blog/stream fields
+      if (vehicleToEdit.type === "blog") {
+        setBlogTitle(s.title ?? "");
+        setBlogSlug(vehicleToEdit.model ?? "");
+        setBlogExcerpt(s.excerpt ?? "");
+        setBlogContent(s.content ?? "");
       }
-    } else {
-      setFormData({ make: "", model: "", description: "", daily_price: "", image_url: "" });
-      setSpecs([]);
-      setGallery([]);
-      setImageFile(null);
-      setImagePreview(null);
-      setBikeSubtype('road');
+      if (vehicleToEdit.type === "stream") {
+        setStreamTitle(s.title ?? "");
+        setStreamSlug(vehicleToEdit.model ?? "");
+        setStreamSpecsRaw(JSON.stringify(s, null, 2));
+      }
     }
   }, [vehicleToEdit]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
+  // helpers for specs/gallery
+  function addSpec() {
+    setSpecs((prev) => [...prev, { id: uuidv4(), key: "", value: "" }]);
+  }
+  function updateSpec(id: string, field: "key" | "value", value: string) {
+    setSpecs((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+  }
+  function removeSpec(id: string) {
+    setSpecs((prev) => prev.filter((p) => p.id !== id));
+  }
+  function addGallery() {
+    setGallery((g) => [...g, { id: uuidv4(), url: "" }]);
+  }
+  function updateGallery(id: string, url: string) {
+    setGallery((g) => g.map((it) => (it.id === id ? { ...it, url } : it)));
+  }
+  function removeGallery(id: string) {
+    setGallery((g) => g.filter((it) => it.id !== id));
+  }
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
     setImageFile(file);
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.onload = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
     } else {
-      setImagePreview(formData.image_url || null);
+      setImagePreview(imageUrl || null);
     }
-  };
+  }
 
-  const handleSpecChange = (id: string, field: 'key' | 'value', newValue: string) => {
-    setSpecs(s => s.map(spec => spec.id === id ? { ...spec, [field]: newValue } : spec));
-  };
+  // sample stream JSON
+  function insertSampleStream() {
+    const sample = {
+      title: "Demo VIP Stream",
+      slug: `demo-${Date.now()}`,
+      startAt: null,
+      endAt: null,
+      sections: [
+        { id: `s-${Date.now()}-1`, title: "Intro", type: "text", text: "Привет, VIP!", durationSec: 12 },
+        { id: `s-${Date.now()}-2`, title: "Sauna Pack", type: "image", mediaUrl: "https://source.unsplash.com/random/1200x800/?sauna", durationSec: 18 },
+      ],
+    };
+    setStreamSpecsRaw(JSON.stringify(sample, null, 2));
+    setStreamTitle(String(sample.title));
+    setStreamSlug(String(sample.slug));
+    toast.success("Sample stream inserted — отредактируй по вкусу");
+  }
 
-  const addNewSpec = () => {
-    const currentSpecKeys = specs.map(s => s.key);
-    const availableKeys = bikeSubtype === 'enduro' ? enduroBikeSpecKeys : roadBikeSpecKeys;
-    const nextKey = availableKeys.find(k => !currentSpecKeys.includes(k));
-    setSpecs(currentSpecs => [...currentSpecs, { id: uuidv4(), key: nextKey || "", value: "" }]);
-  };
+  // validation + build specs object
+  function buildSpecsObject(): Record<string, any> {
+    const obj: Record<string, any> = {};
+    specs.forEach((s) => {
+      if (s.key) obj[s.key] = s.value;
+    });
+    const galleryUrls = gallery.map((g) => g.url).filter(Boolean);
+    if (galleryUrls.length) obj.gallery = galleryUrls;
 
-  const removeSpec = (id: string) => setSpecs(s => s.filter(spec => spec.id !== id));
-  const handleGalleryChange = (id: string, url: string) => {
-    setGallery(g => g.map(item => item.id === id ? { ...item, url } : item));
-  };
-  const addNewGalleryItem = () => setGallery(g => [...g, { id: uuidv4(), url: "" }]);
-  const removeGalleryItem = (id: string) => setGallery(g => g.filter(item => item.id !== id));
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ownerId && !isEditMode) {
-        toast.error("Ошибка: ID пользователя не найден. Авторизуйтесь заново.");
-        return;
+    // blog type fields override (store inside specs)
+    if (type === "blog") {
+      obj.title = blogTitle || make || "Blog post";
+      obj.slug = blogSlug || model || `${(blogTitle || "post").toLowerCase().replace(/\s+/g, "-")}`;
+      obj.excerpt = blogExcerpt;
+      obj.content = blogContent;
+      if (!obj.cover_url && imageUrl) obj.cover_url = imageUrl;
     }
-    setIsSubmitting(true);
-    toast.info(isEditMode ? "Обновление техники..." : "Добавление техники...");
-    try {
-      let imageUrl = formData.image_url;
-      if (imageFile) {
-        const uploadResult = await uploadImage("carpix", imageFile);
-        if (uploadResult.success && uploadResult.publicUrl) {
-            imageUrl = uploadResult.publicUrl;
-            toast.success("Изображение обновлено!");
-        } else {
-            throw new Error(uploadResult.error || "Не удалось загрузить изображение.");
+
+    // stream type: parse raw JSON if provided, otherwise use streamTitle/sections as minimal
+    if (type === "stream") {
+      if (streamSpecsRaw) {
+        try {
+          const parsed = JSON.parse(streamSpecsRaw);
+          return { ...obj, ...parsed };
+        } catch (e) {
+          // if invalid JSON, still include basic fields and a note
+          obj._parse_error = "Invalid JSON in stream specs";
+          obj.title = streamTitle || make || "Stream";
+          obj.slug = streamSlug || model || `stream-${Date.now()}`;
+          return obj;
         }
+      } else {
+        obj.title = streamTitle || make || "Stream";
+        obj.slug = streamSlug || model || `stream-${Date.now()}`;
       }
-      if (!imageUrl) throw new Error("Необходимо указать URL изображения или загрузить файл.");
-      
-      const specsObject = specs.reduce((acc, { key, value }) => {
-        if (key) acc[key] = value;
-        return acc;
-      }, {} as Record<string, any>);
-      
-      const galleryUrls = gallery.map(item => item.url).filter(Boolean);
-      if (galleryUrls.length > 0) {
-        specsObject.gallery = galleryUrls;
+    }
+
+    return obj;
+  }
+
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
+    setSaving(true);
+    toast.info(isEdit ? "Обновляю..." : "Сохраняю...");
+
+    try {
+      if (!isEdit && !ownerIdState) {
+        throw new Error("ownerId required for creation (login required)");
       }
 
-      const vehicleData = {
-        make: formData.make, model: formData.model, description: formData.description,
-        specs: specsObject, daily_price: Number(formData.daily_price), image_url: imageUrl, type: 'bike',
+      // upload image if provided
+      let finalImageUrl = imageUrl;
+      if (imageFile) {
+        const up = await uploadImage("carpix", imageFile);
+        if (!up.success) throw new Error(up.error || "Image upload failed");
+        finalImageUrl = up.publicUrl;
+        toast.success("Изображение загружено");
+      }
+
+      if (!finalImageUrl) {
+        throw new Error("Укажите изображение (url или загрузку)");
+      }
+
+      // build payload
+      const specsObject = buildSpecsObject();
+
+      const payload: Partial<Database["public"]["Tables"]["cars"]["Insert"]> = {
+        make: make || (type === "blog" ? (specsObject.title ?? "blog") : "unknown"),
+        model: model || (type === "blog" ? (specsObject.slug ?? `blog-${Date.now()}`) : `item-${Date.now()}`),
+        description: description || (specsObject.excerpt ?? ""),
+        specs: specsObject,
+        daily_price: Number(dailyPrice || 0),
+        image_url: finalImageUrl,
+        rent_link: rentLink || "",
+        is_test_result: Boolean(isTest),
+        type: type,
+        owner_id: ownerIdState ?? null,
       };
 
-      if (isEditMode) {
-        const { error } = await supabaseAdmin.from("cars").update(vehicleData).eq('id', vehicleToEdit.id!);
+      if (isEdit && vehicleToEdit?.id) {
+        const { error } = await supabaseAdmin.from("cars").update(payload).eq("id", vehicleToEdit.id);
         if (error) throw error;
-        toast.success("Техника успешно обновлена!");
+        toast.success("Успешно обновлено");
+        onSuccess?.(payload);
       } else {
-        const id = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}-${uuidv4().substring(0,8)}`;
-        const { error } = await supabaseAdmin.from("cars").insert([{ ...vehicleData, id, owner_id: ownerId! }]);
+        // generate id if not provided
+        const id = `${(payload.make || "item").toString().toLowerCase().replace(/\s+/g, "-")}-${(payload.model || "x").toString().toLowerCase().replace(/\s+/g, "-")}-${uuidv4().slice(0, 8)}`;
+        const { error } = await supabaseAdmin.from("cars").insert([{ id, ...payload }]);
         if (error) throw error;
-        toast.success("Техника успешно добавлена в гараж!");
+        toast.success("Успешно добавлено в public.cars");
+        onSuccess?.({ id, ...payload });
       }
-      onSuccess?.();
-    } catch (error) {
-      toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Неизвестная ошибка")}`);
+    } catch (err: any) {
+      console.error("CarSubmissionForm error:", err);
+      toast.error(err?.message || "Ошибка сохранения");
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
-  };
+  }
 
   return (
     <motion.form
       key={formId}
       onSubmit={handleSubmit}
-      className="space-y-6 bg-card/50 p-4 md:p-6 rounded-xl border border-border backdrop-blur-sm"
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-4 bg-card/95 p-4 md:p-6 rounded-xl border border-border shadow-sm"
     >
-      <div className="flex justify-center gap-4 p-2 bg-input/50 rounded-lg border border-dashed border-border">
-          {/* ИЗМЕНЕНИЕ: Lucide иконки заменены на VibeContentRenderer */}
-          <Button type="button" onClick={() => setBikeSubtype('road')} variant={bikeSubtype === 'road' ? 'secondary' : 'ghost'} className="gap-2">
-            <VibeContentRenderer content="::FaRoad::"/> Шоссейный
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-orbitron text-foreground">Добавить / Редактировать запись</h3>
+        <div className="flex items-center gap-2">
+          <select value={type} onChange={(e) => setType(e.target.value as CarType)} className="input-cyber text-sm">
+            <option value="car">Car</option>
+            <option value="bike">Bike</option>
+            <option value="cross">Cross</option>
+            <option value="sauna">Sauna</option>
+            <option value="blog">Blog (post)</option>
+            <option value="stream">Stream (overlay)</option>
+          </select>
+          <Button type="button" variant="ghost" onClick={() => { setOwnerIdState(ownerId ?? ownerIdState); toast.success("Owner ID synced"); }}>
+            Sync owner
           </Button>
-          <Button type="button" onClick={() => setBikeSubtype('enduro')} variant={bikeSubtype === 'enduro' ? 'secondary' : 'ghost'} className="gap-2">
-            <VibeContentRenderer content="::FaMountain::"/> Эндуро/Кросс
-          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* generic fields */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <Label className="text-sm font-mono text-accent-text mb-1.5 block">Марка</Label>
-          <Input value={formData.make} onChange={e => setFormData(p => ({ ...p, make: e.target.value }))} placeholder={bikeSubtype === 'road' ? 'Ducati' : 'KTM'} className="input-cyber" required/>
+          <Label className="text-xs text-muted-foreground">Make / Title</Label>
+          <Input value={make} onChange={(e) => setMake(e.target.value)} className="input-cyber" placeholder={type === "blog" ? "Заголовок поста" : "Марка / Title"} />
         </div>
         <div>
-          <Label className="text-sm font-mono text-accent-text mb-1.5 block">Модель</Label>
-          <Input value={formData.model} onChange={e => setFormData(p => ({ ...p, model: e.target.value }))} placeholder={bikeSubtype === 'road' ? 'Panigale V4' : '300 EXC'} className="input-cyber" required/>
-        </div>
-      </div>
-      <div>
-        <Label className="text-sm font-mono text-accent-text mb-1.5 block">Описание</Label>
-        <Textarea value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} placeholder="Краткое, но зажигательное описание..." className="textarea-cyber" required/>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-mono text-accent-text mb-2">Характеристики</h3>
-        <p className="text-xs text-muted-foreground mb-3 -mt-2">
-            {bikeSubtype === 'road' ? 'Спецификации для шоссейных мотоциклов.' : 'Спецификации для внедорожной техники.'}
-        </p>
-        <div className="space-y-2">
-          {specs.map((spec) => (
-            <motion.div key={spec.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
-              <Input value={spec.key} onChange={e => handleSpecChange(spec.id, 'key', e.target.value)} placeholder="Ключ" className="input-cyber flex-[2]" />
-              <Input value={spec.value} onChange={e => handleSpecChange(spec.id, 'value', e.target.value)} placeholder="Значение" className="input-cyber flex-[3]" />
-              {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
-              <Button type="button" onClick={() => removeSpec(spec.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0">
-                <VibeContentRenderer content="::FaXmark::" className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          ))}
-          {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
-          <Button type="button" onClick={addNewSpec} variant="outline" className="w-full gap-2">
-            <VibeContentRenderer content="::FaCirclePlus::" className="h-4 w-4" /> Добавить характеристику
-          </Button>
+          <Label className="text-xs text-muted-foreground">Model / Slug</Label>
+          <Input value={model} onChange={(e) => setModel(e.target.value)} className="input-cyber" placeholder={type === "blog" ? "slug-для-url" : "Модель / slug"} />
         </div>
       </div>
 
-      {isEditMode && (
       <div>
-        <h3 className="text-lg font-mono text-primary mb-2">Фотогалерея</h3>
-        <div className="space-y-2">
-          {gallery.map(item => (
-            <motion.div key={item.id} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2 items-center">
-              <div className="w-10 h-10 flex-shrink-0 bg-card/50 rounded border border-border flex items-center justify-center">
-                <Image src={item.url || 'https://placehold.co/36x36/000000/31343C/png?text=??'} alt="Gallery preview" width={36} height={36} className="object-cover rounded-sm" />
+        <Label className="text-xs text-muted-foreground">Описание (кратко)</Label>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="textarea-cyber" placeholder="Короткое описание" />
+      </div>
+
+      {/* bike-specific specs editor (also used for car/sauna generic extra fields) */}
+      {(type === "bike" || type === "cross" || type === "car" || type === "sauna") && (
+        <>
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Характеристики (Specs)</h4>
+            <p className="text-xs text-muted-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается.</p>
+            <div className="space-y-2">
+              {specs.map((s) => (
+                <div key={s.id} className="flex gap-2">
+                  <Input value={s.key} onChange={(e) => updateSpec(s.id, "key", e.target.value)} placeholder="ключ (например engine_cc)" className="input-cyber" />
+                  <Input value={s.value} onChange={(e) => updateSpec(s.id, "value", e.target.value)} placeholder="значение" className="input-cyber" />
+                  <Button type="button" variant="destructive" onClick={() => removeSpec(s.id)}>Удалить</Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button type="button" onClick={addSpec} variant="outline">Добавить характеристику</Button>
+                <Button type="button" onClick={() => { setSpecs([]); toast.success("Specs очищены"); }} variant="ghost">Очистить</Button>
               </div>
-              <Input value={item.url} onChange={e => handleGalleryChange(item.id, e.target.value)} placeholder="https://.../image.jpg" className="input-cyber" />
-              {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
-              <Button type="button" onClick={() => removeGalleryItem(item.id)} variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0">
-                <VibeContentRenderer content="::FaXmark::" className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          ))}
-          {/* ИЗМЕНЕНИЕ: Lucide иконка заменена на VibeContentRenderer */}
-          <Button type="button" onClick={addNewGalleryItem} variant="outline" className="w-full gap-2">
-            <VibeContentRenderer content="::FaCirclePlus::" className="h-4 w-4" /> Добавить фото в галерею
-          </Button>
-        </div>
-      </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-semibold text-foreground">Gallery (optional)</h4>
+            <div className="space-y-2">
+              {gallery.map((g) => (
+                <div key={g.id} className="flex gap-2 items-center">
+                  <div className="w-12 h-8 overflow-hidden rounded-sm bg-muted/30 border border-border">
+                    {g.url ? <Image src={g.url} alt="preview" width={120} height={80} className="object-cover" /> : <div className="text-xs text-muted-foreground p-2">no</div>}
+                  </div>
+                  <Input value={g.url} onChange={(e) => updateGallery(g.id, e.target.value)} className="input-cyber" placeholder="https://..." />
+                  <Button type="button" variant="destructive" onClick={() => removeGallery(g.id)}>Удалить</Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Button type="button" onClick={addGallery} variant="outline">Добавить фото</Button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-              <Label className="text-sm font-mono text-accent-text mb-1.5 block">Цена за день (₽)</Label>
-              <Input type="number" value={formData.daily_price} onChange={e => setFormData(p => ({ ...p, daily_price: e.target.value }))} placeholder="999" className="input-cyber" required />
+      {/* blog editor */}
+      {type === "blog" && (
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">Blog post — content</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Title</Label>
+              <Input value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} className="input-cyber" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Slug</Label>
+              <Input value={blogSlug} onChange={(e) => setBlogSlug(e.target.value)} className="input-cyber" />
+            </div>
           </div>
-          <div>
-              <Label className="text-sm font-mono text-accent-text mb-1.5 block">Главное изображение</Label>
-              <div className="flex gap-2">
-                  <Input value={formData.image_url} onChange={e => {setFormData(p => ({ ...p, image_url: e.target.value })); setImagePreview(e.target.value); setImageFile(null);}} placeholder="https://..." className="input-cyber" />
-                  <Button asChild variant="outline" className="flex-shrink-0"><Label htmlFor="image-upload" className="cursor-pointer"><VibeContentRenderer content="::FaUpload::" /></Label></Button>
-                  <input id="image-upload" type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-              </div>
+          <div className="mt-2">
+            <Label className="text-xs text-muted-foreground">Excerpt</Label>
+            <Textarea value={blogExcerpt} onChange={(e) => setBlogExcerpt(e.target.value)} className="textarea-cyber" />
           </div>
+          <div className="mt-2">
+            <Label className="text-xs text-muted-foreground">Content (HTML allowed)</Label>
+            <Textarea value={blogContent} onChange={(e) => setBlogContent(e.target.value)} className="textarea-cyber" minLength={0} />
+          </div>
+        </div>
+      )}
+
+      {/* stream editor */}
+      {type === "stream" && (
+        <div>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-foreground">Stream overlay — config</h4>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={insertSampleStream}>Insert sample</Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Stream title</Label>
+              <Input value={streamTitle} onChange={(e) => setStreamTitle(e.target.value)} className="input-cyber" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Slug</Label>
+              <Input value={streamSlug} onChange={(e) => setStreamSlug(e.target.value)} className="input-cyber" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <Label className="text-xs text-muted-foreground">Raw JSON specs (sections, media...)</Label>
+            <Textarea value={streamSpecsRaw} onChange={(e) => setStreamSpecsRaw(e.target.value)} className="textarea-cyber" />
+            <p className="text-xs text-muted-foreground mt-1">Если JSON некорректен — он будет сохранен с пометкой. Можно вставлять ответ бота прямо сюда.</p>
+          </div>
+        </div>
+      )}
+
+      {/* common media / price */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs text-muted-foreground">Price</Label>
+          <Input type="number" value={dailyPrice} onChange={(e) => setDailyPrice(e.target.value)} className="input-cyber" />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Image URL or upload</Label>
+          <div className="flex gap-2">
+            <Input value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="input-cyber" placeholder="https://..." />
+            <label htmlFor={`file-${formId}`} className="btn input-cyber cursor-pointer p-2 border border-border rounded-md flex items-center">
+              <VibeContentRenderer content="::FaUpload::" />&nbsp;Upload
+            </label>
+            <input id={`file-${formId}`} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+          </div>
+        </div>
       </div>
 
       {imagePreview && (
-          <div className="flex justify-center">
-              <Image src={imagePreview} alt="Превью" width={200} height={150} className="rounded-lg object-cover" />
-          </div>
+        <div className="flex items-center justify-center">
+          <Image src={imagePreview} alt="preview" width={420} height={240} className="rounded-lg object-cover" />
+        </div>
       )}
 
-      {/* Блок кнопки отправки теперь использует корректные имена иконок fa6 */}
-      <Button type="submit" disabled={isSubmitting} className="w-full text-lg">
-        {isSubmitting 
-          ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Обработка..." /> 
-          : isEditMode
-            ? <VibeContentRenderer content="::FaFloppyDisk:: Обновить Данные" />
-            : <VibeContentRenderer content="::FaCirclePlus:: Добавить в Гараж" />
-        }
-      </Button>
+      <div className="flex gap-2 items-center">
+        <Button type="submit" disabled={saving} className="w-full">
+          {saving ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> Сохраняю...</> :
+            isEdit ? "Обновить запись" : "Добавить в public.cars"}
+        </Button>
+
+        <Button type="button" variant="secondary" onClick={() => { setIsTest((s) => !s); }} >
+          {isTest ? "Marked Test" : "Mark test"}
+        </Button>
+
+        <div className="ml-auto text-xs text-muted-foreground">
+          {isEdit ? "Редактирование" : "Новая запись"} • type: <span className="font-mono ml-1">{type}</span>
+        </div>
+      </div>
     </motion.form>
   );
 }
+
+export default CarSubmissionForm;
