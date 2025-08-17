@@ -1,8 +1,8 @@
-// /app/optimapipe/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
@@ -14,14 +14,12 @@ import { getTelegramUser } from "@/lib/telegram";
 
 /**
  * /app/optimapipe/page.tsx
- * Улучшенная версия хиро-секции:
- * - гарантированно full-screen (min-h-screen),
- * - Image использует fill + parent height/position корректно,
- * - unoptimized для внешних URL (dev / при проблемах с next.config),
- * - кнопки адаптивно стекутся на мобильных (flex-col -> sm:flex-row),
- * - кнопки становятся full-width на мобильных для UX,
- * - контент центрируется вертикально,
- * - лёгкие анимации и улучшения доступности.
+ * Исправленный хиро + визуальные улучшения для визитки.
+ * - уверенный full-screen хиро,
+ * - Image с fill и fallback (если загрузка падает — показываем затемнённый градиент),
+ * - контент над картинкой (relative z-10),
+ * - улучшенные CTA на мобиле, читабельность текста,
+ * - адаптивность и небольшие анимации.
  */
 
 const t = {
@@ -42,6 +40,8 @@ export default function OptimapipeLandingPage(): JSX.Element {
   const [form, setForm] = useState<ContactForm>({ name: "", phone: "", email: "", message: "" });
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   useEffect(() => {
     let tmo: any;
@@ -64,7 +64,6 @@ export default function OptimapipeLandingPage(): JSX.Element {
       return;
     }
 
-    // Подготовим payload. Если мы внутри Telegram WebApp — подхватим юзера для удобства.
     const tg = getTelegramUser();
     const payload = {
       name: form.name.trim(),
@@ -110,37 +109,53 @@ export default function OptimapipeLandingPage(): JSX.Element {
       {/* HERO */}
       <header
         role="banner"
-        className="relative min-h-screen overflow-hidden flex items-center"
+        className="relative min-h-screen flex items-center justify-center overflow-hidden bg-transparent"
         aria-label="Hero section — Optimapipe"
       >
-        {/* Background image container — must be absolute and have a positioned parent (header is relative) */}
-        <div className="absolute inset-0 -z-10 bg-gray-900/20">
-          {/* Next Image with fill: parent is absolute inset-0 so Image works.
-              unoptimized added as pragmatic fallback for remote images if next.config.domains not configured.
-              If you have domains added in next.config.js, you can remove unoptimized. */}
-          <Image
-            src={heroImage}
-            alt="Монтаж инженерных сетей — Optimapipe"
-            fill
-            style={{ objectFit: "cover", objectPosition: "center" }}
-            priority
-            unoptimized
-          />
-          {/* gradient overlay for contrast */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/10 to-black/60" aria-hidden />
+        {/* Фон: абсолютный блок, z-0 — картинка ниже контента */}
+        <div className="absolute inset-0 z-0">
+          {!imgError ? (
+            <Image
+              src={heroImage}
+              alt="Монтаж инженерных сетей — Optimapipe"
+              fill
+              style={{ objectFit: "cover", objectPosition: "center" }}
+              priority
+              unoptimized
+              onLoadingComplete={() => setImgLoaded(true)}
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            // fallback: градиент + текстура (темный, чтобы текст читался)
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(12,17,23,0.85) 0%, rgba(10,11,13,0.85) 100%), repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 6px)",
+              }}
+            />
+          )}
+
+          {/* overlay for contrast (pointer-events-none чтобы не блокировать интерактив) */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/10 to-black/60 pointer-events-none" aria-hidden />
         </div>
 
-        {/* Content wrapper — center vertically and horizontally */}
-        <div className="container mx-auto px-4 py-[6vh] md:py-24">
+        {/* Контент — над фоном */}
+        <div className="container mx-auto px-4 py-[6vh] md:py-24 relative z-10">
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="max-w-4xl mx-auto text-center"
           >
-            <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white drop-shadow-sm">
-              {t.company}
-            </h1>
+            {/* Лёгкий стек и фон за заголовком для читаемости */}
+            <div className="inline-block px-4 py-2 rounded-md bg-black/30 backdrop-blur-sm">
+              <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white drop-shadow-md">
+                {t.company}
+              </h1>
+            </div>
+
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">{t.subtitle}</p>
 
             {/* Buttons: stack on mobile, row on sm+ */}
@@ -148,7 +163,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
               <motion.div whileTap={{ scale: 0.98 }}>
                 <Button
                   onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })}
-                  className="w-full sm:w-auto px-6 py-3 font-semibold"
+                  className="w-full sm:w-auto px-6 py-3 font-semibold shadow-lg"
                   aria-label={t.heroCta}
                 >
                   <VibeContentRenderer content="::FaPhone::" className="inline mr-2 h-4 w-4 align-text-bottom" />
@@ -157,18 +172,13 @@ export default function OptimapipeLandingPage(): JSX.Element {
               </motion.div>
 
               <motion.div whileTap={{ scale: 0.98 }}>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    // smooth scroll to projects section if present
-                    const el = document.getElementById("projects");
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                    else window.scrollTo({ top: 700, behavior: "smooth" });
-                  }}
-                  className="w-full sm:w-auto px-6 py-3"
-                >
-                  Портфолио • Кейсы
-                </Button>
+                <Link href="#projects">
+                  <a>
+                    <Button variant="ghost" className="w-full sm:w-auto px-6 py-3">
+                      Портфолио • Кейсы
+                    </Button>
+                  </a>
+                </Link>
               </motion.div>
             </div>
 
@@ -302,32 +312,45 @@ export default function OptimapipeLandingPage(): JSX.Element {
 
         {/* PROJECTS */}
         <section id="projects" className="space-y-6">
-          <h2 className="text-3xl font-orbitron text-accent">Кейсы и проекты</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-orbitron text-accent">Кейсы и проекты</h2>
+            <Link href="/optimapipe/cases/project-1">
+              <a className="text-sm underline">Все кейсы →</a>
+            </Link>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((src, i) => (
-              <motion.div key={i} whileHover={{ y: -6 }} transition={{ type: "spring", stiffness: 200 }}>
-                <Card className="bg-card border-border overflow-hidden">
-                  <div className="relative h-48 w-full rounded-t overflow-hidden">
-                    <Image src={src} alt={`project-${i}`} fill style={{ objectFit: "cover" }} unoptimized />
-                  </div>
-                  <CardContent>
-                    <h4 className="font-semibold">Проект #{i + 1} — промышленная сеть</h4>
-                    <p className="text-sm text-muted-foreground mt-2">Монтаж магистрали, врезки и пуско-наладка. Срок — 6 недель.</p>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="ghost">Подробнее</Button>
-                      <Button
-                        onClick={() => {
-                          navigator.clipboard?.writeText("Контакт: " + t.phone);
-                          toast.success("Скопировано в буфер обмена");
-                        }}
-                      >
-                        Копировать контакт
-                      </Button>
+            {projects.map((src, i) => {
+              const slug = `project-${i + 1}`;
+              return (
+                <motion.div key={i} whileHover={{ y: -6 }} transition={{ type: "spring", stiffness: 200 }}>
+                  <Card className="bg-card border-border overflow-hidden">
+                    <div className="relative h-48 w-full rounded-t overflow-hidden">
+                      <Image src={src} alt={`project-${i}`} fill style={{ objectFit: "cover" }} unoptimized />
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    <CardContent>
+                      <h4 className="font-semibold">Проект #{i + 1} — промышленная сеть</h4>
+                      <p className="text-sm text-muted-foreground mt-2">Монтаж магистрали, врезки и пуско-наладка. Срок — 6 недель.</p>
+                      <div className="mt-4 flex gap-2">
+                        <Link href={`/optimapipe/cases/${slug}`}>
+                          <a>
+                            <Button variant="ghost">Подробнее</Button>
+                          </a>
+                        </Link>
+                        <Button
+                          onClick={() => {
+                            navigator.clipboard?.writeText("Контакт: " + t.phone);
+                            toast.success("Скопировано в буфер обмена");
+                          }}
+                        >
+                          Копировать контакт
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </section>
 
