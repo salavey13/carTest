@@ -159,7 +159,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
               <motion.div whileTap={{ scale: 0.98 }}>
                 <Button
-                  variant="primary"
+                  
                   onClick={() => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" })}
                   className="w-full sm:w-auto px-6 py-3 font-semibold shadow-lg"
                   aria-label={t.heroCta}
