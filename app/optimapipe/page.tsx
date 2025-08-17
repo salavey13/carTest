@@ -1,3 +1,4 @@
+// /app/optimapipe/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -101,7 +102,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
   const projects = [
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/5d2ee1919380006ba715e997-4a06c39a-1b5f-4030-a66f-93100060d4ba.jpg",
-    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/2965769-013f70ea-5a13-479e-9baa-2a75eb972b13.jpg",
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_0455-53b7a2ea-4449-401a-be76-70b786973c73.png",
   ];
 
   return (
