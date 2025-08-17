@@ -97,7 +97,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
   }
 
   const heroImage =
-    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250817_222630_932-d3181cd6-7fe5-4dcf-94b7-63be826befbf.jpg";
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/optimapipeLogo-f48041c9-24ba-4df4-8b1e-458fb9063047.jpg";
 
   const projects = [
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
