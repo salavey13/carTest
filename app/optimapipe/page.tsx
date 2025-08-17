@@ -1,3 +1,4 @@
+// /app/optimapipe/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -88,7 +89,7 @@ export default function OptimapipeLandingPage(): JSX.Element {
 
   const heroImage = "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=1600&auto=format&fit=crop&ixlib=rb-4.0.3&s=bd8b1c1d7f8b1b8d2a2b3c4d5e6f7a8b";
   const projects = [
-    "https://picsum.photos/seed/optimapipe-1/800/600",
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/883_original-7b7c2108-cc6f-455b-9efd-10cd65fa3c97.webp",
     "https://picsum.photos/seed/optimapipe-2/800/600",
     "https://picsum.photos/seed/optimapipe-3/800/600",
   ];
