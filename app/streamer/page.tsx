@@ -1,3 +1,4 @@
+// /app/streamer/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 import StreamManager from "@/components/streamer/StreamManager";
+import CarSubmissionForm from "@/components/CarSubmissionForm";
 
 /**
  * Streamer page — Level 1 demo (fixed JSX + StreamManager integration)
@@ -155,11 +157,22 @@ export default function StreamerPage() {
 
         {/* StreamManager only for owner */}
         {isOwner && (
-          <div className="mt-6">
-            <h3 className="font-semibold mb-3">Stream Overlay — редактор (Level 1)</h3>
-            <StreamManager />
-          </div>
-        )}
+  <div className="mt-6">
+    <h3 className="font-semibold mb-3">Stream Overlay — редактор (Level 1)</h3>
+    <StreamManager />
+    <div className="mt-4">
+      <h4 className="font-semibold mb-2">Сохранить текущий стрим как запись (public.cars)</h4>
+      <CarSubmissionForm
+        ownerId={dbUser?.user_id}
+        vehicleToEdit={null}
+        onSuccess={(row) => {
+          console.info("Stream saved to public.cars:", row);
+          // Можно обновить профиль/расписание: refreshDbUser() если нужно
+        }}
+      />
+    </div>
+  </div>
+)}
 
         {/* Main layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
