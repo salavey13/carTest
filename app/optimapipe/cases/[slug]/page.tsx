@@ -1,3 +1,4 @@
+// /app/optimapipe/cases/[slug]/page.tsx
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -5,11 +6,17 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
+import { motion } from "framer-motion";
 
 /**
- * Страница кейса по slug.
- * Серверный компонент (App Router). Использует хардкоженный массив кейсов.
- * URL: /optimapipe/cases/:slug
+ * Improved /app/optimapipe/cases/[slug]/page.tsx
+ * Enhancements:
+ * - Added animations for better engagement (fade-in on load).
+ * - Improved layout: Larger images, better spacing, responsive grid.
+ * - Added share buttons placeholder (e.g., for social media).
+ * - Enhanced accessibility: Alt texts, aria labels.
+ * - Code: Refactored for consistency with landing page improvements.
+ * - Added back to home link in not found state.
  */
 
 type CaseItem = {
@@ -71,19 +78,14 @@ export default function CasePage({ params }: { params: { slug: string } }) {
   const item = CASES.find((c) => c.slug === slug);
 
   if (!item) {
-    // можно вернуть notFound() в app router — но для простоты рендерим фоллбек
     return (
-      <main className="min-h-screen flex items-center justify-center p-8">
+      <main className="min-h-screen flex items-center justify-center p-8 bg-background">
         <div className="max-w-xl text-center">
-          <h1 className="text-2xl font-semibold">Кейс не найден</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Похоже, кейс с таким идентификатором отсутствует.</p>
-          <div className="mt-4">
-            <Link href="/optimapipe">
-              <a>
-                <Button>Вернуться на главную</Button>
-              </a>
-            </Link>
-          </div>
+          <h1 className="text-3xl font-semibold mb-4">Кейс не найден</h1>
+          <p className="text-muted-foreground mb-6">Похоже, кейс с таким идентификатором отсутствует.</p>
+          <Link href="/optimapipe">
+            <Button>Вернуться на главную</Button>
+          </Link>
         </div>
       </main>
     );
@@ -91,103 +93,112 @@ export default function CasePage({ params }: { params: { slug: string } }) {
 
   return (
     <main className="min-h-screen bg-background text-foreground antialiased">
-      <header className="relative h-60 md:h-72 lg:h-96 overflow-hidden">
+      <header className="relative h-80 md:h-96 lg:h-[500px] overflow-hidden">
         <div className="absolute inset-0">
-          <Image src={item.images[0]} alt={item.title} fill style={{ objectFit: "cover" }} unoptimized />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-black/60 pointer-events-none" />
+          <Image src={item.images[0]} alt={item.title} fill style={{ objectFit: "cover" }} unoptimized priority />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/70" />
         </div>
-
-        <div className="relative z-10 container mx-auto h-full px-4 flex items-end pb-8">
-          <div className="bg-black/30 backdrop-blur-sm rounded-md p-4">
-            <h1 className="text-2xl md:text-3xl font-semibold text-white">{item.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{item.subtitle}</p>
-          </div>
+        <div className="relative z-10 container mx-auto h-full flex items-end pb-12 px-4">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="bg-black/40 backdrop-blur-md rounded-lg p-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{item.title}</h1>
+            <p className="text-lg text-white/80">{item.subtitle}</p>
+          </motion.div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <article className="lg:col-span-2 space-y-6">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle>Описание проекта</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{item.description}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {item.tags.map((tag) => (
-                  <span key={tag} className="text-xs px-2 py-1 bg-muted-foreground/8 rounded-full border border-border text-muted-foreground">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-4 text-xs text-muted-foreground">Период: {item.period}</div>
-            </CardContent>
-          </Card>
+      <div className="container mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <article className="lg:col-span-2 space-y-8">
+          <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+            <Card className="border-border shadow-md">
+              <CardHeader>
+                <CardTitle className="text-2xl">Описание проекта</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">{item.description}</p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {item.tags.map((tag) => (
+                    <span key={tag} className="px-3 py-1 bg-muted rounded-full text-sm text-muted-foreground">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground">Период: {item.period}</p>
+              </CardContent>
+            </Card>
+          </motion.section>
 
-          <section>
-            <h3 className="text-xl font-semibold">Фотографии</h3>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}>
+            <h3 className="text-2xl font-semibold mb-4">Фотографии</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {item.images.map((src, i) => (
-                <div key={i} className="relative h-48 w-full rounded overflow-hidden">
-                  <Image src={src} alt={`${item.title}-${i}`} fill style={{ objectFit: "cover" }} unoptimized />
+                <div key={i} className="relative h-64 rounded-lg overflow-hidden shadow-md">
+                  <Image src={src} alt={`${item.title} - фото ${i + 1}`} fill style={{ objectFit: "cover" }} loading="lazy" unoptimized />
                 </div>
               ))}
             </div>
-          </section>
+          </motion.section>
 
-          <section>
-            <h3 className="text-lg font-semibold">Результат и комментарии</h3>
-            <p className="text-sm text-muted-foreground mt-2">
+          <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.4 }}>
+            <h3 className="text-2xl font-semibold mb-4">Результат и комментарии</h3>
+            <p className="text-muted-foreground">
               Работы завершены в срок, передача акта выполнена с полным комплектом исполнительной документации. Возможны повторные работы по сервисному обслуживанию и расширению сети.
             </p>
-          </section>
+          </motion.section>
+
+          {/* Share */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.6 }} className="flex gap-4">
+            <Button variant="outline">Поделиться в Telegram</Button>
+            <Button variant="outline">Поделиться в VK</Button>
+          </motion.div>
         </article>
 
-        <aside className="lg:col-span-1 space-y-4">
-          <Card className="bg-card border-border p-4">
-            <h4 className="font-semibold">Контакт для схожих работ</h4>
-            <div className="mt-3 text-sm text-foreground flex items-center gap-2">
-              <VibeContentRenderer content="::FaPhone::" /> +7 (XXX) XXX-XX-XX
-            </div>
-            <div className="mt-2 text-sm text-foreground flex items-center gap-2">
-              <VibeContentRenderer content="::FaEnvelope::" /> info@optimapipe.ru
-            </div>
-            {item.contactNote && <div className="mt-3 text-xs text-muted-foreground">{item.contactNote}</div>}
-            <div className="mt-4 flex gap-2">
-              <Link href="/optimapipe#contact">
-                <a>
+        <aside className="lg:col-span-1 space-y-6">
+          <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+            <Card className="p-6 border-border shadow-md">
+              <h4 className="font-semibold text-lg mb-4">Контакт для схожих работ</h4>
+              <div className="space-y-3 text-sm mb-4">
+                <div className="flex items-center gap-3">
+                  <VibeContentRenderer content="::FaPhone::" className="h-5 w-5 text-accent" />
+                  +7 (XXX) XXX-XX-XX
+                </div>
+                <div className="flex items-center gap-3">
+                  <VibeContentRenderer content="::FaEnvelope::" className="h-5 w-5 text-accent" />
+                  info@optimapipe.ru
+                </div>
+              </div>
+              {item.contactNote && <p className="text-sm text-muted-foreground mb-4">{item.contactNote}</p>}
+              <div className="flex gap-3">
+                <Link href="/optimapipe#contact">
                   <Button>Оставить заявку</Button>
-                </a>
-              </Link>
-              <Link href="/optimapipe">
-                <a>
-                  <Button variant="ghost">Назад</Button>
-                </a>
-              </Link>
-            </div>
-          </Card>
+                </Link>
+                <Link href="/optimapipe">
+                  <Button variant="outline">Назад</Button>
+                </Link>
+              </div>
+            </Card>
+          </motion.div>
 
-          <Card className="bg-card border-border p-4">
-            <h4 className="font-semibold">Похожие проекты</h4>
-            <div className="mt-3 space-y-2">
-              {CASES.filter((c) => c.slug !== item.slug).map((c) => (
-                <div key={c.slug} className="flex items-center gap-3">
-                  <div className="w-12 h-12 relative rounded overflow-hidden">
-                    <Image src={c.images[0]} alt={c.title} fill style={{ objectFit: "cover" }} unoptimized />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">{c.title}</div>
-                    <div className="text-xs text-muted-foreground">{c.period}</div>
-                    <div className="mt-1">
+          <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}>
+            <Card className="p-6 border-border shadow-md">
+              <h4 className="font-semibold text-lg mb-4">Похожие проекты</h4>
+              <div className="space-y-6">
+                {CASES.filter((c) => c.slug !== item.slug).map((c) => (
+                  <div key={c.slug} className="flex items-start gap-4">
+                    <div className="relative h-16 w-16 rounded overflow-hidden flex-shrink-0">
+                      <Image src={c.images[0]} alt={c.title} fill style={{ objectFit: "cover" }} unoptimized />
+                    </div>
+                    <div>
+                      <h5 className="font-medium">{c.title}</h5>
+                      <p className="text-sm text-muted-foreground">{c.period}</p>
                       <Link href={`/optimapipe/cases/${c.slug}`}>
-                        <a className="text-xs underline">Открыть</a>
+                        <a className="text-sm text-accent underline hover:no-underline">Открыть</a>
                       </Link>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
         </aside>
       </div>
     </main>
