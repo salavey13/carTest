@@ -6,7 +6,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
