@@ -236,7 +236,7 @@ export default function OptimapipeLandingPage2(): JSX.Element {
               </motion.div>
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link href="#projects">
-                  <Button variant="outline" className="w-full sm:w-auto px-8 py-6 text-lg border-2 border-white/80 text-white hover:bg-white/10">
+                  <Button variant="accent" className="w-full sm:w-auto px-8 py-6 text-lg border-2 border-white/80 text-white hover:bg-white/10">
                     Портфолио
                   </Button>
                 </Link>
