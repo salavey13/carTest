@@ -63,22 +63,32 @@ export default function StreamEditorForm({
     }));
   };
 
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Basic validation
+    const invalidSections = config.sections.filter(s => 
+      (s.type !== "text" && !s.mediaUrl) || (s.type === "text" && !s.text)
+    );
+    if (invalidSections.length > 0) {
+      alert("Пожалуйста, заполните все обязательные поля в секциях (mediaUrl или text).");
+      return;
+    }
+    onSave(config);
+  };
+
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave(config);
-      }}
+      onSubmit={handleSave}
       className="space-y-6"
     >
       {/* Основные настройки */}
-      <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-accent-text mb-3">
+      <div className="p-4 bg-gray-900 border border-border rounded-lg shadow-sm"> {/* Dark bg */}
+        <h3 className="text-lg font-semibold text-white mb-3">
           Основные настройки
-        </h3>
+        </h3> {/* White text */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-muted-foreground">Название стрима</span>
+            <span className="text-gray-300">Название стрима</span> {/* Light gray */}
             <input
               type="text"
               value={config.title}
@@ -90,7 +100,7 @@ export default function StreamEditorForm({
             />
           </label>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
-            <span className="text-muted-foreground">Описание</span>
+            <span className="text-gray-300">Описание</span> {/* Light gray */}
             <textarea
               value={config.description || ""}
               onChange={(e) =>
@@ -103,31 +113,31 @@ export default function StreamEditorForm({
       </div>
 
       {/* Секции */}
-      <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-accent-text mb-3">
+      <div className="p-4 bg-gray-900 border border-border rounded-lg shadow-sm"> {/* Dark bg */}
+        <h3 className="text-lg font-semibold text-white mb-3">
           Секции
-        </h3>
+        </h3> {/* White text */}
         <div className="space-y-4">
           {config.sections.map((s, idx) => (
             <div
               key={s.id}
-              className="p-3 border border-border rounded-md bg-background/50 space-y-2"
+              className="p-3 border border-border rounded-md bg-gray-800 space-y-2" {/* Darker bg */}
             >
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm text-accent-text">
+                <h4 className="font-medium text-sm text-white">
                   {idx + 1}. {s.title || "Без названия"}
-                </h4>
+                </h4> {/* White text */}
                 <button
                   type="button"
                   onClick={() => removeSection(s.id)}
-                  className="px-2 py-1 rounded bg-destructive text-destructive-foreground text-xs hover:bg-destructive/90 transition"
+                  className="px-2 py-1 rounded bg-destructive text-white text-xs hover:bg-destructive/90 transition" // White text
                 >
                   Удалить
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <label className="flex flex-col text-xs gap-1">
-                  <span className="text-muted-foreground">Заголовок</span>
+                  <span className="text-gray-300">Заголовок</span> {/* Light gray */}
                   <input
                     value={s.title}
                     onChange={(e) =>
@@ -137,7 +147,7 @@ export default function StreamEditorForm({
                   />
                 </label>
                 <label className="flex flex-col text-xs gap-1">
-                  <span className="text-muted-foreground">Тип</span>
+                  <span className="text-gray-300">Тип</span> {/* Light gray */}
                   <select
                     value={s.type}
                     onChange={(e) =>
@@ -154,7 +164,7 @@ export default function StreamEditorForm({
                 </label>
                 {s.type !== "text" && (
                   <label className="flex flex-col text-xs gap-1 md:col-span-2">
-                    <span className="text-muted-foreground">Media URL</span>
+                    <span className="text-gray-300">Media URL</span> {/* Light gray */}
                     <input
                       value={s.mediaUrl || ""}
                       onChange={(e) =>
@@ -162,23 +172,25 @@ export default function StreamEditorForm({
                       }
                       placeholder="https://..."
                       className="input-cyber"
+                      required
                     />
                   </label>
                 )}
                 {s.type === "text" && (
                   <label className="flex flex-col text-xs gap-1 md:col-span-2">
-                    <span className="text-muted-foreground">Текст</span>
+                    <span className="text-gray-300">Текст</span> {/* Light gray */}
                     <textarea
                       value={s.text || ""}
                       onChange={(e) =>
                         updateSection(s.id, { text: e.target.value })
                       }
                       className="textarea-cyber min-h-[60px]"
+                      required
                     />
                   </label>
                 )}
                 <label className="flex flex-col text-xs gap-1">
-                  <span className="text-muted-foreground">Длительность (сек)</span>
+                  <span className="text-gray-300">Длительность (сек)</span> {/* Light gray */}
                   <input
                     type="number"
                     value={s.durationSec || 6}
@@ -191,7 +203,7 @@ export default function StreamEditorForm({
                   />
                 </label>
                 <label className="flex flex-col text-xs gap-1">
-                  <span className="text-muted-foreground">Прозрачность</span>
+                  <span className="text-gray-300">Прозрачность</span> {/* Light gray */}
                   <input
                     type="range"
                     min={0}
@@ -213,21 +225,21 @@ export default function StreamEditorForm({
           <button
             type="button"
             onClick={() => addSection("text")}
-            className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm hover:bg-accent/10 transition"
+            className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-border text-white text-sm hover:bg-gray-700 transition" // Dark bg, white text
           >
             + Текст
           </button>
           <button
             type="button"
             onClick={() => addSection("image")}
-            className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm hover:bg-accent/10 transition"
+            className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-border text-white text-sm hover:bg-gray-700 transition" // Dark bg, white text
           >
             + Изображение
           </button>
           <button
             type="button"
             onClick={() => addSection("video")}
-            className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm hover:bg-accent/10 transition"
+            className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-border text-white text-sm hover:bg-gray-700 transition" // Dark bg, white text
           >
             + Видео
           </button>
@@ -237,7 +249,7 @@ export default function StreamEditorForm({
       {/* Submit */}
       <button
         type="submit"
-        className="w-full px-4 py-2 rounded-lg bg-brand-cyan text-white text-base font-medium shadow hover:bg-brand-cyan/90 transition"
+        className="w-full px-4 py-2 rounded-lg bg-brand-cyan text-white text-base font-medium shadow hover:bg-brand-cyan/90 transition" // White text
       >
         Сохранить настройки
       </button>
