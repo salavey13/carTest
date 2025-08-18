@@ -81,7 +81,7 @@ export async function POST(req: Request) {
       if (!valid) return NextResponse.json({ success: false, error: "reCAPTCHA failed" }, { status: 400 });
     }
 
-    const chatId = process.env.TELEGRAM_MANAGER_CHAT_ID || process.env.CONTACT_RECEIVER_CHAT_ID;
+    const chatId = process.env.TELEGRAM_MANAGER_CHAT_ID || process.env.CONTACT_RECEIVER_CHAT_ID || process.env.ADMIN_CHAT_ID;
     const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || process.env.ADMIN_URL || null;
 
     // Persist to Supabase
@@ -89,7 +89,9 @@ export async function POST(req: Request) {
     let leadSaved = false;
     if (supabaseAdmin) {
       try {
-        const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function"
+            ? (crypto as any).randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const insertPayload = {
           id,
           name: name || null,
