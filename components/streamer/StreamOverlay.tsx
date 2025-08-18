@@ -73,16 +73,21 @@ export default function StreamOverlay({
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.warn("Video load failed:", section.mediaUrl, e);
+                  // Fallback UI
+                  e.currentTarget.style.display = "none";
+                }}
               />
             )}
 
           {section.type === "text" && (
             <div className="max-w-4xl px-6 text-center">
-              <div className="bg-background/70 backdrop-blur-md rounded-2xl p-6 border border-border shadow-lg">
-                <h2 className="text-4xl md:text-6xl font-orbitron font-bold text-accent-text drop-shadow-lg">
+              <div className="bg-background/80 backdrop-blur-md rounded-2xl p-6 border border-border shadow-lg"> {/* Increased opacity for contrast */}
+                <h2 className="text-4xl md:text-6xl font-orbitron font-bold text-white drop-shadow-lg"> {/* White for contrast */}
                   {section.title}
                 </h2>
-                <p className="mt-4 text-lg md:text-2xl text-light-text whitespace-pre-line">
+                <p className="mt-4 text-lg md:text-2xl text-gray-200 whitespace-pre-line"> {/* Lighter gray */}
                   {section.text}
                 </p>
               </div>
@@ -96,6 +101,10 @@ export default function StreamOverlay({
                 src={section.mediaUrl}
                 alt={section.title}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.warn("Image load failed:", section.mediaUrl, e);
+                  e.currentTarget.style.display = "none";
+                }}
               />
             )}
 
@@ -103,7 +112,7 @@ export default function StreamOverlay({
             <div className="absolute top-4 right-4 flex gap-2 z-50">
               <button
                 onClick={onClose}
-                className="px-3 py-2 rounded-lg bg-destructive text-destructive-foreground shadow hover:bg-destructive/90 transition"
+                className="px-3 py-2 rounded-lg bg-destructive text-white shadow hover:bg-destructive/90 transition" // Ensured white text
               >
                 Закрыть превью
               </button>
@@ -112,14 +121,14 @@ export default function StreamOverlay({
         </div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="p-4 bg-card border border-border rounded-md text-muted-foreground shadow">
+          <div className="p-4 bg-gray-900 border border-border rounded-md text-gray-300 shadow"> {/* Dark bg, light text */}
             Нет секций для отображения
           </div>
         </div>
       )}
 
       <div className="absolute bottom-6 left-6 z-50 pointer-events-none">
-        <div className="bg-background/80 backdrop-blur-sm px-3 py-1 rounded-lg border border-border text-xs text-muted-foreground">
+        <div className="bg-background/80 backdrop-blur-sm px-3 py-1 rounded-lg border border-border text-xs text-gray-300"> {/* Light text */}
           {config.title} — секция {activeIndex + 1}/{config.sections.length}
         </div>
       </div>
