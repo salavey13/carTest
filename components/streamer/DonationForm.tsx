@@ -135,7 +135,7 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
 
   return (
     <>
-      <form onSubmit={handleDonate} className="space-y-3 p-3 rounded-md border border-border bg-card/80 backdrop-blur-sm relative overflow-hidden" aria-live="polite">
+      <form onSubmit={handleDonate} className="space-y-3 p-3 rounded-md border border-border bg-gray-900/80 backdrop-blur-sm relative overflow-hidden" aria-live="polite"> {/* Darker bg */}
         {/* burst overlay */}
         <AnimatePresence>
           {paid && (
@@ -154,7 +154,7 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
                 <motion.div initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 12 }} className="py-6 px-8 rounded-full bg-gradient-to-r from-primary/20 to-transparent backdrop-blur-md shadow-xl text-white">
                   <div className="text-center">
                     <div className="text-2xl font-bold">Спасибо! 🎉</div>
-                    <div className="text-xs text-muted-foreground">Платёж получен</div>
+                    <div className="text-xs text-gray-300">Платёж получен</div> {/* Light gray */}
                   </div>
                 </motion.div>
               </div>
@@ -164,8 +164,8 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
         </AnimatePresence>
 
         <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">Поддержать стримера — выберите уровень</div>
-          <div className="text-xs text-muted-foreground">Текущий выбор: <span className="font-semibold ml-1">{selectedTier.label} • {amount}★</span></div>
+          <div className="text-sm text-gray-300">Поддержать стримера — выберите уровень</div> {/* Light gray */}
+          <div className="text-xs text-gray-300">Текущий выбор: <span className="font-semibold ml-1">{selectedTier.label} • {amount}★</span></div> {/* Light gray */}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -175,15 +175,15 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
               type="button"
               onClick={() => { setSelectedTier(t); setAmount(t.amount); }}
               whileTap={{ scale: 0.98 }}
-              className={`p-2 rounded-md text-sm flex flex-col items-start justify-between border transition-shadow duration-200 ${selectedTier.id === t.id ? `border-primary bg-primary/8 ${t.highlight}` : "bg-card border-border"}`}
+              className={`p-2 rounded-md text-sm flex flex-col items-start justify-between border transition-shadow duration-200 ${selectedTier.id === t.id ? `border-primary bg-primary/8 ${t.highlight}` : "bg-gray-900 border-border"}`} {/* Dark bg */}
             >
               <div className="flex items-center gap-2 w-full">
                 <div className="text-lg">{t.badge ?? "★"}</div>
                 <div className="flex-1 text-left min-w-0">
-                  <div className="font-medium text-sm truncate">{t.label}</div>
-                  <div className="text-xs text-muted-foreground truncate">{t.description}</div>
+                  <div className="font-medium text-sm truncate text-white">{t.label}</div> {/* White text */}
+                  <div className="text-xs text-gray-300 truncate">{t.description}</div> {/* Light gray */}
                 </div>
-                <div className="font-semibold">{t.amount}★</div>
+                <div className="font-semibold text-white">{t.amount}★</div> {/* White text */}
               </div>
             </motion.button>
           ))}
@@ -203,7 +203,7 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="text-xs text-muted-foreground">Средства — XTR. После оплаты звезды зачисляются автоматически.</div>
+          <div className="text-xs text-gray-300">Средства — XTR. После оплаты звезды зачисляются автоматически.</div> {/* Light gray */}
 
           {invoice && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -211,12 +211,13 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
                 <Button size="sm" onClick={copyInvoiceLink}>Копировать ссылку</Button>
                 <Button size="sm" variant="secondary" onClick={openInTelegram}>Открыть в Telegram</Button>
               </div>
-              <div className="text-xs text-muted-foreground whitespace-nowrap mt-1 sm:mt-0">
+              <div className="text-xs text-gray-300 whitespace-nowrap mt-1 sm:mt-0"> {/* Light gray */}
                 {paid ? <span className="text-primary">✅ Оплачен</span> : <span>Ожидание оплаты</span>}
               </div>
             </div>
           )}
         </div>
+
       </form>
 
       <div className="mt-3">

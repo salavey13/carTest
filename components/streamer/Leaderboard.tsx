@@ -71,24 +71,24 @@ export default function Leaderboard({ streamerId }: { streamerId: string }) {
   }, [streamerId]);
 
   return (
-    <div className="p-3 bg-card rounded-md border border-border" aria-live="polite">
+    <div className="p-3 bg-gray-900 rounded-md border border-border" aria-live="polite"> {/* Dark bg */}
       <div className="flex items-start justify-between mb-2">
-        <h4 className="font-semibold mb-2">Топ поддержавших</h4>
+        <h4 className="font-semibold mb-2 text-white">Топ поддержавших</h4> {/* White text */}
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={fetchBoardSnapshot} disabled={loading}>Обновить</Button>
-          <div className="text-xs text-muted-foreground">{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : ""}</div>
+          <div className="text-xs text-gray-300">{lastUpdated ? new Date(lastUpdated).toLocaleTimeString() : ""}</div> {/* Light gray */}
         </div>
       </div>
 
       {loading ? (
         <div className="space-y-2">
-          {[1,2,3].map(i=> <div key={i} className="h-10 rounded bg-muted/50 animate-pulse" />)}
+          {[1,2,3].map(i=> <div key={i} className="h-10 rounded bg-gray-800/50 animate-pulse" />)} {/* Darker bg */}
         </div>
       ) : error ? (
         <div className="text-sm text-destructive-foreground">{error}</div>
       ) : (
         <ol className="list-decimal list-inside space-y-2">
-          {rows.length === 0 && <div className="text-sm text-muted-foreground">Пока что нет донатов</div>}
+          {rows.length === 0 && <div className="text-sm text-gray-300">Пока что нет донатов</div>} {/* Light gray */}
           <AnimatePresence initial={false}>
             {rows.map(r => {
               const isHighlighted = highlightedUserId === r.user_id;
@@ -98,10 +98,10 @@ export default function Leaderboard({ streamerId }: { streamerId: string }) {
                     {r.avatar_url ? <Image src={r.avatar_url} alt={r.username} width={32} height={32} /> : <span>{(r.username && r.username[0]) || "?"}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{r.username}</div>
-                    <div className="text-xs text-muted-foreground truncate">{r.user_id}</div>
+                    <div className="text-sm font-medium truncate text-white">{r.username}</div> {/* White text */}
+                    <div className="text-xs text-gray-300 truncate">{r.user_id}</div> {/* Light gray */}
                   </div>
-                  <div className="font-semibold text-right">{r.total}★</div>
+                  <div className="font-semibold text-right text-white">{r.total}★</div> {/* White text */}
                 </motion.li>
               );
             })}
