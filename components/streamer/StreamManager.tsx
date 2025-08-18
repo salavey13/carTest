@@ -2,12 +2,16 @@
 import React, { useEffect, useState } from "react";
 import StreamEditorForm, { defaultStreamTemplate } from "./StreamEditorForm";
 import StreamOverlay, { StreamConfig } from "./StreamOverlay";
+import { useAppContext } from "@/contexts/AppContext";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 export default function StreamManager({
   initialConfig,
 }: {
   initialConfig?: StreamConfig | null;
 }) {
+  const { dbUser, refreshDbUser } = useAppContext();
+  const supabase = getSupabaseBrowserClient();
   const [config, setConfig] = useState<StreamConfig | null>(
     initialConfig ?? null
   );
@@ -17,8 +21,11 @@ export default function StreamManager({
   const [previewVisible, setPreviewVisible] = useState(false);
 
   useEffect(() => {
-    if (!config) setConfig(defaultStreamTemplate());
-  }, [config]);
+    if (!config) {
+      const savedConfig = dbUser?.metadata?.streamConfig as StreamConfig | undefined;
+      setConfig(savedConfig || defaultStreamTemplate());
+    }
+  }, [config, dbUser]);
 
   useEffect(() => {
     if (!config || !playing) return;
@@ -35,6 +42,18 @@ export default function StreamManager({
       clearTimeout(timer);
     };
   }, [playing, activeIndex, config]);
+
+  const handleSave = async (next: StreamConfig) => {
+    setConfig(next);
+    if (dbUser) {
+      const currentMeta = dbUser.metadata || {};
+      await supabase
+        .from("users")
+        .update({ metadata: { ...currentMeta, streamConfig: next } })
+        .eq("user_id", dbUser.user_id);
+      refreshDbUser();
+    }
+  };
 
   if (!config) return null;
 
@@ -74,9 +93,7 @@ export default function StreamManager({
         <div className="lg:col-span-2">
           <StreamEditorForm
             initial={config}
-            onSave={(next) => {
-              setConfig(next);
-            }}
+            onSave={handleSave}
           />
         </div>
 

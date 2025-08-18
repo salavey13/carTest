@@ -69,18 +69,18 @@ export default function DonationFeed({ streamerId, limit = 12 }: { streamerId: s
   }, [streamerId]);
 
   return (
-    <div className="p-3 bg-card rounded-md border border-border">
+    <div className="p-3 bg-gray-900 rounded-md border border-border"> {/* Dark bg */}
       <div className="flex items-center justify-between mb-2">
-        <h4 className="font-semibold">Live донаты и покупки</h4>
-        <div className="text-xs text-muted-foreground">Поток в реальном времени</div>
+        <h4 className="font-semibold text-white">Live донаты и покупки</h4> {/* White text */}
+        <div className="text-xs text-gray-300">Поток в реальном времени</div> {/* Light gray */}
       </div>
 
       {loading ? (
         <div className="space-y-2">
-          {[1,2,3].map(i=> <div key={i} className="h-12 rounded bg-muted/50 animate-pulse" />)}
+          {[1,2,3].map(i=> <div key={i} className="h-12 rounded bg-gray-800/50 animate-pulse" />)} {/* Darker bg */}
         </div>
       ) : feed.length === 0 ? (
-        <div className="text-sm text-muted-foreground">Пока что нет платных донатов.</div>
+        <div className="text-sm text-gray-300">Пока что нет платных донатов.</div> {/* Light gray */}
       ) : (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
@@ -95,15 +95,15 @@ export default function DonationFeed({ streamerId, limit = 12 }: { streamerId: s
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-medium truncate">{d.username}</div>
-                      <div className="text-xs text-muted-foreground">{meta.badge} <span className="ml-1 text-muted-foreground">{meta.label}</span></div>
+                      <div className="text-sm font-medium truncate text-white">{d.username}</div> {/* White text */}
+                      <div className="text-xs text-gray-300">{meta.badge} <span className="ml-1 text-gray-300">{meta.label}</span></div> {/* Light gray */}
                     </div>
-                    <div className="text-xs text-muted-foreground truncate">{d.created_at ? new Date(d.created_at).toLocaleString() : ""}</div>
+                    <div className="text-xs text-gray-300 truncate">{d.created_at ? new Date(d.created_at).toLocaleString() : ""}</div> {/* Light gray */}
                   </div>
 
                   <div className="text-right">
-                    <div className="font-semibold">{d.amount}★</div>
-                    <div className="text-xs text-muted-foreground">{d.type || "донат"}</div>
+                    <div className="font-semibold text-white">{d.amount}★</div> {/* White text */}
+                    <div className="text-xs text-gray-300">{d.type || "донат"}</div> {/* Light gray */}
                   </div>
                 </motion.li>
               );

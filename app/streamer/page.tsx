@@ -133,7 +133,8 @@ export default function StreamerPage() {
     <div
       className="min-h-screen pb-12 text-white"
       style={{
-        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.95), rgba(5,10,22,0.98)), url(${heroUrl})`, // Increased opacity for better contrast
+        // Increased opacity for better contrast
+        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.95), rgba(5,10,22,0.98)), url(${heroUrl})`,
         backgroundBlendMode: "overlay",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",

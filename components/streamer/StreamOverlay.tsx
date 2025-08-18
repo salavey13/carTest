@@ -32,12 +32,14 @@ export default function StreamOverlay({
   visible = true,
   mode = "public",
   onClose,
+  forceGreenScreen = false,
 }: {
   config: StreamConfig | null;
   activeIndex?: number;
   visible?: boolean;
   mode?: "public" | "admin";
   onClose?: () => void;
+  forceGreenScreen?: boolean;
 }) {
   if (!config || !visible) return null;
   const section = config.sections?.[activeIndex] ?? null;
@@ -53,7 +55,7 @@ export default function StreamOverlay({
         <div
           className="absolute inset-0 flex items-center justify-center transition-all duration-300"
           style={{
-            background: section.greenScreen
+            background: forceGreenScreen || section.greenScreen
               ? "#00ff00"
               : section.type === "image" && section.mediaUrl
               ? `center / cover no-repeat url(${section.mediaUrl})`
