@@ -89,7 +89,7 @@ export default function StreamOverlay({
                 <h2 className="text-4xl md:text-6xl font-orbitron font-bold text-white drop-shadow-lg"> {/* White for contrast */}
                   {section.title}
                 </h2>
-                <p className="mt-4 text-lg md:text-2xl text-gray-200 whitespace-pre-line"> {/* Lighter gray */}
+                <p className="mt-4 text-lg md:text-2xl text-gray-200 whitespace-pre-line"> 
                   {section.text}
                 </p>
               </div>

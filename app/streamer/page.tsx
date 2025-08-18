@@ -159,12 +159,12 @@ export default function StreamerPage() {
               <h1 className="text-3xl font-extrabold text-primary leading-tight">
                 {profile.username || profile.full_name || "Стример"}
               </h1>
-              <p className="text-sm text-gray-300 mt-1"> {/* Lighter gray for contrast */}
+              <p className="text-sm text-gray-300 mt-1"> 
                 Демо-страница персонального VIP Dashboard для стримера.
               </p>
 
               <div className="mt-2 flex items-center gap-4">
-                <div className="text-sm text-gray-300">Баланс</div> {/* Lighter gray */}
+                <div className="text-sm text-gray-300">Баланс</div> 
                 <div className="text-xl font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</div>
                 <div>
                   <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>
@@ -172,13 +172,13 @@ export default function StreamerPage() {
                   </Button>
                 </div>
 
-                {!isOwner && <div className="text-xs text-gray-300 ml-2">Вы просматриваете публичную страницу</div>} {/* Lighter gray */}
+                {!isOwner && <div className="text-xs text-gray-300 ml-2">Вы просматриваете публичную страницу</div>} 
               </div>
             </div>
           </div>
         </div>
 
-        {/* StreamManager only for owner */}
+        
         {isOwner && (
           <div className="mt-6">
             <h3 className="font-semibold mb-3">Stream Overlay — редактор (Level 1)</h3>
@@ -204,7 +204,7 @@ export default function StreamerPage() {
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <CardTitle className="text-2xl text-white">VIP Dashboard</CardTitle>
-                  <div className="text-xs text-gray-300">Управление донатами, наградами и VIP фан-базой</div> {/* Lighter gray */}
+                  <div className="text-xs text-gray-300">Управление донатами, наградами и VIP фан-базой</div> 
                 </div>
               </CardHeader>
 
@@ -227,12 +227,12 @@ export default function StreamerPage() {
                         {schedule.map((s: any, idx: number) => (
                           <li key={idx} className="p-2 rounded bg-gray-800/80 border border-border"> {/* Darker bg */}
                             <div className="text-sm font-medium text-white">{s.title}</div>
-                            <div className="text-xs text-gray-300">{s.day} — {s.time}</div> {/* Lighter gray */}
+                            <div className="text-xs text-gray-300">{s.day} — {s.time}</div> 
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <div className="text-sm text-gray-300">Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.</div> {/* Lighter gray */}
+                      <div className="text-sm text-gray-300">Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.</div> 
                     )}
 
                     <div className="mt-4 space-y-4">
@@ -255,7 +255,7 @@ export default function StreamerPage() {
               <CardContent>
                 <p className="text-sm text-gray-300">
                   Полная история хранится в таблице <code className="bg-gray-800 px-1 rounded">invoices</code>.
-                </p> {/* Lighter gray */}
+                </p> 
               </CardContent>
             </Card>
           </div>
@@ -263,19 +263,19 @@ export default function StreamerPage() {
           <aside className="space-y-4">
             <Card className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"> {/* Darker bg */}
               <h4 className="font-semibold mb-2 text-white">VIP Fan Management</h4>
-              <p className="text-sm text-gray-300">Владелец управляет VIP-фанатами и шаблонами уведомлений.</p> {/* Lighter gray */}
+              <p className="text-sm text-gray-300">Владелец управляет VIP-фанатами и шаблонами уведомлений.</p> 
               <div className="mt-3">
                 {isOwner ? (
                   <Button onClick={() => alert("Открываю VIP панель (TODO)")} className="w-full">Открыть VIP панель</Button>
                 ) : (
-                  <div className="text-xs text-gray-300">Только владелец может открыть панель управления</div> {/* Lighter gray */}
+                  <div className="text-xs text-gray-300">Только владелец может открыть панель управления</div> 
                 )}
               </div>
             </Card>
 
             <Card className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"> {/* Darker bg */}
               <h4 className="font-semibold mb-2 text-white">Роадмап проекта</h4>
-              <ul className="text-sm list-inside text-gray-300 space-y-1"> {/* Lighter gray */}
+              <ul className="text-sm list-inside text-gray-300 space-y-1"> 
                 <li><strong>Lvl1 (стример)</strong> — текущая демо-страница.</li>
                 <li><strong><Link href="/sauna-rent" className="underline">Lvl2 (сауна)</Link></strong> — IRL бонусы.</li>
                 <li><strong><Link href="/vipbikerentals" className="underline">Lvl3 (VIP Bike Rentals)</Link></strong> — масштабируемый сервис.</li>
