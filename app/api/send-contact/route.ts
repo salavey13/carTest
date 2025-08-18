@@ -1,19 +1,7 @@
-// /app/api/send-contact/route.ts
 import { NextResponse } from "next/server";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
-
-/**
- * Improved /app/api/send-contact/route.ts
- * Enhancements:
- * - Added rate limiting placeholder (implement with upstash or similar if needed).
- * - Improved validation: Added email/phone regex checks.
- * - Enhanced logging: More details on errors.
- * - Added optional reCAPTCHA verification (commented; enable if token sent in payload).
- * - Code: Refactored escapeHtml to use DOMParser for better security, but kept simple for Node.
- * - Handled Supabase errors more gracefully.
- */
 
 function escapeHtml(input: string | undefined | null) {
   if (!input) return "";
@@ -50,32 +38,29 @@ ${fromTelegram}
 }
 
 async function verifyRecaptcha(token: string) {
-  // Placeholder: Implement with fetch to Google reCAPTCHA API
-  // const res = await fetch(`https://www.google.com/recaptcha/api/siteverify`, { method: 'POST', body: new URLSearchParams({ secret: process.env.RECAPTCHA_SECRET, response: token }) });
-  // const data = await res.json();
-  // return data.success;
-  return true; // Disable for now
+  // Placeholder: Implement verification if needed
+  return true;
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // TODO: Add rate limiting here (e.g., using headers or session)
-
-    // Validation
     const name = (body.name || "").trim();
-    const phone = (body.phone || "").trim();
+    const phoneRaw = (body.phone || "").trim();
     const email = (body.email || "").trim();
     const message = (body.message || "").trim();
 
     if (!name) return NextResponse.json({ success: false, error: "Имя обязательно" }, { status: 400 });
-    if (!phone && !email) return NextResponse.json({ success: false, error: "Укажите телефон или email" }, { status: 400 });
-    if (phone && !/^\+?\d{10,15}$/.test(phone)) return NextResponse.json({ success: false, error: "Неверный формат телефона" }, { status: 400 });
+
+    // Нормализуем телефон: удаляем все не-цифры, затем валидируем длину
+    const phoneDigits = phoneRaw.replace(/\D/g, "");
+    if (!phoneDigits && !email) return NextResponse.json({ success: false, error: "Укажите телефон или email" }, { status: 400 });
+    if (phoneDigits && !/^\d{10,15}$/.test(phoneDigits)) return NextResponse.json({ success: false, error: "Неверный формат телефона" }, { status: 400 });
+
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ success: false, error: "Неверный формат email" }, { status: 400 });
     if (message.length < 10) return NextResponse.json({ success: false, error: "Сообщение слишком короткое" }, { status: 400 });
 
-    // reCAPTCHA (if token provided)
     if (body.recaptchaToken) {
       const valid = await verifyRecaptcha(body.recaptchaToken);
       if (!valid) return NextResponse.json({ success: false, error: "reCAPTCHA failed" }, { status: 400 });
@@ -84,18 +69,20 @@ export async function POST(req: Request) {
     const chatId = process.env.TELEGRAM_MANAGER_CHAT_ID || process.env.CONTACT_RECEIVER_CHAT_ID || process.env.ADMIN_CHAT_ID;
     const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || process.env.ADMIN_URL || null;
 
-    // Persist to Supabase
+    // Prepare insert payload
     let leadId: string | null = null;
     let leadSaved = false;
     if (supabaseAdmin) {
       try {
-        typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function"
-            ? (crypto as any).randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const insertPayload = {
+        // generate id properly
+        const id = (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function")
+          ? (crypto as any).randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const insertPayload: any = {
           id,
           name: name || null,
-          phone: phone || null,
+          phone: phoneDigits ? `+${phoneDigits}` : null,
           email: email || null,
           message: message || null,
           source: body.fromTelegram ? "telegram" : "website",
@@ -120,19 +107,20 @@ export async function POST(req: Request) {
       } catch (err) {
         logger.error("/api/send-contact: Supabase insert failed", err);
       }
+    } else {
+      logger.warn("/api/send-contact: supabaseAdmin not available — skipping DB save");
     }
 
-    const html = buildHtmlMessage({ ...body, ts: body.ts || new Date().toISOString() });
+    const html = buildHtmlMessage({ ...body, phone: phoneDigits ? `+${phoneDigits}` : phoneRaw, ts: body.ts || new Date().toISOString() });
 
     // Buttons
     const buttons: any[] = [];
     const row: any[] = [];
     if (adminUrl && leadId) row.push({ text: "Открыть в админке", url: `${adminUrl.replace(/\/$/, "")}/?leadId=${leadId}` });
-    if (phone) row.push({ text: "Позвонить", url: `tel:${phone}` });
+    if (phoneDigits) row.push({ text: "Позвонить", url: `tel:+${phoneDigits}` });
     if (email) row.push({ text: "Написать на почту", url: `mailto:${email}` });
     if (row.length) buttons.push(row);
 
-    // Send to Telegram
     const sendResult = await sendComplexMessage(String(chatId || ""), html, buttons, {
       imageQuery: body.imageQuery || "industrial pipes installation",
       parseMode: "HTML",
@@ -141,14 +129,22 @@ export async function POST(req: Request) {
     if (!sendResult.success) {
       logger.error("/api/send-contact: Telegram send failed", sendResult.error);
       if (leadSaved) {
-        await supabaseAdmin?.from("leads_optima").update({ notified: false, updated_at: new Date().toISOString() }).eq("id", leadId);
+        try {
+          await supabaseAdmin?.from("leads_optima").update({ notified: false, updated_at: new Date().toISOString() }).eq("id", leadId);
+        } catch (e) {
+          logger.error("/api/send-contact: failed updating lead notified flag", e);
+        }
         return NextResponse.json({ success: true, info: "Lead saved but notification failed", leadId, error: sendResult.error }, { status: 202 });
       }
       return NextResponse.json({ success: false, error: "Telegram send failed" }, { status: 500 });
     }
 
     if (leadSaved) {
-      await supabaseAdmin?.from("leads_optima").update({ notified: true, updated_at: new Date().toISOString() }).eq("id", leadId);
+      try {
+        await supabaseAdmin?.from("leads_optima").update({ notified: true, updated_at: new Date().toISOString() }).eq("id", leadId);
+      } catch (e) {
+        logger.error("/api/send-contact: failed updating lead notified=true", e);
+      }
     }
 
     return NextResponse.json({ success: true, leadId });

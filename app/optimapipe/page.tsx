@@ -73,46 +73,67 @@ export default function OptimapipeLandingPage2(): JSX.Element {
     return null;
   }
 
-  async function handleSubmit(e?: React.FormEvent) {
-    e?.preventDefault();
-    const err = validate(form);
-    if (err) {
-      toast.error(err);
-      return;
-    }
+  // normalizePhone helper (внутри файла page.tsx, вместе с другими функциями)
+function normalizePhone(raw: string) {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, ""); // оставляем только цифры
+  // простая логика: если 10 цифр — русская локаль без +7
+  if (digits.length === 10) return `+7${digits}`;
+  if (digits.length === 11 && digits.startsWith("8")) return `+7${digits.slice(1)}`;
+  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
+  return raw; // fallback — сервер всё равно перепроверит
+}
 
-    // TODO: Add reCAPTCHA verification here if implemented
-
-    const tg = getTelegramUser();
-    const payload = {
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim(),
-      message: form.message.trim(),
-      fromTelegram: !!tg,
-      telegramUser: tg ? { id: tg.id, username: tg.username, first_name: tg.first_name, last_name: tg.last_name } : null,
-      ts: new Date().toISOString(),
-    } as const;
-
-    try {
-      setSending(true);
-      const res = await fetch("/api/send-contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || json?.message || "Server error");
-
-      toast.success("Заявка отправлена — менеджер свяжется в рабочее время");
-      setForm({ name: "", phone: "", email: "", message: "" });
-    } catch (err: any) {
-      console.error("send contact failed", err);
-      toast.error(err?.message || "Ошибка отправки — попробуйте позже");
-    } finally {
-      setSending(false);
-    }
+async function handleSubmit(e?: React.FormEvent) {
+  e?.preventDefault();
+  const err = validate(form);
+  if (err) {
+    toast.error(err);
+    return;
   }
+
+  const tg = getTelegramUser();
+
+  // Нормализуем телефон перед отправкой
+  const normalizedPhone = normalizePhone(form.phone);
+
+  const payload = {
+    name: form.name.trim(),
+    phone: normalizedPhone || form.phone.trim(),
+    email: form.email.trim(),
+    message: form.message.trim(),
+    fromTelegram: !!tg,
+    telegramUser: tg ? { id: tg.id, username: tg.username, first_name: tg.first_name, last_name: tg.last_name } : null,
+    ts: new Date().toISOString(),
+  } as const;
+
+  try {
+    setSending(true);
+
+    const res = await fetch("/api/send-contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok) {
+      // если бек вернул объект { error: '...' } — показываем
+      const msg = json?.error || json?.message || `Ошибка ${res.status}`;
+      throw new Error(msg);
+    }
+
+    toast.success("Заявка отправлена — менеджер свяжется в рабочее время");
+    setForm({ name: "", phone: "", email: "", message: "" });
+  } catch (err: any) {
+    console.error("send contact failed", err);
+    toast.error(err?.message || "Ошибка отправки — попробуйте позже");
+  } finally {
+    setSending(false);
+  }
+}
+
 
   const heroImage =
     "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/optimapipeLogo-72082dcc-f28b-4d28-aeb1-09d64569419a.jpg";
