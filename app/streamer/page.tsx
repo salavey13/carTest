@@ -143,7 +143,7 @@ export default function StreamerPage() {
     >
       <div className="container mx-auto px-4 py-8">
         {/* Header card */}
-        <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a40,#001d2a60)] border border-border shadow-2xl"> {/* Increased opacity */}
+        <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a40,#001d2a60)] border border-border shadow-2xl"> 
           <div className="flex items-center gap-4">
             <div className={cn("w-20 h-20 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-primary/40")}>
               <Image
@@ -200,7 +200,7 @@ export default function StreamerPage() {
         {/* Main layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
           <div className="lg:col-span-2 space-y-4">
-            <Card className="p-0 bg-gradient-to-br from-gray-900 to-gray-800 border-transparent"> {/* Darker bg for contrast */}
+            <Card className="p-0 bg-gradient-to-br from-gray-900 to-gray-800 border-transparent">
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <CardTitle className="text-2xl text-white">VIP Dashboard</CardTitle>
@@ -212,7 +212,7 @@ export default function StreamerPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <DonationForm streamerId={streamerId} />
-                    <div className="p-3 rounded-md border border-border bg-gray-800/80 mt-3"> {/* Darker bg */}
+                    <div className="p-3 rounded-md border border-border bg-gray-800/80 mt-3">
                       <h5 className="font-semibold mb-2 text-white">Почему донат = мерч?</h5>
                       <p className="text-sm text-gray-300">
                         Эксперимент: донат превращается в цифровой/IRL пакет (Sauna Pack и т.п.). Всё хранится в БД и может быть управляемо.
@@ -225,7 +225,7 @@ export default function StreamerPage() {
                     {schedule.length > 0 ? (
                       <ul className="list-inside space-y-2" aria-live="polite">
                         {schedule.map((s: any, idx: number) => (
-                          <li key={idx} className="p-2 rounded bg-gray-800/80 border border-border"> {/* Darker bg */}
+                          <li key={idx} className="p-2 rounded bg-gray-800/80 border border-border"> 
                             <div className="text-sm font-medium text-white">{s.title}</div>
                             <div className="text-xs text-gray-300">{s.day} — {s.time}</div> 
                           </li>
@@ -248,7 +248,7 @@ export default function StreamerPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-gray-900 to-gray-800"> {/* Darker bg */}
+            <Card className="bg-gradient-to-br from-gray-900 to-gray-800"> 
               <CardHeader>
                 <CardTitle className="text-white">Вся история донатов</CardTitle>
               </CardHeader>
@@ -261,7 +261,7 @@ export default function StreamerPage() {
           </div>
 
           <aside className="space-y-4">
-            <Card className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"> {/* Darker bg */}
+            <Card className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"> 
               <h4 className="font-semibold mb-2 text-white">VIP Fan Management</h4>
               <p className="text-sm text-gray-300">Владелец управляет VIP-фанатами и шаблонами уведомлений.</p> 
               <div className="mt-3">
@@ -286,7 +286,7 @@ export default function StreamerPage() {
         </div>
       </div>
 
-      {/* Subtle vignette */}
+      
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
     </div>
   );
