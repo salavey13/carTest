@@ -1,6 +1,6 @@
 // /app/optimapipe/page.tsx
 "use client";
-
+import { t } from "@/lib/optimapipeTranslations";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -29,21 +29,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
  * - Styling: Subtle improvements like hover effects, consistent spacing.
  * - Code: Refactored for readability, extracted constants where possible.
  */
-
-const t = {
-  company: 'ООО "Оптимапайп"',
-  subtitle: "Монтаж инженерных сетей — качество и надёжность",
-  heroCta: "Заказать оценку проекта",
-  servicesTitle: "Наши услуги",
-  whyTitle: "Почему выбирают нас",
-  testimonialsTitle: "Отзывы клиентов",
-  faqTitle: "Частые вопросы",
-  projectsTitle: "Кейсы и проекты",
-  contactTitle: "Контакты",
-  phone: "+7 (XXX) XXX-XX-XX",
-  email: "info@optimapipe.ru",
-  address: "г. Город, ул. Улица, дом 1",
-};
 
 type ContactForm = { name: string; phone: string; email: string; message: string };
 

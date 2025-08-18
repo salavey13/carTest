@@ -1,7 +1,6 @@
 // /app/optimapipe/cases/[slug]/page.tsx
 "use client";
-
-
+import { t } from "@/lib/optimapipeTranslations";
 import React from "react";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -79,7 +78,6 @@ const CASES: CaseItem[] = [
     tags: ["врезка", "ночные работы", "контроль качества"],
   },
 ];
-
 
 export default function CasePage({ params }: { params: { slug: string } }) {
   const router = useRouter();
