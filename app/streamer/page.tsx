@@ -287,7 +287,7 @@ export default function StreamerPage() {
       </div>
 
       
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
     </div>
   );
 }
