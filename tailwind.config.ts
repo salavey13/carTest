@@ -1,3 +1,4 @@
+// /tailwind.config.ts
 import type { Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 import animate from "tailwindcss-animate";
@@ -102,6 +103,7 @@ const config: Config = {
         "cyan-glow": "0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2)",
         "orange-glow": "0 0 15px hsla(var(--red-orange-rgb), 0.4), 0 0 30px hsla(var(--red-orange-rgb), 0.2)",
         "lime-glow": "0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2)", 
+        "primary-glow": "0 0 10px hsl(var(--primary))"
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
