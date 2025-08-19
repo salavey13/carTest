@@ -1,3 +1,4 @@
+// /app/streamer/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -126,7 +127,7 @@ export default function StreamerPage() {
   const isOwner = dbUser?.user_id === streamerId;
 
   const heroUrl =
-    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1600&q=80";
+    "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/fon-8f9c72b7-c622-4159-98da-64173322eae4.jpg";
   const bgPos = `${50 + (pos.x - 0.5) * 6}% ${50 + (pos.y - 0.5) * 4}%`;
 
   return (
