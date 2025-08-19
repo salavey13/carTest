@@ -1,8 +1,11 @@
+// /components/streamer/DonationFeed.tsx
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionLi = motion.li;
 
 type DonationItem = { id: string; user_id: string; username?: string | null; avatar_url?: string | null; amount: number; type?: string; created_at?: string | null; };
 
@@ -71,7 +74,7 @@ export default function DonationFeed({ streamerId, limit = 12 }: { streamerId: s
   return (
     <div className="p-3 bg-card rounded-md border border-border">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="font-semibold">Live донаты и покупки</h4>
+        <h4 className="font-semibold text-foreground">Live донаты и покупки</h4>
         <div className="text-xs text-muted-foreground">Поток в реальном времени</div>
       </div>
 
@@ -88,24 +91,24 @@ export default function DonationFeed({ streamerId, limit = 12 }: { streamerId: s
               const meta = TYPE_META[d.type ?? "unknown"] ?? TYPE_META.unknown;
               const isNew = highlightId === d.id;
               return (
-                <motion.li key={d.id} initial={{ opacity:0, y: 8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }} transition={{ duration: 0.35 }} className={`p-2 rounded-md border border-border flex items-center gap-3 ${isNew ? "ring-2 ring-primary/40" : ""}`}>
+                <MotionLi key={d.id} initial={{ opacity:0, y: 8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }} transition={{ duration: 0.35 }} className={`p-2 rounded-md border border-border flex items-center gap-3 ${isNew ? "ring-2 ring-primary/40" : ""}`}>
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center text-sm">
                     {d.avatar_url ? <Image src={d.avatar_url} alt={d.username || d.user_id} width={40} height={40} /> : <span>{(d.username && d.username[0]) || "?"}</span>}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <div className="text-sm font-medium truncate">{d.username}</div>
+                      <div className="text-sm font-medium truncate text-foreground">{d.username}</div>
                       <div className="text-xs text-muted-foreground">{meta.badge} <span className="ml-1 text-muted-foreground">{meta.label}</span></div>
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{d.created_at ? new Date(d.created_at).toLocaleString() : ""}</div>
                   </div>
 
                   <div className="text-right">
-                    <div className="font-semibold">{d.amount}★</div>
+                    <div className="font-semibold text-foreground">{d.amount}★</div>
                     <div className="text-xs text-muted-foreground">{d.type || "донат"}</div>
                   </div>
-                </motion.li>
+                </MotionLi>
               );
             })}
           </AnimatePresence>
