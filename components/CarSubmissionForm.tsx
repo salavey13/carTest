@@ -25,6 +25,7 @@ type GalleryItem = { id: string; url: string };
  * - supports types: car, bike, cross, sauna, blog, stream
  * - writes to public.cars using supabaseAdmin (insert/update)
  * - for blog & stream stores extra data in specs JSONB
+ * - Enhanced with UI/UX from /forms version: random images, gallery previews, stream template/copy/prompt, clear form, etc.
  */
 
 interface Props {
@@ -32,6 +33,9 @@ interface Props {
   vehicleToEdit?: VehicleData | null;
   onSuccess?: (row?: any) => void;
 }
+
+const RANDOM_UNSPLASH = (seed = "") =>
+  `https://source.unsplash.com/random/1200x800/?cyber,${encodeURIComponent(seed)}&sig=${Date.now() % 100000}`;
 
 export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSuccess }: Props) {
   const formId = useId();
@@ -59,11 +63,33 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [blogSlug, setBlogSlug] = useState<string>(vehicleToEdit?.model ?? "");
   const [blogExcerpt, setBlogExcerpt] = useState<string>((vehicleToEdit?.specs as any)?.excerpt ?? "");
   const [blogContent, setBlogContent] = useState<string>((vehicleToEdit?.specs as any)?.content ?? "");
+  const [blogTags, setBlogTags] = useState<string>(((vehicleToEdit?.specs as any)?.tags ?? []).join(", "));
   const [streamTitle, setStreamTitle] = useState<string>((vehicleToEdit?.specs as any)?.title ?? "");
   const [streamSlug, setStreamSlug] = useState<string>((vehicleToEdit?.model ?? ""));
+  const defaultStreamTemplate = JSON.stringify({
+    title: "Пример стрима",
+    sections: [
+      {
+        id: "sec-1",
+        title: "Вступление",
+        durationSec: 60,
+        showImage: true,
+        image: RANDOM_UNSPLASH("intro"),
+        text: "Короткое вступление. Текст, который стример видит на панели.",
+      },
+      {
+        id: "sec-2",
+        title: "Main topic",
+        durationSec: 300,
+        showImage: true,
+        image: RANDOM_UNSPLASH("topic"),
+        text: "Основная секция: сюда можно добавить ссылку на видос и т.д.",
+      },
+    ],
+  }, null, 2);
   const [streamSpecsRaw, setStreamSpecsRaw] = useState<string>(() => {
     if (vehicleToEdit?.specs) return JSON.stringify(vehicleToEdit.specs, null, 2);
-    return "";
+    return defaultStreamTemplate;
   });
 
   const [saving, setSaving] = useState(false);
@@ -72,7 +98,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
     // hydrate specs & gallery from edit
     if (vehicleToEdit?.specs && typeof vehicleToEdit.specs === "object") {
       const s = vehicleToEdit.specs as Record<string, any>;
-      const entries = Object.entries(s).filter(([k]) => k !== "gallery");
+      const entries = Object.entries(s).filter(([k]) => k !== "gallery" && k !== "title" && k !== "slug" && k !== "excerpt" && k !== "content" && k !== "tags");
       setSpecs(entries.map(([key, value]) => ({ id: uuidv4(), key, value: String(value) })));
       const g = Array.isArray(s.gallery) ? s.gallery.map((url: string) => ({ id: uuidv4(), url })) : [];
       setGallery(g);
@@ -83,6 +109,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         setBlogSlug(vehicleToEdit.model ?? "");
         setBlogExcerpt(s.excerpt ?? "");
         setBlogContent(s.content ?? "");
+        setBlogTags((s.tags ?? []).join(", "));
       }
       if (vehicleToEdit.type === "stream") {
         setStreamTitle(s.title ?? "");
@@ -103,7 +130,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
     setSpecs((prev) => prev.filter((p) => p.id !== id));
   }
   function addGallery() {
-    setGallery((g) => [...g, { id: uuidv4(), url: "" }]);
+    setGallery((g) => [...g, { id: uuidv4(), url: RANDOM_UNSPLASH("gallery") }]);
   }
   function updateGallery(id: string, url: string) {
     setGallery((g) => g.map((it) => (it.id === id ? { ...it, url } : it)));
@@ -126,20 +153,65 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
 
   // sample stream JSON
   function insertSampleStream() {
-    const sample = {
-      title: "Demo VIP Stream",
-      slug: `demo-${Date.now()}`,
-      startAt: null,
-      endAt: null,
-      sections: [
-        { id: `s-${Date.now()}-1`, title: "Intro", type: "text", text: "Привет, VIP!", durationSec: 12 },
-        { id: `s-${Date.now()}-2`, title: "Sauna Pack", type: "image", mediaUrl: "https://source.unsplash.com/random/1200x800/?sauna", durationSec: 18 },
-      ],
-    };
-    setStreamSpecsRaw(JSON.stringify(sample, null, 2));
-    setStreamTitle(String(sample.title));
-    setStreamSlug(String(sample.slug));
+    setStreamSpecsRaw(defaultStreamTemplate);
+    const sample = JSON.parse(defaultStreamTemplate);
+    setStreamTitle(sample.title);
+    setStreamSlug(streamSlug || `stream-${Date.now()}`);
     toast.success("Sample stream inserted — отредактируй по вкусу");
+  }
+
+  // copy stream json
+  async function copyStreamJson() {
+    try {
+      await navigator.clipboard.writeText(streamSpecsRaw);
+      toast.success("Stream JSON скопирован в буфер обмена");
+    } catch (e) {
+      toast.error("Не удалось скопировать в буфер обмена");
+    }
+  }
+
+  // generate prompt for bot
+  function generateJsonForBot() {
+    const payload = {
+      action: "generate_stream_overlay",
+      streamer: make || model || id,
+      hint: "Создай структуру секций для 30-минутного стрима: intro, main, q&a, outro",
+    };
+    return JSON.stringify(payload, null, 2);
+  }
+
+  async function copyBotPrompt() {
+    try {
+      await navigator.clipboard.writeText(generateJsonForBot());
+      toast.success("Подсказка для бота скопирована");
+    } catch (e) {
+      toast.error("Не удалось скопировать");
+    }
+  }
+
+  // clear form
+  function clearForm() {
+    setType("bike");
+    setMake("");
+    setModel("");
+    setDescription("");
+    setDailyPrice("0");
+    setImageUrl("");
+    setRentLink("");
+    setIsTest(true);
+    setSpecs([]);
+    setGallery([]);
+    setImageFile(null);
+    setImagePreview(null);
+    setBlogTitle("");
+    setBlogSlug("");
+    setBlogExcerpt("");
+    setBlogContent("");
+    setBlogTags("");
+    setStreamTitle("");
+    setStreamSlug("");
+    setStreamSpecsRaw(defaultStreamTemplate);
+    toast.info("Форма очищена");
   }
 
   // validation + build specs object
@@ -157,6 +229,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       obj.slug = blogSlug || model || `${(blogTitle || "post").toLowerCase().replace(/\s+/g, "-")}`;
       obj.excerpt = blogExcerpt;
       obj.content = blogContent;
+      obj.tags = blogTags.split(",").map((t) => t.trim()).filter(Boolean);
       if (!obj.cover_url && imageUrl) obj.cover_url = imageUrl;
     }
 
@@ -264,6 +337,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           <Button type="button" variant="ghost" onClick={() => { setOwnerIdState(ownerId ?? ownerIdState); toast.success("Owner ID synced"); }}>
             Sync owner
           </Button>
+          <Button type="button" variant="outline" onClick={clearForm}>Сброс формы</Button>
         </div>
       </div>
 
@@ -288,7 +362,12 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       {(type === "bike" || type === "cross" || type === "car" || type === "sauna") && (
         <>
           <div>
-            <h4 className="text-sm font-semibold text-foreground">Характеристики (Specs)</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-foreground">Характеристики (Specs)</h4>
+              <div className="flex gap-2">
+                <Button type="button" onClick={() => { setSpecs([]); toast.success("Specs очищены"); }} variant="ghost" size="sm">Очистить</Button>
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается.</p>
             <div className="space-y-2">
               {specs.map((s) => (
@@ -298,32 +377,34 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
                   <Button type="button" variant="destructive" onClick={() => removeSpec(s.id)}>Удалить</Button>
                 </div>
               ))}
-              <div className="flex gap-2">
-                <Button type="button" onClick={addSpec} variant="outline">Добавить характеристику</Button>
-                <Button type="button" onClick={() => { setSpecs([]); toast.success("Specs очищены"); }} variant="ghost">Очистить</Button>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="text-sm font-semibold text-foreground">Gallery (optional)</h4>
-            <div className="space-y-2">
-              {gallery.map((g) => (
-                <div key={g.id} className="flex gap-2 items-center">
-                  <div className="w-12 h-8 overflow-hidden rounded-sm bg-muted/30 border border-border">
-                    {g.url ? <Image src={g.url} alt="preview" width={120} height={80} className="object-cover" /> : <div className="text-xs text-muted-foreground p-2">no</div>}
-                  </div>
-                  <Input value={g.url} onChange={(e) => updateGallery(g.id, e.target.value)} className="input-cyber" placeholder="https://..." />
-                  <Button type="button" variant="destructive" onClick={() => removeGallery(g.id)}>Удалить</Button>
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <Button type="button" onClick={addGallery} variant="outline">Добавить фото</Button>
-              </div>
+              <Button type="button" onClick={addSpec} variant="outline">Добавить характеристику</Button>
             </div>
           </div>
         </>
       )}
+
+      {/* Gallery with previews */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-semibold text-foreground">Gallery (optional)</h4>
+          <div className="flex gap-2">
+            <Button type="button" onClick={addGallery} variant="outline" size="sm">Добавить случайное</Button>
+            <Button type="button" onClick={() => { setGallery([]); toast.info("Галерея очищена"); }} variant="ghost" size="sm">Очистить</Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {gallery.length === 0 && <div className="text-xs text-muted-foreground col-span-full">Галерея пуста — добавьте изображения</div>}
+          {gallery.map((g, i) => (
+            <div key={g.id} className="relative h-24 rounded overflow-hidden border border-border bg-muted/20">
+              <Image src={g.url} alt={`gallery-${i}`} fill style={{ objectFit: "cover" }} />
+              <div className="absolute top-1 right-1 flex gap-1">
+                <button type="button" onClick={() => navigator.clipboard?.writeText(g.url).then(() => toast.success("URL скопирован"))} className="p-1 bg-black/50 rounded text-xs">Copy</button>
+                <button type="button" onClick={() => removeGallery(g.id)} className="p-1 bg-red-600/70 rounded text-xs">X</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* blog editor */}
       {type === "blog" && (
@@ -345,7 +426,11 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           </div>
           <div className="mt-2">
             <Label className="text-xs text-muted-foreground">Content (HTML allowed)</Label>
-            <Textarea value={blogContent} onChange={(e) => setBlogContent(e.target.value)} className="textarea-cyber" minLength={0} />
+            <Textarea value={blogContent} onChange={(e) => setBlogContent(e.target.value)} className="textarea-cyber min-h-[140px]" />
+          </div>
+          <div className="mt-2">
+            <Label className="text-xs text-muted-foreground">Tags (comma separated)</Label>
+            <Input value={blogTags} onChange={(e) => setBlogTags(e.target.value)} className="input-cyber" placeholder="vip, sauna, roadmap" />
           </div>
         </div>
       )}
@@ -357,6 +442,8 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
             <h4 className="text-sm font-semibold text-foreground">Stream overlay — config</h4>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" onClick={insertSampleStream}>Insert sample</Button>
+              <Button type="button" variant="ghost" onClick={copyStreamJson}>Copy JSON</Button>
+              <Button type="button" variant="ghost" onClick={copyBotPrompt}>Copy bot prompt</Button>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -371,7 +458,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           </div>
           <div className="mt-2">
             <Label className="text-xs text-muted-foreground">Raw JSON specs (sections, media...)</Label>
-            <Textarea value={streamSpecsRaw} onChange={(e) => setStreamSpecsRaw(e.target.value)} className="textarea-cyber" />
+            <Textarea value={streamSpecsRaw} onChange={(e) => setStreamSpecsRaw(e.target.value)} className="textarea-cyber min-h-[180px]" />
             <p className="text-xs text-muted-foreground mt-1">Если JSON некорректен — он будет сохранен с пометкой. Можно вставлять ответ бота прямо сюда.</p>
           </div>
         </div>
@@ -387,6 +474,9 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           <Label className="text-xs text-muted-foreground">Image URL or upload</Label>
           <div className="flex gap-2">
             <Input value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="input-cyber" placeholder="https://..." />
+            <Button type="button" variant="ghost" onClick={() => { const newUrl = RANDOM_UNSPLASH("hero"); setImageUrl(newUrl); setImagePreview(newUrl); toast.info("Случайная обложка обновлена"); }}>
+              Random
+            </Button>
             <label htmlFor={`file-${formId}`} className="btn input-cyber cursor-pointer p-2 border border-border rounded-md flex items-center">
               <VibeContentRenderer content="::FaUpload::" />&nbsp;Upload
             </label>
@@ -404,7 +494,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       <div className="flex gap-2 items-center">
         <Button type="submit" disabled={saving} className="w-full">
           {saving ? <><VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> Сохраняю...</> :
-            isEdit ? "Обновить запись" : "Добавить в public.cars"}
+            isEdit ? "Обновить запись" : "Поддержать в public.cars"}
         </Button>
 
         <Button type="button" variant="secondary" onClick={() => { setIsTest((s) => !s); }} >
