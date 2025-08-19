@@ -1,4 +1,3 @@
-// /app/streamer/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -65,28 +64,39 @@ export default function StreamerPage() {
     };
   }, [profile?.user_id, supabase]);
 
-  // Mouse parallax
+  // Combined parallax
   useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      setPos({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight });
-    };
-    window.addEventListener("mousemove", handleMove, { passive: true });
-    return () => window.removeEventListener("mousemove", handleMove);
-  }, []);
+    let requestId: number;
 
-  // Gyro parallax for mobile
-  useEffect(() => {
+    const updatePos = (x: number, y: number) => {
+      setPos({ x, y });
+    };
+
+    const handleMouse = (e: MouseEvent) => {
+      const newX = e.clientX / window.innerWidth;
+      const newY = e.clientY / window.innerHeight;
+      cancelAnimationFrame(requestId);
+      requestId = requestAnimationFrame(() => updatePos(newX, newY));
+    };
+
     const handleGyro = (e: DeviceOrientationEvent) => {
       if (e.gamma == null || e.beta == null) return;
-      setPos({
-        x: (e.gamma + 90) / 180,
-        y: (e.beta + 90) / 180,
-      });
+      const gammaNorm = Math.max(0, Math.min(1, (e.gamma + 90) / 180));
+      const betaNorm = Math.max(0, Math.min(1, (e.beta + 90) / 180));
+      cancelAnimationFrame(requestId);
+      requestId = requestAnimationFrame(() => updatePos(gammaNorm, betaNorm));
     };
-    if (typeof window !== "undefined" && "DeviceOrientationEvent" in window) {
-      window.addEventListener("deviceorientation", handleGyro as any, true);
+
+    window.addEventListener("mousemove", handleMouse, { passive: true });
+    if ("DeviceOrientationEvent" in window) {
+      window.addEventListener("deviceorientation", handleGyro, true);
     }
-    return () => window.removeEventListener("deviceorientation", handleGyro as any);
+
+    return () => {
+      cancelAnimationFrame(requestId);
+      window.removeEventListener("mousemove", handleMouse);
+      window.removeEventListener("deviceorientation", handleGyro);
+    };
   }, []);
 
   if (isLoading || !profile) {
@@ -94,6 +104,19 @@ export default function StreamerPage() {
       <div className="min-h-[60vh] flex items-center justify-center" role="status" aria-live="polite">
         <div className="loading-spinner-cyber w-16 h-16 rounded-full" />
         <span className="sr-only">Загрузка профиля стримера...</span>
+        <div className="mt-8 space-y-4 w-full max-w-2xl px-4">
+          <div className="h-32 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg animate-pulse" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="col-span-2 space-y-4">
+              <div className="h-64 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg animate-pulse" />
+              <div className="h-48 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg animate-pulse" />
+            </div>
+            <div className="space-y-4">
+              <div className="h-32 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg animate-pulse" />
+              <div className="h-40 bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg animate-pulse" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -110,7 +133,7 @@ export default function StreamerPage() {
     <div
       className="min-h-screen pb-12 text-white"
       style={{
-        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.85), rgba(5,10,22,0.96)), url(${heroUrl})`,
+        backgroundImage: `linear-gradient(180deg, rgba(3,7,18,0.95), rgba(5,10,22,0.98)), url(${heroUrl})`,
         backgroundBlendMode: "overlay",
         backgroundSize: "cover",
         backgroundRepeat: "no-repeat",
@@ -120,7 +143,7 @@ export default function StreamerPage() {
     >
       <div className="container mx-auto px-4 py-8">
         {/* Header card */}
-        <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a20,#001d2a40)] border border-border shadow-2xl">
+        <div className="rounded-2xl p-6 bg-[linear-gradient(135deg,#00121a40,#001d2a60)] border border-border shadow-2xl"> 
           <div className="flex items-center gap-4">
             <div className={cn("w-20 h-20 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-primary/40")}>
               <Image
@@ -136,12 +159,12 @@ export default function StreamerPage() {
               <h1 className="text-3xl font-extrabold text-primary leading-tight">
                 {profile.username || profile.full_name || "Стример"}
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-gray-300 mt-1"> 
                 Демо-страница персонального VIP Dashboard для стримера.
               </p>
 
               <div className="mt-2 flex items-center gap-4">
-                <div className="text-sm text-muted-foreground">Баланс</div>
+                <div className="text-sm text-gray-300">Баланс</div> 
                 <div className="text-xl font-semibold">{liveBalance !== null ? `${liveBalance}★` : "—"}</div>
                 <div>
                   <Button variant="secondary" size="sm" onClick={() => refreshDbUser()}>
@@ -149,39 +172,39 @@ export default function StreamerPage() {
                   </Button>
                 </div>
 
-                {!isOwner && <div className="text-xs text-muted-foreground ml-2">Вы просматриваете публичную страницу</div>}
+                {!isOwner && <div className="text-xs text-gray-300 ml-2">Вы просматриваете публичную страницу</div>} 
               </div>
             </div>
           </div>
         </div>
 
-        {/* StreamManager only for owner */}
+        
         {isOwner && (
-  <div className="mt-6">
-    <h3 className="font-semibold mb-3">Stream Overlay — редактор (Level 1)</h3>
-    <StreamManager />
-    <div className="mt-4">
-      <h4 className="font-semibold mb-2">Сохранить текущий стрим как запись (public.cars)</h4>
-      <CarSubmissionForm
-        ownerId={dbUser?.user_id}
-        vehicleToEdit={null}
-        onSuccess={(row) => {
-          console.info("Stream saved to public.cars:", row);
-          // Можно обновить профиль/расписание: refreshDbUser() если нужно
-        }}
-      />
-    </div>
-  </div>
-)}
+          <div className="mt-6">
+            <h3 className="font-semibold mb-3">Stream Overlay — редактор (Level 1)</h3>
+            <StreamManager />
+            <div className="mt-4">
+              <h4 className="font-semibold mb-2">Сохранить текущий стрим как запись (public.cars)</h4>
+              <CarSubmissionForm
+                ownerId={dbUser?.user_id}
+                vehicleToEdit={null}
+                onSuccess={(row) => {
+                  console.info("Stream saved to public.cars:", row);
+                  // Можно обновить профиль/расписание: refreshDbUser() если нужно
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Main layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
           <div className="lg:col-span-2 space-y-4">
-            <Card className="p-0 bg-transparent border-transparent">
+            <Card className="p-0 bg-gradient-to-br from-gray-900 to-gray-800 border-transparent">
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <CardTitle className="text-2xl text-white">VIP Dashboard</CardTitle>
-                  <div className="text-xs text-muted-foreground">Управление донатами, наградами и VIP фан-базой</div>
+                  <div className="text-xs text-gray-300">Управление донатами, наградами и VIP фан-базой</div> 
                 </div>
               </CardHeader>
 
@@ -189,9 +212,9 @@ export default function StreamerPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <DonationForm streamerId={streamerId} />
-                    <div className="p-3 rounded-md border border-border bg-card/60 mt-3">
+                    <div className="p-3 rounded-md border border-border bg-gray-800/80 mt-3">
                       <h5 className="font-semibold mb-2 text-white">Почему донат = мерч?</h5>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-gray-300">
                         Эксперимент: донат превращается в цифровой/IRL пакет (Sauna Pack и т.п.). Всё хранится в БД и может быть управляемо.
                       </p>
                     </div>
@@ -202,14 +225,14 @@ export default function StreamerPage() {
                     {schedule.length > 0 ? (
                       <ul className="list-inside space-y-2" aria-live="polite">
                         {schedule.map((s: any, idx: number) => (
-                          <li key={idx} className="p-2 rounded bg-muted/60 border border-border">
-                            <div className="text-sm font-medium">{s.title}</div>
-                            <div className="text-xs text-muted-foreground">{s.day} — {s.time}</div>
+                          <li key={idx} className="p-2 rounded bg-gray-800/80 border border-border"> 
+                            <div className="text-sm font-medium text-white">{s.title}</div>
+                            <div className="text-xs text-gray-300">{s.day} — {s.time}</div> 
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <div className="text-sm text-muted-foreground">Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.</div>
+                      <div className="text-sm text-gray-300">Расписание пока не настроено. Добавьте в profile metadata.streamSchedule.</div> 
                     )}
 
                     <div className="mt-4 space-y-4">
@@ -225,34 +248,34 @@ export default function StreamerPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="bg-gradient-to-br from-gray-900 to-gray-800"> 
               <CardHeader>
                 <CardTitle className="text-white">Вся история донатов</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Полная история хранится в таблице <code className="bg-muted px-1 rounded">invoices</code>.
-                </p>
+                <p className="text-sm text-gray-300">
+                  Полная история хранится в таблице <code className="bg-gray-800 px-1 rounded">invoices</code>.
+                </p> 
               </CardContent>
             </Card>
           </div>
 
           <aside className="space-y-4">
-            <Card className="p-3">
+            <Card className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"> 
               <h4 className="font-semibold mb-2 text-white">VIP Fan Management</h4>
-              <p className="text-sm text-muted-foreground">Владелец управляет VIP-фанатами и шаблонами уведомлений.</p>
+              <p className="text-sm text-gray-300">Владелец управляет VIP-фанатами и шаблонами уведомлений.</p> 
               <div className="mt-3">
                 {isOwner ? (
                   <Button onClick={() => alert("Открываю VIP панель (TODO)")} className="w-full">Открыть VIP панель</Button>
                 ) : (
-                  <div className="text-xs text-muted-foreground">Только владелец может открыть панель управления</div>
+                  <div className="text-xs text-gray-300">Только владелец может открыть панель управления</div> 
                 )}
               </div>
             </Card>
 
-            <Card className="p-3">
+            <Card className="p-3 bg-gradient-to-br from-gray-900 to-gray-800"> {/* Darker bg */}
               <h4 className="font-semibold mb-2 text-white">Роадмап проекта</h4>
-              <ul className="text-sm list-inside text-muted-foreground space-y-1">
+              <ul className="text-sm list-inside text-gray-300 space-y-1"> 
                 <li><strong>Lvl1 (стример)</strong> — текущая демо-страница.</li>
                 <li><strong><Link href="/sauna-rent" className="underline">Lvl2 (сауна)</Link></strong> — IRL бонусы.</li>
                 <li><strong><Link href="/vipbikerentals" className="underline">Lvl3 (VIP Bike Rentals)</Link></strong> — масштабируемый сервис.</li>
@@ -263,8 +286,8 @@ export default function StreamerPage() {
         </div>
       </div>
 
-      {/* Subtle vignette */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
+      
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0" style={{ background: "radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.35) 100%)", mixBlendMode: "multiply" }} />
     </div>
   );
 }

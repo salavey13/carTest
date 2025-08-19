@@ -1,3 +1,4 @@
+// /components/streamer/StreamEditorForm.tsx
 "use client";
 import React, { useState } from "react";
 import type { StreamConfig, StreamSection } from "./StreamOverlay";
@@ -63,17 +64,27 @@ export default function StreamEditorForm({
     }));
   };
 
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Basic validation
+    const invalidSections = config.sections.filter(s => 
+      (s.type !== "text" && !s.mediaUrl) || (s.type === "text" && !s.text)
+    );
+    if (invalidSections.length > 0) {
+      alert("Пожалуйста, заполните все обязательные поля в секциях (mediaUrl или text).");
+      return;
+    }
+    onSave(config);
+  };
+
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave(config);
-      }}
+      onSubmit={handleSave}
       className="space-y-6"
     >
       {/* Основные настройки */}
       <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-accent-text mb-3">
+        <h3 className="text-lg font-semibold text-foreground mb-3">
           Основные настройки
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -104,17 +115,17 @@ export default function StreamEditorForm({
 
       {/* Секции */}
       <div className="p-4 bg-card border border-border rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-accent-text mb-3">
+        <h3 className="text-lg font-semibold text-foreground mb-3">
           Секции
         </h3>
         <div className="space-y-4">
           {config.sections.map((s, idx) => (
             <div
               key={s.id}
-              className="p-3 border border-border rounded-md bg-background/50 space-y-2"
+              className="p-3 border border-border rounded-md bg-muted space-y-2"
             >
               <div className="flex items-center justify-between">
-                <h4 className="font-medium text-sm text-accent-text">
+                <h4 className="font-medium text-sm text-foreground">
                   {idx + 1}. {s.title || "Без названия"}
                 </h4>
                 <button
@@ -162,6 +173,7 @@ export default function StreamEditorForm({
                       }
                       placeholder="https://..."
                       className="input-cyber"
+                      required
                     />
                   </label>
                 )}
@@ -174,6 +186,7 @@ export default function StreamEditorForm({
                         updateSection(s.id, { text: e.target.value })
                       }
                       className="textarea-cyber min-h-[60px]"
+                      required
                     />
                   </label>
                 )}
@@ -213,21 +226,21 @@ export default function StreamEditorForm({
           <button
             type="button"
             onClick={() => addSection("text")}
-            className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm hover:bg-accent/10 transition"
+            className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm hover:bg-muted/80 transition"
           >
             + Текст
           </button>
           <button
             type="button"
             onClick={() => addSection("image")}
-            className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm hover:bg-accent/10 transition"
+            className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm hover:bg-muted/80 transition"
           >
             + Изображение
           </button>
           <button
             type="button"
             onClick={() => addSection("video")}
-            className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm hover:bg-accent/10 transition"
+            className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-foreground text-sm hover:bg-muted/80 transition"
           >
             + Видео
           </button>
@@ -237,7 +250,7 @@ export default function StreamEditorForm({
       {/* Submit */}
       <button
         type="submit"
-        className="w-full px-4 py-2 rounded-lg bg-brand-cyan text-white text-base font-medium shadow hover:bg-brand-cyan/90 transition"
+        className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground text-base font-medium shadow hover:bg-primary/90 transition"
       >
         Сохранить настройки
       </button>

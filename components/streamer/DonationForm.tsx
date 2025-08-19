@@ -1,3 +1,4 @@
+// /components/streamer/DonationForm.tsx
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import MarketBox from "./MarketBox";
 import { useAppToast } from "@/hooks/useAppToast";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionDiv = motion.div;
+const MotionButton = motion.button;
 
 type Tier = {
   id: string;
@@ -134,12 +138,12 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
   };
 
   return (
-    <>
+    <React.Fragment>
       <form onSubmit={handleDonate} className="space-y-3 p-3 rounded-md border border-border bg-card/80 backdrop-blur-sm relative overflow-hidden" aria-live="polite">
         {/* burst overlay */}
         <AnimatePresence>
           {paid && (
-            <motion.div
+            <MotionDiv
               key={`burst-${burstKey}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -151,15 +155,15 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
               }}
             >
               <div className="absolute inset-0 flex items-center justify-center">
-                <motion.div initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 12 }} className="py-6 px-8 rounded-full bg-gradient-to-r from-primary/20 to-transparent backdrop-blur-md shadow-xl text-white">
+                <MotionDiv initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 12 }} className="py-6 px-8 rounded-full bg-gradient-to-r from-primary/20 to-transparent backdrop-blur-md shadow-xl text-foreground">
                   <div className="text-center">
                     <div className="text-2xl font-bold">Спасибо! 🎉</div>
                     <div className="text-xs text-muted-foreground">Платёж получен</div>
                   </div>
-                </motion.div>
+                </MotionDiv>
               </div>
               <div className="confetti-container" aria-hidden>{renderBurst()}</div>
-            </motion.div>
+            </MotionDiv>
           )}
         </AnimatePresence>
 
@@ -170,32 +174,32 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {TIERS.map((t) => (
-            <motion.button
+            <MotionButton
               key={t.id}
               type="button"
               onClick={() => { setSelectedTier(t); setAmount(t.amount); }}
               whileTap={{ scale: 0.98 }}
-              className={`p-2 rounded-md text-sm flex flex-col items-start justify-between border transition-shadow duration-200 ${selectedTier.id === t.id ? `border-primary bg-primary/8 ${t.highlight}` : "bg-card border-border"}`}
+              className={`p-2 rounded-md text-sm flex flex-col items-start justify-between border transition-shadow duration-200 ${selectedTier.id === t.id ? `border-primary bg-primary/10 ${t.highlight}` : "bg-card border-border"}`}
             >
               <div className="flex items-center gap-2 w-full">
                 <div className="text-lg">{t.badge ?? "★"}</div>
                 <div className="flex-1 text-left min-w-0">
-                  <div className="font-medium text-sm truncate">{t.label}</div>
+                  <div className="font-medium text-sm truncate text-foreground">{t.label}</div>
                   <div className="text-xs text-muted-foreground truncate">{t.description}</div>
                 </div>
-                <div className="font-semibold">{t.amount}★</div>
+                <div className="font-semibold text-foreground">{t.amount}★</div>
               </div>
-            </motion.button>
+            </MotionButton>
           ))}
         </div>
 
         <div className="flex gap-2">
           <Input aria-label="Сумма XTR" type="number" min={1} value={amount} onChange={(e) => setAmount(Number(e.target.value) || 0)} className="flex-1 input-cyber" />
-          <motion.div whileTap={{ scale: 0.98 }}>
+          <MotionDiv whileTap={{ scale: 0.98 }}>
             <Button type="submit" className="whitespace-nowrap" disabled={loading || !!invoice}>
               {loading ? "Создаём..." : invoice ? "Инвойс готов" : "Поддержать"}
             </Button>
-          </motion.div>
+          </MotionDiv>
         </div>
 
         <div>
@@ -217,6 +221,7 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
             </div>
           )}
         </div>
+
       </form>
 
       <div className="mt-3">
@@ -247,6 +252,6 @@ export default function DonationForm({ streamerId }: { streamerId: string }) {
           100% { transform: translateY(-320px) rotate(360deg) scale(0.8); opacity: 0; }
         }
       `}</style>
-    </>
+    </React.Fragment>
   );
 }

@@ -1,3 +1,4 @@
+// /components/streamer/StreamOverlay.tsx
 "use client";
 import React from "react";
 
@@ -32,12 +33,14 @@ export default function StreamOverlay({
   visible = true,
   mode = "public",
   onClose,
+  forceGreenScreen = false,
 }: {
   config: StreamConfig | null;
   activeIndex?: number;
   visible?: boolean;
   mode?: "public" | "admin";
   onClose?: () => void;
+  forceGreenScreen?: boolean;
 }) {
   if (!config || !visible) return null;
   const section = config.sections?.[activeIndex] ?? null;
@@ -53,7 +56,7 @@ export default function StreamOverlay({
         <div
           className="absolute inset-0 flex items-center justify-center transition-all duration-300"
           style={{
-            background: section.greenScreen
+            background: forceGreenScreen || section.greenScreen
               ? "#00ff00"
               : section.type === "image" && section.mediaUrl
               ? `center / cover no-repeat url(${section.mediaUrl})`
@@ -73,16 +76,21 @@ export default function StreamOverlay({
                 muted
                 playsInline
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.warn("Video load failed:", section.mediaUrl, e);
+                  // Fallback UI
+                  e.currentTarget.style.display = "none";
+                }}
               />
             )}
 
           {section.type === "text" && (
             <div className="max-w-4xl px-6 text-center">
-              <div className="bg-background/70 backdrop-blur-md rounded-2xl p-6 border border-border shadow-lg">
-                <h2 className="text-4xl md:text-6xl font-orbitron font-bold text-accent-text drop-shadow-lg">
+              <div className="bg-background/80 backdrop-blur-md rounded-2xl p-6 border border-border shadow-lg">
+                <h2 className="text-4xl md:text-6xl font-orbitron font-bold text-foreground drop-shadow-lg">
                   {section.title}
                 </h2>
-                <p className="mt-4 text-lg md:text-2xl text-light-text whitespace-pre-line">
+                <p className="mt-4 text-lg md:text-2xl text-muted-foreground whitespace-pre-line"> 
                   {section.text}
                 </p>
               </div>
@@ -96,6 +104,10 @@ export default function StreamOverlay({
                 src={section.mediaUrl}
                 alt={section.title}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.warn("Image load failed:", section.mediaUrl, e);
+                  e.currentTarget.style.display = "none";
+                }}
               />
             )}
 
