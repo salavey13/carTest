@@ -1,8 +1,11 @@
+// /components/streamer/DonationFeed.tsx
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { motion, AnimatePresence } from "framer-motion";
+
+const MotionLi = motion.li;
 
 type DonationItem = { id: string; user_id: string; username?: string | null; avatar_url?: string | null; amount: number; type?: string; created_at?: string | null; };
 
@@ -88,7 +91,7 @@ export default function DonationFeed({ streamerId, limit = 12 }: { streamerId: s
               const meta = TYPE_META[d.type ?? "unknown"] ?? TYPE_META.unknown;
               const isNew = highlightId === d.id;
               return (
-                <motion.li key={d.id} initial={{ opacity:0, y: 8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }} transition={{ duration: 0.35 }} className={`p-2 rounded-md border border-border flex items-center gap-3 ${isNew ? "ring-2 ring-primary/40" : ""}`}>
+                <MotionLi key={d.id} initial={{ opacity:0, y: 8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }} transition={{ duration: 0.35 }} className={`p-2 rounded-md border border-border flex items-center gap-3 ${isNew ? "ring-2 ring-primary/40" : ""}`}>
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center text-sm">
                     {d.avatar_url ? <Image src={d.avatar_url} alt={d.username || d.user_id} width={40} height={40} /> : <span>{(d.username && d.username[0]) || "?"}</span>}
                   </div>
@@ -105,7 +108,7 @@ export default function DonationFeed({ streamerId, limit = 12 }: { streamerId: s
                     <div className="font-semibold text-white">{d.amount}★</div> {/* White text */}
                     <div className="text-xs text-gray-300">{d.type || "донат"}</div> {/* Light gray */}
                   </div>
-                </motion.li>
+                </MotionLi>
               );
             })}
           </AnimatePresence>
