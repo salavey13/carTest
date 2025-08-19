@@ -1,3 +1,4 @@
+// /components/streamer/StreamEditorForm.tsx
 "use client";
 import React, { useState } from "react";
 import type { StreamConfig, StreamSection } from "./StreamOverlay";
