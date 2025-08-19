@@ -1,3 +1,4 @@
+// /components/streamer/StreamManager.tsx
 "use client";
 import React, { useEffect, useState } from "react";
 import StreamEditorForm, { defaultStreamTemplate } from "./StreamEditorForm";
@@ -62,7 +63,7 @@ export default function StreamManager({
       <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={() => setMode(mode === "admin" ? "public" : "admin")}
-          className="px-3 py-1 rounded-lg bg-gray-800 border border-border text-white text-sm hover:bg-gray-700 transition" // Dark bg, white text
+          className="px-3 py-1 rounded-lg bg-muted border border-border text-foreground text-sm hover:bg-muted/80 transition"
         >
           {mode === "admin"
             ? "Переключить в PUBLIC (OBS)"
@@ -72,19 +73,19 @@ export default function StreamManager({
           onClick={() => setPlaying(!playing)}
           className={`px-3 py-1 rounded-lg text-sm shadow transition ${
             playing
-              ? "bg-destructive text-white hover:bg-destructive/90"
-              : "bg-green-500 text-white hover:bg-green-600"
-          }`} // White text
+              ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              : "bg-accent text-accent-foreground hover:bg-accent/90"
+          }`}
         >
           {playing ? "Стоп" : "Запустить авто-демо"}
         </button>
         <button
           onClick={() => setPreviewVisible(!previewVisible)}
-          className="px-3 py-1 rounded-lg bg-gray-800 border border-border text-white text-sm hover:bg-gray-700 transition" // Dark bg, white text
+          className="px-3 py-1 rounded-lg bg-muted border border-border text-foreground text-sm hover:bg-muted/80 transition"
         >
           {previewVisible ? "Скрыть превью" : "Показать превью"}
         </button>
-        <div className="ml-auto text-xs text-gray-300">
+        <div className="ml-auto text-xs text-muted-foreground">
           Активная секция: {activeIndex + 1}/{config.sections.length}
         </div>
       </div>
@@ -98,12 +99,12 @@ export default function StreamManager({
         </div>
 
         <aside className="space-y-4">
-          <div className="p-4 border border-border rounded-lg bg-gray-900 shadow-sm"> {/* Dark bg */}
-            <h4 className="font-semibold mb-2 text-white">Контроллер</h4> {/* White text */}
+          <div className="p-4 border border-border rounded-lg bg-card shadow-sm">
+            <h4 className="font-semibold mb-2 text-foreground">Контроллер</h4>
             <div className="flex flex-col gap-2">
-              <label className="text-xs text-gray-300">
+              <label className="text-xs text-muted-foreground">
                 Выбрать секцию
-              </label> {/* Light gray */}
+              </label>
               <input
                 type="range"
                 min={0}
@@ -114,7 +115,7 @@ export default function StreamManager({
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => setActiveIndex(Math.max(0, activeIndex - 1))}
-                  className="px-2 py-1 bg-gray-800 border border-border rounded text-white text-sm hover:bg-gray-700" // Dark bg, white text
+                  className="px-2 py-1 bg-muted border border-border rounded text-foreground text-sm hover:bg-muted/80"
                 >
                   Prev
                 </button>
@@ -124,35 +125,35 @@ export default function StreamManager({
                       (activeIndex + 1) % Math.max(1, config.sections.length)
                     )
                   }
-                  className="px-2 py-1 bg-gray-800 border border-border rounded text-white text-sm hover:bg-gray-700" // Dark bg, white text
+                  className="px-2 py-1 bg-muted border border-border rounded text-foreground text-sm hover:bg-muted/80"
                 >
                   Next
                 </button>
               </div>
-              <div className="mt-3 text-xs text-gray-300">
+              <div className="mt-3 text-xs text-muted-foreground">
                 Режим: <strong>{mode}</strong>. В Public overlay получает
                 pointer-events: none для OBS. Если секция greenScreen=true —
                 фон #00ff00 для хромакея.
-              </div> {/* Light gray */}
+              </div>
             </div>
           </div>
 
-          <div className="p-4 border border-border rounded-lg bg-gray-900 shadow-sm"> {/* Dark bg */}
-            <h4 className="font-semibold mb-2 text-white">
+          <div className="p-4 border border-border rounded-lg bg-card shadow-sm">
+            <h4 className="font-semibold mb-2 text-foreground">
               Превью (публичное)
-            </h4> {/* White text */}
-            <div className="p-2 bg-gray-800 rounded"> {/* Darker bg */}
-              <div className="text-xs text-gray-300 mb-2">
+            </h4>
+            <div className="p-2 bg-muted rounded">
+              <div className="text-xs text-muted-foreground mb-2">
                 Нажми &quot;Показать превью&quot; чтобы увидеть fullscreen
                 overlay.
-              </div> {/* Light gray */}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => {
                     setPreviewVisible(true);
                     setMode("public");
                   }}
-                  className="px-2 py-1 bg-brand-cyan text-white rounded text-sm shadow hover:bg-brand-cyan/90 transition" // White text
+                  className="px-2 py-1 bg-primary text-primary-foreground rounded text-sm shadow hover:bg-primary/90 transition"
                 >
                   Публичный preview
                 </button>
@@ -161,7 +162,7 @@ export default function StreamManager({
                     setPreviewVisible(true);
                     setMode("admin");
                   }}
-                  className="px-2 py-1 bg-gray-800 border border-border rounded text-white text-sm hover:bg-gray-700 transition" // Dark bg, white text
+                  className="px-2 py-1 bg-muted border border-border rounded text-foreground text-sm hover:bg-muted/80 transition"
                 >
                   Admin preview
                 </button>
@@ -169,20 +170,20 @@ export default function StreamManager({
             </div>
           </div>
 
-          <div className="p-4 border border-border rounded-lg bg-gray-900 shadow-sm"> {/* Dark bg */}
-            <h4 className="font-semibold mb-2 text-white">
+          <div className="p-4 border border-border rounded-lg bg-card shadow-sm">
+            <h4 className="font-semibold mb-2 text-foreground">
               Экспорт / Бот
-            </h4> {/* White text */}
-            <div className="text-xs text-gray-300 mb-2">
+            </h4>
+            <div className="text-xs text-muted-foreground mb-2">
               Скопировать JSON для бота или сервера.
-            </div> {/* Light gray */}
+            </div>
             <button
               onClick={() => {
                 navigator.clipboard
                   .writeText(JSON.stringify(config, null, 2))
                   .then(() => alert("JSON скопирован"));
               }}
-              className="px-2 py-1 bg-green-500 text-white rounded text-sm shadow hover:bg-green-600 transition" // White text
+              className="px-2 py-1 bg-accent text-accent-foreground rounded text-sm shadow hover:bg-accent/90 transition"
             >
               Copy JSON
             </button>
