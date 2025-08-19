@@ -1,9 +1,12 @@
+// /components/streamer/MarketBox.tsx
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+
+const MotionArticle = motion.article;
 
 type Item = { id: string; title: string; price: number; short: string; perks?: string[]; image?: string; accent?: string; };
 
@@ -41,34 +44,34 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
   const [flipped, setFlipped] = useState<string | null>(null);
 
   return (
-    <div className="p-3 rounded-md border border-border bg-gray-800/80 backdrop-blur-sm"> {/* Darker bg */}
+    <div className="p-3 rounded-md border border-border bg-muted/80 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold text-white">Мини-маркет: Sauna Pack</h4> {/* White text */}
-        <div className="text-xs text-gray-300">Прототип</div> {/* Light gray */}
+        <h4 className="font-semibold text-foreground">Мини-маркет: Sauna Pack</h4>
+        <div className="text-xs text-muted-foreground">Прототип</div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {ITEMS.map((it) => {
           const isFlipped = flipped === it.id;
           return (
-            <motion.article
+            <MotionArticle
               key={it.id}
               className={cn("relative perspective-800 p-0", it.accent ?? "")}
               whileHover={{ y: -6 }}
             >
               <div className={`flip-card ${isFlipped ? "is-flipped" : ""}`}>
-                <div className="flip-card-face flip-card-front p-3 rounded-md border border-border bg-gradient-to-br from-gray-900/60 to-transparent flex flex-col h-full"> {/* Darker bg */}
+                <div className="flip-card-face flip-card-front p-3 rounded-md border border-border bg-gradient-to-br from-card/60 to-transparent flex flex-col h-full">
                   <div className="w-full flex items-center gap-3 mb-2">
                     <div className="w-14 h-14 relative rounded-lg overflow-hidden bg-muted flex-shrink-0">
                       <Image src={it.image!} alt={it.title} fill style={{ objectFit: "cover" }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate text-white">{it.title}</div> {/* White text */}
-                      <div className="text-xs text-gray-300 truncate">{it.short}</div> {/* Light gray */}
+                      <div className="font-medium text-sm truncate text-foreground">{it.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">{it.short}</div>
                     </div>
-                    <div className="text-sm font-semibold text-white">{it.price}★</div> {/* White text */}
+                    <div className="text-sm font-semibold text-foreground">{it.price}★</div>
                   </div>
-                  <ul className="text-xs text-gray-300 list-disc list-inside mt-1 mb-2 flex-1"> {/* Light gray */}
+                  <ul className="text-xs text-muted-foreground list-disc list-inside mt-1 mb-2 flex-1">
                     {it.perks?.slice(0,3).map((p,i) => <li key={i}>{p}</li>)}
                   </ul>
 
@@ -78,13 +81,13 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
                   </div>
                 </div>
 
-                <div className="flip-card-face flip-card-back p-3 rounded-md border border-border bg-gradient-to-tr from-gray-900/80 to-transparent flex flex-col items-start justify-between"> {/* Darker bg */}
-                  <div className="text-sm font-semibold mb-2 text-white">{it.title} — детали</div> {/* White text */}
-                  <div className="text-xs text-gray-300 mb-4">
+                <div className="flip-card-face flip-card-back p-3 rounded-md border border-border bg-gradient-to-tr from-card/80 to-transparent flex flex-col items-start justify-between">
+                  <div className="text-sm font-semibold mb-2 text-foreground">{it.title} — детали</div>
+                  <div className="text-xs text-muted-foreground mb-4">
                     Товар: {it.title}. Цена: {it.price} XTR.
                     <br />
                     Перки: {it.perks?.join(", ")}
-                  </div> {/* Light gray */}
+                  </div>
                   <div className="w-full flex items-center gap-2">
                     <Button size="sm" onClick={() => { onPick && onPick(it); setFlipped(null); }}>Купить сейчас</Button>
                     <Button size="sm" variant="ghost" onClick={() => setFlipped(null)}>Назад</Button>
@@ -100,7 +103,7 @@ export default function MarketBox({ onPick }: { onPick?: (item: Item) => void })
                 .flip-card.is-flipped { transform: rotateY(180deg); }
                 @media (max-width:640px) { .flip-card { height: auto; } .flip-card-face { position:relative; transform:none; } .flip-card.is-flipped { transform:none; } }
               `}</style>
-            </motion.article>
+            </MotionArticle>
           );
         })}
       </div>
