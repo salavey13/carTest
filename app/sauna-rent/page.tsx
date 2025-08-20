@@ -13,11 +13,11 @@ import { useAppContext } from "@/contexts/AppContext";
 import RockstarHeroSection from "@/app/tutorials/RockstarHeroSection";
 import SaunaOccupancyChart from "@/components/SaunaOccupancyChart";
 import { toast } from "sonner";
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
 // Server actions
 import { createSaunaBooking } from "@/app/sauna-rent/actions";
-import { updateUserSettings } from "@/app/actions"; // Используем существующий центральный экшен
+import { updateUserSettings } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 
 // ----------------------------- types -----------------------------
@@ -83,7 +83,6 @@ export default function ForestSPAPage() {
   const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
   
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [masters, setMasters] = useState<MassageMaster[]>([]);
 
   // State для баланса звезд, синхронизированный с dbUser.metadata
   const [starsBalance, setStarsBalance] = useState<number>(() => Number(dbUser?.metadata?.starsBalance ?? 120));
@@ -113,6 +112,7 @@ export default function ForestSPAPage() {
   }, [dbUser?.user_id, refreshDbUser]);
 
   // Form state
+  const [currentStep, setCurrentStep] = useState(1);
   const [date, setDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -120,19 +120,34 @@ export default function ForestSPAPage() {
   });
   const [startHour, setStartHour] = useState(18);
   const [durationHours, setDurationHours] = useState(3);
-  const [selectedExtras, setSelectedExtras] = useState<Record<string, boolean>>({ cinema: false, parilshchik: false, shop: false, oils: false, music: false, hotStone: false });
+  const [selectedSaunaExtras, setSelectedSaunaExtras] = useState<Record<string, boolean>>({ cinema: false, parilshchik: false, shop: false });
   const [massageType, setMassageType] = useState<string>('none');
+  const [selectedMassageExtras, setSelectedMassageExtras] = useState<Record<string, boolean>>({ oils: false, music: false, hotStone: false });
   const [selectedMaster, setSelectedMaster] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [masters, setMasters] = useState<MassageMaster[]>([]);
 
   // Fetch masters
   useEffect(() => {
     async function fetchMasters() {
       const { data } = await supabaseAdmin.from('cars').select('*').eq('type', 'massage_master');
-      setMasters(data?.map(d => ({id: d.id, name: d.make, specialty: d.model, bio: d.description, imageUrl: d.image_url, rating: d.daily_price || 5})) || []);
+      setMasters(data?.map(d => ({
+        id: d.id,
+        name: d.make,
+        specialty: d.model,
+        bio: d.description,
+        imageUrl: d.image_url,
+        rating: d.daily_price || 5
+      })) || []);
     }
     fetchMasters();
+  }, []);
+
+  // Fetch bookings for availability (user's for history, but for global availability, assume server check)
+  useEffect(() => {
+    // Fetch user's bookings for history
+    // For global, rely on server
   }, []);
 
   // Pricing calc
@@ -149,29 +164,37 @@ export default function ForestSPAPage() {
     }
     let price = saunaPerHour * durationHours;
     if (friday) price = Math.round(price * BASE_PRICING.fridayExtendedMultiplier);
-    if (selectedExtras.cinema) price += BASE_PRICING.cinemaFlat;
-    if (selectedExtras.parilshchik) price += BASE_PRICING.parilshchikFlat;
+    if (selectedSaunaExtras.cinema) price += BASE_PRICING.cinemaFlat;
+    if (selectedSaunaExtras.parilshchik) price += BASE_PRICING.parilshchikFlat;
+    if (selectedSaunaExtras.shop) price += 500; // Assume shop flat
     
-    // Massage addition
+    // Massage
     if (massageType !== 'none') {
       let massagePerHour = BASE_PRICING.classicPerHour;
-      if (massageType === 'deep') massagePerHour = BASE_PRICING.deepTissuePerHour;
-      if (massageType === 'aroma') massagePerHour = BASE_PRICING.aromatherapyPerHour;
+      if (massageType === 'deepTissue') massagePerHour = BASE_PRICING.deepTissuePerHour;
+      if (massageType === 'aromatherapy') massagePerHour = BASE_PRICING.aromatherapyPerHour;
       price += massagePerHour * durationHours;
-      if (selectedExtras.hotStone) price += BASE_PRICING.hotStoneFlat;
-      if (selectedExtras.oils) price += BASE_PRICING.extras.oils;
-      if (selectedExtras.music) price += BASE_PRICING.extras.music;
-      if (selectedMaster) price *= 1.1; // Premium master
+      if (selectedMassageExtras.hotStone) price += BASE_PRICING.hotStoneFlat;
+      if (selectedMassageExtras.oils) price += BASE_PRICING.extras.oils;
+      if (selectedMassageExtras.music) price += BASE_PRICING.extras.music;
+      if (selectedMaster) {
+        const master = masters.find(m => m.id === selectedMaster);
+        if (master) price *= (1 + (5 - master.rating) * 0.05); // Adjust price based on rating
+      }
     }
-    
-    return price;
-  }, [date, startHour, durationHours, selectedExtras, massageType, selectedMaster]);
+
+    return Math.round(price);
+  }, [date, startHour, durationHours, selectedSaunaExtras, massageType, selectedMassageExtras, selectedMaster, masters]);
 
   const starsCost = Math.round(totalPrice / 100);
   const starsEarned = Math.max(0, Math.round((totalPrice * 0.1) / 100));
 
-  function toggleExtra(key: keyof typeof selectedExtras) {
-    setSelectedExtras((s) => ({ ...s, [key]: !s[key] }));
+  function toggleSaunaExtra(key: string) {
+    setSelectedSaunaExtras((s) => ({ ...s, [key]: !s[key] }));
+  }
+
+  function toggleMassageExtra(key: string) {
+    setSelectedMassageExtras((s) => ({ ...s, [key]: !s[key] }));
   }
 
   function formatHour(h: number) {
@@ -197,7 +220,7 @@ export default function ForestSPAPage() {
       startIso,
       endIso,
       price: totalPrice,
-      extras: Object.keys(selectedExtras).filter((k) => selectedExtras[k]),
+      extras: [...Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]), ...Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k])],
       starsUsed: Math.min(starsBalance, starsCost),
       userId: dbUser?.user_id ?? undefined,
       notes: message || undefined,
@@ -208,7 +231,7 @@ export default function ForestSPAPage() {
     try {
       const res = await createSaunaBooking(payload as any);
       if (!res || !res.success) {
-        throw new Error(res?.error || "Server failed to create booking");
+        throw new Error(res?.error || "Server failed to create sauna booking");
       }
 
       const id = res?.data?.rental_id || res?.data?.id || `bk_${Date.now()}`;
@@ -230,6 +253,7 @@ export default function ForestSPAPage() {
       await persistStarsBalance(newBalance);
 
       setMessage("Бронь создана — счёт отправлен в Telegram (проверь бота).");
+      setCurrentStep(1); // Reset to start
     } catch (err: any) {
       console.error("Booking error:", err);
       setMessage("Ошибка при создании брони. Попробуй ещё раз.");
@@ -238,8 +262,8 @@ export default function ForestSPAPage() {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/forest-spa-hero.jpg";
-  const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/forest-spa-icon.png";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/her2-31adfe54-e81d-4e65-becf-e85e689af170.jpg";
+  const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
   
   const cleaningOpportunities = useMemo(() => {
     return bookings.filter(b => {
@@ -252,11 +276,15 @@ export default function ForestSPAPage() {
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], [0, -100]); // For parallax
 
+  const steps = [
+    'Sauna Details',
+    'Massage Type',
+    'Choose Massagist',
+    'Review & Confirm'
+  ];
+
   return (
     <div className="relative min-h-screen bg-background overflow-hidden text-foreground dark">
-        {/* ==================================================================== */}
-        /* ✨ HERO-СЕКЦИЯ ОБНОВЛЕНА ✨ */
-        {/* ==================================================================== */}
         <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white p-4">
             <div className="absolute inset-0 z-0">
                 <Image 
@@ -275,38 +303,34 @@ export default function ForestSPAPage() {
                 transition={{ duration: 0.8 }}
                 className="relative z-10 flex flex-col items-center"
             >
-                {/* ==================================================================== */}
-                {/* ✨ НОВЫЙ БОЛЬШОЙ И СМЕЛЫЙ ЗАГОЛОВОК ✨ */}
-                {/* ==================================================================== */}
                 <h1 className="font-orbitron font-black uppercase text-shadow-neon text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
                     <span className="block drop-shadow-lg">Forest SPA</span>
-                    <span className="block text-primary drop-shadow-lg">Your Relaxation Oasis</span>
+                    <span className="block text-primary drop-shadow-lg">Sauna & Massage</span>
                 </h1>
-                {/* ==================================================================== */}
                 <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-foreground/80 font-light">
-                    VIP Forest SPA: Ultimate relaxation with sauna, massage, and professional massagists in Нижний Новгород.
+                    Ultimate relaxation in Нижний Новгород: Sauna sessions with optional professional massage.
                 </p>
                 <div className="mt-8">
                     <Link href="#booking">
                         <Button size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
-                            <VibeContentRenderer content="::FaSpa className='mr-2':: BOOK NOW" />
+                            <VibeContentRenderer content="::FaSpa className='mr-2':: START EXPERIENCE" />
                         </Button>
                     </Link>
                 </div>
             </motion.div>
         </section>
 
-        <motion.section style={{ y }} className="relative"> {/* Parallax effect */}
-          {/* Showcase for sauna/massage images */}
+        <motion.section style={{ y }} className="relative">
+          {/* Showcase */}
           <div className="h-[80vh] w-full overflow-hidden relative">
-            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/forest-spa-showcase.jpg" alt="Showcase" layout="fill" objectFit="cover" className="brightness-50" />
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-showcase.jpg" alt="Showcase" layout="fill" objectFit="cover" className="brightness-50" />
           </div>
         </motion.section>
 
         <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
                 <ServiceCard 
-                    title="Sauna Requirements"
+                    title="Requirements"
                     icon="::FaClipboardList::"
                     borderColorClass="border-secondary text-secondary"
                     items={[
@@ -317,26 +341,26 @@ export default function ForestSPAPage() {
                     ]}
                 />
                  <ServiceCard 
-                    title="What you get in Sauna"
+                    title="What you get"
                     icon="::FaGift::"
                     borderColorClass="border-accent text-accent"
-                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/sauna-gift.jpg"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/spa-gift.jpg"
                     items={[
-                        { icon: "::FaCircleCheck::", text: "Fully serviced sauna" },
-                        { icon: "::FaUserShield::", text: "Full equipment" },
-                        { icon: "::FaTag::", text: "10% discount with 'FOREST2025'" }
+                        { icon: "::FaCircleCheck::", text: "Fully serviced facilities" },
+                        { icon: "::FaUserShield::", text: "Professional equipment and staff" },
+                        { icon: "::FaTag::", text: "10% discount with 'SPA2025'" }
                     ]}
                 />
                 <ServiceCard 
-                    title="Massage Services"
+                    title="Services"
                     icon="::FaHands::"
                     borderColorClass="border-primary text-primary"
-                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/massage-services.jpg"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-services.jpg"
                     items={[
-                        { icon: "::FaSpa::", text: "Classic massage" },
-                        { icon: "::FaOilWell::", text: "Aromatherapy" },
-                        { icon: "::FaFire::", text: "Hot stones" },
-                        { icon: "::FaHandsHelping::", text: "Deep tissue" }
+                        { icon: "::FaSpa::", text: "Sauna sessions" },
+                        { icon: "::FaOilWell::", text: "Massage types" },
+                        { icon: "::FaFire::", text: "Hot stones add-on" },
+                        { icon: "::FaHandsHelping::", text: "Custom experiences" }
                     ]}
                 />
             </section>
@@ -359,10 +383,10 @@ export default function ForestSPAPage() {
             <section>
                 <h2 className="text-4xl font-orbitron text-center mb-10">How it works</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <StepItem num="1" title="Pick Sauna Time" icon="::FaCalendarCheck::">Choose your sauna session time.</StepItem>
-                    <StepItem num="2" title="Select Massage" icon="::FaHands::">Pick massage type.</StepItem>
-                    <StepItem num="3" title="Choose Massagist" icon="::FaUser::">Select your massagist.</StepItem>
-                    <StepItem num="4" title="Book" icon="::FaKey::">Confirm and book all in one.</StepItem>
+                    <StepItem num="1" title="Sauna Setup" icon="::FaCalendarCheck::">Choose date, time, extras.</StepItem>
+                    <StepItem num="2" title="Massage Type" icon="::FaHands::">Select massage if desired.</StepItem>
+                    <StepItem num="3" title="Massagist" icon="::FaUser::">Pick your expert.</StepItem>
+                    <StepItem num="4" title="Confirm" icon="::FaKey::">Review and book.</StepItem>
                 </div>
             </section>
             
@@ -371,22 +395,166 @@ export default function ForestSPAPage() {
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
                         <AccordionTrigger>Can I book sauna and massage together?</AccordionTrigger>
-                        <AccordionContent>Yes, our system allows simultaneous booking.</AccordionContent>
+                        <AccordionContent>Yes, it's integrated as one experience.</AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
                         <AccordionTrigger>How to choose massagist?</AccordionTrigger>
-                        <AccordionContent>Based on specialty and rating from the list.</AccordionContent>
+                        <AccordionContent>Based on specialty, rating, and availability.</AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3">
+                        <AccordionTrigger>What if massagist is unavailable?</AccordionTrigger>
+                        <AccordionContent>System checks and suggests alternatives.</AccordionContent>
                     </AccordionItem>
                 </Accordion>
             </section>
 
             <section id="booking" className="py-10 space-y-6 scroll-mt-24">
-              <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Booking</h2>
+              <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Create Your Experience</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                  <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Booking Form</CardTitle></CardHeader><CardContent><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><label className="text-xs font-mono text-[#fff]">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><label className="text-xs font-mono text-[#fff]">Start Time<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label><label className="text-xs font-mono text-[#fff]">Duration (hours)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><label className="text-xs font-mono text-[#fff]">Massage Type<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]"><option value="none">No Massage</option><option value="classic">Classic</option><option value="deep">Deep Tissue</option><option value="aroma">Aromatherapy</option></select></label><label className="text-xs font-mono text-[#fff]">Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]"><option value="">No Massagist</option>{masters.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><div className="text-xs font-mono text-[#fff]">Stars & Discounts<div className="mt-1 text-sm text-[#fff]">Balance: <strong className="text-[#ffd879]">{starsBalance}★</strong> • Cost in stars: <strong className="text-[#ffd879]">{starsCost}★</strong></div></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex gap-2 flex-wrap"><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra('cinema' as any)} /> <span className="text-sm">Cinema + Console</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.parilshchik} onChange={() => toggleExtra('parilshchik' as any)} /> <span className="text-sm">Parilshchik</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.shop} onChange={() => toggleExtra('shop' as any)} /> <span className="text-sm">Shop Items</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.oils} onChange={() => toggleExtra('oils' as any)} /> <span className="text-sm">Oils</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.music} onChange={() => toggleExtra('music' as any)} /> <span className="text-sm">Music</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.hotStone} onChange={() => toggleExtra('hotStone' as any)} /> <span className="text-sm">Hot Stones</span></label></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="p-3 rounded bg-[#080707] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">Total</div><div className="text-lg font-bold text-[#fff]">{totalPrice} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Or ~ {starsCost}★. Earn {starsEarned}★ cashback on payment.</div></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="mt-4"><SaunaOccupancyChart bookings={bookings} date={date} title="Occupancy Schedule — Selected Date" /></div></div><div className="col-span-1 sm:col-span-2 mt-3"><textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional wishes (heating, music, film, request for parilshchik or massagist)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" /></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex flex-col sm:flex-row gap-3"><Button onClick={handleCreateBooking} disabled={isSubmitting} className="flex-1 bg-[#ffd29b] text-[#241309] hover:bg-white">{isSubmitting ? "Processing..." : "Create Booking and Get Invoice in Telegram"}</Button><Button variant="ghost" onClick={() => { setDate(new Date(Date.now() + 864e5).toISOString().slice(0, 10)); setMessage(""); setSelectedExtras({ cinema: false, parilshchik: false, shop: false, oils: false, music: false, hotStone: false }); setDurationHours(3); setStartHour(18); setMassageType('none'); setSelectedMaster(''); }} className="w-full sm:w-auto border border-[#ff6b6b] text-[#ffb6b6] hover:bg-[#2a0c0c]">Reset</Button></div></div><div className="col-span-1 sm:col-span-2 mt-1"><div className="flex gap-3 items-center"><Button variant="ghost" onClick={() => setShowHistory((s) => !s)} className="border border-[#2b1b12]">{showHistory ? "Hide History" : "Show Booking History"}</Button><div className="text-sm text-[#d9d6cd]">{bookings.length} bookings in history</div></div></div></div></CardContent></Card>
-                  {showHistory && (<Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Booking History</CardTitle></CardHeader><CardContent>{bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">No bookings yet.</div> : (<ul className="space-y-2">{bookings.map((b) => (<li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч {b.massageType ? `(${b.massageType})` : ''} {b.masterId ? `(Master: ${masters.find(m => m.id === b.masterId)?.name || b.masterId})` : ''}</div><div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Extras: {b.extras.join(", ") || "—"}</div></li>))}</ul>)}</CardContent></Card>)}
+                  <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
+                    <CardHeader>
+                      <CardTitle className="text-[#fff]">Booking Wizard - Step {currentStep}/4</CardTitle>
+                      <div className="flex justify-between mt-2">
+                        {steps.map((step, idx) => (
+                          <div key={idx} className={`text-sm ${idx + 1 === currentStep ? 'text-[#ffd29b]' : 'text-[#d9d6cd]'}`}>
+                            {step}
+                          </div>
+                        ))}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <AnimatePresence mode="wait">
+                        {currentStep === 1 && (
+                          <motion.div
+                            key="step1"
+                            initial={{ opacity: 0, x: 50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -50 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {/* Step 1: Sauna */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <label className="text-xs font-mono text-[#fff]">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
+                              <label className="text-xs font-mono text-[#fff]">Start Time<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label>
+                              <label className="text-xs font-mono text-[#fff]">Duration (hours)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
+                              <div className="col-span-1 sm:col-span-2 mt-2">
+                                <div className="flex gap-2 flex-wrap">
+                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.cinema} onChange={() => toggleSaunaExtra('cinema')} /> <span className="text-sm">Cinema + Console</span></label>
+                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.parilshchik} onChange={() => toggleSaunaExtra('parilshchik')} /> <span className="text-sm">Parilshchik</span></label>
+                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.shop} onChange={() => toggleSaunaExtra('shop')} /> <span className="text-sm">Shop Items</span></label>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                        {currentStep === 2 && (
+                          <motion.div
+                            key="step2"
+                            initial={{ opacity: 0, x: 50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -50 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {/* Step 2: Massage Type */}
+                            <div className="grid grid-cols-1 gap-3">
+                              <label className="text-xs font-mono text-[#fff]">Massage Type<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
+                                <option value="none">No Massage</option>
+                                <option value="classic">Classic ({BASE_PRICING.classicPerHour} ₽/hr)</option>
+                                <option value="deepTissue">Deep Tissue ({BASE_PRICING.deepTissuePerHour} ₽/hr)</option>
+                                <option value="aromatherapy">Aromatherapy ({BASE_PRICING.aromatherapyPerHour} ₽/hr)</option>
+                              </select></label>
+                              {massageType !== 'none' && (
+                                <div className="mt-2">
+                                  <div className="flex gap-2 flex-wrap">
+                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.oils} onChange={() => toggleMassageExtra('oils')} /> <span className="text-sm">Oils (+{BASE_PRICING.extras.oils} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.music} onChange={() => toggleMassageExtra('music')} /> <span className="text-sm">Music (+{BASE_PRICING.extras.music} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.hotStone} onChange={() => toggleMassageExtra('hotStone')} /> <span className="text-sm">Hot Stones (+{BASE_PRICING.hotStoneFlat} ₽)</span></label>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                        {currentStep === 3 && (
+                          <motion.div
+                            key="step3"
+                            initial={{ opacity: 0, x: 50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -50 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {/* Step 3: Choose Massagist */}
+                            <div className="grid grid-cols-1 gap-3">
+                              <label className="text-xs font-mono text-[#fff]">Select Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
+                                <option value="">No Massagist</option>
+                                {masters.filter(m => massageType === 'none' || m.specialty.includes(massageType)).map(m => <option key={m.id} value={m.id}>{m.name} ({m.rating}★)</option>)}
+                              </select></label>
+                              {selectedMaster && (
+                                <div className="mt-2 p-2 bg-[#080707] rounded border border-[#2b1b12]">
+                                  <div className="text-sm text-[#fff]">Selected: {masters.find(m => m.id === selectedMaster)?.name}</div>
+                                  <div className="text-xs text-[#d9d6cd]">Bio: {masters.find(m => m.id === selectedMaster)?.bio}</div>
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                        {currentStep === 4 && (
+                          <motion.div
+                            key="step4"
+                            initial={{ opacity: 0, x: 50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -50 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {/* Step 4: Review & Confirm */}
+                            <div className="space-y-2">
+                              <div className="text-sm text-[#fff]">Date: {date}</div>
+                              <div className="text-sm text-[#fff]">Time: {formatHour(startHour)} for {durationHours} hours</div>
+                              <div className="text-sm text-[#fff]">Sauna Extras: {Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]).join(", ") || "None"}</div>
+                              <div className="text-sm text-[#fff]">Massage Type: {massageType || "None"}</div>
+                              <div className="text-sm text-[#fff]">Massage Extras: {Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k]).join(", ") || "None"}</div>
+                              <div className="text-sm text-[#fff]">Massagist: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "None"}</div>
+                              <div className="text-lg font-bold text-[#fff]">Total: {totalPrice} ₽ (Stars cost: {starsCost}★, Earn: {starsEarned}★)</div>
+                              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional notes" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <div className="flex justify-between mt-4">
+                        <Button disabled={currentStep === 1 || isSubmitting} onClick={() => setCurrentStep(prev => prev - 1)} variant="ghost">Back</Button>
+                        {currentStep < 4 ? (
+                          <Button disabled={isSubmitting} onClick={() => setCurrentStep(prev => prev + 1)}>Next</Button>
+                        ) : (
+                          <Button disabled={isSubmitting} onClick={handleCreateBooking}>{isSubmitting ? "Booking..." : "Confirm & Book"}</Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {message && <p className="mt-2 text-[#ffd29b]">{message}</p>}
+                  {/* History */}
+                  {showHistory && (
+                    <Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border">
+                      <CardHeader><CardTitle className="text-[#fff]">Booking History</CardTitle></CardHeader>
+                      <CardContent>
+                        {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">No bookings yet.</div> : (
+                          <ul className="space-y-2">
+                            {bookings.map((b) => (
+                              <li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]">
+                                <div className="flex justify-between items-center">
+                                  <div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч {b.massageType ? `(${b.massageType})` : ''}</div>
+                                  <div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div>
+                                </div>
+                                <div className="text-xs text-[#d9d6cd] mt-1">Extras: {b.extras.join(", ") || "—"} • Master: {b.masterId ? masters.find(m => m.id === b.masterId)?.name : "None"}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
+                {/* Aside with stars, chart, links */}
                 <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Star System</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Your stars — internal currency. Spend on discounts or save for future bookings.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Balance</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Total: accruals for actions, referrals, cleanings.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Subscribe to cleaning alerts</div><p className="text-xs text-[#d9d6cd]">After rental, subscribe to short cleaning shift: paid in stars.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Subscribe</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="Available Cleanings Schedule" /></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Quick Links</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP Bike</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
               </div>
             </section>
@@ -396,14 +564,14 @@ export default function ForestSPAPage() {
           <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <h3 className="font-orbitron text-xl mb-4">Forest SPA</h3>
-              <p className="text-muted-foreground">Ultimate relaxation in Нижний Новгород.</p>
+              <p className="text-muted-foreground">Ultimate sauna and massage in Нижний Новгород.</p>
             </div>
             <div>
               <h3 className="font-orbitron text-xl mb-4">Links</h3>
               <ul className="space-y-2">
-                <li><Link href="#zones" className="text-accent-text hover:underline">Sauna Zones</Link></li>
-                <li><Link href="#extras" className="text-accent-text hover:underline">Massage Services</Link></li>
-                <li><Link href="#work" className="text-accent-text hover:underline">Massagists</Link></li>
+                <li><Link href="#zones" className="text-accent-text hover:underline">Zones</Link></li>
+                <li><Link href="#pricing" className="text-accent-text hover:underline">Pricing</Link></li>
+                <li><Link href="#extras" className="text-accent-text hover:underline">Extras</Link></li>
               </ul>
             </div>
             <div>
