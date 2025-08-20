@@ -13,10 +13,12 @@ import { useAppContext } from "@/contexts/AppContext";
 import RockstarHeroSection from "@/app/tutorials/RockstarHeroSection";
 import SaunaOccupancyChart from "@/components/SaunaOccupancyChart";
 import { toast } from "sonner";
+import { motion, useScroll, useTransform } from 'framer-motion';
 
 // Server actions
 import { createSaunaBooking } from "@/app/sauna-rent/actions";
 import { updateUserSettings } from "@/app/actions"; // Используем существующий центральный экшен
+import { supabaseAdmin } from "@/hooks/supabase";
 
 // ----------------------------- types -----------------------------
 type Booking = {
@@ -32,6 +34,17 @@ type Booking = {
   start_at?: string;
   end_at?: string;
   metadata?: Record<string, any>;
+  massageType?: string;
+  masterId?: string;
+};
+
+type MassageMaster = {
+  id: string;
+  name: string;
+  specialty: string;
+  bio: string;
+  imageUrl: string;
+  rating: number;
 };
 
 // ----------------------------- pricing constants -----------------------------
@@ -44,6 +57,14 @@ const BASE_PRICING = {
   cinemaFlat: 3000,
   parilshchikFlat: 1200,
   cleaningFlat: 500,
+  classicPerHour: 2000,
+  deepTissuePerHour: 2500,
+  aromatherapyPerHour: 2200,
+  hotStoneFlat: 500,
+  extras: {
+    oils: 300,
+    music: 200,
+  },
 };
 
 // helpers
@@ -56,12 +77,13 @@ function isFriday(date: Date) {
 }
 
 // ----------------------------- page -----------------------------
-export default function SaunaRentMegaPage() {
+export default function ForestSPAPage() {
   const { dbUser, refreshDbUser } = useAppContext();
   const [showHistory, setShowHistory] = useState(false);
   const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
   
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [masters, setMasters] = useState<MassageMaster[]>([]);
 
   // State для баланса звезд, синхронизированный с dbUser.metadata
   const [starsBalance, setStarsBalance] = useState<number>(() => Number(dbUser?.metadata?.starsBalance ?? 120));
@@ -98,48 +120,19 @@ export default function SaunaRentMegaPage() {
   });
   const [startHour, setStartHour] = useState(18);
   const [durationHours, setDurationHours] = useState(3);
-  const [selectedExtras, setSelectedExtras] = useState<Record<string, boolean>>({ cinema: false, parilshchik: false, shop: false });
+  const [selectedExtras, setSelectedExtras] = useState<Record<string, boolean>>({ cinema: false, parilshchik: false, shop: false, oils: false, music: false, hotStone: false });
+  const [massageType, setMassageType] = useState<string>('none');
+  const [selectedMaster, setSelectedMaster] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Navigation sections (bottom nav)
-  const sections = [
-    { id: "home", label: "Главная" },
-    { id: "zones", label: "Зоны" },
-    { id: "pricing", label: "Цены" },
-    { id: "extras", label: "Услуги" },
-    { id: "work", label: "Работа" },
-    { id: "other", label: "Прочее" },
-  ];
-  const [activeId, setActiveId] = useState("home");
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  
+  // Fetch masters
   useEffect(() => {
-    const opts = { root: null, rootMargin: "0px 0px -50% 0px", threshold: 0 };
-    observerRef.current = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting && e.target.id) {
-            setActiveId(e.target.id);
-        }
-      });
-    }, opts);
-
-    sections.forEach((s) => {
-      const el = document.getElementById(s.id);
-      if (el) observerRef.current?.observe(el);
-    });
-
-    const handleScroll = () => {
-        if (window.scrollY < 300) {
-            setActiveId('home');
-        }
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-        observerRef.current?.disconnect();
-        window.removeEventListener('scroll', handleScroll);
+    async function fetchMasters() {
+      const { data } = await supabaseAdmin.from('cars').select('*').eq('type', 'massage_master');
+      setMasters(data?.map(d => ({id: d.id, name: d.make, specialty: d.model, bio: d.description, imageUrl: d.image_url, rating: d.daily_price || 5})) || []);
     }
+    fetchMasters();
   }, []);
 
   // Pricing calc
@@ -148,18 +141,31 @@ export default function SaunaRentMegaPage() {
     const weekend = isWeekend(d);
     const friday = isFriday(d);
     const isEvening = startHour >= 15 || startHour < 6;
-    let basePerHour = BASE_PRICING.weekdayMorningPerHour;
+    let saunaPerHour = BASE_PRICING.weekdayMorningPerHour;
     if (weekend) {
-      basePerHour = isEvening ? BASE_PRICING.weekendNightPerHour : BASE_PRICING.weekendDayPerHour;
+      saunaPerHour = isEvening ? BASE_PRICING.weekendNightPerHour : BASE_PRICING.weekendDayPerHour;
     } else {
-      basePerHour = isEvening ? BASE_PRICING.weekdayEveningPerHour : BASE_PRICING.weekdayMorningPerHour;
+      saunaPerHour = isEvening ? BASE_PRICING.weekdayEveningPerHour : BASE_PRICING.weekdayMorningPerHour;
     }
-    let price = basePerHour * durationHours;
+    let price = saunaPerHour * durationHours;
     if (friday) price = Math.round(price * BASE_PRICING.fridayExtendedMultiplier);
     if (selectedExtras.cinema) price += BASE_PRICING.cinemaFlat;
     if (selectedExtras.parilshchik) price += BASE_PRICING.parilshchikFlat;
+    
+    // Massage addition
+    if (massageType !== 'none') {
+      let massagePerHour = BASE_PRICING.classicPerHour;
+      if (massageType === 'deep') massagePerHour = BASE_PRICING.deepTissuePerHour;
+      if (massageType === 'aroma') massagePerHour = BASE_PRICING.aromatherapyPerHour;
+      price += massagePerHour * durationHours;
+      if (selectedExtras.hotStone) price += BASE_PRICING.hotStoneFlat;
+      if (selectedExtras.oils) price += BASE_PRICING.extras.oils;
+      if (selectedExtras.music) price += BASE_PRICING.extras.music;
+      if (selectedMaster) price *= 1.1; // Premium master
+    }
+    
     return price;
-  }, [date, startHour, durationHours, selectedExtras]);
+  }, [date, startHour, durationHours, selectedExtras, massageType, selectedMaster]);
 
   const starsCost = Math.round(totalPrice / 100);
   const starsEarned = Math.max(0, Math.round((totalPrice * 0.1) / 100));
@@ -191,16 +197,18 @@ export default function SaunaRentMegaPage() {
       startIso,
       endIso,
       price: totalPrice,
-      extras: Object.keys(selectedExtras).filter((k) => (selectedExtras as any)[k]),
+      extras: Object.keys(selectedExtras).filter((k) => selectedExtras[k]),
       starsUsed: Math.min(starsBalance, starsCost),
       userId: dbUser?.user_id ?? undefined,
       notes: message || undefined,
+      massageType: massageType !== 'none' ? massageType : undefined,
+      masterId: selectedMaster || undefined,
     };
 
     try {
       const res = await createSaunaBooking(payload as any);
       if (!res || !res.success) {
-        throw new Error(res?.error || "Server failed to create sauna booking");
+        throw new Error(res?.error || "Server failed to create booking");
       }
 
       const id = res?.data?.rental_id || res?.data?.id || `bk_${Date.now()}`;
@@ -211,6 +219,8 @@ export default function SaunaRentMegaPage() {
         createdAt: new Date().toISOString(),
         start_at: startIso,
         end_at: endIso,
+        massageType: payload.massageType,
+        masterId: payload.masterId,
       };
 
       setBookings((b) => [newBooking, ...b]);
@@ -228,8 +238,8 @@ export default function SaunaRentMegaPage() {
     }
   }
 
-  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/her2-31adfe54-e81d-4e65-becf-e85e689af170.jpg";
-  const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
+  const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/forest-spa-hero.jpg";
+  const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/forest-spa-icon.png";
   
   const cleaningOpportunities = useMemo(() => {
     return bookings.filter(b => {
@@ -239,165 +249,182 @@ export default function SaunaRentMegaPage() {
     });
   }, [bookings]);
 
+  const { scrollYProgress } = useScroll();
+  const y = useTransform(scrollYProgress, [0, 1], [0, -100]); // For parallax
+
   return (
-    <div className="relative min-h-[80vh] bg-[#030203] antialiased overflow-x-hidden">
-      <RockstarHeroSection
-        title=""
-        subtitle="Проспект Ленина 98, Нижний Новгород Гостиница Волна"
-        mainBackgroundImageUrl={heroImage}
-        backgroundImageObjectUrl={objectImage}
-        triggerElementSelector={`#${heroTriggerId}`}
-      >
-        <div className="flex gap-4 justify-center relative z-20">
-          <Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })} className="bg-[#ffd29b] text-[#241309] px-6 py-3 font-bold transition-transform transform hover:scale-105">
-            БРОНИРОВАНИЕ
-          </Button>
-        </div>
-      </RockstarHeroSection>
-
-      <div id={heroTriggerId} style={{ height: '110vh' }} aria-hidden="true" />
-
-      <main className="container mx-auto px-4 relative z-10 bg-gradient-to-b from-transparent via-[#101217] to-[#030203]">
-        <div id="home" className="absolute -top-[110vh]" aria-hidden="true" />
-        
-        <div className="fixed top-20 w-32 z-40 mx-auto right-4 container px-4 -mt-16 mb-16">
-          <div className="backdrop-blur-sm bg-[#00000066] border border-[#ffffff0d] rounded-xl p-3 flex items-center justify-between gap-4">
-            
-            <div className="flex items-center gap-6">
-              <div className="hidden sm:flex items-center gap-4">
-                <ActiveRentalsIndicator />
-              </div>
-              <div className="flex flex-col items-end">
-                <div className="text-xs text-[#ffe9c7]">Твой баланс</div>
-                <div className="text-lg font-bold flex items-center gap-2 text-[#fff]">
-                  <VibeContentRenderer content="::FaStar::" className="w-5 h-5 text-yellow-400 inline" /> {starsBalance}★
+    <div className="relative min-h-screen bg-background overflow-hidden text-foreground dark">
+        {/* ==================================================================== */}
+        /* ✨ HERO-СЕКЦИЯ ОБНОВЛЕНА ✨ */
+        {/* ==================================================================== */}
+        <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white p-4">
+            <div className="absolute inset-0 z-0">
+                <Image 
+                  src={heroImage} 
+                  alt="Forest SPA" 
+                  layout="fill" 
+                  objectFit="cover" 
+                  className="brightness-50 animate-pan-zoom" 
+                  priority 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+            </div>
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                className="relative z-10 flex flex-col items-center"
+            >
+                {/* ==================================================================== */}
+                {/* ✨ НОВЫЙ БОЛЬШОЙ И СМЕЛЫЙ ЗАГОЛОВОК ✨ */}
+                {/* ==================================================================== */}
+                <h1 className="font-orbitron font-black uppercase text-shadow-neon text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
+                    <span className="block drop-shadow-lg">Forest SPA</span>
+                    <span className="block text-primary drop-shadow-lg">Your Relaxation Oasis</span>
+                </h1>
+                {/* ==================================================================== */}
+                <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-foreground/80 font-light">
+                    VIP Forest SPA: Ultimate relaxation with sauna, massage, and professional massagists in Нижний Новгород.
+                </p>
+                <div className="mt-8">
+                    <Link href="#booking">
+                        <Button size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
+                            <VibeContentRenderer content="::FaSpa className='mr-2':: BOOK NOW" />
+                        </Button>
+                    </Link>
                 </div>
+            </motion.div>
+        </section>
+
+        <motion.section style={{ y }} className="relative"> {/* Parallax effect */}
+          {/* Showcase for sauna/massage images */}
+          <div className="h-[80vh] w-full overflow-hidden relative">
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/forest-spa-showcase.jpg" alt="Showcase" layout="fill" objectFit="cover" className="brightness-50" />
+          </div>
+        </motion.section>
+
+        <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
+                <ServiceCard 
+                    title="Sauna Requirements"
+                    icon="::FaClipboardList::"
+                    borderColorClass="border-secondary text-secondary"
+                    items={[
+                        { icon: "::FaUserClock::", text: "Age 18+" },
+                        { icon: "::FaIdCard::", text: "No contraindications" },
+                        { icon: "::FaAward::", text: "Deposit from 5000 ₽" },
+                        { icon: "::FaCreditCard::", text: "Payment by card or cash" }
+                    ]}
+                />
+                 <ServiceCard 
+                    title="What you get in Sauna"
+                    icon="::FaGift::"
+                    borderColorClass="border-accent text-accent"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/sauna-gift.jpg"
+                    items={[
+                        { icon: "::FaCircleCheck::", text: "Fully serviced sauna" },
+                        { icon: "::FaUserShield::", text: "Full equipment" },
+                        { icon: "::FaTag::", text: "10% discount with 'FOREST2025'" }
+                    ]}
+                />
+                <ServiceCard 
+                    title="Massage Services"
+                    icon="::FaHands::"
+                    borderColorClass="border-primary text-primary"
+                    imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/massage-services.jpg"
+                    items={[
+                        { icon: "::FaSpa::", text: "Classic massage" },
+                        { icon: "::FaOilWell::", text: "Aromatherapy" },
+                        { icon: "::FaFire::", text: "Hot stones" },
+                        { icon: "::FaHandsHelping::", text: "Deep tissue" }
+                    ]}
+                />
+            </section>
+
+            <section>
+                <h2 className="text-4xl font-orbitron text-center mb-10">Our Massagists</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    {masters.map(master => (
+                        <Card key={master.id} className="bg-card/50 p-4 rounded-lg border border-border text-center relative h-full backdrop-blur-sm">
+                            <Image src={master.imageUrl} alt={master.name} width={300} height={300} className="rounded-full mx-auto mb-4" />
+                            <h4 className="font-orbitron text-lg mb-2">{master.name}</h4>
+                            <p className="text-sm text-muted-foreground">{master.specialty}</p>
+                            <p className="text-sm">{master.bio}</p>
+                            <div className="mt-2">Rating: {master.rating} ★</div>
+                        </Card>
+                    ))}
+                </div>
+            </section>
+
+            <section>
+                <h2 className="text-4xl font-orbitron text-center mb-10">How it works</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StepItem num="1" title="Pick Sauna Time" icon="::FaCalendarCheck::">Choose your sauna session time.</StepItem>
+                    <StepItem num="2" title="Select Massage" icon="::FaHands::">Pick massage type.</StepItem>
+                    <StepItem num="3" title="Choose Massagist" icon="::FaUser::">Select your massagist.</StepItem>
+                    <StepItem num="4" title="Book" icon="::FaKey::">Confirm and book all in one.</StepItem>
+                </div>
+            </section>
+            
+            <section className="max-w-3xl mx-auto">
+                <h2 className="text-4xl font-orbitron text-center mb-10">FAQ</h2>
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="item-1">
+                        <AccordionTrigger>Can I book sauna and massage together?</AccordionTrigger>
+                        <AccordionContent>Yes, our system allows simultaneous booking.</AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2">
+                        <AccordionTrigger>How to choose massagist?</AccordionTrigger>
+                        <AccordionContent>Based on specialty and rating from the list.</AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </section>
+
+            <section id="booking" className="py-10 space-y-6 scroll-mt-24">
+              <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Booking</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Booking Form</CardTitle></CardHeader><CardContent><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><label className="text-xs font-mono text-[#fff]">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><label className="text-xs font-mono text-[#fff]">Start Time<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label><label className="text-xs font-mono text-[#fff]">Duration (hours)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><label className="text-xs font-mono text-[#fff]">Massage Type<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]"><option value="none">No Massage</option><option value="classic">Classic</option><option value="deep">Deep Tissue</option><option value="aroma">Aromatherapy</option></select></label><label className="text-xs font-mono text-[#fff]">Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]"><option value="">No Massagist</option>{masters.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><div className="text-xs font-mono text-[#fff]">Stars & Discounts<div className="mt-1 text-sm text-[#fff]">Balance: <strong className="text-[#ffd879]">{starsBalance}★</strong> • Cost in stars: <strong className="text-[#ffd879]">{starsCost}★</strong></div></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex gap-2 flex-wrap"><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra('cinema' as any)} /> <span className="text-sm">Cinema + Console</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.parilshchik} onChange={() => toggleExtra('parilshchik' as any)} /> <span className="text-sm">Parilshchik</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.shop} onChange={() => toggleExtra('shop' as any)} /> <span className="text-sm">Shop Items</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.oils} onChange={() => toggleExtra('oils' as any)} /> <span className="text-sm">Oils</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.music} onChange={() => toggleExtra('music' as any)} /> <span className="text-sm">Music</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.hotStone} onChange={() => toggleExtra('hotStone' as any)} /> <span className="text-sm">Hot Stones</span></label></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="p-3 rounded bg-[#080707] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">Total</div><div className="text-lg font-bold text-[#fff]">{totalPrice} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Or ~ {starsCost}★. Earn {starsEarned}★ cashback on payment.</div></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="mt-4"><SaunaOccupancyChart bookings={bookings} date={date} title="Occupancy Schedule — Selected Date" /></div></div><div className="col-span-1 sm:col-span-2 mt-3"><textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional wishes (heating, music, film, request for parilshchik or massagist)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" /></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex flex-col sm:flex-row gap-3"><Button onClick={handleCreateBooking} disabled={isSubmitting} className="flex-1 bg-[#ffd29b] text-[#241309] hover:bg-white">{isSubmitting ? "Processing..." : "Create Booking and Get Invoice in Telegram"}</Button><Button variant="ghost" onClick={() => { setDate(new Date(Date.now() + 864e5).toISOString().slice(0, 10)); setMessage(""); setSelectedExtras({ cinema: false, parilshchik: false, shop: false, oils: false, music: false, hotStone: false }); setDurationHours(3); setStartHour(18); setMassageType('none'); setSelectedMaster(''); }} className="w-full sm:w-auto border border-[#ff6b6b] text-[#ffb6b6] hover:bg-[#2a0c0c]">Reset</Button></div></div><div className="col-span-1 sm:col-span-2 mt-1"><div className="flex gap-3 items-center"><Button variant="ghost" onClick={() => setShowHistory((s) => !s)} className="border border-[#2b1b12]">{showHistory ? "Hide History" : "Show Booking History"}</Button><div className="text-sm text-[#d9d6cd]">{bookings.length} bookings in history</div></div></div></div></CardContent></Card>
+                  {showHistory && (<Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Booking History</CardTitle></CardHeader><CardContent>{bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">No bookings yet.</div> : (<ul className="space-y-2">{bookings.map((b) => (<li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч {b.massageType ? `(${b.massageType})` : ''} {b.masterId ? `(Master: ${masters.find(m => m.id === b.masterId)?.name || b.masterId})` : ''}</div><div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Extras: {b.extras.join(", ") || "—"}</div></li>))}</ul>)}</CardContent></Card>)}
+                </div>
+                <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Star System</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Your stars — internal currency. Spend on discounts or save for future bookings.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Balance</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Total: accruals for actions, referrals, cleanings.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Subscribe to cleaning alerts</div><p className="text-xs text-[#d9d6cd]">After rental, subscribe to short cleaning shift: paid in stars.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Subscribe</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="Available Cleanings Schedule" /></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Quick Links</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP Bike</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
+              </div>
+            </section>
+        </div>
+
+        <footer className="bg-card py-12 px-4">
+          <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Forest SPA</h3>
+              <p className="text-muted-foreground">Ultimate relaxation in Нижний Новгород.</p>
+            </div>
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Links</h3>
+              <ul className="space-y-2">
+                <li><Link href="#zones" className="text-accent-text hover:underline">Sauna Zones</Link></li>
+                <li><Link href="#extras" className="text-accent-text hover:underline">Massage Services</Link></li>
+                <li><Link href="#work" className="text-accent-text hover:underline">Massagists</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Contacts</h3>
+              <p className="text-muted-foreground">Проспект Ленина 98, Гостиница Волна</p>
+              <p className="text-muted-foreground">Tel: +7 (XXX) XXX-XX-XX</p>
+              <p className="text-muted-foreground">Email: info@forestspa.ru</p>
+            </div>
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Social</h3>
+              <div className="flex space-x-4">
+                <a href="#" className="text-accent-text hover:text-primary"><FaFacebook size={24} /></a>
+                <a href="#" className="text-accent-text hover:text-primary"><FaInstagram size={24} /></a>
+                <a href="#" className="text-accent-text hover:text-primary"><FaTwitter size={24} /></a>
               </div>
             </div>
           </div>
-        </div>
-
-        <section id="zones" className="py-10 space-y-8 scroll-mt-24">
-          <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Наши зоны</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Парилка</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/parilka2-61257e59-971c-4b21-bb32-650ba72e4ae3.jpg" alt="парилка" layout="fill" objectFit="cover" /></div>
-                <p className="text-sm text-[#ddd]">Жаркая финская парная. Места: 6. Доп. услуги парильщика — индивидуальные сессии, веник, ароматерапия.</p>
-                <ul className="text-sm text-[#d9d6cd] mt-3 list-inside list-disc"><li>Парильщик — от {BASE_PRICING.parilshchikFlat} ₽ (за сессию).</li><li>Веники и масла можно добрать на стойке в прихожей.</li></ul>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Бассейн / Джакузи / Душ</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/pool4girls-5ae07070-499e-4a17-98da-9072298652ef.jpg" alt="бассейн" layout="fill" objectFit="cover" /></div>
-                 <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/dzhacuzy2-96f492d4-498f-4973-bb38-6ad827f237cb.jpg" alt="джакузи" layout="fill" objectFit="cover" /></div>
-                <p className="text-sm text-[#ddd]">Прохладный бассейн 3×3, джакузи на 2 человека, отдельные душевые кабины.</p>
-                <div className="text-sm text-[#d9d6cd] mt-3">В зоне предоставляются: шампуни, одноразовые тапочки, полотенца (по запросу) — удобно для гостей.</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Гостиная — стол на 6</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/sofaAndTable.jpg" alt="гостиная" layout="fill" objectFit="cover" /></div>
-                <p className="text-sm text-[#ddd]">Уютная гостиная с столом на 8, лаунж-зона. Игры: нарды, покер, дженга — по желанию.</p>
-              </CardContent>
-            </Card>
+          <div className="container mx-auto max-w-7xl mt-8 text-center text-muted-foreground">
+            © 2025 Forest SPA. All rights reserved.
           </div>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:col-span-1">
-              <CardHeader><CardTitle className="text-[#fff]">Прихожая — магазин</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/sauna-images/map3d.jpg" alt="прилавок" layout="fill" objectFit="cover" /></div>
-                <p className="text-sm text-[#ddd]">Прилавок с аксессуарами: веники, тапочки, полотенца, халаты, эфирные масла, свечи — всё для комфортного сеанса и приятных покупок.</p>
-                <ul className="text-sm text-[#d9d6cd] mt-3 list-disc list-inside"><li>Веники — 300 ₽</li><li>Тапочки — 400 ₽</li><li>Полотенца — 700 ₽</li><li>Халаты — 1500 ₽</li></ul>
-              </CardContent>
-            </Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
-              <CardHeader><CardTitle className="text-[#fff]">Кинотеатр & приставки</CardTitle></CardHeader>
-              <CardContent>
-                <div className="relative h-44 rounded overflow-hidden mb-3"><Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250814_230533_963-d86832d1-60d3-4380-9518-a5e6bb2fd98b.jpg" alt="кино" layout="fill" objectFit="cover" /></div>
-                <p className="text-sm text-[#ddd]">Большой экран, проектор, приставки — можно подключать свои аккаунты и контроллеры. Идеально для вечеринок и просмотра матчей.</p>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        <section id="pricing" className="py-10 space-y-6 scroll-mt-24">
-          <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Цены и режимы</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-4 rounded-lg bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><div className="text-xs text-[#ffd29b]">Будни — утро</div><div className="text-xl font-bold text-[#fff]">{BASE_PRICING.weekdayMorningPerHour} ₽ / час</div><div className="text-sm text-[#ddd] mt-2">Пн—Пт 09:00—15:00 • Мин. аренда 2 ч</div></div>
-            <div className="p-4 rounded-lg bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><div className="text-xs text-[#ffd29b]">Будни — вечер / ночь</div><div className="text-xl font-bold text-[#fff]">{BASE_PRICING.weekdayEveningPerHour} ₽ / час</div><div className="text-sm text-[#ddd] mt-2">Пн—Пт 15:00—02:00 • Часто удлинённая пятница</div></div>
-            <div className="p-4 rounded-lg bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><div className="text-xs text-[#ffd29b]">Выходные</div><div className="text-xl font-bold text-[#fff]">{BASE_PRICING.weekendDayPerHour}—{BASE_PRICING.weekendNightPerHour} ₽ / час</div><div className="text-sm text-[#ddd] mt-2">Сб—Вс 09:00—05:00 (ночной тариф выше)</div></div>
-          </div>
-          <div className="mt-6 p-4 bg-[#080707]/60 backdrop-blur-sm rounded-lg border-border"><h4 className="font-semibold text-[#fff]">Особые правила</h4><ul className="list-disc list-inside mt-2 text-sm text-[#ddd]"><li>Минимальная аренда — 2 часа.</li><li>Максимум — 12 человек.</li><li>Гостям отеля «Волна» — скидки 20–30% (в зависимости от частоты посещений и загрузки).</li></ul></div>
-        </section>
-
-        <section id="extras" className="py-10 space-y-6 scroll-mt-24">
-          <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Дополнительные услуги</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Караоке</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Караоке-система в гостиной для ваших вечеринок — запрос при брони.</p></CardContent></Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Кино + приставка</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Flat fee {BASE_PRICING.cinemaFlat} ₽ — проектор, звук, контроллеры.</p></CardContent></Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Парильщик</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Опытный парильщик проведёт индивидуальную сессию, веник и ароматерапия — от {BASE_PRICING.parilshchikFlat} ₽.</p></CardContent></Card>
-          </div>
-          <div className="mt-4 text-sm text-[#d9d6cd]">Также в наличии — магазин аксессуаров (веники, тапочки, полотенца и т.д.).</div>
-        </section>
-
-        <section id="work" className="py-10 space-y-6 scroll-mt-24">
-          <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Работа — клининг, мотивация, график</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Клин-тим и персонал</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">Назначай клинеров: уборка между сменами, проверка оборудования, прием гостей.</p><ol className="list-decimal list-inside text-sm text-[#ddd] mt-2"><li>План уборок после каждой смены — опция для админов.</li><li>Клин-тим получает звёзды за выполненную работу.</li><li>График и подписка — интерфейс для участников.</li></ol></CardContent></Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Программа мотивации</CardTitle></CardHeader><CardContent><p className="text-sm text-[#ddd]">За уборку, приводы гостей и полезные действия начисляются звёзды.</p><ul className="list-disc list-inside text-sm mt-2 text-[#ddd]"><li>Clean+ — бонус 5★ за качественную уборку.</li><li>Referral — 2★ за привлечение друга.</li></ul></CardContent></Card>
-          </div>
-        </section>
-
-        <section id="booking" className="py-10 space-y-6 scroll-mt-24">
-          <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Бронирование</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Форма брони</CardTitle></CardHeader><CardContent><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><label className="text-xs font-mono text-[#fff]">Дата<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><label className="text-xs font-mono text-[#fff]">Время начала<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label><label className="text-xs font-mono text-[#fff]">Длительность (часы)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label><div className="text-xs font-mono text-[#fff]">Скидки и звезды<div className="mt-1 text-sm text-[#fff]">Баланс: <strong className="text-[#ffd879]">{starsBalance}★</strong> • Стоимость в звёздах: <strong className="text-[#ffd879]">{starsCost}★</strong></div></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex gap-2 flex-wrap"><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.cinema} onChange={() => toggleExtra('cinema' as any)} /> <span className="text-sm">Кино + приставка</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.parilshchik} onChange={() => toggleExtra('parilshchik' as any)} /> <span className="text-sm">Парильщик</span></label><label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedExtras.shop} onChange={() => toggleExtra('shop' as any)} /> <span className="text-sm">Покупки на стойке</span></label></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="p-3 rounded bg-[#080707] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">Итого</div><div className="text-lg font-bold text-[#fff]">{totalPrice} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Или ~ {starsCost}★ (прибл.). При оплате — начислим {starsEarned}★ cashback.</div></div></div><div className="col-span-1 sm:col-span-2 mt-3"><div className="mt-4"><SaunaOccupancyChart bookings={bookings} date={date} title="График занятости — выбранная дата" /></div></div><div className="col-span-1 sm:col-span-2 mt-3"><textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Доп. пожелания (обогрев, музыка, фильм, просьба для парильщика)" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" /></div><div className="col-span-1 sm:col-span-2 mt-2"><div className="flex flex-col sm:flex-row gap-3"><Button onClick={handleCreateBooking} disabled={isSubmitting} className="flex-1 bg-[#ffd29b] text-[#241309] hover:bg-white">{isSubmitting ? "Обработка..." : "Создать бронь и получить счёт в Telegram"}</Button><Button variant="ghost" onClick={() => { setDate(new Date(Date.now() + 864e5).toISOString().slice(0, 10)); setMessage(""); setSelectedExtras({ cinema: false, parilshchik: false, shop: false }); setDurationHours(3); setStartHour(18); }} className="w-full sm:w-auto border border-[#ff6b6b] text-[#ffb6b6] hover:bg-[#2a0c0c]">Сброс</Button></div></div><div className="col-span-1 sm:col-span-2 mt-1"><div className="flex gap-3 items-center"><Button variant="ghost" onClick={() => setShowHistory((s) => !s)} className="border border-[#2b1b12]">{showHistory ? "Скрыть историю" : "Показать историю броней"}</Button><div className="text-sm text-[#d9d6cd]">{bookings.length} броней в истории</div></div></div></div></CardContent></Card>
-              {showHistory && (<Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">История броней</CardTitle></CardHeader><CardContent>{bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">Пока что пусто — твои брони появятся здесь.</div> : (<ul className="space-y-2">{bookings.map((b) => (<li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]"><div className="flex justify-between items-center"><div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч</div><div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div></div><div className="text-xs text-[#d9d6cd] mt-1">Экстры: {b.extras.join(", ") || "—"}</div></li>))}</ul>)}</CardContent></Card>)}
-            </div>
-            <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Система звёзд</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Твои звезды — внутренняя валюта. Трать их на скидки или копи для будущих броней.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Баланс</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Суммарно: начисления за действия, рефералы, уборки.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Подпишись на оповещения уборки</div><p className="text-xs text-[#d9d6cd]">После аренды можно подписаться на короткий shift уборки: за работу платят звёздами.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Подписаться</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="График доступных уборок" /></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Быстрые ссылки</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP Байк</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
-          </div>
-        </section>
-
-        <section id="other" className="py-10 space-y-6 scroll-mt-24">
-          <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Прочее / Поддержка</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Заявки / Саппорт</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd]">Если нужно организовать мероприятие, доп. персонал, кейтеринг — оставь заявку.</p><div className="mt-3"><SupportForm /></div></CardContent></Card>
-            <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border"><CardHeader><CardTitle className="text-[#fff]">Отель «Волна» — скидки</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd]">Гостям отеля предоставляем скидки 20–30% в зависимости от частоты посещений и загрузки. Рекомендуем интеграцию с ресепшеном отеля для подтверждений и штрих-кодов.</p></CardContent></Card>
-          </div>
-        </section>
-
-        <section className="py-8 text-center">
-          <div className="max-w-2xl mx-auto"><h4 className="text-xl font-orbitron mb-2 text-[#fff]">Готов взять ВАЙБ на себя?</h4><p className="text-sm text-[#d9d6cd] mb-4">Бронируй сейчас — счёт в Telegram. Плати звёздами. Я вижу оплату и подтверждаю вручную.</p><div className="flex justify-center gap-3"><Button onClick={() => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" })} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Забронировать</Button><Button variant="ghost" onClick={() => document.getElementById("other")?.scrollIntoView({ behavior: "smooth" })} className="border border-white/50 text-white hover:bg-white/10">Саппорт</Button></div></div>
-        </section>
-      </main>
-
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 w-[92%] sm:w-[640px] md:hidden">
-        <div className="bg-[#0b0b0b]/80 backdrop-blur-md border border-[#2b1b12] rounded-full p-2 flex justify-between items-center shadow-lg">
-          {sections.map((s) => (<a key={s.id} href={`#${s.id}`} className={cn("flex-1 text-center p-2 rounded-full text-xs font-semibold transition-colors duration-300", activeId === s.id ? "bg-[#ffd29b] text-[#120800]" : "text-[#fff]")}>{s.label}</a>))}
-        </div>
-      </div>
-
-      <aside className="hidden md:block fixed right-6 top-1/2 -translate-y-1/2 z-40">
-        <div className="bg-[#0b0b0b]/60 backdrop-blur-md border border-[#2b1b12] rounded-xl p-2 w-44 shadow-xl">
-          <div className="text-xs text-[#ffd29b] mb-2 px-2">Навигация</div>
-          <div className="flex flex-col gap-1">
-            {sections.map((s) => (<a key={s.id} href={`#${s.id}`} className={cn("block p-2 rounded-md text-sm font-semibold transition-colors duration-300", activeId === s.id ? "bg-[#ffd29b] text-[#120800]" : "text-[#fff] hover:bg-[#ffffff10]")}>{s.label}</a>))}
-          </div>
-        </div>
-      </aside>
-
-      <style jsx>{`
-        html { scroll-behavior: smooth; }
-        .font-orbitron { font-family: 'Orbitron', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-        @media (max-width: 640px) {
-          main { padding-bottom: 140px; }
-        }
-      `}</style>
+        </footer>
     </div>
   );
 }
