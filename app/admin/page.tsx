@@ -1,3 +1,4 @@
+// /app/admin/page.tsx
 "use client";
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -28,7 +29,6 @@ function AdminPageContent() {
   const [isFetchingVehicles, setIsFetchingVehicles] = useState(false);
 
   const fetchUserVehicles = useCallback(async (userId: string) => {
-    // Убираем проверку отсюда, так как теперь она будет в useEffect
     setIsFetchingVehicles(true);
     try {
       const { data, error, success } = await getEditableVehiclesForUser(userId);
@@ -54,19 +54,16 @@ function AdminPageContent() {
     } finally {
       setIsFetchingVehicles(false);
     }
-  }, [editId]); // dbUser?.user_id убран из зависимостей, так как передается как аргумент
+  }, [editId]);
 
-  // ИЗМЕНЕНИЕ: Этот useEffect теперь зависит от dbUser
   useEffect(() => {
-    // Ждем окончания загрузки контекста И наличия пользователя
     if (!appContextLoading && dbUser?.user_id) {
       if (typeof isAdmin === 'function') {
         setIsTrulyAdmin(isAdmin());
       }
-      // Вызываем загрузку, только когда уверены, что есть ID пользователя
       fetchUserVehicles(dbUser.user_id);
     }
-  }, [appContextLoading, dbUser, isAdmin, fetchUserVehicles]); // Добавили dbUser в зависимости
+  }, [appContextLoading, dbUser, isAdmin, fetchUserVehicles]);
 
   const handleVehicleSelect = (vehicleId: string) => {
     const vehicle = userVehicles.find(v => v.id === vehicleId);
@@ -115,7 +112,7 @@ function AdminPageContent() {
           </p>
 
           <div className="mb-6 space-y-2">
-            <label className="text-sm font-mono text-muted-foreground">УПРАВЛЕНИЕ ГАРАЖОМ</label>
+            <label className="text-sm font-mono text-foreground">УПРАВЛЕНИЕ ГАРАЖОМ</label> {/* Fixed contrast */}
             <div className="flex gap-2">
                 <Select onValueChange={handleVehicleSelect} value={selectedVehicle?.id || ""} disabled={isFetchingVehicles || !!editId}>
                     <SelectTrigger className="input-cyber flex-1">

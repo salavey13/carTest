@@ -1,4 +1,3 @@
-// /app/sauna-rent/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, useId, useCallback } from "react";

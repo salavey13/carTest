@@ -1,3 +1,4 @@
+// /components/CarSubmissionForm.tsx
 "use client";
 import React, { useEffect, useId, useState } from "react";
 import Image from "next/image";
@@ -16,17 +17,9 @@ import type { Database } from "@/types/database.types";
 
 type VehicleData = Partial<Database["public"]["Tables"]["cars"]["Row"]>;
 
-type CarType = "car" | "bike" | "cross" | "sauna" | "blog" | "stream";
+type CarType = "car" | "bike" | "cross" | "sauna" | "blog" | "stream" | "massage" | "massage_master";
 type SpecItem = { id: string; key: string; value: string };
 type GalleryItem = { id: string; url: string };
-
-/**
- * Universal CarSubmissionForm (components/CarSubmissionForm.tsx)
- * - supports types: car, bike, cross, sauna, blog, stream
- * - writes to public.cars using supabaseAdmin (insert/update)
- * - for blog & stream stores extra data in specs JSONB
- * - Enhanced with UI/UX from /forms version: random images, gallery previews, stream template/copy/prompt, clear form, etc.
- */
 
 interface Props {
   ownerId?: string | null;
@@ -65,7 +58,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [blogContent, setBlogContent] = useState<string>((vehicleToEdit?.specs as any)?.content ?? "");
   const [blogTags, setBlogTags] = useState<string>(((vehicleToEdit?.specs as any)?.tags ?? []).join(", "));
   const [streamTitle, setStreamTitle] = useState<string>((vehicleToEdit?.specs as any)?.title ?? "");
-  const [streamSlug, setStreamSlug] = useState<string>((vehicleToEdit?.model ?? ""));
+  const [streamSlug, setStreamSlug] = useState<string>(vehicleToEdit?.model ?? "");
   const defaultStreamTemplate = JSON.stringify({
     title: "Пример стрима",
     sections: [
@@ -83,7 +76,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
         durationSec: 300,
         showImage: true,
         image: RANDOM_UNSPLASH("topic"),
-        text: "Основная секция: сюда можно добавить ссылку на видос и т.д.",
+        text: "Основная секция: сюда можно добавить ссылку на видос и т.d.",
       },
     ],
   }, null, 2);
@@ -95,7 +88,6 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // hydrate specs & gallery from edit
     if (vehicleToEdit?.specs && typeof vehicleToEdit.specs === "object") {
       const s = vehicleToEdit.specs as Record<string, any>;
       const entries = Object.entries(s).filter(([k]) => k !== "gallery" && k !== "title" && k !== "slug" && k !== "excerpt" && k !== "content" && k !== "tags");
@@ -119,7 +111,6 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
     }
   }, [vehicleToEdit]);
 
-  // helpers for specs/gallery
   function addSpec() {
     setSpecs((prev) => [...prev, { id: uuidv4(), key: "", value: "" }]);
   }
@@ -333,6 +324,8 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
             <option value="sauna">Sauna</option>
             <option value="blog">Blog (post)</option>
             <option value="stream">Stream (overlay)</option>
+            <option value="massage">Massage Service</option>
+            <option value="massage_master">Massage Master</option>
           </select>
           <Button type="button" variant="ghost" onClick={() => { setOwnerIdState(ownerId ?? ownerIdState); toast.success("Owner ID synced"); }}>
             Sync owner
@@ -344,22 +337,22 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       {/* generic fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs text-muted-foreground">Make / Title</Label>
+          <Label className="text-xs text-foreground">Make / Title</Label> {/* Fixed contrast */}
           <Input value={make} onChange={(e) => setMake(e.target.value)} className="input-cyber" placeholder={type === "blog" ? "Заголовок поста" : "Марка / Title"} />
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Model / Slug</Label>
+          <Label className="text-xs text-foreground">Model / Slug</Label> {/* Fixed */}
           <Input value={model} onChange={(e) => setModel(e.target.value)} className="input-cyber" placeholder={type === "blog" ? "slug-для-url" : "Модель / slug"} />
         </div>
       </div>
 
       <div>
-        <Label className="text-xs text-muted-foreground">Описание (кратко)</Label>
+        <Label className="text-xs text-foreground">Описание (кратко)</Label> {/* Fixed */}
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="textarea-cyber" placeholder="Короткое описание" />
       </div>
 
-      {/* bike-specific specs editor (also used for car/sauna generic extra fields) */}
-      {(type === "bike" || type === "cross" || type === "car" || type === "sauna") && (
+      {/* bike-specific specs editor (also for car/sauna/massage generic extra fields) */}
+      {(type === "bike" || type === "cross" || type === "car" || type === "sauna" || type === "massage" || type === "massage_master") && (
         <>
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -368,7 +361,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
                 <Button type="button" onClick={() => { setSpecs([]); toast.success("Specs очищены"); }} variant="ghost" size="sm">Очистить</Button>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается.</p>
+            <p className="text-xs text-foreground mb-2">Добавь пар ключ-значение. Галерея тоже поддерживается.</p> {/* Fixed */}
             <div className="space-y-2">
               {specs.map((s) => (
                 <div key={s.id} className="flex gap-2">
@@ -393,7 +386,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {gallery.length === 0 && <div className="text-xs text-muted-foreground col-span-full">Галерея пуста — добавьте изображения</div>}
+          {gallery.length === 0 && <div className="text-xs text-foreground col-span-full">Галерея пуста — добавьте изображения</div>} {/* Fixed */}
           {gallery.map((g, i) => (
             <div key={g.id} className="relative h-24 rounded overflow-hidden border border-border bg-muted/20">
               <Image src={g.url} alt={`gallery-${i}`} fill style={{ objectFit: "cover" }} />
@@ -412,24 +405,24 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           <h4 className="text-sm font-semibold text-foreground">Blog post — content</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs text-muted-foreground">Title</Label>
+              <Label className="text-xs text-foreground">Title</Label> {/* Fixed */}
               <Input value={blogTitle} onChange={(e) => setBlogTitle(e.target.value)} className="input-cyber" />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Slug</Label>
+              <Label className="text-xs text-foreground">Slug</Label> {/* Fixed */}
               <Input value={blogSlug} onChange={(e) => setBlogSlug(e.target.value)} className="input-cyber" />
             </div>
           </div>
           <div className="mt-2">
-            <Label className="text-xs text-muted-foreground">Excerpt</Label>
+            <Label className="text-xs text-foreground">Excerpt</Label> {/* Fixed */}
             <Textarea value={blogExcerpt} onChange={(e) => setBlogExcerpt(e.target.value)} className="textarea-cyber" />
           </div>
           <div className="mt-2">
-            <Label className="text-xs text-muted-foreground">Content (HTML allowed)</Label>
+            <Label className="text-xs text-foreground">Content (HTML allowed)</Label> {/* Fixed */}
             <Textarea value={blogContent} onChange={(e) => setBlogContent(e.target.value)} className="textarea-cyber min-h-[140px]" />
           </div>
           <div className="mt-2">
-            <Label className="text-xs text-muted-foreground">Tags (comma separated)</Label>
+            <Label className="text-xs text-foreground">Tags (comma separated)</Label> {/* Fixed */}
             <Input value={blogTags} onChange={(e) => setBlogTags(e.target.value)} className="input-cyber" placeholder="vip, sauna, roadmap" />
           </div>
         </div>
@@ -448,18 +441,18 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs text-muted-foreground">Stream title</Label>
+              <Label className="text-xs text-foreground">Stream title</Label> {/* Fixed */}
               <Input value={streamTitle} onChange={(e) => setStreamTitle(e.target.value)} className="input-cyber" />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Slug</Label>
+              <Label className="text-xs text-foreground">Slug</Label> {/* Fixed */}
               <Input value={streamSlug} onChange={(e) => setStreamSlug(e.target.value)} className="input-cyber" />
             </div>
           </div>
           <div className="mt-2">
-            <Label className="text-xs text-muted-foreground">Raw JSON specs (sections, media...)</Label>
+            <Label className="text-xs text-foreground">Raw JSON specs (sections, media...)</Label> {/* Fixed */}
             <Textarea value={streamSpecsRaw} onChange={(e) => setStreamSpecsRaw(e.target.value)} className="textarea-cyber min-h-[180px]" />
-            <p className="text-xs text-muted-foreground mt-1">Если JSON некорректен — он будет сохранен с пометкой. Можно вставлять ответ бота прямо сюда.</p>
+            <p className="text-xs text-foreground mt-1">Если JSON некорректен — он будет сохранен с пометкой. Можно вставлять ответ бота прямо сюда.</p> {/* Fixed */}
           </div>
         </div>
       )}
@@ -467,11 +460,11 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
       {/* common media / price */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <Label className="text-xs text-muted-foreground">Price</Label>
+          <Label className="text-xs text-foreground">Price</Label> {/* Fixed */}
           <Input type="number" value={dailyPrice} onChange={(e) => setDailyPrice(e.target.value)} className="input-cyber" />
         </div>
         <div>
-          <Label className="text-xs text-muted-foreground">Image URL or upload</Label>
+          <Label className="text-xs text-foreground">Image URL or upload</Label> {/* Fixed */}
           <div className="flex gap-2">
             <Input value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setImagePreview(e.target.value); }} className="input-cyber" placeholder="https://..." />
             <Button type="button" variant="ghost" onClick={() => { const newUrl = RANDOM_UNSPLASH("hero"); setImageUrl(newUrl); setImagePreview(newUrl); toast.info("Случайная обложка обновлена"); }}>
@@ -501,7 +494,7 @@ export function CarSubmissionForm({ ownerId = null, vehicleToEdit = null, onSucc
           {isTest ? "Marked Test" : "Mark test"}
         </Button>
 
-        <div className="ml-auto text-xs text-muted-foreground">
+        <div className="ml-auto text-xs text-foreground">
           {isEdit ? "Редактирование" : "Новая запись"} • type: <span className="font-mono ml-1">{type}</span>
         </div>
       </div>
