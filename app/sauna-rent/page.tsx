@@ -6,19 +6,18 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import SupportForm from "@/components/SupportForm";
 import { cn } from "@/lib/utils";
-import { ActiveRentalsIndicator } from "@/components/ActiveRentalsIndicator";
 import { useAppContext } from "@/contexts/AppContext";
-import RockstarHeroSection from "@/app/tutorials/RockstarHeroSection";
 import SaunaOccupancyChart from "@/components/SaunaOccupancyChart";
 import { toast } from "sonner";
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ServiceCard } from "@/components/ServiceCard";
+import { FaFacebook, FaInstagram, FaTwitter } from 'react-icons/fa';
 
 // Server actions
-import { createSaunaBooking } from "@/app/sauna-rent/actions";
+import { createSaunaBooking, getMassageMasters } from "@/app/sauna-rent/actions";
 import { updateUserSettings } from "@/app/actions";
-import { supabaseAdmin } from "@/hooks/supabase";
 
 // ----------------------------- types -----------------------------
 type Booking = {
@@ -76,11 +75,23 @@ function isFriday(date: Date) {
   return date.getDay() === 5;
 }
 
+// Local helper components
+const StepItem: React.FC<{ num: string, title: string, icon: string, children: React.ReactNode }> = ({ num, title, icon, children }) => (
+  <div className="text-center p-4">
+    <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center rounded-full bg-primary/10 border-2 border-primary text-primary">
+      <VibeContentRenderer content={icon} className="w-8 h-8" />
+      <span className="absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground font-bold">{num}</span>
+    </div>
+    <h3 className="font-orbitron text-lg mb-2">{title}</h3>
+    <p className="text-sm text-muted-foreground">{children}</p>
+  </div>
+);
+
+
 // ----------------------------- page -----------------------------
 export default function ForestSPAPage() {
   const { dbUser, refreshDbUser } = useAppContext();
   const [showHistory, setShowHistory] = useState(false);
-  const heroTriggerId = useId().replace(/:/g, "-") + "-hero-trigger";
   
   const [bookings, setBookings] = useState<Booking[]>([]);
 
@@ -128,26 +139,17 @@ export default function ForestSPAPage() {
   const [message, setMessage] = useState("");
   const [masters, setMasters] = useState<MassageMaster[]>([]);
 
-  // Fetch masters
+  // Fetch masters using server action
   useEffect(() => {
-    async function fetchMasters() {
-      const { data } = await supabaseAdmin.from('cars').select('*').eq('type', 'massage_master');
-      setMasters(data?.map(d => ({
-        id: d.id,
-        name: d.make,
-        specialty: d.model,
-        bio: d.description,
-        imageUrl: d.image_url,
-        rating: d.daily_price || 5
-      })) || []);
-    }
+    const fetchMasters = async () => {
+      const result = await getMassageMasters();
+      if (result.success) {
+        setMasters(result.data);
+      } else {
+        toast.error(result.error || "Could not fetch masters list.");
+      }
+    };
     fetchMasters();
-  }, []);
-
-  // Fetch bookings for availability (user's for history, but for global availability, assume server check)
-  useEffect(() => {
-    // Fetch user's bookings for history
-    // For global, rely on server
   }, []);
 
   // Pricing calc
@@ -233,6 +235,7 @@ export default function ForestSPAPage() {
       if (!res || !res.success) {
         throw new Error(res?.error || "Server failed to create sauna booking");
       }
+      toast.success("Booking created! Check Telegram for confirmation.");
 
       const id = res?.data?.rental_id || res?.data?.id || `bk_${Date.now()}`;
       const newBooking: Booking = {
@@ -256,14 +259,14 @@ export default function ForestSPAPage() {
       setCurrentStep(1); // Reset to start
     } catch (err: any) {
       console.error("Booking error:", err);
-      setMessage("Ошибка при создании брони. Попробуй ещё раз.");
+      setMessage(`Ошибка при создании брони: ${err.message}`);
+      toast.error(`Booking Error: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
   }
 
   const heroImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/her2-31adfe54-e81d-4e65-becf-e85e689af170.jpg";
-  const objectImage = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/appStore/oneSitePls_transparent_icon.png";
   
   const cleaningOpportunities = useMemo(() => {
     return bookings.filter(b => {
@@ -292,7 +295,7 @@ export default function ForestSPAPage() {
                   alt="Forest SPA" 
                   layout="fill" 
                   objectFit="cover" 
-                  className="brightness-50 animate-pan-zoom" 
+                  className="brightness-50" 
                   priority 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
@@ -303,7 +306,7 @@ export default function ForestSPAPage() {
                 transition={{ duration: 0.8 }}
                 className="relative z-10 flex flex-col items-center"
             >
-                <h1 className="font-orbitron font-black uppercase text-shadow-neon text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
+                <h1 className="font-orbitron font-black uppercase text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
                     <span className="block drop-shadow-lg">Forest SPA</span>
                     <span className="block text-primary drop-shadow-lg">Sauna & Massage</span>
                 </h1>
@@ -311,11 +314,11 @@ export default function ForestSPAPage() {
                     Ultimate relaxation in Нижний Новгород: Sauna sessions with optional professional massage.
                 </p>
                 <div className="mt-8">
-                    <Link href="#booking">
-                        <Button size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
-                            <VibeContentRenderer content="::FaSpa className='mr-2':: START EXPERIENCE" />
-                        </Button>
-                    </Link>
+                    <Button asChild size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
+                        <Link href="#booking">
+                          <VibeContentRenderer content="::FaSpa className='mr-2':: START EXPERIENCE" />
+                        </Link>
+                    </Button>
                 </div>
             </motion.div>
         </section>
@@ -370,7 +373,7 @@ export default function ForestSPAPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {masters.map(master => (
                         <Card key={master.id} className="bg-card/50 p-4 rounded-lg border border-border text-center relative h-full backdrop-blur-sm">
-                            <Image src={master.imageUrl} alt={master.name} width={300} height={300} className="rounded-full mx-auto mb-4" />
+                            <Image src={master.imageUrl} alt={master.name} width={300} height={300} className="rounded-full mx-auto mb-4 object-cover aspect-square" />
                             <h4 className="font-orbitron text-lg mb-2">{master.name}</h4>
                             <p className="text-sm text-muted-foreground">{master.specialty}</p>
                             <p className="text-sm">{master.bio}</p>
@@ -487,8 +490,8 @@ export default function ForestSPAPage() {
                             {/* Step 3: Choose Massagist */}
                             <div className="grid grid-cols-1 gap-3">
                               <label className="text-xs font-mono text-[#fff]">Select Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
-                                <option value="">No Massagist</option>
-                                {masters.filter(m => massageType === 'none' || m.specialty.includes(massageType)).map(m => <option key={m.id} value={m.id}>{m.name} ({m.rating}★)</option>)}
+                                <option value="">Any available</option>
+                                {masters.filter(m => massageType === 'none' || m.specialty.toLowerCase().includes(massageType.toLowerCase())).map(m => <option key={m.id} value={m.id}>{m.name} ({m.rating}★)</option>)}
                               </select></label>
                               {selectedMaster && (
                                 <div className="mt-2 p-2 bg-[#080707] rounded border border-[#2b1b12]">
@@ -514,7 +517,7 @@ export default function ForestSPAPage() {
                               <div className="text-sm text-[#fff]">Sauna Extras: {Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]).join(", ") || "None"}</div>
                               <div className="text-sm text-[#fff]">Massage Type: {massageType || "None"}</div>
                               <div className="text-sm text-[#fff]">Massage Extras: {Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k]).join(", ") || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massagist: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "None"}</div>
+                              <div className="text-sm text-[#fff]">Massagist: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "Any"}</div>
                               <div className="text-lg font-bold text-[#fff]">Total: {totalPrice} ₽ (Stars cost: {starsCost}★, Earn: {starsEarned}★)</div>
                               <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional notes" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" />
                             </div>
@@ -531,8 +534,8 @@ export default function ForestSPAPage() {
                       </div>
                     </CardContent>
                   </Card>
-                  {message && <p className="mt-2 text-[#ffd29b]">{message}</p>}
                   {/* History */}
+                  <Button variant="ghost" onClick={() => setShowHistory(s => !s)} className="mt-4">{showHistory ? "Hide History" : "Show History"}</Button>
                   {showHistory && (
                     <Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border">
                       <CardHeader><CardTitle className="text-[#fff]">Booking History</CardTitle></CardHeader>
@@ -569,9 +572,9 @@ export default function ForestSPAPage() {
             <div>
               <h3 className="font-orbitron text-xl mb-4">Links</h3>
               <ul className="space-y-2">
-                <li><Link href="#zones" className="text-accent-text hover:underline">Zones</Link></li>
-                <li><Link href="#pricing" className="text-accent-text hover:underline">Pricing</Link></li>
-                <li><Link href="#extras" className="text-accent-text hover:underline">Extras</Link></li>
+                <li><Link href="#zones" className="text-accent hover:underline">Zones</Link></li>
+                <li><Link href="#pricing" className="text-accent hover:underline">Pricing</Link></li>
+                <li><Link href="#extras" className="text-accent hover:underline">Extras</Link></li>
               </ul>
             </div>
             <div>
@@ -583,9 +586,9 @@ export default function ForestSPAPage() {
             <div>
               <h3 className="font-orbitron text-xl mb-4">Social</h3>
               <div className="flex space-x-4">
-                <a href="#" className="text-accent-text hover:text-primary"><FaFacebook size={24} /></a>
-                <a href="#" className="text-accent-text hover:text-primary"><FaInstagram size={24} /></a>
-                <a href="#" className="text-accent-text hover:text-primary"><FaTwitter size={24} /></a>
+                <a href="#" className="text-accent hover:text-primary"><FaFacebook size={24} /></a>
+                <a href="#" className="text-accent hover:text-primary"><FaInstagram size={24} /></a>
+                <a href="#" className="text-accent hover:text-primary"><FaTwitter size={24} /></a>
               </div>
             </div>
           </div>
