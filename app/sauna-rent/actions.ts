@@ -69,8 +69,8 @@ export async function createSaunaBooking(payload: SaunaPayload) {
       .from("rentals")
       .select("rental_id")
       .eq("vehicle_id", vehicleId)
-      .filter("start_at", "lt", payload.endIso)
-      .filter("end_at", "gt", payload.startIso);
+      .filter("requested_start_date", "lt", payload.endIso)
+      .filter("requested_end_date", "gt", payload.startIso);
 
     if (saunaError) throw new Error(`Sauna availability check failed: ${saunaError.message}`);
     if (overlappingSauna && overlappingSauna.length > 0) {
@@ -82,8 +82,8 @@ export async function createSaunaBooking(payload: SaunaPayload) {
         .from("rentals")
         .select("rental_id")
         .eq("metadata->>master_id", payload.masterId)
-        .filter("start_at", "lt", payload.endIso)
-        .filter("end_at", "gt", payload.startIso);
+        .filter("requested_start_date", "lt", payload.endIso)
+        .filter("requested_end_date", "gt", payload.startIso);
       
       if (masterError) throw new Error(`Master availability check failed: ${masterError.message}`);
       if (overlappingMaster && overlappingMaster.length > 0) {
