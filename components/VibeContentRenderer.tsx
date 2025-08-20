@@ -1,3 +1,4 @@
+// The VibeContentRenderer remains unchanged as it wasn't the focus of the overhaul, but it's included for completeness.
 "use client";
 
 import React from 'react';
@@ -14,52 +15,40 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 
 function preprocessIconSyntaxInternal(content: string): string {
     if (!content) return '';
-    // Regex to match ::faIconName attributes:: or ::FaIconName attributes::
-    // It captures the "fa" + "IconName" part, and any attributes.
-    // Uses 'i' flag for case-insensitivity on the icon name itself.
     return content.replace(
         /::(fa[a-zA-Z0-9_]+)((?:\s+\w+(?:=(?:(["'])(?:(?!\3).)*\3|\w+)))*)\s*::/gi,
         (_match, rawIconName, attributesString) => {
-            const lowerIconName = rawIconName.toLowerCase(); // e.g., fausershield
+            const lowerIconName = rawIconName.toLowerCase(); 
             
-            // Try to map to PascalCase using iconNameMap first
             let pascalCaseIconName = iconNameMap[lowerIconName];
             
-            // If not in map, try to convert rawIconName to PascalCase (e.g., if user typed ::FaUserShield::)
             if (!pascalCaseIconName) {
                 if (rawIconName.startsWith('Fa')) {
                     pascalCaseIconName = rawIconName as keyof typeof Fa6Icons;
                 } else if (rawIconName.startsWith('fa')) {
-                    pascalCaseIconName = ('F' + rawIconName.substring(1)) as keyof typeof Fa6Icons; // faUserShield -> FaUserShield
+                    pascalCaseIconName = ('F' + rawIconName.substring(1)) as keyof typeof Fa6Icons; 
                 }
             }
-            // Final check if it's a valid icon name
+            
             if (!isValidFa6Icon(pascalCaseIconName as string)) {
-                 // Fallback: if it's not a known Fa icon even after attempts,
-                 // we might pass the original rawIconName or a standardized PascalCase version.
-                 // For now, construct the tag with the best guess PascalCase.
-                 // The main parser will handle it if it's still not found.
                  if (!pascalCaseIconName && rawIconName.length > 2) {
                     pascalCaseIconName = rawIconName.charAt(0).toUpperCase() + rawIconName.slice(1) as keyof typeof Fa6Icons;
                  } else if (!pascalCaseIconName) {
-                    pascalCaseIconName = rawIconName as keyof typeof Fa6Icons; // keep original if unsure
+                    pascalCaseIconName = rawIconName as keyof typeof Fa6Icons; 
                  }
             }
             
             const attrs = attributesString ? attributesString.trim() : '';
-            // Create a tag like <FaUserShield attributes />
             return `<${pascalCaseIconName}${attrs ? ' ' + attrs : ''}></${pascalCaseIconName}>`;
         }
     );
 }
 
-// Function to apply simple markdown conversions
 function applySimpleMarkdown(content: string): string {
     if (!content) return '';
     let result = content;
     result = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     result = result.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    // Note: Be cautious with more complex regex to avoid unclosed tags or invalid HTML
     return result;
 }
 
@@ -82,7 +71,6 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                            ? domToReact(domNode.children, simplifiedParserOptions) 
                            : null;
 
-            // --- Icon Handling ---
             let iconToRender: keyof typeof Fa6Icons | undefined = undefined;
             
             if (isValidFa6Icon(nodeName)) { 
@@ -103,13 +91,12 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                     style: style,
                     title: title 
                 };
-                return React.createElement(IconComponent, finalProps); // Icons are self-closing
+                return React.createElement(IconComponent, finalProps); 
             } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) {
                 logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
                 return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?] Неизвестная иконка <${nodeName}>`}</span>;
             }
 
-            // --- Link Handling ---
             if (lowerCaseName === 'a') {
                 const hrefVal = mutableAttribs.href;
                 const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
@@ -123,7 +110,6 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 return React.createElement('a', mutableAttribs, children);
             }
             
-            // --- Standard HTML Elements Styling & Passing Children ---
             if (lowerCaseName === 'strong') {
                 mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim();
             }
@@ -176,15 +162,11 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       const parsedContent = parse(processedContent, simplifiedParserOptions); 
       
       if (className) {
-        // If the parsed content is a single, valid React element, clone it and apply the className.
-        // This avoids adding a wrapper div, which was causing layout issues.
         if (React.isValidElement(parsedContent)) {
           return React.cloneElement(parsedContent, {
             className: cn(parsedContent.props.className, className)
           });
         } else {
-          // If the content is complex (e.g., text and an icon), fall back to a SPAN wrapper.
-          // This is more inline-friendly than a div.
           logger.warn("[VCR] Applying className to a span wrapper because content is not a single element.", content);
           return <span className={className}>{parsedContent}</span>;
         }
@@ -195,7 +177,6 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       logger.error("[VCR Root] Parse Error:", error, "Input for parsing:", content, "Processed HTML:", preprocessIconSyntaxInternal(applySimpleMarkdown(String(content))));
       const ErrorSpan = () => <span className="text-red-500">[Content Parse Error]</span>;
       if (className) {
-        // The wrapper for an error is acceptable.
         return <div className={className}><ErrorSpan /></div>;
       }
       return <ErrorSpan />;

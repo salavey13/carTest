@@ -4,7 +4,8 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import useEmblaCarousel from 'embla-carousel-react';
+import useEmblaCarousel, { EmblaOptionsType } from 'embla-carousel-react';
+import Autoplay from 'embla-carousel-autoplay';
 import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { motion } from 'framer-motion';
@@ -33,8 +34,10 @@ const bikes: ShowcaseBike[] = [
     }
 ];
 
+const options: EmblaOptionsType = { loop: true };
+
 export function BikeShowcase() {
-  const [emblaRef] = useEmblaCarousel({ loop: true });
+  const [emblaRef] = useEmblaCarousel(options, [Autoplay({ delay: 5000 })]);
 
   return (
     <section className="h-[80vh] w-full overflow-hidden relative" ref={emblaRef}>
@@ -49,7 +52,6 @@ export function BikeShowcase() {
               className="brightness-50"
               priority={index === 0}
             />
-            {/* ✨ ГРАДИЕНТ КАК НА HERO-СЕКЦИИ ✨ */}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
             <div className="absolute inset-0 flex flex-col justify-end items-center text-center text-white p-8">
               <motion.div
