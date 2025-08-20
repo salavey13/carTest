@@ -111,6 +111,9 @@ const config: Config = {
         "page-gradient":"linear-gradient(145deg, hsl(var(--background)), hsl(var(--card)))", // Will adapt to light/dark
         "brand-gradient-purple-blue": "linear-gradient(to right, hsl(var(--brand-deep-indigo)), hsl(var(--brand-cyan)))",
         "brand-gradient-pink-purple": "linear-gradient(to right, hsl(var(--brand-red-orange)), hsl(var(--brand-deep-indigo)))",
+        // Added for 2025 trends: Gradient schemes
+        "hero-gradient": "linear-gradient(135deg, hsl(var(--brand-red-orange)), hsl(var(--brand-deep-indigo)))",
+        "section-gradient": "linear-gradient(to bottom, transparent, hsl(var(--background)))",
       },
       animation: {
         "subtle-pulse": "subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
@@ -126,6 +129,8 @@ const config: Config = {
         "neon-border-glow": "neon-border-glow 2.5s infinite alternate", 
         "glitch-border": "glitch-border 2s linear infinite", 
         "ticker": "ticker 20s linear infinite",
+        // Added for parallax and dynamic effects
+        "parallax": "parallax 1s linear",
       },
       keyframes: { // Keyframes remain the same, their perceived effect might change with colors
         "subtle-pulse": {
@@ -150,6 +155,11 @@ const config: Config = {
         'neon-border-glow': { '0%,100%':{borderColor:'hsla(var(--gold-rgb),0.7)',boxShadow:'0 0 5px hsla(var(--gold-rgb),0.5), 0 0 10px hsla(var(--gold-rgb),0.3)'},'50%':{borderColor:'hsla(var(--red-orange-rgb),0.7)',boxShadow:'0 0 8px hsla(var(--red-orange-rgb),0.5), 0 0 15px hsla(var(--red-orange-rgb),0.3), 0 0 5px hsla(var(--deep-indigo-rgb),0.2)'}},
         'glitch-border': { '0%,100%':{borderColor:'hsla(var(--gold-rgb),.3)',boxShadow:'0 0 5px hsla(var(--gold-rgb),.2),inset 0 0 3px hsla(var(--gold-rgb),.1)'},'25%':{borderColor:'hsla(var(--red-orange-rgb),.3)',boxShadow:'0 0 8px hsla(var(--red-orange-rgb),.3),inset 0 0 3px hsla(var(--red-orange-rgb),.1)'},'50%':{borderColor:'hsla(var(--beige-rgb),.3)',boxShadow:'0 0 5px hsla(var(--beige-rgb),.2),inset 0 0 3px hsla(var(--beige-rgb),.1)'},'75%':{borderColor:'hsla(var(--green-rgb),.3)',boxShadow:'0 0 8px hsla(var(--green-rgb),.3),inset 0 0 3px hsla(var(--green-rgb),.1)'}},
         ticker: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(-100%)' } },
+        // Added keyframe for parallax
+        parallax: {
+          '0%': { backgroundPosition: 'top' },
+          '100%': { backgroundPosition: 'bottom' },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
