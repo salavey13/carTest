@@ -1,27 +1,29 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { supabaseAdmin } from '@/hooks/supabase'; // Admin for write
 import { NextResponse } from 'next/server';
-import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage'; // Reuse из boilerplate
-import { escapeTelegramMarkdown } from '@/lib/utils'; // Предполагаем helper для escape
+import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
+import { escapeTelegramMarkdown } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
-  const cookieStore = cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  if (!supabaseAdmin) {
+    logger.error('[POST /api/rules/book] Supabase admin client unavailable.');
+    return NextResponse.json({ error: 'Database unavailable' }, { status: 500 });
+  }
 
   const body = await request.json();
   const { startIso, endIso, price, extras, sessionType, riggerId = null, notes, userId } = body;
 
   try {
     // Check overlap для rig и rigger (если есть)
-    const overlapQuery = supabase.from('rentals').select('*').eq('vehicle_id', 'rule-cube-basic');
-    if (riggerId) overlapQuery.eq('metadata->>rigger_id', riggerId);
-    overlapQuery.lt('requested_start_date', endIso).gt('requested_end_date', startIso);
+    let overlapQuery = supabaseAdmin.from('rentals').select('*').eq('vehicle_id', 'rule-cube-basic');
+    if (riggerId) overlapQuery = overlapQuery.eq('metadata->>rigger_id', riggerId);
+    overlapQuery = overlapQuery.lt('requested_start_date', endIso).gt('requested_end_date', startIso);
 
     const { data: overlaps } = await overlapQuery;
     if (overlaps?.length) throw new Error('Overlap detected');
 
     // Create booking
-    const { data: rental } = await supabase.rpc('createBooking', {
+    const { data: rental } = await supabaseAdmin.rpc('createBooking', {
       p_user_id: userId,
       p_vehicle_id: 'rule-cube-basic',
       p_start_date: startIso,
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     const rentalId = rental.rental_id;
 
     // Update metadata
-    await supabase.from('rentals').update({
+    await supabaseAdmin.from('rentals').update({
       metadata: {
         type: 'rule',
         rule_id: 'rule-cube-basic',
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
 
     // 1% XTR invoice
     const amount = Math.round(price * 0.01 * 100);
-    const { data: invoice } = await supabase.rpc('create_invoice', {
+    const { data: invoice } = await supabaseAdmin.rpc('create_invoice', {
       p_type: 'rule_booking',
       p_id: `rule_${rentalId}`,
       p_user_id: userId,
@@ -80,13 +82,13 @@ export async function POST(request: Request) {
 
     // Rigger notif if set
     if (riggerId) {
-      const { data: rigger } = await supabase.from('users').select('user_id').eq('metadata->>rigger_id', riggerId).single();
+      const { data: rigger } = await supabaseAdmin.from('users').select('user_id').eq('metadata->>rigger_id', riggerId).single();
       if (rigger) await sendComplexMessage(rigger.user_id, `${summaryMd}\nAccept?`, [[{ text: '/accept_' + rentalId }, { text: '/decline_' + rentalId }]], { keyboardType: 'reply' });
     }
 
     return NextResponse.json({ success: true, rentalId });
   } catch (error) {
-    console.error('[POST /api/rules/book]', error);
+    logger.error('[POST /api/rules/book]', error);
     return NextResponse.json({ error: 'Booking failed' }, { status: 500 });
   }
 }
