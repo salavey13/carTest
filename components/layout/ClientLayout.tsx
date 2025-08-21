@@ -182,7 +182,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const showBottomNav = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)) || pathname === "/";
   
   useEffect(() => {
-    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" || pathname === "/streamer" || pathname === "/blogger" || pathname?.startsWith("/optimapipe") || pathname === "/"));
+    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" || pathname === "/streamer" || pathname === "/blogger" || pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"));
   }, [pathname]);
 
   const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
