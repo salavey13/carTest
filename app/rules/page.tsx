@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format } from 'date-fns';
-import { useAppContext } from '@/contexts/AppContext'; // Для userId/stars
+import { useAppContext } from '@/contexts/AppContext'; // Для dbUser.user_id
 import { ServiceCard } from '@/components/ServiceCard'; // Reuse
 
 // Hardcoded для MVP
@@ -36,43 +36,50 @@ const faqItems = [
 ];
 
 export default function RulesPage() {
-  const { userId } = useAppContext();
+  const { dbUser, isLoading, error: authError } = useAppContext(); // Используем dbUser вместо userId
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({ start: '', end: '', sessionType: '', rigger: false, extras: [], notes: '' });
   const [calendar, setCalendar] = useState(null);
   const [price, setPrice] = useState(0);
   const [bookings, setBookings] = useState(null);
   const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // Новый loading state
+  const [isFetching, setIsFetching] = useState(true);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ axis: 'y', dragFree: false, loop: false });
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true);
+      if (!dbUser?.user_id) {
+        setError('Пользователь не авторизован');
+        setIsFetching(false);
+        return;
+      }
+
+      setIsFetching(true);
       try {
         const calRes = await fetch('/api/rules/rule-cube-basic/calendar');
-        if (!calRes.ok) throw new Error('Failed to fetch calendar');
+        if (!calRes.ok) throw new Error('Не удалось загрузить календарь');
         const calData = await calRes.json();
         setCalendar(calData || []);
 
-        const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
-        if (!bookRes.ok) throw new Error('Failed to fetch bookings');
+        const bookRes = await fetch(`/api/my/bookings?userId=${dbUser.user_id}`);
+        if (!bookRes.ok) throw new Error('Не удалось загрузить бронирования');
         const bookData = await bookRes.json();
         setBookings(bookData || []);
       } catch (err) {
         setError('Ошибка загрузки данных. Попробуйте позже.');
       } finally {
-        setIsLoading(false);
+        setIsFetching(false);
       }
     };
-    if (userId) fetchData(); // Ждём userId
-    else setError('Пользователь не авторизован');
+
+    if (!isLoading && dbUser?.user_id) fetchData();
+    else if (!isLoading && !dbUser) setError('Пользователь не авторизован');
 
     // Load draft from localStorage
     const draft = localStorage.getItem('rulesDraft');
     if (draft) setFormData(JSON.parse(draft));
-  }, [userId]);
+  }, [dbUser, isLoading]);
 
   useEffect(() => {
     // Save draft to localStorage
@@ -108,28 +115,41 @@ export default function RulesPage() {
   useEffect(calculatePrice, [formData]);
 
   const handleBook = async () => {
-    const payload = { ...formData, price, userId, riggerId: formData.rigger ? rigger.id : null };
+    if (!dbUser?.user_id) {
+      setError('Пользователь не авторизован');
+      return;
+    }
+
+    const payload = { ...formData, price, userId: dbUser.user_id, riggerId: formData.rigger ? rigger.id : null };
     const res = await fetch('/api/rules/book', { method: 'POST', body: JSON.stringify(payload) });
     if (res.ok) {
       alert('Invoice sent!');
       localStorage.removeItem('rulesDraft');
       // Refresh bookings
-      const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
+      const bookRes = await fetch(`/api/my/bookings?userId=${dbUser.user_id}`);
       if (bookRes.ok) setBookings(await bookRes.json() || []);
+    } else {
+      setError('Ошибка бронирования. Попробуйте снова.');
     }
   };
 
   const handleCancel = async (id: string) => {
+    if (!dbUser?.user_id) {
+      setError('Пользователь не авторизован');
+      return;
+    }
+
     if (confirm('Отменить бронирование?')) {
       await fetch(`/api/rentals/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
       // Refresh bookings
-      const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
+      const bookRes = await fetch(`/api/my/bookings?userId=${dbUser.user_id}`);
       if (bookRes.ok) setBookings(await bookRes.json() || []);
     }
   };
 
+  if (authError) return <div className="text-red-500 p-4">Ошибка авторизации: {authError.message}</div>;
+  if (isLoading || isFetching) return <div className="p-4">Загрузка...</div>;
   if (error) return <div className="text-red-500 p-4">{error}</div>;
-  if (isLoading) return <div className="p-4">Загрузка...</div>;
 
   const steps = [
     <Card key="step1">
@@ -157,7 +177,7 @@ export default function RulesPage() {
         </Button>
         <div>Заметки: <textarea onChange={e => updateForm('notes', e.target.value)} value={formData.notes} /></div>
         <div className="sticky bottom-0 bg-background p-4 border-t">Цена: {price} RUB</div>
-        <Button onClick={handleBook}>Забронировать и оплатить 1%</Button>
+        <Button onClick={handleBook} disabled={!dbUser?.user_id}>Забронировать и оплатить 1%</Button>
       </CardContent>
     </Card>,
   ];
@@ -215,7 +235,7 @@ export default function RulesPage() {
             <Card key={booking.rental_id} className="mb-4">
               <CardContent>
                 <p>{booking.metadata?.session_type || 'Неизвестно'} {format(new Date(booking.requested_start_date), 'dd.MM.yy HH:mm')}</p>
-                <Button variant="destructive" onClick={() => handleCancel(booking.rental_id)}>Отменить</Button>
+                <Button variant="destructive" onClick={() => handleCancel(booking.rental_id)} disabled={!dbUser?.user_id}>Отменить</Button>
               </CardContent>
             </Card>
           ))
