@@ -22,7 +22,7 @@ const sessionTypes = [
 // How-to на русском
 const howToSteps = [
   { icon: '1️⃣', text: 'Выберите время и длительность сессии.' },
-  { icon: '2️⃣', text: 'Определите тип сессии ( растяжка, акробатика и т.д.).' },
+  { icon: '2️⃣', text: 'Определите тип сессии (растяжка, акробатика и т.д.).' },
   { icon: '3️⃣', text: 'Добавьте риггера (опционально) и подтвердите бронирование с 1% депозитом в XTR.' },
 ];
 
@@ -39,28 +39,35 @@ export default function RulesPage() {
   const { userId } = useAppContext();
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({ start: '', end: '', sessionType: '', rigger: false, extras: [], notes: '' });
-  const [calendar, setCalendar] = useState(null); // Изменено на null для handling
+  const [calendar, setCalendar] = useState(null);
   const [price, setPrice] = useState(0);
-  const [bookings, setBookings] = useState(null); // Изменено на null
-  const [error, setError] = useState(null); // Для error handling
+  const [bookings, setBookings] = useState(null);
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); // Новый loading state
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ axis: 'y', dragFree: false, loop: false });
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
         const calRes = await fetch('/api/rules/rule-cube-basic/calendar');
+        if (!calRes.ok) throw new Error('Failed to fetch calendar');
         const calData = await calRes.json();
-        setCalendar(calData || []); // Default empty
+        setCalendar(calData || []);
 
         const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
+        if (!bookRes.ok) throw new Error('Failed to fetch bookings');
         const bookData = await bookRes.json();
-        setBookings(bookData || []); // Default empty
+        setBookings(bookData || []);
       } catch (err) {
         setError('Ошибка загрузки данных. Попробуйте позже.');
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchData();
+    if (userId) fetchData(); // Ждём userId
+    else setError('Пользователь не авторизован');
 
     // Load draft from localStorage
     const draft = localStorage.getItem('rulesDraft');
@@ -95,7 +102,6 @@ export default function RulesPage() {
   const calculatePrice = () => {
     let base = rig.price;
     if (formData.rigger) base += rigger.price;
-    // Duration calc etc.
     setPrice(base);
   };
 
@@ -107,6 +113,9 @@ export default function RulesPage() {
     if (res.ok) {
       alert('Invoice sent!');
       localStorage.removeItem('rulesDraft');
+      // Refresh bookings
+      const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
+      if (bookRes.ok) setBookings(await bookRes.json() || []);
     }
   };
 
@@ -115,26 +124,21 @@ export default function RulesPage() {
       await fetch(`/api/rentals/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
       // Refresh bookings
       const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
-      const bookData = await bookRes.json();
-      setBookings(bookData || []);
+      if (bookRes.ok) setBookings(await bookRes.json() || []);
     }
   };
 
   if (error) return <div className="text-red-500 p-4">{error}</div>;
+  if (isLoading) return <div className="p-4">Загрузка...</div>;
 
   const steps = [
-    // Step 1: Time/duration/extras
     <Card key="step1">
       <CardHeader><CardTitle>Выберите время</CardTitle></CardHeader>
       <CardContent>
-        {/* Time picker, disable overlaps from calendar */}
         <input type="datetime-local" onChange={e => updateForm('start', e.target.value)} value={formData.start} />
         <input type="datetime-local" onChange={e => updateForm('end', e.target.value)} value={formData.end} />
-        {/* Extras checkboxes */}
       </CardContent>
     </Card>,
-
-    // Step 2: Session type
     <Card key="step2">
       <CardHeader><CardTitle>Тип сессии</CardTitle></CardHeader>
       <CardContent className="grid gap-4">
@@ -145,8 +149,6 @@ export default function RulesPage() {
         ))}
       </CardContent>
     </Card>,
-
-    // Step 3: Rigger/review/notes/confirm
     <Card key="step3">
       <CardHeader><CardTitle>Риггер?</CardTitle></CardHeader>
       <CardContent>
@@ -161,26 +163,19 @@ export default function RulesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-green-100 text-foreground"> {/* Spa gradients */}
-      {/* Hero with wave anim */}
+    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-green-100 text-foreground">
       <section className="relative h-48 bg-lavender-200 text-center pt-16 wave-anim">
         <h1 className="text-4xl font-bold">ПравИла: Забронируйте сессию</h1>
         <p className="text-lg">Самостоятельное бронирование для снижения звонков на 80%+</p>
       </section>
-
-      {/* Showcase: vertical carousel for rig images (hardcoded 1) */}
       <div ref={emblaRef} className="overflow-hidden">
         <div className="flex flex-col">
           <img src={rig.image} alt={rig.name} className="h-64 object-cover" />
         </div>
       </div>
-
-      {/* Services: session types cards */}
       <section className="p-4 grid gap-4">
         {sessionTypes.map(type => <ServiceCard {...type} borderColorClass="border-blue-500" />)}
       </section>
-
-      {/* Riggers: single card */}
       <Card className="m-4">
         <CardHeader><CardTitle>{rigger.name}</CardTitle></CardHeader>
         <CardContent>
@@ -188,8 +183,6 @@ export default function RulesPage() {
           <Button onClick={() => updateForm('rigger', !formData.rigger)}>Включить/Выключить</Button>
         </CardContent>
       </Card>
-
-      {/* How-to */}
       <section className="p-4">
         <h2 className="text-2xl font-bold mb-4">Как забронировать:</h2>
         <ul className="space-y-2">
@@ -200,8 +193,6 @@ export default function RulesPage() {
           ))}
         </ul>
       </section>
-
-      {/* FAQ */}
       <Accordion type="single" collapsible className="p-4">
         {faqItems.map((item, i) => (
           <AccordionItem value={`item-${i}`} key={i}>
@@ -210,8 +201,6 @@ export default function RulesPage() {
           </AccordionItem>
         ))}
       </Accordion>
-
-      {/* Wizard: vertical embla */}
       <AnimatePresence mode="wait">
         <motion.div key={step} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
           <div ref={emblaRef} className="h-[400px] overflow-hidden">
@@ -219,21 +208,19 @@ export default function RulesPage() {
           </div>
         </motion.div>
       </AnimatePresence>
-
-      {/* History */}
       <section className="p-4">
         <h2 className="text-2xl font-bold mb-4">История бронирований</h2>
-        {bookings ? (
+        {bookings?.length ? (
           bookings.map(booking => (
-            <Card key={booking.id} className="mb-4">
+            <Card key={booking.rental_id} className="mb-4">
               <CardContent>
-                <p>{booking.session_type} {format(new Date(booking.start), 'dd.MM.yy HH:mm')}</p>
-                <Button variant="destructive" onClick={() => handleCancel(booking.id)}>Отменить</Button>
+                <p>{booking.metadata?.session_type || 'Неизвестно'} {format(new Date(booking.requested_start_date), 'dd.MM.yy HH:mm')}</p>
+                <Button variant="destructive" onClick={() => handleCancel(booking.rental_id)}>Отменить</Button>
               </CardContent>
             </Card>
           ))
         ) : (
-          <p>Загрузка...</p>
+          <p>Бронирований пока нет.</p>
         )}
       </section>
     </div>
