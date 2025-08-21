@@ -2,6 +2,7 @@
 
 import { createBooking } from "@/app/rentals/actions"; // existing server action in your repo
 import { supabaseAdmin } from "@/hooks/supabase";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 type SaunaPayload = {
   saunaVehicleId: string; // 'sauna-001'
@@ -12,7 +13,43 @@ type SaunaPayload = {
   starsUsed?: number;
   userId?: string;
   notes?: string | null;
+  massageType?: string;
+  masterId?: string;
 };
+
+// Helper function, as it's not available on the server side otherwise
+function formatHour(h: number) {
+  const s = (h % 24).toString().padStart(2, "0");
+  return `${s}:00`;
+}
+
+export async function getMassageMasters() {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('cars')
+      .select('*')
+      .eq('type', 'massage_master');
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const masters = data?.map(d => ({
+      id: d.id,
+      name: d.make,
+      specialty: d.model,
+      bio: d.description,
+      imageUrl: d.image_url,
+      rating: d.daily_price || 5
+    })) || [];
+    
+    return { success: true, data: masters };
+
+  } catch (e: any) {
+    console.error("[getMassageMasters] Fatal:", e);
+    return { success: false, error: e?.message || "Failed to fetch masters" };
+  }
+}
 
 export async function createSaunaBooking(payload: SaunaPayload) {
   const ownerId = process.env.SAUNA_ADMIN_CHAT_ID || process.env.ADMIN_CHAT_ID || "413553377";
@@ -20,14 +57,41 @@ export async function createSaunaBooking(payload: SaunaPayload) {
 
   try {
     if (!payload.userId) {
-      // You may want to allow anonymous bookings, but currently require userId
       throw new Error("User ID required for sauna booking.");
     }
 
     const startDate = new Date(payload.startIso);
     const endDate = new Date(payload.endIso);
+    const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
 
-    // Call shared booking flow — adjust signature call if necessary for your codebase
+    // Check availability for sauna and master
+    const { data: overlappingSauna, error: saunaError } = await supabaseAdmin
+      .from("rentals")
+      .select("rental_id")
+      .eq("vehicle_id", vehicleId)
+      .filter("requested_start_date", "lt", payload.endIso)
+      .filter("requested_end_date", "gt", payload.startIso);
+
+    if (saunaError) throw new Error(`Sauna availability check failed: ${saunaError.message}`);
+    if (overlappingSauna && overlappingSauna.length > 0) {
+      return { success: false, error: "Sauna slot is already booked in this time." };
+    }
+
+    if (payload.masterId) {
+      const { data: overlappingMaster, error: masterError } = await supabaseAdmin
+        .from("rentals")
+        .select("rental_id")
+        .eq("metadata->>master_id", payload.masterId)
+        .filter("requested_start_date", "lt", payload.endIso)
+        .filter("requested_end_date", "gt", payload.startIso);
+      
+      if (masterError) throw new Error(`Master availability check failed: ${masterError.message}`);
+      if (overlappingMaster && overlappingMaster.length > 0) {
+        return { success: false, error: "Massagist is unavailable in the selected slot." };
+      }
+    }
+
+    // Call shared booking flow
     const res = await createBooking(payload.userId, vehicleId, startDate, endDate, payload.price);
     if (!res || !res.success) {
       return res;
@@ -38,58 +102,48 @@ export async function createSaunaBooking(payload: SaunaPayload) {
       return { success: false, error: "No rental_id returned from createBooking." };
     }
 
-    // Update rentals.metadata to include sauna info
-    try {
-      const { data: existingRental } = await supabaseAdmin
-        .from("rentals")
-        .select("metadata")
-        .eq("rental_id", rentalId)
-        .single();
+    // Update rentals.metadata
+    const { data: existingRental } = await supabaseAdmin
+      .from("rentals")
+      .select("metadata")
+      .eq("rental_id", rentalId)
+      .single();
 
-      const existingMetadata = (existingRental?.metadata as Record<string, any>) || {};
-      const newMetadata = {
-        ...existingMetadata,
-        type: "sauna",
-        sauna_id: vehicleId,
-        extras: payload.extras || [],
-        stars_used: payload.starsUsed || 0,
-        notes: payload.notes || null,
-      };
+    const existingMetadata = (existingRental?.metadata as Record<string, any>) || {};
+    const newMetadata = {
+      ...existingMetadata,
+      type: "sauna",
+      sauna_id: vehicleId,
+      extras: payload.extras || [],
+      stars_used: payload.starsUsed || 0,
+      notes: payload.notes || null,
+      massage_type: payload.massageType || null,
+      master_id: payload.masterId || null,
+    };
 
-      const { error: rUpdateErr } = await supabaseAdmin
-        .from("rentals")
-        .update({ metadata: newMetadata, updated_at: new Date().toISOString() })
-        .eq("rental_id", rentalId);
+    const { error: rUpdateErr } = await supabaseAdmin
+      .from("rentals")
+      .update({ metadata: newMetadata, updated_at: new Date().toISOString() })
+      .eq("rental_id", rentalId);
 
-      if (rUpdateErr) console.warn("[createSaunaBooking] rental metadata update error:", rUpdateErr);
-    } catch (err) {
-      console.warn("[createSaunaBooking] rental metadata patch error:", err);
+    if (rUpdateErr) console.warn("[createSaunaBooking] rental metadata update error:", rUpdateErr);
+
+    // Notifications
+    // User confirmation
+    const readableDate = startDate.toLocaleDateString('ru-RU');
+    const readableTime = formatHour(startDate.getHours());
+
+    await sendComplexMessage(payload.userId, `Ваша бронь в Forest SPA создана! Дата: ${readableDate}, Время: ${readableTime} на ${durationHours} ч. Итог: ${payload.price} ₽. Массаж: ${payload.massageType || 'Нет'}. Мастер: ${payload.masterId || 'Нет'}.`, [], { parseMode: 'Markdown' });
+
+    // Admin alert
+    await sendComplexMessage(ownerId, `Новая бронь: User ${payload.userId}, Rental ${rentalId}. Сумма ${payload.price} ₽. Подтвердить?`, [[{ text: "Подтвердить", callback_data: `approve_${rentalId}` }, { text: "Отклонить", callback_data: `decline_${rentalId}` }]], { keyboardType: 'inline' });
+
+    // Massagist assignment if applicable
+    if (payload.masterId) {
+      // FIXME: This should be fetched from the master's profile
+      const masterChatId = "MASTER_CHAT_ID_PLACEHOLDER"; 
+      await sendComplexMessage(masterChatId, `Новая запись на ${readableDate} в ${readableTime}. Rental ID: ${rentalId}. Принять?`, [[{ text: "Принять", callback_data: `accept_master_${rentalId}` }, { text: "Отклонить", callback_data: `decline_master_${rentalId}` }]], { keyboardType: 'inline' });
     }
-
-    // Try to patch invoice metadata if exists (non-fatal)
-    try {
-      const invoiceId = `rental_interest_${rentalId}`;
-      const { data: invRow, error: invFetchErr } = await supabaseAdmin
-        .from("invoices")
-        .select("metadata")
-        .eq("id", invoiceId)
-        .single();
-
-      if (!invFetchErr && invRow) {
-        const existingInvMeta = (invRow?.metadata as Record<string, any>) || {};
-        const newInvMeta = { ...existingInvMeta, type: "sauna", sauna_id: vehicleId };
-        const { error: invUpdateErr } = await supabaseAdmin
-          .from("invoices")
-          .update({ metadata: newInvMeta, updated_at: new Date().toISOString() })
-          .eq("id", invoiceId);
-
-        if (invUpdateErr) console.warn("[createSaunaBooking] invoice update error:", invUpdateErr);
-      }
-    } catch (err) {
-      console.warn("[createSaunaBooking] invoice patch error:", err);
-    }
-
-    // Optionally: send Telegram notification to ownerId (left to your existing infra)
 
     return res;
   } catch (e: any) {
