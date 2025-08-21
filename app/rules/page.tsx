@@ -22,7 +22,7 @@ const sessionTypes = [
 // How-to на русском
 const howToSteps = [
   { icon: '1️⃣', text: 'Выберите время и длительность сессии.' },
-  { icon: '2️⃣', text: 'Определите тип сессии (растяжка, акробатика и т.д.).' },
+  { icon: '2️⃣', text: 'Определите тип сессии ( растяжка, акробатика и т.д.).' },
   { icon: '3️⃣', text: 'Добавьте риггера (опционально) и подтвердите бронирование с 1% депозитом в XTR.' },
 ];
 
@@ -39,15 +39,28 @@ export default function RulesPage() {
   const { userId } = useAppContext();
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({ start: '', end: '', sessionType: '', rigger: false, extras: [], notes: '' });
-  const [calendar, setCalendar] = useState([]);
+  const [calendar, setCalendar] = useState(null); // Изменено на null для handling
   const [price, setPrice] = useState(0);
-  const [bookings, setBookings] = useState([]);
+  const [bookings, setBookings] = useState(null); // Изменено на null
+  const [error, setError] = useState(null); // Для error handling
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ axis: 'y', dragFree: false, loop: false });
 
   useEffect(() => {
-    fetch('/api/rules/rule-cube-basic/calendar').then(res => res.json()).then(setCalendar);
-    fetch(`/api/my/bookings?userId=${userId}`).then(res => res.json()).then(setBookings);
+    const fetchData = async () => {
+      try {
+        const calRes = await fetch('/api/rules/rule-cube-basic/calendar');
+        const calData = await calRes.json();
+        setCalendar(calData || []); // Default empty
+
+        const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
+        const bookData = await bookRes.json();
+        setBookings(bookData || []); // Default empty
+      } catch (err) {
+        setError('Ошибка загрузки данных. Попробуйте позже.');
+      }
+    };
+    fetchData();
 
     // Load draft from localStorage
     const draft = localStorage.getItem('rulesDraft');
@@ -101,9 +114,13 @@ export default function RulesPage() {
     if (confirm('Отменить бронирование?')) {
       await fetch(`/api/rentals/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
       // Refresh bookings
-      fetch(`/api/my/bookings?userId=${userId}`).then(res => res.json()).then(setBookings);
+      const bookRes = await fetch(`/api/my/bookings?userId=${userId}`);
+      const bookData = await bookRes.json();
+      setBookings(bookData || []);
     }
   };
+
+  if (error) return <div className="text-red-500 p-4">{error}</div>;
 
   const steps = [
     // Step 1: Time/duration/extras
@@ -206,14 +223,18 @@ export default function RulesPage() {
       {/* History */}
       <section className="p-4">
         <h2 className="text-2xl font-bold mb-4">История бронирований</h2>
-        {bookings.map(booking => (
-          <Card key={booking.id} className="mb-4">
-            <CardContent>
-              <p>{booking.session_type} {format(new Date(booking.start), 'dd.MM.yy HH:mm')}</p>
-              <Button variant="destructive" onClick={() => handleCancel(booking.id)}>Отменить</Button>
-            </CardContent>
-          </Card>
-        ))}
+        {bookings ? (
+          bookings.map(booking => (
+            <Card key={booking.id} className="mb-4">
+              <CardContent>
+                <p>{booking.session_type} {format(new Date(booking.start), 'dd.MM.yy HH:mm')}</p>
+                <Button variant="destructive" onClick={() => handleCancel(booking.id)}>Отменить</Button>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <p>Загрузка...</p>
+        )}
       </section>
     </div>
   );
