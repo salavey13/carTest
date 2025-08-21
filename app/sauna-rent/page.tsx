@@ -37,8 +37,8 @@ type Booking = {
 
 // ----------------------------- pricing constants -----------------------------
 const BASE_PRICING = {
-  weekdayMorningPerHour: 1500, // 09:00-15:00
-  weekdayEveningPerHour: 2000, // 15:00-02:00
+  weekdayMorningPerHour: 1800, // 09:00-15:00
+  weekdayEveningPerHour: 2300, // 15:00-02:00
   weekendDayPerHour: 2000,     // 09:00-15:00
   weekendNightPerHour: 2500,   // 15:00-05:00
   fridayExtendedMultiplier: 1.15,
