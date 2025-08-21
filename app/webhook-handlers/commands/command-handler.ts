@@ -20,46 +20,9 @@ import { leaderboardCommand } from "./leaderboard";
 import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
-
-// --- УДАЛЕНО: Вся эта функция больше не нужна. Логика перенесена в /app/api/telegramWebhook/route.ts ---
-/*
-async function handleLocationUpdate(userId: string, location: { latitude: number; longitude: number; }) {
-    try {
-        const { data: member } = await supabaseAdmin
-            .from('crew_members')
-            .select('live_status')
-            .eq('user_id', userId)
-            .eq('membership_status', 'active')
-            .single();
-        
-        // Обновляем локацию, только если он сейчас "На Байке"
-        if (member && member.live_status === 'riding') {
-            const { error } = await supabaseAdmin
-                .from('crew_members')
-                .update({ last_location: `POINT(${location.longitude} ${location.latitude})` })
-                .eq('user_id', userId);
-            
-            if (error) throw error;
-            logger.info(`[Location Update] Updated location for riding user ${userId}`);
-        }
-    } catch (error) {
-        logger.error(`[Location Update] Failed for user ${userId}`, error);
-    }
-}
-*/
+import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
 export async function handleCommand(update: any) {
-    // --- УДАЛЕНО: Этот блок `if` теперь обрабатывается в /app/api/telegramWebhook/route.ts ---
-    /*
-    if (update.message?.location) {
-        const userId: string = String(update.message.from.id);
-        const location = update.message.location;
-        await handleLocationUpdate(userId, location);
-        return;
-    }
-    */
-
-    // --- ИЗМЕНЕНО: условие теперь проверяет только текстовые сообщения и колбэки ---
     if (update.message?.text || update.callback_query) {
         const text: string = update.message?.text || update.callback_query?.data;
         const chatId: number = update.message?.chat.id || update.callback_query?.message.chat.id;
@@ -71,6 +34,41 @@ export async function handleCommand(update: any) {
         const args = parts.slice(1);
 
         logger.info(`[Command Handler] Received: '${text}' from User: ${userIdStr}`);
+
+        // Новые handlers для rules
+        if (command.startsWith('/approve_')) {
+            const id = command.split('_')[1];
+            await handleApprove(id, chatId, userIdStr);
+            return;
+        }
+        if (command.startsWith('/decline_')) {
+            const id = command.split('_')[1];
+            await handleDecline(id, chatId, userIdStr);
+            return;
+        }
+        if (command.startsWith('/accept_')) {
+            const id = command.split('_')[1];
+            await handleAccept(id, chatId, userIdStr);
+            return;
+        }
+        if (command.startsWith('/decline_rigger_')) { // Для rigger decline
+            const id = command.split('_')[2];
+            await handleRiggerDecline(id, chatId, userIdStr);
+            return;
+        }
+
+        // Fix для sauna: аналогичные handlers
+        if (command.startsWith('/approve_sauna_')) {
+            const id = command.split('_')[2];
+            await handleApprove(id, chatId, userIdStr, 'sauna'); // Передаём type для адаптации
+            return;
+        }
+        if (command.startsWith('/decline_sauna_')) {
+            const id = command.split('_')[2];
+            await handleDecline(id, chatId, userIdStr, 'sauna');
+            return;
+        }
+        // Аналогично для accept/decline в sauna, если нужно
 
         const commandMap: { [key: string]: Function } = {
             "/start": () => startCommand(chatId, userId, update.message?.from || update.callback_query?.from, text),
@@ -135,4 +133,101 @@ export async function handleCommand(update: any) {
         return;
     }
     logger.warn("[Command Handler] Received unhandled update type.", { update_id: update.update_id });
+}
+
+async function handleApprove(id: string, chatId: number, userId: string, type: string = 'rule') {
+  // Простая проверка на admin (расширить по appContext)
+  const { data: isAdmin } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+  if (isAdmin?.role !== 'admin') {
+    await sendComplexMessage(chatId, 'Access denied.', []);
+    return;
+  }
+
+  const response = await fetch(`/api/rentals/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'confirmed', action: 'approve' }),
+  });
+
+  if (response.ok) {
+    const { data: rental } = await supabaseAdmin.from('rentals').select('*').eq('rental_id', id).single();
+    const summaryMd = escapeTelegramMarkdown(`Booking approved! \n**Type:** ${rental.metadata.session_type || type} \n**Time:** ${rental.requested_start_date} - ${rental.requested_end_date}`);
+    await sendComplexMessage(rental.user_id, summaryMd, [], { imageQuery: `${type}-confirmed`, parseMode: 'MarkdownV2' });
+    if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+    await sendComplexMessage(chatId, 'Approved.', []);
+  } else {
+    await sendComplexMessage(chatId, 'Error approving.', []);
+  }
+}
+
+async function handleDecline(id: string, chatId: number, userId: string, type: string = 'rule') {
+  // Admin check аналогично
+  const { data: isAdmin } = await supabaseAdmin.from('users').select('role').eq('user_id', userId).single();
+  if (isAdmin?.role !== 'admin') {
+    await sendComplexMessage(chatId, 'Access denied.', []);
+    return;
+  }
+
+  const response = await fetch(`/api/rentals/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'cancelled', action: 'decline' }),
+  });
+
+  if (response.ok) {
+    const { data: rental } = await supabaseAdmin.from('rentals').select('*').eq('rental_id', id).single();
+    const summaryMd = escapeTelegramMarkdown(`Booking declined. \n**Type:** ${rental.metadata.session_type || type} \nRefund initiated.`);
+    await sendComplexMessage(rental.user_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+    if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+    await sendComplexMessage(chatId, 'Declined and refunded.', []);
+  } else {
+    await sendComplexMessage(chatId, 'Error declining.', []);
+  }
+}
+
+async function handleAccept(id: string, chatId: number, userId: string) {
+  // Rigger check: убедиться, что userId == rigger_id
+  const { data: rental } = await supabaseAdmin.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
+  if (rental.metadata.rigger_id !== userId) {
+    await sendComplexMessage(chatId, 'Access denied.', []);
+    return;
+  }
+
+  const { error } = await supabaseAdmin.from('rentals').update({
+    metadata: { ...rental.metadata, rigger_confirmed: true }
+  }).eq('rental_id', id);
+
+  if (!error) {
+    const summaryMd = escapeTelegramMarkdown(`You accepted the booking!`);
+    await sendComplexMessage(chatId, summaryMd, [], { parseMode: 'MarkdownV2' });
+    // Notify admin/user
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID, `Rigger accepted ${id}.`, []);
+  } else {
+    await sendComplexMessage(chatId, 'Error accepting.', []);
+  }
+}
+
+async function handleRiggerDecline(id: string, chatId: number, userId: string) {
+  // Аналогично accept, но decline: notify admin to reassign
+  const { data: rental } = await supabaseAdmin.from('rentals').select('metadata->>rigger_id').eq('rental_id', id).single();
+  if (rental.metadata.rigger_id !== userId) {
+    await sendComplexMessage(chatId, 'Access denied.', []);
+    return;
+  }
+
+  const { error } = await supabaseAdmin.from('rentals').update({
+    status: 'pending_reassign', // Или cancelled, по логике
+    metadata: { ...rental.metadata, rigger_confirmed: false }
+  }).eq('rental_id', id);
+
+  if (!error) {
+    await sendComplexMessage(chatId, 'Declined.', []);
+    // Notify admin
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID, `Rigger declined ${id}. Reassign?`, [[{ text: '/reassign_' + id }]]);
+    // Notify user
+    const summaryMd = escapeTelegramMarkdown(`Rigger declined. Admin will reassign.`);
+    await sendComplexMessage(rental.user_id, summaryMd, [], { parseMode: 'MarkdownV2' });
+  } else {
+    await sendComplexMessage(chatId, 'Error declining.', []);
+  }
 }
