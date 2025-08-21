@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { data, error } = await supabaseAnon.rpc('get_user_rentals_dashboard', { p_user_id: userId, p_minimal: false });
+    const { data, error } = await supabaseAnon.rpc('get_user_rentals_dashboard_new', { p_user_id: userId, p_minimal: false });
     
     if (error) {
       logger.error('[GET /api/my/bookings] RPC error:', error);
