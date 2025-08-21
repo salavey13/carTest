@@ -85,11 +85,17 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Added for massage/spa theme: Soft, relaxing colors
+        "spa-blue": "hsl(200, 80%, 70%)",
+        "spa-green": "hsl(150, 60%, 80%)",
+        "spa-lavender": "hsl(270, 70%, 85%)",
       },
       fontFamily: {
         sans: ["Inter", ...fontFamily.sans],
         mono: ["monospace", ...fontFamily.mono],
         orbitron: ["Orbitron", "sans-serif"],
+        // Added for spa: Elegant serif for headings
+        serif: ["Playfair Display", "serif"],
       },
       boxShadow: {
         "glow-sm": "0 0 8px rgba(var(--default-glow-rgb), 0.5)",
@@ -103,7 +109,9 @@ const config: Config = {
         "cyan-glow": "0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2)",
         "orange-glow": "0 0 15px hsla(var(--red-orange-rgb), 0.4), 0 0 30px hsla(var(--red-orange-rgb), 0.2)",
         "lime-glow": "0 0 15px hsla(var(--lime-rgb),0.4),0 0 30px hsla(var(--lime-rgb),0.2)", 
-        "primary-glow": "0 0 10px hsl(var(--primary))"
+        "primary-glow": "0 0 10px hsl(var(--primary))",
+        // Spa glow: Soft ambient
+        "spa-glow": "0 4px 20px hsla(200, 50%, 50%, 0.3)",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
@@ -111,6 +119,11 @@ const config: Config = {
         "page-gradient":"linear-gradient(145deg, hsl(var(--background)), hsl(var(--card)))", // Will adapt to light/dark
         "brand-gradient-purple-blue": "linear-gradient(to right, hsl(var(--brand-deep-indigo)), hsl(var(--brand-cyan)))",
         "brand-gradient-pink-purple": "linear-gradient(to right, hsl(var(--brand-red-orange)), hsl(var(--brand-deep-indigo)))",
+        // Added for 2025 trends: Gradient schemes
+        "hero-gradient": "linear-gradient(135deg, hsl(var(--brand-red-orange)), hsl(var(--brand-deep-indigo)))",
+        "section-gradient": "linear-gradient(to bottom, transparent, hsl(var(--background)))",
+        // Spa gradients: Calming
+        "spa-gradient": "linear-gradient(135deg, hsl(200, 80%, 70%), hsl(150, 60%, 80%))",
       },
       animation: {
         "subtle-pulse": "subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
@@ -126,6 +139,11 @@ const config: Config = {
         "neon-border-glow": "neon-border-glow 2.5s infinite alternate", 
         "glitch-border": "glitch-border 2s linear infinite", 
         "ticker": "ticker 20s linear infinite",
+        // Added for parallax and dynamic effects
+        "parallax": "parallax 1s linear",
+        // Spa animations: Gentle fade, wave
+        "gentle-fade": "gentle-fade 2s ease-in-out infinite",
+        "wave": "wave 10s ease-in-out infinite",
       },
       keyframes: { // Keyframes remain the same, their perceived effect might change with colors
         "subtle-pulse": {
@@ -150,6 +168,20 @@ const config: Config = {
         'neon-border-glow': { '0%,100%':{borderColor:'hsla(var(--gold-rgb),0.7)',boxShadow:'0 0 5px hsla(var(--gold-rgb),0.5), 0 0 10px hsla(var(--gold-rgb),0.3)'},'50%':{borderColor:'hsla(var(--red-orange-rgb),0.7)',boxShadow:'0 0 8px hsla(var(--red-orange-rgb),0.5), 0 0 15px hsla(var(--red-orange-rgb),0.3), 0 0 5px hsla(var(--deep-indigo-rgb),0.2)'}},
         'glitch-border': { '0%,100%':{borderColor:'hsla(var(--gold-rgb),.3)',boxShadow:'0 0 5px hsla(var(--gold-rgb),.2),inset 0 0 3px hsla(var(--gold-rgb),.1)'},'25%':{borderColor:'hsla(var(--red-orange-rgb),.3)',boxShadow:'0 0 8px hsla(var(--red-orange-rgb),.3),inset 0 0 3px hsla(var(--red-orange-rgb),.1)'},'50%':{borderColor:'hsla(var(--beige-rgb),.3)',boxShadow:'0 0 5px hsla(var(--beige-rgb),.2),inset 0 0 3px hsla(var(--beige-rgb),.1)'},'75%':{borderColor:'hsla(var(--green-rgb),.3)',boxShadow:'0 0 8px hsla(var(--green-rgb),.3),inset 0 0 3px hsla(var(--green-rgb),.1)'}},
         ticker: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(-100%)' } },
+        // Added keyframe for parallax
+        parallax: {
+          '0%': { backgroundPosition: 'top' },
+          '100%': { backgroundPosition: 'bottom' },
+        },
+        // Spa keyframes
+        "gentle-fade": {
+          "0%, 100%": { opacity: 0.8 },
+          "50%": { opacity: 1 },
+        },
+        "wave": {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -1,14 +1,16 @@
+// /app/vipbikerental/page.tsx
 "use client";
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { VibeContentRenderer } from '@/components/VibeContentRenderer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { BikeShowcase } from '@/components/BikeShowcase';
 import { cn } from "@/lib/utils";
+import { FaFacebook, FaInstagram, FaTwitter } from 'react-icons/fa6';
 
 const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode }) => (
     <div className="flex items-start gap-3">
@@ -18,7 +20,7 @@ const InfoItem = ({ icon, children }: { icon: string, children: React.ReactNode 
 );
 
 const StepItem = ({ num, title, icon, children }: { num: string, title: string, icon: string, children: React.ReactNode }) => (
-    <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative h-full backdrop-blur-sm">
+    <div className="bg-card/50 p-6 rounded-lg border border-border text-center relative min-w-[300px] h-full backdrop-blur-sm snap-center">
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-orbitron font-bold">{num}</div>
         <VibeContentRenderer content={icon} className="text-4xl text-primary mx-auto my-4" />
         <h4 className="font-orbitron text-lg mb-2">{title}</h4>
@@ -49,23 +51,27 @@ const ServiceCard = ({ title, icon, items, imageUrl, borderColorClass }: { title
 );
 
 export default function HomePage() {
-  // const titleText = "АРЕНДА МОТОЦИКЛОВ VIPBIKE"; // Больше не используется
+  const { scrollYProgress } = useScroll();
+  const y = useTransform(scrollYProgress, [0, 1], [0, -100]); // For parallax effect
 
   return (
     <div className="relative min-h-screen bg-background overflow-hidden text-foreground dark">
         {/* ==================================================================== */}
-        {/* ✨ HERO-СЕКЦИЯ ОБНОВЛЕНА ✨ */}
+        {/* ✨ HERO-СЕКЦИЯ ОБНОВЛЕНА С ВИДЕО И ГРАДИЕНТОМ ✨ */}
         {/* ==================================================================== */}
-        <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white p-4">
+        <section className="relative h-screen min-h-[600px] flex items-center justify-center text-center text-white p-4 overflow-hidden">
             <div className="absolute inset-0 z-0">
-                <Image 
-                  src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/hero-4f94e671-c5c8-4405-ab08-8f9a47e1ad69.jpg" 
-                  alt="Мотоциклист делает вилли на фоне заката" 
-                  layout="fill" 
-                  objectFit="cover" 
-                  className="brightness-50 animate-pan-zoom" // Добавлена анимация для динамики
-                  priority 
-                />
+                <video 
+                  autoPlay 
+                  muted 
+                  loop 
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-cover brightness-50"
+                >
+                  <source src="https://videos.pexels.com/video-files/2519660/2519660-hd_1920_1080_25fps.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+                <div className="absolute inset-0 bg-hero-gradient opacity-50"></div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
             </div>
             <motion.div 
@@ -74,14 +80,10 @@ export default function HomePage() {
                 transition={{ duration: 0.8 }}
                 className="relative z-10 flex flex-col items-center"
             >
-                {/* ==================================================================== */}
-                {/* ✨ НОВЫЙ БОЛЬШОЙ И СМЕЛЫЙ ЗАГОЛОВОК ✨ */}
-                {/* ==================================================================== */}
-                <h1 className="font-orbitron font-black uppercase text-shadow-neon text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
+                <h1 className="font-orbitron font-black uppercase text-shadow-neon text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none bg-gradient-to-r from-brand-red-orange to-brand-deep-indigo text-transparent bg-clip-text">
                     <span className="block drop-shadow-lg">Твоя Свобода</span>
-                    <span className="block text-primary drop-shadow-lg">В Движении</span>
+                    <span className="block drop-shadow-lg">В Движении</span>
                 </h1>
-                {/* ==================================================================== */}
                 <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-foreground/80 font-light">
                     VIPBIKE: Лидеры проката мотоциклов в Нижнем Новгороде. <br/>От брутальных круизеров до яростных спортбайков — выбери свой вайб.
                 </p>
@@ -95,10 +97,18 @@ export default function HomePage() {
             </motion.div>
         </section>
 
-        <BikeShowcase />
+        <motion.section style={{ y }} className="relative"> {/* Parallax effect */}
+          <BikeShowcase />
+        </motion.section>
 
         <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
+            <motion.section 
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch"
+            >
                 <ServiceCard 
                     title="Требования"
                     icon="::FaClipboardList::"
@@ -134,11 +144,11 @@ export default function HomePage() {
                         { icon: "::FaBeerMugEmpty::", text: "Место, где можно встретить единомышленников" }
                     ]}
                 />
-            </section>
+            </motion.section>
 
             <section>
                 <h2 className="text-4xl font-orbitron text-center mb-10">Как это работает</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="flex overflow-x-auto gap-4 snap-x snap-mandatory pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible">
                     <StepItem num="1" title="Бронь" icon="::FaCalendarCheck::">Выберите модель в нашем <Link href="/rent-bike" className="text-accent-text hover:underline">каталоге</Link> и оформите бронь онлайн.</StepItem>
                     <StepItem num="2" title="Подтверждение" icon="::FaPaperPlane::">Свяжитесь с нами для подтверждения. Возьмите с собой оригиналы документов и залог.</StepItem>
                     <StepItem num="3" title="Получение" icon="::FaKey::">Приезжайте в наш новый дом на Стригинском переулке 13Б, подписываем договор и забираете байк.</StepItem>
@@ -146,7 +156,13 @@ export default function HomePage() {
                 </div>
             </section>
             
-            <section className="max-w-3xl mx-auto">
+            <motion.section 
+              initial={{ opacity: 0, y: 50 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="max-w-3xl mx-auto"
+            >
                 <h2 className="text-4xl font-orbitron text-center mb-10">Частые вопросы</h2>
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
@@ -166,8 +182,43 @@ export default function HomePage() {
                         <AccordionContent>Да, на нашей новой локации работает полноценный сервис. Вы можете пригнать своего верного друга к нам на обслуживание или ремонт.</AccordionContent>
                     </AccordionItem>
                 </Accordion>
-            </section>
+            </motion.section>
         </div>
+
+        {/* ✨ ДОБАВЛЕН ДЕТАЛЬНЫЙ ФУТЕР ✨ */}
+        <footer className="bg-card py-12 px-4">
+          <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">VIPBIKE</h3>
+              <p className="text-muted-foreground">Лидеры проката мотоциклов в Нижнем Новгороде.</p>
+            </div>
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Ссылки</h3>
+              <ul className="space-y-2">
+                <li><Link href="/rent-bike" className="text-accent-text hover:underline">Каталог</Link></li>
+                <li><Link href="/services" className="text-accent-text hover:underline">Услуги</Link></li>
+                <li><Link href="/contact" className="text-accent-text hover:underline">Контакты</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Контакты</h3>
+              <p className="text-muted-foreground">Стригинский переулок 13Б, Нижний Новгород</p>
+              <p className="text-muted-foreground">Тел: +7 (XXX) XXX-XX-XX</p>
+              <p className="text-muted-foreground">Email: info@vipbike.ru</p>
+            </div>
+            <div>
+              <h3 className="font-orbitron text-xl mb-4">Социальные сети</h3>
+              <div className="flex space-x-4">
+                <a href="#" className="text-accent-text hover:text-primary"><FaFacebook size={24} /></a>
+                <a href="#" className="text-accent-text hover:text-primary"><FaInstagram size={24} /></a>
+                <a href="#" className="text-accent-text hover:text-primary"><FaTwitter size={24} /></a>
+              </div>
+            </div>
+          </div>
+          <div className="container mx-auto max-w-7xl mt-8 text-center text-muted-foreground">
+            © 2025 VIPBIKE. Все права защищены.
+          </div>
+        </footer>
     </div>
   );
 }
