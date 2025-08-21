@@ -5,13 +5,35 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AnimatePresence, motion } from 'framer-motion';
 import useEmblaCarousel from 'embla-carousel-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format } from 'date-fns';
 import { useAppContext } from '@/contexts/AppContext'; // Для userId/stars
+import { ServiceCard } from '@/components/ServiceCard'; // Reuse
 
 // Hardcoded для MVP
-const rig = { id: 'rule-cube-basic', name: 'Cube Basic', price: 800, image: 'https://.../cube.jpg' };
-const rigger = { id: 'rule-master-default', name: 'Default Rigger', price: 500, image: 'https://.../rigger.jpg' };
-const sessionTypes = ['Stretching', 'Acrobatics', 'Photo'];
+const rig = { id: 'rule-cube-basic', name: 'Куб Базовый', price: 800, image: 'https://.../cube.jpg' };
+const rigger = { id: 'rule-master-default', name: 'Дефолтный Риггер', price: 500, image: 'https://.../rigger.jpg' };
+const sessionTypes = [
+  { title: 'Растяжка', icon: '🧘', items: [{ icon: '🔥', text: 'Глубокая релаксация' }] },
+  { title: 'Акробатика', icon: '🤸', items: [{ icon: '💪', text: 'Динамичные позы' }] },
+  { title: 'Фото-сессия', icon: '📸', items: [{ icon: '🌟', text: 'Профессиональные снимки' }] },
+];
+
+// How-to на русском
+const howToSteps = [
+  { icon: '1️⃣', text: 'Выберите время и длительность сессии.' },
+  { icon: '2️⃣', text: 'Определите тип сессии (растяжка, акробатика и т.д.).' },
+  { icon: '3️⃣', text: 'Добавьте риггера (опционально) и подтвердите бронирование с 1% депозитом в XTR.' },
+];
+
+// FAQ на русском
+const faqItems = [
+  { question: 'Что такое 1% депозит в XTR?', answer: 'Это анти-спам фильтр и демонстрация стабильной валюты. Сумма ~1% от цены сессии, возвращается при отмене.' },
+  { question: 'Можно ли отменить бронирование?', answer: 'Да, через историю бронирований. Депозит вернется автоматически.' },
+  { question: 'Нужен ли риггер?', answer: 'Опционально. Для самостоятельных сессий — бесплатно, с риггером — доплата.' },
+  { question: 'Что если время занято?', answer: 'Система покажет доступные слоты в реал-тайм. Пересечения блокируются.' },
+  { question: 'Как оплатить?', answer: 'Через Telegram Invoice в XTR. Полная оплата на месте.' },
+];
 
 export default function RulesPage() {
   const { userId } = useAppContext();
@@ -19,19 +41,40 @@ export default function RulesPage() {
   const [formData, setFormData] = useState({ start: '', end: '', sessionType: '', rigger: false, extras: [], notes: '' });
   const [calendar, setCalendar] = useState([]);
   const [price, setPrice] = useState(0);
+  const [bookings, setBookings] = useState([]);
 
   const [emblaRef, emblaApi] = useEmblaCarousel({ axis: 'y', dragFree: false, loop: false });
 
   useEffect(() => {
     fetch('/api/rules/rule-cube-basic/calendar').then(res => res.json()).then(setCalendar);
-  }, []);
+    fetch(`/api/my/bookings?userId=${userId}`).then(res => res.json()).then(setBookings);
+
+    // Load draft from localStorage
+    const draft = localStorage.getItem('rulesDraft');
+    if (draft) setFormData(JSON.parse(draft));
+  }, [userId]);
 
   useEffect(() => {
-    if (emblaApi) emblaApi.on('pointerDown', (evt) => {
-      const { clientX } = evt;
-      // Prevent left swipe: if horizontal drag > vertical, preventDefault
-      // Более точная логика в onDragStart
-    });
+    // Save draft to localStorage
+    localStorage.setItem('rulesDraft', JSON.stringify(formData));
+  }, [formData]);
+
+  useEffect(() => {
+    if (emblaApi) {
+      emblaApi.on('pointerDown', (evt) => {
+        const startX = evt.clientX;
+        const startY = evt.clientY;
+        const handleDrag = (e: PointerEvent) => {
+          const deltaX = Math.abs(e.clientX - startX);
+          const deltaY = Math.abs(e.clientY - startY);
+          if (deltaX > deltaY && deltaX > 10) { // Left/right drag
+            e.preventDefault();
+            emblaApi.off('pointerMove', handleDrag);
+          }
+        };
+        emblaApi.on('pointerMove', handleDrag);
+      });
+    }
   }, [emblaApi]);
 
   const updateForm = (key: string, value: any) => setFormData(prev => ({ ...prev, [key]: value }));
@@ -48,7 +91,18 @@ export default function RulesPage() {
   const handleBook = async () => {
     const payload = { ...formData, price, userId, riggerId: formData.rigger ? rigger.id : null };
     const res = await fetch('/api/rules/book', { method: 'POST', body: JSON.stringify(payload) });
-    if (res.ok) alert('Invoice sent!');
+    if (res.ok) {
+      alert('Invoice sent!');
+      localStorage.removeItem('rulesDraft');
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    if (confirm('Отменить бронирование?')) {
+      await fetch(`/api/rentals/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
+      // Refresh bookings
+      fetch(`/api/my/bookings?userId=${userId}`).then(res => res.json()).then(setBookings);
+    }
   };
 
   const steps = [
@@ -57,62 +111,110 @@ export default function RulesPage() {
       <CardHeader><CardTitle>Выберите время</CardTitle></CardHeader>
       <CardContent>
         {/* Time picker, disable overlaps from calendar */}
-        <input type="datetime-local" onChange={e => updateForm('start', e.target.value)} />
-        {/* Duration, extras */}
+        <input type="datetime-local" onChange={e => updateForm('start', e.target.value)} value={formData.start} />
+        <input type="datetime-local" onChange={e => updateForm('end', e.target.value)} value={formData.end} />
+        {/* Extras checkboxes */}
       </CardContent>
     </Card>,
 
     // Step 2: Session type
     <Card key="step2">
       <CardHeader><CardTitle>Тип сессии</CardTitle></CardHeader>
-      <CardContent>
-        {sessionTypes.map(type => <Button key={type} onClick={() => updateForm('sessionType', type)}>{type}</Button>)}
+      <CardContent className="grid gap-4">
+        {sessionTypes.map(type => (
+          <Button key={type.title} onClick={() => updateForm('sessionType', type.title)} variant={formData.sessionType === type.title ? 'default' : 'outline'}>
+            {type.title}
+          </Button>
+        ))}
       </CardContent>
     </Card>,
 
     // Step 3: Rigger/review/notes/confirm
     <Card key="step3">
-      <CardHeader><CardTitle>Rigger?</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Риггер?</CardTitle></CardHeader>
       <CardContent>
-        <Button onClick={() => updateForm('rigger', !formData.rigger)}>{formData.rigger ? 'With Rigger' : 'Self'}</Button>
-        <div>Notes: <textarea onChange={e => updateForm('notes', e.target.value)} /></div>
-        <div>Price: {price} RUB</div>
-        <Button onClick={handleBook}>Book & Pay 1%</Button>
+        <Button onClick={() => updateForm('rigger', !formData.rigger)} variant={formData.rigger ? 'default' : 'outline'}>
+          {formData.rigger ? 'С риггером' : 'Самостоятельно'}
+        </Button>
+        <div>Заметки: <textarea onChange={e => updateForm('notes', e.target.value)} value={formData.notes} /></div>
+        <div className="sticky bottom-0 bg-background p-4 border-t">Цена: {price} RUB</div>
+        <Button onClick={handleBook}>Забронировать и оплатить 1%</Button>
       </CardContent>
     </Card>,
   ];
 
   return (
-    <div className="spa-gradient">
-      {/* Hero */}
-      <section>ПравИла: Book Your Session</section>
+    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-green-100 text-foreground"> {/* Spa gradients */}
+      {/* Hero with wave anim */}
+      <section className="relative h-48 bg-lavender-200 text-center pt-16 wave-anim">
+        <h1 className="text-4xl font-bold">ПравИла: Забронируйте сессию</h1>
+        <p className="text-lg">Самостоятельное бронирование для снижения звонков на 80%+</p>
+      </section>
 
       {/* Showcase: vertical carousel for rig images (hardcoded 1) */}
       <div ref={emblaRef} className="overflow-hidden">
         <div className="flex flex-col">
-          <img src={rig.image} alt={rig.name} />
+          <img src={rig.image} alt={rig.name} className="h-64 object-cover" />
         </div>
       </div>
 
       {/* Services: session types cards */}
-      {sessionTypes.map(type => <Card>{type}</Card>)}
+      <section className="p-4 grid gap-4">
+        {sessionTypes.map(type => <ServiceCard {...type} borderColorClass="border-blue-500" />)}
+      </section>
 
       {/* Riggers: single card */}
-      <Card>{rigger.name} <Button>Toggle</Button></Card>
+      <Card className="m-4">
+        <CardHeader><CardTitle>{rigger.name}</CardTitle></CardHeader>
+        <CardContent>
+          <img src={rigger.image} alt={rigger.name} className="h-32" />
+          <Button onClick={() => updateForm('rigger', !formData.rigger)}>Включить/Выключить</Button>
+        </CardContent>
+      </Card>
 
-      {/* How-to, FAQ */}
+      {/* How-to */}
+      <section className="p-4">
+        <h2 className="text-2xl font-bold mb-4">Как забронировать:</h2>
+        <ul className="space-y-2">
+          {howToSteps.map(step => (
+            <li key={step.icon} className="flex items-center gap-2">
+              <span>{step.icon}</span> {step.text}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* FAQ */}
+      <Accordion type="single" collapsible className="p-4">
+        {faqItems.map((item, i) => (
+          <AccordionItem value={`item-${i}`} key={i}>
+            <AccordionTrigger>{item.question}</AccordionTrigger>
+            <AccordionContent>{item.answer}</AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
 
       {/* Wizard: vertical embla */}
       <AnimatePresence mode="wait">
-        <motion.div key={step} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div key={step} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
           <div ref={emblaRef} className="h-[400px] overflow-hidden">
             <div className="flex flex-col">{steps}</div>
           </div>
         </motion.div>
       </AnimatePresence>
 
-      {/* History: from /api/my/bookings */}
-      <Button onClick={() => fetch('/api/my/bookings?userId=' + userId).then(res => res.json())}>Show History</Button>
+      {/* History */}
+      <section className="p-4">
+        <h2 className="text-2xl font-bold mb-4">История бронирований</h2>
+        {bookings.map(booking => (
+          <Card key={booking.id} className="mb-4">
+            <CardContent>
+              <p>{booking.session_type} {format(new Date(booking.start), 'dd.MM.yy HH:mm')}</p>
+              <Button variant="destructive" onClick={() => handleCancel(booking.id)}>Отменить</Button>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
     </div>
   );
 }
