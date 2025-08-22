@@ -1,4 +1,3 @@
-// /app/sauna-rent/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, useId, useCallback } from "react";
@@ -146,7 +145,7 @@ export default function ForestSPAPage() {
       if (result.success) {
         setMasters(result.data);
       } else {
-        toast.error(result.error || "Could not fetch masters list.");
+        toast.error(result.error || "Не удалось загрузить список мастеров.");
       }
     };
     fetchMasters();
@@ -233,9 +232,9 @@ export default function ForestSPAPage() {
     try {
       const res = await createSaunaBooking(payload as any);
       if (!res || !res.success) {
-        throw new Error(res?.error || "Server failed to create sauna booking");
+        throw new Error(res?.error || "Сервер не смог создать бронь сауны");
       }
-      toast.success("Booking created! Check Telegram for confirmation.");
+      toast.success("Бронь создана! Проверьте Telegram для подтверждения.");
 
       const id = res?.data?.rental_id || res?.data?.id || `bk_${Date.now()}`;
       const newBooking: Booking = {
@@ -260,7 +259,7 @@ export default function ForestSPAPage() {
     } catch (err: any) {
       console.error("Booking error:", err);
       setMessage(`Ошибка при создании брони: ${err.message}`);
-      toast.error(`Booking Error: ${err.message}`);
+      toast.error(`Ошибка бронирования: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -280,10 +279,10 @@ export default function ForestSPAPage() {
   const y = useTransform(scrollYProgress, [0, 1], [0, -100]); // For parallax
 
   const steps = [
-    'Sauna Details',
-    'Massage Type',
-    'Choose Massagist',
-    'Review & Confirm'
+    'Детали сауны',
+    'Тип массажа',
+    'Выберите массажиста',
+    'Просмотр и подтверждение'
   ];
 
   return (
@@ -308,15 +307,15 @@ export default function ForestSPAPage() {
             >
                 <h1 className="font-orbitron font-black uppercase text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
                     <span className="block drop-shadow-lg">Forest SPA</span>
-                    <span className="block text-primary drop-shadow-lg">Sauna & Massage</span>
+                    <span className="block text-primary drop-shadow-lg">Сауна и массаж</span>
                 </h1>
                 <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-foreground/80 font-light">
-                    Ultimate relaxation in Нижний Новгород: Sauna sessions with optional professional massage.
+                    Идеальное расслабление в Нижнем Новгороде: сессии сауны с опциональным профессиональным массажем.
                 </p>
                 <div className="mt-8">
                     <Button asChild size="lg" variant="accent" className="font-orbitron text-lg shadow-lg shadow-accent/30 hover:shadow-accent/50 transition-all duration-300 transform hover:scale-105">
                         <Link href="#booking">
-                          <VibeContentRenderer content="::FaSpa className='mr-2':: START EXPERIENCE" />
+                          <VibeContentRenderer content="::FaSpa className='mr-2':: НАЧАТЬ ОПЫТ" />
                         </Link>
                     </Button>
                 </div>
@@ -326,50 +325,50 @@ export default function ForestSPAPage() {
         <motion.section style={{ y }} className="relative">
           {/* Showcase */}
           <div className="h-[80vh] w-full overflow-hidden relative">
-            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-showcase.jpg" alt="Showcase" layout="fill" objectFit="cover" className="brightness-50" />
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-showcase.jpg" alt="Витрина" layout="fill" objectFit="cover" className="brightness-50" />
           </div>
         </motion.section>
 
         <div className="container mx-auto max-w-7xl px-4 py-16 sm:py-24 space-y-20 sm:space-y-28">
             <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-8 items-stretch">
                 <ServiceCard 
-                    title="Requirements"
+                    title="Требования"
                     icon="::FaClipboardList::"
                     borderColorClass="border-secondary text-secondary"
                     items={[
-                        { icon: "::FaUserClock::", text: "Age 18+" },
-                        { icon: "::FaIdCard::", text: "No contraindications" },
-                        { icon: "::FaAward::", text: "Deposit from 5000 ₽" },
-                        { icon: "::FaCreditCard::", text: "Payment by card or cash" }
+                        { icon: "::FaUserClock::", text: "Возраст 18+" },
+                        { icon: "::FaIdCard::", text: "Нет противопоказаний" },
+                        { icon: "::FaAward::", text: "Залог от 5000 ₽" },
+                        { icon: "::FaCreditCard::", text: "Оплата картой или наличными" }
                     ]}
                 />
                  <ServiceCard 
-                    title="What you get"
+                    title="Что вы получаете"
                     icon="::FaGift::"
                     borderColorClass="border-accent text-accent"
                     imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/spa-gift.jpg"
                     items={[
-                        { icon: "::FaCircleCheck::", text: "Fully serviced facilities" },
-                        { icon: "::FaUserShield::", text: "Professional equipment and staff" },
-                        { icon: "::FaTag::", text: "10% discount with 'SPA2025'" }
+                        { icon: "::FaCircleCheck::", text: "Полностью обслуживаемые помещения" },
+                        { icon: "::FaUserShield::", text: "Профессиональное оборудование и персонал" },
+                        { icon: "::FaTag::", text: "10% скидка с 'SPA2025'" }
                     ]}
                 />
                 <ServiceCard 
-                    title="Services"
+                    title="Услуги"
                     icon="::FaHands::"
                     borderColorClass="border-primary text-primary"
                     imageUrl="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/spa-services.jpg"
                     items={[
-                        { icon: "::FaSpa::", text: "Sauna sessions" },
-                        { icon: "::FaOilWell::", text: "Massage types" },
-                        { icon: "::FaFire::", text: "Hot stones add-on" },
-                        { icon: "::FaHandsHelping::", text: "Custom experiences" }
+                        { icon: "::FaSpa::", text: "Сессии сауны" },
+                        { icon: "::FaOilWell::", text: "Типы массажа" },
+                        { icon: "::FaFire::", text: "Дополнение горячими камнями" },
+                        { icon: "::FaHandsHelping::", text: "Индивидуальные опыты" }
                     ]}
                 />
             </section>
 
             <section>
-                <h2 className="text-4xl font-orbitron text-center mb-10">Our Massagists</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10">Наши массажисты</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {masters.map(master => (
                         <Card key={master.id} className="bg-card/50 p-4 rounded-lg border border-border text-center relative h-full backdrop-blur-sm">
@@ -377,47 +376,47 @@ export default function ForestSPAPage() {
                             <h4 className="font-orbitron text-lg mb-2">{master.name}</h4>
                             <p className="text-sm text-muted-foreground">{master.specialty}</p>
                             <p className="text-sm">{master.bio}</p>
-                            <div className="mt-2">Rating: {master.rating} ★</div>
+                            <div className="mt-2">Рейтинг: {master.rating} ★</div>
                         </Card>
                     ))}
                 </div>
             </section>
 
             <section>
-                <h2 className="text-4xl font-orbitron text-center mb-10">How it works</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10">Как это работает</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <StepItem num="1" title="Sauna Setup" icon="::FaCalendarCheck::">Choose date, time, extras.</StepItem>
-                    <StepItem num="2" title="Massage Type" icon="::FaHands::">Select massage if desired.</StepItem>
-                    <StepItem num="3" title="Massagist" icon="::FaUser::">Pick your expert.</StepItem>
-                    <StepItem num="4" title="Confirm" icon="::FaKey::">Review and book.</StepItem>
+                    <StepItem num="1" title="Настройка сауны" icon="::FaCalendarCheck::">Выберите дату, время, дополнения.</StepItem>
+                    <StepItem num="2" title="Тип массажа" icon="::FaHands::">Выберите массаж, если желаете.</StepItem>
+                    <StepItem num="3" title="Массажист" icon="::FaUser::">Выберите вашего эксперта.</StepItem>
+                    <StepItem num="4" title="Подтверждение" icon="::FaKey::">Просмотрите и забронируйте.</StepItem>
                 </div>
             </section>
             
             <section className="max-w-3xl mx-auto">
-                <h2 className="text-4xl font-orbitron text-center mb-10">FAQ</h2>
+                <h2 className="text-4xl font-orbitron text-center mb-10">Часто задаваемые вопросы</h2>
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="item-1">
-                        <AccordionTrigger>Can I book sauna and massage together?</AccordionTrigger>
-                        <AccordionContent>Yes, it's integrated as one experience.</AccordionContent>
+                        <AccordionTrigger>Можно ли забронировать сауну и массаж вместе?</AccordionTrigger>
+                        <AccordionContent>Да, это интегрировано как один опыт.</AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-2">
-                        <AccordionTrigger>How to choose massagist?</AccordionTrigger>
-                        <AccordionContent>Based on specialty, rating, and availability.</AccordionContent>
+                        <AccordionTrigger>Как выбрать массажиста?</AccordionTrigger>
+                        <AccordionContent>На основе специализации, рейтинга и доступности.</AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="item-3">
-                        <AccordionTrigger>What if massagist is unavailable?</AccordionTrigger>
-                        <AccordionContent>System checks and suggests alternatives.</AccordionContent>
+                        <AccordionTrigger>Что если массажист недоступен?</AccordionTrigger>
+                        <AccordionContent>Система проверяет и предлагает альтернативы.</AccordionContent>
                     </AccordionItem>
                 </Accordion>
             </section>
 
             <section id="booking" className="py-10 space-y-6 scroll-mt-24">
-              <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Create Your Experience</h2>
+              <h2 className="text-3xl font-orbitron text-[#ffd29b] [text-shadow:0_0_12px_#ff8a00b0]">Создайте свой опыт</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
                   <Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border">
                     <CardHeader>
-                      <CardTitle className="text-[#fff]">Booking Wizard - Step {currentStep}/4</CardTitle>
+                      <CardTitle className="text-[#fff]">Мастер бронирования - Шаг {currentStep}/4</CardTitle>
                       <div className="flex justify-between mt-2">
                         {steps.map((step, idx) => (
                           <div key={idx} className={`text-sm ${idx + 1 === currentStep ? 'text-[#ffd29b]' : 'text-[#d9d6cd]'}`}>
@@ -438,14 +437,14 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 1: Sauna */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <label className="text-xs font-mono text-[#fff]">Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
-                              <label className="text-xs font-mono text-[#fff]">Start Time<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label>
-                              <label className="text-xs font-mono text-[#fff]">Duration (hours)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
+                              <label className="text-xs font-mono text-[#fff]">Дата<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
+                              <label className="text-xs font-mono text-[#fff]">Время начала<select value={String(startHour)} onChange={(e) => setStartHour(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">{Array.from({ length: 24 }).map((_, i) => <option key={i} value={i}>{formatHour(i)}</option>)}</select></label>
+                              <label className="text-xs font-mono text-[#fff]">Продолжительность (часы)<input type="number" min={2} max={12} value={durationHours} onChange={(e) => setDurationHours(Number(e.target.value))} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]" /></label>
                               <div className="col-span-1 sm:col-span-2 mt-2">
                                 <div className="flex gap-2 flex-wrap">
-                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.cinema} onChange={() => toggleSaunaExtra('cinema')} /> <span className="text-sm">Cinema + Console</span></label>
-                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.parilshchik} onChange={() => toggleSaunaExtra('parilshchik')} /> <span className="text-sm">Parilshchik</span></label>
-                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.shop} onChange={() => toggleSaunaExtra('shop')} /> <span className="text-sm">Shop Items</span></label>
+                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.cinema} onChange={() => toggleSaunaExtra('cinema')} /> <span className="text-sm">Кино + консоль</span></label>
+                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.parilshchik} onChange={() => toggleSaunaExtra('parilshchik')} /> <span className="text-sm">Парильщик</span></label>
+                                  <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedSaunaExtras.shop} onChange={() => toggleSaunaExtra('shop')} /> <span className="text-sm">Товары из магазина</span></label>
                                 </div>
                               </div>
                             </div>
@@ -461,18 +460,18 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 2: Massage Type */}
                             <div className="grid grid-cols-1 gap-3">
-                              <label className="text-xs font-mono text-[#fff]">Massage Type<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
-                                <option value="none">No Massage</option>
-                                <option value="classic">Classic ({BASE_PRICING.classicPerHour} ₽/hr)</option>
-                                <option value="deepTissue">Deep Tissue ({BASE_PRICING.deepTissuePerHour} ₽/hr)</option>
-                                <option value="aromatherapy">Aromatherapy ({BASE_PRICING.aromatherapyPerHour} ₽/hr)</option>
+                              <label className="text-xs font-mono text-[#fff]">Тип массажа<select value={massageType} onChange={(e) => setMassageType(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
+                                <option value="none">Без массажа</option>
+                                <option value="classic">Классический ({BASE_PRICING.classicPerHour} ₽/ч)</option>
+                                <option value="deepTissue">Глубокотканный ({BASE_PRICING.deepTissuePerHour} ₽/ч)</option>
+                                <option value="aromatherapy">Ароматерапия ({BASE_PRICING.aromatherapyPerHour} ₽/ч)</option>
                               </select></label>
                               {massageType !== 'none' && (
                                 <div className="mt-2">
                                   <div className="flex gap-2 flex-wrap">
-                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.oils} onChange={() => toggleMassageExtra('oils')} /> <span className="text-sm">Oils (+{BASE_PRICING.extras.oils} ₽)</span></label>
-                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.music} onChange={() => toggleMassageExtra('music')} /> <span className="text-sm">Music (+{BASE_PRICING.extras.music} ₽)</span></label>
-                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.hotStone} onChange={() => toggleMassageExtra('hotStone')} /> <span className="text-sm">Hot Stones (+{BASE_PRICING.hotStoneFlat} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.oils} onChange={() => toggleMassageExtra('oils')} /> <span className="text-sm">Масла (+{BASE_PRICING.extras.oils} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.music} onChange={() => toggleMassageExtra('music')} /> <span className="text-sm">Музыка (+{BASE_PRICING.extras.music} ₽)</span></label>
+                                    <label className="inline-flex items-center gap-2 text-[#fff]"><input type="checkbox" checked={selectedMassageExtras.hotStone} onChange={() => toggleMassageExtra('hotStone')} /> <span className="text-sm">Горячие камни (+{BASE_PRICING.hotStoneFlat} ₽)</span></label>
                                   </div>
                                 </div>
                               )}
@@ -489,14 +488,14 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 3: Choose Massagist */}
                             <div className="grid grid-cols-1 gap-3">
-                              <label className="text-xs font-mono text-[#fff]">Select Massagist<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
-                                <option value="">Any available</option>
+                              <label className="text-xs font-mono text-[#fff]">Выберите массажиста<select value={selectedMaster} onChange={(e) => setSelectedMaster(e.target.value)} className="w-full mt-1 p-2 rounded bg-[#141212] border border-[#2b1b12] text-sm text-[#fff]">
+                                <option value="">Любой доступный</option>
                                 {masters.filter(m => massageType === 'none' || m.specialty.toLowerCase().includes(massageType.toLowerCase())).map(m => <option key={m.id} value={m.id}>{m.name} ({m.rating}★)</option>)}
                               </select></label>
                               {selectedMaster && (
                                 <div className="mt-2 p-2 bg-[#080707] rounded border border-[#2b1b12]">
-                                  <div className="text-sm text-[#fff]">Selected: {masters.find(m => m.id === selectedMaster)?.name}</div>
-                                  <div className="text-xs text-[#d9d6cd]">Bio: {masters.find(m => m.id === selectedMaster)?.bio}</div>
+                                  <div className="text-sm text-[#fff]">Выбрано: {masters.find(m => m.id === selectedMaster)?.name}</div>
+                                  <div className="text-xs text-[#d9d6cd]">Био: {masters.find(m => m.id === selectedMaster)?.bio}</div>
                                 </div>
                               )}
                             </div>
@@ -512,35 +511,35 @@ export default function ForestSPAPage() {
                           >
                             {/* Step 4: Review & Confirm */}
                             <div className="space-y-2">
-                              <div className="text-sm text-[#fff]">Date: {date}</div>
-                              <div className="text-sm text-[#fff]">Time: {formatHour(startHour)} for {durationHours} hours</div>
-                              <div className="text-sm text-[#fff]">Sauna Extras: {Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]).join(", ") || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massage Type: {massageType || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massage Extras: {Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k]).join(", ") || "None"}</div>
-                              <div className="text-sm text-[#fff]">Massagist: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "Any"}</div>
-                              <div className="text-lg font-bold text-[#fff]">Total: {totalPrice} ₽ (Stars cost: {starsCost}★, Earn: {starsEarned}★)</div>
-                              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Additional notes" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" />
+                              <div className="text-sm text-[#fff]">Дата: {date}</div>
+                              <div className="text-sm text-[#fff]">Время: {formatHour(startHour)} на {durationHours} часов</div>
+                              <div className="text-sm text-[#fff]">Дополнения сауны: {Object.keys(selectedSaunaExtras).filter(k => selectedSaunaExtras[k]).join(", ") || "Нет"}</div>
+                              <div className="text-sm text-[#fff]">Тип массажа: {massageType || "Нет"}</div>
+                              <div className="text-sm text-[#fff]">Дополнения массажа: {Object.keys(selectedMassageExtras).filter(k => selectedMassageExtras[k]).join(", ") || "Нет"}</div>
+                              <div className="text-sm text-[#fff]">Массажист: {selectedMaster ? masters.find(m => m.id === selectedMaster)?.name : "Любой"}</div>
+                              <div className="text-lg font-bold text-[#fff]">Итого: {totalPrice} ₽ (Стоимость в звездах: {starsCost}★, Заработать: {starsEarned}★)</div>
+                              <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Дополнительные заметки" className="w-full p-3 rounded bg-[#141212] border border-[#2b1b12] text-sm h-24 text-[#fff]" />
                             </div>
                           </motion.div>
                         )}
                       </AnimatePresence>
                       <div className="flex justify-between mt-4">
-                        <Button disabled={currentStep === 1 || isSubmitting} onClick={() => setCurrentStep(prev => prev - 1)} variant="ghost">Back</Button>
+                        <Button disabled={currentStep === 1 || isSubmitting} onClick={() => setCurrentStep(prev => prev - 1)} variant="ghost">Назад</Button>
                         {currentStep < 4 ? (
-                          <Button disabled={isSubmitting} onClick={() => setCurrentStep(prev => prev + 1)}>Next</Button>
+                          <Button disabled={isSubmitting} onClick={() => setCurrentStep(prev => prev + 1)}>Далее</Button>
                         ) : (
-                          <Button disabled={isSubmitting} onClick={handleCreateBooking}>{isSubmitting ? "Booking..." : "Confirm & Book"}</Button>
+                          <Button disabled={isSubmitting} onClick={handleCreateBooking}>{isSubmitting ? "Бронирование..." : "Подтвердить и забронировать"}</Button>
                         )}
                       </div>
                     </CardContent>
                   </Card>
                   {/* History */}
-                  <Button variant="ghost" onClick={() => setShowHistory(s => !s)} className="mt-4">{showHistory ? "Hide History" : "Show History"}</Button>
+                  <Button variant="ghost" onClick={() => setShowHistory(s => !s)} className="mt-4">{showHistory ? "Скрыть историю" : "Показать историю"}</Button>
                   {showHistory && (
                     <Card className="mt-4 bg-[#080707]/60 backdrop-blur-sm border-border">
-                      <CardHeader><CardTitle className="text-[#fff]">Booking History</CardTitle></CardHeader>
+                      <CardHeader><CardTitle className="text-[#fff]">История бронирований</CardTitle></CardHeader>
                       <CardContent>
-                        {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">No bookings yet.</div> : (
+                        {bookings.length === 0 ? <div className="text-sm text-[#d9d6cd]">Пока нет бронирований.</div> : (
                           <ul className="space-y-2">
                             {bookings.map((b) => (
                               <li key={b.id} className="p-2 rounded bg-[#0b0b0b] border border-[#2b1b12]">
@@ -548,7 +547,7 @@ export default function ForestSPAPage() {
                                   <div className="text-sm text-[#fff]">{b.date} • {formatHour(b.startHour)} • {b.durationHours}ч {b.massageType ? `(${b.massageType})` : ''}</div>
                                   <div className="text-sm font-semibold text-[#fff]">{b.price} ₽</div>
                                 </div>
-                                <div className="text-xs text-[#d9d6cd] mt-1">Extras: {b.extras.join(", ") || "—"} • Master: {b.masterId ? masters.find(m => m.id === b.masterId)?.name : "None"}</div>
+                                <div className="text-xs text-[#d9d6cd] mt-1">Дополнения: {b.extras.join(", ") || "—"} • Мастер: {b.masterId ? masters.find(m => m.id === b.masterId)?.name : "Нет"}</div>
                               </li>
                             ))}
                           </ul>
@@ -558,7 +557,7 @@ export default function ForestSPAPage() {
                   )}
                 </div>
                 {/* Aside with stars, chart, links */}
-                <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Star System</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Your stars — internal currency. Spend on discounts or save for future bookings.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Balance</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Total: accruals for actions, referrals, cleanings.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Subscribe to cleaning alerts</div><p className="text-xs text-[#d9d6cd]">After rental, subscribe to short cleaning shift: paid in stars.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Subscribe</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="Available Cleanings Schedule" /></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Quick Links</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP Bike</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Studio</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">SelfDev</Link></li></ul></CardContent></Card></aside>
+                <aside><Card className="bg-[#0b0b0b]/60 backdrop-blur-sm border-border md:sticky md:top-24"><CardHeader><CardTitle className="text-[#fff]">Система звезд</CardTitle></CardHeader><CardContent><p className="text-sm text-[#d9d6cd] mb-2">Ваши звезды — внутренняя валюта. Тратьте на скидки или копите для будущих бронирований.</p><div className="p-3 bg-[#060606] rounded border border-[#2b1b12]"><div className="text-xs text-[#ffd29b]">Баланс</div><div className="text-3xl font-bold flex items-center gap-2 text-[#fff]"><VibeContentRenderer content="::FaStar::" className="w-7 h-7 text-yellow-400" /> {starsBalance}★</div><div className="text-xs text-[#d9d6cd] mt-2">Итого: начисления за действия, рефералы, уборки.</div></div><div className="mt-4"><div className="text-xs text-[#ffd29b] mb-2">Подписаться на оповещения об уборках</div><p className="text-xs text-[#d9d6cd]">После аренды подпишитесь на короткую смену уборки: оплачивается в звездах.</p><div className="mt-2 flex gap-2"><Button onClick={() => alert("TODO: send subscription to /api/notify-cleanup")} className="bg-[#ffd29b] text-[#241309] hover:bg-white">Подписаться</Button><SaunaOccupancyChart bookings={cleaningOpportunities} title="Расписание доступных уборок" /></div></div></CardContent></Card><Card className="bg-[#070707]/60 backdrop-blur-sm border-border mt-6"><CardContent className="py-4"><h4 className="font-semibold mb-2 text-[#fff]">Быстрые ссылки</h4><ul className="text-sm list-inside space-y-2 text-[#d9d6cd]"><li><Link href="/vipbikerental" className="text-[#fff] hover:underline">VIP байк</Link></li><li><Link href="/repo-xml" className="text-[#fff] hover:underline">/repo-xml Студия</Link></li><li><Link href="/selfdev" className="text-[#fff] hover:underline">Саморазвитие</Link></li></ul></CardContent></Card></aside>
               </div>
             </section>
         </div>
@@ -567,24 +566,24 @@ export default function ForestSPAPage() {
           <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <h3 className="font-orbitron text-xl mb-4">Forest SPA</h3>
-              <p className="text-muted-foreground">Ultimate sauna and massage in Нижний Новгород.</p>
+              <p className="text-muted-foreground">Идеальная сауна и массаж в Нижнем Новгороде.</p>
             </div>
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Links</h3>
+              <h3 className="font-orbitron text-xl mb-4">Ссылки</h3>
               <ul className="space-y-2">
-                <li><Link href="#zones" className="text-accent hover:underline">Zones</Link></li>
-                <li><Link href="#pricing" className="text-accent hover:underline">Pricing</Link></li>
-                <li><Link href="#extras" className="text-accent hover:underline">Extras</Link></li>
+                <li><Link href="#zones" className="text-accent hover:underline">Зоны</Link></li>
+                <li><Link href="#pricing" className="text-accent hover:underline">Цены</Link></li>
+                <li><Link href="#extras" className="text-accent hover:underline">Дополнения</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Contacts</h3>
+              <h3 className="font-orbitron text-xl mb-4">Контакты</h3>
               <p className="text-muted-foreground">Проспект Ленина 98, Гостиница Волна</p>
-              <p className="text-muted-foreground">Tel: +7 (XXX) XXX-XX-XX</p>
+              <p className="text-muted-foreground">Тел: +7 (XXX) XXX-XX-XX</p>
               <p className="text-muted-foreground">Email: info@forestspa.ru</p>
             </div>
             <div>
-              <h3 className="font-orbitron text-xl mb-4">Social</h3>
+              <h3 className="font-orbitron text-xl mb-4">Социальные сети</h3>
               <div className="flex space-x-4">
                 <a href="#" className="text-accent hover:text-primary"><FaFacebook size={24} /></a>
                 <a href="#" className="text-accent hover:text-primary"><FaInstagram size={24} /></a>
@@ -593,7 +592,7 @@ export default function ForestSPAPage() {
             </div>
           </div>
           <div className="container mx-auto max-w-7xl mt-8 text-center text-muted-foreground">
-            © 2025 Forest SPA. All rights reserved.
+            © 2025 Forest SPA. Все права защищены.
           </div>
         </footer>
     </div>
