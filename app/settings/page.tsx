@@ -31,7 +31,8 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Loading } from "@/components/Loading";
-import ArbitrageAgent from "@/app/arbitrage/agent"; // New import for agent
+import ArbitrageAgent from "@/app/arbitrage/agent"; 
+import HappyFuturesSuggestor from "@/app/happy-futures/suggestor"; // New import
 
 interface GeneralSettingConfig {
   key: string;
@@ -392,7 +393,8 @@ export default function SettingsPage() {
                 <Button onClick={handleSaveArbitrageSettings} disabled={isSavingArbitrage || isSavingGeneral} className="w-full">
                     {isSavingArbitrage ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Сохранение..." /> : <VibeContentRenderer content="::FaSave className='mr-2':: Сохранить Настройки Арбитража" />}
                 </Button>
-                <ArbitrageAgent /> {/* Integrated AI Agent */}
+                <ArbitrageAgent />
+                <HappyFuturesSuggestor /> {/* Integrated DeepSearch Bot */}
             </CardContent>
         </Card>
         )}
