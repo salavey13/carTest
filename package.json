@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "use-clipboard-copy": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
     "google-it": "latest",
