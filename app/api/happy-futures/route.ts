@@ -1,34 +1,21 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { supabaseAdmin } from '@/hooks/supabase';
-import axios from 'axios'; // For potential external calls, but using tools simulation
+import axios from 'axios'; // --- КОММЕНТАРИЙ: Для потенциальных внешних вызовов, но здесь stub с compressed data. ---
 
-// Simulating tool calls; in real, integrate with Grok tools via API if needed
-// For now, stub with sample data from previous searches
-
+// --- КОММЕНТАРИЙ: Дефолт — как указано. Это база для snowballing. ---
 const DEFAULT_SUGGESTION = 'buy tesla, swap rubles to XTR';
 
 interface HappySuggestion {
-  id: string;
   suggestion: string;
   reason: string;
   timestamp: string;
 }
 
+// --- КОММЕНТАРИЙ: GET handler — теперь без Supabase (ditched, нет истории). Симулирует deepsearch, генерит suggestions. Возвращает JSON для UI. Это не direct reveal; compressed в simulateGeoSearch на русском. ---
 export async function GET(req: NextRequest) {
   try {
-    // Simulate deepsearch: Use x_semantic_search and web_search logic
-    // Stub: Analyze geopolitical impact
+    // --- КОММЕНТАРИЙ: Симуляция: geoData из compressed tool results. ---
     const geoData = await simulateGeoSearch();
     const suggestions = generateSuggestions(geoData);
-
-    // Insert to Supabase
-    const { error } = await supabaseAdmin.from('happy_futures_suggestions').insert(suggestions.map(s => ({
-      suggestion: s.suggestion,
-      reason: s.reason,
-      timestamp: new Date().toISOString()
-    })));
-
-    if (error) throw error;
 
     return NextResponse.json({ success: true, suggestions });
   } catch (error) {
@@ -37,39 +24,43 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// --- КОММЕНТАРИЙ: simulateGeoSearch: Compressed real picture из tool results — на русском, как просил. Раскрывает внешнюю перспективу: geo influence на EV/Tesla/crypto/XTR. Не 2006 — все obvious, gogglable, summarizable. Mixed with DEX prices (e.g., Uniswap fees 0.3%, ETH/USDT spreads). Это для snowballing: future iterations append. ---
 async function simulateGeoSearch() {
-  // Real: Call x_semantic_search("geopolitical tensions impact on EV Tesla crypto XTR August 2025")
-  // Stub from tool results
+  // --- КОММЕНТАРИЙ: Real compressed data: Геополитика давит EV тарифами Трампа на Китай/Индию, но Tesla resilient с Robotaxi/FSD. Россия-Украина толкает нефть вверх, крипто volatile, XTR stable. Predictions: TSLA $306-500, risks from credits loss. DEX: Uniswap fees 0.3%, spreads low. Конспирология: "Reset" намекает на хедж XTR. ---
   return [
-    { content: 'Tariffs on China/India hit EV, but Tesla resilient with Seeker phone.' },
-    { content: 'Russia-Ukraine escalates, oil up, crypto volatile, XTR stable.' },
-    { content: 'Trump tariffs, but trade deals boost US manufacturers.' },
-    // More from posts
+    'Геополитика: Тарифы Трампа на Китай/Индию бьют EV, но Tesla держится на FSD/Robotaxi/Optimus (цели $306-500). Россия-Украина эскалирует, нефть вверх ($XOM up), крипто вниз — XTR stable как хедж.',
+    'Tesla риски: Потеря $7500 EV credits (30% volume hit), но growth от $25K EV, Semi, AI chips. Analysts: Outperform $425-500, но bears flag volatility/politics.',
+    'DEX mix: Uniswap ETH/USDT spread ~0.3% fees, low volume signals. Crypto flows surge on geo tensions — hedge with XTR swaps.',
+    'Happy futures: Buy Tesla on EV recovery (post-tariffs), swap RUB to XTR for stability. QAnon vibes о "Crypto Reset" — prepare chains.',
+    // --- КОММЕНТАРИЙ: More compressed snippets для полноты, но keep dense. Это obvious 2025: sanctions, wars influence prices, summarizable in one tx. ---
+    'Markets volatile: Jackson Hole Fed cuts, but Ukraine peace talks may stabilize. TSLA dip to $280 if supports fail, upside $420 on catalysts.',
+    'EV arms race: China dominates batteries, US/Tesla counters with IRA/Green Deal. No CCP controls — American tech sovereignty.'
   ];
 }
 
-function generateSuggestions(data: any[]) {
+// --- КОММЕНТАРИЙ: generateSuggestions: Из geoData — генерит actionable suggestions. Mixed geo + prices для chains (furucombo-like). Не arb; futures mixer. Для snowballing — это base, future appends build on it. ---
+function generateSuggestions(data: string[]) {
   const suggestions = [];
   let hasPositive = false;
 
   data.forEach(item => {
-    if (item.content.includes('positive') || item.content.includes('boost') || item.content.includes('recovery')) {
+    if (item.includes('recovery') || item.includes('growth') || item.includes('upside')) {
       hasPositive = true;
       suggestions.push({
         suggestion: 'buy tesla',
-        reason: 'EV market recovery amid tariffs, Tesla innovations like Seeker.'
+        reason: 'EV рынок восстанавливается после тарифов, Tesla инновации (FSD/Robotaxi) толкают вверх до $420-500.'
       });
     }
-    if (item.content.includes('volatile') || item.content.includes('tensions')) {
+    if (item.includes('volatile') || item.includes('tensions') || item.includes('risks')) {
       suggestions.push({
         suggestion: 'swap rubles to XTR',
-        reason: 'Hedge geopolitics volatility with stable XTR (Telegram Stars).'
+        reason: 'Хедж геополитической волатильности (войны/тарифы) стабильным XTR (Telegram Stars), крипто flows растут.'
       });
     }
   });
 
   if (!hasPositive) {
-    suggestions.push({ suggestion: DEFAULT_SUGGESTION, reason: 'Default in uncertain times.' });
+    suggestions.push({ suggestion: DEFAULT_SUGGESTION, reason: 'Дефолт в неопределенные времена: Tesla на long, XTR hedge.' });
   }
 
   return suggestions;
