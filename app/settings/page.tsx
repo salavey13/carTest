@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Loading } from "@/components/Loading";
+import ArbitrageAgent from "@/app/arbitrage/agent"; // New import for agent
 
 interface GeneralSettingConfig {
   key: string;
@@ -133,7 +135,6 @@ export default function SettingsPage() {
     }
   }, [dbUser?.user_id, loadArbitrageSettings]);
 
-
   const handleGeneralSettingChange = useCallback(async (settingKey: string, value: boolean) => {
     if (!generalSettingsProfile || !dbUser?.user_id) { 
       toast.error("Профиль пользователя не загружен для общих настроек. Попробуйте позже.");
@@ -171,7 +172,6 @@ export default function SettingsPage() {
       setIsSavingGeneral(false);
     }
   }, [generalSettingsProfile, dbUser]);
-
 
   const handleArbitrageSettingChange = (key: keyof Omit<ArbitrageSettings, "exchangeFees" | "networkFees">, value: any) => {
     setArbitrageSettings(prev => {
@@ -392,6 +392,7 @@ export default function SettingsPage() {
                 <Button onClick={handleSaveArbitrageSettings} disabled={isSavingArbitrage || isSavingGeneral} className="w-full">
                     {isSavingArbitrage ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Сохранение..." /> : <VibeContentRenderer content="::FaSave className='mr-2':: Сохранить Настройки Арбитража" />}
                 </Button>
+                <ArbitrageAgent /> {/* Integrated AI Agent */}
             </CardContent>
         </Card>
         )}
