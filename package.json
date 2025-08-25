@@ -101,7 +101,7 @@
     "xlsx": "^0.18.5",
     "zod": "^3.24.1",
     "web3": "latest",
-    "ethers": "latest",
+    "ethers": "^5.7.2",
     "@flashbots/ethers-provider-bundle": "latest",
     "@uniswap/v3-sdk": "latest",
     "@uniswap/smart-order-router": "latest"
