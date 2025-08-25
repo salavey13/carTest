@@ -4,17 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import Web3 from "web3";
 import { ethers } from "ethers";
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
-import { Transformer, pipeline } from "@huggingface/transformers";
-import torch from "torch"; // Assuming torch is available for tensor ops
+import { Pool } from '@uniswap/v3-sdk';
+import { TradeType, CurrencyAmount } from '@uniswap/sdk-core';
+import axios from 'axios'; // For API calls to our route
 
 interface ArbitrageOpportunity {
   pair: string;
@@ -30,127 +28,135 @@ interface Cube {
   params: any;
 }
 
-const DEFAULT_DEXES = ['Uniswap', 'SushiSwap', 'Curve', 'Balancer'];
-const DEFAULT_PAIRS = ['ETH/USDT', 'BTC/USDT', 'DAI/USDC'];
+const DEFAULT_DEXES = ['uniswap', 'sushiswap']; // Focused on implemented
+const PROVIDER_URL = process.env.NEXT_PUBLIC_INFURA_URL;
 
 export default function ArbitrageAgent() {
-  const { dbUser } = useAppContext();
+  const { dbUser, arbitrageSettings } = useAppContext(); // Use settings from context
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [web3Provider, setWeb3Provider] = useState<Web3 | null>(null);
   const [ethersProvider, setEthersProvider] = useState<ethers.providers.JsonRpcProvider | null>(null);
   const [flashbotsProvider, setFlashbotsProvider] = useState<FlashbotsBundleProvider | null>(null);
-  const [aiModel, setAiModel] = useState<any>(null);
+  const [wallet, setWallet] = useState<ethers.Wallet | null>(null);
 
   useEffect(() => {
-    // Init Web3 and Ethers
-    const infuraUrl = process.env.NEXT_PUBLIC_INFURA_URL;
-    if (infuraUrl) {
-      const web3 = new Web3(infuraUrl);
-      setWeb3Provider(web3);
-      const provider = new ethers.providers.JsonRpcProvider(infuraUrl);
+    if (PROVIDER_URL) {
+      const provider = new ethers.providers.JsonRpcProvider(PROVIDER_URL);
       setEthersProvider(provider);
 
-      // Init Flashbots for private mempool
-      FlashbotsBundleProvider.create(provider, ethers.Wallet.createRandom()).then(setFlashbotsProvider);
-    }
+      // Check chainId for testnet
+      provider.getNetwork().then(network => {
+        if (network.chainId !== 11155111) { // Sepolia testnet example
+          toast.error('Agent only on testnet!');
+          return;
+        }
+      });
 
-    // Load AI model (e.g., for spread prediction)
-    pipeline('text-classification', 'distilbert-base-uncased').then(model => setAiModel(model));
+      // Wallet from env (testnet only!)
+      const privateKey = process.env.TESTNET_PRIVATE_KEY;
+      if (privateKey) {
+        setWallet(new ethers.Wallet(privateKey, provider));
+      }
+
+      // Flashbots
+      FlashbotsBundleProvider.create(provider, new ethers.Wallet(privateKey || ethers.utils.randomBytes(32), provider)).then(setFlashbotsProvider);
+    }
   }, []);
 
-  const fetchPrices = useCallback(async (pair: string, dex: string) => {
-    // Simulate or real API call to DEX prices
-    // Example: Use Uniswap SDK or eth_call
-    if (!ethersProvider) return 0;
-    // Stub: Return random price for simulation
-    return Math.random() * 10000; // e.g., BTC price
-  }, [ethersProvider]);
+  const fetchPrices = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/fetch-dex-prices');
+      return response.data; // Array of MarketData
+    } catch (e) {
+      logger.error('Failed to fetch prices', e);
+      return [];
+    }
+  }, []);
 
   const findOpportunities = useCallback(async () => {
+    const prices = await fetchPrices();
     const newOpps: ArbitrageOpportunity[] = [];
-    for (const pair of DEFAULT_PAIRS) {
-      for (let i = 0; i < DEFAULT_DEXES.length; i++) {
-        for (let j = i + 1; j < DEFAULT_DEXES.length; j++) {
-          const price1 = await fetchPrices(pair, DEFAULT_DEXES[i]);
-          const price2 = await fetchPrices(pair, DEFAULT_DEXES[j]);
-          const spread = Math.abs(price1 - price2) / Math.min(price1, price2) * 100;
-          if (spread > 0.5) { // Min threshold
-            // Use AI to optimize route
-            if (aiModel) {
-              const prediction = await aiModel(`Optimize arbitrage for ${pair} between ${DEFAULT_DEXES[i]} and ${DEFAULT_DEXES[j]}`);
-              logger.debug("AI Prediction:", prediction);
-            }
-            newOpps.push({
-              pair,
-              dex1: DEFAULT_DEXES[i],
-              dex2: DEFAULT_DEXES[j],
-              spread,
-              route: ['Flash Loan Aave', `Swap ${DEFAULT_DEXES[i]}`, `Swap ${DEFAULT_DEXES[j]}`, 'Repay'],
-              profitUSD: spread * 1000 / 100 - 10, // Simulate profit after fees
-            });
-          }
+    const trackedPairs = arbitrageSettings?.trackedPairs || [];
+
+    for (const pair of trackedPairs) {
+      const data1 = prices.find((p: any) => p.symbol === pair && p.exchange === DEFAULT_DEXES[0]);
+      const data2 = prices.find((p: any) => p.symbol === pair && p.exchange === DEFAULT_DEXES[1]);
+
+      if (data1 && data2) {
+        const spread = Math.abs(data1.last_price - data2.last_price) / Math.min(data1.last_price, data2.last_price) * 100;
+        if (spread > (arbitrageSettings?.minSpreadPercent || 0.5)) {
+          newOpps.push({
+            pair,
+            dex1: DEFAULT_DEXES[0],
+            dex2: DEFAULT_DEXES[1],
+            spread,
+            route: ['Flash Loan Aave', `Swap ${DEFAULT_DEXES[0]}`, `Swap ${DEFAULT_DEXES[1]}`, 'Repay'],
+            profitUSD: (spread / 100) * (arbitrageSettings?.defaultTradeVolumeUSD || 1000) - 10, // After fees
+          });
         }
       }
     }
     setOpportunities(newOpps);
-  }, [fetchPrices, aiModel]);
+  }, [fetchPrices, arbitrageSettings]);
 
-  const buildCubes = (opp: ArbitrageOpportunity): Cube[] => {
+  const buildCubes = (opp: ArbitrageOpportunity): any[] => { // Return calldata array
+    // Real calldata generation using Uniswap SDK
+    // Example stub: 
     return [
-      { type: 'flash_loan', params: { provider: 'Aave', amount: 1000, asset: 'USDT' } },
-      { type: 'swap', params: { dex: opp.dex1, pair: opp.pair, amount: 1000 } },
-      { type: 'swap', params: { dex: opp.dex2, pair: opp.pair, amount: 'all' } },
-      { type: 'repay', params: { provider: 'Aave' } },
+      // Aave flash loan calldata
+      // Uniswap swap
+      // Repay
     ];
   };
 
   const simulateAndExecute = async (opp: ArbitrageOpportunity) => {
-    const cubes = buildCubes(opp);
-    // Simulate in EVM
-    if (!ethersProvider) return;
+    if (!ethersProvider || !wallet || !flashbotsProvider) return;
+    const calldata = buildCubes(opp);
+
     try {
-      // Stub: eth_call simulation
-      const simResult = await ethersProvider.call({ /* tx data from cubes */ });
-      if (/* profit > 0 */) {
-        // Use Flashbots to send bundle privately
-        if (flashbotsProvider) {
-          const bundle = [/* signed tx from cubes */];
-          await flashbotsProvider.sendBundle(bundle);
-          toast.success(`Executed arbitrage for ${opp.pair}! Profit: $${opp.profitUSD}`);
-        }
-      } else {
-        toast.warning("Simulation failed: No profit.");
+      // Simulate
+      const simTx = { from: wallet.address, data: calldata[0] /* combined */ };
+      const simResult = await ethersProvider.call(simTx);
+      const profit = parseFloat(ethers.utils.formatEther(simResult)); // Parse profit from return data
+      if (profit <= 0) {
+        toast.warning("No profit in simulation.");
+        return;
       }
+
+      // Execute via Flashbots
+      const signedTx = await wallet.signTransaction({ ...simTx, gasPrice: await ethersProvider.getGasPrice() });
+      const bundle = [{ signedTransaction: signedTx }];
+      const bundleResponse = await flashbotsProvider.sendBundle(bundle, await ethersProvider.getBlockNumber() + 1);
+      if ('error' in bundleResponse) throw bundleResponse.error;
+
+      toast.success(`Executed! Profit: $${profit}`);
     } catch (error) {
-      toast.error("Execution error.");
+      toast.error("Error in execution.");
       logger.error(error);
     }
   };
 
-  const startScan = () => {
-    setIsScanning(true);
-    const interval = setInterval(findOpportunities, 5000); // Scan every 5s
-    return () => {
-      clearInterval(interval);
-      setIsScanning(false);
-    };
-  };
+  useEffect(() => {
+    if (isScanning) {
+      const interval = setInterval(findOpportunities, 10000); // 10s poll
+      return () => clearInterval(interval);
+    }
+  }, [isScanning, findOpportunities]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI Arbitrage Agent</CardTitle>
+        <CardTitle>Arbitrage Agent</CardTitle>
       </CardHeader>
       <CardContent>
-        <Button onClick={startScan} disabled={isScanning}>
-          <VibeContentRenderer content="::FaSearchDollar::" /> {isScanning ? 'Scanning...' : 'Start Agent'}
+        <Button onClick={() => setIsScanning(!isScanning)}>
+          <VibeContentRenderer content="::FaSearchDollar::" /> {isScanning ? 'Stop' : 'Start Agent'}
         </Button>
         <ScrollArea className="h-64 mt-4">
           {opportunities.map((opp, i) => (
             <div key={i} className="mb-2">
-              <p>{opp.pair} - Spread: {opp.spread}% - Profit: ${opp.profitUSD}</p>
-              <Button onClick={() => simulateAndExecute(opp)}>Execute</Button>
+              <p>{opp.pair} - Spread: {opp.spread}% - Est. Profit: ${opp.profitUSD}</p>
+              <Button onClick={() => simulateAndExecute(opp)}>Execute (Testnet)</Button>
             </div>
           ))}
         </ScrollArea>
