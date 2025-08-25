@@ -2,7 +2,40 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { logger } from "./logger"; // Import logger for warnings
+import { BigNumber, ethers } from 'ethers';
 
+/**
+ * feeBps = 9 => 0.09%
+ * calcFee: returns wei string for fee
+ */
+export function calcFee(amountWei: string, feeBps: number, round: 'floor' | 'round' = 'round') {
+  const amt = BigNumber.from(amountWei);
+  const numerator = amt.mul(feeBps);
+  const denom = 10_000;
+  // rounding choice:
+  const raw = numerator.div(denom);
+  if (round === 'floor') return raw.toString();
+  // simple rounding: if remainder*2 >= denom -> +1
+  const rem = numerator.mod(denom);
+  const add = rem.mul(2).gte(denom) ? BigNumber.from(1) : BigNumber.from(0);
+  return raw.add(add).toString();
+}
+
+/**
+ * reverseAmountWithFee: given repay = loan + fee,
+ * compute loan from repay and feeBps
+ */
+export function reverseAmountWithFee(repayWei: string, feeBps: number) {
+  const r = BigNumber.from(repayWei);
+  // loan = floor(repay * 10000 / (10000 + feeBps))
+  const loan = r.mul(10000).div(10000 + feeBps);
+  return loan.toString();
+}
+
+// helper: convert decimal amount to wei string (token decimals)
+export function decimalsToWei(amount: string, decimals: number) {
+  return ethers.utils.parseUnits(amount, decimals).toString();
+}
 /**
  * Formats a date into a readable string like "10.08.2025".
  * @param dateInput - The date to format (Date object, ISO string, or timestamp number).
@@ -27,7 +60,6 @@ export function formatDate(dateInput: Date | string | number, locale: string = '
         return "Error";
     }
 }
-
 
 /**
  * Combines Tailwind CSS class names intelligently.
