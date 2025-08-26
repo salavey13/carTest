@@ -29,9 +29,8 @@ export default function ArbitrageAgentPage() {
       const res = await axios.get("/api/fetch-dex-prices");
       if (res.data?.success) {
         toast.success("Prices fetched");
-        setPrices(res.data.marketData || []);
+        setPrices(res.data.markets || []);
       } else {
-        // If existing route returns {success: true, count: N} we still call DB? fallback
         toast.success("Prices endpoint returned ok");
       }
     } catch (e) {
@@ -46,7 +45,6 @@ export default function ArbitrageAgentPage() {
     fetchPrices();
   }, [fetchPrices]);
 
-  // simple opportunity detector: compare mid prices for same pair across exchanges
   const findOpportunities = useCallback(() => {
     const newOpps: any[] = [];
     const grouped: Record<string, MarketData[]> = {};
@@ -77,20 +75,18 @@ export default function ArbitrageAgentPage() {
   }, [prices]);
 
   const onQuote = async (opp: any) => {
-    // client prepares basic payload and sends to server for quick quote
     const payload = {
       loanToken: { chainId: 1, address: "TON_FAKE_ADDRESS", decimals: 18, symbol: "TON" },
-      loanAmount: "5", // example borrow 5 TON
-      midPrice: 1, // for simplicity, assume 1 TON == 1 ETH (user should provide real)
+      loanAmount: "5",
+      midPrice: 1,
       gasEstimateETH: 0.004,
-      ethPriceInLoanToken: opp.low.last_price, // not exact, but we accept heuristic
-      assumedProfitRatio: opp.spread / 100, // use spread as profit est.
+      ethPriceInLoanToken: opp.low.last_price,
+      assumedProfitRatio: opp.spread / 100,
     };
     try {
       const res = await axios.post("/api/arb/quote", payload);
       if (res.data.success) {
         toast.success(`Quote computed. NetProfit (loanToken units): ${res.data.netProfit.toFixed?.(4) ?? res.data.netProfit}`);
-        // Save plan to show simulate button
         return res.data;
       } else {
         toast.error("Quote failed");
