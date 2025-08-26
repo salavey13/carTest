@@ -1,4 +1,3 @@
-// /app/settings/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -9,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
@@ -33,9 +31,12 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Loading } from "@/components/Loading";
-import ArbitrageAgent from "@/app/arbitrage/agent"; 
 import dynamic from 'next/dynamic';
 
+const ArbitrageAgent = dynamic(
+  () => import('@/app/arbitrage/agent'),
+  { ssr: false }
+);
 const HappyFuturesSuggestor = dynamic(
   () => import('@/app/happy-futures/suggestor'),
   { ssr: false }
@@ -92,6 +93,7 @@ export default function SettingsPage() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('SettingsPage module loaded'); // Отладка
     if (!isAppContextLoading && dbUser) {
       logger.debug("[SettingsPage] AppContext loaded, dbUser found. Metadata:", dbUser.metadata);
       const userGeneralSettings = dbUser.metadata?.settings_profile as GeneralSettingsProfile | undefined;
@@ -105,7 +107,6 @@ export default function SettingsPage() {
       }
     } else if (!isAppContextLoading && !dbUser) {
       logger.warn("[SettingsPage] AppContext loaded, but no dbUser. Using default general settings.");
-
       const defaults = getDefaultGeneralSettings();
       setGeneralSettingsProfile(defaults);
       document.documentElement.classList.toggle('dark', defaults.dark_mode_enabled);
@@ -195,7 +196,6 @@ export default function SettingsPage() {
   const handleArbitrageExchangeEnabledToggle = (exchangeName: ExchangeName, checked: boolean) => {
     setArbitrageSettings(prev => {
       if (!prev) return null;
-
       const newEnabledExchanges = checked
         ? [...prev.enabledExchanges, exchangeName]
         : prev.enabledExchanges.filter(ex => ex !== exchangeName);
