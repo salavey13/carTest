@@ -1,4 +1,6 @@
+// /app/settings/page.tsx
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -32,7 +34,12 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Loading } from "@/components/Loading";
 import ArbitrageAgent from "@/app/arbitrage/agent"; 
-import HappyFuturesSuggestor from "@/app/happy-futures/suggestor"; // New import
+import dynamic from 'next/dynamic';
+
+const HappyFuturesSuggestor = dynamic(
+  () => import('@/app/happy-futures/suggestor'),
+  { ssr: false }
+);
 
 interface GeneralSettingConfig {
   key: string;
@@ -78,7 +85,6 @@ export default function SettingsPage() {
   const [generalSettingsProfile, setGeneralSettingsProfile] = useState<GeneralSettingsProfile | null>(null);
   const [arbitrageSettings, setArbitrageSettings] = useState<ArbitrageSettings | null>(null);
   const [isLoadingArbitrageSettings, setIsLoadingArbitrageSettings] = useState(false);
-
   const [isSavingGeneral, setIsSavingGeneral] = useState(false);
   const [isSavingArbitrage, setIsSavingArbitrage] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -376,7 +382,6 @@ export default function SettingsPage() {
                        <VibeContentRenderer content="::FaNetworkWired className='inline mr-1.5'::" />Сетевые Комиссии (USD)
                     </h4>
                     <ScrollArea className="h-[200px] p-2 border rounded-md simple-scrollbar bg-muted/20">
-
                         <div className="space-y-3 pr-2">
                         {DEFAULT_TRACKED_ASSETS_FOR_NETWORK_FEES.map(assetSymbol => (
                             <div key={`arbNetFee-${assetSymbol}`} className="p-2.5 bg-background/70 rounded-md border">
@@ -394,7 +399,7 @@ export default function SettingsPage() {
                     {isSavingArbitrage ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Сохранение..." /> : <VibeContentRenderer content="::FaSave className='mr-2':: Сохранить Настройки Арбитража" />}
                 </Button>
                 <ArbitrageAgent />
-                <HappyFuturesSuggestor /> {/* Integrated DeepSearch Bot */}
+                <HappyFuturesSuggestor />
             </CardContent>
         </Card>
         )}
