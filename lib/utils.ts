@@ -103,6 +103,13 @@ export const escapeMarkdown = (text: string | null | undefined): string => {
 };
 
 /**
+ * Escapes characters for Telegram's MarkdownV2 parser (alias for escapeMarkdown).
+ * @param text - The text to escape.
+ * @returns The escaped text string.
+ */
+export const escapeTelegramMarkdown = escapeMarkdown;
+
+/**
  * Calculates a fee based on an amount in wei and a fee in basis points.
  * @param amountWei - The amount in wei as a string.
  * @param feeBps - The fee in basis points.
