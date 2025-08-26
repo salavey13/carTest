@@ -1,17 +1,14 @@
 /**
  * Minimal "core" shim for protocolink-logics usage inside carTest MVP.
- * Не полная замена @protocolink/core — только то, что нужно для сборки логик и UI.
+ * Переведено на ethers@6-friendly типы (bigint/string)
  */
-
-import { BigNumber } from 'ethers';
-
 export const ELASTIC_ADDRESS = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 export const BPS_NOT_USED = 0;
 export const OFFSET_NOT_USED = 'OFFSET_NOT_USED' as unknown as number;
 
 export type LogicInput = {
-  token: string; // token address or ELASTIC_ADDRESS for native
-  amountWei: BigNumber | string;
+  token: string;
+  amountWei: bigint | string;
   balanceBps?: number;
   amountOrOffset?: number | string;
 };

@@ -1,3 +1,8 @@
+/**
+ * Простая логика: Swap TON -> ETH (MVP).
+ *
+ * Переведено на ethers@6 — использует ethers.parseUnits / ethers.formatUnits / ethers.Interface
+ */
 import * as core from '../../core';
 import axios from 'axios';
 import { ethers } from 'ethers';
@@ -5,7 +10,7 @@ import { ethers } from 'ethers';
 export type SwapTonFields = {
   input: { token: { address: string; symbol: string; decimals: number; isNative?: boolean }; amount: string };
   output: { token: { address: string; symbol: string; decimals: number; isNative?: boolean }; amount?: string };
-  slippage?: number;
+  slippage?: number; // bps
 };
 
 export class SwapTonLogic extends core.Logic {
@@ -27,45 +32,47 @@ export class SwapTonLogic extends core.Logic {
   async quote(fields: SwapTonFields) {
     try {
       const resp = await axios.get('/api/fetch-dex-prices');
-      const data = resp.data?.markets ?? [];
+      const markets = resp.data?.markets ?? [];
       const pairKey = `${fields.input.token.symbol}/ETH`;
-      const p = data.find((m: any) => m.symbol === pairKey);
-      if (!p) {
-        throw new Error('no price');
-      }
-      const inputAmount = ethers.utils.parseUnits(fields.input.amount, fields.input.token.decimals);
-      const price = p.last_price;
-      const outputAmountFloat = parseFloat(fields.input.amount) * price;
-      const outputAmount = ethers.utils.parseUnits(String(outputAmountFloat), fields.output.token.decimals);
+      const p = markets.find((m: any) => m.symbol === pairKey);
+      if (!p) throw new Error('no price');
+
+      const inputAmount = ethers.parseUnits(fields.input.amount, fields.input.token.decimals); // bigint
+      const price = p.midPriceFloat; // approximate number: 1 inputToken == price ETH
+      const outputAmountFloat = Number(fields.input.amount) * price;
+      const outputAmount = ethers.parseUnits(String(outputAmountFloat), fields.output.token.decimals);
+
       return {
-        input: { token: fields.input.token, amountWei: inputAmount },
-        output: { token: fields.output.token, amountWei: outputAmount },
+        input: { token: fields.input.token, amountWei: inputAmount.toString() },
+        output: { token: fields.output.token, amountWei: outputAmount.toString() },
       };
     } catch (e) {
-      const inputAmount = ethers.utils.parseUnits(fields.input.amount, fields.input.token.decimals);
-      const outputAmount = ethers.utils.parseUnits(String(parseFloat(fields.input.amount) * 0.02), fields.output.token.decimals);
+      // fallback stub: 1 TON = 0.02 ETH
+      const inputAmount = ethers.parseUnits(fields.input.amount, fields.input.token.decimals);
+      const outputAmount = ethers.parseUnits(String(Number(fields.input.amount) * 0.02), fields.output.token.decimals);
       return {
-        input: { token: fields.input.token, amountWei: inputAmount },
-        output: { token: fields.output.token, amountWei: outputAmount },
+        input: { token: fields.input.token, amountWei: inputAmount.toString() },
+        output: { token: fields.output.token, amountWei: outputAmount.toString() },
       };
     }
   }
 
   async build(fields: SwapTonFields, options: { account?: string }) {
-    const DEX_ROUTER = '0x1111111111111111111111111111111111111111';
-    const iface = new ethers.utils.Interface([
+    const DEX_ROUTER = '0x1111111111111111111111111111111111111111'; // placeholder
+    const iface = new ethers.Interface([
       'function swapExactTokensForTokens(uint256,uint256,address[],address,uint256)',
       'function swapExactETHForTokens(uint256,address[],address,uint256) payable',
     ]);
     const path = [fields.input.token.address, fields.output.token.address];
     const amountIn = (fields.input as any).amountWei;
     const amountOutMin = (fields.output as any).amountWei;
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
     const data = iface.encodeFunctionData('swapExactTokensForTokens', [
       amountIn,
       amountOutMin,
       path,
-      options.account ?? ethers.constants.AddressZero,
-      Math.floor(Date.now() / 1000) + 60 * 10,
+      options.account ?? '0x0000000000000000000000000000000000000000',
+      deadline,
     ]);
     const inputs = [
       core.newLogicInput({ input: { token: fields.input.token, amountWei: amountIn }, balanceBps: core.BPS_NOT_USED }),
