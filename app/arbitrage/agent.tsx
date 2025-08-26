@@ -8,11 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import { ethers } from "ethers";
+import { ethers } from "ethers"; // Обновлено для ethers@6
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 import { Pool } from '@uniswap/v3-sdk';
 import { TradeType, CurrencyAmount } from '@uniswap/sdk-core';
-import axios from 'axios'; // For API calls to our route
+import axios from 'axios';
 
 interface ArbitrageOpportunity {
   pair: string;
@@ -28,45 +28,42 @@ interface Cube {
   params: any;
 }
 
-const DEFAULT_DEXES = ['uniswap', 'sushiswap']; // Focused on implemented
+const DEFAULT_DEXES = ['uniswap', 'sushiswap'];
 const PROVIDER_URL = process.env.NEXT_PUBLIC_INFURA_URL;
 
 export default function ArbitrageAgent() {
-  const { dbUser, arbitrageSettings } = useAppContext(); // Use settings from context
+  const { dbUser, arbitrageSettings } = useAppContext();
   const [opportunities, setOpportunities] = useState<ArbitrageOpportunity[]>([]);
   const [isScanning, setIsScanning] = useState(false);
-  const [ethersProvider, setEthersProvider] = useState<ethers.providers.JsonRpcProvider | null>(null);
+  const [ethersProvider, setEthersProvider] = useState<ethers.JsonRpcProvider | null>(null); // Обновлено
   const [flashbotsProvider, setFlashbotsProvider] = useState<FlashbotsBundleProvider | null>(null);
   const [wallet, setWallet] = useState<ethers.Wallet | null>(null);
 
   useEffect(() => {
     if (PROVIDER_URL) {
-      const provider = new ethers.providers.JsonRpcProvider(PROVIDER_URL);
+      const provider = new ethers.JsonRpcProvider(PROVIDER_URL); // Обновлено
       setEthersProvider(provider);
 
-      // Check chainId for testnet
       provider.getNetwork().then(network => {
-        if (network.chainId !== 11155111) { // Sepolia testnet example
+        if (network.chainId !== 11155111) { // Sepolia testnet
           toast.error('Agent only on testnet!');
           return;
         }
       });
 
-      // Wallet from env (testnet only!)
       const privateKey = process.env.TESTNET_PRIVATE_KEY;
       if (privateKey) {
         setWallet(new ethers.Wallet(privateKey, provider));
       }
 
-      // Flashbots
-      FlashbotsBundleProvider.create(provider, new ethers.Wallet(privateKey || ethers.utils.randomBytes(32), provider)).then(setFlashbotsProvider);
+      FlashbotsBundleProvider.create(provider, new ethers.Wallet(privateKey || ethers.randomBytes(32), provider)).then(setFlashbotsProvider); // Обновлено
     }
   }, []);
 
   const fetchPrices = useCallback(async () => {
     try {
       const response = await axios.get('/api/fetch-dex-prices');
-      return response.data; // Array of MarketData
+      return response.data;
     } catch (e) {
       logger.error('Failed to fetch prices', e);
       return [];
@@ -91,7 +88,7 @@ export default function ArbitrageAgent() {
             dex2: DEFAULT_DEXES[1],
             spread,
             route: ['Flash Loan Aave', `Swap ${DEFAULT_DEXES[0]}`, `Swap ${DEFAULT_DEXES[1]}`, 'Repay'],
-            profitUSD: (spread / 100) * (arbitrageSettings?.defaultTradeVolumeUSD || 1000) - 10, // After fees
+            profitUSD: (spread / 100) * (arbitrageSettings?.defaultTradeVolumeUSD || 1000) - 10,
           });
         }
       }
@@ -99,14 +96,8 @@ export default function ArbitrageAgent() {
     setOpportunities(newOpps);
   }, [fetchPrices, arbitrageSettings]);
 
-  const buildCubes = (opp: ArbitrageOpportunity): any[] => { // Return calldata array
-    // Real calldata generation using Uniswap SDK
-    // Example stub: 
-    return [
-      // Aave flash loan calldata
-      // Uniswap swap
-      // Repay
-    ];
+  const buildCubes = (opp: ArbitrageOpportunity): any[] => {
+    return [];
   };
 
   const simulateAndExecute = async (opp: ArbitrageOpportunity) => {
@@ -114,16 +105,14 @@ export default function ArbitrageAgent() {
     const calldata = buildCubes(opp);
 
     try {
-      // Simulate
-      const simTx = { from: wallet.address, data: calldata[0] /* combined */ };
+      const simTx = { from: wallet.address, data: calldata[0] };
       const simResult = await ethersProvider.call(simTx);
-      const profit = parseFloat(ethers.utils.formatEther(simResult)); // Parse profit from return data
+      const profit = parseFloat(ethers.formatEther(simResult)); // Обновлено
       if (profit <= 0) {
         toast.warning("No profit in simulation.");
         return;
       }
 
-      // Execute via Flashbots
       const signedTx = await wallet.signTransaction({ ...simTx, gasPrice: await ethersProvider.getGasPrice() });
       const bundle = [{ signedTransaction: signedTx }];
       const bundleResponse = await flashbotsProvider.sendBundle(bundle, await ethersProvider.getBlockNumber() + 1);
@@ -138,7 +127,7 @@ export default function ArbitrageAgent() {
 
   useEffect(() => {
     if (isScanning) {
-      const interval = setInterval(findOpportunities, 10000); // 10s poll
+      const interval = setInterval(findOpportunities, 10000);
       return () => clearInterval(interval);
     }
   }, [isScanning, findOpportunities]);
