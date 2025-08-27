@@ -14,6 +14,8 @@ import { Loading } from "@/components/Loading";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
 import Confetti from "react-dom-confetti";
 import Link from "next/link";
 
@@ -35,6 +37,11 @@ const FUN_REVIEWS = [
   { text: "Легкие и удобные, не скользят. Идеально для релакса! 😊", author: "Фанат сауны" },
   { text: "Купил пару — теперь вся семья в них. Комфорт на уровне!", author: "Семейный эксперт" },
 ];
+const RECOMMENDATIONS = [
+  { name: "Банный веник", price: 50, link: "/sauna-accessories/venik" },
+  { name: "Аромамасла", price: 80, link: "/sauna-accessories/oils" },
+  { name: "Шапка для сауны", price: 120, link: "/sauna-accessories/hat" },
+];
 
 export default function TapkiPage() {
   const router = useRouter();
@@ -44,6 +51,7 @@ export default function TapkiPage() {
   const [error, setError] = useState<string | null>(null);
   const [invoiceSent, setInvoiceSent] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [customMessage, setCustomMessage] = useState('');
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [confetti, setConfetti] = useState(false);
 
@@ -74,12 +82,12 @@ export default function TapkiPage() {
       if (dbUser?.user_id && !invoiceSent && tapki) {
         try {
           const totalAmount = TAPKI_PRICE * selectedQuantity;
-          const result = await createTapkiInvoice(dbUser.user_id, TAPKI_ID, totalAmount, TAPKI_IMAGE);
+          const result = await createTapkiInvoice(dbUser.user_id, TAPKI_ID, totalAmount, TAPKI_IMAGE, customMessage);
           if (result.success) {
             setInvoiceSent(true);
             setConfetti(true);
             setTimeout(() => setConfetti(false), 3000);
-            toast.success("Инвойс на тапочки отправлен! Комфорт ждет.");
+            toast.success("Донат на good service отправлен! Тапочки в пути.");
           } else {
             toast.error(result.error || "Не удалось отправить инвойс.");
           }
@@ -89,7 +97,7 @@ export default function TapkiPage() {
       }
     };
     sendAutoInvoice();
-  }, [dbUser, tapki, invoiceSent, selectedQuantity]);
+  }, [dbUser, tapki, invoiceSent, selectedQuantity, customMessage]);
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const qty = parseInt(e.target.value, 10);
@@ -97,6 +105,7 @@ export default function TapkiPage() {
   };
 
   const totalPrice = TAPKI_PRICE * selectedQuantity;
+  const stockPercentage = ((tapki?.quantity || 0) / 10) * 100; // Assume max 10 for progress demo
 
   const galleryImages = useMemo(() => FAKE_GALLERY, []);
 
@@ -134,7 +143,7 @@ export default function TapkiPage() {
           </div>
           <div className="absolute bottom-6 left-6">
             <h1 className="text-4xl md:text-6xl font-orbitron font-bold drop-shadow-lg">ТАПКИ СВЕТА</h1>
-            <h2 className="text-3xl md:text-5xl font-orbitron text-primary drop-shadow-lg">Комфорт в сауне на новом уровне!</h2>
+            <h2 className="text-3xl md:text-5xl font-orbitron text-primary drop-shadow-lg">Донат за good service!</h2>
           </div>
         </div>
 
@@ -142,14 +151,19 @@ export default function TapkiPage() {
           <div className="bg-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
             <h3 className="text-2xl font-orbitron text-secondary mb-4">ОПИСАНИЕ (С ЛЕГКИМ ЮМОРОМ)</h3>
             <p className="font-sans text-muted-foreground leading-relaxed">
-              Эти тапочки — твой билет в мир комфорта сауны! Легкие, как перышко, с антискользящей подошвой — шагай уверенно, как по облаку. Идеально для релакса после тяжелого дня. В наличии: {tapki.quantity} шт. (Если мало — владелец уже знает, пора пополнить!)
+              Эти тапочки — твой билет в мир комфорта сауны! Легкие, как перышко, с антискользящей подошвой — шагай уверенно, как по облаку. Поддержи good service донатом и получи их. В наличии: {tapki.quantity} шт.
             </p>
             <ul className="mt-4 list-disc pl-5 text-muted-foreground">
               <li>Материал: Мягкая резина — комфортно и прочно.</li>
               <li>Цвет: Светлый — стильно и практично в сауне.</li>
               <li>Бонус: +10 к расслаблению и хорошему настроению!</li>
-              <li>Юмор: "Почему тапочки светлые? Чтобы сауна сияла от твоей улыбки! 😄"</li>
+              <li>Юмор: "Донат за good service — и сауна станет еще лучше! 😄"</li>
             </ul>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-4">
+              <label className="text-sm font-mono text-muted-foreground block mb-1">Остаток в наличии</label>
+              <Progress value={stockPercentage} className="h-2" />
+              <p className="text-xs text-muted-foreground mt-1">{tapki.quantity}/10</p>
+            </motion.div>
             <div className="mt-6">
               <h4 className="text-xl font-orbitron text-secondary mb-2">ОТЗЫВЫ КЛИЕНТОВ</h4>
               {FUN_REVIEWS.map((review, idx) => (
@@ -159,39 +173,54 @@ export default function TapkiPage() {
                 </motion.div>
               ))}
             </div>
+            <div className="mt-6">
+              <h4 className="text-xl font-orbitron text-secondary mb-2">РЕКОМЕНДАЦИИ</h4>
+              <div className="grid grid-cols-1 gap-2">
+                {RECOMMENDATIONS.map((rec, idx) => (
+                  <motion.div key={idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className="bg-muted/20 p-3 rounded-md flex justify-between items-center">
+                    <span>{rec.name} - {rec.price} XTR</span>
+                    <Link href={rec.link} className="text-brand-blue hover:underline text-sm">Купить</Link>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
             <Link href="/sauna-rent" className="text-brand-blue hover:underline mt-4 block text-sm">Перейти в сауну и забронировать визит →</Link>
           </div>
 
           <div className="bg-card/70 backdrop-blur-md p-6 rounded-lg border border-border">
-            <h3 className="text-2xl font-orbitron text-secondary mb-4">КУПИТЬ ТАПОЧКИ</h3>
+            <h3 className="text-2xl font-orbitron text-secondary mb-4">ДОНАТ ЗА GOOD SERVICE</h3>
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-mono text-muted-foreground block mb-1">Количество (макс {tapki.quantity})</label>
                 <Input type="number" value={selectedQuantity} onChange={handleQuantityChange} min={1} max={tapki.quantity} className="input-cyber" />
               </div>
-              <div className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center">
-                <p className="text-sm font-mono text-muted-foreground">ИТОГО</p>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="bg-input/50 border border-dashed border-border rounded-lg p-3 text-center">
+                <p className="text-sm font-mono text-muted-foreground">ИТОГО ДОНАТ</p>
                 <p className="text-2xl font-orbitron text-accent-text font-bold">{totalPrice} XTR</p>
                 <p className="text-xs text-muted-foreground">({selectedQuantity} пар{selectedQuantity > 1 ? 'ы' : 'а'})</p>
-              </div>
+              </motion.div>
               {tapki.quantity < 3 && <p className="text-xs text-destructive text-center">Мало в наличии! Владелец уведомлен.</p>}
+              <div>
+                <label className="text-sm font-mono text-muted-foreground block mb-1">Персональное сообщение (опционально)</label>
+                <Textarea value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} placeholder="Спасибо за отличный сервис!" className="input-cyber min-h-[80px]" />
+              </div>
               <Button
                 onClick={async () => {
                   if (!dbUser?.user_id) return toast.error("Авторизуйся сначала!");
                   if (selectedQuantity > tapki.quantity) return toast.error("Не хватает в наличии!");
                   const totalAmount = TAPKI_PRICE * selectedQuantity;
-                  const result = await createTapkiInvoice(dbUser.user_id, TAPKI_ID, totalAmount, TAPKI_IMAGE);
+                  const result = await createTapkiInvoice(dbUser.user_id, TAPKI_ID, totalAmount, TAPKI_IMAGE, customMessage);
                   if (result.success) {
-                    toast.success("Инвойс отправлен! Тапочки на подходе.");
+                    toast.success("Донат отправлен! Спасибо за good service.");
                     setConfetti(true);
                     setTimeout(() => setConfetti(false), 3000);
                   } else toast.error(result.error);
                 }}
                 className="w-full p-4 rounded-xl font-orbitron text-lg font-bold text-accent-foreground bg-gradient-to-r from-primary to-accent hover:brightness-125 transition-all duration-300 shadow-lg hover:shadow-primary/50"
               >
-                КУПИТЬ ({selectedQuantity} шт.)
+                ДОНАТИТЬ ({selectedQuantity} шт.)
               </Button>
-              <p className="text-xs text-brand-green text-center">Оплата в XTR — быстро и надежно!</p>
+              <p className="text-xs text-brand-green text-center">Донат в XTR — быстро и надежно!</p>
             </div>
           </div>
         </div>

@@ -3,26 +3,31 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
+import { v4 as uuidv4 } from 'uuid';
 
 const TELEGRAM_BOT_LINK = process.env.NEXT_PUBLIC_TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 
-export async function createTapkiInvoice(userId: string, tapkiId: string, amount: number, imageUrl: string) {
+export async function createTapkiInvoice(userId: string, tapkiId: string, amount: number, imageUrl: string, customMessage: string = '') {
   try {
+    const invoiceId = uuidv4();
+
     // Create invoice in DB
     const { data: invoice, error: invError } = await supabaseAdmin.from('invoices').insert({
+      id: invoiceId,
       user_id: userId,
-      type: 'tapki_purchase',
+      subscription_id: 'fake_good_service', // NEW: Fake sub ID for not-null
+      type: 'donation',
       amount: amount,
       status: 'pending',
-      metadata: { tapki_id: tapkiId, image_url: imageUrl, message: "Tapki for sauna - спаси ноги в сауне!" }
+      metadata: { tapki_id: tapkiId, image_url: imageUrl, message: `Donation for good service - спасибо за тапочки в сауне! ${customMessage}` }
     }).select().single();
 
     if (invError || !invoice) throw new Error(`Failed to create invoice: ${invError?.message}`);
 
-    // Send message with invoice link or direct invoice
-    const renterMessage = `🛒 Готовы купить тапочки для сауны? Оплатите 100 XTR и спасите ноги от жара!`;
-    await sendComplexMessage(userId, renterMessage, [[{ text: "Оплатить тапочки", url: `${TELEGRAM_BOT_LINK}?startapp=invoice_${invoice.id}` }]], { imageQuery: imageUrl });
+    // Send message with invoice link
+    const renterMessage = `🛒 Поддержи good service донатом! Оплати ${amount} XTR и получи тапочки. 😊 ${customMessage ? `\nТвое сообщение: ${customMessage}` : ''}`;
+    await sendComplexMessage(userId, renterMessage, [[{ text: "Оплатить донат", url: `${TELEGRAM_BOT_LINK}?startapp=invoice_${invoice.id}` }]], { imageQuery: imageUrl });
 
     return { success: true };
   } catch (error) {
@@ -56,7 +61,7 @@ export async function sendLowStockAlert(tapkiId: string, quantity: number) {
     const { data: owner, error } = await supabaseAdmin.from('cars').select('owner_id').eq('id', tapkiId).single();
     if (error || !owner?.owner_id) return;
 
-    const message = `⚠️ Низкий запас тапочек! Осталось ${quantity} шт. Пополните, чтобы не потерять клиентов в сауне-апокалипсисе! 😂`;
+    const message = `⚠️ Низкий запас тапочек! Осталось ${quantity} шт. Пополните для good service! 😊`;
     await sendComplexMessage(owner.owner_id, message, []);
   } catch (error) {
     logger.error("[sendLowStockAlert]", error);
