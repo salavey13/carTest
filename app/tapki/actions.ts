@@ -4,7 +4,6 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 
-
 const TELEGRAM_BOT_LINK = process.env.NEXT_PUBLIC_TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 
