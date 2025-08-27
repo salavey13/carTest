@@ -9,6 +9,7 @@ import { inventoryScriptAccessHandler } from "./inventory-script-access";
 import { selfDevBoostHandler } from "./selfdev-boost";
 import { disableDummyModeHandler } from "./disable-dummy-mode";
 import { protocardPurchaseHandler } from "./protocard-purchase-handler"; 
+import { tapkiHandler } from "./tapki"; // NEW: Import tapki handler
 // Импорты Supabase и Telegram Actions будут сделаны внутри функции
 import { logger } from "@/lib/logger";
 import { getBaseUrl } from "@/lib/utils";
@@ -26,7 +27,8 @@ const handlers: WebhookHandler[] = [
   inventoryScriptAccessHandler,
   selfDevBoostHandler,
   disableDummyModeHandler,
-  protocardPurchaseHandler, 
+  protocardPurchaseHandler,
+  tapkiHandler, // NEW: Add tapki handler
 ];
 
 export async function handleWebhookProxy(update: any) {
