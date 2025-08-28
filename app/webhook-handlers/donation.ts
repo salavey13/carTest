@@ -1,17 +1,17 @@
 // /app/webhook-handlers/donation.ts
 import { WebhookHandler } from "./types";
 import { sendTelegramMessage } from "../actions";
-import { updateQuantity } from "@/app/tapki/actions"; // NEW: Import for quantity update on donation with tapki
+import { updateQuantity } from "@/app/tapki/actions"; // NEW: Import for quantity update on donation with item
 
 export const donationHandler: WebhookHandler = {
   canHandle: (invoice) => invoice.type === "donation",
   handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
     const message = invoice.metadata?.message || "Сообщение отсутствует";
 
-    // NEW: If metadata has tapki_id, update quantity (fake donation but real stock)
-    const tapkiId = invoice.metadata?.tapki_id;
-    if (tapkiId) {
-      await updateQuantity(tapkiId); // Assume 1 for simplicity; extend if qty in metadata
+    // NEW: If metadata has item_id (tapki or accessory), update quantity
+    const itemId = invoice.metadata?.item_id;
+    if (itemId) {
+      await updateQuantity(itemId); // Assume 1; extend if qty in metadata
     }
 
     await sendTelegramMessage(
