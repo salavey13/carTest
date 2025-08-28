@@ -1,3 +1,4 @@
+// /app/tapki/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -38,7 +39,7 @@ export async function createAccessoryInvoice(userId: string, itemId: string, amo
       payload: invoiceId, // For webhook
       provider_token: TELEGRAM_PROVIDER_TOKEN,
       currency: 'XTR',
-      prices: [{ label: title, amount: amount * 100 }], // In smallest units? But XTR may differ; assume
+      prices: [{ label: title, amount: amount }], // In smallest units? But XTR may differ; assume
       photo_url: imageUrl,
       need_name: false,
       need_phone_number: false,
