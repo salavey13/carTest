@@ -9,19 +9,34 @@ import { getWarehouseItems, updateItemLocation } from "@/app/wb/actions";
 import { toast } from "sonner";
 import { Loading } from "@/components/Loading";
 
-// Хардкод дефолтных items (из компонента)
-const DEFAULT_ITEMS = [
-  { id: 'leto-odeyalo-120', name: 'Летнее одеяло 120x180', description: 'Маленькая, светло-зеленая упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/leto-odeyalo-120.jpg`, voxel: 'A1' },
-  { id: 'leto-odeyalo-150', name: 'Летнее одеяло 150x200', description: 'Средняя, зеленая упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/leto-odeyalo-150.jpg`, voxel: 'A2' },
-  { id: 'leto-odeyalo-180', name: 'Летнее одеяло 180x220', description: 'Большая, темно-зеленая упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/leto-odeyalo-180.jpg`, voxel: 'A3' },
-  { id: 'leto-odeyalo-220', name: 'Летнее одеяло 220x240', description: 'Огромная, темно-зеленая упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/leto-odeyalo-220.jpg`, voxel: 'A4' },
-  { id: 'zima-odeyalo-120', name: 'Зимнее одеяло 120x180', description: 'Маленькая, серая упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/zima-odeyalo-120.jpg`, voxel: 'B1' },
-  { id: 'zima-odeyalo-150', name: 'Зимнее одеяло 150x200', description: 'Средняя, серая упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/zima-odeyalo-150.jpg`, voxel: 'B2' },
-  { id: 'zima-odeyalo-180', name: 'Зимнее одеяло 180x220', description: 'Большая, красная упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/zima-odeyalo-180.jpg`, voxel: 'B3' },
-  { id: 'zima-odeyalo-220', name: 'Зимнее одеяло 220x240', description: 'Огромная, красная упаковка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/zima-odeyalo-220.jpg`, voxel: 'B4' },
-  // Пододеяльники и наволочки аналогично, добавить если нужно
-  { id: 'leto-podot-120', name: 'Летний пододеяльник 120x180', description: 'Маленькая, светло-зеленая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/leto-podot-120.jpg`, voxel: null },
-  // ... остальное
+// Хардкод дефолтных items, подогнанный под транскрипт
+const DEFAULT_ITEMS: Item[] = [
+  // Евро (бежевый, leto/zima)
+  { id: 'evro-leto-kruzheva', name: 'Евро Лето Кружева', description: 'Бежевая, полосочка, закрытая пачка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-kruzheva.jpg`, voxel: 'A1', season: 'leto', pattern: 'kruzheva' },
+  { id: 'evro-zima-kruzheva', name: 'Евро Зима Кружева', description: 'Бежевая, полузакрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-kruzheva.jpg`, voxel: 'A1', season: 'zima', pattern: 'kruzheva' },
+  { id: 'evro-leto-mirodel', name: 'Евро Лето Миродель', description: 'Бежевая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-mirodel.jpg`, voxel: 'A1', season: 'leto', pattern: 'mirodel' },
+  // ... аналогично для ogurtsy, flora1/2/3 (добавить все комбинации leto/zima)
+
+  // Двушки (голубой, 200см)
+  { id: 'dvushka-leto-kruzheva', name: 'Двушка Лето Кружева', description: 'Голубая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-kruzheva.jpg`, voxel: 'A2', season: 'leto', pattern: 'kruzheva' },
+  { id: 'dvushka-zima-kruzheva', name: 'Двушка Зима Кружева', description: 'Голубая, закрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-kruzheva.jpg`, voxel: 'A2', season: 'zima', pattern: 'kruzheva' },
+  // ... для mirodell, ogurtsy, flora
+
+  // Евро Макси (красный)
+  { id: 'evro-maksi-leto-kruzheva', name: 'Евро Макси Лето Кружева', description: 'Красная, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-kruzheva.jpg`, voxel: 'A3', season: 'leto', pattern: 'kruzheva' },
+  // ... все вариации
+
+  // Матрасники (салатовый маленькие 90/120/140, темно-зеленый большие 160/180/200, только кружева)
+  { id: 'matrasnik-90-kruzheva', name: 'Матрасник 90 Кружева', description: 'Салатовый, маленький', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-90-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
+  { id: 'matrasnik-120-kruzheva', name: 'Матрасник 120 Кружева', description: 'Салатовый, маленький', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-120-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
+  { id: 'matrasnik-140-kruzheva', name: 'Матрасник 140 Кружева', description: 'Салатовый, маленький', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-140-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
+  { id: 'matrasnik-160-kruzheva', name: 'Матрасник 160 Кружева', description: 'Темно-зеленый, большой', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-160-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
+  // 180,200 аналогично
+
+  // Полуторки (серый, 150см, leto/zima, все узоры)
+  { id: 'polutorka-leto-kruzheva', name: 'Полуторка Лето Кружева', description: 'Серая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-kruzheva.jpg`, voxel: 'B1', season: 'leto', pattern: 'kruzheva' },
+  { id: 'polutorka-zima-kruzheva', name: 'Полуторка Зима Кружева', description: 'Серая, закрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-kruzheva.jpg`, voxel: 'B1', season: 'zima', pattern: 'kruzheva' },
+  // ... для mirodell, ogurtsy, flora, все leto/zima
 ];
 
 export default function WBPage() {
@@ -40,6 +55,8 @@ export default function WBPage() {
           description: item.description || '',
           image: item.image_url || '',
           voxel: item.specs?.warehouse_location?.voxel_id || null,
+          season: item.specs?.season,
+          pattern: item.specs?.pattern,
         })));
       } else {
         toast.error(error || "Ошибка загрузки товаров");
@@ -79,7 +96,7 @@ export default function WBPage() {
         <WarehouseViz 
           items={items} 
           selectedVoxel={selectedVoxel} 
-          onSelectVoxel={handleSelectVoxel} 
+          onSelectVoxel={setSelectedVoxel} // Исправил onSelectVoxel
           onUpdateLocation={handleUpdateLocation} 
         />
       </div>
@@ -95,7 +112,7 @@ export default function WBPage() {
                   <Image src={item.image} alt={item.name} width={50} height={50} className="rounded" />
                   <div>
                     <h3 className="font-bold">{item.name}</h3>
-                    <p className="text-sm">{item.description}</p>
+                    <p className="text-sm">{item.description} ({item.season}, {item.pattern || 'нет'})</p>
                     <p className="text-xs text-muted-foreground">Локация: {item.voxel || 'Не назначена'}</p>
                   </div>
                 </CardContent>
