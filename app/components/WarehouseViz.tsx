@@ -33,6 +33,7 @@ const VOXELS = [
   { id: 'B10', position: { x: 1, y: 1, z: 4 }, label: 'B10' },
 ];
 
+
 type Location = {
   voxel: string;
   quantity: number;
@@ -51,6 +52,11 @@ type Item = {
   size: string;
 };
 
+type Content = {
+  item: Item;
+  local_quantity: number;
+};
+
 type WarehouseVizProps = {
   items: Item[];
   selectedVoxel: string | null;
@@ -60,7 +66,7 @@ type WarehouseVizProps = {
 
 export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLocationQty }: WarehouseVizProps) {
   const voxelMap = useMemo(() => {
-    const map: { [key: string]: {item: Item, local_quantity: number}[] } = {};
+    const map: { [key: string]: Content[] } = {};
     items.forEach(item => {
       item.locations.forEach(loc => {
         if (!map[loc.voxel]) map[loc.voxel] = [];
@@ -74,36 +80,34 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
     <div className="relative w-full h-full perspective-1000">
       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-xs">Вход</div>
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-xs">Комп с окном</div>
-      <div className="w-full h-full transform rotate-x-30 rotate-y-[-30deg] grid grid-cols-2 gap-2">
-        {/* Левая полка (A1-A10, 5 столбцов, overflow-x-auto на мобилке) */}
-        <div className="overflow-x-auto">
-          <div className="grid grid-cols-5 gap-1 min-w-max">
-            {VOXELS.filter(v => v.id.startsWith('A')).map(voxel => (
-              <WarehouseCell
-                key={voxel.id}
-                voxel={voxel}
-                contents={voxelMap[voxel.id] || []}
-                selected={selectedVoxel === voxel.id}
-                onSelect={onSelectVoxel}
-                onUpdateQty={onUpdateLocationQty}
-              />
-            ))}
-          </div>
+      <div className="w-full h-full transform rotate-x-30 rotate-y-[-30deg] flex flex-col md:grid md:grid-cols-2 gap-2">
+        {/* Левая полка вертикально на mobile */}
+        <div className="flex flex-col gap-1">
+          {VOXELS.filter(v => v.id.startsWith('A')).map(voxel => (
+            <WarehouseCell
+              key={voxel.id}
+              voxel={voxel}
+              contents={voxelMap[voxel.id] || []}
+              selected={selectedVoxel === voxel.id}
+              onSelect={onSelectVoxel}
+              onUpdateQty={onUpdateLocationQty}
+              items={items} // Pass all items for add new
+            />
+          ))}
         </div>
-        {/* Правая полка (B1-B10) */}
-        <div className="overflow-x-auto">
-          <div className="grid grid-cols-5 gap-1 min-w-max">
-            {VOXELS.filter(v => v.id.startsWith('B')).map(voxel => (
-              <WarehouseCell
-                key={voxel.id}
-                voxel={voxel}
-                contents={voxelMap[voxel.id] || []}
-                selected={selectedVoxel === voxel.id}
-                onSelect={onSelectVoxel}
-                onUpdateQty={onUpdateLocationQty}
-              />
-            ))}
-          </div>
+        {/* Правая полка */}
+        <div className="flex flex-col gap-1">
+          {VOXELS.filter(v => v.id.startsWith('B')).map(voxel => (
+            <WarehouseCell
+              key={voxel.id}
+              voxel={voxel}
+              contents={voxelMap[voxel.id] || []}
+              selected={selectedVoxel === voxel.id}
+              onSelect={onSelectVoxel}
+              onUpdateQty={onUpdateLocationQty}
+              items={items} // Pass all items for add new
+            />
+          ))}
         </div>
       </div>
     </div>
