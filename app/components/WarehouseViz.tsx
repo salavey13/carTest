@@ -7,6 +7,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { WarehouseCell } from "@/app/components/WarehouseCell";
 
+const COLOR_MAP: {[key: string]: string} = {
+  beige: 'bg-yellow-200',
+  blue: 'bg-blue-200',
+  red: 'bg-red-200',
+  'light-green': 'bg-green-200',
+  'dark-green': 'bg-green-500',
+  gray: 'bg-gray-200',
+};
+
+const SIZE_PACK: {[key: string]: number} = {
+  '180x220': 6,
+  '200x220': 6,
+  '220x240': 8,
+  '90': 8,
+  '120': 8,
+  '140': 8,
+  '160': 8,
+  '180': 8,
+  '200': 8,
+  '150x200': 6,
+};
+
 // Воксели: слева A1-A10, справа B1-B10
 const VOXELS = [
   // Лево: A1-A10
