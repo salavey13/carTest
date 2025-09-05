@@ -1,174 +1,337 @@
-// /app/wb/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { WarehouseViz } from "@/app/components/WarehouseViz";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Image from "next/image";
-import { getWarehouseItems, updateItemLocation } from "@/app/wb/actions";
+import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
 import { toast } from "sonner";
 import { Loading } from "@/components/Loading";
-import { cn } from "@/lib/utils";
+import Papa from "papaparse";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+type Location = {
+  voxel: string;
+  quantity: number;
+};
+
 type Item = {
   id: string;
   name: string;
   description: string;
   image: string;
-  voxel: string | null;
+  locations: Location[];
+  total_quantity: number;
   season?: 'leto' | 'zima' | null;
   pattern?: 'kruzheva' | 'mirodel' | 'ogurtsy' | 'flora1' | 'flora2' | 'flora3';
+  color: string;
+  size: string;
 };
 
-// Хардкод дефолтных items, синхронизирован с wb_seed.sql
+// Хардкод дефолтных items обновлен с warehouse_locations array
 const DEFAULT_ITEMS: Item[] = [
-  // Евро (бежевый, 180x220, лето/зима, все узоры)
-  { id: 'evro-leto-kruzheva', name: 'Евро Лето Кружева', description: 'Бежевая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-kruzheva.jpg`, voxel: 'A1', season: 'leto', pattern: 'kruzheva' },
-  { id: 'evro-zima-kruzheva', name: 'Евро Зима Кружева', description: 'Бежевая, полузакрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-kruzheva.jpg`, voxel: 'A1', season: 'zima', pattern: 'kruzheva' },
-  { id: 'evro-leto-mirodel', name: 'Евро Лето Миродель', description: 'Бежевая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-mirodel.jpg`, voxel: 'A1', season: 'leto', pattern: 'mirodel' },
-  { id: 'evro-zima-mirodel', name: 'Евро Зима Миродель', description: 'Бежевая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-mirodel.jpg`, voxel: 'A1', season: 'zima', pattern: 'mirodel' },
-  { id: 'evro-leto-ogurtsy', name: 'Евро Лето Огурцы', description: 'Бежевая, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-ogurtsy.jpg`, voxel: 'A1', season: 'leto', pattern: 'ogurtsy' },
-  { id: 'evro-zima-ogurtsy', name: 'Евро Зима Огурцы', description: 'Бежевая, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-ogurtsy.jpg`, voxel: 'A1', season: 'zima', pattern: 'ogurtsy' },
-  { id: 'evro-leto-flora1', name: 'Евро Лето Флора 1', description: 'Бежевая, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-flora1.jpg`, voxel: 'A1', season: 'leto', pattern: 'flora1' },
-  { id: 'evro-zima-flora1', name: 'Евро Зима Флора 1', description: 'Бежевая, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-flora1.jpg`, voxel: 'A1', season: 'zima', pattern: 'flora1' },
-  { id: 'evro-leto-flora2', name: 'Евро Лето Флора 2', description: 'Бежевая, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-flora2.jpg`, voxel: 'A1', season: 'leto', pattern: 'flora2' },
-  { id: 'evro-zima-flora2', name: 'Евро Зима Флора 2', description: 'Бежевая, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-flora2.jpg`, voxel: 'A1', season: 'zima', pattern: 'flora2' },
-  { id: 'evro-leto-flora3', name: 'Евро Лето Флора 3', description: 'Бежевая, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-flora3.jpg`, voxel: 'A1', season: 'leto', pattern: 'flora3' },
-  { id: 'evro-zima-flora3', name: 'Евро Зима Флора 3', description: 'Бежевая, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-zima-flora3.jpg`, voxel: 'A1', season: 'zima', pattern: 'flora3' },
-
-  // Двушки (голубой, 200x220, лето/зима, все узоры)
-  { id: 'dvushka-leto-kruzheva', name: 'Двушка Лето Кружева', description: 'Голубая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-kruzheva.jpg`, voxel: 'A2', season: 'leto', pattern: 'kruzheva' },
-  { id: 'dvushka-zima-kruzheva', name: 'Двушка Зима Кружева', description: 'Голубая, полузакрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-kruzheva.jpg`, voxel: 'A2', season: 'zima', pattern: 'kruzheva' },
-  { id: 'dvushka-leto-mirodel', name: 'Двушка Лето Миродель', description: 'Голубая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-mirodel.jpg`, voxel: 'A2', season: 'leto', pattern: 'mirodel' },
-  { id: 'dvushka-zima-mirodel', name: 'Двушка Зима Миродель', description: 'Голубая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-mirodel.jpg`, voxel: 'A2', season: 'zima', pattern: 'mirodel' },
-  { id: 'dvushka-leto-ogurtsy', name: 'Двушка Лето Огурцы', description: 'Голубая, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-ogurtsy.jpg`, voxel: 'A2', season: 'leto', pattern: 'ogurtsy' },
-  { id: 'dvushka-zima-ogurtsy', name: 'Двушка Зима Огурцы', description: 'Голубая, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-ogurtsy.jpg`, voxel: 'A2', season: 'zima', pattern: 'ogurtsy' },
-  { id: 'dvushka-leto-flora1', name: 'Двушка Лето Флора 1', description: 'Голубая, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-flora1.jpg`, voxel: 'A2', season: 'leto', pattern: 'flora1' },
-  { id: 'dvushka-zima-flora1', name: 'Двушка Зима Флора 1', description: 'Голубая, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-flora1.jpg`, voxel: 'A2', season: 'zima', pattern: 'flora1' },
-  { id: 'dvushka-leto-flora2', name: 'Двушка Лето Флора 2', description: 'Голубая, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-flora2.jpg`, voxel: 'A2', season: 'leto', pattern: 'flora2' },
-  { id: 'dvushka-zima-flora2', name: 'Двушка Зима Флора 2', description: 'Голубая, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-flora2.jpg`, voxel: 'A2', season: 'zima', pattern: 'flora2' },
-  { id: 'dvushka-leto-flora3', name: 'Двушка Лето Флора 3', description: 'Голубая, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-leto-flora3.jpg`, voxel: 'A2', season: 'leto', pattern: 'flora3' },
-  { id: 'dvushka-zima-flora3', name: 'Двушка Зима Флора 3', description: 'Голубая, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/dvushka-zima-flora3.jpg`, voxel: 'A2', season: 'zima', pattern: 'flora3' },
-
-  // Евро Макси (красный, 220x240, лето/зима, все узоры)
-  { id: 'evro-maksi-leto-kruzheva', name: 'Евро Макси Лето Кружева', description: 'Красная, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-kruzheva.jpg`, voxel: 'A3', season: 'leto', pattern: 'kruzheva' },
-  { id: 'evro-maksi-zima-kruzheva', name: 'Евро Макси Зима Кружева', description: 'Красная, полузакрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-zima-kruzheva.jpg`, voxel: 'A3', season: 'zima', pattern: 'kruzheva' },
-  { id: 'evro-maksi-leto-mirodel', name: 'Евро Макси Лето Миродель', description: 'Красная, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-mirodel.jpg`, voxel: 'A3', season: 'leto', pattern: 'mirodel' },
-  { id: 'evro-maksi-zima-mirodel', name: 'Евро Макси Зима Миродель', description: 'Красная, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-zima-mirodel.jpg`, voxel: 'A3', season: 'zima', pattern: 'mirodel' },
-  { id: 'evro-maksi-leto-ogurtsy', name: 'Евро Макси Лето Огурцы', description: 'Красная, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-ogurtsy.jpg`, voxel: 'A3', season: 'leto', pattern: 'ogurtsy' },
-  { id: 'evro-maksi-zima-ogurtsy', name: 'Евро Макси Зима Огурцы', description: 'Красная, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-zima-ogurtsy.jpg`, voxel: 'A3', season: 'zima', pattern: 'ogurtsy' },
-  { id: 'evro-maksi-leto-flora1', name: 'Евро Макси Лето Флора 1', description: 'Красная, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-flora1.jpg`, voxel: 'A3', season: 'leto', pattern: 'flora1' },
-  { id: 'evro-maksi-zima-flora1', name: 'Евро Макси Зима Флора 1', description: 'Красная, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-zima-flora1.jpg`, voxel: 'A3', season: 'zima', pattern: 'flora1' },
-  { id: 'evro-maksi-leto-flora2', name: 'Евро Макси Лето Флора 2', description: 'Красная, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-flora2.jpg`, voxel: 'A3', season: 'leto', pattern: 'flora2' },
-  { id: 'evro-maksi-zima-flora2', name: 'Евро Макси Зима Флора 2', description: 'Красная, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-zima-flora2.jpg`, voxel: 'A3', season: 'zima', pattern: 'flora2' },
-  { id: 'evro-maksi-leto-flora3', name: 'Евро Макси Лето Флора 3', description: 'Красная, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-leto-flora3.jpg`, voxel: 'A3', season: 'leto', pattern: 'flora3' },
-  { id: 'evro-maksi-zima-flora3', name: 'Евро Макси Зима Флора 3', description: 'Красная, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-maksi-zima-flora3.jpg`, voxel: 'A3', season: 'zima', pattern: 'flora3' },
-
-  // Матрасники (салатовый для 90/120/140, темно-зеленый для 160/180/200, только кружева, без сезона)
-  { id: 'matrasnik-90-kruzheva', name: 'Матрасник 90 Кружева', description: 'Салатовый, маленький', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-90-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
-  { id: 'matrasnik-120-kruzheva', name: 'Матрасник 120 Кружева', description: 'Салатовый, маленький', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-120-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
-  { id: 'matrasnik-140-kruzheva', name: 'Матрасник 140 Кружева', description: 'Салатовый, маленький', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-140-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
-  { id: 'matrasnik-160-kruzheva', name: 'Матрасник 160 Кружева', description: 'Темно-зеленый, большой', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-160-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
-  { id: 'matrasnik-180-kruzheva', name: 'Матрасник 180 Кружева', description: 'Темно-зеленый, большой', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-180-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
-  { id: 'matrasnik-200-kruzheva', name: 'Матрасник 200 Кружева', description: 'Темно-зеленый, большой', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/matrasnik-200-kruzheva.jpg`, voxel: 'A4', season: null, pattern: 'kruzheva' },
-
-  // Полуторки (серый, 150x200, лето/зима, все узоры)
-  { id: 'polutorka-leto-kruzheva', name: 'Полуторка Лето Кружева', description: 'Серая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-kruzheva.jpg`, voxel: 'B1', season: 'leto', pattern: 'kruzheva' },
-  { id: 'polutorka-zima-kruzheva', name: 'Полуторка Зима Кружева', description: 'Серая, полузакрытая', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-kruzheva.jpg`, voxel: 'B1', season: 'zima', pattern: 'kruzheva' },
-  { id: 'polutorka-leto-mirodel', name: 'Полуторка Лето Миродель', description: 'Серая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-mirodel.jpg`, voxel: 'B1', season: 'leto', pattern: 'mirodel' },
-  { id: 'polutorka-zima-mirodel', name: 'Полуторка Зима Миродель', description: 'Серая, фиолетовый узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-mirodel.jpg`, voxel: 'B1', season: 'zima', pattern: 'mirodel' },
-  { id: 'polutorka-leto-ogurtsy', name: 'Полуторка Лето Огурцы', description: 'Серая, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-ogurtsy.jpg`, voxel: 'B1', season: 'leto', pattern: 'ogurtsy' },
-  { id: 'polutorka-zima-ogurtsy', name: 'Полуторка Зима Огурцы', description: 'Серая, фрактальный узор', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-ogurtsy.jpg`, voxel: 'B1', season: 'zima', pattern: 'ogurtsy' },
-  { id: 'polutorka-leto-flora1', name: 'Полуторка Лето Флора 1', description: 'Серая, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-flora1.jpg`, voxel: 'B1', season: 'leto', pattern: 'flora1' },
-  { id: 'polutorka-zima-flora1', name: 'Полуторка Зима Флора 1', description: 'Серая, маленькие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-flora1.jpg`, voxel: 'B1', season: 'zima', pattern: 'flora1' },
-  { id: 'polutorka-leto-flora2', name: 'Полуторка Лето Флора 2', description: 'Серая, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-flora2.jpg`, voxel: 'B1', season: 'leto', pattern: 'flora2' },
-  { id: 'polutorka-zima-flora2', name: 'Полуторка Зима Флора 2', description: 'Серая, средние цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-flora2.jpg`, voxel: 'B1', season: 'zima', pattern: 'flora2' },
-  { id: 'polutorka-leto-flora3', name: 'Полуторка Лето Флора 3', description: 'Серая, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-leto-flora3.jpg`, voxel: 'B1', season: 'leto', pattern: 'flora3' },
-  { id: 'polutorka-zima-flora3', name: 'Полуторка Зима Флора 3', description: 'Серая, большие цветочки', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/polutorka-zima-flora3.jpg`, voxel: 'B1', season: 'zima', pattern: 'flora3' },
+  // Евро...
+  { id: 'evro-leto-kruzheva', name: 'Евро Лето Кружева', description: 'Бежевая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-kruzheva.jpg`, locations: [{voxel: 'A1', quantity: 5}], total_quantity: 5, season: 'leto', pattern: 'kruzheva', color: 'beige', size: '180x220' },
+  // ... все остальные аналогично, с locations: [{voxel: ..., quantity: ...}], total_quantity: quantity
 ];
 
 export default function WBPage() {
-  const [items, setItems] = useState(DEFAULT_ITEMS);
+  const [items, setItems] = useState<Item[]>(DEFAULT_ITEMS);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'voxel'>('name');
+  const [filterSeason, setFilterSeason] = useState<string | null>(null);
+  const [filterPattern, setFilterPattern] = useState<string | null>(null);
+  const [filterColor, setFilterColor] = useState<string | null>(null);
+  const [filterSize, setFilterSize] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [workflowItems, setWorkflowItems] = useState<{id: string, change: number, voxel?: string}[]>([]);
+  const [currentWorkflowIndex, setCurrentWorkflowIndex] = useState(0);
+  const [selectedWorkflowVoxel, setSelectedWorkflowVoxel] = useState<string | null>(null);
+  const [lastCheckpoint, setLastCheckpoint] = useState<{[key: string]: {locations: Location[]}} | null>(null);
 
   useEffect(() => {
     async function loadItems() {
       const { success, data, error } = await getWarehouseItems();
       if (success && data) {
-        setItems(data.map(item => ({
-          id: item.id,
-          name: `${item.make} ${item.model}`,
-          description: item.description || '',
-          image: item.image_url || '',
-          voxel: item.specs?.warehouse_location?.voxel_id || null,
-          season: item.specs?.season,
-          pattern: item.specs?.pattern,
-        })));
+        setItems(data.map(item => {
+          const locations = item.specs.warehouse_locations || (item.specs.warehouse_location ? [{voxel_id: item.specs.warehouse_location.voxel_id, quantity: item.specs.quantity || 0}] : []);
+          const total_quantity = locations.reduce((sum, l) => sum + l.quantity, 0);
+          return {
+            id: item.id,
+            name: `${item.make} ${item.model}`,
+            description: item.description || '',
+            image: item.image_url || '',
+            locations: locations.map(l => ({voxel: l.voxel_id, quantity: l.quantity})),
+            total_quantity,
+            season: item.specs.season,
+            pattern: item.specs.pattern,
+            color: item.specs.color,
+            size: item.specs.size,
+          };
+        }));
       } else {
         toast.error(error || "Ошибка загрузки товаров");
       }
       setLoading(false);
+      const stored = localStorage.getItem('warehouse_checkpoint');
+      if (stored) setLastCheckpoint(JSON.parse(stored));
     }
     loadItems();
   }, []);
 
+  const filteredItems = useMemo(() => {
+    return items
+      .filter(i => (!filterSeason || i.season === filterSeason) &&
+                   (!filterPattern || i.pattern === filterPattern) &&
+                   (!filterColor || i.color === filterColor) &&
+                   (!filterSize || i.size === filterSize) &&
+                   i.name.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        if (sortBy === 'quantity') return b.total_quantity - a.total_quantity;
+        if (sortBy === 'voxel') return (a.locations[0]?.voxel || '').localeCompare(b.locations[0]?.voxel || '');
+        return a.name.localeCompare(b.name);
+      });
+  }, [items, sortBy, filterSeason, filterPattern, filterColor, filterSize, search]);
+
+  const totals = useMemo(() => {
+    return filteredItems.reduce((acc, i) => acc + i.total_quantity, 0);
+  }, [filteredItems]);
+
   const handleSelectVoxel = (id: string) => {
     setSelectedVoxel(id);
-    const item = items.find(i => i.voxel === id);
-    setSelectedItemId(item?.id || null);
+    // No setSelectedItemId, since multi
   };
 
   const handleSelectItem = (id: string) => {
     setSelectedItemId(id);
     const item = items.find(i => i.id === id);
-    setSelectedVoxel(item?.voxel || null);
+    if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
   };
 
-  const handleUpdateLocation = async (itemId: string, voxelId: string) => {
-    const { success, error } = await updateItemLocation(itemId, voxelId);
+  const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number) => {
+    const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
     if (success) {
-      setItems(prev => prev.map(i => i.id === itemId ? { ...i, voxel: voxelId } : i));
-      toast.success("Локация обновлена");
+      setItems(prev => prev.map(i => {
+        if (i.id === itemId) {
+          let locations = [...i.locations];
+          const index = locations.findIndex(l => l.voxel === voxelId);
+          if (index >= 0) {
+            if (quantity <= 0) {
+              locations.splice(index, 1);
+            } else {
+              locations[index].quantity = quantity;
+            }
+          } else if (quantity > 0) {
+            locations.push({ voxel: voxelId, quantity });
+          }
+          return { ...i, locations, total_quantity: locations.reduce((sum, l) => sum + l.quantity, 0) };
+        }
+        return i;
+      }));
+      toast.success("Локация/количество обновлены");
     } else {
       toast.error(error);
     }
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const file = e.target.files[0];
+      setImportFile(file);
+      Papa.parse(file, {
+        complete: (results) => {
+          const changes = results.data.map((row: any) => ({id: row[0], change: parseInt(row[1]), voxel: row[2] || undefined})).filter(c => c.id && !isNaN(c.change));
+          setWorkflowItems(changes);
+          setCurrentWorkflowIndex(0);
+        },
+        header: false,
+      });
+    }
+  };
+
+  const handleWorkflowNext = async () => {
+    if (currentWorkflowIndex < workflowItems.length) {
+      const {id, change} = workflowItems[currentWorkflowIndex];
+      const voxel = selectedWorkflowVoxel || items.find(i => i.id === id)?.locations[0]?.voxel;
+      if (!voxel) {
+        toast.error("Выберите локацию");
+        return;
+      }
+      const item = items.find(i => i.id === id);
+      const currentQty = item?.locations.find(l => l.voxel === voxel)?.quantity || 0;
+      await handleUpdateLocationQty(id, voxel, currentQty + change);
+      setSelectedWorkflowVoxel(null);
+      setCurrentWorkflowIndex(prev => prev + 1);
+    } else {
+      setWorkflowItems([]);
+      toast.success("Импорт завершен");
+    }
+  };
+
+  const handleExportDiff = () => {
+    if (!lastCheckpoint) return toast.error("Нет чекпоинта");
+    const diff = items.reduce((acc, i) => {
+      const prev = lastCheckpoint[i.id];
+      if (prev) {
+        acc[i.id] = {locations: i.locations};
+      }
+      return acc;
+    }, {} as any);
+    const blob = new Blob([JSON.stringify(diff)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'warehouse_diff.json';
+    a.click();
+  };
+
+  const handleCheckpoint = () => {
+    const checkpoint = items.reduce((acc, i) => {
+      acc[i.id] = {locations: i.locations};
+      return acc;
+    }, {} as any);
+    localStorage.setItem('warehouse_checkpoint', JSON.stringify(checkpoint));
+    setLastCheckpoint(checkpoint);
+    toast.success("Чекпоинт сохранен");
   };
 
   if (loading) return <Loading text="Загрузка склада..." />;
 
   return (
     <div className="min-h-screen pt-24 bg-background flex flex-col md:flex-row">
-      <div className="w-full md:w-1/2 h-[50vh] md:h-auto overflow-auto p-4">
+      <div className="w-full md:w-1/2 h-[40vh] md:h-auto overflow-auto p-2">
         <WarehouseViz 
           items={items} 
           selectedVoxel={selectedVoxel} 
           onSelectVoxel={handleSelectVoxel} 
-          onUpdateLocation={handleUpdateLocation} 
+          onUpdateLocationQty={handleUpdateLocationQty}
         />
       </div>
-      <div className="w-full md:w-1/2 overflow-auto p-4">
+      <div className="w-full md:w-1/2 overflow-auto p-2">
         <Card>
-          <CardHeader>
-            <CardTitle>Список Товаров</CardTitle>
+          <CardHeader className="p-2">
+            <CardTitle className="text-sm">Список Товаров (Всего: {totals})</CardTitle>
+            <div className="flex flex-wrap gap-1 text-xs">
+              <Input className="h-6 text-xs" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                <SelectTrigger className="h-6 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Имя</SelectItem>
+                  <SelectItem value="quantity">Кол-во</SelectItem>
+                  <SelectItem value="voxel">Локация</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select onValueChange={setFilterSeason}>
+                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Сезон" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="leto">Лето</SelectItem>
+                  <SelectItem value="zima">Зима</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select onValueChange={setFilterPattern}>
+                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Узор" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kruzheva">Кружева</SelectItem>
+                  <SelectItem value="mirodel">Миродель</SelectItem>
+                  <SelectItem value="ogurtsy">Огурцы</SelectItem>
+                  <SelectItem value="flora1">Флора 1</SelectItem>
+                  <SelectItem value="flora2">Флора 2</SelectItem>
+                  <SelectItem value="flora3">Флора 3</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select onValueChange={setFilterColor}>
+                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Цвет" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="beige">Бежевый</SelectItem>
+                  <SelectItem value="blue">Голубой</SelectItem>
+                  <SelectItem value="red">Красный</SelectItem>
+                  <SelectItem value="light-green">Салатовый</SelectItem>
+                  <SelectItem value="dark-green">Темно-зеленый</SelectItem>
+                  <SelectItem value="gray">Серый</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select onValueChange={setFilterSize}>
+                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Размер" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="180x220">180x220</SelectItem>
+                  <SelectItem value="200x220">200x220</SelectItem>
+                  <SelectItem value="220x240">220x240</SelectItem>
+                  <SelectItem value="90">90</SelectItem>
+                  <SelectItem value="120">120</SelectItem>
+                  <SelectItem value="140">140</SelectItem>
+                  <SelectItem value="160">160</SelectItem>
+                  <SelectItem value="180">180</SelectItem>
+                  <SelectItem value="200">200</SelectItem>
+                  <SelectItem value="150x200">150x200</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1 text-xs">
+              <Label htmlFor="import" className="text-xs">Импорт CSV</Label>
+              <Input id="import" type="file" accept=".csv" onChange={handleImport} className="h-6 text-xs" />
+              <Button onClick={handleExportDiff} className="h-6 text-xs">Diff</Button>
+              <Button onClick={handleCheckpoint} className="h-6 text-xs">Чекпоинт</Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {items.map(item => (
-              <Card key={item.id} className={cn("cursor-pointer transition-all", selectedItemId === item.id && "border-primary shadow-lg")}>
-                <CardContent className="flex items-center gap-4" onClick={() => handleSelectItem(item.id)}>
-                  <Image src={item.image} alt={item.name} width={50} height={50} className="rounded" />
-                  <div>
-                    <h3 className="font-bold">{item.name}</h3>
-                    <p className="text-sm">{item.description} ({item.season || 'без сезона'}, {item.pattern || 'без узора'})</p>
-                    <p className="text-xs text-muted-foreground">Локация: {item.voxel || 'Не назначена'}</p>
-                  </div>
-                </CardContent>
-              </Card>
+          <CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[40vh] md:max-h-auto">
+            {filteredItems.map(item => (
+              <Accordion type="single" collapsible key={item.id}>
+                <AccordionItem value={item.id}>
+                  <AccordionTrigger className="p-1 text-xs" onClick={() => handleSelectItem(item.id)}>
+                    <div className="flex items-center gap-1">
+                      <Image src={item.image} alt={item.name} width={20} height={20} className="rounded" />
+                      <div>
+                        <h3 className="font-bold text-xs">{item.name}</h3>
+                        <p className="text-xs">Кол-во: {item.total_quantity}</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-1 text-xs">
+                    {item.locations.map(loc => (
+                      <div key={loc.voxel} className="flex justify-between">
+                        <span>{loc.voxel}: {loc.quantity}</span>
+                        <Button size="xs" onClick={() => setSelectedVoxel(loc.voxel)}>Посмотреть</Button>
+                      </div>
+                    ))}
+                    <p>{item.description}</p>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             ))}
           </CardContent>
         </Card>
       </div>
+      {workflowItems.length > 0 && (
+        <Dialog open={true}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Workflow: {currentWorkflowIndex + 1}/{workflowItems.length}</DialogTitle>
+            </DialogHeader>
+            {currentWorkflowIndex < workflowItems.length && (
+              <div>
+                <p>Товар: {workflowItems[currentWorkflowIndex].id}, Изменение: {workflowItems[currentWorkflowIndex].change}</p>
+                <Select value={selectedWorkflowVoxel || ''} onValueChange={setSelectedWorkflowVoxel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите локацию" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VOXELS.map(v => <SelectItem key={v.id} value={v.id}>{v.id}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleWorkflowNext}>Обновить и Далее</Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
