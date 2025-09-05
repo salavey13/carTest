@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Loading } from "@/components/Loading";
 import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { X } from "lucide-react";
 
 type Location = {
   voxel: string;
@@ -39,7 +40,6 @@ const DEFAULT_ITEMS: Item[] = [
   { id: 'evro-leto-kruzheva', name: 'Евро Лето Кружева', description: 'Бежевая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-kruzheva.jpg`, locations: [{voxel: 'A1', quantity: 5}], total_quantity: 5, season: 'leto', pattern: 'kruzheva', color: 'beige', size: '180x220' },
   // ... все остальные аналогично, с locations: [{voxel: ..., quantity: ...}], total_quantity: quantity
 ];
-
 export default function WBPage() {
   const [items, setItems] = useState<Item[]>(DEFAULT_ITEMS);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -107,7 +107,6 @@ export default function WBPage() {
 
   const handleSelectVoxel = (id: string) => {
     setSelectedVoxel(id);
-    // No setSelectedItemId, since multi
   };
 
   const handleSelectItem = (id: string) => {
@@ -136,7 +135,7 @@ export default function WBPage() {
         }
         return i;
       }));
-      toast.success("Локация/количество обновлены");
+      toast.success("Обновлено");
     } else {
       toast.error(error);
     }
@@ -203,11 +202,20 @@ export default function WBPage() {
     toast.success("Чекпоинт сохранен");
   };
 
+  const handleResetFilters = () => {
+    setFilterSeason(null);
+    setFilterPattern(null);
+    setFilterColor(null);
+    setFilterSize(null);
+    setSearch('');
+    setSortBy('name');
+  };
+
   if (loading) return <Loading text="Загрузка склада..." />;
 
   return (
-    <div className="min-h-screen pt-24 bg-background flex flex-col md:flex-row">
-      <div className="w-full md:w-1/2 h-[40vh] md:h-auto overflow-auto p-2">
+    <div className="min-h-screen pt-24 bg-background flex flex-col">
+      <div className="w-full h-[40vh] overflow-auto p-2">
         <WarehouseViz 
           items={items} 
           selectedVoxel={selectedVoxel} 
@@ -215,10 +223,10 @@ export default function WBPage() {
           onUpdateLocationQty={handleUpdateLocationQty}
         />
       </div>
-      <div className="w-full md:w-1/2 overflow-auto p-2">
+      <div className="w-full overflow-auto p-2">
         <Card>
           <CardHeader className="p-2">
-            <CardTitle className="text-sm">Список Товаров (Всего: {totals})</CardTitle>
+            <CardTitle className="text-sm">Список (Всего: {totals})</CardTitle>
             <div className="flex flex-wrap gap-1 text-xs">
               <Input className="h-6 text-xs" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
               <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
@@ -229,16 +237,18 @@ export default function WBPage() {
                   <SelectItem value="voxel">Локация</SelectItem>
                 </SelectContent>
               </Select>
-              <Select onValueChange={setFilterSeason}>
+              <Select value={filterSeason || 'all'} onValueChange={v => setFilterSeason(v === 'all' ? null : v)}>
                 <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Сезон" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="leto">Лето</SelectItem>
                   <SelectItem value="zima">Зима</SelectItem>
                 </SelectContent>
               </Select>
-              <Select onValueChange={setFilterPattern}>
+              <Select value={filterPattern || 'all'} onValueChange={v => setFilterPattern(v === 'all' ? null : v)}>
                 <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Узор" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="kruzheva">Кружева</SelectItem>
                   <SelectItem value="mirodel">Миродель</SelectItem>
                   <SelectItem value="ogurtsy">Огурцы</SelectItem>
@@ -247,9 +257,10 @@ export default function WBPage() {
                   <SelectItem value="flora3">Флора 3</SelectItem>
                 </SelectContent>
               </Select>
-              <Select onValueChange={setFilterColor}>
+              <Select value={filterColor || 'all'} onValueChange={v => setFilterColor(v === 'all' ? null : v)}>
                 <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Цвет" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="beige">Бежевый</SelectItem>
                   <SelectItem value="blue">Голубой</SelectItem>
                   <SelectItem value="red">Красный</SelectItem>
@@ -258,9 +269,10 @@ export default function WBPage() {
                   <SelectItem value="gray">Серый</SelectItem>
                 </SelectContent>
               </Select>
-              <Select onValueChange={setFilterSize}>
+              <Select value={filterSize || 'all'} onValueChange={v => setFilterSize(v === 'all' ? null : v)}>
                 <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Размер" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="180x220">180x220</SelectItem>
                   <SelectItem value="200x220">200x220</SelectItem>
                   <SelectItem value="220x240">220x240</SelectItem>
@@ -273,6 +285,7 @@ export default function WBPage() {
                   <SelectItem value="150x200">150x200</SelectItem>
                 </SelectContent>
               </Select>
+              <Button onClick={handleResetFilters} className="h-6 text-xs"><X size={12} /> Сброс</Button>
             </div>
             <div className="flex flex-wrap gap-1 mt-1 text-xs">
               <Label htmlFor="import" className="text-xs">Импорт CSV</Label>
@@ -285,12 +298,12 @@ export default function WBPage() {
             {filteredItems.map(item => (
               <Accordion type="single" collapsible key={item.id}>
                 <AccordionItem value={item.id}>
-                  <AccordionTrigger className="p-1 text-xs" onClick={() => handleSelectItem(item.id)}>
+                  <AccordionTrigger className={cn("p-1 text-xs rounded", COLOR_MAP[item.color])} onClick={() => handleSelectItem(item.id)}>
                     <div className="flex items-center gap-1">
-                      <Image src={item.image} alt={item.name} width={20} height={20} className="rounded" />
+                      {item.image && <Image src={item.image} alt={item.name} width={16} height={16} className="rounded" />}
                       <div>
                         <h3 className="font-bold text-xs">{item.name}</h3>
-                        <p className="text-xs">Кол-во: {item.total_quantity}</p>
+                        <p className="text-xs">Кол: {item.total_quantity}</p>
                       </div>
                     </div>
                   </AccordionTrigger>
@@ -298,7 +311,7 @@ export default function WBPage() {
                     {item.locations.map(loc => (
                       <div key={loc.voxel} className="flex justify-between">
                         <span>{loc.voxel}: {loc.quantity}</span>
-                        <Button size="xs" onClick={() => setSelectedVoxel(loc.voxel)}>Посмотреть</Button>
+                        <Button size="xs" onClick={() => setSelectedVoxel(loc.voxel)}>Посм.</Button>
                       </div>
                     ))}
                     <p>{item.description}</p>

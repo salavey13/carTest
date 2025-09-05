@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Plus, Minus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Voxel = {
   id: string;
@@ -40,6 +42,7 @@ type WarehouseCellProps = {
   selected: boolean;
   onSelect: (id: string) => void;
   onUpdateQty: (itemId: string, voxelId: string, quantity: number) => void;
+  items: Item[]; // All items for add new
 };
 
 const COLOR_MAP: {[key: string]: string} = {
@@ -64,8 +67,18 @@ const SIZE_PACK: {[key: string]: number} = {
   '150x200': 6,
 };
 
-export function WarehouseCell({ voxel, contents, selected, onSelect, onUpdateQty }: WarehouseCellProps) {
+export function WarehouseCell({ voxel, contents, selected, onSelect, onUpdateQty, items }: WarehouseCellProps) {
   const totalQuantity = contents.reduce((acc, c) => acc + c.local_quantity, 0);
+  const [addItemId, setAddItemId] = useState<string | null>(null);
+
+  const availableItems = items.filter(i => !contents.some(c => c.item.id === i.id));
+
+  const handleAddItem = () => {
+    if (addItemId) {
+      onUpdateQty(addItemId, voxel.id, 1);
+      setAddItemId(null);
+    }
+  };
 
   const renderBullets = (item: Item, qty: number) => {
     const packSize = SIZE_PACK[item.size] || 6;
@@ -74,20 +87,24 @@ export function WarehouseCell({ voxel, contents, selected, onSelect, onUpdateQty
     const bullets = [];
     for (let i = 0; i < fullPacks; i++) {
       bullets.push(
-        <div key={`pack-${i}`} className="flex gap-0.5">
-          {Array.from({length: packSize}).map((_, j) => (
-            <div key={j} className={cn("w-2 h-2 rounded-full", COLOR_MAP[item.color || 'gray'])} />
-          ))}
-        </div>
+        <AnimatePresence key={`pack-${i}`}>
+          <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }} className="flex flex-col gap-0.5">
+            {Array.from({length: packSize}).map((_, j) => (
+              <div key={j} className={cn("w-2 h-2 rounded-full", COLOR_MAP[item.color || 'gray'])} />
+            ))}
+          </motion.div>
+        </AnimatePresence>
       );
     }
     if (partial > 0) {
       bullets.push(
-        <div key="partial" className="flex gap-0.5">
-          {Array.from({length: packSize}).map((_, j) => (
-            <div key={j} className={cn("w-2 h-2 rounded-full", j < partial ? COLOR_MAP[item.color || 'gray'] : 'bg-gray-100')} />
-          ))}
-        </div>
+        <AnimatePresence key="partial">
+          <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }} className="flex flex-col gap-0.5">
+            {Array.from({length: packSize}).map((_, j) => (
+              <div key={j} className={cn("w-2 h-2 rounded-full", j < partial ? COLOR_MAP[item.color || 'gray'] : 'bg-gray-100')} />
+            ))}
+          </motion.div>
+        </AnimatePresence>
       );
     }
     return bullets;
@@ -104,7 +121,7 @@ export function WarehouseCell({ voxel, contents, selected, onSelect, onUpdateQty
           onClick={() => onSelect(voxel.id)}
         >
           <div>{voxel.id}</div>
-          <div className="flex flex-wrap gap-1">{contents.map(c => renderBullets(c.item, c.local_quantity))}</div>
+          <div className="flex flex-wrap gap-0.5">{contents.map(c => renderBullets(c.item, c.local_quantity))}</div>
           <div>{totalQuantity > 0 ? totalQuantity : 'Пусто'}</div>
         </div>
       </DialogTrigger>
@@ -119,6 +136,21 @@ export function WarehouseCell({ voxel, contents, selected, onSelect, onUpdateQty
             <Button size="icon" onClick={() => onUpdateQty(item.id, voxel.id, local_quantity - 1)}><Minus size={12} /></Button>
           </div>
         ))}
+        {availableItems.length > 0 && (
+          <div className="mt-4">
+            <Select value={addItemId || ''} onValueChange={setAddItemId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Добавить товар" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableItems.map(i => (
+                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleAddItem} className="mt-2">Добавить</Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
