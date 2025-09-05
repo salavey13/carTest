@@ -1,3 +1,4 @@
+// /app/components/WarehouseViz.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -49,7 +50,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
     <div className="relative w-full h-[50vh] md:h-full perspective-1000">
       <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 text-center">Вход</div> {/* Снизу */}
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 text-center">Комп с окном</div> {/* Сверху */}
-      <div className="w-full h-full transform rotate-180 rotate-x-30 rotate-y-[-30deg] grid grid-cols-2 gap-4"> {/* Переворот 180deg */}
+      <div className="w-full h-full transform rotate-x-30 rotate-y-[-30deg] grid grid-cols-2 gap-4"> 
         {/* Левая полка (теперь слева после переворота) */}
         <div className="grid grid-cols-2 gap-2">
           {VOXELS.filter(v => v.id.startsWith('A')).map(voxel => (
