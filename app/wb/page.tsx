@@ -1,3 +1,4 @@
+// /app/wb/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,7 +9,7 @@ import Image from "next/image";
 import { getWarehouseItems, updateItemLocation } from "@/app/wb/actions";
 import { toast } from "sonner";
 import { Loading } from "@/components/Loading";
-
+import { cn } from "@/lib/utils";
 type Item = {
   id: string;
   name: string;
