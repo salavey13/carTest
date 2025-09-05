@@ -15,6 +15,7 @@ import { Loading } from "@/components/Loading";
 import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Location = {
   voxel: string;
