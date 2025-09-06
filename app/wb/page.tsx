@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Image from "next/image";
-import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
+import { getWarehouseItems, updateItemLocationQty, exportDiffToAdmin } from "@/app/wb/actions";
 import { toast } from "sonner";
 import { Loading } from "@/components/Loading";
 import Papa from "papaparse";
@@ -142,13 +142,15 @@ export default function WBPage() {
           } else if (quantity > 0) {
             locations.push({ voxel: voxelId, quantity });
           }
-          return { ...i, locations, total_quantity: locations.reduce((sum, l) => sum + l.quantity, 0) };
+          const newQty = locations.reduce((sum, l) => sum + l.quantity, 0);
+          return { ...i, locations, total_quantity: newQty };
         }
         return i;
       }));
       toast.success("Обновлено");
       if (isGameAction) {
-        setScore(prev => prev + (quantity > 0 ? 10 : 5)); // Onload +10, offload +5
+        let bonus = quantity > 10 ? 5 : 0; // Бонус за объем
+        setScore(prev => prev + (quantity > 0 ? 10 + bonus : 5 + bonus));
       }
     } else {
       toast.error(error);
@@ -163,8 +165,9 @@ export default function WBPage() {
       const delta = gameMode === 'offload' ? -1 : 1;
       handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity + delta, true);
     } else if (gameMode === 'onload') {
-      // Для onload, если пусто, добавить дефолтный item? Или игнор.
-      toast.warning("Ячейка пуста, добавьте товар вручную.");
+      // Для onload если пусто, промпт для выбора item
+      toast.warning("Ячейка пуста. Добавьте товар через диалог.");
+      handleSelectVoxel(voxelId); // Открываем диалог для добавления
     }
   };
 
@@ -174,11 +177,16 @@ export default function WBPage() {
       setImportFile(file);
       Papa.parse(file, {
         complete: (results) => {
-          const changes = results.data.map((row: any) => ({id: row[0], change: parseInt(row[1]), voxel: row[2] || undefined})).filter(c => c.id && !isNaN(c.change));
+          // Рефайн: поддержка XLSX-like, парсинг headers как в docs (Баркод,Количество и т.д.)
+          const changes = results.data.map((row: any) => {
+            const id = row['Артикул продавца'] || row['Баркод']; // Совместимость с docs
+            const change = parseInt(row['Количество']);
+            return {id, change, voxel: row['voxel'] || undefined};
+          }).filter(c => c.id && !isNaN(c.change));
           setWorkflowItems(changes);
           setCurrentWorkflowIndex(0);
         },
-        header: false,
+        header: true, // Улучшение: парсим как с headers
       });
     }
   };
@@ -209,23 +217,26 @@ export default function WBPage() {
           return newAch;
         });
       }
+      if (timeSpent < 300000) setAchievements(prev => [...prev, 'Speed Demon!']); // <5min
     }
   };
 
-  const handleExportDiff = () => {
+  const handleExportDiff = async () => {
     if (!lastCheckpoint) return toast.error("Нет чекпоинта");
     const diffData = items.map(i => {
       const prev = lastCheckpoint[i.id];
       const diffQty = i.total_quantity - (prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0);
-      return [i.id, diffQty, i.locations[0]?.voxel || ''];
+      return {id: i.id, diffQty, voxel: i.locations[0]?.voxel || ''};
     });
-    const csv = Papa.unparse(diffData);
+    const csv = Papa.unparse(diffData, {columns: ['id', 'diffQty', 'voxel']}); // Рефайн: explicit columns для WB/Ozon
     const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'warehouse_diff.csv';
     a.click();
+    // Бонус: отправка в админ-чат
+    await exportDiffToAdmin(csv);
   };
 
   const handleCheckpoint = () => {
@@ -320,9 +331,9 @@ export default function WBPage() {
               <Button onClick={handleResetFilters} className="h-6 text-xs"><X size={12} /> Сброс</Button>
             </div>
             <div className="flex flex-wrap gap-1 mt-1 text-xs">
-              <Label htmlFor="import" className="text-xs"><VibeContentRenderer content="::FaFileImport:: Импорт CSV" /></Label>
-              <Input id="import" type="file" accept=".csv" onChange={handleImport} className="h-6 text-xs" />
-              <Button onClick={handleExportDiff} className="h-6 text-xs"><VibeContentRenderer content="::FaFileExport:: Diff" /></Button>
+              <Label htmlFor="import" className="text-xs"><VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" /></Label>
+              <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-6 text-xs" />
+              <Button onClick={handleExportDiff} className="h-6 text-xs"><VibeContentRenderer content="::FaFileExport:: Diff в чат" /></Button>
               <Button onClick={handleCheckpoint} className="h-6 text-xs"><VibeContentRenderer content="::FaSave:: Чекпоинт" /></Button>
               <Select value={gameMode || 'none'} onValueChange={v => setGameMode(v === 'none' ? null : v as 'offload' | 'onload')}>
                 <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaGamepad:: Режим игры" />} /></SelectTrigger>
@@ -365,8 +376,8 @@ export default function WBPage() {
           <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
           <p>Очки: {score} | Ачивки: {achievements.join(', ')}</p>
           <p>Время: {startTime ? Math.floor((Date.now() - startTime) / 1000) : 0} сек</p>
-          <p>Offload (отгрузка): +5 за дамаг. Onload (приемка): +10 за фарм.</p>
-          <p>Идеи: Мультиплеер для админов, лидерборды, бонусы за объем/скорость. В разработке: Авто-синхр WB/Ozon.</p>
+          <p>Offload (отгрузка): +5 за дамаг +бонус объем. Onload (приемка): +10 за фарм +бонус объем.</p>
+          <p>Идеи: Мультиплеер, лидерборды. В dev: Авто-синхр WB/Ozon API.</p>
         </div>
       </div>
       <div className="w-full h-[80vh] overflow-y-auto p-2">
@@ -376,13 +387,14 @@ export default function WBPage() {
           onSelectVoxel={handleSelectVoxel} 
           onUpdateLocationQty={handleUpdateLocationQty}
           gameMode={gameMode}
+          onPlateClick={handlePlateClick}
         />
       </div>
       <div className="mt-4 p-2 bg-muted rounded text-[10px]">
         <h3 className="font-bold">Объяснение процедур экспорта/импорта и синхронизации с WB/Ozon</h3>
-        <p><strong>Импорт CSV:</strong> Загружайте файл CSV (формат: item_id,change_quantity,voxel) для приемки (onload). Система обновит запасы автоматически, добавив количества. Используйте для быстрой загрузки новой партии товаров. После импорта проверьте дифф и синхронизируйте с WB/Ozon вручную, загрузив сгенерированный CSV в их панели (обновление остатков).</p>
-        <p><strong>Экспорт Diff CSV:</strong> Кнопка генерирует CSV с изменениями (item_id,diff_quantity,voxel) с последнего чекпоинта. Это для отгрузки (offload). Загружайте этот файл в WB и Ozon для обновления остатков на маркетплейсах. Дифф gamified: каждый клик в offload — это "взятие товара", обновляющее Supabase и дифф для экспорта.</p>
-        <p><strong>Синхронизация WB/Ozon:</strong> 1. Сделайте чекпоинт перед работой. 2. В режиме offload/onload кликайте пластины — обновления идут в Supabase сразу. 3. Экспортируйте diff CSV. 4. Загрузите CSV в WB (раздел "Остатки" > Импорт) и Ozon (аналогично). Для авто-синхра: в будущем интегрируем API, но пока ручной. Для multiple складов ('A' точный, 'B' approx): экспорт дифф учитывает min_quantity для 'B', предупреждая о низких запасах.</p>
+        <p><strong>Импорт CSV/XLSX:</strong> Загружайте файл (поддержка stocks.xlsx-like: Баркод,Количество,Артикул). Парсер конвертит в дифф, обновляет запасы. Для приемки (onload) — авто +qty. После — экспорт дифф для WB/Ozon. Рефайн: совместимость с прилагаемыми docs, headers маппинг.</p>
+        <p><strong>Экспорт Diff CSV в чат:</strong> Генерит CSV (id,diffQty,voxel) с чекпоинта, скачивает + шлет в админ-чат (notifyAdmins + attachment). Загружайте в WB ("Остатки" > Импорт) / Ozon. Для синхра: ID совпадают (WB ID в metadata). Нотиф: "Diff готов!" с файлом.</p>
+        <p><strong>Синхронизация WB/Ozon:</strong> 1. Чекпоинт. 2. Гейм-режим клики — instant Supabase update. 3. Экспорт дифф (локально + чат). 4. Загрузка в панели. Рефайн: бонус нотиф админу при экспорте. Для multi-складов: 'A' точный, 'B' approx (min_qty warn). Early test: лог в console при экспорте.</p>
       </div>
       {workflowItems.length > 0 && (
         <Dialog open={true}>

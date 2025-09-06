@@ -78,6 +78,7 @@ export type WarehouseVizProps = {
   onSelectVoxel: (id: string) => void;
   onUpdateLocationQty: (itemId: string, voxelId: string, quantity: number) => void;
   gameMode: 'offload' | 'onload' | null;
+  onPlateClick: (voxelId: string) => void;
 };
 
 export type Voxel = typeof VOXELS[0];
