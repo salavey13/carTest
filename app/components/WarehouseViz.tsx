@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { WarehouseCell } from "@/app/components/WarehouseCell";
+import { WarehousePlate } from "@/app/components/WarehousePlate";
 import { WarehouseVizProps, VOXELS } from "@/app/wb/common";
 
-export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLocationQty }: WarehouseVizProps) {
+export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLocationQty, gameMode }: WarehouseVizProps) {
   const voxelMap = useMemo(() => {
     const map: { [key: string]: {item: any; local_quantity: number}[] } = {};
     items.forEach(item => {
@@ -25,7 +25,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
         {/* Левая полка: 4 ряда по схеме */}
         <div className="grid grid-cols-4 gap-1" style={{ gridTemplateRows: 'repeat(4, minmax(0, 1fr))' }}>
           {VOXELS.filter(v => v.id.startsWith('A')).map(voxel => (
-            <WarehouseCell
+            <WarehousePlate
               key={voxel.id}
               voxel={voxel}
               contents={voxelMap[voxel.id] || []}
@@ -33,13 +33,15 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
               onSelect={onSelectVoxel}
               onUpdateQty={onUpdateLocationQty}
               items={items}
+              onPlateClick={handlePlateClick}
+              gameMode={gameMode}
             />
           ))}
         </div>
         {/* Правая полка аналогично */}
         <div className="grid grid-cols-4 gap-1" style={{ gridTemplateRows: 'repeat(4, minmax(0, 1fr))' }}>
           {VOXELS.filter(v => v.id.startsWith('B')).map(voxel => (
-            <WarehouseCell
+            <WarehousePlate
               key={voxel.id}
               voxel={voxel}
               contents={voxelMap[voxel.id] || []}
@@ -47,6 +49,8 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
               onSelect={onSelectVoxel}
               onUpdateQty={onUpdateLocationQty}
               items={items}
+              onPlateClick={handlePlateClick}
+              gameMode={gameMode}
             />
           ))}
         </div>

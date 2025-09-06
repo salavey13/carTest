@@ -39,6 +39,7 @@ export default function WBPage() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<string[]>([]);
   const [score, setScore] = useState(0);
+  const [gameMode, setGameMode] = useState<'offload' | 'onload' | null>(null);
 
   useEffect(() => {
     async function loadItems() {
@@ -147,18 +148,23 @@ export default function WBPage() {
       }));
       toast.success("Обновлено");
       if (isGameAction) {
-        setScore(prev => prev + (quantity > 0 ? 10 : 5)); // Фарм +10, дамаг +5
+        setScore(prev => prev + (quantity > 0 ? 10 : 5)); // Onload +10, offload +5
       }
     } else {
       toast.error(error);
     }
   };
 
-  const handleCellClick = (voxelId: string) => {
+  const handlePlateClick = (voxelId: string) => {
+    if (!gameMode) return;
     const content = items.flatMap(i => i.locations.filter(l => l.voxel === voxelId).map(l => ({item: i, quantity: l.quantity})));
     if (content.length > 0) {
       const mainItem = content[0].item;
-      handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity - 1, true); // Вычитаем 1, гейм-акция
+      const delta = gameMode === 'offload' ? -1 : 1;
+      handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity + delta, true);
+    } else if (gameMode === 'onload') {
+      // Для onload, если пусто, добавить дефолтный item? Или игнор.
+      toast.warning("Ячейка пуста, добавьте товар вручную.");
     }
   };
 
@@ -245,14 +251,6 @@ export default function WBPage() {
 
   return (
     <div className="min-h-screen pt-24 bg-background flex flex-col">
-      <div className="w-full h-[60vh] overflow-y-auto p-2">
-        <WarehouseViz 
-          items={items} 
-          selectedVoxel={selectedVoxel} 
-          onSelectVoxel={handleSelectVoxel} 
-          onUpdateLocationQty={handleUpdateLocationQty}
-        />
-      </div>
       <div className="w-full overflow-auto p-2">
         <Card>
           <CardHeader className="p-2">
@@ -326,6 +324,14 @@ export default function WBPage() {
               <Input id="import" type="file" accept=".csv" onChange={handleImport} className="h-6 text-xs" />
               <Button onClick={handleExportDiff} className="h-6 text-xs"><VibeContentRenderer content="::FaFileExport:: Diff" /></Button>
               <Button onClick={handleCheckpoint} className="h-6 text-xs"><VibeContentRenderer content="::FaSave:: Чекпоинт" /></Button>
+              <Select value={gameMode || 'none'} onValueChange={v => setGameMode(v === 'none' ? null : v as 'offload' | 'onload')}>
+                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaGamepad:: Режим игры" />} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Выкл</SelectItem>
+                  <SelectItem value="offload"><VibeContentRenderer content="::FaArrowDown:: Offload (Отгрузка)" /></SelectItem>
+                  <SelectItem value="onload"><VibeContentRenderer content="::FaArrowUp:: Onload (Приемка)" /></SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardHeader>
           <CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[30vh]">
@@ -359,9 +365,24 @@ export default function WBPage() {
           <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
           <p>Очки: {score} | Ачивки: {achievements.join(', ')}</p>
           <p>Время: {startTime ? Math.floor((Date.now() - startTime) / 1000) : 0} сек</p>
-          <p>Фарм (приемка): +10 за упаковку. Дамаг (отгрузка): +5 за скорость.</p>
+          <p>Offload (отгрузка): +5 за дамаг. Onload (приемка): +10 за фарм.</p>
           <p>Идеи: Мультиплеер для админов, лидерборды, бонусы за объем/скорость. В разработке: Авто-синхр WB/Ozon.</p>
         </div>
+      </div>
+      <div className="w-full h-[80vh] overflow-y-auto p-2">
+        <WarehouseViz 
+          items={items} 
+          selectedVoxel={selectedVoxel} 
+          onSelectVoxel={handleSelectVoxel} 
+          onUpdateLocationQty={handleUpdateLocationQty}
+          gameMode={gameMode}
+        />
+      </div>
+      <div className="mt-4 p-2 bg-muted rounded text-[10px]">
+        <h3 className="font-bold">Объяснение процедур экспорта/импорта и синхронизации с WB/Ozon</h3>
+        <p><strong>Импорт CSV:</strong> Загружайте файл CSV (формат: item_id,change_quantity,voxel) для приемки (onload). Система обновит запасы автоматически, добавив количества. Используйте для быстрой загрузки новой партии товаров. После импорта проверьте дифф и синхронизируйте с WB/Ozon вручную, загрузив сгенерированный CSV в их панели (обновление остатков).</p>
+        <p><strong>Экспорт Diff CSV:</strong> Кнопка генерирует CSV с изменениями (item_id,diff_quantity,voxel) с последнего чекпоинта. Это для отгрузки (offload). Загружайте этот файл в WB и Ozon для обновления остатков на маркетплейсах. Дифф gamified: каждый клик в offload — это "взятие товара", обновляющее Supabase и дифф для экспорта.</p>
+        <p><strong>Синхронизация WB/Ozon:</strong> 1. Сделайте чекпоинт перед работой. 2. В режиме offload/onload кликайте пластины — обновления идут в Supabase сразу. 3. Экспортируйте diff CSV. 4. Загрузите CSV в WB (раздел "Остатки" > Импорт) и Ozon (аналогично). Для авто-синхра: в будущем интегрируем API, но пока ручной. Для multiple складов ('A' точный, 'B' approx): экспорт дифф учитывает min_quantity для 'B', предупреждая о низких запасах.</p>
       </div>
       {workflowItems.length > 0 && (
         <Dialog open={true}>

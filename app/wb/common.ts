@@ -77,17 +77,20 @@ export type WarehouseVizProps = {
   selectedVoxel: string | null;
   onSelectVoxel: (id: string) => void;
   onUpdateLocationQty: (itemId: string, voxelId: string, quantity: number) => void;
+  gameMode: 'offload' | 'onload' | null;
 };
 
 export type Voxel = typeof VOXELS[0];
 
-export type WarehouseCellProps = {
+export type WarehousePlateProps = {
   voxel: Voxel;
   contents: Content[];
   selected: boolean;
   onSelect: (id: string) => void;
   onUpdateQty: (itemId: string, voxelId: string, quantity: number) => void;
   items: Item[];
+  onPlateClick: (voxelId: string) => void;
+  gameMode: 'offload' | 'onload' | null;
 };
 
 export type WarehouseItem = Database['public']['Tables']['cars']['Row'] & {
