@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { WarehousePlate } from "@/app/components/WarehousePlate";
 import { WarehouseVizProps, VOXELS } from "@/app/wb/common";
 
-export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLocationQty, gameMode }: WarehouseVizProps) {
+export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLocationQty, gameMode, onPlateClick }: WarehouseVizProps) {
   const voxelMap = useMemo(() => {
     const map: { [key: string]: {item: any; local_quantity: number}[] } = {};
     items.forEach(item => {
@@ -33,7 +33,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
               onSelect={onSelectVoxel}
               onUpdateQty={onUpdateLocationQty}
               items={items}
-              onPlateClick={handlePlateClick}
+              onPlateClick={onPlateClick}
               gameMode={gameMode}
             />
           ))}
@@ -49,7 +49,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
               onSelect={onSelectVoxel}
               onUpdateQty={onUpdateLocationQty}
               items={items}
-              onPlateClick={handlePlateClick}
+              onPlateClick={onPlateClick}
               gameMode={gameMode}
             />
           ))}

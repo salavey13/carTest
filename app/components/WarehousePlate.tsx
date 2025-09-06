@@ -26,16 +26,16 @@ export function WarehousePlate({ voxel, contents, selected, onSelect, onUpdateQt
     const packSize = SIZE_PACK[item.size] || 6;
     const fullPacks = Math.floor(qty / packSize);
     const partial = qty % packSize;
-    const borderClass = item.season === 'leto' ? 'border-1 border-dashed' : 'border-2 border-solid';
-    const tintFilter = item.color === 'beige' ? 'sepia(0.5)' : item.color === 'blue' ? 'hue-rotate(180deg)' : ''; // Пример tint
+    const borderClass = item.season === 'leto' ? 'border-[0.5px] border-dashed' : 'border-[1px] border-solid'; // Рефайн stripes
+    const tintFilter = `brightness(0.8) contrast(1.2) hue-rotate(${item.color === 'beige' ? 30 : item.color === 'blue' ? 180 : 0}deg)`; // Улучшенный tint
     const bullets = [];
     for (let i = 0; i < fullPacks; i++) {
       bullets.push(
         <AnimatePresence key={`pack-${i}`}>
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }} className="flex flex-wrap gap-0.5 justify-center items-center w-8 h-8 rounded-full overflow-hidden rotate-anim relative">
-            <div className="absolute inset-0 bg-cover bg-center opacity-30" style={{backgroundImage: `url(${item.image})`, filter: tintFilter}} />
+            <div className="absolute inset-0 bg-cover bg-center opacity-40" style={{backgroundImage: `url(${item.image})`, filter: tintFilter}} />
             {Array.from({length: packSize}).map((_, j) => (
-              <div key={j} className={cn("w-0.5 h-0.5 rounded-full", COLOR_MAP[item.color || 'gray'], borderClass)} />
+              <div key={j} className={cn("w-[1.3px] h-[1.3px] rounded-full", COLOR_MAP[item.color || 'gray'], borderClass)} />
             ))}
           </motion.div>
         </AnimatePresence>
@@ -45,9 +45,9 @@ export function WarehousePlate({ voxel, contents, selected, onSelect, onUpdateQt
       bullets.push(
         <AnimatePresence key="partial">
           <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }} className="flex flex-wrap gap-0.5 justify-center items-center w-8 h-8 rounded-full overflow-hidden rotate-anim relative">
-            <div className="absolute inset-0 bg-cover bg-center opacity-30" style={{backgroundImage: `url(${item.image})`, filter: tintFilter}} />
+            <div className="absolute inset-0 bg-cover bg-center opacity-40" style={{backgroundImage: `url(${item.image})`, filter: tintFilter}} />
             {Array.from({length: packSize}).map((_, j) => (
-              <div key={j} className={cn("w-0.5 h-0.5 rounded-full", j < partial ? COLOR_MAP[item.color || 'gray'] : 'bg-gray-100', borderClass)} />
+              <div key={j} className={cn("w-[1.3px] h-[1.3px] rounded-full", j < partial ? COLOR_MAP[item.color || 'gray'] : 'bg-gray-100', borderClass)} />
             ))}
           </motion.div>
         </AnimatePresence>
@@ -60,6 +60,8 @@ export function WarehousePlate({ voxel, contents, selected, onSelect, onUpdateQt
     onSelect(voxel.id);
     if (gameMode) {
       onPlateClick(voxel.id);
+      // Виб/звук для иммерсии
+      if (navigator.vibrate) navigator.vibrate(50);
     }
   };
 
@@ -67,7 +69,7 @@ export function WarehousePlate({ voxel, contents, selected, onSelect, onUpdateQt
     <Dialog>
       <DialogTrigger asChild>
         <motion.div
-          whileTap={{ scale: 0.95 }}
+          whileTap={{ scale: 0.95, boxShadow: "0 0 10px rgba(255,255,255,0.5)" }} // Улучшенная анимация
           className={cn(
             "w-12 h-12 rounded-lg bg-blue-500/30 border border-blue-300 cursor-pointer transition-all flex flex-col items-center justify-center text-[10px] p-0.5 overflow-hidden",
             selected && "bg-blue-500/70 scale-105"
@@ -75,7 +77,7 @@ export function WarehousePlate({ voxel, contents, selected, onSelect, onUpdateQt
           onClick={handleClick}
         >
           <div>{voxel.id}</div>
-          <div className="flex flex-wrap gap-0.5 max-h-6 overflow-hidden">{contents.map(c => renderBullets(c.item, c.local_quantity))}</div>
+          <div className="flex flex-wrap gap-0.5 max-h-6 max-w-full overflow-hidden">{contents.map(c => renderBullets(c.item, c.local_quantity))}</div>
           <div>{totalQuantity > 0 ? totalQuantity : 'Пусто'}</div>
         </motion.div>
       </DialogTrigger>

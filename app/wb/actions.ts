@@ -4,6 +4,8 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import type { WarehouseItem } from "@/app/wb/common";
+import { SendComplexMessage } from "@/app/rentals/SendComplexMessage"; // Предполагаем импорт из контекста
+import { notifyAdmins } from "@/app/actions"; // Предполагаем core notifyAdmins
 
 export async function getWarehouseItems(): Promise<{ success: boolean; data?: WarehouseItem[]; error?: string }> {
   noStore();
@@ -55,4 +57,17 @@ export async function updateItemLocationQty(itemId: string, voxelId: string, qua
 async function getItemSpecs(itemId: string): Promise<any> {
   const { data } = await supabaseAdmin.from('cars').select('specs').eq('id', itemId).single();
   return data?.specs || {};
+}
+
+export async function exportDiffToAdmin(diffCsv: string) {
+  try {
+    // Отправка файла в админ-чат
+    const message = "Diff CSV для синхра WB/Ozon готов! Загружайте в панели.";
+    await notifyAdmins(message); // Основное уведомление
+    // Для файла используем SendComplexMessage с attach
+    await SendComplexMessage(process.env.ADMINS_CHAT_ID, message, { attachment: { type: 'document', content: diffCsv, filename: 'warehouse_diff.csv' } });
+    logger.info("[exportDiffToAdmin] Sent to admins.");
+  } catch (error) {
+    logger.error("[exportDiffToAdmin] Error:", error);
+  }
 }
