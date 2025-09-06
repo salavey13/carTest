@@ -18,41 +18,21 @@ import { toast } from "sonner";
 import { Loading } from "@/components/Loading";
 import Papa from "papaparse";
 
-/**
- * UI/UX design notes:
- * - Убираем Accordion: карточки — полноценные интерактивные плитки.
- * - Фон каждой плитки — Image fill + цветной tint сверху (COLOR_MAP).
- * - Hover overlay: описание, action-плашка (pointer-events: none — чтобы не ломать клики).
- * - Layout animation: framer-motion layout + AnimatePresence для плавной перестановки.
- * - Клик по плитке — select (и если gameMode включён — триггер onPlateClick).
- * - На мобильных держим всё простым, но с анимашками (scale/shine).
- */
-
-/* ------------------------
-   Types (local) - уточняем Item
-   ------------------------ */
 type SortMode = "name" | "quantity" | "voxel";
 
 /* ------------------------
-   Helpers: subtle CSS-in-JS additions (shimmer, glow)
+   Встраиваемые стили (shimmer, glow и т.п.)
    ------------------------ */
-const SHIMMER = `
-  background-image: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.02) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2.1s infinite;
+const STYLE_STRING = `
+@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+.wb-tile-glow { box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 24px rgba(255,255,255,0.02) inset; border-radius: 12px; }
+.wb-pulse { animation: wb-pulse 1.6s infinite; }
+@keyframes wb-pulse { 0% { transform: translateY(0); } 50% { transform: translateY(-3px);} 100% { transform: translateY(0); } }
+.wb-shimmer { background-image: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.02) 100%); background-size: 200% 100%; animation: shimmer 2.1s linear infinite; }
 `;
-const STYLE_TAG = (
-  <style>{`
-    @keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
-    .wb-tile-glow { box-shadow: 0 8px 30px rgba(0,0,0,0.45), 0 0 24px rgba(255,255,255,0.02) inset; }
-    .wb-pulse { animation: wb-pulse 1.6s infinite; }
-    @keyframes wb-pulse { 0% { transform: translateY(0); } 50% { transform: translateY(-3px);} 100% { transform: translateY(0); } }
-    .wb-shrink-on-tap:active { transform: scale(.985) !important; }
-  `}</style>
-);
 
 /* ------------------------
-   Component
+   Компонент
    ------------------------ */
 export default function WBPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -75,9 +55,6 @@ export default function WBPage() {
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState<'offload' | 'onload' | null>(null);
 
-  /* ------------------------
-     Load items
-     ------------------------ */
   useEffect(() => {
     let cancelled = false;
     async function loadItems() {
@@ -102,7 +79,7 @@ export default function WBPage() {
             } as Item;
           });
 
-          // Добавляем примеры паттернов (как раньше)
+          // Дополняем шаблонами (как было раньше)
           const newItems = [...processed];
           ["evro", "dvushka", "evro-maksi", "polutorka"].forEach((type) => {
             ["adel", "malvina"].forEach((pattern) => {
@@ -142,9 +119,6 @@ export default function WBPage() {
     return () => { cancelled = true; };
   }, []);
 
-  /* ------------------------
-     Filters + sorting
-     ------------------------ */
   const filteredItems = useMemo(() => {
     const out = items
       .filter(i => (!filterSeason || i.season === filterSeason) &&
@@ -162,20 +136,7 @@ export default function WBPage() {
 
   const totals = useMemo(() => filteredItems.reduce((acc, i) => acc + i.total_quantity, 0), [filteredItems]);
 
-  /* ------------------------
-     Actions
-     ------------------------ */
-  const handleSelectVoxel = (id: string) => setSelectedVoxel(id);
-
-  const handleSelectItem = (id: string) => {
-    setSelectedItemId(id);
-    const item = items.find(i => i.id === id);
-    if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
-    // tactile feedback
-    if (navigator.vibrate) navigator.vibrate(30);
-  };
-
-  const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
+  async function handleUpdateLocationQty(itemId: string, voxelId: string, quantity: number, isGameAction = false) {
     const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
     if (success) {
       setItems(prev => prev.map(i => {
@@ -201,9 +162,16 @@ export default function WBPage() {
     } else {
       toast.error(error || "Ошибка обновления");
     }
-  };
+  }
 
-  const handlePlateClick = (voxelId: string) => {
+  function handleSelectItem(id: string) {
+    setSelectedItemId(id);
+    const item = items.find(i => i.id === id);
+    if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+
+  function handlePlateClick(voxelId: string) {
     if (!gameMode) return;
     const content = items.flatMap(i => i.locations.filter(l => l.voxel === voxelId).map(l => ({ item: i, quantity: l.quantity })));
     if (content.length > 0) {
@@ -212,10 +180,10 @@ export default function WBPage() {
       handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity + delta, true);
     } else if (gameMode === "onload") {
       toast.warning("Ячейка пуста. Добавьте товар через диалог.");
-      handleSelectVoxel(voxelId);
+      setSelectedVoxel(voxelId);
     }
     if (navigator.vibrate) navigator.vibrate(40);
-  };
+  }
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -303,9 +271,6 @@ export default function WBPage() {
     setSortBy("name");
   };
 
-  /* ------------------------
-     Small helper for tint filter based on color key
-     ------------------------ */
   function tintFilterFor(colorKey?: string) {
     if (!colorKey) return "brightness(0.85) contrast(1.05)";
     switch (colorKey) {
@@ -319,17 +284,12 @@ export default function WBPage() {
     }
   }
 
-  /* ------------------------
-     Render: if loading show spinner
-     ------------------------ */
   if (loading) return <Loading text="Загрузка склада..." />;
 
-  /* ------------------------
-     Main JSX
-     ------------------------ */
   return (
     <div className="min-h-screen pt-24 bg-background flex flex-col">
-      {STYLE_TAG}
+      <style>{STYLE_STRING}</style>
+
       <div className="w-full overflow-auto p-2">
         <Card>
           <CardHeader className="flex flex-col gap-2 p-3">
@@ -338,16 +298,13 @@ export default function WBPage() {
               <div className="flex gap-2 items-center">
                 <Button onClick={handleExportDiff} className="h-8 text-xs">Export Diff</Button>
                 <Button onClick={handleCheckpoint} className="h-8 text-xs">Чекпоинт</Button>
-                <Button onClick={() => {
-                  // quick visual fireworks — маленькая побочная радость
-                  setAchievements(prev => [...prev, "Пофейерверк!"]);
-                  toast.success("Пиксельный фейерверк!");
-                }} className="h-8 text-xs">Фейерверк</Button>
+                <Button onClick={() => { setAchievements(prev => [...prev, "Пофейерверк!"]); toast.success("Пиксельный фейерверк!"); }} className="h-8 text-xs">Фейерверк</Button>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2 text-xs">
               <Input className="h-8 text-sm w-60" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
+
               <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
                 <SelectTrigger className="h-8 text-sm w-36"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -358,7 +315,7 @@ export default function WBPage() {
               </Select>
 
               <Select value={filterSeason || "all"} onValueChange={v => setFilterSeason(v === "all" ? null : v)}>
-                <SelectTrigger className="h-8 text-sm w-40"><SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} /></SelectValue></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm w-40"><SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="leto">Лето</SelectItem>
@@ -405,7 +362,7 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
 
-              <Label htmlFor="import" className="text-xs flex items-center gap-1">
+              <Label htmlFor="import" className="text-xs flex items-center gap-1 cursor-pointer">
                 <VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" />
                 <input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="hidden" />
               </Label>
@@ -423,11 +380,8 @@ export default function WBPage() {
             </div>
           </CardHeader>
 
-          {/* Карточки-плитки */}
           <CardContent className="p-3">
-            <div className="mb-2 text-xs text-muted-foreground">
-              Подсказка: клик — выбрать/открыть. Включите режим игры для мгновенных правок (vibrate + instant update).
-            </div>
+            <div className="mb-2 text-xs text-muted-foreground">Подсказка: клик — выбрать/открыть. Включите режим игры для мгновенных правок (vibrate + instant update).</div>
 
             <AnimatePresence initial={false}>
               <motion.div
@@ -450,14 +404,9 @@ export default function WBPage() {
                       whileHover={{ scale: 1.035 }}
                       whileTap={{ scale: 0.985 }}
                       onClick={() => handleSelectItem(item.id)}
-                      className={cn(
-                        "relative rounded-2xl overflow-hidden cursor-pointer wb-tile-glow wb-shrink-on-tap",
-                        "min-h-[120px] flex flex-col justify-between",
-                        "transition-transform duration-300",
-                      )}
+                      className={cn("relative rounded-2xl overflow-hidden cursor-pointer wb-tile-glow wb-shrink-on-tap min-h-[120px] flex flex-col justify-between transition-transform duration-300")}
                       style={{ border: "1px solid rgba(255,255,255,0.03)" }}
                     >
-                      {/* background image (fill) */}
                       {hasImage && (
                         <div className="absolute inset-0 -z-10">
                           <Image
@@ -466,33 +415,19 @@ export default function WBPage() {
                             fill
                             priority={idx < 6}
                             sizes="(max-width: 768px) 100px, 200px"
-                            className="object-cover transform-gpu transition-transform duration-700 group-hover:scale-110"
+                            className="object-cover transform-gpu transition-transform duration-700"
                             style={{ filter: tintFilterFor(item.color) }}
                           />
                         </div>
                       )}
 
-                      {/* color tint overlay */}
-                      <div
-                        className={cn("absolute inset-0 -z-5", colorClass)}
-                        style={{ mixBlendMode: "overlay", opacity: 0.72, transition: "opacity .25s" }}
-                      />
+                      <div className={cn("absolute inset-0 -z-5", colorClass)} style={{ mixBlendMode: "overlay", opacity: 0.72, transition: "opacity .25s" }} />
 
-                      {/* top-left badge: pattern / season */}
                       <div className="absolute top-2 left-2 z-10 flex gap-1 items-center">
-                        {item.season && (
-                          <div className="px-2 py-0.5 rounded-full text-[10px] bg-black/40 text-white backdrop-blur-sm">
-                            {item.season === "leto" ? "🌞 Лето" : "❄️ Зима"}
-                          </div>
-                        )}
-                        {item.pattern && (
-                          <div className="px-2 py-0.5 rounded-full text-[10px] bg-black/30 text-white">
-                            {item.pattern}
-                          </div>
-                        )}
+                        {item.season && <div className="px-2 py-0.5 rounded-full text-[10px] bg-black/40 text-white backdrop-blur-sm">{item.season === "leto" ? "🌞 Лето" : "❄️ Зима"}</div>}
+                        {item.pattern && <div className="px-2 py-0.5 rounded-full text-[10px] bg-black/30 text-white">{item.pattern}</div>}
                       </div>
 
-                      {/* main content */}
                       <div className="relative z-10 p-3 flex flex-col justify-between h-full">
                         <div>
                           <h3 className="text-white font-extrabold text-sm leading-5 drop-shadow-lg">{item.name}</h3>
@@ -508,24 +443,15 @@ export default function WBPage() {
 
                             <div className="flex gap-1">
                               {item.locations.slice(0,3).map(loc => (
-                                <motion.span
-                                  key={loc.voxel}
-                                  layout
-                                  className="px-2 py-0.5 rounded-full text-[11px] bg-black/50 backdrop-blur-sm text-white flex items-center gap-1"
-                                  initial={{ opacity: 0.9 }}
-                                  animate={{ opacity: 1 }}
-                                >
+                                <motion.span key={loc.voxel} layout className="px-2 py-0.5 rounded-full text-[11px] bg-black/50 backdrop-blur-sm text-white flex items-center gap-1">
                                   <span className="font-mono text-[10px]">{loc.voxel}</span>
                                   <span className="text-[11px]">:{loc.quantity}</span>
                                 </motion.span>
                               ))}
-                              {item.locations.length > 3 && (
-                                <div className="px-2 py-0.5 rounded-full text-[10px] bg-black/30 text-white">+{item.locations.length - 3}</div>
-                              )}
+                              {item.locations.length > 3 && <div className="px-2 py-0.5 rounded-full text-[10px] bg-black/30 text-white">+{item.locations.length - 3}</div>}
                             </div>
                           </div>
 
-                          {/* action cluster */}
                           <div className="flex gap-2 items-center">
                             <Button onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); setSelectedVoxel(item.locations[0]?.voxel || null); }} className="h-8 text-[11px]">Edit</Button>
                             <Button variant="ghost" onClick={(e) => { e.stopPropagation(); handlePlateClick(item.locations[0]?.voxel || ""); }} className="h-8 text-[11px]">Quick</Button>
@@ -533,23 +459,16 @@ export default function WBPage() {
                         </div>
                       </div>
 
-                      {/* hover description overlay (visual only, pointer-events none so clicks pass through) */}
                       {item.description && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          whileHover={{ opacity: 1 }}
-                          transition={{ duration: 0.25 }}
-                          className="absolute inset-0 z-20 flex items-center justify-center p-4"
-                          style={{ pointerEvents: "none" }}
-                        >
+                        <motion.div initial={{ opacity: 0 }} whileHover={{ opacity: 1 }} transition={{ duration: 0.25 }} className="absolute inset-0 z-20 flex items-center justify-center p-4" style={{ pointerEvents: "none" }}>
                           <div style={{ width: "100%", maxHeight: "100%", overflow: "hidden" }}>
                             <div style={{ borderRadius: 12, padding: 8, background: "linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.72))" }} className="text-[12px] text-white/95 leading-tight">
                               {item.description}
                             </div>
                             <div style={{ height: 6 }} />
                             <div style={{ display: "flex", justifyContent: "center" }}>
-                              <div style={{ width: "70%", height: 6, borderRadius: 6, background: "rgba(255,255,255,0.06)", ...{ mixBlendMode: "soft-light" } as any, ...{ boxShadow: "0 6px 18px rgba(0,0,0,0.35)" } }}>
-                                <div style={{ width: `${Math.min(100, Math.max(1, (item.total_quantity / 50) * 100))}%`, height: "100%", borderRadius: 6, background: "linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06))", ...{ boxShadow: "0 4px 10px rgba(0,0,0,0.35) inset" } as any, ...( { ...(SHIMMER ? { animation: "shimmer 2s infinite" } : {}) } as any) }} />
+                              <div style={{ width: "70%", height: 6, borderRadius: 6, background: "rgba(255,255,255,0.06)" }}>
+                                <div className="wb-shimmer" style={{ width: `${Math.min(100, Math.max(1, (item.total_quantity / 50) * 100))}%`, height: "100%", borderRadius: 6, background: "linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06))" }} />
                               </div>
                             </div>
                           </div>
@@ -563,29 +482,18 @@ export default function WBPage() {
           </CardContent>
         </Card>
 
-        {/* Side / game status */}
         <div className="mt-4 p-2 bg-muted rounded text-[12px]">
           <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
           <p>Очки: <span className="font-mono">{score}</span> | Ачивки: {achievements.join(", ") || "—"}</p>
           <p>Время с загрузки: <span className="font-mono">{startTime ? Math.floor((Date.now() - startTime) / 1000) : 0}</span> сек</p>
           <p>Offload: уменьшение шт. Onload: прибавление. Быстрая синхра в Supabase при клике (режим игры).</p>
-          <p>Идеи: мультиплеер, лидерборды, звуки, эффекты частиц. Хочешь — добавлю партиклы при кейс-открытии.</p>
         </div>
       </div>
 
-      {/* Warehouse visualisation panel (нижняя часть) */}
       <div className="w-full h-[80vh] overflow-y-auto p-2">
-        {/* Мы оставляем WarehouseViz как есть — плитки сверху уже заменили список.
-            WarehouseViz отвечает за визуализацию полок. */}
         <div className="w-full h-full rounded border border-dashed border-neutral-800 p-2">
           <h4 className="text-sm font-bold mb-2">Визуализация склада</h4>
-          {/* Вставляем оригинальный компонент WarehouseViz, если он есть */}
-          <div>
-            {/* Используем динамический импорт? Нет — просто рендерим клиентский компонент через тег */}
-            {/* Если компонент не подключен — можно отобразить fallback */}
-            {/* TODO: если нужен — можно добавить drag&drop plates, particle FX */}
-            <div className="text-[12px] text-muted-foreground">Панель визуализации складских полок (тул-панель ниже)</div>
-          </div>
+          <div className="text-[12px] text-muted-foreground">Панель визуализации складских полок (если нужен live viz — втащу WarehouseViz сюда и добавлю drag & drop).</div>
         </div>
       </div>
 
@@ -596,7 +504,6 @@ export default function WBPage() {
         <p><strong>Синхронизация:</strong> 1) Сохрани чекпоинт. 2) Играй в режиме Game для мгновенных update'ов. 3) Экспорт — отправь в админку/панель WB/Ozon.</p>
       </div>
 
-      {/* Dialog: редактирование выбранного элемента */}
       <Dialog open={!!selectedItemId} onOpenChange={(open) => { if (!open) setSelectedItemId(null); }}>
         <DialogContent className="max-h-[80vh] overflow-auto">
           <DialogHeader>
@@ -650,7 +557,6 @@ export default function WBPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Workflow dialog */}
       {workflowItems.length > 0 && (
         <Dialog open={true}>
           <DialogContent className="max-h-[80vh] overflow-auto">
