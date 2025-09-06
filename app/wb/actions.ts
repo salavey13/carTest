@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
 import type { WarehouseItem } from "@/app/wb/common";
-import { SendComplexMessage } from "@/app/webhook-handlers/actions/SendComplexMessage";
+import { SendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions"; // Предполагаем core notifyAdmins
 
 export async function getWarehouseItems(): Promise<{ success: boolean; data?: WarehouseItem[]; error?: string }> {
