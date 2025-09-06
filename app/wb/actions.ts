@@ -3,17 +3,7 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from 'next/cache';
-import type { Database } from "@/types/database.types";
-
-type WarehouseItem = Database['public']['Tables']['cars']['Row'] & {
-  specs: { 
-    size: string; 
-    color: string; 
-    pattern: string; 
-    season: string | null; 
-    warehouse_locations: { voxel_id: string; quantity: number }[]; 
-  };
-};
+import type { WarehouseItem } from "@/app/wb/common";
 
 export async function getWarehouseItems(): Promise<{ success: boolean; data?: WarehouseItem[]; error?: string }> {
   noStore();
@@ -45,6 +35,10 @@ export async function updateItemLocationQty(itemId: string, voxelId: string, qua
       }
     } else if (quantity > 0) {
       locations.push({ voxel_id: voxelId, quantity });
+    }
+    // Для 'B' полок проверяем min_quantity
+    if (voxelId.startsWith('B') && specs.min_quantity && quantity < specs.min_quantity) {
+      logger.warn(`[updateItemLocationQty] Warning: Quantity below min for B shelf: ${quantity} < ${specs.min_quantity}`);
     }
     const { error } = await supabaseAdmin
       .from('cars')
