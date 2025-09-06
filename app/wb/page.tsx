@@ -16,52 +16,12 @@ import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-const SIZE_PACK: {[key: string]: number} = {
-  '180x220': 6,
-  '200x220': 6,
-  '220x240': 8,
-  '90': 8,
-  '120': 8,
-  '140': 8,
-  '160': 8,
-  '180': 8,
-  '200': 8,
-  '150x200': 6,
-};
-const COLOR_MAP: {[key: string]: string} = {
-  beige: 'bg-yellow-200',
-  blue: 'bg-blue-200',
-  red: 'bg-red-200',
-  'light-green': 'bg-green-200',
-  'dark-green': 'bg-green-500',
-  gray: 'bg-gray-200',
-};
-type Location = {
-  voxel: string;
-  quantity: number;
-};
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { COLOR_MAP, SIZE_PACK, VOXELS, Item, Location } from "@/app/wb/common";
+import { motion } from "framer-motion";
 
-type Item = {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  locations: Location[];
-  total_quantity: number;
-  season?: 'leto' | 'zima' | null;
-  pattern?: 'kruzheva' | 'mirodel' | 'ogurtsy' | 'flora1' | 'flora2' | 'flora3';
-  color: string;
-  size: string;
-};
-
-// Хардкод дефолтных items обновлен с warehouse_locations array
-const DEFAULT_ITEMS: Item[] = [
-  // Евро...
-  { id: 'evro-leto-kruzheva', name: 'Евро Лето Кружева', description: 'Бежевая, полосочка', image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/evro-leto-kruzheva.jpg`, locations: [{voxel: 'A1', quantity: 5}], total_quantity: 5, season: 'leto', pattern: 'kruzheva', color: 'beige', size: '180x220' },
-  // ... все остальные аналогично, с locations: [{voxel: ..., quantity: ...}], total_quantity: quantity
-];
 export default function WBPage() {
-  const [items, setItems] = useState<Item[]>(DEFAULT_ITEMS);
+  const [items, setItems] = useState<Item[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,13 +36,16 @@ export default function WBPage() {
   const [currentWorkflowIndex, setCurrentWorkflowIndex] = useState(0);
   const [selectedWorkflowVoxel, setSelectedWorkflowVoxel] = useState<string | null>(null);
   const [lastCheckpoint, setLastCheckpoint] = useState<{[key: string]: {locations: Location[]}} | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [achievements, setAchievements] = useState<string[]>([]);
+  const [score, setScore] = useState(0);
 
   useEffect(() => {
     async function loadItems() {
       const { success, data, error } = await getWarehouseItems();
       if (success && data) {
-        setItems(data.map(item => {
-          const locations = item.specs.warehouse_locations || (item.specs.warehouse_location ? [{voxel_id: item.specs.warehouse_location.voxel_id, quantity: item.specs.quantity || 0}] : []);
+        const processed = data.map(item => {
+          const locations = item.specs.warehouse_locations || [];
           const total_quantity = locations.reduce((sum, l) => sum + l.quantity, 0);
           return {
             id: item.id,
@@ -96,13 +59,40 @@ export default function WBPage() {
             color: item.specs.color,
             size: item.specs.size,
           };
-        }));
+        });
+        // Добавляем новые паттерны
+        const newItems = [...processed];
+        ['evro', 'dvushka', 'evro-maksi', 'polutorka'].forEach(type => {
+          ['adel', 'malvina'].forEach(pattern => {
+            ['leto', 'zima'].forEach(season => {
+              const id = `${type}-${season}-${pattern}`;
+              if (!newItems.some(i => i.id === id)) {
+                newItems.push({
+                  id,
+                  name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${season.charAt(0).toUpperCase() + season.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`,
+                  description: pattern === 'adel' ? 'Бежевая, белое голубой горошек' : 'Бежевая, мятное фиолетовый цветок',
+                  image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/${id}.jpg`,
+                  locations: [],
+                  total_quantity: 0,
+                  season,
+                  pattern,
+                  color: type === 'evro' ? 'beige' : type === 'dvushka' ? 'blue' : type === 'evro-maksi' ? 'red' : 'gray',
+                  size: type === 'evro' ? '180x220' : type === 'dvushka' ? '200x220' : type === 'evro-maksi' ? '220x240' : '150x200',
+                });
+              }
+            });
+          });
+        });
+        setItems(newItems);
       } else {
         toast.error(error || "Ошибка загрузки товаров");
       }
       setLoading(false);
       const stored = localStorage.getItem('warehouse_checkpoint');
       if (stored) setLastCheckpoint(JSON.parse(stored));
+      const ach = localStorage.getItem('achievements');
+      if (ach) setAchievements(JSON.parse(ach));
+      setStartTime(Date.now());
     }
     loadItems();
   }, []);
@@ -135,7 +125,7 @@ export default function WBPage() {
     if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
   };
 
-  const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number) => {
+  const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
     const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
     if (success) {
       setItems(prev => prev.map(i => {
@@ -156,8 +146,19 @@ export default function WBPage() {
         return i;
       }));
       toast.success("Обновлено");
+      if (isGameAction) {
+        setScore(prev => prev + (quantity > 0 ? 10 : 5)); // Фарм +10, дамаг +5
+      }
     } else {
       toast.error(error);
+    }
+  };
+
+  const handleCellClick = (voxelId: string) => {
+    const content = items.flatMap(i => i.locations.filter(l => l.voxel === voxelId).map(l => ({item: i, quantity: l.quantity})));
+    if (content.length > 0) {
+      const mainItem = content[0].item;
+      handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity - 1, true); // Вычитаем 1, гейм-акция
     }
   };
 
@@ -186,29 +187,38 @@ export default function WBPage() {
       }
       const item = items.find(i => i.id === id);
       const currentQty = item?.locations.find(l => l.voxel === voxel)?.quantity || 0;
-      await handleUpdateLocationQty(id, voxel, currentQty + change);
+      await handleUpdateLocationQty(id, voxel, currentQty + change, true);
       setSelectedWorkflowVoxel(null);
       setCurrentWorkflowIndex(prev => prev + 1);
     } else {
       setWorkflowItems([]);
       toast.success("Импорт завершен");
+      const timeSpent = Date.now() - (startTime || Date.now());
+      const prevBest = localStorage.getItem('bestTime');
+      if (!prevBest || timeSpent < parseInt(prevBest)) {
+        localStorage.setItem('bestTime', timeSpent.toString());
+        setAchievements(prev => {
+          const newAch = [...prev, 'Новый рекорд времени!'];
+          localStorage.setItem('achievements', JSON.stringify(newAch));
+          return newAch;
+        });
+      }
     }
   };
 
   const handleExportDiff = () => {
     if (!lastCheckpoint) return toast.error("Нет чекпоинта");
-    const diff = items.reduce((acc, i) => {
+    const diffData = items.map(i => {
       const prev = lastCheckpoint[i.id];
-      if (prev) {
-        acc[i.id] = {locations: i.locations};
-      }
-      return acc;
-    }, {} as any);
-    const blob = new Blob([JSON.stringify(diff)], {type: 'application/json'});
+      const diffQty = i.total_quantity - (prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0);
+      return [i.id, diffQty, i.locations[0]?.voxel || ''];
+    });
+    const csv = Papa.unparse(diffData);
+    const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'warehouse_diff.json';
+    a.download = 'warehouse_diff.csv';
     a.click();
   };
 
@@ -235,7 +245,7 @@ export default function WBPage() {
 
   return (
     <div className="min-h-screen pt-24 bg-background flex flex-col">
-      <div className="w-full h-[40vh] overflow-auto p-2">
+      <div className="w-full h-[60vh] overflow-y-auto p-2">
         <WarehouseViz 
           items={items} 
           selectedVoxel={selectedVoxel} 
@@ -248,9 +258,9 @@ export default function WBPage() {
           <CardHeader className="p-2">
             <CardTitle className="text-sm">Список (Всего: {totals})</CardTitle>
             <div className="flex flex-wrap gap-1 text-xs">
-              <Input className="h-6 text-xs" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
+              <Input className="h-6 text-xs w-auto" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
               <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-                <SelectTrigger className="h-6 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Имя</SelectItem>
                   <SelectItem value="quantity">Кол-во</SelectItem>
@@ -258,15 +268,15 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterSeason || 'all'} onValueChange={v => setFilterSeason(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Сезон" /></SelectTrigger>
+                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="leto">Лето</SelectItem>
-                  <SelectItem value="zima">Зима</SelectItem>
+                  <SelectItem value="leto"><VibeContentRenderer content="::FaSun:: Лето" /></SelectItem>
+                  <SelectItem value="zima"><VibeContentRenderer content="::FaSnowflake:: Зима" /></SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterPattern || 'all'} onValueChange={v => setFilterPattern(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Узор" /></SelectTrigger>
+                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="kruzheva">Кружева</SelectItem>
@@ -275,10 +285,12 @@ export default function WBPage() {
                   <SelectItem value="flora1">Флора 1</SelectItem>
                   <SelectItem value="flora2">Флора 2</SelectItem>
                   <SelectItem value="flora3">Флора 3</SelectItem>
+                  <SelectItem value="adel">Адель</SelectItem>
+                  <SelectItem value="malvina">Мальвина</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterColor || 'all'} onValueChange={v => setFilterColor(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Цвет" /></SelectTrigger>
+                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="beige">Бежевый</SelectItem>
@@ -287,10 +299,12 @@ export default function WBPage() {
                   <SelectItem value="light-green">Салатовый</SelectItem>
                   <SelectItem value="dark-green">Темно-зеленый</SelectItem>
                   <SelectItem value="gray">Серый</SelectItem>
+                  <SelectItem value="adel">Адель</SelectItem>
+                  <SelectItem value="malvina">Мальвина</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterSize || 'all'} onValueChange={v => setFilterSize(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs"><SelectValue placeholder="Размер" /></SelectTrigger>
+                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="180x220">180x220</SelectItem>
@@ -308,26 +322,26 @@ export default function WBPage() {
               <Button onClick={handleResetFilters} className="h-6 text-xs"><X size={12} /> Сброс</Button>
             </div>
             <div className="flex flex-wrap gap-1 mt-1 text-xs">
-              <Label htmlFor="import" className="text-xs">Импорт CSV</Label>
+              <Label htmlFor="import" className="text-xs"><VibeContentRenderer content="::FaFileImport:: Импорт CSV" /></Label>
               <Input id="import" type="file" accept=".csv" onChange={handleImport} className="h-6 text-xs" />
-              <Button onClick={handleExportDiff} className="h-6 text-xs">Diff</Button>
-              <Button onClick={handleCheckpoint} className="h-6 text-xs">Чекпоинт</Button>
+              <Button onClick={handleExportDiff} className="h-6 text-xs"><VibeContentRenderer content="::FaFileExport:: Diff" /></Button>
+              <Button onClick={handleCheckpoint} className="h-6 text-xs"><VibeContentRenderer content="::FaSave:: Чекпоинт" /></Button>
             </div>
           </CardHeader>
-          <CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[40vh] md:max-h-auto">
+          <CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[30vh]">
             {filteredItems.map(item => (
               <Accordion type="single" collapsible key={item.id}>
                 <AccordionItem value={item.id}>
-                  <AccordionTrigger className={cn("p-1 text-xs rounded", COLOR_MAP[item.color])} onClick={() => handleSelectItem(item.id)}>
+                  <AccordionTrigger className={cn("p-1 text-[10px] rounded", COLOR_MAP[item.color || 'gray'])} onClick={() => handleSelectItem(item.id)}>
                     <div className="flex items-center gap-1">
-                      {item.image && <Image src={item.image} alt={item.name} width={16} height={16} className="rounded" />}
+                      {item.image && <Image src={item.image} alt={item.name} width={12} height={12} className="rounded" />}
                       <div>
-                        <h3 className="font-bold text-xs">{item.name}</h3>
-                        <p className="text-xs">Кол: {item.total_quantity}</p>
+                        <h3 className="font-bold text-[10px]">{item.name}</h3>
+                        <p className="text-[10px]">Кол: {item.total_quantity}</p>
                       </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="p-1 text-xs">
+                  <AccordionContent className="p-1 text-[10px]">
                     {item.locations.map(loc => (
                       <div key={loc.voxel} className="flex justify-between">
                         <span>{loc.voxel}: {loc.quantity}</span>
@@ -341,10 +355,17 @@ export default function WBPage() {
             ))}
           </CardContent>
         </Card>
+        <div className="mt-4 p-2 bg-muted rounded text-[10px]">
+          <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
+          <p>Очки: {score} | Ачивки: {achievements.join(', ')}</p>
+          <p>Время: {startTime ? Math.floor((Date.now() - startTime) / 1000) : 0} сек</p>
+          <p>Фарм (приемка): +10 за упаковку. Дамаг (отгрузка): +5 за скорость.</p>
+          <p>Идеи: Мультиплеер для админов, лидерборды, бонусы за объем/скорость. В разработке: Авто-синхр WB/Ozon.</p>
+        </div>
       </div>
       {workflowItems.length > 0 && (
         <Dialog open={true}>
-          <DialogContent>
+          <DialogContent className="max-h-[80vh] overflow-auto">
             <DialogHeader>
               <DialogTitle>Workflow: {currentWorkflowIndex + 1}/{workflowItems.length}</DialogTitle>
             </DialogHeader>
