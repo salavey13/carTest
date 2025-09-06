@@ -264,6 +264,32 @@ export default function WBPage() {
     <div className="min-h-screen pt-24 bg-background flex flex-col">
       <div className="w-full overflow-auto p-2">
         <Card>
+<CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[80vh]">
+            {filteredItems.map(item => (
+              <Accordion type="single" collapsible key={item.id}>
+                <AccordionItem value={item.id}>
+                  <AccordionTrigger className={cn("p-1 text-[10px] rounded", COLOR_MAP[item.color || 'gray'])} onClick={() => handleSelectItem(item.id)}>
+                    <div className="flex items-center gap-1">
+                      {item.image && <Image src={item.image} alt={item.name} width={12} height={12} className="rounded" />}
+                      <div>
+                        <h3 className="font-bold text-[10px]">{item.name}</h3>
+                        <p className="text-[10px]">Кол: {item.total_quantity}</p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-1 text-[10px]">
+                    {item.locations.map(loc => (
+                      <div key={loc.voxel} className="flex justify-between">
+                        <span>{loc.voxel}: {loc.quantity}</span>
+                        <Button size="xs" onClick={() => setSelectedVoxel(loc.voxel)}>Посм.</Button>
+                      </div>
+                    ))}
+                    <p>{item.description}</p>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            ))}
+          </CardContent>
           <CardHeader className="p-2">
             <CardTitle className="text-sm">Список (Всего: {totals})</CardTitle>
             <div className="flex flex-wrap gap-1 text-xs">
@@ -345,32 +371,7 @@ export default function WBPage() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[30vh]">
-            {filteredItems.map(item => (
-              <Accordion type="single" collapsible key={item.id}>
-                <AccordionItem value={item.id}>
-                  <AccordionTrigger className={cn("p-1 text-[10px] rounded", COLOR_MAP[item.color || 'gray'])} onClick={() => handleSelectItem(item.id)}>
-                    <div className="flex items-center gap-1">
-                      {item.image && <Image src={item.image} alt={item.name} width={12} height={12} className="rounded" />}
-                      <div>
-                        <h3 className="font-bold text-[10px]">{item.name}</h3>
-                        <p className="text-[10px]">Кол: {item.total_quantity}</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="p-1 text-[10px]">
-                    {item.locations.map(loc => (
-                      <div key={loc.voxel} className="flex justify-between">
-                        <span>{loc.voxel}: {loc.quantity}</span>
-                        <Button size="xs" onClick={() => setSelectedVoxel(loc.voxel)}>Посм.</Button>
-                      </div>
-                    ))}
-                    <p>{item.description}</p>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            ))}
-          </CardContent>
+          
         </Card>
         <div className="mt-4 p-2 bg-muted rounded text-[10px]">
           <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
