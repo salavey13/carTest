@@ -264,13 +264,13 @@ export default function WBPage() {
     <div className="min-h-screen pt-24 bg-background flex flex-col">
       <div className="w-full overflow-auto p-2">
         <Card>
-<CardContent className="p-2 grid grid-cols-3 gap-1 overflow-auto max-h-[80vh]">
+<CardContent className="p-1 grid grid-cols-3 gap-1 overflow-auto max-h-[80vh]">
             {filteredItems.map(item => (
               <Accordion type="single" collapsible key={item.id}>
                 <AccordionItem value={item.id}>
                   <AccordionTrigger className={cn("p-1 text-[10px] rounded", COLOR_MAP[item.color || 'gray'])} onClick={() => handleSelectItem(item.id)}>
                     <div className="flex items-center gap-1">
-                      {item.image && <Image src={item.image} alt={item.name} width={12} height={12} className="rounded" />}
+                      {item.image && <Image src={item.image} alt={item.name} width={42} height={42} className="rounded" />}
                       <div>
                         <h3 className="font-bold text-[10px]">{item.name}</h3>
                         <p className="text-[10px]">Кол: {item.total_quantity}</p>
