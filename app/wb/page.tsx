@@ -507,17 +507,17 @@ export default function WBPage() {
     setSortBy("name");
   };
 
-  if (loading) return <Loading text="Загрузка данных склада..." />;
+  // if (loading) return <Loading text="Загрузка данных склада..." />;
 
   const bgStyle = {
     backgroundColor: gameMode === "onload" ? "#e6f4ea" : gameMode === "offload" ? "#fee2e2" : "#f5f5f5",
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col" style={bgStyle}>
+    <div className=" bg-background flex flex-col" style={bgStyle}>
       <div className="w-full overflow-auto p-3" style={bgStyle}>
         <Card className="shadow-md">
-          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[60vh]">
+          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[69vh]">
             {loading
               ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-20 rounded-xl" />)
               : filteredItems.map((item, idx) => (
@@ -530,8 +530,8 @@ export default function WBPage() {
                     className={cn(
                       "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
                       "transition-all duration-300 ease-in-out",
-                      gameMode ? "w-16 h-16 text-[8px]" : "w-20 h-20 text-[8px]",
-                      "sm:w-16 sm:h-16 sm:text-[8px]",
+                      gameMode ? "w-16 h-16 text-[9px]" : "w-20 h-20 text-[9px]",
+                      "sm:w-16 sm:h-16 sm:text-[9px]",
                     )}
                   >
                     {item.image && (
