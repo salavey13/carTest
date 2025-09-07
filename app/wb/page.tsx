@@ -38,6 +38,35 @@ function Loading({ text }: { text: string }) {
   );
 }
 
+// helpers
+const RUS_TYPE_MAP: Record<string, string> = {
+  evro: "Евро",
+  "dvushka": "Двушка",
+  "evro-maksi": "Евро Макси",
+  "polutorka": "Полуторка",
+};
+
+function makeRussianTitle(item: Item) {
+  // If item has explicit russian-ish fields in id (fake items created in loader) - map them
+  const id = item.id || "";
+  for (const key of Object.keys(RUS_TYPE_MAP)) {
+    if (id.includes(key)) {
+      // try to produce: "Евро Лето Адель"
+      const pieces = id.split("-");
+      const type = pieces[0];
+      const season = pieces[1];
+      const pattern = pieces[2];
+      const typeRu = RUS_TYPE_MAP[type] || type;
+      const seasonRu = season === "leto" ? "Лето" : season === "zima" ? "Зима" : season || "";
+      const patternRu = pattern ? pattern.charAt(0).toUpperCase() + pattern.slice(1) : "";
+      return `${typeRu}${seasonRu ? ` ${seasonRu}` : ""}${patternRu ? ` • ${patternRu}` : ""}`;
+    }
+  }
+  // fallback: try to detect common english words and translate (simple heuristic)
+  if (item.name) return item.name.replace(/(bed|mattress|cover)/gi, "покрывало");
+  return item.name || "Товар";
+}
+
 export default function WBPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -84,7 +113,7 @@ export default function WBPage() {
           const total_quantity = locations.reduce((sum: number, l: any) => sum + l.quantity, 0);
           return {
             id: item.id,
-            name: `${item.make} ${item.model}`,
+            name: `${item.make || ""} ${item.model || ""}`.trim(),
             description: item.description || "",
             image: item.image_url || "",
             locations: locations.map((l: any) => ({
@@ -99,6 +128,8 @@ export default function WBPage() {
             size: item.specs.size,
           } as Item;
         });
+
+        // Add demo dynamic ru items if missing (same as before but with ru fields)
         const newItems: Item[] = [...processed];
         ["evro", "dvushka", "evro-maksi", "polutorka"].forEach((type) => {
           ["adel", "malvina"].forEach((pattern) => {
@@ -107,7 +138,7 @@ export default function WBPage() {
               if (!newItems.some((i) => i.id === id)) {
                 newItems.push({
                   id,
-                  name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${season.charAt(0).toUpperCase() + season.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`,
+                  name: `${RUS_TYPE_MAP[type] || type} ${season === "leto" ? "Лето" : "Зима"} ${pattern === "adel" ? "Адель" : "Мальвина"}`,
                   description: pattern === "adel" ? "Бежевая, белое голубой горошек" : "Бежевая, мятное фиолетовый цветок",
                   image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/${id}.jpg`,
                   locations: [],
@@ -126,7 +157,6 @@ export default function WBPage() {
         console.error("Ошибка загрузки товаров:", error);
         toast.error(error || "Ошибка загрузки товаров");
         setErrorCount((prev) => prev + 1);
-        updateStreak(false);
       }
       setLoading(false);
       const stored = localStorage.getItem("warehouse_checkpoint");
@@ -135,12 +165,8 @@ export default function WBPage() {
       if (ach) setAchievements(JSON.parse(ach));
       const lb = localStorage.getItem("leaderboard");
       if (lb) setLeaderboard(JSON.parse(lb));
-      const prevErrors = localStorage.getItem("errorRate") || "0";
-      if (errorCount < parseInt(prevErrors)) setAchievements((prev) => [...new Set([...prev, "Высокая точность"])]);
-      localStorage.setItem("errorRate", errorCount.toString());
       setStartTime(Date.now());
       setSessionStart(Date.now());
-      loadDailyStreak();
       const name = localStorage.getItem("playerName");
       if (name) setPlayerName(name);
       else {
@@ -165,64 +191,6 @@ export default function WBPage() {
     }
   }, [bossMode, bossTimer]);
 
-  useEffect(() => {
-    if (score >= 100 && level === 1) levelUp(2);
-    if (score >= 500 && level === 2) levelUp(3);
-    if (score >= 1000 && level === 3) levelUp(4);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [score, level]);
-
-  const levelUp = (newLevel: number) => {
-    setLevel(newLevel);
-    setAchievements((prev) => [...new Set([...prev, `Уровень повышен: ${newLevel}`])]);
-    localStorage.setItem("achievements", JSON.stringify(achievements));
-    toast.success(`Уровень повышен до ${newLevel}! Множитель эффективности: x${newLevel / 2}`);
-  };
-
-  const updateStreak = (success: boolean) => {
-    if (success) {
-      setStreak((prev) => prev + 1);
-      if (streak + 1 === 10) addAchievement("Стабильность операций: 10");
-      if (streak + 1 === 50) addAchievement("Мастер операций: 50");
-    } else {
-      setStreak(0);
-    }
-  };
-
-  const addAchievement = (ach: string) => {
-    setAchievements((prev) => {
-      const newAch = [...new Set([...prev, ach])];
-      localStorage.setItem("achievements", JSON.stringify(newAch));
-      return newAch;
-    });
-  };
-
-  const loadDailyStreak = () => {
-    const lastDate = localStorage.getItem("lastSessionDate");
-    const today = new Date().toDateString();
-    if (lastDate === today) {
-      setDailyStreak(parseInt(localStorage.getItem("dailyStreak") || "0"));
-    } else if (new Date(lastDate || "").getTime() === new Date().setDate(new Date().getDate() - 1)) {
-      const newStreak = parseInt(localStorage.getItem("dailyStreak") || "0") + 1;
-      setDailyStreak(newStreak);
-      localStorage.setItem("dailyStreak", newStreak.toString());
-      if (newStreak === 3) addAchievement("Стабильность: 3 дня");
-      if (newStreak === 7) addAchievement("Неделя эффективности");
-    } else {
-      setDailyStreak(1);
-      localStorage.setItem("dailyStreak", "1");
-    }
-    localStorage.setItem("lastSessionDate", today);
-  };
-
-  const updateLeaderboard = (newScore: number) => {
-    if (!playerName) return;
-    const entry = { name: playerName, score: newScore, date: new Date().toLocaleString() };
-    const newLb = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
-    setLeaderboard(newLb);
-    localStorage.setItem("leaderboard", JSON.stringify(newLb));
-  };
-
   const filteredItems = useMemo(() => {
     return items
       .filter(
@@ -240,13 +208,10 @@ export default function WBPage() {
       });
   }, [items, sortBy, filterSeason, filterPattern, filterColor, filterSize, search]);
 
-  const totals = useMemo(() => {
-    return filteredItems.reduce((acc, i) => acc + i.total_quantity, 0);
-  }, [filteredItems]);
+  const totals = useMemo(() => filteredItems.reduce((acc, i) => acc + i.total_quantity, 0), [filteredItems]);
 
   const handleSelectVoxel = (id: string) => {
     setSelectedVoxel(id);
-    // Открывать модалку для ручного редактирования, если режим игры выключен
     if (!gameMode) {
       const content = items.flatMap((i) => i.locations.filter((l) => l.voxel === id).map((l) => ({ item: i, qty: l.quantity })));
       if (content.length > 0) {
@@ -266,7 +231,6 @@ export default function WBPage() {
     setSelectedItemId(id);
     const item = items.find((i) => i.id === id);
     if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
-    // Открываем модалку при клике на товар (если не режим игры)
     if (!gameMode) {
       setModalItem(item || null);
       setModalVoxel(item?.locations[0]?.voxel || null);
@@ -281,7 +245,6 @@ export default function WBPage() {
     if (voxelId.startsWith("B") && loc?.min_qty && quantity < loc.min_qty) {
       toast.warn("Минимальный запас на полке B! Требуется полный пересчет.");
       setErrorCount((prev) => prev + 1);
-      updateStreak(false);
       return;
     }
     const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
@@ -307,31 +270,15 @@ export default function WBPage() {
         }),
       );
       toast.success("Обновление выполнено");
-      // Закрыть модалку если она была открыта для этой локации/товара
       if (modalOpen && modalVoxel === voxelId) {
         setModalOpen(false);
         setModalItem(null);
         setModalVoxel(null);
         setModalQuantity("");
       }
-      if (isGameAction) {
-        const absChange = Math.abs(quantity - (loc?.quantity || 0));
-        let basePoints = gameMode === "onload" ? 10 : 5;
-        let bonus = absChange > 10 ? 5 : 0; // Volume bonus
-        bonus += level * 2; // Level bonus
-        const points = (basePoints + bonus) * absChange;
-        setScore((prev) => prev + points);
-        setClickCount((prev) => prev + 1);
-        updateStreak(true);
-        if (clickCount > 10 && (Date.now() - (startTime || Date.now())) / 60000 < 1) {
-          addAchievement("Высокая скорость");
-        }
-        updateLeaderboard(score + points);
-      }
     } else {
       toast.error(error || "Ошибка обновления");
       setErrorCount((prev) => prev + 1);
-      updateStreak(false);
     }
   };
 
@@ -354,7 +301,6 @@ export default function WBPage() {
     if (!item?.locations[0]) {
       toast.error("Локация не указана. Добавьте вручную.");
       setErrorCount((prev) => prev + 1);
-      updateStreak(false);
       return;
     }
     const voxelId = item.locations[0].voxel;
@@ -396,7 +342,6 @@ export default function WBPage() {
       if (!voxel) {
         toast.error("Выберите локацию");
         setErrorCount((prev) => prev + 1);
-        updateStreak(false);
         return;
       }
       const item = items.find((i) => i.id === id);
@@ -411,20 +356,20 @@ export default function WBPage() {
       const prevBest = localStorage.getItem("bestTime");
       if (!prevBest || timeSpent < parseInt(prevBest)) {
         localStorage.setItem("bestTime", timeSpent.toString());
-        addAchievement("Рекорд времени");
+        setAchievements((prev) => [...new Set([...prev, "Рекорд времени")]);
       }
-      if (timeSpent < 300000) addAchievement("Молниеносная операция");
+      if (timeSpent < 300000) setAchievements((prev) => [...new Set([...prev, "Молниеносная операция")]);
       if (bossMode) {
         setBossMode(false);
         if (bossTimer > 0) {
           setScore((prev) => prev * 1.5);
-          addAchievement("Мастер критических операций");
+          setAchievements((prev) => [...new Set([...prev, "Мастер критических операций")]);
         }
       }
     }
   };
 
-  // Полировка экспорта — корректный CSV + попытка вызвать серверную отправку
+  // Exports
   const handleExportDiff = async () => {
     if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
     const diffData = items.map((i) => {
@@ -433,7 +378,7 @@ export default function WBPage() {
       const diffQty = i.total_quantity - prevQty;
       return { id: i.id, name: i.name, diffQty, voxel: i.locations[0]?.voxel || "" };
     });
-    // CSV
+    // локальный CSV и скачивание
     const csv = Papa.unparse(diffData);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -447,13 +392,30 @@ export default function WBPage() {
     URL.revokeObjectURL(url);
     toast.success("CSV с изменениями скачан");
 
-    // Попытка отправить на сервер / в админ-чат, если функция доступна
+    // серверная отправка XLSX админам (используем core action — exportDiffToAdmin)
     try {
       await exportDiffToAdmin(diffData);
-      toast.success("Изменения отправлены администратору");
+      toast.success("Изменения отправлены администратору (XLSX)");
     } catch (e) {
-      // тихо падаем — уже скачали CSV
       console.warn("exportDiffToAdmin failed", e);
+      toast.error("Не удалось отправить XLSX админам");
+    }
+  };
+
+  const handleSendDiffToAdmins = async () => {
+    if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
+    const diffData = items.map((i) => {
+      const prev = lastCheckpoint[i.id];
+      const prevQty = prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0;
+      const diffQty = i.total_quantity - prevQty;
+      return { id: i.id, name: i.name, diffQty, voxel: i.locations[0]?.voxel || "" };
+    });
+    try {
+      await exportDiffToAdmin(diffData);
+      toast.success("XLSX с изменениями отправлен админам");
+    } catch (e) {
+      console.warn(e);
+      toast.error("Ошибка отправки админам");
     }
   };
 
@@ -479,9 +441,20 @@ export default function WBPage() {
 
     try {
       await exportCurrentStock(items);
-      toast.success("Текущий сток отправлен на сервер");
+      toast.success("Текущий сток отправлен на сервер (XLSX)");
     } catch (e) {
       console.warn("exportCurrentStock failed", e);
+      toast.error("Не удалось отправить сток админам");
+    }
+  };
+
+  const handleSendStockToAdmins = async () => {
+    try {
+      await exportCurrentStock(items);
+      toast.success("XLSX стока отправлен админам");
+    } catch (e) {
+      console.warn(e);
+      toast.error("Ошибка отправки админам");
     }
   };
 
@@ -507,17 +480,148 @@ export default function WBPage() {
     setSortBy("name");
   };
 
-  // if (loading) return <Loading text="Загрузка данных склада..." />;
-
   const bgStyle = {
     backgroundColor: gameMode === "onload" ? "#e6f4ea" : gameMode === "offload" ? "#fee2e2" : "#f5f5f5",
   };
 
   return (
-    <div className=" bg-background flex flex-col" style={bgStyle}>
+    <div className="min-h-screen bg-background flex flex-col" style={bgStyle}>
       <div className="w-full overflow-auto p-3" style={bgStyle}>
         <Card className="shadow-md">
-          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[69vh]">
+          <CardHeader className="p-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-4">
+              {/* Main mode selector — вынесен наверх и сделан главным */}
+              <div className="flex items-center gap-2">
+                <Select
+                  value={gameMode || "none"}
+                  onValueChange={(v: "none" | "offload" | "onload") => setGameMode(v === "none" ? null : v)}
+                >
+                  <SelectTrigger className={cn("h-9 text-sm w-48 font-semibold", gameMode ? "ring-2 ring-offset-1" : "") }>
+                    <SelectValue placeholder={<VibeContentRenderer content="::FaTasks:: Режим операций" />} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Выкл</SelectItem>
+                    <SelectItem value="offload"> <VibeContentRenderer content="::FaArrowDown:: Отгрузка" /> </SelectItem>
+                    <SelectItem value="onload"> <VibeContentRenderer content="::FaArrowUp:: Приемка" /> </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleCheckpoint} className="h-9 text-sm px-3">Чекпоинт</Button>
+                <Button onClick={handleResetFilters} className="h-9 text-sm px-3">Сброс фильтров</Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button onClick={handleSendDiffToAdmins} className="h-9 text-sm px-3">Отправить изменения админам</Button>
+                <Button onClick={handleSendStockToAdmins} className="h-9 text-sm px-3">Отправить сток админам</Button>
+              </div>
+            </div>
+
+            <CardTitle className="text-base flex items-center gap-2">
+              Список товаров (Всего: {totals})
+              {gameMode && (
+                <VibeContentRenderer
+                  content={gameMode === "onload" ? "::FaArrowUp:: Приемка" : "::FaArrowDown:: Отгрузка"}
+                  className="text-base"
+                />
+              )}
+            </CardTitle>
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Input
+                  className="h-8 text-sm w-44"
+                  placeholder="Поиск..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <Select value={sortBy} onValueChange={(v: "name" | "quantity" | "voxel") => setSortBy(v)}>
+                  <SelectTrigger className="h-8 text-sm w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Имя</SelectItem>
+                    <SelectItem value="quantity">Количество</SelectItem>
+                    <SelectItem value="voxel">Локация</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterSeason || "all"} onValueChange={(v) => setFilterSeason(v === "all" ? null : v)}>
+                  <SelectTrigger className="h-8 text-sm w-32">
+                    <SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все</SelectItem>
+                    <SelectItem value="leto"><VibeContentRenderer content="::FaSun:: Лето" /></SelectItem>
+                    <SelectItem value="zima"><VibeContentRenderer content="::FaSnowflake:: Зима" /></SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterPattern || "all"} onValueChange={(v) => setFilterPattern(v === "all" ? null : v)}>
+                  <SelectTrigger className="h-8 text-sm w-32">
+                    <SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все</SelectItem>
+                    <SelectItem value="kruzheva">Кружева</SelectItem>
+                    <SelectItem value="mirodel">Миродель</SelectItem>
+                    <SelectItem value="ogurtsy">Огурцы</SelectItem>
+                    <SelectItem value="flora1">Флора 1</SelectItem>
+                    <SelectItem value="flora2">Флора 2</SelectItem>
+                    <SelectItem value="flora3">Флора 3</SelectItem>
+                    <SelectItem value="adel">Адель</SelectItem>
+                    <SelectItem value="malvina">Мальвина</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterColor || "all"} onValueChange={(v) => setFilterColor(v === "all" ? null : v)}>
+                  <SelectTrigger className="h-8 text-sm w-32">
+                    <SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все</SelectItem>
+                    <SelectItem value="beige">Бежевый</SelectItem>
+                    <SelectItem value="blue">Голубой</SelectItem>
+                    <SelectItem value="red">Красный</SelectItem>
+                    <SelectItem value="light-green">Салатовый</SelectItem>
+                    <SelectItem value="dark-green">Темно-зеленый</SelectItem>
+                    <SelectItem value="gray">Серый</SelectItem>
+                    <SelectItem value="adel">Адель</SelectItem>
+                    <SelectItem value="malvina">Мальвина</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filterSize || "all"} onValueChange={(v) => setFilterSize(v === "all" ? null : v)}>
+                  <SelectTrigger className="h-8 text-sm w-32">
+                    <SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все</SelectItem>
+                    <SelectItem value="180x220">180x220</SelectItem>
+                    <SelectItem value="200x220">200x220</SelectItem>
+                    <SelectItem value="220x240">220x240</SelectItem>
+                    <SelectItem value="90">90</SelectItem>
+                    <SelectItem value="120">120</SelectItem>
+                    <SelectItem value="140">140</SelectItem>
+                    <SelectItem value="160">160</SelectItem>
+                    <SelectItem value="180">180</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                    <SelectItem value="150x200">150x200</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Label htmlFor="import" className="text-sm">
+                  <VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" />
+                </Label>
+                <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-8 text-sm" />
+                <Button onClick={handleExportDiff} className="h-8 text-sm px-3">Экспорт изменений</Button>
+                <Button onClick={handleExportStock} className="h-8 text-sm px-3">Экспорт стока</Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          {/* Items grid — делаем высоту окна для списка + фильтров */}
+          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto" style={{ maxHeight: 'calc(100vh - 360px)' }}>
             {loading
               ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-20 rounded-xl" />)
               : filteredItems.map((item, idx) => (
@@ -525,7 +629,7 @@ export default function WBPage() {
                     key={item.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03 }}
+                    transition={{ delay: idx * 0.02 }}
                     onClick={() => handleItemClick(item.id)}
                     className={cn(
                       "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
@@ -548,9 +652,13 @@ export default function WBPage() {
                         COLOR_MAP[item.color || "gray"],
                       )}
                     />
+
                     <div className="relative z-10 flex flex-col h-full p-1 justify-between">
                       <div>
-                        <h3 className="font-semibold text-[8px] leading-tight truncate">{item.name}</h3>
+                        {/* Wrap title вместо truncate */}
+                        <h3 className="font-semibold text-[9px] leading-tight whitespace-normal break-words" style={{ maxHeight: 36 }}>
+                          {makeRussianTitle(item)}
+                        </h3>
                         <p className="text-gray-700 text-[9px]">Кол: {item.total_quantity}</p>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
@@ -576,130 +684,6 @@ export default function WBPage() {
                   </motion.div>
                 ))}
           </CardContent>
-          <CardHeader className="p-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              Список товаров (Всего: {totals})
-              {gameMode && (
-                <VibeContentRenderer
-                  content={gameMode === "onload" ? "::FaArrowUp:: Приемка" : "::FaArrowDown:: Отгрузка"}
-                  className="text-base"
-                />
-              )}
-            </CardTitle>
-            <div className="flex flex-wrap gap-2 text-sm">
-              <Input
-                className="h-7 text-sm w-36"
-                placeholder="Поиск..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <Select value={sortBy} onValueChange={(v: "name" | "quantity" | "voxel") => setSortBy(v)}>
-                <SelectTrigger className="h-7 text-sm w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Имя</SelectItem>
-                  <SelectItem value="quantity">Количество</SelectItem>
-                  <SelectItem value="voxel">Локация</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterSeason || "all"} onValueChange={(v) => setFilterSeason(v === "all" ? null : v)}>
-                <SelectTrigger className="h-7 text-sm w-28">
-                  <SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="leto"><VibeContentRenderer content="::FaSun:: Лето" /></SelectItem>
-                  <SelectItem value="zima"><VibeContentRenderer content="::FaSnowflake:: Зима" /></SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterPattern || "all"} onValueChange={(v) => setFilterPattern(v === "all" ? null : v)}>
-                <SelectTrigger className="h-7 text-sm w-28">
-                  <SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="kruzheva">Кружева</SelectItem>
-                  <SelectItem value="mirodel">Миродель</SelectItem>
-                  <SelectItem value="ogurtsy">Огурцы</SelectItem>
-                  <SelectItem value="flora1">Флора 1</SelectItem>
-                  <SelectItem value="flora2">Флора 2</SelectItem>
-                  <SelectItem value="flora3">Флора 3</SelectItem>
-                  <SelectItem value="adel">Адель</SelectItem>
-                  <SelectItem value="malvina">Мальвина</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterColor || "all"} onValueChange={(v) => setFilterColor(v === "all" ? null : v)}>
-                <SelectTrigger className="h-7 text-sm w-28">
-                  <SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="beige">Бежевый</SelectItem>
-                  <SelectItem value="blue">Голубой</SelectItem>
-                  <SelectItem value="red">Красный</SelectItem>
-                  <SelectItem value="light-green">Салатовый</SelectItem>
-                  <SelectItem value="dark-green">Темно-зеленый</SelectItem>
-                  <SelectItem value="gray">Серый</SelectItem>
-                  <SelectItem value="adel">Адель</SelectItem>
-                  <SelectItem value="malvina">Мальвина</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={filterSize || "all"} onValueChange={(v) => setFilterSize(v === "all" ? null : v)}>
-                <SelectTrigger className="h-7 text-sm w-28">
-                  <SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="180x220">180x220</SelectItem>
-                  <SelectItem value="200x220">200x220</SelectItem>
-                  <SelectItem value="220x240">220x240</SelectItem>
-                  <SelectItem value="90">90</SelectItem>
-                  <SelectItem value="120">120</SelectItem>
-                  <SelectItem value="140">140</SelectItem>
-                  <SelectItem value="160">160</SelectItem>
-                  <SelectItem value="180">180</SelectItem>
-                  <SelectItem value="200">200</SelectItem>
-                  <SelectItem value="150x200">150x200</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={handleResetFilters} className="h-7 text-sm px-2">
-                <X size={14} /> Сброс
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2 text-sm">
-              <Label htmlFor="import" className="text-sm">
-                <VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" />
-              </Label>
-              <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-7 text-sm" />
-              <Button onClick={handleExportDiff} className="h-7 text-sm px-2">
-                <VibeContentRenderer content="::FaFileExport:: Экспорт изменений" />
-              </Button>
-              <Button onClick={handleExportStock} className="h-7 text-sm px-2">
-                <VibeContentRenderer content="::FaFileExport:: Экспорт стока" />
-              </Button>
-              <Button onClick={handleCheckpoint} className="h-7 text-sm px-2">
-                <VibeContentRenderer content="::FaSave:: Чекпоинт" />
-              </Button>
-              <Select
-                value={gameMode || "none"}
-                onValueChange={(v: "none" | "offload" | "onload") => setGameMode(v === "none" ? null : v)}
-              >
-                <SelectTrigger className="h-7 text-sm w-36">
-                  <SelectValue placeholder={<VibeContentRenderer content="::FaTasks:: Режим операций" />} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Выкл</SelectItem>
-                  <SelectItem value="offload">
-                    <VibeContentRenderer content="::FaArrowDown:: Отгрузка" />
-                  </SelectItem>
-                  <SelectItem value="onload">
-                    <VibeContentRenderer content="::FaArrowUp:: Приемка" />
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
         </Card>
 
         <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
