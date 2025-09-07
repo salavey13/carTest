@@ -21,6 +21,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import Confetti from "react-confetti"; // Добавляем для particles
 
+function Loading({ text }: { text: string }) {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"
+      />
+      <p className="ml-4">{text}</p>
+    </div>
+  );
+}
+
 export default function WBPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -635,19 +648,6 @@ export default function WBPage() {
           </DialogContent>
         </Dialog>
       )}
-    </div>
-  );
-}
-
-function Loading({ text }: { text: string }) {
-  return (
-    <div className="flex items-center justify-center h-screen">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"
-      />
-      <p className="ml-4">{text}</p>
     </div>
   );
 }
