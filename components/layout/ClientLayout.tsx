@@ -187,7 +187,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 pathname === "/streamer" || pathname === "/blogger" || pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"));
   }, [pathname]);
 
-  const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
+  const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard', '/wb' ];
   const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || theme.isTransparent;
 
   return (

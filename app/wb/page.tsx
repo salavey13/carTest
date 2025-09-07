@@ -431,65 +431,6 @@ export default function WBPage() {
     <div className="min-h-screen bg-background flex flex-col" style={bgStyle}>
       <div className="w-full overflow-auto p-4">
         <Card className="shadow-md">
-          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[70vh]">
-            {loading
-              ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-24 rounded-xl" />)
-              : filteredItems.map((item, idx) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03 }}
-                    onClick={() => handleItemClick(item.id)}
-                    className={cn(
-                      "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
-                      "transition-all duration-300 ease-in-out",
-                      gameMode ? "w-16 h-16 text-[10px]" : "w-20 h-20 text-xs",
-                      "sm:w-16 sm:h-16 sm:text-[10px]",
-                    )}
-                  >
-                    {item.image && (
-                      <Image
-                        src={item.image}
-                        alt=""
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    )}
-                    <div
-                      className={cn(
-                        "absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300",
-                        COLOR_MAP[item.color || "gray"],
-                      )}
-                    />
-                    <div className="relative z-10 flex flex-col h-full p-1 justify-between">
-                      <div>
-                        <h3 className="font-semibold truncate">{item.name}</h3>
-                        <p className="text-gray-700">Кол: {item.total_quantity}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {item.locations.map((loc) => (
-                          <span
-                            key={loc.voxel}
-                            className="px-1 py-0.5 rounded bg-gray-800/50 text-[8px] text-white"
-                          >
-                            {loc.voxel}:{loc.quantity}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    {item.description && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        whileHover={{ opacity: 1 }}
-                        className="absolute inset-0 bg-gray-900/70 flex items-center justify-center text-center text-[10px] text-white p-1"
-                      >
-                        {item.description}
-                      </motion.div>
-                    )}
-                  </motion.div>
-                ))}
-          </CardContent>
           <CardHeader className="p-3">
             <CardTitle className="text-base flex items-center gap-2">
               Список товаров (Всего: {totals})
@@ -614,30 +555,68 @@ export default function WBPage() {
               </Select>
             </div>
           </CardHeader>
+          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[70vh]">
+            {loading
+              ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-24 rounded-xl" />)
+              : filteredItems.map((item, idx) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.03 }}
+                    onClick={() => handleItemClick(item.id)}
+                    className={cn(
+                      "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
+                      "transition-all duration-300 ease-in-out",
+                      gameMode ? "w-16 h-16 text-[10px]" : "w-20 h-20 text-xs",
+                      "sm:w-16 sm:h-16 sm:text-[10px]",
+                    )}
+                  >
+                    {item.image && (
+                      <Image
+                        src={item.image}
+                        alt=""
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    )}
+                    <div
+                      className={cn(
+                        "absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300",
+                        COLOR_MAP[item.color || "gray"],
+                      )}
+                    />
+                    <div className="relative z-10 flex flex-col h-full p-1 justify-between">
+                      <div>
+                        <h3 className={cn("font-semibold truncate", gameMode ? "text-[10px]" : "text-xs sm:text-sm")}>
+                          {item.name}
+                        </h3>
+                        <p className="text-gray-700">Кол: {item.total_quantity}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.locations.map((loc) => (
+                          <span
+                            key={loc.voxel}
+                            className="px-1 py-0.5 rounded bg-gray-800/50 text-[8px] text-white"
+                          >
+                            {loc.voxel}:{loc.quantity}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {item.description && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        whileHover={{ opacity: 1 }}
+                        className="absolute inset-0 bg-gray-900/70 flex items-center justify-center text-center text-[10px] text-white p-1"
+                      >
+                        {item.description}
+                      </motion.div>
+                    )}
+                  </motion.div>
+                ))}
+          </CardContent>
         </Card>
-        <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
-          <h3 className="font-semibold">Статистика операций</h3>
-          <p>
-            Эффективность: {score} (Внутр. валюта: {Math.floor(score / 100)}) | Уровень: {level} | Серия: {streak} | Дни: {dailyStreak}
-          </p>
-          <p>Достижения: {achievements.join(", ")}</p>
-          <p>Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
-          <p>Приемка: +10 за единицу +бонус. Отгрузка: +5 за единицу +бонус. Бонус уровня: x{level / 2}</p>
-          {bossMode && (
-            <p className="text-red-600 font-medium">
-              Критическая операция! Осталось: {Math.floor(bossTimer / 1000)} сек
-            </p>
-          )}
-          <p className="font-medium">Рейтинг операторов:</p>
-          <ol className="list-decimal pl-5">
-            {leaderboard.map((entry, idx) => (
-              <li key={idx}>
-                {entry.name}: {entry.score} ({entry.date})
-              </li>
-            ))}
-          </ol>
-          <p>В разработке: Совместные операции (Supabase), награды за топ.</p>
-        </div>
       </div>
       <div className="w-full h-[80vh] overflow-y-auto p-4">
         <WarehouseViz
@@ -649,12 +628,35 @@ export default function WBPage() {
           onPlateClick={handlePlateClick}
         />
       </div>
-      <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
+      <div className="w-full p-4">
+        <div className="bg-gray-100 rounded-lg text-sm p-3">
+          <h3 className="font-semibold text-sm">Статистика операций</h3>
+          <p className="text-xs">
+            Эффективность: {score} (Внутр. валюта: {Math.floor(score / 100)}) | Уровень: {level} | Серия: {streak} | Дни: {dailyStreak}
+          </p>
+          <p className="text-xs">Достижения: {achievements.join(", ")}</p>
+          <p className="text-xs">Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
+          <p className="text-xs">Приемка: +10 за единицу +бонус. Отгрузка: +5 за единицу +бонус. Бонус уровня: x{level / 2}</p>
+          {bossMode && (
+            <p className="text-red-600 font-medium text-xs">
+              Критическая операция! Осталось: {Math.floor(bossTimer / 1000)} сек
+            </p>
+          )}
+          <p className="font-medium text-xs">Рейтинг операторов:</p>
+          <ol className="list-decimal pl-5 text-xs">
+            {leaderboard.map((entry, idx) => (
+              <li key={idx}>
+                {entry.name}: {entry.score} ({entry.date})
+              </li>
+            ))}
+          </ol>
+          <p className="text-xs">В разработке: Совместные операции (Supabase), награды за топ.</p>
+        </div>
         <Accordion type="single" collapsible>
           <AccordionItem value="instructions">
-            <AccordionTrigger className="font-semibold">Инструкции по операциям</AccordionTrigger>
+            <AccordionTrigger className="font-semibold text-sm">Инструкции по операциям</AccordionTrigger>
             <AccordionContent>
-              <ol className="list-decimal pl-5 space-y-2">
+              <ol className="list-decimal pl-5 space-y-2 text-xs">
                 <li>
                   <strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом для фиксации текущего состояния.
                 </li>
@@ -685,28 +687,28 @@ export default function WBPage() {
         <Dialog open={true}>
           <DialogContent className="max-h-[80vh] overflow-auto">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-sm">
                 Операция: {currentWorkflowIndex + 1}/{workflowItems.length}
               </DialogTitle>
             </DialogHeader>
             {currentWorkflowIndex < workflowItems.length && (
               <div className="space-y-2">
-                <p>
+                <p className="text-xs">
                   Товар: {workflowItems[currentWorkflowIndex].id}, Изменение: {workflowItems[currentWorkflowIndex].change}
                 </p>
                 <Select value={selectedWorkflowVoxel || ""} onValueChange={setSelectedWorkflowVoxel}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-xs">
                     <SelectValue placeholder="Выберите ячейку" />
                   </SelectTrigger>
                   <SelectContent>
                     {VOXELS.map((v) => (
-                      <SelectItem key={v.id} value={v.id}>
+                      <SelectItem key={v.id} value={v.id} className="text-xs">
                         {v.id}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button onClick={handleWorkflowNext}>Обновить и продолжить</Button>
+                <Button onClick={handleWorkflowNext} className="h-8 text-xs">Обновить и продолжить</Button>
               </div>
             )}
           </DialogContent>
