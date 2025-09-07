@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import dynamic from "next/dynamic";
 import { WarehouseViz } from "@/app/components/WarehouseViz";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,9 +19,6 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { COLOR_MAP, SIZE_PACK, VOXELS, Item, Location } from "@/app/wb/common";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-
-// Динамическая загрузка Confetti для SSR
-const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 function Loading({ text }: { text: string }) {
   return (
@@ -49,10 +45,10 @@ export default function WBPage() {
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [workflowItems, setWorkflowItems] = useState<{id: string, change: number, voxel?: string}[]>([]);
+  const [workflowItems, setWorkflowItems] = useState<{ id: string; change: number; voxel?: string }[]>([]);
   const [currentWorkflowIndex, setCurrentWorkflowIndex] = useState(0);
   const [selectedWorkflowVoxel, setSelectedWorkflowVoxel] = useState<string | null>(null);
-  const [lastCheckpoint, setLastCheckpoint] = useState<{[key: string]: {locations: Location[]}} | null>(null);
+  const [lastCheckpoint, setLastCheckpoint] = useState<{ [key: string]: { locations: Location[] } } | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<string[]>([]);
   const [score, setScore] = useState(0);
@@ -65,8 +61,7 @@ export default function WBPage() {
   const [dailyStreak, setDailyStreak] = useState(0);
   const [bossMode, setBossMode] = useState(false);
   const [bossTimer, setBossTimer] = useState(300000); // 5min
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<{name: string, score: number, date: string}[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
   const [playerName, setPlayerName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -84,7 +79,7 @@ export default function WBPage() {
             locations: locations.map(l => ({
               voxel: l.voxel_id,
               quantity: l.quantity,
-              min_qty: item.specs.min_quantity && l.voxel_id.startsWith('B') ? item.specs.min_quantity : undefined
+              min_qty: item.specs.min_quantity && l.voxel_id.startsWith('B') ? item.specs.min_quantity : undefined,
             })),
             total_quantity,
             season: item.specs.season,
@@ -120,7 +115,7 @@ export default function WBPage() {
         console.error("Ошибка загрузки товаров:", error);
         toast.error(error || "Ошибка загрузки товаров");
         setErrorCount(prev => prev + 1);
-        playSound('/sounds/error.mp3');
+        updateStreak(false);
       }
       setLoading(false);
       const stored = localStorage.getItem('warehouse_checkpoint');
@@ -130,7 +125,7 @@ export default function WBPage() {
       const lb = localStorage.getItem('leaderboard');
       if (lb) setLeaderboard(JSON.parse(lb));
       const prevErrors = localStorage.getItem('errorRate') || '0';
-      if (errorCount < parseInt(prevErrors)) setAchievements(prev => [...new Set([...prev, 'Error Slayer!'])]); // Dedup
+      if (errorCount < parseInt(prevErrors)) setAchievements(prev => [...new Set([...prev, 'Высокая точность'])]); // Dedup
       localStorage.setItem('errorRate', errorCount.toString());
       setStartTime(Date.now());
       setSessionStart(Date.now());
@@ -138,7 +133,7 @@ export default function WBPage() {
       const name = localStorage.getItem('playerName');
       if (name) setPlayerName(name);
       else {
-        const inputName = prompt("Введи свой ник для лидерборда:");
+        const inputName = prompt("Введите имя для статистики операций:");
         if (inputName) {
           setPlayerName(inputName);
           localStorage.setItem('playerName', inputName);
@@ -153,7 +148,7 @@ export default function WBPage() {
       const interval = setInterval(() => setBossTimer(prev => prev - 1000), 1000);
       return () => clearInterval(interval);
     } else if (bossMode && bossTimer <= 0) {
-      toast.error("Boss fight timed out! No bonus.");
+      toast.error("Критическая операция не завершена вовремя!");
       setBossMode(false);
     }
   }, [bossMode, bossTimer]);
@@ -166,18 +161,16 @@ export default function WBPage() {
 
   const levelUp = (newLevel: number) => {
     setLevel(newLevel);
-    setAchievements(prev => [...new Set([...prev, `Level Up! Lvl ${newLevel}`])]);
+    setAchievements(prev => [...new Set([...prev, `Уровень повышен: ${newLevel}`])]);
     localStorage.setItem('achievements', JSON.stringify(achievements));
-    setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 3000);
-    toast.success(`Level Up to ${newLevel}! Bonus multiplier x${newLevel / 2}`);
+    toast.success(`Уровень повышен до ${newLevel}! Множитель эффективности: x${newLevel / 2}`);
   };
 
   const updateStreak = (success: boolean) => {
     if (success) {
       setStreak(prev => prev + 1);
-      if (streak + 1 === 10) addAchievement('Streak Master 10!');
-      if (streak + 1 === 50) addAchievement('Unstoppable Streak 50!');
+      if (streak + 1 === 10) addAchievement('Стабильность операций: 10');
+      if (streak + 1 === 50) addAchievement('Мастер операций: 50');
     } else {
       setStreak(0);
     }
@@ -197,11 +190,11 @@ export default function WBPage() {
     if (lastDate === today) {
       setDailyStreak(parseInt(localStorage.getItem('dailyStreak') || '0'));
     } else if (new Date(lastDate || '').getTime() === new Date().setDate(new Date().getDate() - 1)) {
-      const newStreak = (parseInt(localStorage.getItem('dailyStreak') || '0') + 1);
+      const newStreak = parseInt(localStorage.getItem('dailyStreak') || '0') + 1;
       setDailyStreak(newStreak);
       localStorage.setItem('dailyStreak', newStreak.toString());
-      if (newStreak === 3) addAchievement('Daily Streak 3!');
-      if (newStreak === 7) addAchievement('Week Warrior!');
+      if (newStreak === 3) addAchievement('Стабильность: 3 дня');
+      if (newStreak === 7) addAchievement('Неделя эффективности');
     } else {
       setDailyStreak(1);
       localStorage.setItem('dailyStreak', '1');
@@ -211,7 +204,7 @@ export default function WBPage() {
 
   const updateLeaderboard = (newScore: number) => {
     if (!playerName) return;
-    const entry = {name: playerName, score: newScore, date: new Date().toLocaleString()};
+    const entry = { name: playerName, score: newScore, date: new Date().toLocaleString() };
     const newLb = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
     setLeaderboard(newLb);
     localStorage.setItem('leaderboard', JSON.stringify(newLb));
@@ -219,11 +212,14 @@ export default function WBPage() {
 
   const filteredItems = useMemo(() => {
     return items
-      .filter(i => (!filterSeason || i.season === filterSeason) &&
-                   (!filterPattern || i.pattern === filterPattern) &&
-                   (!filterColor || i.color === filterColor) &&
-                   (!filterSize || i.size === filterSize) &&
-                   i.name.toLowerCase().includes(search.toLowerCase()))
+      .filter(
+        i =>
+          (!filterSeason || i.season === filterSeason) &&
+          (!filterPattern || i.pattern === filterPattern) &&
+          (!filterColor || i.color === filterColor) &&
+          (!filterSize || i.size === filterSize) &&
+          i.name.toLowerCase().includes(search.toLowerCase()),
+      )
       .sort((a, b) => {
         if (sortBy === 'quantity') return b.total_quantity - a.total_quantity;
         if (sortBy === 'voxel') return (a.locations[0]?.voxel || '').localeCompare(b.locations[0]?.voxel || '');
@@ -249,33 +245,34 @@ export default function WBPage() {
     const item = items.find(i => i.id === itemId);
     const loc = item?.locations.find(l => l.voxel === voxelId);
     if (voxelId.startsWith('B') && loc?.min_qty && quantity < loc.min_qty) {
-      toast.warn("Min qty on B! Full recount needed.");
+      toast.warn("Минимальный запас на полке B! Требуется полный пересчет.");
       setErrorCount(prev => prev + 1);
       updateStreak(false);
-      playSound('/sounds/error.mp3');
       return;
     }
     const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
     if (success) {
-      setItems(prev => prev.map(i => {
-        if (i.id === itemId) {
-          let locations = [...i.locations];
-          const index = locations.findIndex(l => l.voxel === voxelId);
-          if (index >= 0) {
-            if (quantity <= 0) {
-              locations.splice(index, 1);
-            } else {
-              locations[index].quantity = quantity;
+      setItems(prev =>
+        prev.map(i => {
+          if (i.id === itemId) {
+            let locations = [...i.locations];
+            const index = locations.findIndex(l => l.voxel === voxelId);
+            if (index >= 0) {
+              if (quantity <= 0) {
+                locations.splice(index, 1);
+              } else {
+                locations[index].quantity = quantity;
+              }
+            } else if (quantity > 0) {
+              locations.push({ voxel: voxelId, quantity });
             }
-          } else if (quantity > 0) {
-            locations.push({ voxel: voxelId, quantity });
+            const newQty = locations.reduce((sum, l) => sum + l.quantity, 0);
+            return { ...i, locations, total_quantity: newQty };
           }
-          const newQty = locations.reduce((sum, l) => sum + l.quantity, 0);
-          return { ...i, locations, total_quantity: newQty };
-        }
-        return i;
-      }));
-      toast.success("Обновлено");
+          return i;
+        }),
+      );
+      toast.success("Обновление выполнено");
       if (isGameAction) {
         const absChange = Math.abs(quantity - (loc?.quantity || 0));
         let basePoints = gameMode === 'onload' ? 10 : 5;
@@ -286,35 +283,26 @@ export default function WBPage() {
         setClickCount(prev => prev + 1);
         updateStreak(true);
         if (clickCount > 10 && (Date.now() - (startTime || Date.now())) / 60000 < 1) {
-          addAchievement('Fast Clicker!');
+          addAchievement('Высокая скорость');
         }
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 1000);
-        playSound(gameMode === 'onload' ? '/sounds/farm.mp3' : '/sounds/damage.mp3');
         updateLeaderboard(score + points);
       }
     } else {
-      toast.error(error);
+      toast.error(error || "Ошибка обновления");
       setErrorCount(prev => prev + 1);
       updateStreak(false);
-      playSound('/sounds/error.mp3');
     }
-  };
-
-  const playSound = (src: string) => {
-    const audio = new Audio(src);
-    audio.play();
   };
 
   const handlePlateClick = (voxelId: string) => {
     if (!gameMode) return;
-    const content = items.flatMap(i => i.locations.filter(l => l.voxel === voxelId).map(l => ({item: i, quantity: l.quantity})));
+    const content = items.flatMap(i => i.locations.filter(l => l.voxel === voxelId).map(l => ({ item: i, quantity: l.quantity })));
     if (content.length > 0) {
       const mainItem = content[0].item;
       const delta = gameMode === 'offload' ? -1 : 1;
       handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity + delta, true);
     } else if (gameMode === 'onload') {
-      toast.warning("Ячейка пуста. Добавьте товар через диалог.");
+      toast.warning("Ячейка пуста. Добавьте товар через интерфейс.");
       handleSelectVoxel(voxelId);
     }
   };
@@ -322,13 +310,16 @@ export default function WBPage() {
   const handleItemClick = (itemId: string) => {
     if (!gameMode) return handleSelectItem(itemId);
     const item = items.find(i => i.id === itemId);
-    if (!item?.locations[0]) return toast.error("Нет локации. Добавьте вручную.", {onClose: () => {setErrorCount(prev => prev + 1); updateStreak(false); playSound('/sounds/error.mp3');}});
+    if (!item?.locations[0]) {
+      toast.error("Локация не указана. Добавьте вручную.");
+      setErrorCount(prev => prev + 1);
+      updateStreak(false);
+      return;
+    }
     const voxelId = item.locations[0].voxel;
     const currentQty = item.locations[0].quantity;
     const delta = gameMode === 'offload' ? -1 : 1;
     handleUpdateLocationQty(itemId, voxelId, currentQty + delta, true);
-    if (navigator.vibrate) navigator.vibrate(50);
-    playSound('/sounds/click.mp3');
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,18 +328,19 @@ export default function WBPage() {
       setImportFile(file);
       Papa.parse(file, {
         complete: (results) => {
-          const changes = results.data.map((row: any) => {
-            const id = row['Артикул продавца'] || row['Баркод'];
-            const change = parseInt(row['Количество']);
-            return {id, change, voxel: row['voxel'] || undefined};
-          }).filter(c => c.id && !isNaN(c.change));
+          const changes = results.data
+            .map((row: any) => {
+              const id = row['Артикул продавца'] || row['Баркод'];
+              const change = parseInt(row['Количество']);
+              return { id, change, voxel: row['voxel'] || undefined };
+            })
+            .filter(c => c.id && !isNaN(c.change));
           setWorkflowItems(changes);
           setCurrentWorkflowIndex(0);
           if (changes.length > 20) {
             setBossMode(true);
             setBossTimer(300000);
-            toast.warn("Boss Fight! Заверши за 5 мин для x1.5 бонуса.");
-            playSound('/sounds/boss.mp3');
+            toast.warn("Критическая операция! Завершите за 5 минут для бонуса x1.5.");
           }
         },
         header: true,
@@ -358,13 +350,12 @@ export default function WBPage() {
 
   const handleWorkflowNext = async () => {
     if (currentWorkflowIndex < workflowItems.length) {
-      const {id, change, voxel: importVoxel} = workflowItems[currentWorkflowIndex];
+      const { id, change, voxel: importVoxel } = workflowItems[currentWorkflowIndex];
       const voxel = selectedWorkflowVoxel || importVoxel || items.find(i => i.id === id)?.locations[0]?.voxel;
       if (!voxel) {
         toast.error("Выберите локацию");
         setErrorCount(prev => prev + 1);
         updateStreak(false);
-        playSound('/sounds/error.mp3');
         return;
       }
       const item = items.find(i => i.id === id);
@@ -379,41 +370,45 @@ export default function WBPage() {
       const prevBest = localStorage.getItem('bestTime');
       if (!prevBest || timeSpent < parseInt(prevBest)) {
         localStorage.setItem('bestTime', timeSpent.toString());
-        addAchievement('Новый рекорд времени!');
+        addAchievement('Рекорд времени');
       }
-      if (timeSpent < 300000) addAchievement('Speed Demon!');
+      if (timeSpent < 300000) addAchievement('Молниеносная операция');
       if (bossMode) {
         setBossMode(false);
         if (bossTimer > 0) {
           setScore(prev => prev * 1.5);
-          addAchievement('Boss Slayer!');
+          addAchievement('Мастер критических операций');
         }
       }
     }
   };
 
   const handleExportDiff = async () => {
-    if (!lastCheckpoint) return toast.error("Нет чекпоинта");
+    if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
     const diffData = items.map(i => {
       const prev = lastCheckpoint[i.id];
       const diffQty = i.total_quantity - (prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0);
-      return {id: i.id, diffQty, voxel: i.locations[0]?.voxel || ''};
+      return { id: i.id, diffQty, voxel: i.locations[0]?.voxel || '' };
     });
-    const csv = Papa.unparse(diffData, {columns: ['id', 'diffQty', 'voxel']});
-    const blob = new Blob([csv], {type: 'text/csv'});
+    const csv = Papa.unparse(diffData, { columns: ['id', 'diffQty', 'voxel'] });
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'warehouse_diff.csv';
     a.click();
     await exportDiffToAdmin(csv);
+    toast.success("Экспорт изменений завершен");
   };
 
   const handleCheckpoint = () => {
-    const checkpoint = items.reduce((acc, i) => {
-      acc[i.id] = {locations: i.locations};
-      return acc;
-    }, {} as any);
+    const checkpoint = items.reduce(
+      (acc, i) => {
+        acc[i.id] = { locations: i.locations };
+        return acc;
+      },
+      {} as { [key: string]: { locations: Location[] } },
+    );
     localStorage.setItem('warehouse_checkpoint', JSON.stringify(checkpoint));
     setLastCheckpoint(checkpoint);
     toast.success("Чекпоинт сохранен");
@@ -428,101 +423,107 @@ export default function WBPage() {
     setSortBy('name');
   };
 
-  if (loading) return <Loading text="Загрузка склада..." />;
+  if (loading) return <Loading text="Загрузка данных склада..." />;
 
   const bgStyle = {
-    background: gameMode === 'onload' ? 'linear-gradient(to bottom right, #15803d, #22c55e)' 
-      : gameMode === 'offload' ? 'linear-gradient(to bottom right, #b91c1c, #ef4444)' 
-      : undefined,
+    backgroundColor: gameMode === 'onload' ? '#e6f4ea' : gameMode === 'offload' ? '#fee2e2' : '#f5f5f5',
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col transition-colors duration-300" style={bgStyle}>
-      {showConfetti && typeof window !== 'undefined' && (
-        <Confetti width={window.innerWidth} height={window.innerHeight} />
-      )}
-      <div className="w-full overflow-auto p-2">
-        <Card>
-          <CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[69vh]">
-            {loading ? Array.from({length: 20}).map((_, idx) => (
-              <Skeleton key={idx} className="h-24 rounded-2xl" />
-            )) : filteredItems.map((item, idx) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.03 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handleItemClick(item.id)}
-                className={cn(
-                  "relative cursor-pointer rounded-2xl shadow-lg overflow-hidden group",
-                  "transition-all duration-300 ease-in-out",
-                  gameMode && "w-24 h-24" // Bigger for mobile game mode
-                )}
-              >
-                {item.image && (
-                  <Image
-                    src={item.image}
-                    alt=""
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                )}
-                <div
-                  className={cn(
-                    "absolute inset-0 opacity-70 group-hover:opacity-50 transition-opacity duration-300",
-                    COLOR_MAP[item.color || "gray"],
-                  )}
-                />
-                <div className="relative z-10 flex flex-col h-full p-2 justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-black">
-                      {item.name}
-                    </h3>
-                    <p className="text-[8px] md:text-xs text-white/80">
-                      Кол: {item.total_quantity}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {item.locations.map((loc) => (
-                      <span
-                        key={loc.voxel}
-                        className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-black shadow"
-                      >
-                        {loc.voxel}:{loc.quantity}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                {item.description && (
+    <div className="min-h-screen bg-background flex flex-col" style={bgStyle}>
+      <div className="w-full overflow-auto p-4">
+        <Card className="shadow-md">
+          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[70vh]">
+            {loading
+              ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-24 rounded-xl" />)
+              : filteredItems.map((item, idx) => (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    whileHover={{ opacity: 1 }}
-                    className="absolute inset-0 bg-black/70 flex items-center justify-center text-center text-[10px] md:text-xs text-white p-2"
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.03 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleItemClick(item.id)}
+                    className={cn(
+                      "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
+                      "transition-all duration-300 ease-in-out",
+                      gameMode && "w-24 h-24",
+                    )}
                   >
-                    {item.description}
+                    {item.image && (
+                      <Image
+                        src={item.image}
+                        alt=""
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    )}
+                    <div
+                      className={cn(
+                        "absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300",
+                        COLOR_MAP[item.color || "gray"],
+                      )}
+                    />
+                    <div className="relative z-10 flex flex-col h-full p-2 justify-between">
+                      <div>
+                        <h3 className="font-semibold text-xs md:text-sm text-gray-900">{item.name}</h3>
+                        <p className="text-[10px] md:text-xs text-gray-700">Кол: {item.total_quantity}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.locations.map(loc => (
+                          <span
+                            key={loc.voxel}
+                            className="px-1.5 py-0.5 rounded bg-gray-800/50 text-[10px] text-white"
+                          >
+                            {loc.voxel}:{loc.quantity}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {item.description && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        whileHover={{ opacity: 1 }}
+                        className="absolute inset-0 bg-gray-900/70 flex items-center justify-center text-center text-[10px] md:text-xs text-white p-2"
+                      >
+                        {item.description}
+                      </motion.div>
+                    )}
                   </motion.div>
-                )}
-              </motion.div>
-            ))}
+                ))}
           </CardContent>
-          <CardHeader className="p-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              Список (Всего: {totals}) {gameMode && <VibeContentRenderer content={gameMode === 'onload' ? '::FaArrowUp:: Приемка' : '::FaArrowDown:: Отгрузка'} className="text-lg" />}
+          <CardHeader className="p-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              Список товаров (Всего: {totals})
+              {gameMode && (
+                <VibeContentRenderer
+                  content={gameMode === 'onload' ? '::FaArrowUp:: Приемка' : '::FaArrowDown:: Отгрузка'}
+                  className="text-base"
+                />
+              )}
             </CardTitle>
-            <div className="flex flex-wrap gap-1 text-xs">
-              <Input className="h-6 text-xs w-auto" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
+            <div className="flex flex-wrap gap-2 text-sm">
+              <Input
+                className="h-8 text-sm w-40"
+                placeholder="Поиск..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
               <Select value={sortBy} onValueChange={(v: 'name' | 'quantity' | 'voxel') => setSortBy(v)}>
-                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm w-32">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Имя</SelectItem>
-                  <SelectItem value="quantity">Кол-во</SelectItem>
+                  <SelectItem value="quantity">Количество</SelectItem>
                   <SelectItem value="voxel">Локация</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={filterSeason || 'all'} onValueChange={v => setFilterSeason(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm w-32">
+                  <SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="leto"><VibeContentRenderer content="::FaSun:: Лето" /></SelectItem>
@@ -530,7 +531,9 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterPattern || 'all'} onValueChange={v => setFilterPattern(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm w-32">
+                  <SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="kruzheva">Кружева</SelectItem>
@@ -544,7 +547,9 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterColor || 'all'} onValueChange={v => setFilterColor(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm w-32">
+                  <SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="beige">Бежевый</SelectItem>
@@ -558,7 +563,9 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterSize || 'all'} onValueChange={v => setFilterSize(v === 'all' ? null : v)}>
-                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm w-32">
+                  <SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Все</SelectItem>
                   <SelectItem value="180x220">180x220</SelectItem>
@@ -573,62 +580,99 @@ export default function WBPage() {
                   <SelectItem value="150x200">150x200</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleResetFilters} className="h-6 text-xs"><X size={12} /> Сброс</Button>
+              <Button onClick={handleResetFilters} className="h-8 text-sm px-3">
+                <X size={14} /> Сброс
+              </Button>
             </div>
-            <div className="flex flex-wrap gap-1 mt-1 text-xs">
-              <Label htmlFor="import" className="text-xs"><VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" /></Label>
-              <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-6 text-xs" />
-              <Button onClick={handleExportDiff} className="h-6 text-xs"><VibeContentRenderer content="::FaFileExport:: Diff в чат" /></Button>
-              <Button onClick={handleCheckpoint} className="h-6 text-xs"><VibeContentRenderer content="::FaSave:: Чекпоинт" /></Button>
-              <Select value={gameMode || 'none'} onValueChange={v => setGameMode(v === 'none' ? null : v as 'offload' | 'onload')}>
-                <SelectTrigger className="h-6 text-xs w-auto"><SelectValue placeholder={<VibeContentRenderer content="::FaGamepad:: Режим игры" />} /></SelectTrigger>
+            <div className="flex flex-wrap gap-2 mt-2 text-sm">
+              <Label htmlFor="import" className="text-sm">
+                <VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" />
+              </Label>
+              <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-8 text-sm" />
+              <Button onClick={handleExportDiff} className="h-8 text-sm px-3">
+                <VibeContentRenderer content="::FaFileExport:: Экспорт изменений" />
+              </Button>
+              <Button onClick={handleCheckpoint} className="h-8 text-sm px-3">
+                <VibeContentRenderer content="::FaSave:: Чекпоинт" />
+              </Button>
+              <Select
+                value={gameMode || 'none'}
+                onValueChange={(v: 'none' | 'offload' | 'onload') => setGameMode(v === 'none' ? null : v)}
+              >
+                <SelectTrigger className="h-8 text-sm w-40">
+                  <SelectValue placeholder={<VibeContentRenderer content="::FaTasks:: Режим операций" />} />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Выкл</SelectItem>
-                  <SelectItem value="offload"><VibeContentRenderer content="::FaArrowDown:: Offload (Отгрузка)" /></SelectItem>
-                  <SelectItem value="onload"><VibeContentRenderer content="::FaArrowUp:: Onload (Приемка)" /></SelectItem>
+                  <SelectItem value="offload">
+                    <VibeContentRenderer content="::FaArrowDown:: Отгрузка" />
+                  </SelectItem>
+                  <SelectItem value="onload">
+                    <VibeContentRenderer content="::FaArrowUp:: Приемка" />
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </CardHeader>
         </Card>
-        <div className="mt-4 p-2 bg-muted rounded text-[10px]">
-          <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
-          <p>Очки: {score} (Вирт. XTR: {Math.floor(score / 100)}) | Lvl: {level} | Streak: {streak} | Daily: {dailyStreak}</p>
-          <p>Ачивки: {achievements.join(', ')}</p>
+        <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
+          <h3 className="font-semibold">Статистика операций</h3>
+          <p>
+            Эффективность: {score} (Внутр. валюта: {Math.floor(score / 100)}) | Уровень: {level} | Серия: {streak} | Дни: {dailyStreak}
+          </p>
+          <p>Достижения: {achievements.join(', ')}</p>
           <p>Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
-          <p>Фарм (onload): +10 за +1 +бонус. Дамаг (offload): +5 за -1 +бонус. Lvl bonus: x{level / 2}</p>
-          {bossMode && <p className="text-red-500 animate-pulse">Boss Fight! Осталось: {Math.floor(bossTimer / 1000)} сек</p>}
-          <p>Лидерборд:</p>
-          <ol className="list-decimal pl-4">
+          <p>Приемка: +10 за единицу +бонус. Отгрузка: +5 за единицу +бонус. Бонус уровня: x{level / 2}</p>
+          {bossMode && (
+            <p className="text-red-600 font-medium">
+              Критическая операция! Осталось: {Math.floor(bossTimer / 1000)} сек
+            </p>
+          )}
+          <p className="font-medium">Рейтинг операторов:</p>
+          <ol className="list-decimal pl-5">
             {leaderboard.map((entry, idx) => (
-              <li key={idx}>{entry.name}: {entry.score} ({entry.date})</li>
+              <li key={idx}>
+                {entry.name}: {entry.score} ({entry.date})
+              </li>
             ))}
           </ol>
-          <p>В dev: Realtime co-op (Supabase), реальные XTR rewards за топ.</p>
+          <p>В разработке: Совместные операции (Supabase), награды за топ.</p>
         </div>
       </div>
-      <div className="w-full h-[80vh] overflow-y-auto p-2">
-        <WarehouseViz 
-          items={items} 
-          selectedVoxel={selectedVoxel} 
-          onSelectVoxel={handleSelectVoxel} 
+      <div className="w-full h-[80vh] overflow-y-auto p-4">
+        <WarehouseViz
+          items={items}
+          selectedVoxel={selectedVoxel}
+          onSelectVoxel={handleSelectVoxel}
           onUpdateLocationQty={handleUpdateLocationQty}
           gameMode={gameMode}
           onPlateClick={handlePlateClick}
         />
       </div>
-      <div className="mt-4 p-2 bg-muted rounded text-[10px]">
+      <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
         <Accordion type="single" collapsible>
           <AccordionItem value="instructions">
-            <AccordionTrigger className="font-bold">Обновлённые инструкции по процедурам</AccordionTrigger>
+            <AccordionTrigger className="font-semibold">Инструкции по операциям</AccordionTrigger>
             <AccordionContent>
-              <ol className="list-decimal pl-4 space-y-2">
-                <li><strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом работы для фиксации текущего состояния.</li>
-                <li><strong>Режимы игры:</strong> Вкл Onload/Offload. Клик на item/ячейку - auto inc/dec. Пусто в Onload? Открывает добавление.</li>
-                <li><strong>Импорт:</strong> Загружайте CSV/XLSX (headers: Артикул,Количество,voxel опц). Workflow шаг за шагом обновляет. Большой импорт - Boss Fight!</li>
-                <li><strong>Экспорт Diff:</strong> После работы - генерит CSV дифф от чекпоинта, скачивает + шлёт файл в админ-чат как документ.</li>
-                <li><strong>Синхронизация:</strong> Загружайте diff в WB/Ozon панели (Остатки > Импорт). Для 'B' полок - warn если qty < min.</li>
-                <li><strong>Mobile Tips:</strong> Ячейки larger, touch-friendly. Swipe для скролла viz.</li>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>
+                  <strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом для фиксации текущего состояния.
+                </li>
+                <li>
+                  <strong>Режимы операций:</strong> Включите Приемку/Отгрузку. Клик на товар/ячейку автоматически изменяет количество. Пустая ячейка в Приемке открывает добавление.
+                </li>
+                <li>
+                  <strong>Импорт:</strong> Загружайте CSV/XLSX (столбцы: Артикул, Количество, voxel опционально). Пошаговое обновление. Крупный импорт — критическая операция.
+                </li>
+                <li>
+                  <strong>Экспорт изменений:</strong> Создает CSV с изменениями от чекпоинта и отправляет в админ-чат.
+                </li>
+                <li>
+                  <strong>Синхронизация:</strong> Загружайте изменения в панели WB/Ozon (Остатки > Импорт). Для полок B — уведомление, если запас ниже минимального.
+                </li>
+                <li>
+                  <strong>Советы для мобильных:</strong> Увеличенные ячейки, поддержка сенсорного ввода. Свайп для прокрутки визуализации.
+                </li>
               </ol>
             </AccordionContent>
           </AccordionItem>
@@ -638,20 +682,29 @@ export default function WBPage() {
         <Dialog open={true}>
           <DialogContent className="max-h-[80vh] overflow-auto">
             <DialogHeader>
-              <DialogTitle>Workflow: {currentWorkflowIndex + 1}/{workflowItems.length}</DialogTitle>
+              <DialogTitle>
+                Операция: {currentWorkflowIndex + 1}/{workflowItems.length}
+              </DialogTitle>
             </DialogHeader>
             {currentWorkflowIndex < workflowItems.length && (
-              <div>
-                <p>Товар: {workflowItems[currentWorkflowIndex].id}, Изменение: {workflowItems[currentWorkflowIndex].change}</p>
+              <div className="space-y-2">
+                <p>
+                  Товар: {workflowItems[currentWorkflowIndex].id}, Изменение:{' '}
+                  {workflowItems[currentWorkflowIndex].change}
+                </p>
                 <Select value={selectedWorkflowVoxel || ''} onValueChange={setSelectedWorkflowVoxel}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Выберите локацию" />
+                    <SelectValue placeholder="Выберите ячейку" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VOXELS.map(v => <SelectItem key={v.id} value={v.id}>{v.id}</SelectItem>)}
+                    {VOXELS.map(v => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.id}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <Button onClick={handleWorkflowNext}>Обновить и Далее</Button>
+                <Button onClick={handleWorkflowNext}>Обновить и продолжить</Button>
               </div>
             )}
           </DialogContent>
