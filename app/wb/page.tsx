@@ -241,7 +241,7 @@ export default function WBPage() {
     if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
   };
 
-  const handleUpdate | LocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
+  const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
     const item = items.find((i) => i.id === itemId);
     const loc = item?.locations.find((l) => l.voxel === voxelId);
     if (voxelId.startsWith("B") && loc?.min_qty && quantity < loc.min_qty) {
