@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { WarehousePlate } from "@/app/components/WarehousePlate";
 import { WarehouseVizProps, VOXELS } from "@/app/wb/common";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLocationQty, gameMode, onPlateClick }: WarehouseVizProps) {
   const voxelMap = useMemo(() => {
@@ -18,43 +19,59 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, onUpdateLoca
   }, [items]);
 
   return (
-    <div className="relative w-full h-full perspective-[1000px] preserve-3d">
-      <div className="absolute bottom-[-10px] left-1/2 transform -translate-x-1/2 text-[10px]">Вход</div>
-      <div className="absolute top-[-10px] left-1/2 transform -translate-x-1/2 text-[10px]">Комп с окном</div>
-      <div className="w-full h-full transform rotate-x-[30deg] rotate-y-[-30deg] flex flex-col md:grid md:grid-cols-2 gap-1 preserve-3d">
-        {/* Левая полка: 4 ряда по схеме */}
-        <div className="grid grid-cols-4 gap-1" style={{ gridTemplateRows: 'repeat(4, minmax(0, 1fr))' }}>
-          {VOXELS.filter(v => v.id.startsWith('A')).map(voxel => (
-            <WarehousePlate
-              key={voxel.id}
-              voxel={voxel}
-              contents={voxelMap[voxel.id] || []}
-              selected={selectedVoxel === voxel.id}
-              onSelect={onSelectVoxel}
-              onUpdateQty={onUpdateLocationQty}
-              items={items}
-              onPlateClick={onPlateClick}
-              gameMode={gameMode}
-            />
-          ))}
-        </div>
-        {/* Правая полка аналогично */}
-        <div className="grid grid-cols-4 gap-1" style={{ gridTemplateRows: 'repeat(4, minmax(0, 1fr))' }}>
-          {VOXELS.filter(v => v.id.startsWith('B')).map(voxel => (
-            <WarehousePlate
-              key={voxel.id}
-              voxel={voxel}
-              contents={voxelMap[voxel.id] || []}
-              selected={selectedVoxel === voxel.id}
-              onSelect={onSelectVoxel}
-              onUpdateQty={onUpdateLocationQty}
-              items={items}
-              onPlateClick={onPlateClick}
-              gameMode={gameMode}
-            />
-          ))}
+    <TooltipProvider>
+      <div className="relative w-full h-full perspective-[1000px] preserve-3d touch-pan-y"> {/* Добавлен touch для mobile */}
+        <div className="absolute bottom-[-10px] left-1/2 transform -translate-x-1/2 text-[10px]">Вход</div>
+        <div className="absolute top-[-10px] left-1/2 transform -translate-x-1/2 text-[10px]">Комп с окном</div>
+        <div className="w-full h-full transform rotate-x-[30deg] rotate-y-[-30deg] flex flex-col md:grid md:grid-cols-2 gap-2 md:gap-1 preserve-3d scale-125 md:scale-100"> {/* Scale для mobile */}
+          {/* Левая полка: 4 ряда по схеме */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="grid grid-cols-4 gap-2 md:gap-1" style={{ gridTemplateRows: 'repeat(4, minmax(0, 1fr))' }}>
+                {VOXELS.filter(v => v.id.startsWith('A')).map(voxel => (
+                  <WarehousePlate
+                    key={voxel.id}
+                    voxel={voxel}
+                    contents={voxelMap[voxel.id] || []}
+                    selected={selectedVoxel === voxel.id}
+                    onSelect={onSelectVoxel}
+                    onUpdateQty={onUpdateLocationQty}
+                    items={items}
+                    onPlateClick={onPlateClick}
+                    gameMode={gameMode}
+                  />
+                ))}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Левая полка: Матрасники, Полуторки, Евро Макси, Двушки</p>
+            </TooltipContent>
+          </Tooltip>
+          {/* Правая полка аналогично */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="grid grid-cols-4 gap-2 md:gap-1" style={{ gridTemplateRows: 'repeat(4, minmax(0, 1fr))' }}>
+                {VOXELS.filter(v => v.id.startsWith('B')).map(voxel => (
+                  <WarehousePlate
+                    key={voxel.id}
+                    voxel={voxel}
+                    contents={voxelMap[voxel.id] || []}
+                    selected={selectedVoxel === voxel.id}
+                    onSelect={onSelectVoxel}
+                    onUpdateQty={onUpdateLocationQty}
+                    items={items}
+                    onPlateClick={onPlateClick}
+                    gameMode={gameMode}
+                  />
+                ))}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Правая полка: Запас, Полуторки</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
