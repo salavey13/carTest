@@ -30,7 +30,7 @@ import useInactivityTimer from "@/hooks/useInactivityTimer";
 import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase"; 
 
 // --- Constants & Types ---
-const INACTIVITY_TIMEOUT_MS = 60000; 
+const INACTIVITY_TIMEOUT_MS = 69420000; 
 const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
