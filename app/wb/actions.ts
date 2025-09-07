@@ -1,13 +1,14 @@
+// /app/wb/actions.ts
 "use server";
 
-import { createClient } from "@/utils/supabase/server";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { Item } from "./common";
 import { writeFileSync } from "fs";
 import XLSX from "xlsx";
 
 export async function getWarehouseItems() {
   const supabase = createClient();
-  const { data, error } = await supabase.from("wb_items").select("id, make, model, description, image_url, specs");
+  const { data, error } = await supabaseAdmin.from("wb_items").select("id, make, model, description, image_url, specs");
   if (error) {
     return { success: false, error: error.message };
   }
