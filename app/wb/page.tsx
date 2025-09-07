@@ -356,14 +356,14 @@ export default function WBPage() {
       const prevBest = localStorage.getItem("bestTime");
       if (!prevBest || timeSpent < parseInt(prevBest)) {
         localStorage.setItem("bestTime", timeSpent.toString());
-        setAchievements((prev) => [...new Set([...prev, "Рекорд времени")]);
+        setAchievements((prev) => [...new Set([...prev, "Рекорд времени"])]);
       }
-      if (timeSpent < 300000) setAchievements((prev) => [...new Set([...prev, "Молниеносная операция")]);
+      if (timeSpent < 300000) setAchievements((prev) => [...new Set([...prev, "Молниеносная операция"])]);
       if (bossMode) {
         setBossMode(false);
         if (bossTimer > 0) {
           setScore((prev) => prev * 1.5);
-          setAchievements((prev) => [...new Set([...prev, "Мастер критических операций")]);
+          setAchievements((prev) => [...new Set([...prev, "Мастер критических операций"])]);
         }
       }
     }
