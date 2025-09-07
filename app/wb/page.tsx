@@ -265,7 +265,7 @@ export default function WBPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <div className="w-full overflow-auto p-2">
         <Card>
-<CardContent className="p-1 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-1 overflow-auto max-h-[80vh]">
+<CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1 overflow-auto max-h-[69vh]">
   {filteredItems.map((item, idx) => (
     <motion.div
       key={item.id}
@@ -284,7 +284,7 @@ export default function WBPage() {
       {item.image && (
         <Image
           src={item.image}
-          alt={item.name}
+          alt=""
           fill
           className="object-cover group-hover:scale-110 transition-transform duration-500"
         />
@@ -307,11 +307,11 @@ export default function WBPage() {
           </p>
         </div>
         {/* Voxels badges */}
-        <div className="flex flex-wrap gap-1 mt-2">
+        <div className="flex flex-wrap gap-1 mt-1">
           {item.locations.map((loc) => (
             <span
               key={loc.voxel}
-              className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-white shadow"
+              className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-black shadow"
             >
               {loc.voxel}:{loc.quantity}
             </span>
