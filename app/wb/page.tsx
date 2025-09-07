@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { WarehouseViz } from "@/app/components/WarehouseViz";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,14 +13,16 @@ import Image from "next/image";
 import { getWarehouseItems, updateItemLocationQty, exportDiffToAdmin } from "@/app/wb/actions";
 import { toast } from "sonner";
 import Papa from "papaparse";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { COLOR_MAP, SIZE_PACK, VOXELS, Item, Location } from "@/app/wb/common";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-import Confetti from "react-confetti"; // Добавляем для particles
+
+// Динамическая загрузка Confetti для SSR
+const Confetti = dynamic(() => import("react-confetti"), { ssr: false });
 
 function Loading({ text }: { text: string }) {
   return (
@@ -29,7 +32,7 @@ function Loading({ text }: { text: string }) {
         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"
       />
-      <p className="ml-4">{text}</p>
+      <p className="ml-4"><VibeContentRenderer content={`::FaSpinner:: ${text}`} /></p>
     </div>
   );
 }
@@ -78,7 +81,11 @@ export default function WBPage() {
             name: `${item.make} ${item.model}`,
             description: item.description || '',
             image: item.image_url || '',
-            locations: locations.map(l => ({voxel: l.voxel_id, quantity: l.quantity, min_qty: item.specs.min_quantity && l.voxel_id.startsWith('B') ? item.specs.min_quantity : undefined})),
+            locations: locations.map(l => ({
+              voxel: l.voxel_id,
+              quantity: l.quantity,
+              min_qty: item.specs.min_quantity && l.voxel_id.startsWith('B') ? item.specs.min_quantity : undefined
+            })),
             total_quantity,
             season: item.specs.season,
             pattern: item.specs.pattern,
@@ -86,7 +93,6 @@ export default function WBPage() {
             size: item.specs.size,
           };
         });
-        // Добавляем новые паттерны
         const newItems = [...processed];
         ['evro', 'dvushka', 'evro-maksi', 'polutorka'].forEach(type => {
           ['adel', 'malvina'].forEach(pattern => {
@@ -111,6 +117,7 @@ export default function WBPage() {
         });
         setItems(newItems);
       } else {
+        console.error("Ошибка загрузки товаров:", error);
         toast.error(error || "Ошибка загрузки товаров");
         setErrorCount(prev => prev + 1);
         playSound('/sounds/error.mp3');
@@ -431,7 +438,9 @@ export default function WBPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col transition-colors duration-300" style={bgStyle}>
-      {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} />}
+      {showConfetti && typeof window !== 'undefined' && (
+        <Confetti width={window.innerWidth} height={window.innerHeight} />
+      )}
       <div className="w-full overflow-auto p-2">
         <Card>
           <CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[69vh]">
@@ -504,7 +513,7 @@ export default function WBPage() {
             </CardTitle>
             <div className="flex flex-wrap gap-1 text-xs">
               <Input className="h-6 text-xs w-auto" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
-              <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+              <Select value={sortBy} onValueChange={(v: 'name' | 'quantity' | 'voxel') => setSortBy(v)}>
                 <SelectTrigger className="h-6 text-xs w-auto"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="name">Имя</SelectItem>
