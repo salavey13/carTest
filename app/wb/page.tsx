@@ -11,7 +11,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import Image from "next/image";
 import { getWarehouseItems, updateItemLocationQty, exportDiffToAdmin } from "@/app/wb/actions";
 import { toast } from "sonner";
-import { Loading } from "@/components/Loading";
 import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { X } from "lucide-react";
@@ -19,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { COLOR_MAP, SIZE_PACK, VOXELS, Item, Location } from "@/app/wb/common";
 import { motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function WBPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -40,6 +40,7 @@ export default function WBPage() {
   const [achievements, setAchievements] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState<'offload' | 'onload' | null>(null);
+  const [clickCount, setClickCount] = useState(0);
 
   useEffect(() => {
     async function loadItems() {
@@ -151,6 +152,10 @@ export default function WBPage() {
       if (isGameAction) {
         let bonus = quantity > 10 ? 5 : 0; // Бонус за объем
         setScore(prev => prev + (quantity > 0 ? 10 + bonus : 5 + bonus));
+        setClickCount(prev => prev + 1);
+        if (clickCount > 10 && (Date.now() - (startTime || Date.now())) / 60000 < 1) { // >10 кликов в минуту
+          setAchievements(prev => [...prev, 'Fast Clicker!']);
+        }
       }
     } else {
       toast.error(error);
@@ -169,6 +174,19 @@ export default function WBPage() {
       toast.warning("Ячейка пуста. Добавьте товар через диалог.");
       handleSelectVoxel(voxelId); // Открываем диалог для добавления
     }
+  };
+
+  const handleItemClick = (itemId: string) => {
+    if (!gameMode) return handleSelectItem(itemId);
+    const item = items.find(i => i.id === itemId);
+    if (!item?.locations[0]) return toast.error("Нет локации. Добавьте вручную.");
+    const voxelId = item.locations[0].voxel;
+    const currentQty = item.locations[0].quantity;
+    const delta = gameMode === 'offload' ? -1 : 1;
+    handleUpdateLocationQty(itemId, voxelId, currentQty + delta, true);
+    if (navigator.vibrate) navigator.vibrate(50);
+    const audio = new Audio('/sounds/click.mp3');
+    audio.play();
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,8 +211,8 @@ export default function WBPage() {
 
   const handleWorkflowNext = async () => {
     if (currentWorkflowIndex < workflowItems.length) {
-      const {id, change} = workflowItems[currentWorkflowIndex];
-      const voxel = selectedWorkflowVoxel || items.find(i => i.id === id)?.locations[0]?.voxel;
+      const {id, change, voxel: importVoxel} = workflowItems[currentWorkflowIndex];
+      const voxel = selectedWorkflowVoxel || importVoxel || items.find(i => i.id === id)?.locations[0]?.voxel;
       if (!voxel) {
         toast.error("Выберите локацию");
         return;
@@ -260,15 +278,20 @@ export default function WBPage() {
 
   if (loading) return <Loading text="Загрузка склада..." />;
 
+  const bgStyle = {
+    background: gameMode === 'onload' ? 'linear-gradient(to bottom right, #15803d, #22c55e)' 
+      : gameMode === 'offload' ? 'linear-gradient(to bottom right, #b91c1c, #ef4444)' 
+      : undefined,
+  };
+
   return (
-    <div className={cn(
-      "min-h-screen bg-background flex flex-col transition-colors duration-300",
-      gameMode === 'onload' ? 'bg-gradient-to-br from-green-900 to-green-500' : gameMode === 'offload' ? 'bg-gradient-to-br from-red-900 to-red-500' : 'bg-background'
-    )}>
+    <div className="min-h-screen bg-background flex flex-col transition-colors duration-300" style={bgStyle}>
       <div className="w-full overflow-auto p-2">
         <Card>
-          <CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1 overflow-auto max-h-[69vh]">
-            {filteredItems.map((item, idx) => (
+          <CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[69vh]">
+            {loading ? Array.from({length: 20}).map((_, idx) => (
+              <Skeleton key={idx} className="h-24 rounded-2xl" />
+            )) : filteredItems.map((item, idx) => (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -276,7 +299,7 @@ export default function WBPage() {
                 transition={{ delay: idx * 0.03 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => handleSelectItem(item.id)}
+                onClick={() => handleItemClick(item.id)}
                 className={cn(
                   "relative cursor-pointer rounded-2xl shadow-lg overflow-hidden group",
                   "transition-all duration-300 ease-in-out",
@@ -443,7 +466,7 @@ export default function WBPage() {
             <AccordionContent>
               <ol className="list-decimal pl-4 space-y-2">
                 <li><strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом работы для фиксации текущего состояния.</li>
-                <li><strong>Режимы игры:</strong> Вкл Onload/Offload. Клик на ячейку - auto inc/dec. Пусто в Onload? Открывает добавление.</li>
+                <li><strong>Режимы игры:</strong> Вкл Onload/Offload. Клик на item/ячейку - auto inc/dec. Пусто в Onload? Открывает добавление.</li>
                 <li><strong>Импорт:</strong> Загружайте CSV/XLSX (headers: Артикул,Количество,voxel опц). Workflow шаг за шагом обновляет.</li>
                 <li><strong>Экспорт Diff:</strong> После работы - генерит CSV дифф от чекпоинта, скачивает + шлёт файл в админ-чат как документ.</li>
                 <li><strong>Синхронизация:</strong> Загружайте diff в WB/Ozon панели (Остатки > Импорт). Для 'B' полок - warn если qty < min.</li>
