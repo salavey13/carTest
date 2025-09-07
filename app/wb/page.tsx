@@ -9,7 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Image from "next/image";
-import { getWarehouseItems, updateItemLocationQty, exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
+import {
+  getWarehouseItems,
+  updateItemLocationQty,
+  exportDiffToAdmin,
+  exportCurrentStock,
+} from "@/app/wb/actions";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,7 +22,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { COLOR_MAP, SIZE_PACK, VOXELS, Item, Location } from "@/app/wb/common";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function Loading({ text }: { text: string }) {
@@ -64,19 +69,25 @@ export default function WBPage() {
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
   const [playerName, setPlayerName] = useState<string | null>(null);
 
+  // Modal states (восстановленные модалки для редактирования)
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalItem, setModalItem] = useState<Item | null>(null);
+  const [modalVoxel, setModalVoxel] = useState<string | null>(null);
+  const [modalQuantity, setModalQuantity] = useState<number | "">("");
+
   useEffect(() => {
     async function loadItems() {
       const { success, data, error } = await getWarehouseItems();
       if (success && data) {
         const processed = data.map((item) => {
           const locations = item.specs.warehouse_locations || [];
-          const total_quantity = locations.reduce((sum, l) => sum + l.quantity, 0);
+          const total_quantity = locations.reduce((sum: number, l: any) => sum + l.quantity, 0);
           return {
             id: item.id,
             name: `${item.make} ${item.model}`,
             description: item.description || "",
             image: item.image_url || "",
-            locations: locations.map((l) => ({
+            locations: locations.map((l: any) => ({
               voxel: l.voxel_id,
               quantity: l.quantity,
               min_qty: item.specs.min_quantity && l.voxel_id.startsWith("B") ? item.specs.min_quantity : undefined,
@@ -86,9 +97,9 @@ export default function WBPage() {
             pattern: item.specs.pattern,
             color: item.specs.color,
             size: item.specs.size,
-          };
+          } as Item;
         });
-        const newItems = [...processed];
+        const newItems: Item[] = [...processed];
         ["evro", "dvushka", "evro-maksi", "polutorka"].forEach((type) => {
           ["adel", "malvina"].forEach((pattern) => {
             ["leto", "zima"].forEach((season) => {
@@ -105,7 +116,7 @@ export default function WBPage() {
                   pattern,
                   color: type === "evro" ? "beige" : type === "dvushka" ? "blue" : type === "evro-maksi" ? "red" : "gray",
                   size: type === "evro" ? "180x220" : type === "dvushka" ? "200x220" : type === "evro-maksi" ? "220x240" : "150x200",
-                });
+                } as Item);
               }
             });
           });
@@ -141,6 +152,7 @@ export default function WBPage() {
       }
     }
     loadItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -157,6 +169,7 @@ export default function WBPage() {
     if (score >= 100 && level === 1) levelUp(2);
     if (score >= 500 && level === 2) levelUp(3);
     if (score >= 1000 && level === 3) levelUp(4);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [score, level]);
 
   const levelUp = (newLevel: number) => {
@@ -233,12 +246,33 @@ export default function WBPage() {
 
   const handleSelectVoxel = (id: string) => {
     setSelectedVoxel(id);
+    // Открывать модалку для ручного редактирования, если режим игры выключен
+    if (!gameMode) {
+      const content = items.flatMap((i) => i.locations.filter((l) => l.voxel === id).map((l) => ({ item: i, qty: l.quantity })));
+      if (content.length > 0) {
+        setModalItem(content[0].item);
+        setModalVoxel(id);
+        setModalQuantity(content[0].qty);
+      } else {
+        setModalItem(null);
+        setModalVoxel(id);
+        setModalQuantity("");
+      }
+      setModalOpen(true);
+    }
   };
 
   const handleSelectItem = (id: string) => {
     setSelectedItemId(id);
     const item = items.find((i) => i.id === id);
     if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
+    // Открываем модалку при клике на товар (если не режим игры)
+    if (!gameMode) {
+      setModalItem(item || null);
+      setModalVoxel(item?.locations[0]?.voxel || null);
+      setModalQuantity(item?.locations[0]?.quantity ?? "");
+      setModalOpen(true);
+    }
   };
 
   const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
@@ -273,6 +307,13 @@ export default function WBPage() {
         }),
       );
       toast.success("Обновление выполнено");
+      // Закрыть модалку если она была открыта для этой локации/товара
+      if (modalOpen && modalVoxel === voxelId) {
+        setModalOpen(false);
+        setModalItem(null);
+        setModalVoxel(null);
+        setModalQuantity("");
+      }
       if (isGameAction) {
         const absChange = Math.abs(quantity - (loc?.quantity || 0));
         let basePoints = gameMode === "onload" ? 10 : 5;
@@ -328,11 +369,11 @@ export default function WBPage() {
       setImportFile(file);
       Papa.parse(file, {
         complete: (results) => {
-          const changes = results.data
+          const changes = (results.data as any[])
             .map((row: any) => {
-              const id = row["Артикул продавца"] || row["Баркод"];
-              const change = parseInt(row["Количество"]);
-              return { id, change, voxel: row["voxel"] || undefined };
+              const id = row["Артикул продавца"] || row["Баркод"] || row["Артикул"] || row["SKU"];
+              const change = parseInt(row["Количество"] || row["Quantity"] || row["Qty"]);
+              return { id, change, voxel: row["voxel"] || row["voxel_id"] || undefined };
             })
             .filter((c) => c.id && !isNaN(c.change));
           setWorkflowItems(changes);
@@ -383,20 +424,65 @@ export default function WBPage() {
     }
   };
 
+  // Полировка экспорта — корректный CSV + попытка вызвать серверную отправку
   const handleExportDiff = async () => {
     if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
     const diffData = items.map((i) => {
       const prev = lastCheckpoint[i.id];
-      const diffQty = i.total_quantity - (prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0);
-      return { id: i.id, diffQty, voxel: i.locations[0]?.voxel || "" };
+      const prevQty = prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0;
+      const diffQty = i.total_quantity - prevQty;
+      return { id: i.id, name: i.name, diffQty, voxel: i.locations[0]?.voxel || "" };
     });
-    await exportDiffToAdmin(diffData);
-    toast.success("Экспорт изменений завершен");
+    // CSV
+    const csv = Papa.unparse(diffData);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const fileName = `wb_diff_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("CSV с изменениями скачан");
+
+    // Попытка отправить на сервер / в админ-чат, если функция доступна
+    try {
+      await exportDiffToAdmin(diffData);
+      toast.success("Изменения отправлены администратору");
+    } catch (e) {
+      // тихо падаем — уже скачали CSV
+      console.warn("exportDiffToAdmin failed", e);
+    }
   };
 
   const handleExportStock = async () => {
-    await exportCurrentStock(items);
-    toast.success("Экспорт текущего стока завершен");
+    const stock = items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      total_quantity: i.total_quantity,
+      locations: i.locations.map((l) => `${l.voxel}:${l.quantity}`).join(";"),
+    }));
+    const csv = Papa.unparse(stock);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const fileName = `wb_stock_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("CSV стока скачан");
+
+    try {
+      await exportCurrentStock(items);
+      toast.success("Текущий сток отправлен на сервер");
+    } catch (e) {
+      console.warn("exportCurrentStock failed", e);
+    }
   };
 
   const handleCheckpoint = () => {
@@ -428,12 +514,12 @@ export default function WBPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" style={bgStyle}>
-      <div className="w-full overflow-auto p-4">
+    <div className="h-screen bg-background flex flex-col" style={bgStyle}>
+      <div className="w-full overflow-auto p-3" style={bgStyle}>
         <Card className="shadow-md">
-          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[70vh]">
+          <CardContent className="p-2 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[60vh]">
             {loading
-              ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-24 rounded-xl" />)
+              ? Array.from({ length: 20 }).map((_, idx) => <Skeleton key={idx} className="h-20 rounded-xl" />)
               : filteredItems.map((item, idx) => (
                   <motion.div
                     key={item.id}
@@ -444,8 +530,8 @@ export default function WBPage() {
                     className={cn(
                       "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
                       "transition-all duration-300 ease-in-out",
-                      gameMode ? "w-16 h-16 text-[10px]" : "w-20 h-20 text-xs",
-                      "sm:w-16 sm:h-16 sm:text-[10px]",
+                      gameMode ? "w-16 h-16 text-[8px]" : "w-20 h-20 text-[8px]",
+                      "sm:w-16 sm:h-16 sm:text-[8px]",
                     )}
                   >
                     {item.image && (
@@ -464,8 +550,8 @@ export default function WBPage() {
                     />
                     <div className="relative z-10 flex flex-col h-full p-1 justify-between">
                       <div>
-                        <h3 className="font-semibold">{item.name}</h3>
-                        <p className="text-gray-700">Кол: {item.total_quantity}</p>
+                        <h3 className="font-semibold text-[8px] leading-tight truncate">{item.name}</h3>
+                        <p className="text-gray-700 text-[9px]">Кол: {item.total_quantity}</p>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {item.locations.map((loc) => (
@@ -502,13 +588,13 @@ export default function WBPage() {
             </CardTitle>
             <div className="flex flex-wrap gap-2 text-sm">
               <Input
-                className="h-8 text-sm w-40"
+                className="h-7 text-sm w-36"
                 placeholder="Поиск..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               <Select value={sortBy} onValueChange={(v: "name" | "quantity" | "voxel") => setSortBy(v)}>
-                <SelectTrigger className="h-8 text-sm w-32">
+                <SelectTrigger className="h-7 text-sm w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -518,7 +604,7 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterSeason || "all"} onValueChange={(v) => setFilterSeason(v === "all" ? null : v)}>
-                <SelectTrigger className="h-8 text-sm w-32">
+                <SelectTrigger className="h-7 text-sm w-28">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} />
                 </SelectTrigger>
                 <SelectContent>
@@ -528,7 +614,7 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterPattern || "all"} onValueChange={(v) => setFilterPattern(v === "all" ? null : v)}>
-                <SelectTrigger className="h-8 text-sm w-32">
+                <SelectTrigger className="h-7 text-sm w-28">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} />
                 </SelectTrigger>
                 <SelectContent>
@@ -544,7 +630,7 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterColor || "all"} onValueChange={(v) => setFilterColor(v === "all" ? null : v)}>
-                <SelectTrigger className="h-8 text-sm w-32">
+                <SelectTrigger className="h-7 text-sm w-28">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} />
                 </SelectTrigger>
                 <SelectContent>
@@ -560,7 +646,7 @@ export default function WBPage() {
                 </SelectContent>
               </Select>
               <Select value={filterSize || "all"} onValueChange={(v) => setFilterSize(v === "all" ? null : v)}>
-                <SelectTrigger className="h-8 text-sm w-32">
+                <SelectTrigger className="h-7 text-sm w-28">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} />
                 </SelectTrigger>
                 <SelectContent>
@@ -577,7 +663,7 @@ export default function WBPage() {
                   <SelectItem value="150x200">150x200</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleResetFilters} className="h-8 text-sm px-3">
+              <Button onClick={handleResetFilters} className="h-7 text-sm px-2">
                 <X size={14} /> Сброс
               </Button>
             </div>
@@ -585,21 +671,21 @@ export default function WBPage() {
               <Label htmlFor="import" className="text-sm">
                 <VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" />
               </Label>
-              <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-8 text-sm" />
-              <Button onClick={handleExportDiff} className="h-8 text-sm px-3">
+              <Input id="import" type="file" accept=".csv,.xlsx" onChange={handleImport} className="h-7 text-sm" />
+              <Button onClick={handleExportDiff} className="h-7 text-sm px-2">
                 <VibeContentRenderer content="::FaFileExport:: Экспорт изменений" />
               </Button>
-              <Button onClick={handleExportStock} className="h-8 text-sm px-3">
+              <Button onClick={handleExportStock} className="h-7 text-sm px-2">
                 <VibeContentRenderer content="::FaFileExport:: Экспорт стока" />
               </Button>
-              <Button onClick={handleCheckpoint} className="h-8 text-sm px-3">
+              <Button onClick={handleCheckpoint} className="h-7 text-sm px-2">
                 <VibeContentRenderer content="::FaSave:: Чекпоинт" />
               </Button>
               <Select
                 value={gameMode || "none"}
                 onValueChange={(v: "none" | "offload" | "onload") => setGameMode(v === "none" ? null : v)}
               >
-                <SelectTrigger className="h-8 text-sm w-40">
+                <SelectTrigger className="h-7 text-sm w-36">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaTasks:: Режим операций" />} />
                 </SelectTrigger>
                 <SelectContent>
@@ -615,31 +701,33 @@ export default function WBPage() {
             </div>
           </CardHeader>
         </Card>
+
         <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
-          <h3 className="font-semibold">Статистика операций</h3>
-          <p>
+          <h3 className="font-semibold text-[10px]">Статистика операций</h3>
+          <p className="text-[13px]">
             Эффективность: {score} (Внутр. валюта: {Math.floor(score / 100)}) | Уровень: {level} | Серия: {streak} | Дни: {dailyStreak}
           </p>
-          <p>Достижения: {achievements.join(", ")}</p>
-          <p>Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
-          <p>Приемка: +10 за единицу +бонус. Отгрузка: +5 за единицу +бонус. Бонус уровня: x{level / 2}</p>
+          <p className="text-[12px]">Достижения: {achievements.join(", ")}</p>
+          <p className="text-[12px]">Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
+          <p className="text-[12px]">Приемка: +10 за единицу +бонус. Отгрузка: +5 за единицу +бонус. Бонус уровня: x{level / 2}</p>
           {bossMode && (
             <p className="text-red-600 font-medium">
               Критическая операция! Осталось: {Math.floor(bossTimer / 1000)} сек
             </p>
           )}
           <p className="font-medium">Рейтинг операторов:</p>
-          <ol className="list-decimal pl-5">
+          <ol className="list-decimal pl-5 text-[12px]">
             {leaderboard.map((entry, idx) => (
               <li key={idx}>
                 {entry.name}: {entry.score} ({entry.date})
               </li>
             ))}
           </ol>
-          <p>В разработке: Совместные операции (Supabase), награды за топ.</p>
+          <p className="text-[12px]">В разработке: Совместные операции (Supabase), награды за топ.</p>
         </div>
       </div>
-      <div className="w-full h-[80vh] overflow-y-auto p-4">
+
+      <div className="w-full flex-1 overflow-y-auto p-4" style={bgStyle}>
         <WarehouseViz
           items={items}
           selectedVoxel={selectedVoxel}
@@ -649,12 +737,13 @@ export default function WBPage() {
           onPlateClick={handlePlateClick}
         />
       </div>
+
       <div className="mt-4 p-3 bg-gray-100 rounded-lg text-sm">
         <Accordion type="single" collapsible>
           <AccordionItem value="instructions">
             <AccordionTrigger className="font-semibold">Инструкции по операциям</AccordionTrigger>
             <AccordionContent>
-              <ol className="list-decimal pl-5 space-y-2">
+              <ol className="list-decimal pl-5 space-y-2 text-[13px]">
                 <li>
                   <strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом для фиксации текущего состояния.
                 </li>
@@ -665,13 +754,13 @@ export default function WBPage() {
                   <strong>Импорт:</strong> Загружайте CSV/XLSX (столбцы: Артикул, Количество, voxel опционально). Пошаговое обновление. Крупный импорт — критическая операция.
                 </li>
                 <li>
-                  <strong>Экспорт изменений:</strong> Создает XLSX с изменениями от чекпоинта и отправляет в админ-чат.
+                  <strong>Экспорт изменений:</strong> Создает CSV с изменениями от чекпоинта и отправляет в админ-чат.
                 </li>
                 <li>
-                  <strong>Экспорт стока:</strong> Выгружает текущее состояние склада в XLSX для синхронизации.
+                  <strong>Экспорт стока:</strong> Выгружает текущее состояние склада в CSV для синхронизации.
                 </li>
                 <li>
-                  <strong>Синхронизация:</strong> Загружайте изменения в панели WB/Ozon (Остатки > Импорт). Для полок B — уведомление, если запас ниже минимального.
+                  <strong>Синхронизация:</strong> Загружайте изменения в панели WB/Ozon (Остатки &gt; Импорт). Для полок B — уведомление, если запас ниже минимального.
                 </li>
                 <li>
                   <strong>Советы для мобильных:</strong> Уменьшены ячейки, поддержка сенсорного ввода. Свайп для прокрутки визуализации.
@@ -681,6 +770,8 @@ export default function WBPage() {
           </AccordionItem>
         </Accordion>
       </div>
+
+      {/* Workflow modal */}
       {workflowItems.length > 0 && (
         <Dialog open={true}>
           <DialogContent className="max-h-[80vh] overflow-auto">
@@ -712,6 +803,82 @@ export default function WBPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Manual edit modal (восстановленный) */}
+      <Dialog open={modalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{modalItem ? `Товар: ${modalItem.name}` : `Ячейка: ${modalVoxel || "—"}`}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {modalItem ? (
+              <div>
+                <p className="text-[13px]">Текущий запас в {modalVoxel}: {modalQuantity === "" ? "—" : modalQuantity}</p>
+                <div className="flex gap-2 items-center mt-2">
+                  <Input
+                    type="number"
+                    value={modalQuantity === "" ? "" : String(modalQuantity)}
+                    onChange={(e) => setModalQuantity(e.target.value === "" ? "" : parseInt(e.target.value))}
+                  />
+                  <Button
+                    onClick={async () => {
+                      if (!modalItem || !modalVoxel) return toast.error("Нет товара или ячейки");
+                      const qty = typeof modalQuantity === "number" ? modalQuantity : parseInt(String(modalQuantity));
+                      if (isNaN(qty)) return toast.error("Некорректное количество");
+                      await handleUpdateLocationQty(modalItem.id, modalVoxel, qty, false);
+                    }}
+                  >
+                    Сохранить
+                  </Button>
+                  <Button onClick={() => { setModalOpen(false); setModalItem(null); setModalVoxel(null); setModalQuantity(""); }}>
+                    Отмена
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p className="text-[13px]">Ячейка <strong>{modalVoxel}</strong> пуста. Привяжите товар и укажите количество:</p>
+                <Select value={selectedItemId || ""} onValueChange={setSelectedItemId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите товар" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {items.map((it) => (
+                      <SelectItem key={it.id} value={it.id}>
+                        {it.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2 items-center mt-2">
+                  <Input
+                    type="number"
+                    placeholder="Количество"
+                    value={modalQuantity === "" ? "" : String(modalQuantity)}
+                    onChange={(e) => setModalQuantity(e.target.value === "" ? "" : parseInt(e.target.value))}
+                  />
+                  <Button
+                    onClick={async () => {
+                      if (!modalVoxel) return toast.error("Нет ячейки");
+                      const idToUse = selectedItemId;
+                      if (!idToUse) return toast.error("Выберите товар");
+                      const qty = typeof modalQuantity === "number" ? modalQuantity : parseInt(String(modalQuantity));
+                      if (isNaN(qty)) return toast.error("Некорректное количество");
+                      await handleUpdateLocationQty(idToUse, modalVoxel, qty, false);
+                    }}
+                  >
+                    Привязать и сохранить
+                  </Button>
+                  <Button onClick={() => { setModalOpen(false); setModalItem(null); setModalVoxel(null); setModalQuantity(""); }}>
+                    Отмена
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
