@@ -1,3 +1,4 @@
+// /app/wb/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -261,10 +262,10 @@ export default function WBPage() {
   if (loading) return <Loading text="Загрузка склада..." />;
 
   return (
-    <div className="min-h-screen pt-24 bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <div className="w-full overflow-auto p-2">
         <Card>
-<CardContent className="p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-auto max-h-[80vh]">
+<CardContent className="p-1 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-10 gap-1 overflow-auto max-h-[80vh]">
   {filteredItems.map((item, idx) => (
     <motion.div
       key={item.id}
@@ -298,10 +299,10 @@ export default function WBPage() {
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full p-2 justify-between">
         <div>
-          <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-white">
+          <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-black">
             {item.name}
           </h3>
-          <p className="text-[10px] md:text-xs text-white/80">
+          <p className="text-[8px] md:text-xs text-white/80">
             Кол: {item.total_quantity}
           </p>
         </div>
