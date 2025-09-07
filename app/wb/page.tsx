@@ -264,32 +264,72 @@ export default function WBPage() {
     <div className="min-h-screen pt-24 bg-background flex flex-col">
       <div className="w-full overflow-auto p-2">
         <Card>
-<CardContent className="p-1 grid grid-cols-3 gap-1 overflow-auto max-h-[80vh]">
-            {filteredItems.map(item => (
-              <Accordion type="single" collapsible key={item.id}>
-                <AccordionItem value={item.id}>
-                  <AccordionTrigger className={cn("p-1 text-[10px] rounded", COLOR_MAP[item.color || 'gray'])} onClick={() => handleSelectItem(item.id)}>
-                    <div className="flex items-center gap-1">
-                      {item.image && <Image src={item.image} alt={item.name} width={42} height={42} className="rounded" />}
-                      <div>
-                        <h3 className="font-bold text-[10px]">{item.name}</h3>
-                        <p className="text-[10px]">Кол: {item.total_quantity}</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="p-1 text-[10px]">
-                    {item.locations.map(loc => (
-                      <div key={loc.voxel} className="flex justify-between">
-                        <span>{loc.voxel}: {loc.quantity}</span>
-                        <Button size="xs" onClick={() => setSelectedVoxel(loc.voxel)}>Посм.</Button>
-                      </div>
-                    ))}
-                    <p>{item.description}</p>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            ))}
-          </CardContent>
+<CardContent className="p-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-auto max-h-[80vh]">
+  {filteredItems.map((item, idx) => (
+    <motion.div
+      key={item.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.03 }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      onClick={() => handleSelectItem(item.id)}
+      className={cn(
+        "relative cursor-pointer rounded-2xl shadow-lg overflow-hidden group",
+        "transition-all duration-300 ease-in-out",
+      )}
+    >
+      {/* BG Image */}
+      {item.image && (
+        <Image
+          src={item.image}
+          alt={item.name}
+          fill
+          className="object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+      )}
+      {/* Color tint */}
+      <div
+        className={cn(
+          "absolute inset-0 opacity-70 group-hover:opacity-50 transition-opacity duration-300",
+          COLOR_MAP[item.color || "gray"],
+        )}
+      />
+      {/* Content */}
+      <div className="relative z-10 flex flex-col h-full p-2 justify-between">
+        <div>
+          <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-white">
+            {item.name}
+          </h3>
+          <p className="text-[10px] md:text-xs text-white/80">
+            Кол: {item.total_quantity}
+          </p>
+        </div>
+        {/* Voxels badges */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {item.locations.map((loc) => (
+            <span
+              key={loc.voxel}
+              className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-white shadow"
+            >
+              {loc.voxel}:{loc.quantity}
+            </span>
+          ))}
+        </div>
+      </div>
+      {/* Description overlay (hover only) */}
+      {item.description && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+          className="absolute inset-0 bg-black/70 flex items-center justify-center text-center text-[10px] md:text-xs text-white p-2"
+        >
+          {item.description}
+        </motion.div>
+      )}
+    </motion.div>
+  ))}
+</CardContent>
           <CardHeader className="p-2">
             <CardTitle className="text-sm">Список (Всего: {totals})</CardTitle>
             <div className="flex flex-wrap gap-1 text-xs">
