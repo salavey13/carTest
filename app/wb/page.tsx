@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Image from "next/image";
-import { getWarehouseItems, updateItemLocationQty, exportDiffToAdmin } from "@/app/wb/actions";
+import { getWarehouseItems, updateItemLocationQty, exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -38,12 +38,12 @@ export default function WBPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'voxel'>('name');
+  const [sortBy, setSortBy] = useState<"name" | "quantity" | "voxel">("name");
   const [filterSeason, setFilterSeason] = useState<string | null>(null);
   const [filterPattern, setFilterPattern] = useState<string | null>(null);
   const [filterColor, setFilterColor] = useState<string | null>(null);
   const [filterSize, setFilterSize] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
   const [workflowItems, setWorkflowItems] = useState<{ id: string; change: number; voxel?: string }[]>([]);
   const [currentWorkflowIndex, setCurrentWorkflowIndex] = useState(0);
@@ -52,7 +52,7 @@ export default function WBPage() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<string[]>([]);
   const [score, setScore] = useState(0);
-  const [gameMode, setGameMode] = useState<'offload' | 'onload' | null>(null);
+  const [gameMode, setGameMode] = useState<"offload" | "onload" | null>(null);
   const [clickCount, setClickCount] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [sessionStart, setSessionStart] = useState(Date.now());
@@ -68,18 +68,18 @@ export default function WBPage() {
     async function loadItems() {
       const { success, data, error } = await getWarehouseItems();
       if (success && data) {
-        const processed = data.map(item => {
+        const processed = data.map((item) => {
           const locations = item.specs.warehouse_locations || [];
           const total_quantity = locations.reduce((sum, l) => sum + l.quantity, 0);
           return {
             id: item.id,
             name: `${item.make} ${item.model}`,
-            description: item.description || '',
-            image: item.image_url || '',
-            locations: locations.map(l => ({
+            description: item.description || "",
+            image: item.image_url || "",
+            locations: locations.map((l) => ({
               voxel: l.voxel_id,
               quantity: l.quantity,
-              min_qty: item.specs.min_quantity && l.voxel_id.startsWith('B') ? item.specs.min_quantity : undefined,
+              min_qty: item.specs.min_quantity && l.voxel_id.startsWith("B") ? item.specs.min_quantity : undefined,
             })),
             total_quantity,
             season: item.specs.season,
@@ -89,22 +89,22 @@ export default function WBPage() {
           };
         });
         const newItems = [...processed];
-        ['evro', 'dvushka', 'evro-maksi', 'polutorka'].forEach(type => {
-          ['adel', 'malvina'].forEach(pattern => {
-            ['leto', 'zima'].forEach(season => {
+        ["evro", "dvushka", "evro-maksi", "polutorka"].forEach((type) => {
+          ["adel", "malvina"].forEach((pattern) => {
+            ["leto", "zima"].forEach((season) => {
               const id = `${type}-${season}-${pattern}`;
-              if (!newItems.some(i => i.id === id)) {
+              if (!newItems.some((i) => i.id === id)) {
                 newItems.push({
                   id,
                   name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${season.charAt(0).toUpperCase() + season.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`,
-                  description: pattern === 'adel' ? 'Бежевая, белое голубой горошек' : 'Бежевая, мятное фиолетовый цветок',
+                  description: pattern === "adel" ? "Бежевая, белое голубой горошек" : "Бежевая, мятное фиолетовый цветок",
                   image: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/wb/${id}.jpg`,
                   locations: [],
                   total_quantity: 0,
                   season,
                   pattern,
-                  color: type === 'evro' ? 'beige' : type === 'dvushka' ? 'blue' : type === 'evro-maksi' ? 'red' : 'gray',
-                  size: type === 'evro' ? '180x220' : type === 'dvushka' ? '200x220' : type === 'evro-maksi' ? '220x240' : '150x200',
+                  color: type === "evro" ? "beige" : type === "dvushka" ? "blue" : type === "evro-maksi" ? "red" : "gray",
+                  size: type === "evro" ? "180x220" : type === "dvushka" ? "200x220" : type === "evro-maksi" ? "220x240" : "150x200",
                 });
               }
             });
@@ -114,29 +114,29 @@ export default function WBPage() {
       } else {
         console.error("Ошибка загрузки товаров:", error);
         toast.error(error || "Ошибка загрузки товаров");
-        setErrorCount(prev => prev + 1);
+        setErrorCount((prev) => prev + 1);
         updateStreak(false);
       }
       setLoading(false);
-      const stored = localStorage.getItem('warehouse_checkpoint');
+      const stored = localStorage.getItem("warehouse_checkpoint");
       if (stored) setLastCheckpoint(JSON.parse(stored));
-      const ach = localStorage.getItem('achievements');
+      const ach = localStorage.getItem("achievements");
       if (ach) setAchievements(JSON.parse(ach));
-      const lb = localStorage.getItem('leaderboard');
+      const lb = localStorage.getItem("leaderboard");
       if (lb) setLeaderboard(JSON.parse(lb));
-      const prevErrors = localStorage.getItem('errorRate') || '0';
-      if (errorCount < parseInt(prevErrors)) setAchievements(prev => [...new Set([...prev, 'Высокая точность'])]); // Dedup
-      localStorage.setItem('errorRate', errorCount.toString());
+      const prevErrors = localStorage.getItem("errorRate") || "0";
+      if (errorCount < parseInt(prevErrors)) setAchievements((prev) => [...new Set([...prev, "Высокая точность"])]);
+      localStorage.setItem("errorRate", errorCount.toString());
       setStartTime(Date.now());
       setSessionStart(Date.now());
       loadDailyStreak();
-      const name = localStorage.getItem('playerName');
+      const name = localStorage.getItem("playerName");
       if (name) setPlayerName(name);
       else {
         const inputName = prompt("Введите имя для статистики операций:");
         if (inputName) {
           setPlayerName(inputName);
-          localStorage.setItem('playerName', inputName);
+          localStorage.setItem("playerName", inputName);
         }
       }
     }
@@ -145,7 +145,7 @@ export default function WBPage() {
 
   useEffect(() => {
     if (bossMode && bossTimer > 0) {
-      const interval = setInterval(() => setBossTimer(prev => prev - 1000), 1000);
+      const interval = setInterval(() => setBossTimer((prev) => prev - 1000), 1000);
       return () => clearInterval(interval);
     } else if (bossMode && bossTimer <= 0) {
       toast.error("Критическая операция не завершена вовремя!");
@@ -161,45 +161,45 @@ export default function WBPage() {
 
   const levelUp = (newLevel: number) => {
     setLevel(newLevel);
-    setAchievements(prev => [...new Set([...prev, `Уровень повышен: ${newLevel}`])]);
-    localStorage.setItem('achievements', JSON.stringify(achievements));
+    setAchievements((prev) => [...new Set([...prev, `Уровень повышен: ${newLevel}`])]);
+    localStorage.setItem("achievements", JSON.stringify(achievements));
     toast.success(`Уровень повышен до ${newLevel}! Множитель эффективности: x${newLevel / 2}`);
   };
 
   const updateStreak = (success: boolean) => {
     if (success) {
-      setStreak(prev => prev + 1);
-      if (streak + 1 === 10) addAchievement('Стабильность операций: 10');
-      if (streak + 1 === 50) addAchievement('Мастер операций: 50');
+      setStreak((prev) => prev + 1);
+      if (streak + 1 === 10) addAchievement("Стабильность операций: 10");
+      if (streak + 1 === 50) addAchievement("Мастер операций: 50");
     } else {
       setStreak(0);
     }
   };
 
   const addAchievement = (ach: string) => {
-    setAchievements(prev => {
+    setAchievements((prev) => {
       const newAch = [...new Set([...prev, ach])];
-      localStorage.setItem('achievements', JSON.stringify(newAch));
+      localStorage.setItem("achievements", JSON.stringify(newAch));
       return newAch;
     });
   };
 
   const loadDailyStreak = () => {
-    const lastDate = localStorage.getItem('lastSessionDate');
+    const lastDate = localStorage.getItem("lastSessionDate");
     const today = new Date().toDateString();
     if (lastDate === today) {
-      setDailyStreak(parseInt(localStorage.getItem('dailyStreak') || '0'));
-    } else if (new Date(lastDate || '').getTime() === new Date().setDate(new Date().getDate() - 1)) {
-      const newStreak = parseInt(localStorage.getItem('dailyStreak') || '0') + 1;
+      setDailyStreak(parseInt(localStorage.getItem("dailyStreak") || "0"));
+    } else if (new Date(lastDate || "").getTime() === new Date().setDate(new Date().getDate() - 1)) {
+      const newStreak = parseInt(localStorage.getItem("dailyStreak") || "0") + 1;
       setDailyStreak(newStreak);
-      localStorage.setItem('dailyStreak', newStreak.toString());
-      if (newStreak === 3) addAchievement('Стабильность: 3 дня');
-      if (newStreak === 7) addAchievement('Неделя эффективности');
+      localStorage.setItem("dailyStreak", newStreak.toString());
+      if (newStreak === 3) addAchievement("Стабильность: 3 дня");
+      if (newStreak === 7) addAchievement("Неделя эффективности");
     } else {
       setDailyStreak(1);
-      localStorage.setItem('dailyStreak', '1');
+      localStorage.setItem("dailyStreak", "1");
     }
-    localStorage.setItem('lastSessionDate', today);
+    localStorage.setItem("lastSessionDate", today);
   };
 
   const updateLeaderboard = (newScore: number) => {
@@ -207,13 +207,13 @@ export default function WBPage() {
     const entry = { name: playerName, score: newScore, date: new Date().toLocaleString() };
     const newLb = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
     setLeaderboard(newLb);
-    localStorage.setItem('leaderboard', JSON.stringify(newLb));
+    localStorage.setItem("leaderboard", JSON.stringify(newLb));
   };
 
   const filteredItems = useMemo(() => {
     return items
       .filter(
-        i =>
+        (i) =>
           (!filterSeason || i.season === filterSeason) &&
           (!filterPattern || i.pattern === filterPattern) &&
           (!filterColor || i.color === filterColor) &&
@@ -221,8 +221,8 @@ export default function WBPage() {
           i.name.toLowerCase().includes(search.toLowerCase()),
       )
       .sort((a, b) => {
-        if (sortBy === 'quantity') return b.total_quantity - a.total_quantity;
-        if (sortBy === 'voxel') return (a.locations[0]?.voxel || '').localeCompare(b.locations[0]?.voxel || '');
+        if (sortBy === "quantity") return b.total_quantity - a.total_quantity;
+        if (sortBy === "voxel") return (a.locations[0]?.voxel || "").localeCompare(b.locations[0]?.voxel || "");
         return a.name.localeCompare(b.name);
       });
   }, [items, sortBy, filterSeason, filterPattern, filterColor, filterSize, search]);
@@ -237,26 +237,26 @@ export default function WBPage() {
 
   const handleSelectItem = (id: string) => {
     setSelectedItemId(id);
-    const item = items.find(i => i.id === id);
+    const item = items.find((i) => i.id === id);
     if (item?.locations[0]) setSelectedVoxel(item.locations[0].voxel);
   };
 
-  const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
-    const item = items.find(i => i.id === itemId);
-    const loc = item?.locations.find(l => l.voxel === voxelId);
-    if (voxelId.startsWith('B') && loc?.min_qty && quantity < loc.min_qty) {
+  const handleUpdate | LocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
+    const item = items.find((i) => i.id === itemId);
+    const loc = item?.locations.find((l) => l.voxel === voxelId);
+    if (voxelId.startsWith("B") && loc?.min_qty && quantity < loc.min_qty) {
       toast.warn("Минимальный запас на полке B! Требуется полный пересчет.");
-      setErrorCount(prev => prev + 1);
+      setErrorCount((prev) => prev + 1);
       updateStreak(false);
       return;
     }
     const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
     if (success) {
-      setItems(prev =>
-        prev.map(i => {
+      setItems((prev) =>
+        prev.map((i) => {
           if (i.id === itemId) {
             let locations = [...i.locations];
-            const index = locations.findIndex(l => l.voxel === voxelId);
+            const index = locations.findIndex((l) => l.voxel === voxelId);
             if (index >= 0) {
               if (quantity <= 0) {
                 locations.splice(index, 1);
@@ -275,33 +275,33 @@ export default function WBPage() {
       toast.success("Обновление выполнено");
       if (isGameAction) {
         const absChange = Math.abs(quantity - (loc?.quantity || 0));
-        let basePoints = gameMode === 'onload' ? 10 : 5;
+        let basePoints = gameMode === "onload" ? 10 : 5;
         let bonus = absChange > 10 ? 5 : 0; // Volume bonus
         bonus += level * 2; // Level bonus
         const points = (basePoints + bonus) * absChange;
-        setScore(prev => prev + points);
-        setClickCount(prev => prev + 1);
+        setScore((prev) => prev + points);
+        setClickCount((prev) => prev + 1);
         updateStreak(true);
         if (clickCount > 10 && (Date.now() - (startTime || Date.now())) / 60000 < 1) {
-          addAchievement('Высокая скорость');
+          addAchievement("Высокая скорость");
         }
         updateLeaderboard(score + points);
       }
     } else {
       toast.error(error || "Ошибка обновления");
-      setErrorCount(prev => prev + 1);
+      setErrorCount((prev) => prev + 1);
       updateStreak(false);
     }
   };
 
   const handlePlateClick = (voxelId: string) => {
     if (!gameMode) return;
-    const content = items.flatMap(i => i.locations.filter(l => l.voxel === voxelId).map(l => ({ item: i, quantity: l.quantity })));
+    const content = items.flatMap((i) => i.locations.filter((l) => l.voxel === voxelId).map((l) => ({ item: i, quantity: l.quantity })));
     if (content.length > 0) {
       const mainItem = content[0].item;
-      const delta = gameMode === 'offload' ? -1 : 1;
+      const delta = gameMode === "offload" ? -1 : 1;
       handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity + delta, true);
-    } else if (gameMode === 'onload') {
+    } else if (gameMode === "onload") {
       toast.warning("Ячейка пуста. Добавьте товар через интерфейс.");
       handleSelectVoxel(voxelId);
     }
@@ -309,16 +309,16 @@ export default function WBPage() {
 
   const handleItemClick = (itemId: string) => {
     if (!gameMode) return handleSelectItem(itemId);
-    const item = items.find(i => i.id === itemId);
+    const item = items.find((i) => i.id === itemId);
     if (!item?.locations[0]) {
       toast.error("Локация не указана. Добавьте вручную.");
-      setErrorCount(prev => prev + 1);
+      setErrorCount((prev) => prev + 1);
       updateStreak(false);
       return;
     }
     const voxelId = item.locations[0].voxel;
     const currentQty = item.locations[0].quantity;
-    const delta = gameMode === 'offload' ? -1 : 1;
+    const delta = gameMode === "offload" ? -1 : 1;
     handleUpdateLocationQty(itemId, voxelId, currentQty + delta, true);
   };
 
@@ -330,11 +330,11 @@ export default function WBPage() {
         complete: (results) => {
           const changes = results.data
             .map((row: any) => {
-              const id = row['Артикул продавца'] || row['Баркод'];
-              const change = parseInt(row['Количество']);
-              return { id, change, voxel: row['voxel'] || undefined };
+              const id = row["Артикул продавца"] || row["Баркод"];
+              const change = parseInt(row["Количество"]);
+              return { id, change, voxel: row["voxel"] || undefined };
             })
-            .filter(c => c.id && !isNaN(c.change));
+            .filter((c) => c.id && !isNaN(c.change));
           setWorkflowItems(changes);
           setCurrentWorkflowIndex(0);
           if (changes.length > 20) {
@@ -351,33 +351,33 @@ export default function WBPage() {
   const handleWorkflowNext = async () => {
     if (currentWorkflowIndex < workflowItems.length) {
       const { id, change, voxel: importVoxel } = workflowItems[currentWorkflowIndex];
-      const voxel = selectedWorkflowVoxel || importVoxel || items.find(i => i.id === id)?.locations[0]?.voxel;
+      const voxel = selectedWorkflowVoxel || importVoxel || items.find((i) => i.id === id)?.locations[0]?.voxel;
       if (!voxel) {
         toast.error("Выберите локацию");
-        setErrorCount(prev => prev + 1);
+        setErrorCount((prev) => prev + 1);
         updateStreak(false);
         return;
       }
-      const item = items.find(i => i.id === id);
-      const currentQty = item?.locations.find(l => l.voxel === voxel)?.quantity || 0;
+      const item = items.find((i) => i.id === id);
+      const currentQty = item?.locations.find((l) => l.voxel === voxel)?.quantity || 0;
       await handleUpdateLocationQty(id, voxel, currentQty + change, true);
       setSelectedWorkflowVoxel(null);
-      setCurrentWorkflowIndex(prev => prev + 1);
+      setCurrentWorkflowIndex((prev) => prev + 1);
     } else {
       setWorkflowItems([]);
       toast.success("Импорт завершен");
       const timeSpent = Date.now() - (startTime || Date.now());
-      const prevBest = localStorage.getItem('bestTime');
+      const prevBest = localStorage.getItem("bestTime");
       if (!prevBest || timeSpent < parseInt(prevBest)) {
-        localStorage.setItem('bestTime', timeSpent.toString());
-        addAchievement('Рекорд времени');
+        localStorage.setItem("bestTime", timeSpent.toString());
+        addAchievement("Рекорд времени");
       }
-      if (timeSpent < 300000) addAchievement('Молниеносная операция');
+      if (timeSpent < 300000) addAchievement("Молниеносная операция");
       if (bossMode) {
         setBossMode(false);
         if (bossTimer > 0) {
-          setScore(prev => prev * 1.5);
-          addAchievement('Мастер критических операций');
+          setScore((prev) => prev * 1.5);
+          addAchievement("Мастер критических операций");
         }
       }
     }
@@ -385,20 +385,18 @@ export default function WBPage() {
 
   const handleExportDiff = async () => {
     if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
-    const diffData = items.map(i => {
+    const diffData = items.map((i) => {
       const prev = lastCheckpoint[i.id];
       const diffQty = i.total_quantity - (prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0);
-      return { id: i.id, diffQty, voxel: i.locations[0]?.voxel || '' };
+      return { id: i.id, diffQty, voxel: i.locations[0]?.voxel || "" };
     });
-    const csv = Papa.unparse(diffData, { columns: ['id', 'diffQty', 'voxel'] });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'warehouse_diff.csv';
-    a.click();
-    await exportDiffToAdmin(csv);
+    await exportDiffToAdmin(diffData);
     toast.success("Экспорт изменений завершен");
+  };
+
+  const handleExportStock = async () => {
+    await exportCurrentStock(items);
+    toast.success("Экспорт текущего стока завершен");
   };
 
   const handleCheckpoint = () => {
@@ -409,7 +407,7 @@ export default function WBPage() {
       },
       {} as { [key: string]: { locations: Location[] } },
     );
-    localStorage.setItem('warehouse_checkpoint', JSON.stringify(checkpoint));
+    localStorage.setItem("warehouse_checkpoint", JSON.stringify(checkpoint));
     setLastCheckpoint(checkpoint);
     toast.success("Чекпоинт сохранен");
   };
@@ -419,14 +417,14 @@ export default function WBPage() {
     setFilterPattern(null);
     setFilterColor(null);
     setFilterSize(null);
-    setSearch('');
-    setSortBy('name');
+    setSearch("");
+    setSortBy("name");
   };
 
   if (loading) return <Loading text="Загрузка данных склада..." />;
 
   const bgStyle = {
-    backgroundColor: gameMode === 'onload' ? '#e6f4ea' : gameMode === 'offload' ? '#fee2e2' : '#f5f5f5',
+    backgroundColor: gameMode === "onload" ? "#e6f4ea" : gameMode === "offload" ? "#fee2e2" : "#f5f5f5",
   };
 
   return (
@@ -442,13 +440,12 @@ export default function WBPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => handleItemClick(item.id)}
                     className={cn(
                       "relative cursor-pointer rounded-xl shadow-md overflow-hidden group border",
                       "transition-all duration-300 ease-in-out",
-                      gameMode && "w-24 h-24",
+                      gameMode ? "w-16 h-16 text-[10px]" : "w-20 h-20 text-xs",
+                      "sm:w-16 sm:h-16 sm:text-[10px]",
                     )}
                   >
                     {item.image && (
@@ -465,16 +462,16 @@ export default function WBPage() {
                         COLOR_MAP[item.color || "gray"],
                       )}
                     />
-                    <div className="relative z-10 flex flex-col h-full p-2 justify-between">
+                    <div className="relative z-10 flex flex-col h-full p-1 justify-between">
                       <div>
-                        <h3 className="font-semibold text-xs md:text-sm text-gray-900">{item.name}</h3>
-                        <p className="text-[10px] md:text-xs text-gray-700">Кол: {item.total_quantity}</p>
+                        <h3 className="font-semibold truncate">{item.name}</h3>
+                        <p className="text-gray-700">Кол: {item.total_quantity}</p>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {item.locations.map(loc => (
+                        {item.locations.map((loc) => (
                           <span
                             key={loc.voxel}
-                            className="px-1.5 py-0.5 rounded bg-gray-800/50 text-[10px] text-white"
+                            className="px-1 py-0.5 rounded bg-gray-800/50 text-[8px] text-white"
                           >
                             {loc.voxel}:{loc.quantity}
                           </span>
@@ -485,7 +482,7 @@ export default function WBPage() {
                       <motion.div
                         initial={{ opacity: 0 }}
                         whileHover={{ opacity: 1 }}
-                        className="absolute inset-0 bg-gray-900/70 flex items-center justify-center text-center text-[10px] md:text-xs text-white p-2"
+                        className="absolute inset-0 bg-gray-900/70 flex items-center justify-center text-center text-[10px] text-white p-1"
                       >
                         {item.description}
                       </motion.div>
@@ -498,7 +495,7 @@ export default function WBPage() {
               Список товаров (Всего: {totals})
               {gameMode && (
                 <VibeContentRenderer
-                  content={gameMode === 'onload' ? '::FaArrowUp:: Приемка' : '::FaArrowDown:: Отгрузка'}
+                  content={gameMode === "onload" ? "::FaArrowUp:: Приемка" : "::FaArrowDown:: Отгрузка"}
                   className="text-base"
                 />
               )}
@@ -508,9 +505,9 @@ export default function WBPage() {
                 className="h-8 text-sm w-40"
                 placeholder="Поиск..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
               />
-              <Select value={sortBy} onValueChange={(v: 'name' | 'quantity' | 'voxel') => setSortBy(v)}>
+              <Select value={sortBy} onValueChange={(v: "name" | "quantity" | "voxel") => setSortBy(v)}>
                 <SelectTrigger className="h-8 text-sm w-32">
                   <SelectValue />
                 </SelectTrigger>
@@ -520,7 +517,7 @@ export default function WBPage() {
                   <SelectItem value="voxel">Локация</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterSeason || 'all'} onValueChange={v => setFilterSeason(v === 'all' ? null : v)}>
+              <Select value={filterSeason || "all"} onValueChange={(v) => setFilterSeason(v === "all" ? null : v)}>
                 <SelectTrigger className="h-8 text-sm w-32">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaFilter:: Сезон" />} />
                 </SelectTrigger>
@@ -530,7 +527,7 @@ export default function WBPage() {
                   <SelectItem value="zima"><VibeContentRenderer content="::FaSnowflake:: Зима" /></SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterPattern || 'all'} onValueChange={v => setFilterPattern(v === 'all' ? null : v)}>
+              <Select value={filterPattern || "all"} onValueChange={(v) => setFilterPattern(v === "all" ? null : v)}>
                 <SelectTrigger className="h-8 text-sm w-32">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaPaintBrush:: Узор" />} />
                 </SelectTrigger>
@@ -546,7 +543,7 @@ export default function WBPage() {
                   <SelectItem value="malvina">Мальвина</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterColor || 'all'} onValueChange={v => setFilterColor(v === 'all' ? null : v)}>
+              <Select value={filterColor || "all"} onValueChange={(v) => setFilterColor(v === "all" ? null : v)}>
                 <SelectTrigger className="h-8 text-sm w-32">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaPalette:: Цвет" />} />
                 </SelectTrigger>
@@ -562,7 +559,7 @@ export default function WBPage() {
                   <SelectItem value="malvina">Мальвина</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filterSize || 'all'} onValueChange={v => setFilterSize(v === 'all' ? null : v)}>
+              <Select value={filterSize || "all"} onValueChange={(v) => setFilterSize(v === "all" ? null : v)}>
                 <SelectTrigger className="h-8 text-sm w-32">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaRuler:: Размер" />} />
                 </SelectTrigger>
@@ -592,12 +589,15 @@ export default function WBPage() {
               <Button onClick={handleExportDiff} className="h-8 text-sm px-3">
                 <VibeContentRenderer content="::FaFileExport:: Экспорт изменений" />
               </Button>
+              <Button onClick={handleExportStock} className="h-8 text-sm px-3">
+                <VibeContentRenderer content="::FaFileExport:: Экспорт стока" />
+              </Button>
               <Button onClick={handleCheckpoint} className="h-8 text-sm px-3">
                 <VibeContentRenderer content="::FaSave:: Чекпоинт" />
               </Button>
               <Select
-                value={gameMode || 'none'}
-                onValueChange={(v: 'none' | 'offload' | 'onload') => setGameMode(v === 'none' ? null : v)}
+                value={gameMode || "none"}
+                onValueChange={(v: "none" | "offload" | "onload") => setGameMode(v === "none" ? null : v)}
               >
                 <SelectTrigger className="h-8 text-sm w-40">
                   <SelectValue placeholder={<VibeContentRenderer content="::FaTasks:: Режим операций" />} />
@@ -620,7 +620,7 @@ export default function WBPage() {
           <p>
             Эффективность: {score} (Внутр. валюта: {Math.floor(score / 100)}) | Уровень: {level} | Серия: {streak} | Дни: {dailyStreak}
           </p>
-          <p>Достижения: {achievements.join(', ')}</p>
+          <p>Достижения: {achievements.join(", ")}</p>
           <p>Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
           <p>Приемка: +10 за единицу +бонус. Отгрузка: +5 за единицу +бонус. Бонус уровня: x{level / 2}</p>
           {bossMode && (
@@ -665,13 +665,16 @@ export default function WBPage() {
                   <strong>Импорт:</strong> Загружайте CSV/XLSX (столбцы: Артикул, Количество, voxel опционально). Пошаговое обновление. Крупный импорт — критическая операция.
                 </li>
                 <li>
-                  <strong>Экспорт изменений:</strong> Создает CSV с изменениями от чекпоинта и отправляет в админ-чат.
+                  <strong>Экспорт изменений:</strong> Создает XLSX с изменениями от чекпоинта и отправляет в админ-чат.
+                </li>
+                <li>
+                  <strong>Экспорт стока:</strong> Выгружает текущее состояние склада в XLSX для синхронизации.
                 </li>
                 <li>
                   <strong>Синхронизация:</strong> Загружайте изменения в панели WB/Ozon (Остатки > Импорт). Для полок B — уведомление, если запас ниже минимального.
                 </li>
                 <li>
-                  <strong>Советы для мобильных:</strong> Увеличенные ячейки, поддержка сенсорного ввода. Свайп для прокрутки визуализации.
+                  <strong>Советы для мобильных:</strong> Уменьшены ячейки, поддержка сенсорного ввода. Свайп для прокрутки визуализации.
                 </li>
               </ol>
             </AccordionContent>
@@ -689,15 +692,14 @@ export default function WBPage() {
             {currentWorkflowIndex < workflowItems.length && (
               <div className="space-y-2">
                 <p>
-                  Товар: {workflowItems[currentWorkflowIndex].id}, Изменение:{' '}
-                  {workflowItems[currentWorkflowIndex].change}
+                  Товар: {workflowItems[currentWorkflowIndex].id}, Изменение: {workflowItems[currentWorkflowIndex].change}
                 </p>
-                <Select value={selectedWorkflowVoxel || ''} onValueChange={setSelectedWorkflowVoxel}>
+                <Select value={selectedWorkflowVoxel || ""} onValueChange={setSelectedWorkflowVoxel}>
                   <SelectTrigger>
                     <SelectValue placeholder="Выберите ячейку" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VOXELS.map(v => (
+                    {VOXELS.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.id}
                       </SelectItem>
