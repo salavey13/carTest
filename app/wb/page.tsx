@@ -33,7 +33,7 @@ function Loading({ text }: { text: string }) {
         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"
       />
-      <p className="ml-4"><VibeContentRenderer content={`::FaSpinner:: ${text}`} /></p>
+      <p className="ml-4"><VibeContentRenderer content={`${text}`} /></p>
     </div>
   );
 }
