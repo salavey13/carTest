@@ -1,4 +1,3 @@
-// /app/wb/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -262,77 +261,82 @@ export default function WBPage() {
   if (loading) return <Loading text="Загрузка склада..." />;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={cn(
+      "min-h-screen bg-background flex flex-col transition-colors duration-300",
+      gameMode === 'onload' ? 'bg-gradient-to-br from-green-900 to-green-500' : gameMode === 'offload' ? 'bg-gradient-to-br from-red-900 to-red-500' : 'bg-background'
+    )}>
       <div className="w-full overflow-auto p-2">
         <Card>
-<CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1 overflow-auto max-h-[69vh]">
-  {filteredItems.map((item, idx) => (
-    <motion.div
-      key={item.id}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.03 }}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={() => handleSelectItem(item.id)}
-      className={cn(
-        "relative cursor-pointer rounded-2xl shadow-lg overflow-hidden group",
-        "transition-all duration-300 ease-in-out",
-      )}
-    >
-      {/* BG Image */}
-      {item.image && (
-        <Image
-          src={item.image}
-          alt=""
-          fill
-          className="object-cover group-hover:scale-110 transition-transform duration-500"
-        />
-      )}
-      {/* Color tint */}
-      <div
-        className={cn(
-          "absolute inset-0 opacity-70 group-hover:opacity-50 transition-opacity duration-300",
-          COLOR_MAP[item.color || "gray"],
-        )}
-      />
-      {/* Content */}
-      <div className="relative z-10 flex flex-col h-full p-2 justify-between">
-        <div>
-          <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-black">
-            {item.name}
-          </h3>
-          <p className="text-[8px] md:text-xs text-white/80">
-            Кол: {item.total_quantity}
-          </p>
-        </div>
-        {/* Voxels badges */}
-        <div className="flex flex-wrap gap-1 mt-1">
-          {item.locations.map((loc) => (
-            <span
-              key={loc.voxel}
-              className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-black shadow"
-            >
-              {loc.voxel}:{loc.quantity}
-            </span>
-          ))}
-        </div>
-      </div>
-      {/* Description overlay (hover only) */}
-      {item.description && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileHover={{ opacity: 1 }}
-          className="absolute inset-0 bg-black/70 flex items-center justify-center text-center text-[10px] md:text-xs text-white p-2"
-        >
-          {item.description}
-        </motion.div>
-      )}
-    </motion.div>
-  ))}
-</CardContent>
+          <CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1 overflow-auto max-h-[69vh]">
+            {filteredItems.map((item, idx) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleSelectItem(item.id)}
+                className={cn(
+                  "relative cursor-pointer rounded-2xl shadow-lg overflow-hidden group",
+                  "transition-all duration-300 ease-in-out",
+                )}
+              >
+                {/* BG Image */}
+                {item.image && (
+                  <Image
+                    src={item.image}
+                    alt=""
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                )}
+                {/* Color tint */}
+                <div
+                  className={cn(
+                    "absolute inset-0 opacity-70 group-hover:opacity-50 transition-opacity duration-300",
+                    COLOR_MAP[item.color || "gray"],
+                  )}
+                />
+                {/* Content */}
+                <div className="relative z-10 flex flex-col h-full p-2 justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-black">
+                      {item.name}
+                    </h3>
+                    <p className="text-[8px] md:text-xs text-white/80">
+                      Кол: {item.total_quantity}
+                    </p>
+                  </div>
+                  {/* Voxels badges */}
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {item.locations.map((loc) => (
+                      <span
+                        key={loc.voxel}
+                        className="px-1.5 py-0.5 rounded bg-black/40 text-[10px] text-black shadow"
+                      >
+                        {loc.voxel}:{loc.quantity}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {/* Description overlay (hover only) */}
+                {item.description && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    whileHover={{ opacity: 1 }}
+                    className="absolute inset-0 bg-black/70 flex items-center justify-center text-center text-[10px] md:text-xs text-white p-2"
+                  >
+                    {item.description}
+                  </motion.div>
+                )}
+              </motion.div>
+            ))}
+          </CardContent>
           <CardHeader className="p-2">
-            <CardTitle className="text-sm">Список (Всего: {totals})</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">
+              Список (Всего: {totals}) {gameMode && <VibeContentRenderer content={gameMode === 'onload' ? '::FaArrowUp:: Приемка' : '::FaArrowDown:: Отгрузка'} className="text-lg" />}
+            </CardTitle>
             <div className="flex flex-wrap gap-1 text-xs">
               <Input className="h-6 text-xs w-auto" placeholder="Поиск..." value={search} onChange={e => setSearch(e.target.value)} />
               <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
@@ -433,10 +437,21 @@ export default function WBPage() {
         />
       </div>
       <div className="mt-4 p-2 bg-muted rounded text-[10px]">
-        <h3 className="font-bold">Объяснение процедур экспорта/импорта и синхронизации с WB/Ozon</h3>
-        <p><strong>Импорт CSV/XLSX:</strong> Загружайте файл (поддержка stocks.xlsx-like: Баркод,Количество,Артикул). Парсер конвертит в дифф, обновляет запасы. Для приемки (onload) — авто +qty. После — экспорт дифф для WB/Ozon. Рефайн: совместимость с прилагаемыми docs, headers маппинг.</p>
-        <p><strong>Экспорт Diff CSV в чат:</strong> Генерит CSV (id,diffQty,voxel) с чекпоинта, скачивает + шлет в админ-чат (notifyAdmins + attachment). Загружайте в WB ("Остатки" > Импорт) / Ozon. Для синхра: ID совпадают (WB ID в metadata). Нотиф: "Diff готов!" с файлом.</p>
-        <p><strong>Синхронизация WB/Ozon:</strong> 1. Чекпоинт. 2. Гейм-режим клики — instant Supabase update. 3. Экспорт дифф (локально + чат). 4. Загрузка в панели. Рефайн: бонус нотиф админу при экспорте. Для multi-складов: 'A' точный, 'B' approx (min_qty warn). Early test: лог в console при экспорте.</p>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="instructions">
+            <AccordionTrigger className="font-bold">Обновлённые инструкции по процедурам</AccordionTrigger>
+            <AccordionContent>
+              <ol className="list-decimal pl-4 space-y-2">
+                <li><strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом работы для фиксации текущего состояния.</li>
+                <li><strong>Режимы игры:</strong> Вкл Onload/Offload. Клик на ячейку - auto inc/dec. Пусто в Onload? Открывает добавление.</li>
+                <li><strong>Импорт:</strong> Загружайте CSV/XLSX (headers: Артикул,Количество,voxel опц). Workflow шаг за шагом обновляет.</li>
+                <li><strong>Экспорт Diff:</strong> После работы - генерит CSV дифф от чекпоинта, скачивает + шлёт файл в админ-чат как документ.</li>
+                <li><strong>Синхронизация:</strong> Загружайте diff в WB/Ozon панели (Остатки > Импорт). Для 'B' полок - warn если qty < min.</li>
+                <li><strong>Mobile Tips:</strong> Ячейки larger, touch-friendly. Swipe для скролла viz.</li>
+              </ol>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
       {workflowItems.length > 0 && (
         <Dialog open={true}>

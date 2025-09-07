@@ -49,10 +49,11 @@ export async function sendComplexMessage(
     messageId?: number,
     keyboardType?: 'inline' | 'reply',
     removeKeyboard?: boolean,
-    parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown' // Allow specifying parse mode
+    parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown', // Allow specifying parse mode
+    attachment?: { type: 'document'; content: string; filename: string }
   } = {}
 ): Promise<{ success: boolean; error?: string; data?: any }> {
-  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false, parseMode = 'Markdown' } = options;
+  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false, parseMode = 'Markdown', attachment } = options;
 
   if (!TELEGRAM_BOT_TOKEN) {
     logger.error("[sendComplexMessage] Telegram bot token not configured.");
@@ -78,8 +79,22 @@ export async function sendComplexMessage(
       payload.reply_markup = keyboardType === 'inline' ? { inline_keyboard: buttons } : { keyboard: buttons, resize_keyboard: true, one_time_keyboard: true };
     }
     
-    const endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-    if (imageUrl) {
+    let endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
+    if (attachment?.type === 'document') {
+      endpoint = 'sendDocument';
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('document', new Blob([attachment.content], { type: 'text/csv' }), attachment.filename);
+      formData.append('caption', sanitizedText);
+      if (payload.reply_markup) formData.append('reply_markup', JSON.stringify(payload.reply_markup));
+
+      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
+        method: "POST", body: formData
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.description || `Failed to ${endpoint}`);
+      return { success: true, data };
+    } else if (imageUrl) {
       payload.photo = imageUrl;
       payload.caption = sanitizedText;
     } else {
