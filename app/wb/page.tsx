@@ -17,8 +17,9 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { COLOR_MAP, SIZE_PACK, VOXELS, Item, Location } from "@/app/wb/common";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
+import Confetti from "react-confetti"; // Добавляем для particles
 
 export default function WBPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -41,6 +42,16 @@ export default function WBPage() {
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState<'offload' | 'onload' | null>(null);
   const [clickCount, setClickCount] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
+  const [sessionStart, setSessionStart] = useState(Date.now());
+  const [level, setLevel] = useState(1);
+  const [streak, setStreak] = useState(0);
+  const [dailyStreak, setDailyStreak] = useState(0);
+  const [bossMode, setBossMode] = useState(false);
+  const [bossTimer, setBossTimer] = useState(300000); // 5min
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<{name: string, score: number, date: string}[]>([]);
+  const [playerName, setPlayerName] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadItems() {
@@ -54,7 +65,7 @@ export default function WBPage() {
             name: `${item.make} ${item.model}`,
             description: item.description || '',
             image: item.image_url || '',
-            locations: locations.map(l => ({voxel: l.voxel_id, quantity: l.quantity})),
+            locations: locations.map(l => ({voxel: l.voxel_id, quantity: l.quantity, min_qty: item.specs.min_quantity && l.voxel_id.startsWith('B') ? item.specs.min_quantity : undefined})),
             total_quantity,
             season: item.specs.season,
             pattern: item.specs.pattern,
@@ -88,16 +99,103 @@ export default function WBPage() {
         setItems(newItems);
       } else {
         toast.error(error || "Ошибка загрузки товаров");
+        setErrorCount(prev => prev + 1);
+        playSound('/sounds/error.mp3');
       }
       setLoading(false);
       const stored = localStorage.getItem('warehouse_checkpoint');
       if (stored) setLastCheckpoint(JSON.parse(stored));
       const ach = localStorage.getItem('achievements');
       if (ach) setAchievements(JSON.parse(ach));
+      const lb = localStorage.getItem('leaderboard');
+      if (lb) setLeaderboard(JSON.parse(lb));
+      const prevErrors = localStorage.getItem('errorRate') || '0';
+      if (errorCount < parseInt(prevErrors)) setAchievements(prev => [...new Set([...prev, 'Error Slayer!'])]); // Dedup
+      localStorage.setItem('errorRate', errorCount.toString());
       setStartTime(Date.now());
+      setSessionStart(Date.now());
+      loadDailyStreak();
+      const name = localStorage.getItem('playerName');
+      if (name) setPlayerName(name);
+      else {
+        const inputName = prompt("Введи свой ник для лидерборда:");
+        if (inputName) {
+          setPlayerName(inputName);
+          localStorage.setItem('playerName', inputName);
+        }
+      }
     }
     loadItems();
   }, []);
+
+  useEffect(() => {
+    if (bossMode && bossTimer > 0) {
+      const interval = setInterval(() => setBossTimer(prev => prev - 1000), 1000);
+      return () => clearInterval(interval);
+    } else if (bossMode && bossTimer <= 0) {
+      toast.error("Boss fight timed out! No bonus.");
+      setBossMode(false);
+    }
+  }, [bossMode, bossTimer]);
+
+  useEffect(() => {
+    if (score >= 100 && level === 1) levelUp(2);
+    if (score >= 500 && level === 2) levelUp(3);
+    if (score >= 1000 && level === 3) levelUp(4);
+  }, [score, level]);
+
+  const levelUp = (newLevel: number) => {
+    setLevel(newLevel);
+    setAchievements(prev => [...new Set([...prev, `Level Up! Lvl ${newLevel}`])]);
+    localStorage.setItem('achievements', JSON.stringify(achievements));
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 3000);
+    toast.success(`Level Up to ${newLevel}! Bonus multiplier x${newLevel / 2}`);
+  };
+
+  const updateStreak = (success: boolean) => {
+    if (success) {
+      setStreak(prev => prev + 1);
+      if (streak + 1 === 10) addAchievement('Streak Master 10!');
+      if (streak + 1 === 50) addAchievement('Unstoppable Streak 50!');
+    } else {
+      setStreak(0);
+    }
+  };
+
+  const addAchievement = (ach: string) => {
+    setAchievements(prev => {
+      const newAch = [...new Set([...prev, ach])];
+      localStorage.setItem('achievements', JSON.stringify(newAch));
+      return newAch;
+    });
+  };
+
+  const loadDailyStreak = () => {
+    const lastDate = localStorage.getItem('lastSessionDate');
+    const today = new Date().toDateString();
+    if (lastDate === today) {
+      setDailyStreak(parseInt(localStorage.getItem('dailyStreak') || '0'));
+    } else if (new Date(lastDate || '').getTime() === new Date().setDate(new Date().getDate() - 1)) {
+      const newStreak = (parseInt(localStorage.getItem('dailyStreak') || '0') + 1);
+      setDailyStreak(newStreak);
+      localStorage.setItem('dailyStreak', newStreak.toString());
+      if (newStreak === 3) addAchievement('Daily Streak 3!');
+      if (newStreak === 7) addAchievement('Week Warrior!');
+    } else {
+      setDailyStreak(1);
+      localStorage.setItem('dailyStreak', '1');
+    }
+    localStorage.setItem('lastSessionDate', today);
+  };
+
+  const updateLeaderboard = (newScore: number) => {
+    if (!playerName) return;
+    const entry = {name: playerName, score: newScore, date: new Date().toLocaleString()};
+    const newLb = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
+    setLeaderboard(newLb);
+    localStorage.setItem('leaderboard', JSON.stringify(newLb));
+  };
 
   const filteredItems = useMemo(() => {
     return items
@@ -128,6 +226,15 @@ export default function WBPage() {
   };
 
   const handleUpdateLocationQty = async (itemId: string, voxelId: string, quantity: number, isGameAction = false) => {
+    const item = items.find(i => i.id === itemId);
+    const loc = item?.locations.find(l => l.voxel === voxelId);
+    if (voxelId.startsWith('B') && loc?.min_qty && quantity < loc.min_qty) {
+      toast.warn("Min qty on B! Full recount needed.");
+      setErrorCount(prev => prev + 1);
+      updateStreak(false);
+      playSound('/sounds/error.mp3');
+      return;
+    }
     const { success, error } = await updateItemLocationQty(itemId, voxelId, quantity);
     if (success) {
       setItems(prev => prev.map(i => {
@@ -150,16 +257,33 @@ export default function WBPage() {
       }));
       toast.success("Обновлено");
       if (isGameAction) {
-        let bonus = quantity > 10 ? 5 : 0; // Бонус за объем
-        setScore(prev => prev + (quantity > 0 ? 10 + bonus : 5 + bonus));
+        const absChange = Math.abs(quantity - (loc?.quantity || 0));
+        let basePoints = gameMode === 'onload' ? 10 : 5;
+        let bonus = absChange > 10 ? 5 : 0; // Volume bonus
+        bonus += level * 2; // Level bonus
+        const points = (basePoints + bonus) * absChange;
+        setScore(prev => prev + points);
         setClickCount(prev => prev + 1);
-        if (clickCount > 10 && (Date.now() - (startTime || Date.now())) / 60000 < 1) { // >10 кликов в минуту
-          setAchievements(prev => [...prev, 'Fast Clicker!']);
+        updateStreak(true);
+        if (clickCount > 10 && (Date.now() - (startTime || Date.now())) / 60000 < 1) {
+          addAchievement('Fast Clicker!');
         }
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 1000);
+        playSound(gameMode === 'onload' ? '/sounds/farm.mp3' : '/sounds/damage.mp3');
+        updateLeaderboard(score + points);
       }
     } else {
       toast.error(error);
+      setErrorCount(prev => prev + 1);
+      updateStreak(false);
+      playSound('/sounds/error.mp3');
     }
+  };
+
+  const playSound = (src: string) => {
+    const audio = new Audio(src);
+    audio.play();
   };
 
   const handlePlateClick = (voxelId: string) => {
@@ -170,23 +294,21 @@ export default function WBPage() {
       const delta = gameMode === 'offload' ? -1 : 1;
       handleUpdateLocationQty(mainItem.id, voxelId, content[0].quantity + delta, true);
     } else if (gameMode === 'onload') {
-      // Для onload если пусто, промпт для выбора item
       toast.warning("Ячейка пуста. Добавьте товар через диалог.");
-      handleSelectVoxel(voxelId); // Открываем диалог для добавления
+      handleSelectVoxel(voxelId);
     }
   };
 
   const handleItemClick = (itemId: string) => {
     if (!gameMode) return handleSelectItem(itemId);
     const item = items.find(i => i.id === itemId);
-    if (!item?.locations[0]) return toast.error("Нет локации. Добавьте вручную.");
+    if (!item?.locations[0]) return toast.error("Нет локации. Добавьте вручную.", {onClose: () => {setErrorCount(prev => prev + 1); updateStreak(false); playSound('/sounds/error.mp3');}});
     const voxelId = item.locations[0].voxel;
     const currentQty = item.locations[0].quantity;
     const delta = gameMode === 'offload' ? -1 : 1;
     handleUpdateLocationQty(itemId, voxelId, currentQty + delta, true);
     if (navigator.vibrate) navigator.vibrate(50);
-    const audio = new Audio('/sounds/click.mp3');
-    audio.play();
+    playSound('/sounds/click.mp3');
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,16 +317,21 @@ export default function WBPage() {
       setImportFile(file);
       Papa.parse(file, {
         complete: (results) => {
-          // Рефайн: поддержка XLSX-like, парсинг headers как в docs (Баркод,Количество и т.д.)
           const changes = results.data.map((row: any) => {
-            const id = row['Артикул продавца'] || row['Баркод']; // Совместимость с docs
+            const id = row['Артикул продавца'] || row['Баркод'];
             const change = parseInt(row['Количество']);
             return {id, change, voxel: row['voxel'] || undefined};
           }).filter(c => c.id && !isNaN(c.change));
           setWorkflowItems(changes);
           setCurrentWorkflowIndex(0);
+          if (changes.length > 20) {
+            setBossMode(true);
+            setBossTimer(300000);
+            toast.warn("Boss Fight! Заверши за 5 мин для x1.5 бонуса.");
+            playSound('/sounds/boss.mp3');
+          }
         },
-        header: true, // Улучшение: парсим как с headers
+        header: true,
       });
     }
   };
@@ -215,6 +342,9 @@ export default function WBPage() {
       const voxel = selectedWorkflowVoxel || importVoxel || items.find(i => i.id === id)?.locations[0]?.voxel;
       if (!voxel) {
         toast.error("Выберите локацию");
+        setErrorCount(prev => prev + 1);
+        updateStreak(false);
+        playSound('/sounds/error.mp3');
         return;
       }
       const item = items.find(i => i.id === id);
@@ -229,13 +359,16 @@ export default function WBPage() {
       const prevBest = localStorage.getItem('bestTime');
       if (!prevBest || timeSpent < parseInt(prevBest)) {
         localStorage.setItem('bestTime', timeSpent.toString());
-        setAchievements(prev => {
-          const newAch = [...prev, 'Новый рекорд времени!'];
-          localStorage.setItem('achievements', JSON.stringify(newAch));
-          return newAch;
-        });
+        addAchievement('Новый рекорд времени!');
       }
-      if (timeSpent < 300000) setAchievements(prev => [...prev, 'Speed Demon!']); // <5min
+      if (timeSpent < 300000) addAchievement('Speed Demon!');
+      if (bossMode) {
+        setBossMode(false);
+        if (bossTimer > 0) {
+          setScore(prev => prev * 1.5);
+          addAchievement('Boss Slayer!');
+        }
+      }
     }
   };
 
@@ -246,14 +379,13 @@ export default function WBPage() {
       const diffQty = i.total_quantity - (prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0);
       return {id: i.id, diffQty, voxel: i.locations[0]?.voxel || ''};
     });
-    const csv = Papa.unparse(diffData, {columns: ['id', 'diffQty', 'voxel']}); // Рефайн: explicit columns для WB/Ozon
+    const csv = Papa.unparse(diffData, {columns: ['id', 'diffQty', 'voxel']});
     const blob = new Blob([csv], {type: 'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'warehouse_diff.csv';
     a.click();
-    // Бонус: отправка в админ-чат
     await exportDiffToAdmin(csv);
   };
 
@@ -286,6 +418,7 @@ export default function WBPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col transition-colors duration-300" style={bgStyle}>
+      {showConfetti && <Confetti width={window.innerWidth} height={window.innerHeight} />}
       <div className="w-full overflow-auto p-2">
         <Card>
           <CardContent className="p-1 grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 md:gap-1 overflow-auto max-h-[69vh]">
@@ -303,9 +436,9 @@ export default function WBPage() {
                 className={cn(
                   "relative cursor-pointer rounded-2xl shadow-lg overflow-hidden group",
                   "transition-all duration-300 ease-in-out",
+                  gameMode && "w-24 h-24" // Bigger for mobile game mode
                 )}
               >
-                {/* BG Image */}
                 {item.image && (
                   <Image
                     src={item.image}
@@ -314,14 +447,12 @@ export default function WBPage() {
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                 )}
-                {/* Color tint */}
                 <div
                   className={cn(
                     "absolute inset-0 opacity-70 group-hover:opacity-50 transition-opacity duration-300",
                     COLOR_MAP[item.color || "gray"],
                   )}
                 />
-                {/* Content */}
                 <div className="relative z-10 flex flex-col h-full p-2 justify-between">
                   <div>
                     <h3 className="font-extrabold text-xs md:text-sm drop-shadow-lg text-black">
@@ -331,7 +462,6 @@ export default function WBPage() {
                       Кол: {item.total_quantity}
                     </p>
                   </div>
-                  {/* Voxels badges */}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {item.locations.map((loc) => (
                       <span
@@ -343,7 +473,6 @@ export default function WBPage() {
                     ))}
                   </div>
                 </div>
-                {/* Description overlay (hover only) */}
                 {item.description && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -439,14 +568,21 @@ export default function WBPage() {
               </Select>
             </div>
           </CardHeader>
-          
         </Card>
         <div className="mt-4 p-2 bg-muted rounded text-[10px]">
           <h3 className="font-bold">Гейм-статка (WMS for Gamers)</h3>
-          <p>Очки: {score} | Ачивки: {achievements.join(', ')}</p>
-          <p>Время: {startTime ? Math.floor((Date.now() - startTime) / 1000) : 0} сек</p>
-          <p>Offload (отгрузка): +5 за дамаг +бонус объем. Onload (приемка): +10 за фарм +бонус объем.</p>
-          <p>Идеи: Мультиплеер, лидерборды. В dev: Авто-синхр WB/Ozon API.</p>
+          <p>Очки: {score} (Вирт. XTR: {Math.floor(score / 100)}) | Lvl: {level} | Streak: {streak} | Daily: {dailyStreak}</p>
+          <p>Ачивки: {achievements.join(', ')}</p>
+          <p>Время сессии: {Math.floor((Date.now() - sessionStart) / 1000)} сек | Ошибки: {errorCount}</p>
+          <p>Фарм (onload): +10 за +1 +бонус. Дамаг (offload): +5 за -1 +бонус. Lvl bonus: x{level / 2}</p>
+          {bossMode && <p className="text-red-500 animate-pulse">Boss Fight! Осталось: {Math.floor(bossTimer / 1000)} сек</p>}
+          <p>Лидерборд:</p>
+          <ol className="list-decimal pl-4">
+            {leaderboard.map((entry, idx) => (
+              <li key={idx}>{entry.name}: {entry.score} ({entry.date})</li>
+            ))}
+          </ol>
+          <p>В dev: Realtime co-op (Supabase), реальные XTR rewards за топ.</p>
         </div>
       </div>
       <div className="w-full h-[80vh] overflow-y-auto p-2">
@@ -467,7 +603,7 @@ export default function WBPage() {
               <ol className="list-decimal pl-4 space-y-2">
                 <li><strong>Чекпоинт:</strong> Нажмите "Чекпоинт" перед началом работы для фиксации текущего состояния.</li>
                 <li><strong>Режимы игры:</strong> Вкл Onload/Offload. Клик на item/ячейку - auto inc/dec. Пусто в Onload? Открывает добавление.</li>
-                <li><strong>Импорт:</strong> Загружайте CSV/XLSX (headers: Артикул,Количество,voxel опц). Workflow шаг за шагом обновляет.</li>
+                <li><strong>Импорт:</strong> Загружайте CSV/XLSX (headers: Артикул,Количество,voxel опц). Workflow шаг за шагом обновляет. Большой импорт - Boss Fight!</li>
                 <li><strong>Экспорт Diff:</strong> После работы - генерит CSV дифф от чекпоинта, скачивает + шлёт файл в админ-чат как документ.</li>
                 <li><strong>Синхронизация:</strong> Загружайте diff в WB/Ozon панели (Остатки > Импорт). Для 'B' полок - warn если qty < min.</li>
                 <li><strong>Mobile Tips:</strong> Ячейки larger, touch-friendly. Swipe для скролла viz.</li>
@@ -499,6 +635,19 @@ export default function WBPage() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+function Loading({ text }: { text: string }) {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full"
+      />
+      <p className="ml-4">{text}</p>
     </div>
   );
 }
