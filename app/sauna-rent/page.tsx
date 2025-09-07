@@ -88,7 +88,7 @@ const StepItem: React.FC<{ num: string, title: string, icon: string, children: R
 );
 
 // ----------------------------- page -----------------------------
-export default function ForestSPAPage() {
+export default function LesSPAPage() {
   const { dbUser, refreshDbUser } = useAppContext();
   const [showHistory, setShowHistory] = useState(false);
   
@@ -297,7 +297,7 @@ export default function ForestSPAPage() {
             <div className="absolute inset-0 z-0">
                 <Image 
                   src={heroImage} 
-                  alt="Forest SPA" 
+                  alt="Лес SPA" 
                   layout="fill" 
                   objectFit="cover" 
                   className="brightness-50" 
@@ -312,7 +312,7 @@ export default function ForestSPAPage() {
                 className="relative z-10 flex flex-col items-center"
             >
                 <h1 className="font-orbitron font-black uppercase text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tighter leading-none">
-                    <span className="block drop-shadow-lg">Forest SPA</span>
+                    <span className="block drop-shadow-lg">Лес SPA</span>
                     <span className="block text-emerald-300 drop-shadow-lg">Sauna & Massage</span>
                 </h1>
                 <p className="max-w-2xl mx-auto mt-6 text-lg md:text-xl text-gray-200 font-light">
@@ -571,7 +571,7 @@ export default function ForestSPAPage() {
         <footer className="bg-gray-100 py-12 px-4">
           <div className="container mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-orbitron text-xl mb-4 text-emerald-700">Forest SPA</h3>
+              <h3 className="font-orbitron text-xl mb-4 text-emerald-700">Лес SPA</h3>
               <p className="text-gray-600">Ultimate sauna and massage in Нижний Новгород.</p>
             </div>
             <div>
@@ -598,7 +598,7 @@ export default function ForestSPAPage() {
             </div>
           </div>
           <div className="container mx-auto max-w-7xl mt-8 text-center text-gray-500">
-            © 2025 Forest SPA. All rights reserved.
+            © 2025 Лес SPA. All rights reserved.
           </div>
         </footer>
     </div>
