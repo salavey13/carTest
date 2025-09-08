@@ -391,19 +391,6 @@ export default function WBPage() {
     toast.success("CSV с изменениями скачан");
   };
    
-    // локальный CSV и скачивание
-    const csv = Papa.unparse(diffData);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const fileName = `wb_diff_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    toast.success("CSV с изменениями скачан");
 
     // серверная отправка XLSX админам (используем core action — exportDiffToAdmin)
     try {
