@@ -426,14 +426,6 @@ export default function WBPage() {
       console.warn("exportDiffToAdmin(csv) failed", e);
       toast.error("Не удалось отправить CSV админам");
     }
-
-    try {
-      await exportDiffToAdmin(diffData);
-      toast.success("XLSX с изменениями отправлен админам");
-    } catch (e) {
-      console.warn(e);
-      toast.error("Ошибка отправки админам");
-    }
   };
 
   const handleExportStock = async () => {
