@@ -18,7 +18,7 @@ import FilterAccordion from "@/components/FilterAccordion";
 import { exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Поправлен путь
 import { cn } from "@/lib/utils";
-import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
+import { VOXELS } from "@/app/wb/common"; // Добавлен импорт VOXELS
 
 const DEFAULT_CSV = `Артикул,Количество
 evro-leto-kruzheva,2
