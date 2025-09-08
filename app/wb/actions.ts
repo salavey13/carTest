@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -7,6 +6,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
+import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
 export async function getWarehouseItems(): Promise<{
@@ -70,27 +70,42 @@ async function getItemSpecs(itemId: string): Promise<any> {
   return data?.specs || {};
 }
 
-export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
+export async function exportDiffToAdmin(diffData: any[], options: { format: 'csv' | 'xlsx' } = { format: 'csv' }): Promise<void> {
   try {
-    // Генерация XLSX
-    const worksheet = XLSX.utils.json_to_sheet(diffData, {
-      header: ["id", "diffQty", "voxel"],
-    });
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Diff");
-    const xlsxBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-    const xlsxContent = Buffer.from(xlsxBuffer).toString("base64");
+    if (options.format === 'csv') {
+      const csvData = Papa.unparse(diffData.map(d => ({
+        'Артикул': d.id,
+        'Изменение': d.diffQty,
+        'Ячейка': d.voxel
+      })), { header: true, delimiter: ';', quotes: true });
+      const message = "Изменения склада в CSV для синхронизации с WB/Ozon готовы! Загружайте в панели.";
+      await notifyAdmins(message);
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
+        attachment: {
+          type: "document",
+          content: Buffer.from(csvData, 'utf-8').toString('base64'),
+          filename: "warehouse_diff.csv",
+        },
+      });
+      logger.info("[exportDiffToAdmin] CSV sent to admins.");
+    } else {
+      const worksheet = XLSX.utils.json_to_sheet(diffData, { header: ["id", "diffQty", "voxel"] });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Diff");
+      const xlsxBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const xlsxContent = Buffer.from(xlsxBuffer).toString("base64");
 
-    const message = "Изменения склада в XLSX для синхронизации с WB/Ozon готовы! Загружайте в панели.";
-    await notifyAdmins(message);
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
-      attachment: {
-        type: "document",
-        content: xlsxContent,
-        filename: "warehouse_diff.xlsx",
-      },
-    });
-    logger.info("[exportDiffToAdmin] XLSX sent to admins.");
+      const message = "Изменения склада в XLSX для синхронизации с WB/Ozon готовы! Загружайте в панели.";
+      await notifyAdmins(message);
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
+        attachment: {
+          type: "document",
+          content: xlsxContent,
+          filename: "warehouse_diff.xlsx",
+        },
+      });
+      logger.info("[exportDiffToAdmin] XLSX sent to admins.");
+    }
   } catch (error) {
     logger.error("[exportDiffToAdmin] Error:", error);
   }
@@ -98,7 +113,6 @@ export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
 
 export async function exportCurrentStock(items: any[]): Promise<void> {
   try {
-    // Формируем данные для текущего стока
     const stockData = items.map((item) => ({
       id: item.id,
       name: item.name,
@@ -110,79 +124,18 @@ export async function exportCurrentStock(items: any[]): Promise<void> {
       size: item.size || "N/A",
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(stockData, {
-      header: ["id", "name", "total_quantity", "locations", "season", "pattern", "color", "size"],
-    });
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Stock");
-    const xlsxBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-    const xlsxContent = Buffer.from(xlsxBuffer).toString("base64");
-
-    const message = "Текущее состояние склада в XLSX. Загружайте в панели для синхронизации.";
+    const csvData = Papa.unparse(stockData, { header: true, delimiter: ';', quotes: true });
+    const message = "Текущее состояние склада в CSV. Загружайте в панели для синхронизации.";
     await notifyAdmins(message);
     await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
       attachment: {
         type: "document",
-        content: xlsxContent,
-        filename: "warehouse_stock.xlsx",
+        content: Buffer.from(csvData, 'utf-8').toString('base64'),
+        filename: "warehouse_stock.csv",
       },
     });
-    logger.info("[exportCurrentStock] XLSX sent to admins.");
+    logger.info("[exportCurrentStock] CSV sent to admins.");
   } catch (error) {
     logger.error("[exportCurrentStock] Error:", error);
   }
 }
-
-
-/*export async function exportDiffToAdmin(diffData: { id: string; diffQty: number; voxel: string }[]) {
-  try {
-    const worksheetData = diffData.map((item) => ({
-      Артикул: item.id,
-      Изменение: item.diffQty,
-      Ячейка: item.voxel,
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Изменения");
-    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
-    const bomBuffer = Buffer.concat([Buffer.from("\uFEFF", "utf8"), buffer]); // Add BOM for UTF-8
-    writeFileSync("/tmp/diff_export.xlsx", bomBuffer);
-    const supabase = createClient();
-    const { error } = await supabase.storage
-      .from("wb")
-      .upload(`exports/diff_${Date.now()}.xlsx`, bomBuffer, { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    if (error) {
-      throw new Error(error.message);
-    }
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: (error as Error).message };
-  }
-}
-
-export async function exportCurrentStock(items: Item[]) {
-  try {
-    const worksheetData = items.map((item) => ({
-      Артикул: item.id,
-      Название: item.name,
-      Количество: item.total_quantity,
-      Ячейки: item.locations.map((l) => `${l.voxel}:${l.quantity}`).join(", "),
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Склад");
-    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
-    const bomBuffer = Buffer.concat([Buffer.from("\uFEFF", "utf8"), buffer]); // Add BOM for UTF-8
-    writeFileSync("/tmp/stock_export.xlsx", bomBuffer);
-    const supabase = createClient();
-    const { error } = await supabase.storage
-      .from("wb")
-      .upload(`exports/stock_${Date.now()}.xlsx`, bomBuffer, { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    if (error) {
-      throw new Error(error.message);
-    }
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: (error as Error).message };
-  }
-}*/
