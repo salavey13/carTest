@@ -16,7 +16,7 @@ import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import { exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
-import { VibeContentRenderer } from "@/components/vibe-content-renderer";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_CSV = `Артикул,Количество
