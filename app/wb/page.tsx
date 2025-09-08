@@ -148,8 +148,8 @@ export default function WBPage() {
             <SelectValue placeholder="Режим" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="onload"><VibeContentRenderer content="::fasun:: Свет" /></SelectItem>
-            <SelectItem value="offload"><VibeContentRenderer content="::famoon:: Тьма" /></SelectItem>
+            <SelectItem value="onload"><VibeContentRenderer content="::fasun:: Прием" /></SelectItem>
+            <SelectItem value="offload"><VibeContentRenderer content="::famoon:: Выдача" /></SelectItem>
           </SelectContent>
         </Select>
         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
