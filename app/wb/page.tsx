@@ -168,13 +168,11 @@ export default function WBPage() {
       setStartTime(Date.now());
       setSessionStart(Date.now());
       const name = localStorage.getItem("playerName");
-      if (name) setPlayerName(name);
-      else {
-        const inputName = prompt("Введите имя для статистики операций:");
-        if (inputName) {
-          setPlayerName(inputName);
-          localStorage.setItem("playerName", inputName);
-        }
+      if (name) {
+        setPlayerName(name);
+      } else {
+        // don't prompt in headless/CI. operator can set name in profile or via localStorage manually.
+        setPlayerName(null);
       }
     }
     loadItems();
@@ -378,6 +376,21 @@ export default function WBPage() {
       const diffQty = i.total_quantity - prevQty;
       return { id: i.id, name: i.name, diffQty, voxel: i.locations[0]?.voxel || "" };
     });
+    // локальный CSV и скачивание (CSV-first variant)
+    const csv = Papa.unparse(diffData);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const fileName = `wb_diff_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("CSV с изменениями скачан");
+  };
+    });
     // локальный CSV и скачивание
     const csv = Papa.unparse(diffData);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -419,6 +432,33 @@ export default function WBPage() {
     }
   };
 
+  // CSV-first: попытка отправить CSV вариантом (бэкенд может поддержать флаг format: 'csv')
+  const handleSendDiffCSVToAdmins = async () => {
+    if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
+    const diffData = items.map((i) => {
+      const prev = lastCheckpoint[i.id];
+      const prevQty = prev ? prev.locations.reduce((sum, l) => sum + l.quantity, 0) : 0;
+      const diffQty = i.total_quantity - prevQty;
+      return { id: i.id, name: i.name, diffQty, voxel: i.locations[0]?.voxel || "" };
+    });
+    try {
+      await exportDiffToAdmin(diffData, { format: "csv" });
+      toast.success("CSV с изменениями отправлен админам");
+    } catch (e) {
+      console.warn("exportDiffToAdmin(csv) failed", e);
+      toast.error("Не удалось отправить CSV админам");
+    }
+  };
+    });
+    try {
+      await exportDiffToAdmin(diffData);
+      toast.success("XLSX с изменениями отправлен админам");
+    } catch (e) {
+      console.warn(e);
+      toast.error("Ошибка отправки админам");
+    }
+  };
+
   const handleExportStock = async () => {
     const stock = items.map((i) => ({
       id: i.id,
@@ -438,14 +478,6 @@ export default function WBPage() {
     a.remove();
     URL.revokeObjectURL(url);
     toast.success("CSV стока скачан");
-
-    try {
-      await exportCurrentStock(items);
-      toast.success("Текущий сток отправлен на сервер (XLSX)");
-    } catch (e) {
-      console.warn("exportCurrentStock failed", e);
-      toast.error("Не удалось отправить сток админам");
-    }
   };
 
   const handleSendStockToAdmins = async () => {
@@ -455,6 +487,16 @@ export default function WBPage() {
     } catch (e) {
       console.warn(e);
       toast.error("Ошибка отправки админам");
+    }
+  };
+
+  const handleSendStockCSVToAdmins = async () => {
+    try {
+      await exportCurrentStock(items, { format: "csv" });
+      toast.success("CSV стока отправлен админам");
+    } catch (e) {
+      console.warn("exportCurrentStock(csv) failed", e);
+      toast.error("Не удалось отправить CSV админам");
     }
   };
 
@@ -491,7 +533,7 @@ export default function WBPage() {
           <CardHeader className="p-3 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-4">
               {/* Main mode selector — вынесен наверх и сделан главным */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Select
                   value={gameMode || "none"}
                   onValueChange={(v: "none" | "offload" | "onload") => setGameMode(v === "none" ? null : v)}
@@ -509,9 +551,9 @@ export default function WBPage() {
                 <Button onClick={handleResetFilters} className="h-9 text-sm px-3">Сброс фильтров</Button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button onClick={handleSendDiffToAdmins} className="h-9 text-sm px-3">Отправить изменения админам</Button>
-                <Button onClick={handleSendStockToAdmins} className="h-9 text-sm px-3">Отправить сток админам</Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={handleSendDiffCSVToAdmins} className="h-9 text-sm px-3">Отправить изменения админам</Button>
+                <Button onClick={handleSendStockCSVToAdmins} className="h-9 text-sm px-3">Отправить сток админам</Button>
               </div>
             </div>
 
@@ -609,7 +651,7 @@ export default function WBPage() {
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Label htmlFor="import" className="text-sm">
                   <VibeContentRenderer content="::FaFileImport:: Импорт CSV/XLSX" />
                 </Label>
