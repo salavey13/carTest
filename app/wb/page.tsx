@@ -73,11 +73,9 @@ export default function WBPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalItem, setModalItem] = useState<Item | null>(null);
-  const [modalVoxel, setModalVoxel] = useState<string | null>(null);
-  const [modalQuantity, setModalQuantity] = useState<number | "">("");
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false); // Переименовано, для редакта
+  const [editVoxel, setEditVoxel] = useState<string | null>(null);
+  const [editContents, setEditContents] = useState<Content[]>([]); // Для мульти
 
   useEffect(() => {
     if (error) toast.error(error);
@@ -112,30 +110,58 @@ export default function WBPage() {
         return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
       }),
     ).filter(Boolean);
-    await exportDiffToAdmin(diffData, { format: 'csv' });
+    await exportDiffToAdmin(diffData);
   };
 
   const handleExportStock = async () => {
     await exportCurrentStock(items);
   };
 
-  const openModal = (item: Item | null, voxel: string) => {
-    setModalItem(item);
-    setModalVoxel(voxel);
-    setModalQuantity(item ? item.locations.find((l) => l.voxel === voxel)?.quantity || 0 : "");
-    setModalOpen(true);
+  const handlePlateClickCustom = (voxelId: string) => {
+    handlePlateClick(voxelId);
+    const content = items.flatMap((i) =>
+      i.locations.filter((l) => l.voxel === voxelId).map((l) => ({ item: i, quantity: l.quantity })),
+    );
+    if (gameMode === "onload") {
+      if (content.length === 0) {
+        setSelectedVoxel(voxelId);
+        setFilterSeason(null);
+        setFilterPattern(null);
+        setFilterColor(null);
+        setFilterSize(null);
+        setSearch("");
+        toast.info(`Выберите товар для добавления в ${voxelId}`);
+      } else {
+        // Открываем диалог редакта
+        setEditVoxel(voxelId);
+        setEditContents(content);
+        setEditDialogOpen(true);
+      }
+    } else if (gameMode === "offload") {
+      if (content.length > 0) {
+        const { item, quantity } = content[0];
+        handleUpdateLocationQty(item.id, voxelId, quantity - 1, true);
+      }
+    }
   };
 
-  const saveModal = async () => {
-    if (!modalVoxel) return;
-    const qty = typeof modalQuantity === "number" ? modalQuantity : parseInt(String(modalQuantity));
-    if (isNaN(qty)) return toast.error("Некорректное количество");
-    if (modalItem) {
-      await handleUpdateLocationQty(modalItem.id, modalVoxel, qty, !!gameMode);
-    } else if (selectedItemId) {
-      await handleUpdateLocationQty(selectedItemId, modalVoxel, qty, !!gameMode);
+  const handleItemClickCustom = (item: Item) => {
+    if (gameMode === "onload" && selectedVoxel) {
+      const loc = item.locations.find((l) => l.voxel === selectedVoxel);
+      const currentQty = loc ? loc.quantity : 0;
+      handleUpdateLocationQty(item.id, selectedVoxel, currentQty + 1, true);
+      toast.success(`Добавлено в ${selectedVoxel}`);
+    } else {
+      handleItemClick(item);
     }
-    setModalOpen(false);
+  };
+
+  const saveEditQty = async (itemId: string, newQty: number) => {
+    if (editVoxel) {
+      await handleUpdateLocationQty(itemId, editVoxel, newQty, !!gameMode);
+      toast.success("Количество обновлено");
+      setEditDialogOpen(false);
+    }
   };
 
   const bgStyle = gameMode === "onload" ? { background: "linear-gradient(to bottom, #fff, #ffd" } : gameMode === "offload" ? { background: "linear-gradient(to bottom, #333, #000" } : {};
@@ -177,8 +203,8 @@ export default function WBPage() {
               <WarehouseItemCard
                 key={item.id}
                 item={item}
-                onClick={() => handleItemClick(item)}
-                isHighlighted={workflowItems.some((w) => w.id === item.id)}
+                onClick={() => handleItemClickCustom(item)}
+                isHighlighted={workflowItems.some((w) => w.id === item.id) || (gameMode === "onload" && !!selectedVoxel)}
               />
             ))}
           </CardContent>
@@ -206,10 +232,7 @@ export default function WBPage() {
           onSelectVoxel={setSelectedVoxel}
           onUpdateLocationQty={handleUpdateLocationQty}
           gameMode={gameMode}
-          onPlateClick={(voxelId) => {
-            handlePlateClick(voxelId);
-            openModal(null, voxelId); // For qty input in onload
-          }}
+          onPlateClick={handlePlateClickCustom}
         />
       </div>
 
@@ -258,30 +281,27 @@ export default function WBPage() {
         </Dialog>
       )}
 
-      {/* Qty Modal */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+      {/* Edit Dialog for filled voxels */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{modalItem ? `Товар: ${modalItem.name}` : `Ячейка: ${modalVoxel}`}</DialogTitle>
+            <DialogTitle>Редактировать ячейку {editVoxel}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            {modalItem ? (
-              <p>Тек. в {modalVoxel}: {modalQuantity}</p>
-            ) : (
-              <Select value={selectedItemId || ""} onValueChange={setSelectedItemId}>
-                <SelectTrigger><SelectValue placeholder="Выберите товар" /></SelectTrigger>
-                <SelectContent>
-                  {items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-            <Input
-              type="number"
-              value={modalQuantity}
-              onChange={(e) => setModalQuantity(parseInt(e.target.value) || "")}
-              placeholder="Количество"
-            />
-            <Button onClick={saveModal}>Сохранить</Button>
+          <div className="space-y-4">
+            {editContents.map(({ item, quantity }) => (
+              <div key={item.id} className="flex items-center gap-2">
+                <span className="flex-1">{item.name}</span>
+                <Input
+                  type="number"
+                  defaultValue={quantity}
+                  onBlur={(e) => {
+                    const newQty = parseInt(e.target.value);
+                    if (!isNaN(newQty)) saveEditQty(item.id, newQty);
+                  }}
+                  className="w-20"
+                />
+              </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
