@@ -33,10 +33,13 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, gameMode, on
           >
             <div className="font-bold">{voxel.id}</div>
             {!isEmpty && (
-              <>
-                <div className="truncate">{content[0].item.name}</div>
-                <div>Кол: {content[0].quantity}</div>
-              </>
+              <div className="space-y-1">
+                {content.map(({ item, quantity }, idx) => (
+                  <div key={idx} className="truncate text-[10px]">
+                    {item.name}: {quantity}
+                  </div>
+                ))}
+              </div>
             )}
           </motion.div>
         );

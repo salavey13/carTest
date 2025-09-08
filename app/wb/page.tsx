@@ -16,9 +16,9 @@ import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import { exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Поправлен путь
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
-import { VOXELS } from "@/app/wb/common"; // Добавлен импорт VOXELS
+import { VOXELS } from "@/app/wb/common";
 
 const DEFAULT_CSV = `Артикул,Количество
 evro-leto-kruzheva,2
@@ -148,8 +148,8 @@ export default function WBPage() {
             <SelectValue placeholder="Режим" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="onload"><VibeContentRenderer content="<fa-sun> Свет" /></SelectItem>
-            <SelectItem value="offload"><VibeContentRenderer content="<fa-moon> Тьма" /></SelectItem>
+            <SelectItem value="onload"><VibeContentRenderer content="::fa-sun:: Свет" /></SelectItem>
+            <SelectItem value="offload"><VibeContentRenderer content="::fa-moon:: Тьма" /></SelectItem>
           </SelectContent>
         </Select>
         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
@@ -172,7 +172,7 @@ export default function WBPage() {
           <CardHeader className="p-2">
             <CardTitle className="text-sm">Товары ({filteredItems.length})</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-2 max-h-[30vh] overflow-y-auto">
+          <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-2 max-h-[69vh] overflow-y-auto">
             {filteredItems.map((item) => (
               <WarehouseItemCard
                 key={item.id}
@@ -223,6 +223,13 @@ export default function WBPage() {
         filterSize={filterSize}
         setFilterSize={setFilterSize}
         items={items}
+        onResetFilters={() => {
+          setFilterSeason(null);
+          setFilterPattern(null);
+          setFilterColor(null);
+          setFilterSize(null);
+          setSearch("");
+        }}
       />
 
       {/* Workflow Dialog */}
