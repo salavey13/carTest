@@ -1,3 +1,4 @@
+// /components/FilterAccordion.tsx
 "use client"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,7 +38,7 @@ export default function FilterAccordion({
   return (
     <Accordion type="single" collapsible className="p-2">
       <AccordionItem value="filters">
-        <AccordionTrigger className="text-sm"><VibeContentRenderer content="::fa-filter:: Фильтры" /></AccordionTrigger>
+        <AccordionTrigger className="text-sm"><VibeContentRenderer content="::fafilter:: Фильтры" /></AccordionTrigger>
         <AccordionContent className="grid grid-cols-2 gap-2">
           <Select value={filterSeason || ""} onValueChange={(v) => setFilterSeason(v || null)}>
             <SelectTrigger className="h-6 text-[10px]"><SelectValue placeholder="Сезон" /></SelectTrigger>
@@ -55,11 +56,11 @@ export default function FilterAccordion({
             <SelectTrigger className="h-6 text-[10px]"><SelectValue placeholder="Размер" /></SelectTrigger>
             <SelectContent>{uniqueSizes.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
           </Select>
-          <Button variant="outline" onClick={onResetFilters} className="col-span-2 text-[10px]"><VibeContentRenderer content="::fa-arrows-rotate:: Сброс" /></Button>
+          <Button variant="outline" onClick={onResetFilters} className="col-span-2 text-[10px]"><VibeContentRenderer content="::faarrowsrotate:: Сброс" /></Button>
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="instructions">
-        <AccordionTrigger className="text-sm"><VibeContentRenderer content="::fa-book:: Инструкция" /></AccordionTrigger>
+        <AccordionTrigger className="text-sm"><VibeContentRenderer content="::fabook:: Инструкция" /></AccordionTrigger>
         <AccordionContent className="text-[10px] space-y-1">
           <ol className="list-decimal pl-4">
             <li><strong>Чекпоинт:</strong> Фиксирует состояние перед работой.</li>
