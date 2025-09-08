@@ -1,6 +1,6 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { VibeContentRenderer } from "@/components/vibe-content-renderer";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
 interface FilterAccordionProps {
   filterSeason: string | null;
