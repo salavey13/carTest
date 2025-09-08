@@ -390,15 +390,6 @@ export default function WBPage() {
     a.remove();
     URL.revokeObjectURL(url);
     toast.success("CSV с изменениями скачан");
-
-    // серверная отправка XLSX админам (используем core action — exportDiffToAdmin)
-    try {
-      await exportDiffToAdmin(diffData);
-      toast.success("Изменения отправлены администратору (XLSX)");
-    } catch (e) {
-      console.warn("exportDiffToAdmin failed", e);
-      toast.error("Не удалось отправить XLSX админам");
-    }
   };
 
 
@@ -410,12 +401,13 @@ export default function WBPage() {
       const diffQty = i.total_quantity - prevQty;
       return { id: i.id, name: i.name, diffQty, voxel: i.locations[0]?.voxel || "" };
     });
+    // серверная отправка XLSX админам (используем core action — exportDiffToAdmin)
     try {
       await exportDiffToAdmin(diffData);
-      toast.success("XLSX с изменениями отправлен админам");
+      toast.success("Изменения отправлены администратору (XLSX)");
     } catch (e) {
-      console.warn(e);
-      toast.error("Ошибка отправки админам");
+      console.warn("exportDiffToAdmin failed", e);
+      toast.error("Не удалось отправить XLSX админам");
     }
   };
 
