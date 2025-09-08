@@ -4,8 +4,7 @@ import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
 import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
 import { logger } from "@/lib/logger";
-import { useConfetti } from "@/hooks/useConfetti";
-import { useUser } from "@/hooks/useUser";
+import { useAppContext } from "@/contexts/AppContext"; // Замена useUser на useAppContext
 
 export function useWarehouse() {
   const [items, setItems] = useState<Item[]>([]);
@@ -26,8 +25,7 @@ export function useWarehouse() {
   const [bossMode, setBossMode] = useState(false);
   const [bossTimer, setBossTimer] = useState(0);
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
-  const confetti = useConfetti();
-  const { user } = useUser();
+  const { dbUser } = useAppContext(); // Получаем dbUser из контекста
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadItems = useCallback(async () => {
@@ -90,7 +88,7 @@ export function useWarehouse() {
           const points = gameMode === "onload" ? 10 : 5;
           setScore((prev) => prev + points * (level / 2));
           setStreak((prev) => prev + 1);
-          if (streak % 5 === 4) confetti.fire();
+          if (streak % 5 === 4) {} // Убрано confetti.fire()
           checkAchievements();
         }
       } else {
@@ -98,7 +96,7 @@ export function useWarehouse() {
         if (isGameAction) setErrorCount((prev) => prev + 1);
       }
     },
-    [gameMode, level, streak, confetti],
+    [gameMode, level, streak], // Убрано confetti из зависимостей
   );
 
   const handleImport = useCallback(
@@ -160,9 +158,11 @@ export function useWarehouse() {
       if (score > 1000 && !newAch.includes("High Scorer")) newAch.push("High Scorer");
       if (workflowItems.length > 20 && errorCount === 0 && !newAch.includes("Perfect Run")) newAch.push("Perfect Run");
       if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 300 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon");
+      if (workflowItems.length > 10 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
+      if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
       return newAch;
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart]);
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode]);
 
   const startBossMode = () => {
     setBossMode(true);
@@ -185,7 +185,7 @@ export function useWarehouse() {
     setBossMode(false);
     const finalScore = score - errorCount * 50;
     setLevel(Math.floor(finalScore / 500) + 1);
-    const newLeaderboard = [...leaderboard, { name: user?.username || "Anon", score: finalScore, date: new Date().toLocaleDateString() }]
+    const newLeaderboard = [...leaderboard, { name: dbUser?.username || "Anon", score: finalScore, date: new Date().toLocaleDateString() }]
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
     setLeaderboard(newLeaderboard);

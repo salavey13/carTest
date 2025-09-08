@@ -16,13 +16,14 @@ import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import { exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Поправлен путь
 import { cn } from "@/lib/utils";
 
 const DEFAULT_CSV = `Артикул,Количество
 evro-leto-kruzheva,2
-dvushka-zima-mirodel,1
-matrasnik-160-kruzheva,3`;
+dvusloyniy-voyazh,1
+klassika-s-zhemchugom,3
+`;
 
 export default function WBPage() {
   const {
@@ -30,6 +31,7 @@ export default function WBPage() {
     loading,
     error,
     checkpoint,
+    setCheckpoint,
     workflowItems,
     currentWorkflowIndex,
     selectedWorkflowVoxel,
@@ -66,51 +68,23 @@ export default function WBPage() {
     selectedVoxel,
     setSelectedVoxel,
     filteredItems,
-    setCheckpoint,
   } = useWarehouse();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalItem, setModalItem] = useState<Item | null>(null);
   const [modalVoxel, setModalVoxel] = useState<string | null>(null);
-  const [modalQuantity, setModalQuantity] = useState<number | "">(1);
+  const [modalQuantity, setModalQuantity] = useState<number | "">("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (loading) return <div>Загрузка...</div>;
-  if (error) return <div>Ошибка: {error}</div>;
-
-  const handleCheckpoint = () => {
-    setCheckpoint(items.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
-    toast.success("Чекпоинт сохранен!");
-  };
-
-  const handleExportDiff = async () => {
-    const diffData = items.flatMap((item) => {
-      const oldItem = checkpoint.find((i) => i.id === item.id);
-      return item.locations.map((loc) => {
-        const oldLoc = oldItem?.locations.find((l) => l.voxel === loc.voxel);
-        const diffQty = loc.quantity - (oldLoc?.quantity || 0);
-        return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
-      }).filter(Boolean);
-    }).filter(Boolean);
-    await exportDiffToAdmin(diffData, { format: "csv" });
-    toast.success("Дифф экспортирован в админ-чат!");
-  };
-
-  const handleExportStock = async () => {
-    await exportCurrentStock(items);
-    toast.success("Текущий сток экспортирован!");
-  };
-
-  const handleReset = () => {
-    setItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
-    toast.success("Сброс к чекпоинту!");
-  };
+  useEffect(() => {
+    if (error) toast.error(error);
+  }, [error]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      handleImport(e.target.files[0]);
-    }
+    const file = e.target.files?.[0];
+    if (file) handleImport(file);
   };
 
   const handleTestImport = () => {
@@ -119,7 +93,32 @@ export default function WBPage() {
     handleImport(file);
   };
 
-  const openModal = (item: Item | null, voxel: string | null) => {
+  const handleCheckpoint = () => {
+    setCheckpoint(items.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
+    toast.success("Checkpoint saved!");
+  };
+
+  const handleReset = () => {
+    setItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
+    toast.success("Reset to checkpoint!");
+  };
+
+  const handleExportDiff = async () => {
+    const diffData = items.flatMap((item) =>
+      item.locations.map((loc) => {
+        const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
+        const diffQty = loc.quantity - (checkpointLoc?.quantity || 0);
+        return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
+      }),
+    ).filter(Boolean);
+    await exportDiffToAdmin(diffData, { format: 'csv' });
+  };
+
+  const handleExportStock = async () => {
+    await exportCurrentStock(items);
+  };
+
+  const openModal = (item: Item | null, voxel: string) => {
     setModalItem(item);
     setModalVoxel(voxel);
     setModalQuantity(item ? item.locations.find((l) => l.voxel === voxel)?.quantity || 0 : "");
