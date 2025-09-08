@@ -1,3 +1,4 @@
+// /app/wb/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -389,8 +390,6 @@ export default function WBPage() {
     a.remove();
     URL.revokeObjectURL(url);
     toast.success("CSV с изменениями скачан");
-  };
-   
 
     // серверная отправка XLSX админам (используем core action — exportDiffToAdmin)
     try {
@@ -402,7 +401,8 @@ export default function WBPage() {
     }
   };
 
-  const handleSendDiffToAdmins = async () => {
+
+  // CSV-first: попытка отправить CSV вариантом (бэкенд может поддержать флаг format: 'csv')  const handleSendDiffToAdmins = async () => {
     if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
     const diffData = items.map((i) => {
       const prev = lastCheckpoint[i.id];
@@ -419,7 +419,6 @@ export default function WBPage() {
     }
   };
 
-  // CSV-first: попытка отправить CSV вариантом (бэкенд может поддержать флаг format: 'csv')
   const handleSendDiffCSVToAdmins = async () => {
     if (!lastCheckpoint) return toast.error("Чекпоинт не установлен");
     const diffData = items.map((i) => {
