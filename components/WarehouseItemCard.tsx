@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -13,12 +13,15 @@ interface WarehouseItemCardProps {
     total_quantity: number;
     locations: { voxel: string; quantity: number }[];
     color: string;
+    season?: string | null;
   };
   onClick: () => void;
   isHighlighted: boolean;
 }
 
 export default function WarehouseItemCard({ item, onClick, isHighlighted }: WarehouseItemCardProps) {
+  const tintClass = item.season === 'leto' ? 'opacity-50' : item.season === 'zima' ? 'bg-opacity-75' : '';
+
   return (
     <motion.div
       onClick={onClick}
@@ -32,7 +35,7 @@ export default function WarehouseItemCard({ item, onClick, isHighlighted }: Ware
       {item.image && (
         <Image src={item.image} alt={item.name} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
       )}
-      <div className={cn("absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300", COLOR_MAP[item.color])} />
+      <div className={cn("absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300", COLOR_MAP[item.color], tintClass)} />
       <div className="relative z-10 flex flex-col h-full p-1 justify-between">
         <div>
           <h3 className="font-semibold leading-tight whitespace-normal break-words" style={{ maxHeight: 24 }}>{item.name}</h3>

@@ -9,6 +9,7 @@ export const COLOR_MAP: {[key: string]: string} = {
   gray: 'bg-gray-200',
   adel: 'bg-blue-100',
   malvina: 'bg-purple-100',
+  lavanda: 'bg-purple-200',
 };
 
 export const SIZE_PACK: {[key: string]: number} = {
@@ -25,35 +26,44 @@ export const SIZE_PACK: {[key: string]: number} = {
 };
 
 export const VOXELS = [
-  // Левая полка A: 4 ряда x 4 полки
-  { id: 'A1', position: { row: 1, col: 1 }, label: 'A1 (Матрасники мал.)' },
-  { id: 'A2', position: { row: 1, col: 2 }, label: 'A2 (Матрасники мал.)' },
-  { id: 'A3', position: { row: 1, col: 3 }, label: 'A3 (Матрасники бол.)' },
-  { id: 'A4', position: { row: 1, col: 4 }, label: 'A4 (Матрасники бол.)' },
-  { id: 'A5', position: { row: 2, col: 1 }, label: 'A5 (Полуторки)' },
-  { id: 'A6', position: { row: 2, col: 2 }, label: 'A6 (Полуторки)' },
-  { id: 'A7', position: { row: 2, col: 3 }, label: 'A7 (Евро Макси)' },
-  { id: 'A8', position: { row: 2, col: 4 }, label: 'A8 (Евро Макси)' },
-  { id: 'A9', position: { row: 3, col: 1 }, label: 'A9 (Двушки)' },
-  { id: 'A10', position: { row: 3, col: 2 }, label: 'A10 (Евро)' },
-  { id: 'A11', position: { row: 3, col: 3 }, label: 'A11 (Запас)' },
-  { id: 'A12', position: { row: 3, col: 4 }, label: 'A12 (Запас)' },
-  { id: 'A13', position: { row: 4, col: 1 }, label: 'A13 (Запас)' },
-  { id: 'A14', position: { row: 4, col: 2 }, label: 'A14 (Запас)' },
-  { id: 'A15', position: { row: 4, col: 3 }, label: 'A15 (Запас)' },
-  { id: 'A16', position: { row: 4, col: 4 }, label: 'A16 (Запас)' },
-  // Правая B симметрично
-  { id: 'B1', position: { row: 1, col: 1 }, label: 'B1 (Полуторки)' },
-  { id: 'B2', position: { row: 1, col: 2 }, label: 'B2 (Запас)' },
-  { id: 'B3', position: { row: 1, col: 3 }, label: 'B3 (Запас)' },
-  { id: 'B4', position: { row: 1, col: 4 }, label: 'B4 (Запас)' },
-  // ... аналогично до B16
+  { id: 'A1', position: { row: 1, col: 1 }, label: 'A1 (евро beige)' },
+  { id: 'A2', position: { row: 1, col: 2 }, label: 'A2 (2 blue)' },
+  { id: 'A3', position: { row: 1, col: 3 }, label: 'A3 (евро макси red)' },
+  { id: 'A4', position: { row: 1, col: 4 }, label: 'A4 (матрасники)' },
+  { id: 'A5', position: { row: 2, col: 1 }, label: 'A5 (1.5 запас)' },
+  { id: 'A6', position: { row: 2, col: 2 }, label: 'A6 (2 запас)' },
+  { id: 'A7', position: { row: 2, col: 3 }, label: 'A7 (евро макси запас)' },
+  { id: 'A8', position: { row: 2, col: 4 }, label: 'A8 (матрасники запас)' },
+  { id: 'A9', position: { row: 3, col: 1 }, label: 'A9 (2 запас)' },
+  { id: 'A10', position: { row: 3, col: 2 }, label: 'A10 (евро запас)' },
+  { id: 'A11', position: { row: 3, col: 3 }, label: 'A11 (матрасники мал запас)' },
+  { id: 'A12', position: { row: 3, col: 4 }, label: 'A12 (матрасники бол запас)' },
+  { id: 'A13', position: { row: 4, col: 1 }, label: 'A13 (запас)' },
+  { id: 'A14', position: { row: 4, col: 2 }, label: 'A14 (запас)' },
+  { id: 'A15', position: { row: 4, col: 3 }, label: 'A15 (матрасники запас)' },
+  { id: 'A16', position: { row: 4, col: 4 }, label: 'A16 (матрасники запас)' },
+  { id: 'B1', position: { row: 1, col: 1 }, label: 'B1 (1.5 gray)' },
+  { id: 'B2', position: { row: 1, col: 2 }, label: 'B2 (запас)' },
+  { id: 'B3', position: { row: 1, col: 3 }, label: 'B3 (запас)' },
+  { id: 'B4', position: { row: 1, col: 4 }, label: 'B4 (запас)' },
+  { id: 'B5', position: { row: 2, col: 1 }, label: 'B5 (запас)' },
+  { id: 'B6', position: { row: 2, col: 2 }, label: 'B6 (запас)' },
+  { id: 'B7', position: { row: 2, col: 3 }, label: 'B7 (запас)' },
+  { id: 'B8', position: { row: 2, col: 4 }, label: 'B8 (запас)' },
+  { id: 'B9', position: { row: 3, col: 1 }, label: 'B9 (запас)' },
+  { id: 'B10', position: { row: 3, col: 2 }, label: 'B10 (запас)' },
+  { id: 'B11', position: { row: 3, col: 3 }, label: 'B11 (запас)' },
+  { id: 'B12', position: { row: 3, col: 4 }, label: 'B12 (запас)' },
+  { id: 'B13', position: { row: 4, col: 1 }, label: 'B13 (запас)' },
+  { id: 'B14', position: { row: 4, col: 2 }, label: 'B14 (запас)' },
+  { id: 'B15', position: { row: 4, col: 3 }, label: 'B15 (запас)' },
+  { id: 'B16', position: { row: 4, col: 4 }, label: 'B16 (запас)' },
 ];
 
 export type Location = {
   voxel: string;
   quantity: number;
-  min_qty?: number; // Для 'B'
+  min_qty?: number;
 };
 
 export type Item = {
@@ -64,7 +74,7 @@ export type Item = {
   locations: Location[];
   total_quantity: number;
   season?: 'leto' | 'zima' | null;
-  pattern?: 'kruzheva' | 'mirodel' | 'ogurtsy' | 'flora1' | 'flora2' | 'flora3' | 'adel' | 'malvina';
+  pattern?: 'kruzheva' | 'ogurtsy' | 'adel' | 'malvina' | 'flora' | 'flora 2' | 'flora 3' | 'lavanda';
   color: string;
   size: string;
 };
@@ -85,17 +95,6 @@ export type WarehouseVizProps = {
 
 export type Voxel = typeof VOXELS[0];
 
-export type WarehousePlateProps = {
-  voxel: Voxel;
-  contents: Content[];
-  selected: boolean;
-  onSelect: (id: string) => void;
-  onUpdateQty: (itemId: string, voxelId: string, quantity: number) => void;
-  items: Item[];
-  onPlateClick: (voxelId: string) => void;
-  gameMode: 'offload' | 'onload' | null;
-};
-
 export type WarehouseItem = Database['public']['Tables']['cars']['Row'] & {
   specs: { 
     size: string; 
@@ -103,6 +102,6 @@ export type WarehouseItem = Database['public']['Tables']['cars']['Row'] & {
     pattern: string; 
     season: string | null; 
     warehouse_locations: { voxel_id: string; quantity: number }[]; 
-    min_quantity?: number; // Для 'B' полок
+    min_quantity?: number;
   };
 };

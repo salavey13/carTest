@@ -2,28 +2,26 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { FileUp, Download, Save, RotateCcw, Upload } from "lucide-react";
-import Papa from "papaparse";
 import { useWarehouse } from "@/hooks/useWarehouse";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
-import { exportDiffToAdmin, exportCurrentStock } from "@/app/wb/actions";
+import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv } from "@/app/wb/actions";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { VOXELS } from "@/app/wb/common";
+import { useAppContext } from "@/contexts/AppContext";
 
-const DEFAULT_CSV = `Артикул,Количество
-evro-leto-kruzheva,2
-dvusloyniy-voyazh,1
-klassika-s-zhemchugom,3
+const DEFAULT_CSV = `Артикул,Изменение,Ячейка
+евро лето кружева,2,A1
+2 зима огурцы,1,A2
+1.5 лето флора,3,B1
 `;
 
 export default function WBPage() {
@@ -51,7 +49,6 @@ export default function WBPage() {
     leaderboard,
     loadItems,
     handleUpdateLocationQty,
-    handleImport,
     handleWorkflowNext,
     handleSkipItem,
     handlePlateClick,
@@ -70,26 +67,45 @@ export default function WBPage() {
     setSelectedVoxel,
     filteredItems,
   } = useWarehouse();
+  const { user } = useAppContext();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [editDialogOpen, setEditDialogOpen] = useState(false); // Переименовано, для редакта
-  const [editVoxel, setEditVoxel] = useState<string | null>(null);
-  const [editContents, setEditContents] = useState<Content[]>([]); // Для мульти
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) handleImport(file);
+    if (file) {
+      setIsUploading(true);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const csv = event.target?.result as string;
+        const result = await uploadWarehouseCsv(csv, user?.id);
+        setIsUploading(false);
+        if (result.success) {
+          toast.success(result.message || "CSV uploaded!");
+          loadItems();
+        } else {
+          toast.error(result.error);
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
-  const handleTestImport = () => {
-    const blob = new Blob([DEFAULT_CSV], { type: "text/csv" });
-    const file = new File([blob], "test.csv");
-    handleImport(file);
+  const handleTestImport = async () => {
+    setIsUploading(true);
+    const result = await uploadWarehouseCsv(DEFAULT_CSV, user?.id);
+    setIsUploading(false);
+    if (result.success) {
+      toast.success(result.message || "Test CSV uploaded!");
+      loadItems();
+    } else {
+      toast.error(result.error);
+    }
   };
 
   const handleCheckpoint = () => {
@@ -132,7 +148,6 @@ export default function WBPage() {
         setSearch("");
         toast.info(`Выберите товар для добавления в ${voxelId}`);
       } else {
-        // Открываем диалог редакта
         setEditVoxel(voxelId);
         setEditContents(content);
         setEditDialogOpen(true);
@@ -166,39 +181,60 @@ export default function WBPage() {
 
   const bgStyle = gameMode === "onload" ? { background: "linear-gradient(to bottom, #fff, #ffd" } : gameMode === "offload" ? { background: "linear-gradient(to bottom, #333, #000" } : {};
 
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editVoxel, setEditVoxel] = useState<string | null>(null);
+  const [editContents, setEditContents] = useState<any[]>([]); // Content type from common
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="p-2 flex justify-between items-center gap-2">
-        <Select value={gameMode || ""} onValueChange={(v: "offload" | "onload") => setGameMode(v || null)}>
-          <SelectTrigger className="w-24 text-[10px]">
-            <SelectValue placeholder="Режим" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="onload"><VibeContentRenderer content="::fasun:: Прием" /></SelectItem>
-            <SelectItem value="offload"><VibeContentRenderer content="::famoon:: Выдача" /></SelectItem>
-          </SelectContent>
-        </Select>
-        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
-        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
-        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><Download size={12} /></Button>
-        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportStock}><FileUp size={12} /></Button>
-        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()}><Upload size={12} /></Button>
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv,.xlsx" />
-        <Button size="sm" variant="outline" className="text-[10px]" onClick={handleTestImport}>Тест CSV</Button>
-        <Input
-          placeholder="Поиск..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-6 text-[10px] flex-1"
+      <header className="p-2 flex flex-col gap-2">
+        <div className="flex justify-between items-center gap-2">
+          <Select value={gameMode || ""} onValueChange={(v: "offload" | "onload") => setGameMode(v || null)}>
+            <SelectTrigger className="w-24 text-[10px]">
+              <SelectValue placeholder="Режим" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="onload"><VibeContentRenderer content="::fasun:: Прием" /></SelectItem>
+              <SelectItem value="offload"><VibeContentRenderer content="::famoon:: Выдача" /></SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><Download size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportStock}><FileUp size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
+          <Button size="sm" variant="outline" className="text-[10px]" onClick={handleTestImport} disabled={isUploading}>Тест CSV</Button>
+        </div>
+        <FilterAccordion
+          filterSeason={filterSeason}
+          setFilterSeason={setFilterSeason}
+          filterPattern={filterPattern}
+          setFilterPattern={setFilterPattern}
+          filterColor={filterColor}
+          setFilterColor={setFilterColor}
+          filterSize={filterSize}
+          setFilterSize={setFilterSize}
+          items={items}
+          onResetFilters={() => {
+            setFilterSeason(null);
+            setFilterPattern(null);
+            setFilterColor(null);
+            setFilterSize(null);
+            setSearch("");
+          }}
+          includeSearch={true}
+          search={search}
+          setSearch={setSearch}
         />
       </header>
 
       <div className="flex-1 overflow-y-auto p-2">
         <Card className="mb-2">
           <CardHeader className="p-2">
-            <CardTitle className="text-sm">Товары ({filteredItems.length})</CardTitle>
+            <CardTitle className="text-xs">Товары ({filteredItems.length})</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-2 max-h-[69vh] overflow-y-auto">
+          <CardContent className="grid grid-cols-5 gap-2 p-2 max-h-[69vh] overflow-y-auto">
             {filteredItems.map((item) => (
               <WarehouseItemCard
                 key={item.id}
@@ -235,25 +271,6 @@ export default function WBPage() {
           onPlateClick={handlePlateClickCustom}
         />
       </div>
-
-      <FilterAccordion
-        filterSeason={filterSeason}
-        setFilterSeason={setFilterSeason}
-        filterPattern={filterPattern}
-        setFilterPattern={setFilterPattern}
-        filterColor={filterColor}
-        setFilterColor={setFilterColor}
-        filterSize={filterSize}
-        setFilterSize={setFilterSize}
-        items={items}
-        onResetFilters={() => {
-          setFilterSeason(null);
-          setFilterPattern(null);
-          setFilterColor(null);
-          setFilterSize(null);
-          setSearch("");
-        }}
-      />
 
       {/* Workflow Dialog */}
       {workflowItems.length > 0 && (
