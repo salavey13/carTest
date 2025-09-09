@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { WarehouseVizProps } from "@/app/wb/common";
-import { VOXELS } from "@/app/wb/common"; // Добавлен импорт VOXELS
+import { VOXELS } from "@/app/wb/common";
 import { COLOR_MAP } from "@/app/wb/common";
 
 export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, gameMode, onPlateClick }: WarehouseVizProps) {

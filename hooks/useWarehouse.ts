@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import Papa from "papaparse";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
 import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
 import { logger } from "@/lib/logger";
-import { useAppContext } from "@/contexts/AppContext"; // Замена useUser на useAppContext
+import { useAppContext } from "@/contexts/AppContext";
 
 export function useWarehouse() {
   const [items, setItems] = useState<Item[]>([]);
@@ -25,7 +24,7 @@ export function useWarehouse() {
   const [bossMode, setBossMode] = useState(false);
   const [bossTimer, setBossTimer] = useState(0);
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
-  const { dbUser } = useAppContext(); // Получаем dbUser из контекста
+  const { dbUser } = useAppContext();
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const loadItems = useCallback(async () => {
@@ -59,7 +58,6 @@ export function useWarehouse() {
 
   useEffect(() => {
     loadItems();
-    // Load leaderboard from localStorage or Supabase
     const savedLeaderboard = JSON.parse(localStorage.getItem("warehouse_leaderboard") || "[]");
     setLeaderboard(savedLeaderboard);
   }, [loadItems]);
@@ -74,10 +72,10 @@ export function useWarehouse() {
               ? {
                   ...i,
                   locations: i.locations.map((l) =>
-                    l.voxel === voxelId ? { ...l, quantity: Math.max(0, quantity) } : l,
+                    l.voxel === voxelId ? { ...l, quantity: Math.max(0, l.quantity + quantity) } : l, // Delta
                   ).filter((l) => l.quantity > 0),
                   total_quantity: i.locations.reduce(
-                    (acc, l) => acc + (l.voxel === voxelId ? Math.max(0, quantity) : l.quantity),
+                    (acc, l) => acc + (l.voxel === voxelId ? Math.max(0, l.quantity + quantity) : l.quantity),
                     0,
                   ),
                 }
@@ -88,7 +86,7 @@ export function useWarehouse() {
           const points = gameMode === "onload" ? 10 : 5;
           setScore((prev) => prev + points * (level / 2));
           setStreak((prev) => prev + 1);
-          if (streak % 5 === 4) {} // Убрано confetti.fire()
+          if (streak % 5 === 4) {} 
           checkAchievements();
         }
       } else {
@@ -96,30 +94,7 @@ export function useWarehouse() {
         if (isGameAction) setErrorCount((prev) => prev + 1);
       }
     },
-    [gameMode, level, streak], // Убрано confetti из зависимостей
-  );
-
-  const handleImport = useCallback(
-    (file: File) => {
-      Papa.parse(file, {
-        complete: (results) => {
-          const data = results.data as any[];
-          const changes = data
-            .filter((row) => row["Артикул"] && row["Количество"])
-            .map((row) => ({
-              id: row["Артикул"],
-              change: parseInt(row["Количество"], 10),
-              voxel: row["Ячейка"] || undefined,
-            }));
-          setWorkflowItems(changes);
-          setCurrentWorkflowIndex(0);
-          if (changes.length > 10) startBossMode();
-          toast.success(`Imported ${changes.length} items for processing`);
-        },
-        header: true,
-      });
-    },
-    [],
+    [gameMode, level, streak],
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -127,9 +102,7 @@ export function useWarehouse() {
       const { id, change } = workflowItems[currentWorkflowIndex];
       const item = items.find((i) => i.id === id);
       if (item) {
-        const loc = item.locations.find((l) => l.voxel === selectedWorkflowVoxel);
-        const currentQty = loc ? loc.quantity : 0;
-        await handleUpdateLocationQty(id, selectedWorkflowVoxel, currentQty + change, true);
+        await handleUpdateLocationQty(id, selectedWorkflowVoxel, change, true);
       }
       setCurrentWorkflowIndex((prev) => prev + 1);
       setSelectedWorkflowVoxel(null);
@@ -166,7 +139,7 @@ export function useWarehouse() {
 
   const startBossMode = () => {
     setBossMode(true);
-    setBossTimer(300000); // 5 min
+    setBossTimer(300000);
     bossIntervalRef.current = setInterval(() => {
       setBossTimer((prev) => {
         if (prev <= 0) {
@@ -201,15 +174,14 @@ export function useWarehouse() {
       );
       if (gameMode === "onload") {
         if (content.length === 0) {
-          // Open modal to add new item with qty
-          // Logic in WBPage
+          // Logic in page
         } else {
-          // Open modal to add qty to existing
+          // Logic in page
         }
       } else if (gameMode === "offload") {
         if (content.length > 0) {
           const { item, quantity } = content[0];
-          handleUpdateLocationQty(item.id, voxelId, quantity - 1, true);
+          handleUpdateLocationQty(item.id, voxelId, -1, true); // Delta -1 for offload
         }
       }
     },
@@ -221,17 +193,17 @@ export function useWarehouse() {
       if (gameMode === "onload") {
         if (item.locations.length === 0) return toast.error("No location for item");
         const primaryLoc = item.locations[0];
-        handleUpdateLocationQty(item.id, primaryLoc.voxel, primaryLoc.quantity + 1, true);
+        handleUpdateLocationQty(item.id, primaryLoc.voxel, 1, true); // Delta +1
       } else if (gameMode === "offload") {
         if (item.locations.length === 0) return toast.error("No location for item");
         const primaryLoc = item.locations[0];
-        handleUpdateLocationQty(item.id, primaryLoc.voxel, primaryLoc.quantity - 1, true);
+        handleUpdateLocationQty(item.id, primaryLoc.voxel, -1, true); // Delta -1
       }
     },
     [gameMode, handleUpdateLocationQty],
   );
 
-  // Filters hook
+  // Filters
   const [search, setSearch] = useState("");
   const [filterSeason, setFilterSeason] = useState<string | null>(null);
   const [filterPattern, setFilterPattern] = useState<string | null>(null);
@@ -290,7 +262,6 @@ export function useWarehouse() {
     leaderboard,
     loadItems,
     handleUpdateLocationQty,
-    handleImport,
     handleWorkflowNext,
     handleSkipItem,
     handlePlateClick,
