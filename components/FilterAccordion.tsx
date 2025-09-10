@@ -1,3 +1,4 @@
+// /components/FilterAccordion.tsx
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,7 +44,7 @@ export default function FilterAccordion({
   const uniqueSizes = Array.from(new Set(items.map((i) => i.size).filter(Boolean)));
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-wrap space-y-2">
       {includeSearch && (
         <Input
           placeholder="Поиск..."
