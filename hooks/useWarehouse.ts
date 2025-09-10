@@ -5,6 +5,33 @@ import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
 
+// Helper function to determine size priority
+const getSizePriority = (size: string | null): number => {
+  if (!size) return 999; // Sort null or undefined sizes last
+
+  const sizeOrder: { [key: string]: number } = {
+    "1.5": 1,
+    "2": 2,
+    "евро": 3,
+    "евро макси": 4,
+  };
+
+  return sizeOrder[size] || 5; // Default priority for unknown sizes
+};
+
+// Helper function to determine season priority
+const getSeasonPriority = (season: string | null): number => {
+  if (!season) return 999; // Sort null or undefined seasons last
+
+  const seasonOrder: { [key: string]: number } = {
+    "лето": 1,
+    "зима": 2,
+  };
+
+  return seasonOrder[season] || 3; // Default priority for unknown seasons
+};
+
+
 export function useWarehouse() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +57,7 @@ export function useWarehouse() {
   const loadItems = useCallback(async () => {
     setLoading(true);
     const { success, data, error: fetchError } = await getWarehouseItems();
+
     if (success && data) {
       const mappedItems: Item[] = data.map((i: WarehouseItem) => ({
         id: i.id,
@@ -86,7 +114,7 @@ export function useWarehouse() {
           const points = gameMode === "onload" ? 10 : 5;
           setScore((prev) => prev + points * (level / 2));
           setStreak((prev) => prev + 1);
-          if (streak % 5 === 4) {} 
+          if (streak % 5 === 4) {}
           checkAchievements();
         }
       } else {
@@ -218,26 +246,73 @@ export function useWarehouse() {
     const matchesColor = !filterColor || item.color === filterColor;
     const matchesSize = !filterSize || item.size === filterSize;
     return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
+  }).sort((a, b) => {
+    // Sort by size first
+    const sizeA = getSizePriority(a.size);
+    const sizeB = getSizePriority(b.size);
+    if (sizeA !== sizeB) {
+      return sizeA - sizeB;
+    }
+
+    // Then sort by season
+    const seasonA = getSeasonPriority(a.season);
+    const seasonB = getSeasonPriority(b.season);
+    if (seasonA !== seasonB) {
+      return seasonA - seasonB;
+    }
+
+    // Finally, sort by color (alphabetical)
+    return a.color.localeCompare(b.color);
   });
 
-  useEffect(() => {
-    if (gameMode === "offload" && workflowItems.length > 0) {
-      const firstItem = items.find((i) => i.id === workflowItems[0].id);
-      if (firstItem) {
-        setFilterSeason(firstItem.season);
-        setFilterPattern(firstItem.pattern);
-        setFilterColor(firstItem.color);
-        setFilterSize(firstItem.size);
-        setSearch("");
+  // --- Sorting Options ---
+  const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
+
+  const sortItems = useCallback((itemsToSort: Item[]) => {
+    return [...itemsToSort].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortOption) {
+        case 'size_season_color':
+          // Size
+          comparison = getSizePriority(a.size) - getSizePriority(b.size);
+          if (comparison !== 0) return comparison;
+
+          // Season
+          comparison = getSeasonPriority(a.season) - getSeasonPriority(b.season);
+          if (comparison !== 0) return comparison;
+
+          // Color
+          return a.color.localeCompare(b.color);
+
+        case 'color_size':
+          // Color
+          comparison = a.color.localeCompare(b.color);
+          if (comparison !== 0) return comparison;
+
+          // Size
+          return getSizePriority(a.size) - getSizePriority(b.size);
+
+        case 'season_size_color':
+          // Season
+          comparison = getSeasonPriority(a.season) - getSeasonPriority(b.season);
+          if (comparison !== 0) return comparison;
+
+          // Size
+          comparison = getSizePriority(a.size) - getSizePriority(b.size);
+          if (comparison !== 0) return comparison;
+
+          // Color
+          return a.color.localeCompare(b.color);
+
+        default:
+          return 0; // No sorting
       }
-    } else if (!gameMode) {
-      setFilterSeason(null);
-      setFilterPattern(null);
-      setFilterColor(null);
-      setFilterSize(null);
-      setSearch("");
-    }
-  }, [gameMode, workflowItems, items]);
+    });
+  }, [sortOption]);
+
+
+  const sortedFilteredItems = sortItems(filteredItems);
 
   return {
     items,
@@ -278,7 +353,9 @@ export function useWarehouse() {
     setFilterSize,
     selectedVoxel,
     setSelectedVoxel,
-    filteredItems,
+    filteredItems: sortedFilteredItems, // Use the sorted items
     setCheckpoint,
+    sortOption, // Expose the sort option
+    setSortOption, // Expose the setSortOption function
   };
 }

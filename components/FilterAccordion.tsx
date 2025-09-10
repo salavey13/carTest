@@ -1,4 +1,3 @@
-// /components/FilterAccordion.tsx
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +20,8 @@ interface FilterAccordionProps {
   includeSearch?: boolean;
   search?: string;
   setSearch?: (value: string) => void;
+  sortOption: 'size_season_color' | 'color_size' | 'season_size_color'; // New prop
+  setSortOption: (option: 'size_season_color' | 'color_size' | 'season_size_color') => void; // New prop
 }
 
 export default function FilterAccordion({
@@ -37,6 +38,8 @@ export default function FilterAccordion({
   includeSearch = false,
   search = "",
   setSearch = () => {},
+  sortOption, // New prop
+  setSortOption, // New prop
 }: FilterAccordionProps) {
   const uniqueSeasons = Array.from(new Set(items.map((i) => i.season).filter(Boolean)));
   const uniquePatterns = Array.from(new Set(items.map((i) => i.pattern).filter(Boolean)));
@@ -87,6 +90,19 @@ export default function FilterAccordion({
           {uniqueSizes.map((sz) => <SelectItem key={sz} value={sz!}>{sz}</SelectItem>)}
         </SelectContent>
       </Select>
+      {/* Sort Option Select */}
+      <div className="col-span-2">
+        <Select value={sortOption} onValueChange={(value) => setSortOption(value as 'size_season_color' | 'color_size' | 'season_size_color')}>
+          <SelectTrigger className="h-6 text-[10px] w-full">
+            <SelectValue placeholder="Сортировка" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="size_season_color">Размер, Сезон, Цвет</SelectItem>
+            <SelectItem value="color_size">Цвет, Размер</SelectItem>
+            <SelectItem value="season_size_color">Сезон, Размер, Цвет</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <div className="col-span-2">
         <Button size="sm" variant="outline" className="text-[10px] h-6 w-full" onClick={onResetFilters}>
           <X size={10} className="mr-1" /> Сброс

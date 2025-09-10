@@ -66,6 +66,8 @@ export default function WBPage() {
     selectedVoxel,
     setSelectedVoxel,
     filteredItems,
+    sortOption,
+    setSortOption,
   } = useWarehouse();
   const { user } = useAppContext();
 
@@ -81,6 +83,7 @@ export default function WBPage() {
     if (file) {
       setIsUploading(true);
       const reader = new FileReader();
+
       reader.onload = async (event) => {
         const csv = event.target?.result as string;
         const result = await uploadWarehouseCsv(csv, user?.id);
@@ -185,6 +188,14 @@ export default function WBPage() {
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<any[]>([]); // Content type from common
 
+const handleResetFilters = () => {
+    setFilterSeason(null);
+    setFilterPattern(null);
+    setFilterColor(null);
+    setFilterSize(null);
+    setSearch("");
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="p-2 flex flex-col gap-2">
@@ -216,16 +227,12 @@ export default function WBPage() {
           filterSize={filterSize}
           setFilterSize={setFilterSize}
           items={items}
-          onResetFilters={() => {
-            setFilterSeason(null);
-            setFilterPattern(null);
-            setFilterColor(null);
-            setFilterSize(null);
-            setSearch("");
-          }}
+          onResetFilters={handleResetFilters}
           includeSearch={true}
           search={search}
           setSearch={setSearch}
+          sortOption={sortOption}
+          setSortOption={setSortOption}
         />
       </header>
 
