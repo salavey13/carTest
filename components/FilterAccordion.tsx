@@ -1,3 +1,4 @@
+// /components/FilterAccordion.tsx
 "use client";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,16 +44,18 @@ export default function FilterAccordion({
   const uniqueSizes = Array.from(new Set(items.map((i) => i.size).filter(Boolean)));
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-2 gap-2">
       {includeSearch && (
-        <Input
-          placeholder="Поиск..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-6 text-[10px] flex-1 min-w-[100px]" //  flex-1 для заполнения оставшегося места, min-w для минимальной ширины
-        />
+        <div className="col-span-2"> {/* Занимает всю ширину */}
+          <Input
+            placeholder="Поиск..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-6 text-[10px] w-full"
+          />
+        </div>
       )}
-      <Select value={filterSeason || ""} onValueChange={(v) => setFilterSeason(v || null)} className="w-fit">
+      <Select value={filterSeason || ""} onValueChange={(v) => setFilterSeason(v || null)}>
         <SelectTrigger className="h-6 text-[10px] w-full">
           <SelectValue placeholder="Сезон" />
         </SelectTrigger>
@@ -60,7 +63,7 @@ export default function FilterAccordion({
           {uniqueSeasons.map((s) => <SelectItem key={s} value={s!}>{s}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Select value={filterPattern || ""} onValueChange={(v) => setFilterPattern(v || null)} className="w-fit">
+      <Select value={filterPattern || ""} onValueChange={(v) => setFilterPattern(v || null)}>
         <SelectTrigger className="h-6 text-[10px] w-full">
           <SelectValue placeholder="Узор" />
         </SelectTrigger>
@@ -68,7 +71,7 @@ export default function FilterAccordion({
           {uniquePatterns.map((p) => <SelectItem key={p} value={p!}>{p}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Select value={filterColor || ""} onValueChange={(v) => setFilterColor(v || null)} className="w-fit">
+      <Select value={filterColor || ""} onValueChange={(v) => setFilterColor(v || null)}>
         <SelectTrigger className="h-6 text-[10px] w-full">
           <SelectValue placeholder="Цвет" />
         </SelectTrigger>
@@ -76,7 +79,7 @@ export default function FilterAccordion({
           {uniqueColors.map((c) => <SelectItem key={c} value={c!}>{c}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Select value={filterSize || ""} onValueChange={(v) => setFilterSize(v || null)} className="w-fit">
+      <Select value={filterSize || ""} onValueChange={(v) => setFilterSize(v || null)}>
         <SelectTrigger className="h-6 text-[10px] w-full">
           <SelectValue placeholder="Размер" />
         </SelectTrigger>
@@ -84,9 +87,11 @@ export default function FilterAccordion({
           {uniqueSizes.map((sz) => <SelectItem key={sz} value={sz!}>{sz}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Button size="sm" variant="outline" className="text-[10px] h-6 w-fit" onClick={onResetFilters}>
-        <X size={10} className="mr-1" /> Сброс
-      </Button>
+      <div className="col-span-2">
+        <Button size="sm" variant="outline" className="text-[10px] h-6 w-full" onClick={onResetFilters}>
+          <X size={10} className="mr-1" /> Сброс
+        </Button>
+      </div>
     </div>
   );
 }
