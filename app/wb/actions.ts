@@ -182,9 +182,7 @@ export async function uploadWarehouseCsv(
       'Изменение': d.diffQty,
       'Ячейка': d.voxel
     })), { header: true, delimiter: ',', quotes: true });
-    const message = "Изменения скла
-
-да в CSV.";
+    const message = "Изменения склада в CSV.";
     await notifyAdmins(message);
     await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
       attachment: {
