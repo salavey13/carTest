@@ -171,49 +171,71 @@ const CSVCompare = () => {
                 toast.error("No data to upload.");
                 return;
             }
+            const cleanCsvData = csvData.replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove zero-width spaces and BOM
 
             // Parse the CSV data using PapaParse
-            const parsedCsv = parse<CsvRow>(csvData, {
+            const parsedCsv = parse<CsvRow>(cleanCsvData, {
                 header: true,
                 skipEmptyLines: true,
                 dynamicTyping: false, // Important for avoiding type conversion issues
                 quoteChar: '"', // Specify the quote character
                 escapeChar: '\\', // Specify the escape character
-                //** KEY FIX:  Handles malformed quotes  **//
                 strict: false, // Disable strict mode to handle malformed quotes
+                complete: (results) => {
+                    if (results.errors.length > 0) {
+                        console.warn("CSV Parsing Errors:", results.errors);  // Log ALL errors
+
+                        // Attempt to recover:  Filter out rows with errors.  This MIGHT lose data.
+                        const validData = results.data.filter((row, index) => {
+                            return !results.errors.some(err => err.row === index);
+                        });
+
+                        if (validData.length === 0) {
+                            toast.error("No valid data after error recovery.");
+                            setUploading(false);
+                            return;
+                        }
+
+                        // Proceed with `validData` instead of `results.data`
+                        processData(validData); // Call function to process the (potentially) filtered data.
+                    } else {
+                        processData(results.data);  // No errors, proceed as normal
+                    }
+                },
+                error: (error) => {
+                    console.error("CSV parsing error:", error);
+                    toast.error(`CSV Parsing Error: ${error.message}`);
+                    setUploading(false);
+                }
             });
 
-            if (parsedCsv.errors.length > 0) {
-                toast.error(`CSV Parsing Error: ${parsedCsv.errors[0].message}`);
-                setUploading(false);
-                return;
-            }
+           const processData = (data: CsvRow[]) => {
+                const BATCH_SIZE = 13;
+                const rows = data;
 
-            const BATCH_SIZE = 13;
-            const rows = parsedCsv.data;
+                for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+                    const batch = rows.slice(i, i + BATCH_SIZE);
+                    const result =  uploadWarehouseCsv(batch, user?.id);
 
-            for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-                const batch = rows.slice(i, i + BATCH_SIZE);
-                const result = await uploadWarehouseCsv(batch, user?.id);
-
-                if (!result.success) {
-                    toast.error(result.error || "Failed to upload batch to Supabase.");
-                    setUploading(false);
-                    return;
-                } else {
-                    console.log(
-                        `Uploaded batch ${i / BATCH_SIZE + 1}/${Math.ceil(
-                            rows.length / BATCH_SIZE
-                        )}`
-                    );
+                    if (!result.success) {
+                        toast.error(result.error || "Failed to upload batch to Supabase.");
+                        setUploading(false);
+                        return;
+                    } else {
+                        console.log(
+                            `Uploaded batch ${i / BATCH_SIZE + 1}/${Math.ceil(
+                                rows.length / BATCH_SIZE
+                            )}`
+                        );
+                    }
                 }
-            }
 
-            toast.success("All data uploaded to Supabase!");
+                toast.success("All data uploaded to Supabase!");
+                setUploading(false); // Set uploading to false only after successful completion
+            };
         } catch (err: any) {
             toast.error(err?.message || "Error during upload.");
             console.error("Upload Error:", err);
-        } finally {
             setUploading(false);
         }
     };
@@ -252,7 +274,7 @@ const CSVCompare = () => {
                             const csv = inventoryToCsv(inventory1);
                             const blob = new Blob([csv], { type: "text/csv" });
                             const url = window.URL.createObjectURL(blob);
-                            const a= document.createElement("a");
+                            const a = document.createElement("a");
                             a.href = url;
                             a.download = "inventory1.csv";
                             document.body.appendChild(a);
