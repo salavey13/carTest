@@ -1,3 +1,4 @@
+// /app/wb/common.ts
 import type { Database } from "@/types/database.types";
 
 export const COLOR_MAP: {[key: string]: string} = {
@@ -40,12 +41,14 @@ export const VOXELS = [
   { id: 'A12', position: { row: 3, col: 4 }, label: 'A12 (матрасники бол запас)' },
   { id: 'A13', position: { row: 4, col: 1 }, label: 'A13 (запас)' },
   { id: 'A14', position: { row: 4, col: 2 }, label: 'A14 (запас)' },
-  { id: 'A15', position: { row: 4, col: 3 }, label: 'A15 (матрасники запас)' },
-  { id: 'A16', position: { row: 4, col: 4 }, label: 'A16 (матрасники запас)' },
+  { id: 'A15', position: { row: 4, col: 3 }, label: 'A15 (матрасники бол запас)' },
+  { id: 'A16', position: { row: 4, col: 4 }, label: 'A16 (матрасники бол запас)' },
   { id: 'B1', position: { row: 1, col: 1 }, label: 'B1 (1.5 gray)' },
   { id: 'B2', position: { row: 1, col: 2 }, label: 'B2 (запас)' },
   { id: 'B3', position: { row: 1, col: 3 }, label: 'B3 (запас)' },
   { id: 'B4', position: { row: 1, col: 4 }, label: 'B4 (запас)' },
+];
+/* сокращеное кол-во ячеек для запасной секции склада
   { id: 'B5', position: { row: 2, col: 1 }, label: 'B5 (запас)' },
   { id: 'B6', position: { row: 2, col: 2 }, label: 'B6 (запас)' },
   { id: 'B7', position: { row: 2, col: 3 }, label: 'B7 (запас)' },
@@ -58,8 +61,7 @@ export const VOXELS = [
   { id: 'B14', position: { row: 4, col: 2 }, label: 'B14 (запас)' },
   { id: 'B15', position: { row: 4, col: 3 }, label: 'B15 (запас)' },
   { id: 'B16', position: { row: 4, col: 4 }, label: 'B16 (запас)' },
-];
-
+*/
 export type Location = {
   voxel: string;
   quantity: number;
