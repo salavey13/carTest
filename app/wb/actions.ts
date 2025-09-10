@@ -8,35 +8,25 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import { notifyAdmins } from "@/app/actions";
 import { parse } from "papaparse"; // Correct Import
 
+// Helper function to generate image URL
+const generateImageUrl = (id: string): string => {
+    const baseURL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", ".inmctohsodgdohamhzag.supabase.co") + "/storage/v1/object/public/wb/";
+    const filename = id.replace("1.5", "poltorashka").replace("2", "dvushka").replace(/ /g, "-") + ".jpg";
+    return baseURL + filename;
+};
+
 
 interface WarehouseCsvRow {
   id: string;
   make: string;
   model: string;
   description: string;
-  size?: string;
-  color?: string;
-  pattern?: string;
-  season?: string;
-  warehouse_locations?: string;
-  imageUrl?: string;
+  type: string;
+  specs: string;
+  image_url: string;
   Количество?: string; // Quantity may exist in some original csv values
 }
 
-
-// Helper function to generate image URL
-const generateImageUrl = (id: string): string => {
-  const baseURL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", ".inmctohsodgdohamhzag.supabase.co") + "/storage/v1/object/public/wb/";
-  const filename = id.replace("1.5", "poltorashka").replace("2", "dvushka").replace(/ /g, "-") + ".jpg";
-  return baseURL + filename;
-};
-
-//Helper function to get the name value from ID value
-
-function getNameFromID(id: string) {
-  const nameArray = id.split(' ')
-  return nameArray[nameArray.length-1]
-}
 
 async function getWarehouseItems(): Promise<{
   success: boolean;
@@ -79,7 +69,6 @@ export async function uploadWarehouseCsv(
   batch: any[],
   userId: string | undefined
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-
   const isAdmin = await verifyAdmin(userId);
   if (!isAdmin) {
     logger.warn(`Unauthorized warehouse CSV upload by ${userId || 'Unknown'}`);
@@ -87,55 +76,63 @@ export async function uploadWarehouseCsv(
   }
 
   if (!batch || batch.length === 0) {
+
     return { success: false, error: "Empty batch provided." };
   }
 
   try {
-
     const itemsToUpsert = batch.map((row: any) => {
-      const itemId = row["id"]?.toLowerCase();
 
-      // Parse the quantity from the original csv file or string (if it's a batch csv parsed)
-      let quantity;
       if (typeof row === 'string') {
         const parsed = parse(row, { header: true, skipEmptyLines: true }).data;
-        quantity = parseInt(parsed[0]['Количество'] || '0', 10);
-      } else {
-        quantity = parseInt(row["Количество"] || '0', 10);
       }
-      // If the row does not have Количество field in data then return null
+
+      const itemId = row["id"]?.toLowerCase();
+
+      // Attempt to extract quantity from original csv - specs field or original csv
+
+      let quantity;
+      try {
+        const specs = JSON.parse(row["specs"])
+
+        if (specs && specs.warehouse_locations) {
+          if (Array.isArray(specs.warehouse_locations)) {
+            quantity = specs.warehouse_locations.reduce((sum: number, location: { quantity: string | number }) => {
+              return sum + (parseInt(location.quantity.toString(), 10) || 0);
+            }, 0);
+          }
+        }
+
+      } catch (error){
+         // Parse the quantity from the original csv file or string (if it's a batch csv parsed)
+         quantity = parseInt(row["Количество"] || '0', 10);
+      }
+
 
       if (!itemId || isNaN(quantity)) {
         logger.warn(`Skipping invalid row: ${JSON.stringify(row)}`);
         return null; // Skip invalid rows
       }
 
-      const make = row["make"] || "Unknown Make";
-      const model = row["model"] || "Unknown Model";
-      const description = row["description"] || "No Description";
+      try {
 
-      // Extract properties from original csv:
-      const size = row["size"] || null;
-      const color = row["color"] || null;
-      const pattern = row["pattern"] || null;
-      const season = row["season"] || null;
+        const specs = JSON.parse(row["specs"])
+
+        return {
+          id: itemId,
+          make: row["make"],
+          model: row["model"],
+          description: row["description"],
+          type: row["type"],
+          specs: { ...specs, warehouse_locations: [{ voxel_id: "A1", quantity }] },
+          image_url: generateImageUrl(itemId),
+        };
+      } catch (e) {
+        logger.warn(`Skipping invalid specs: ${JSON.stringify(row)}`);
+        return null; // Skip invalid specs rows
+      }
 
 
-      return {
-        id: itemId,
-        make: make,
-        model: model,
-        description: description,
-        type: "wb_item", // Ensure 'type' is set
-        specs: {
-          size: size,
-          color: color,
-          pattern: pattern,
-          season: season,
-          warehouse_locations: [{ voxel_id: "A1", quantity }],
-        },
-        image_url: generateImageUrl(itemId),
-      };
     }).filter(item => item !== null);
 
     if (itemsToUpsert.length === 0) {
