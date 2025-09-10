@@ -6,7 +6,12 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
-import Papa from "papaparse";
+
+interface WarehouseCsvRow {
+  'Артикул': string;
+  'Количество': string;
+  [key: string]: any;
+}
 
 export async function getWarehouseItems(): Promise<{
   success: boolean;
@@ -28,41 +33,6 @@ export async function getWarehouseItems(): Promise<{
   }
 }
 
-export async function updateItemLocationQty(
-  itemId: string,
-  voxelId: string,
-  quantity: number,
-): Promise<{ success: boolean; error?: string }> {
-  noStore();
-  try {
-    const specs = await getItemSpecs(itemId);
-    let locations = specs.warehouse_locations || [];
-    const index = locations.findIndex((l) => l.voxel_id === voxelId);
-    if (index >= 0) {
-      locations[index].quantity += quantity; // Добавляем delta
-      if (locations[index].quantity <= 0) {
-        locations.splice(index, 1);
-      }
-    } else if (quantity > 0) {
-      locations.push({ voxel_id: voxelId, quantity });
-    }
-    if (voxelId.startsWith("B") && specs.min_quantity && (locations.find(l => l.voxel_id === voxelId)?.quantity || 0) < specs.min_quantity) {
-      logger.warn(
-        `[updateItemLocationQty] Warning: Quantity below min for B shelf.`,
-      );
-    }
-    const { error } = await supabaseAdmin
-      .from("cars")
-      .update({ specs: { ...specs, warehouse_locations: locations } })
-      .eq("id", itemId);
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    logger.error("[updateItemLocationQty] Error:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-  }
-}
-
 async function getItemSpecs(itemId: string): Promise<any> {
   const { data } = await supabaseAdmin.from("cars").select("specs").eq("id", itemId).single();
   return data?.specs || {};
@@ -70,7 +40,6 @@ async function getItemSpecs(itemId: string): Promise<any> {
 
 async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   if (!userId) return false;
-
   const { data: user, error } = await supabaseAdmin
     .from('users')
     .select('status')
@@ -80,14 +49,8 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   return user.status === 'admin';
 }
 
-interface WarehouseCsvRow {
-  'Артикул': string;
-  'Количество': string;
-  [key: string]: any;
-}
-
 export async function uploadWarehouseCsv(
-  csvContent: string,
+  batch: any[],
   userId: string | undefined
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const isAdmin = await verifyAdmin(userId);
@@ -96,85 +59,53 @@ export async function uploadWarehouseCsv(
     return { success: false, error: "Permission denied. Admin required." };
   }
 
-  if (!csvContent.trim()) {
-    return { success: false, error: 'No CSV data.' };
+  if (!batch || batch.length === 0) {
+    return { success: false, error: "Empty batch provided." };
   }
 
   try {
-    const parseResult = Papa.parse<WarehouseCsvRow>(csvContent.trim(), {
-      header: true,
-      skipEmptyLines: 'greedy',
-      transformHeader: h => h.trim(),
-      transform: v => v.trim(),
-    });
+    const itemsToUpsert = batch.map((row: any) => {
+      const itemId = row["Артикул"]?.toLowerCase(); // Use optional chaining
+      const quantity = parseInt(row["Количество"], 10);
 
-    if (parseResult.errors.length > 0) {
-      const firstError = parseResult.errors[0];
-      return { success: false, error: `CSV Parse Error (Row ${firstError.row + 1}): ${firstError.message}` };
-    }
-
-    const rows = parseResult.data;
-    if (rows.length === 0) {
-      return { success: false, error: 'CSV empty.' };
-    }
-
-    const requiredHeaders = ["Артикул", "Количество"];
-    const actualHeaders = Object.keys(rows[0] || {});
-    const missingHeaders = requiredHeaders.filter(h => !actualHeaders.includes(h));
-    if (missingHeaders.length > 0) {
-      return { success: false, error: `Missing columns: ${missingHeaders.join(', ')}` };
-    }
-
-    const validationErrors: string[] = [];
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowIndex = i + 2;
-      if (!row['Артикул'] || !row['Количество']) {
-        validationErrors.push(`Row ${rowIndex}: Missing Артикул or Количество.`);
-        continue;
+      if (!itemId || isNaN(quantity)) {
+        logger.warn(`Skipping invalid row: ${JSON.stringify(row)}`);
+        return null; // Skip invalid rows
       }
-      const quantityNum = parseInt(row['Количество'], 10);
-      if (isNaN(quantityNum)) {
-        validationErrors.push(`Row ${rowIndex}: Invalid Количество "${row['Количество']}". Must be number.`);
-        continue;
-      }
+
+      return {
+        id: itemId,
+        specs: {
+          warehouse_locations: [{ voxel_id: "A1", quantity }],
+        },
+
+        type: "wb_item", // Ensure 'type' is set for new records
+      };
+    }).filter(item => item !== null); // Filter out invalid rows
+
+    if (itemsToUpsert.length === 0) {
+      return { success: false, error: "No valid items to upsert in this batch." };
     }
 
-    if (validationErrors.length > 0) {
-      return { success: false, error: `Validation Failed:\n${validationErrors.join('\n')}` };
+    const { data, error } = await supabaseAdmin
+      .from("cars")
+      .upsert(itemsToUpsert, { onConflict: "id" }) // Use 'id' for conflict resolution
+      .select(); // Optional: Select the updated rows
+
+    if (error) {
+      logger.error("Error during upsert:", error);
+      return { success: false, error: `Supabase upsert error: ${error.message}` };
     }
 
-    let updatedCount = 0;
-    const updateErrors: string[] = [];
-    for (const row of rows) {
-      const itemId = row['Артикул'].toLowerCase(); // Lower case to match ID
-      const quantity = parseInt(row['Количество'], 10);
-
-      const { success, error } = await supabaseAdmin
-        .from("cars")
-        .update({ specs: {warehouse_locations: [{voxel_id: "A1", quantity: quantity }]} })
-        .eq("id", itemId);
-
-      if (success) {
-        updatedCount++;
-      } else {
-        updateErrors.push(`Item ${itemId}: ${error}`);
-      }
-    }
-
-    const message = `Updated ${updatedCount} / ${rows.length} items.`;
-    if (updateErrors.length > 0) {
-      return { success: updatedCount > 0, message, error: `Errors:\n${updateErrors.join('\n')}` };
-    }
-    return { success: true, message };
-
+    return { success: true, message: `Successfully upserted ${itemsToUpsert.length} items.` };
   } catch (error) {
-    logger.error('Warehouse CSV upload error:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Unexpected error.' };
+    logger.error("Unexpected error during upload:", error);
+    return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
   }
 }
 
-    export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
+
+export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
     // Add UTF-8 BOM to the beginning of the string
     const csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
