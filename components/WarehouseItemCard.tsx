@@ -39,7 +39,7 @@ export default function WarehouseItemCard({ item, onClick, isHighlighted }: Ware
       <div className={cn("absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300", COLOR_MAP[item.color], tintClass)} />
       <div className="relative z-10 flex flex-col h-full p-1 justify-between">
         <div>
-          <h6 className="font-semibold leading-tight whitespace-normal break-words" style={{ maxHeight: 16 }}>{item.name}</h6>
+          <span key={item.name} className="font-semibold leading-tight whitespace-normal break-words text-[10px]" style={{ maxHeight: 10 }}>{item.name}</span>
           <p>Кол: {item.total_quantity}</p>
         </div>
         <div className="flex flex-wrap gap-0.5">
