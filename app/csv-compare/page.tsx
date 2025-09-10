@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { uploadWarehouseCsv } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
 
-
 interface InventoryItem {
   id: string;
   quantity: number;
@@ -24,7 +23,6 @@ const CSVCompare = () => {
   const [popularItems, setPopularItems] = useState<any[]>([]);
   const [diffCounts, setDiffCounts] = useState<{ [id: string]: number }>({});
   const { user } = useAppContext();
-
 
   const parseCSV = useCallback(
     (csvText: string, setInventory: (items: InventoryItem[]) => void) => {
@@ -98,16 +96,16 @@ const CSVCompare = () => {
       diffs.push(`Removed items: ${removedItems.join(", ")}`);
     }
 
-    modifiedItems.forEach(id => {
-        const item1 = inventory1.find(i => i.id === id);
-        const item2 = inventory2.find(i => i.id === id);
-        const qty1 = item1?.quantity || 0;
-        const qty2 = item2?.quantity || 0;
-        const diff = qty2 - qty1;
-        if (diff !== 0) {
-            diffs.push(`${id}: ${qty1} -> ${qty2} (Diff: ${diff})`);
-            diffCounts[id] = diff; // Store the difference
-        }
+    modifiedItems.forEach((id) => {
+      const item1 = inventory1.find((i) => i.id === id);
+      const item2 = inventory2.find((i) => i.id === id);
+      const qty1 = item1?.quantity || 0;
+      const qty2 = item2?.quantity || 0;
+      const diff = qty2 - qty1;
+      if (diff !== 0) {
+        diffs.push(`${id}: ${qty1} -> ${qty2} (Diff: ${diff})`);
+        diffCounts[id] = diff; // Store the difference
+      }
     });
 
     setDifferences(diffs);
@@ -125,8 +123,7 @@ const CSVCompare = () => {
       .sort(([, countA], [, countB]) => countB - countA)
       .slice(0, 13) // Top 13
       .map(([id, count]) => ({ id, count }));
-      setPopularItems(sortedItems);
-
+    setPopularItems(sortedItems);
   }, [inventory1, inventory2]);
 
   const handleCsv1Change = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -141,44 +138,65 @@ const CSVCompare = () => {
     parseCSV(newCsv2, setInventory2);
   };
 
-  const inventoryToCsv = (inventory: InventoryItem[], includeZeroQuantities: boolean = false): string => {
+  const inventoryToCsv = (
+    inventory: InventoryItem[],
+    includeZeroQuantities: boolean = false
+  ): string => {
     const csvData = inventory
-        .filter(item => includeZeroQuantities || item.quantity > 0) // Apply filter
-        .map(item => ({
-            'Артикул': item.id,
-            'Количество': item.quantity
-    }));
+      .filter((item) => includeZeroQuantities || item.quantity > 0) // Apply filter
+      .map((item) => ({
+        Артикул: item.id,
+        Количество: item.quantity,
+      }));
     return unparse(csvData, {
       header: true,
-      quotes: true
+      quotes: true,
     });
   };
 
   const handleUploadToSupabase = async () => {
-        setUploading(true);
-        try {
-            const csvData = inventoryToCsv(inventory2, !hideZeroQuantity); // Respect includeZeroQuantities
-            if (!csvData.trim()) {
-                toast.error("No data to upload.");
-                return;
-            }
+    setUploading(true);
+    try {
+      const csvData = inventoryToCsv(inventory2, !hideZeroQuantity);
+      if (!csvData.trim()) {
+        toast.error("No data to upload.");
+        return;
+      }
 
-            const result = await uploadWarehouseCsv(csvData, user?.id);
-            if (result.success) {
-                toast.success(result.message || "CSV uploaded to Supabase!");
-            } else {
-                toast.error(result.error || "Failed to upload to Supabase.");
-            }
-        } catch (err: any) {
-            toast.error(err?.message || "Error during upload.");
-            console.error("Upload Error:", err);
-        } finally {
-            setUploading(false);
+      // Implement batch upsert
+      const BATCH_SIZE = 13;
+      const rows = parse(csvData, { header: true, skipEmptyLines: true }).data;
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        const result = await uploadWarehouseCsv(batch, user?.id); // Pass batch as object array
+        if (!result.success) {
+          toast.error(result.error || "Failed to upload batch to Supabase.");
+          setUploading(false);
+          return;
+        } else {
+          console.log(
+            `Uploaded batch ${i / BATCH_SIZE + 1}/${Math.ceil(
+              rows.length / BATCH_SIZE
+            )}`
+          );
         }
+      }
+
+toast.success("All data uploaded to Supabase!");
+    } catch (err: any) {
+      toast.error(err?.message || "Error during upload.");
+      console.error("Upload Error:", err);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const filteredInventory1 = hideZeroQuantity ? inventory1.filter(item => item.quantity > 0) : inventory1;
-  const filteredInventory2 = hideZeroQuantity ? inventory2.filter(item => item.quantity > 0) : inventory2;
+  const filteredInventory1 = hideZeroQuantity
+    ? inventory1.filter((item) => item.quantity > 0)
+    : inventory1;
+  const filteredInventory2 = hideZeroQuantity
+    ? inventory2.filter((item) => item.quantity > 0)
+    : inventory2;
 
   return (
     <div className="container mx-auto p-4 pt-24">
@@ -205,17 +223,16 @@ const CSVCompare = () => {
             className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
             onClick={() => {
               const csv = inventoryToCsv(inventory1);
-              const blob = new Blob([csv], { type: 'text/csv' });
+              const blob = new Blob([csv], { type: "text/csv" });
               const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
+              const a = document.createElement("a");
               a.href = url;
-              a.download = 'inventory1.csv';
+              a.download = "inventory1.csv";
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
               window.URL.revokeObjectURL(url);
-
-}}
+            }}
           >
             List to CSV 1
           </button>
@@ -241,11 +258,11 @@ const CSVCompare = () => {
             className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
             onClick={() => {
               const csv = inventoryToCsv(inventory2);
-              const blob = new Blob([csv], { type: 'text/csv' });
+              const blob = new Blob([csv], { type: "text/csv" });
               const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
+              const a = document.createElement("a");
               a.href = url;
-              a.download = 'inventory2.csv';
+              a.download = "inventory2.csv";
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
@@ -274,7 +291,9 @@ const CSVCompare = () => {
         onClick={compareInventories}
       >
         Compare Inventories
-      </button>
+      </
+
+button>
 
       {differences.length > 0 && (
         <div className="mt-4">
@@ -288,46 +307,46 @@ const CSVCompare = () => {
       )}
 
       {popularItems.length > 0 && (
-          <div className="mt-4">
-            <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
-            <ol className="list-decimal pl-5">
-              {popularItems.map((item, index) => (
-                <li key={index}>
-                  {item.id}: {item.count}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-      {Object.keys(diffCounts).length > 0 && (
         <div className="mt-4">
-          <h2 className="text-xl font-semibold">Quantity Differences</h2>
+          <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
           <ol className="list-decimal pl-5">
-            {Object.entries(diffCounts).map(([id, diff], index) => (
+            {popularItems.map((item, index) => (
               <li key={index}>
-                {id}: {diff}
+                {item.id}: {item.count}
               </li>
             ))}
           </ol>
         </div>
       )}
 
-       <div className="mt-4">
-            <h2 className="text-xl font-semibold">Wildberries and Ozon Tools</h2>
-            <p>
-              These tools would integrate with Wildberries and Ozon APIs to
-              facilitate inventory management and product updates.
-            </p>
+      {Object.keys(diffCounts).length > 0 && (
+        <div className="mt-4">
+          <h2 className="text-xl font-semibold">Quantity Differences</h2>
+          <ul>
+            {Object.entries(diffCounts).map(([id, diff], index) => (
+              <li key={index}>
+                {id}: {diff}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-            <button
-                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
-                    onClick={handleUploadToSupabase}
-                    disabled={uploading}
-                >
-                    {uploading ? "Uploading..." : "Upload to Supabase"}
-            </button>
-          </div>
+      <div className="mt-4">
+        <h2 className="text-xl font-semibold">Wildberries and Ozon Tools</h2>
+        <p>
+          These tools would integrate with Wildberries and Ozon APIs to
+          facilitate inventory management and product updates.
+        </p>
+
+        <button
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
+          onClick={handleUploadToSupabase}
+          disabled={uploading}
+        >
+          {uploading ? "Uploading..." : "Upload to Supabase"}
+        </button>
+      </div>
     </div>
   );
 };
