@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -171,9 +172,11 @@ export async function uploadWarehouseCsv(
   }
 }
 
-export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
+
+    export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
-    const csvData = Papa.unparse(diffData.map(d => ({
+    // Add UTF-8 BOM to the beginning of the string
+    const csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
       'Артикул': d.id,
       'Изменение': d.diffQty,
       'Ячейка': d.voxel
@@ -192,8 +195,11 @@ export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   }
 }
 
+    
 export async function exportCurrentStock(items: any[]): Promise<void> {
   try {
+    // Add UTF-8 BOM to the beginning of the string
+    const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
     const stockData = items.map((item) => ({
       'Артикул': item.id,
       'Название': item.name,
@@ -204,7 +210,6 @@ export async function exportCurrentStock(items: any[]): Promise<void> {
       'Цвет': item.color || "N/A",
       'Размер': item.size || "N/A",
     }));
-    const csvData = Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
     const message = "Текущее состояние склада в CSV.";
     await notifyAdmins(message);
     await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
