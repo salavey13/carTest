@@ -198,8 +198,6 @@ export async function uploadWarehouseCsv(
     
 export async function exportCurrentStock(items: any[]): Promise<void> {
   try {
-    // Add UTF-8 BOM to the beginning of the string
-    const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
     const stockData = items.map((item) => ({
       'Артикул': item.id,
       'Название': item.name,
@@ -210,6 +208,8 @@ export async function exportCurrentStock(items: any[]): Promise<void> {
       'Цвет': item.color || "N/A",
       'Размер': item.size || "N/A",
     }));
+    // Add UTF-8 BOM to the beginning of the string
+    const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true })
     const message = "Текущее состояние склада в CSV.";
     await notifyAdmins(message);
     await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
