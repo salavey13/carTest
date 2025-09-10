@@ -15,7 +15,6 @@ const generateImageUrl = (id: string): string => {
     return baseURL + filename;
 };
 
-
 interface WarehouseCsvRow {
   id: string;
   make: string;
@@ -47,7 +46,6 @@ async function getWarehouseItems(): Promise<{
     }
 }
 
-
 async function getItemSpecs(itemId: string): Promise<any> {
   const { data } = await supabaseAdmin.from("cars").select("specs").eq("id", itemId).single();
   return data?.specs || {};
@@ -63,7 +61,6 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   if (error || !user) return false;
   return user.status === 'admin';
 }
-
 
 export async function uploadWarehouseCsv(
     batch: any[],
@@ -82,61 +79,81 @@ export async function uploadWarehouseCsv(
 
     try {
         // Fetch existing items from Supabase to compare
+        const itemIds = batch.map((row: any) => row["id"]?.toLowerCase()).filter(Boolean);
+        logger.info(`Fetching existing items for IDs: ${JSON.stringify(itemIds)}`);
+
         const { data: existingItems, error: existingItemsError } = await supabaseAdmin
             .from("cars")
             .select("*")
-            .in("id", batch.map((row: any) => row["Артикул"]?.toLowerCase()).filter(Boolean));
+            .in("id", itemIds);
 
         if (existingItemsError) {
             logger.error("Error fetching existing items:", existingItemsError);
             return { success: false, error: `Error fetching existing items: ${existingItemsError.message}` };
         }
 
+        logger.info(`Successfully fetched ${existingItems?.length || 0} existing items.`);
+
         const itemsToUpsert = batch.map((row: any) => {
-            const itemId = row["Артикул"]?.toLowerCase();
+            const itemId = row["id"]?.toLowerCase();
             if (!itemId) {
-                logger.warn(`Skipping row with missing Артикул: ${JSON.stringify(row)}`);
+                logger.warn(`Skipping row with missing id: ${JSON.stringify(row)}`);
                 return null;
             }
 
             const existingItem = existingItems?.find(item => item.id === itemId);
 
             // Parse quantity from the simplified CSV or default to 0 if not found
-            const quantity = parseInt(row["Количество"] || '0', 10);
+            let quantity = 0;
+            try {
+                const specs = JSON.parse(row["specs"]);
+                if (specs?.warehouse_locations && Array.isArray(specs.warehouse_locations)) {
+                    quantity = specs.warehouse_locations.reduce((acc, l) => acc + (parseInt(l.quantity, 10) || 0), 0);
+                }
+            } catch (e) {
+                logger.warn(`Could not parse specs for item ${itemId}, using quantity from CSV if available. Error: ${e}`);
+                quantity = parseInt(row["Количество"] || '0', 10) || 0;
+            }
+
             if (isNaN(quantity)) {
                 logger.warn(`Skipping invalid quantity for item ${itemId}: ${JSON.stringify(row)}`);
                 return null;
             }
 
-            // If the item exists, merge the new quantity into the existing item's specs
+            let itemToUpsert: any;
             if (existingItem) {
+                logger.info(`Item ${itemId} exists, merging data.`);
                 try {
-                    const existingSpecs = existingItem.specs || {};
-                    return {
-                        ...existingItem,  // Use the existing row values
-                        specs: { ...existingSpecs, warehouse_locations: [{ voxel_id: "A1", quantity }] }, // Update warehouse_locations
+                    const parsedSpecs = JSON.parse(row["specs"] || "{}"); // Safely parse the specs
+                    itemToUpsert = {
+                        ...existingItem,
+                        specs: { ...existingItem.specs, ...parsedSpecs, warehouse_locations: [{ voxel_id: "A1", quantity }] }
                     };
                 } catch (e) {
-                    logger.warn(`Skipping invalid specs: ${JSON.stringify(row)}`);
-                    return null; // Skip invalid specs rows
+                    logger.error(`Failed to parse and merge specs for existing item ${itemId}:`, e);
+                    return null;
                 }
             } else {
-                // If the item doesn't exist, construct a new item with default values (except quantity in specs)
-                return {
+                logger.info(`Item ${itemId} does not exist, creating new item.`);
+                itemToUpsert = {
                     id: itemId,
-                    make: "Unknown Make",
-                    model: "Unknown Model",
-                    description: "No Description",
+                    make: row["make"] || "Unknown Make",
+                    model: row["model"] || "Unknown Model",
+                    description: row["description"] || "No Description",
                     type: "wb_item",
                     specs: { warehouse_locations: [{ voxel_id: "A1", quantity }] },
                     image_url: generateImageUrl(itemId),
                 };
             }
+            return itemToUpsert;
         }).filter(item => item !== null);
 
         if (itemsToUpsert.length === 0) {
+            logger.warn("No valid items to upsert in this batch.");
             return { success: false, error: "No valid items to upsert in this batch." };
         }
+
+        logger.info(`Upserting ${itemsToUpsert.length} items.`);
 
         const { data, error } = await supabaseAdmin
             .from("cars")
@@ -148,13 +165,14 @@ export async function uploadWarehouseCsv(
             return { success: false, error: `Supabase upsert error: ${error.message}` };
         }
 
+        logger.info(`Successfully upserted ${itemsToUpsert.length} items.`);
         return { success: true, message: `Successfully upserted ${itemsToUpsert.length} items.` };
+
     } catch (error) {
         logger.error("Unexpected error during upload:", error);
         return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
 }
-
 
 export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
@@ -178,18 +196,17 @@ export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   }
 }
 
-
 export async function exportCurrentStock(items: any[]): Promise<void> {
   try {
     const stockData = items.map((item) => ({
-      'Артикул': item.id,
-      'Название': item.name,
-      'Общее Количество': item.total_quantity,
-      'Локации': item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
-      'Сезон': item.season || "N/A",
-      'Узор': item.pattern || "N/A",
-      'Цвет': item.color || "N/A",
-      'Размер': item.size || "N/A",
+      'Артикул': d.id,
+      'Название': d.name,
+      'Общее Количество': d.total_quantity,
+      'Локации': d.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
+      'Сезон': d.season || "N/A",
+      'Узор': d.pattern || "N/A",
+      'Цвет': d.color || "N/A",
+      'Размер': d.size || "N/A",
     }));
     // Add UTF-8 BOM to the beginning of the string
     const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true })
