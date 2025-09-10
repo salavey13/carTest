@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -71,6 +70,7 @@ async function getItemSpecs(itemId: string): Promise<any> {
 
 async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   if (!userId) return false;
+
   const { data: user, error } = await supabaseAdmin
     .from('users')
     .select('status')
@@ -82,8 +82,7 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
 
 interface WarehouseCsvRow {
   'Артикул': string;
-  'Изменение': string;
-  'Ячейка'?: string;
+  'Количество': string;
   [key: string]: any;
 }
 
@@ -119,7 +118,7 @@ export async function uploadWarehouseCsv(
       return { success: false, error: 'CSV empty.' };
     }
 
-    const requiredHeaders = ["Артикул", "Изменение"];
+    const requiredHeaders = ["Артикул", "Количество"];
     const actualHeaders = Object.keys(rows[0] || {});
     const missingHeaders = requiredHeaders.filter(h => !actualHeaders.includes(h));
     if (missingHeaders.length > 0) {
@@ -130,13 +129,13 @@ export async function uploadWarehouseCsv(
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const rowIndex = i + 2;
-      if (!row['Артикул'] || !row['Изменение']) {
-        validationErrors.push(`Row ${rowIndex}: Missing Артикул or Изменение.`);
+      if (!row['Артикул'] || !row['Количество']) {
+        validationErrors.push(`Row ${rowIndex}: Missing Артикул or Количество.`);
         continue;
       }
-      const changeNum = parseInt(row['Изменение'], 10);
-      if (isNaN(changeNum)) {
-        validationErrors.push(`Row ${rowIndex}: Invalid Изменение "${row['Изменение']}". Must be number.`);
+      const quantityNum = parseInt(row['Количество'], 10);
+      if (isNaN(quantityNum)) {
+        validationErrors.push(`Row ${rowIndex}: Invalid Количество "${row['Количество']}". Must be number.`);
         continue;
       }
     }
@@ -149,10 +148,13 @@ export async function uploadWarehouseCsv(
     const updateErrors: string[] = [];
     for (const row of rows) {
       const itemId = row['Артикул'].toLowerCase(); // Lower case to match ID
-      const change = parseInt(row['Изменение'], 10);
-      const voxelId = row['Ячейка'] || 'A1';
+      const quantity = parseInt(row['Количество'], 10);
 
-      const { success, error } = await updateItemLocationQty(itemId, voxelId, change);
+      const { success, error } = await supabaseAdmin
+        .from("cars")
+        .update({ specs: {warehouse_locations: [{voxel_id: "A1", quantity: quantity }]} })
+        .eq("id", itemId);
+
       if (success) {
         updatedCount++;
       } else {
@@ -172,7 +174,6 @@ export async function uploadWarehouseCsv(
   }
 }
 
-
     export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
     // Add UTF-8 BOM to the beginning of the string
@@ -181,7 +182,9 @@ export async function uploadWarehouseCsv(
       'Изменение': d.diffQty,
       'Ячейка': d.voxel
     })), { header: true, delimiter: ',', quotes: true });
-    const message = "Изменения склада в CSV.";
+    const message = "Изменения скла
+
+да в CSV.";
     await notifyAdmins(message);
     await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
       attachment: {
