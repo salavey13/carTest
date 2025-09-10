@@ -2,6 +2,10 @@
 
 import React, { useState, useCallback } from "react";
 import { parse, unparse } from "papaparse";
+import { toast } from "sonner";
+import { uploadWarehouseCsv } from "@/app/wb/actions";
+import { useAppContext } from "@/contexts/AppContext";
+
 
 interface InventoryItem {
   id: string;
@@ -15,8 +19,12 @@ const CSVCompare = () => {
   const [inventory2, setInventory2] = useState<InventoryItem[]>([]);
   const [differences, setDifferences] = useState<string[]>([]);
   const [hideZeroQuantity, setHideZeroQuantity] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [popularItems, setPopularItems] = useState<any[]>([]);
+  const [diffCounts, setDiffCounts] = useState<{ [id: string]: number }>({});
+  const { user } = useAppContext();
+
 
   const parseCSV = useCallback(
     (csvText: string, setInventory: (items: InventoryItem[]) => void) => {
@@ -60,6 +68,7 @@ const CSVCompare = () => {
               quantity,
             })
           );
+
           setInventory(inventoryList);
         },
         error: (error) => {
@@ -72,7 +81,6 @@ const CSVCompare = () => {
   );
 
   const compareInventories = useCallback(() => {
-
     const id1 = new Set(inventory1.map((i) => i.id));
     const id2 = new Set(inventory2.map((i) => i.id));
 
@@ -81,6 +89,7 @@ const CSVCompare = () => {
     const modifiedItems = [...id1].filter((id) => id2.has(id));
 
     const diffs: string[] = [];
+    const diffCounts: { [id: string]: number } = {};
 
     if (addedItems.length > 0) {
       diffs.push(`Added items: ${addedItems.join(", ")}`);
@@ -88,11 +97,21 @@ const CSVCompare = () => {
     if (removedItems.length > 0) {
       diffs.push(`Removed items: ${removedItems.join(", ")}`);
     }
-    if (modifiedItems.length > 0) {
-      diffs.push(`Modified items: ${modifiedItems.join(", ")}`);
-    }
+
+    modifiedItems.forEach(id => {
+        const item1 = inventory1.find(i => i.id === id);
+        const item2 = inventory2.find(i => i.id === id);
+        const qty1 = item1?.quantity || 0;
+        const qty2 = item2?.quantity || 0;
+        const diff = qty2 - qty1;
+        if (diff !== 0) {
+            diffs.push(`${id}: ${qty1} -> ${qty2} (Diff: ${diff})`);
+            diffCounts[id] = diff; // Store the difference
+        }
+    });
 
     setDifferences(diffs);
+    setDiffCounts(diffCounts); // Update diffCounts state
 
     // Basic analytics: Most popular items (example)
     const allItems = [...inventory1, ...inventory2];
@@ -104,7 +123,7 @@ const CSVCompare = () => {
 
     const sortedItems = Object.entries(itemCount)
       .sort(([, countA], [, countB]) => countB - countA)
-      .slice(0, 5) // Top 5
+      .slice(0, 13) // Top 13
       .map(([id, count]) => ({ id, count }));
       setPopularItems(sortedItems);
 
@@ -122,23 +141,40 @@ const CSVCompare = () => {
     parseCSV(newCsv2, setInventory2);
   };
 
-  const inventoryToCsv = (inventory: InventoryItem[]): string => {
-    const csvData = inventory.map(item => {
-      return {
-        id: item.id,
-        make: "",
-        model: "",
-        description: "",
-        type: "wb_item",
-        specs: `{"size": "", "color": "", "pattern": "", "season": null, "warehouse_locations": [{"voxel_id": "A1", "quantity": ${item.quantity}}]}`, // "Hardcoded" example
-        image_url: ""
-      };
-    });
-
+  const inventoryToCsv = (inventory: InventoryItem[], includeZeroQuantities: boolean = false): string => {
+    const csvData = inventory
+        .filter(item => includeZeroQuantities || item.quantity > 0) // Apply filter
+        .map(item => ({
+            'Артикул': item.id,
+            'Количество': item.quantity
+    }));
     return unparse(csvData, {
       header: true,
       quotes: true
     });
+  };
+
+  const handleUploadToSupabase = async () => {
+        setUploading(true);
+        try {
+            const csvData = inventoryToCsv(inventory2, !hideZeroQuantity); // Respect includeZeroQuantities
+            if (!csvData.trim()) {
+                toast.error("No data to upload.");
+                return;
+            }
+
+            const result = await uploadWarehouseCsv(csvData, user?.id);
+            if (result.success) {
+                toast.success(result.message || "CSV uploaded to Supabase!");
+            } else {
+                toast.error(result.error || "Failed to upload to Supabase.");
+            }
+        } catch (err: any) {
+            toast.error(err?.message || "Error during upload.");
+            console.error("Upload Error:", err);
+        } finally {
+            setUploading(false);
+        }
   };
 
   const filteredInventory1 = hideZeroQuantity ? inventory1.filter(item => item.quantity > 0) : inventory1;
@@ -253,7 +289,7 @@ const CSVCompare = () => {
 
       {popularItems.length > 0 && (
           <div className="mt-4">
-            <h2 className="text-xl font-semibold">Most Popular Items</h2>
+            <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
             <ol className="list-decimal pl-5">
               {popularItems.map((item, index) => (
                 <li key={index}>
@@ -263,6 +299,20 @@ const CSVCompare = () => {
             </ol>
           </div>
         )}
+
+      {Object.keys(diffCounts).length > 0 && (
+        <div className="mt-4">
+          <h2 className="text-xl font-semibold">Quantity Differences</h2>
+          <ol className="list-decimal pl-5">
+            {Object.entries(diffCounts).map(([id, diff], index) => (
+              <li key={index}>
+                {id}: {diff}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
        <div className="mt-4">
             <h2 className="text-xl font-semibold">Wildberries and Ozon Tools</h2>
             <p>
@@ -270,22 +320,12 @@ const CSVCompare = () => {
               facilitate inventory management and product updates.
             </p>
 
-            <h3 className="text-lg font-semibold mt-2">
-              Update Available Item Set for Wildberries
-            </h3>
-            <p>Upload a CSV file to update the set of available items on Wildberries:</p>
-            <input type="file" accept=".csv" className="mb-2" />
-            <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded">
-              Upload to Wildberries
-            </button>
-
-            <h3 className="text-lg font-semibold mt-2">
-              Update Item Availability on Ozon
-            </h3>
-            <p>Upload a CSV file to update the item availability on Ozon:</p>
-            <input type="file" accept=".csv" className="mb-2" />
-            <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded">
-              Upload to Ozon
+            <button
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
+                    onClick={handleUploadToSupabase}
+                    disabled={uploading}
+                >
+                    {uploading ? "Uploading..." : "Upload to Supabase"}
             </button>
           </div>
     </div>
