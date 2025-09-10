@@ -27,26 +27,26 @@ interface WarehouseCsvRow {
   Количество?: string; // Quantity may exist in some original csv values
 }
 
-
 async function getWarehouseItems(): Promise<{
-  success: boolean;
-  data?: WarehouseItem[];
-  error?: string;
+    success: boolean;
+    data?: WarehouseItem[];
+    error?: string;
 }> {
-  noStore();
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("cars")
-      .select("*")
-      .eq("type", "wb_item")
-      .order("model");
-    if (error) throw error;
-    return { success: true, data };
-  } catch (error) {
-    logger.error("[getWarehouseItems] Error:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-  }
+    noStore();
+    try {
+        const { data, error } = await supabaseAdmin
+            .from("cars")
+            .select("*")
+            .eq("type", "wb_item")
+            .order("model");
+        if (error) throw error;
+        return { success: true, data };
+    } catch (error) {
+        logger.error("[getWarehouseItems] Error:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
 }
+
 
 async function getItemSpecs(itemId: string): Promise<any> {
   const { data } = await supabaseAdmin.from("cars").select("specs").eq("id", itemId).single();
@@ -66,95 +66,95 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
 
 
 export async function uploadWarehouseCsv(
-  batch: any[],
-  userId: string | undefined
+    batch: any[],
+    userId: string | undefined
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const isAdmin = await verifyAdmin(userId);
-  if (!isAdmin) {
-    logger.warn(`Unauthorized warehouse CSV upload by ${userId || 'Unknown'}`);
-    return { success: false, error: "Permission denied. Admin required." };
-  }
+    const isAdmin = await verifyAdmin(userId);
+    if (!isAdmin) {
+        logger.warn(`Unauthorized warehouse CSV upload by ${userId || 'Unknown'}`);
 
-  if (!batch || batch.length === 0) {
+        return { success: false, error: "Permission denied. Admin required." };
+    }
 
-    return { success: false, error: "Empty batch provided." };
-  }
+    if (!batch || batch.length === 0) {
+        return { success: false, error: "Empty batch provided." };
+    }
 
-  try {
-    const itemsToUpsert = batch.map((row: any) => {
+    try {
+        // Fetch existing items from Supabase to compare
+        const { data: existingItems, error: existingItemsError } = await supabaseAdmin
+            .from("cars")
+            .select("*")
+            .in("id", batch.map((row: any) => row["Артикул"]?.toLowerCase()).filter(Boolean));
 
-      if (typeof row === 'string') {
-        const parsed = parse(row, { header: true, skipEmptyLines: true }).data;
-      }
-
-      const itemId = row["id"]?.toLowerCase();
-
-      // Attempt to extract quantity from original csv - specs field or original csv
-
-      let quantity;
-      try {
-        const specs = JSON.parse(row["specs"])
-
-        if (specs && specs.warehouse_locations) {
-          if (Array.isArray(specs.warehouse_locations)) {
-            quantity = specs.warehouse_locations.reduce((sum: number, location: { quantity: string | number }) => {
-              return sum + (parseInt(location.quantity.toString(), 10) || 0);
-            }, 0);
-          }
+        if (existingItemsError) {
+            logger.error("Error fetching existing items:", existingItemsError);
+            return { success: false, error: `Error fetching existing items: ${existingItemsError.message}` };
         }
 
-      } catch (error){
-         // Parse the quantity from the original csv file or string (if it's a batch csv parsed)
-         quantity = parseInt(row["Количество"] || '0', 10);
-      }
+        const itemsToUpsert = batch.map((row: any) => {
+            const itemId = row["Артикул"]?.toLowerCase();
+            if (!itemId) {
+                logger.warn(`Skipping row with missing Артикул: ${JSON.stringify(row)}`);
+                return null;
+            }
 
+            const existingItem = existingItems?.find(item => item.id === itemId);
 
-      if (!itemId || isNaN(quantity)) {
-        logger.warn(`Skipping invalid row: ${JSON.stringify(row)}`);
-        return null; // Skip invalid rows
-      }
+            // Parse quantity from the simplified CSV or default to 0 if not found
+            const quantity = parseInt(row["Количество"] || '0', 10);
+            if (isNaN(quantity)) {
+                logger.warn(`Skipping invalid quantity for item ${itemId}: ${JSON.stringify(row)}`);
+                return null;
+            }
 
-      try {
+            // If the item exists, merge the new quantity into the existing item's specs
+            if (existingItem) {
+                try {
+                    const existingSpecs = existingItem.specs || {};
+                    return {
+                        ...existingItem,  // Use the existing row values
+                        specs: { ...existingSpecs, warehouse_locations: [{ voxel_id: "A1", quantity }] }, // Update warehouse_locations
+                    };
+                } catch (e) {
+                    logger.warn(`Skipping invalid specs: ${JSON.stringify(row)}`);
+                    return null; // Skip invalid specs rows
+                }
+            } else {
+                // If the item doesn't exist, construct a new item with default values (except quantity in specs)
+                return {
+                    id: itemId,
+                    make: "Unknown Make",
+                    model: "Unknown Model",
+                    description: "No Description",
+                    type: "wb_item",
+                    specs: { warehouse_locations: [{ voxel_id: "A1", quantity }] },
+                    image_url: generateImageUrl(itemId),
+                };
+            }
+        }).filter(item => item !== null);
 
-        const specs = JSON.parse(row["specs"])
+        if (itemsToUpsert.length === 0) {
+            return { success: false, error: "No valid items to upsert in this batch." };
+        }
 
-        return {
-          id: itemId,
-          make: row["make"],
-          model: row["model"],
-          description: row["description"],
-          type: row["type"],
-          specs: { ...specs, warehouse_locations: [{ voxel_id: "A1", quantity }] },
-          image_url: generateImageUrl(itemId),
-        };
-      } catch (e) {
-        logger.warn(`Skipping invalid specs: ${JSON.stringify(row)}`);
-        return null; // Skip invalid specs rows
-      }
+        const { data, error } = await supabaseAdmin
+            .from("cars")
+            .upsert(itemsToUpsert, { onConflict: "id" })
+            .select();
 
+        if (error) {
+            logger.error("Error during upsert:", error);
+            return { success: false, error: `Supabase upsert error: ${error.message}` };
+        }
 
-    }).filter(item => item !== null);
-
-    if (itemsToUpsert.length === 0) {
-      return { success: false, error: "No valid items to upsert in this batch." };
+        return { success: true, message: `Successfully upserted ${itemsToUpsert.length} items.` };
+    } catch (error) {
+        logger.error("Unexpected error during upload:", error);
+        return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
-
-    const { data, error } = await supabaseAdmin
-      .from("cars")
-      .upsert(itemsToUpsert, { onConflict: "id" })
-      .select();
-
-    if (error) {
-      logger.error("Error during upsert:", error);
-      return { success: false, error: `Supabase upsert error: ${error.message}` };
-    }
-
-    return { success: true, message: `Successfully upserted ${itemsToUpsert.length} items.` };
-  } catch (error) {
-    logger.error("Unexpected error during upload:", error);
-    return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
-  }
 }
+
 
 export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
