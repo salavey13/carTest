@@ -177,6 +177,10 @@ const CSVCompare = () => {
                 header: true,
                 skipEmptyLines: true,
                 dynamicTyping: false, // Important for avoiding type conversion issues
+                quoteChar: '"', // Specify the quote character
+                escapeChar: '\\', // Specify the escape character
+                //** KEY FIX:  Handles malformed quotes  **//
+                strict: false, // Disable strict mode to handle malformed quotes
             });
 
             if (parsedCsv.errors.length > 0) {
@@ -248,7 +252,7 @@ const CSVCompare = () => {
                             const csv = inventoryToCsv(inventory1);
                             const blob = new Blob([csv], { type: "text/csv" });
                             const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement("a");
+                            const a= document.createElement("a");
                             a.href = url;
                             a.download = "inventory1.csv";
                             document.body.appendChild(a);
@@ -330,13 +334,13 @@ const CSVCompare = () => {
             {popularItems.length > 0 && (
                 <div className="mt-4">
                     <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
-                    <ol className="list-decimal pl-5">
+                    <ul>
                         {popularItems.map((item, index) => (
                             <li key={index}>
                                 {item.id}: {item.count}
                             </li>
                         ))}
-                    </ol>
+                    </ul>
                 </div>
             )}
 

@@ -152,9 +152,7 @@ export async function uploadWarehouseCsv(
 
         if (itemsToUpsert.length === 0) {
             logger.warn("No valid items to upsert in this batch.");
-            return { success: false, error:
-
-"No valid items to upsert in this batch." };
+            return { success: false, error:"No valid items to upsert in this batch." };
         }
 
         logger.info(`Upserting ${itemsToUpsert.length} items.`);
@@ -207,7 +205,7 @@ export async function exportCurrentStock(items: any[]): Promise<void> {
       'Название': d.name,
       'Общее Количество': item.total_quantity,
       'Локации': item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
-      'Сезон': item.season || "N/A",
+      'Сезон': d.season || "N/A",
       'Узор': d.pattern || "N/A",
       'Цвет': d.color || "N/A",
       'Размер': d.size || "N/A",
