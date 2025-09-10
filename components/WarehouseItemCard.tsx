@@ -1,3 +1,4 @@
+// /components/WarehouseItemCard.tsx
 "use client";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -26,24 +27,24 @@ export default function WarehouseItemCard({ item, onClick, isHighlighted }: Ware
     <motion.div
       onClick={onClick}
       className={cn(
-        "relative rounded-lg overflow-hidden cursor-pointer text-[8px] h-24",
+        "relative rounded-lg overflow-hidden cursor-pointer text-[8px] h-20",
         isHighlighted ? "ring-2 ring-yellow-500 animate-pulse" : "",
       )}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
     >
       {item.image && (
-        <Image src={item.image} alt={item.name} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
+        <Image src={item.image} alt="" fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
       )}
       <div className={cn("absolute inset-0 opacity-60 group-hover:opacity-40 transition-opacity duration-300", COLOR_MAP[item.color], tintClass)} />
       <div className="relative z-10 flex flex-col h-full p-1 justify-between">
         <div>
-          <h3 className="font-semibold leading-tight whitespace-normal break-words" style={{ maxHeight: 24 }}>{item.name}</h3>
+          <h6 className="font-semibold leading-tight whitespace-normal break-words" style={{ maxHeight: 16 }}>{item.name}</h6>
           <p>Кол: {item.total_quantity}</p>
         </div>
         <div className="flex flex-wrap gap-0.5">
           {item.locations.map((loc) => (
-            <span key={loc.voxel} className="px-0.5 py-0.25 rounded bg-gray-800/50 text-white text-[6px]">
+            <span key={loc.voxel} className="px-0.5 py-0.25 rounded bg-gray-800/50 text-white text-[7px]">
               {loc.voxel}:{loc.quantity}
             </span>
           ))}

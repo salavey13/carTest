@@ -1,3 +1,4 @@
+// /components/WarehouseViz.tsx
 "use client";
 
 import { motion } from "framer-motion";
@@ -35,7 +36,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, gameMode, on
             {!isEmpty && (
               <div className="space-y-1">
                 {content.map(({ item, quantity }, idx) => (
-                  <div key={idx} className="truncate text-[10px]">
+                  <div key={idx} className="truncate text-[8px]">
                     {item.name}: {quantity}
                   </div>
                 ))}
