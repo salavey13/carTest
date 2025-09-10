@@ -79,7 +79,8 @@ export async function uploadWarehouseCsv(
 
     try {
         // Fetch existing items from Supabase to compare
-        const itemIds = batch.map((row: any) => row["id"]?.toLowerCase()).filter(Boolean);
+        //** KEY CHANGE: Now using "Артикул" consistently  **//
+        const itemIds = batch.map((row: any) => row["Артикул"]?.toLowerCase()).filter(Boolean);
         logger.info(`Fetching existing items for IDs: ${JSON.stringify(itemIds)}`);
 
         const { data: existingItems, error: existingItemsError } = await supabaseAdmin
@@ -95,9 +96,10 @@ export async function uploadWarehouseCsv(
         logger.info(`Successfully fetched ${existingItems?.length || 0} existing items.`);
 
         const itemsToUpsert = batch.map((row: any) => {
-            const itemId = row["id"]?.toLowerCase();
+            //** KEY CHANGE: Now using "Артикул" consistently  **//
+            const itemId = row["Артикул"]?.toLowerCase();
             if (!itemId) {
-                logger.warn(`Skipping row with missing id: ${JSON.stringify(row)}`);
+                logger.warn(`Skipping row with missing Артикул: ${JSON.stringify(row)}`);
                 return null;
             }
 
@@ -150,7 +152,9 @@ export async function uploadWarehouseCsv(
 
         if (itemsToUpsert.length === 0) {
             logger.warn("No valid items to upsert in this batch.");
-            return { success: false, error: "No valid items to upsert in this batch." };
+            return { success: false, error:
+
+"No valid items to upsert in this batch." };
         }
 
         logger.info(`Upserting ${itemsToUpsert.length} items.`);
@@ -201,9 +205,9 @@ export async function exportCurrentStock(items: any[]): Promise<void> {
     const stockData = items.map((item) => ({
       'Артикул': d.id,
       'Название': d.name,
-      'Общее Количество': d.total_quantity,
-      'Локации': d.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
-      'Сезон': d.season || "N/A",
+      'Общее Количество': item.total_quantity,
+      'Локации': item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
+      'Сезон': item.season || "N/A",
       'Узор': d.pattern || "N/A",
       'Цвет': d.color || "N/A",
       'Размер': d.size || "N/A",
