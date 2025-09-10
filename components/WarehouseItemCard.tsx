@@ -21,7 +21,7 @@ interface WarehouseItemCardProps {
 }
 
 export default function WarehouseItemCard({ item, onClick, isHighlighted }: WarehouseItemCardProps) {
-  const tintClass = item.season === 'leto' ? 'opacity-50' : item.season === 'zima' ? 'bg-opacity-75' : '';
+  const tintClass = item.season === 'leto' ? 'opacity-50' : item.season === 'zima' ? 'opacity-75' : '';
 
   return (
     <motion.div
