@@ -12,7 +12,8 @@ import { parse } from "papaparse"; // Correct Import
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
     const baseURL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", ".inmctohsodgdohamhzag.supabase.co") + "/storage/v1/object/public/wb/";
-    const filename = id.replace("1.5", "poltorashka").replace("2", "dvushka").replace(/ /g, "-") + ".jpg";
+    let filename = id.replace(/^1\.5/, "poltorashka").replace(/^2/, "dvushka").replace(/ /g, "-") + ".jpg";
+
     return baseURL + filename;
 };
 
