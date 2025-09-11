@@ -105,7 +105,28 @@ export default function WBPage() {
     [gameMode]
   );
 
-  // file upload (accept csv/txt)
+  // --- Helpers used for sorting locally (copied logic from hook) ---
+  const getSizePriority = (size: string | null): number => {
+    if (!size) return 999;
+    const sizeOrder: { [key: string]: number } = {
+      "1.5": 1,
+      "2": 2,
+      "евро": 3,
+      "евро макси": 4,
+    };
+    return sizeOrder[size] || 5;
+  };
+
+  const getSeasonPriority = (season: string | null): number => {
+    if (!season) return 999;
+    const seasonOrder: { [key: string]: number } = {
+      "лето": 1,
+      "зима": 2,
+    };
+    return seasonOrder[season] || 3;
+  };
+
+  // --- Файловая загрузка/импорт (accept csv/txt) ---
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -273,14 +294,12 @@ export default function WBPage() {
         setSearch("");
         toast.info(`Выберите товар для добавления в ${voxelId}`);
       } else {
-        // open edit modal to adjust quantities (no auto-add/remove)
         setEditVoxel(voxelId);
         setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
         setEditDialogOpen(true);
       }
     } else if (gameMode === "offload") {
       if (content.length > 0) {
-        // don't auto-decrease — open modal so user can pick item or click item card to decrease
         setEditVoxel(voxelId);
         setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
         setEditDialogOpen(true);
@@ -289,7 +308,6 @@ export default function WBPage() {
         toast.info("В этой ячейке нет товаров");
       }
     } else {
-      // no mode selected - just show content if any
       if (content.length > 0) {
         setEditVoxel(voxelId);
         setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
@@ -317,7 +335,6 @@ export default function WBPage() {
       if (loc) {
         const voxel = loc.voxel;
         optimisticUpdate(item.id, voxel, -1);
-        // update selection if became empty
         const postItem = localItems.find((i) => i.id === item.id);
         const postLoc = postItem?.locations?.find((l:any) => l.voxel === voxel);
         if (!postLoc && selectedVoxel === voxel) setSelectedVoxel(null);
@@ -331,11 +348,12 @@ export default function WBPage() {
     handleItemClick(item);
   };
 
+  // localFilteredItems: now respects filters AND sortOption
   const localFilteredItems = useMemo(() => {
     const arr = (localItems || []).filter((item) => {
       const searchLower = (search || "").toLowerCase();
       const matchesSearch =
-        item.name?.toLowerCase().includes(searchLower) ||
+        (item.name || "").toLowerCase().includes(searchLower) ||
         (item.description || "").toLowerCase().includes(searchLower);
 
       const matchesSeason = !filterSeason || item.season === filterSeason;
@@ -345,8 +363,36 @@ export default function WBPage() {
 
       return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
     });
-    return arr;
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize]);
+
+    // apply sorting according to sortOption from hook
+    const sorted = [...arr].sort((a, b) => {
+      switch (sortOption) {
+        case 'size_season_color': {
+          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
+          if (sizeCmp !== 0) return sizeCmp;
+          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
+          if (seasonCmp !== 0) return seasonCmp;
+          return (a.color || "").localeCompare(b.color || "");
+        }
+        case 'color_size': {
+          const colorCmp = (a.color || "").localeCompare(b.color || "");
+          if (colorCmp !== 0) return colorCmp;
+          return getSizePriority(a.size) - getSizePriority(b.size);
+        }
+        case 'season_size_color': {
+          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
+          if (seasonCmp !== 0) return seasonCmp;
+          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
+          if (sizeCmp !== 0) return sizeCmp;
+          return (a.color || "").localeCompare(b.color || "");
+        }
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
 
   const { changedCount: liveChangedCount, totalDelta: liveTotalDelta } = computeProcessedStats();
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
