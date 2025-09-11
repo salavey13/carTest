@@ -1,5 +1,3 @@
-// /components/WarehouseItemCard.tsx
-"use client";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -17,10 +15,9 @@ interface WarehouseItemCardProps {
     season?: string | null;
   };
   onClick: () => void;
-  isHighlighted: boolean;
 }
 
-export default function WarehouseItemCard({ item, onClick, isHighlighted }: WarehouseItemCardProps) {
+export default function WarehouseItemCard({ item, onClick }: WarehouseItemCardProps) {
   const tintClass = item.season === 'leto' ? 'opacity-25' : item.season === 'zima' ? 'opacity-75' : '';
 
   return (
@@ -28,7 +25,6 @@ export default function WarehouseItemCard({ item, onClick, isHighlighted }: Ware
       onClick={onClick}
       className={cn(
         "relative rounded-lg overflow-hidden cursor-pointer text-[8px] h-20",
-        isHighlighted ? "ring-2 ring-yellow-500 animate-pulse" : "",
       )}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
