@@ -45,7 +45,7 @@ export default function WBPage() {
     bossTimer,
     leaderboard,
     loadItems,
-    handleUpdateLocationQty, // still used for server updates (but we also import updateItemLocationQty for direct call)
+    handleUpdateLocationQty,
     handleWorkflowNext,
     handleSkipItem,
     handlePlateClick,
@@ -72,32 +72,24 @@ export default function WBPage() {
   const [isUploading, setIsUploading] = useState(false);
   const isTelegram = !!tg;
 
-  // модалки
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<{ item: any; quantity: number; newQuantity: number }[]>([]);
 
-  // local optimistic items state — чтобы не ждать полной перезагрузки из хука
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
 
-  // Таймеры чекпоинта / статистика
-  const [checkpointStart, setCheckpointStart] = useState<number | null>(null); // millis
-  const [tick, setTick] = useState(0); // форс-обновление каждую секунду
-  const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null); // сек
+  const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
 
-  // Синхронизация hookItems -> localItems, но только если hookItems реально изменились (например загрузка initial)
-  useEffect(() => {
-    setLocalItems(hookItems || []);
-  }, [hookItems]);
+  useEffect(() => setLocalItems(hookItems || []), [hookItems]);
 
   useEffect(() => {
     loadItems();
     if (error) toast.error(error);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, loadItems]);
 
-  // тикер 1s для обновления UI (показывает live секунды с чекпоинта)
   useEffect(() => {
     const iv = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(iv);
@@ -113,7 +105,7 @@ export default function WBPage() {
     [gameMode]
   );
 
-  // ----------------- FILE UPLOAD -----------------
+  // file upload (accept csv/txt)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -122,13 +114,11 @@ export default function WBPage() {
     reader.onload = async (event) => {
       try {
         const text = (event.target?.result as string) || "";
-        // papaparse разбирает CSV/TXT
         const parsed = parse(text, { header: true, skipEmptyLines: true }).data as any[];
         const result = await uploadWarehouseCsv(parsed, user?.id);
         setIsUploading(false);
         if (result.success) {
           toast.success(result.message || "CSV uploaded!");
-          // получаем свежие данные с бэка асинхронно
           await loadItems();
         } else {
           toast.error(result.error || "Ошибка загрузки CSV");
@@ -141,7 +131,7 @@ export default function WBPage() {
     reader.readAsText(file);
   };
 
-  // ----------------- OPTIMISTIC UPDATE (local UI fast update) -----------------
+  // optimistic update helper (keeps UI instant)
   const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
@@ -149,39 +139,25 @@ export default function WBPage() {
         const locs = (i.locations || []).map((l: any) => ({ ...l }));
         const idx = locs.findIndex((l: any) => l.voxel === voxelId);
         if (idx === -1) {
-          if (delta > 0) {
-            locs.push({ voxel: voxelId, quantity: delta });
-          }
+          if (delta > 0) locs.push({ voxel: voxelId, quantity: delta });
         } else {
           locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
         }
         const filtered = locs.filter((l) => (l.quantity || 0) > 0);
         const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
-        return {
-          ...i,
-          locations: filtered,
-          total_quantity: total,
-        };
+        return { ...i, locations: filtered, total_quantity: total };
       })
     );
-    // Background update to server (don't await to keep UI snappy)
     updateItemLocationQty(itemId, voxelId, delta).then((res) => {
       if (!res.success) {
-        toast.error(res.error || "Ошибка обновления на сервере");
-        // Re-sync from server if server failed
+        toast.error(res.error || "Ошибка сервера при обновлении");
         loadItems();
-      } else {
-        // optionally could re-sync small diff, but we keep optimistic UI
       }
-    }).catch((err) => {
-      console.error("updateItemLocationQty error:", err);
-      loadItems();
-    });
+    }).catch(() => loadItems());
   };
 
-  // ----------------- Checkpoint flow -----------------
   const handleCheckpoint = () => {
-    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l: any) => ({ ...l })) })));
+    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l:any)=>({...l})) })));
     setCheckpointStart(Date.now());
     setLastCheckpointDurationSec(null);
     setLastProcessedCount(null);
@@ -193,12 +169,10 @@ export default function WBPage() {
       toast.error("Нет сохранённого чекпоинта");
       return;
     }
-    // Восстанавливаем локально
-    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) })));
+    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l:any)=>({...l})) })));
     toast.success("Reset to checkpoint!");
   };
 
-  // processed stats относительно checkpoint — используем localItems
   const computeProcessedStats = useCallback(() => {
     if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0 };
     const changedCount = (localItems || []).reduce((acc, it) => {
@@ -212,12 +186,11 @@ export default function WBPage() {
     return { changedCount, totalDelta };
   }, [localItems, checkpoint]);
 
-  // ----------------- EXPORTS (stop timer on export) -----------------
   const handleExportDiff = async () => {
     const diffData = (localItems || [])
       .flatMap((item) =>
         (item.locations || [])
-          .map((loc: any) => {
+          .map((loc:any) => {
             const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
             const diffQty = loc.quantity - (checkpointLoc?.quantity || 0);
             return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
@@ -283,11 +256,12 @@ export default function WBPage() {
     return `${mm}:${ss}`;
   };
 
-  // ----------------- Plate & Item click handlers (use optimisticUpdate) -----------------
+  // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
   const handlePlateClickCustom = (voxelId: string) => {
     handlePlateClick(voxelId);
+
     const content = localItems
-      .flatMap((i) => (i.locations || []).filter((l: any) => l.voxel === voxelId && (l.quantity || 0) > 0).map((l) => ({ item: i, quantity: l.quantity })));
+      .flatMap((i) => i.locations.filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0).map((l:any) => ({ item: i, quantity: l.quantity })));
 
     if (gameMode === "onload") {
       if (content.length === 0) {
@@ -299,22 +273,34 @@ export default function WBPage() {
         setSearch("");
         toast.info(`Выберите товар для добавления в ${voxelId}`);
       } else {
+        // open edit modal to adjust quantities (no auto-add/remove)
         setEditVoxel(voxelId);
         setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
         setEditDialogOpen(true);
       }
     } else if (gameMode === "offload") {
       if (content.length > 0) {
-        const { item } = content[0];
-        if (content[0].quantity > 0) {
-          optimisticUpdate(item.id, voxelId, -1);
-        }
+        // don't auto-decrease — open modal so user can pick item or click item card to decrease
+        setEditVoxel(voxelId);
+        setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
+        setEditDialogOpen(true);
+        toast.info("Касание по карточке товара списывает позицию. Плитка только открывает обзор.");
       } else {
         toast.info("В этой ячейке нет товаров");
+      }
+    } else {
+      // no mode selected - just show content if any
+      if (content.length > 0) {
+        setEditVoxel(voxelId);
+        setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
+        setEditDialogOpen(true);
+      } else {
+        setSelectedVoxel(voxelId);
       }
     }
   };
 
+  // item click still does qty changes (optimistic)
   const handleItemClickCustom = async (item: any) => {
     if (!item) return;
 
@@ -327,16 +313,14 @@ export default function WBPage() {
     }
 
     if (gameMode === "offload") {
-      const loc = (item.locations || []).find((l: any) => (l.quantity || 0) > 0);
+      const loc = (item.locations || []).find((l:any) => (l.quantity || 0) > 0);
       if (loc) {
         const voxel = loc.voxel;
         optimisticUpdate(item.id, voxel, -1);
-        // Проверим локально — если стало пусто, сброс выделения
+        // update selection if became empty
         const postItem = localItems.find((i) => i.id === item.id);
-        const postLoc = postItem?.locations?.find((l: any) => l.voxel === voxel);
-        if (!postLoc && selectedVoxel === voxel) {
-          setSelectedVoxel(null);
-        }
+        const postLoc = postItem?.locations?.find((l:any) => l.voxel === voxel);
+        if (!postLoc && selectedVoxel === voxel) setSelectedVoxel(null);
         toast.success(`Выдано из ${voxel}`);
       } else {
         toast.error("Нет товара на складе");
@@ -347,7 +331,6 @@ export default function WBPage() {
     handleItemClick(item);
   };
 
-  // ----------------- Local filtering for list view (simple copy of hook filters) -----------------
   const localFilteredItems = useMemo(() => {
     const arr = (localItems || []).filter((item) => {
       const searchLower = (search || "").toLowerCase();
@@ -365,7 +348,6 @@ export default function WBPage() {
     return arr;
   }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize]);
 
-  // live stats
   const { changedCount: liveChangedCount, totalDelta: liveTotalDelta } = computeProcessedStats();
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
 
@@ -373,7 +355,7 @@ export default function WBPage() {
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="p-2 flex flex-col gap-2">
         <div className="flex justify-between items-center gap-2">
-          <Select value={gameMode || ""} onValueChange={(v: any) => setGameMode(v || null)}>
+          <Select value={gameMode || ""} onValueChange={(v:any)=> setGameMode(v || null)}>
             <SelectTrigger className="w-24 text-[10px]">
               <SelectValue placeholder="Режим" />
             </SelectTrigger>
@@ -407,13 +389,7 @@ export default function WBPage() {
           filterSize={filterSize}
           setFilterSize={setFilterSize}
           items={localItems}
-          onResetFilters={() => {
-            setFilterSeason(null);
-            setFilterPattern(null);
-            setFilterColor(null);
-            setFilterSize(null);
-            setSearch("");
-          }}
+          onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
           includeSearch={true}
           search={search}
           setSearch={setSearch}
@@ -487,10 +463,7 @@ export default function WBPage() {
           items={localItems}
           selectedVoxel={selectedVoxel}
           onSelectVoxel={setSelectedVoxel}
-          onUpdateLocationQty={(itemId:string, voxelId:string, qty:number) => {
-            // For compatibility; do optimisticUpdate
-            optimisticUpdate(itemId, voxelId, qty);
-          }}
+          onUpdateLocationQty={(itemId:string, voxelId:string, qty:number) => optimisticUpdate(itemId, voxelId, qty)}
           gameMode={gameMode}
           onPlateClick={handlePlateClickCustom}
         />
