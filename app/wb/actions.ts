@@ -7,7 +7,6 @@ import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
 import { parse } from "papaparse";
-import Papa from "papaparse";
 
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
@@ -34,22 +33,23 @@ const deriveFieldsFromId = (id: string) => {
     } else if (parts[0] === 'евро' && parts[1] === 'макси') {
         model = 'Евро Макси';
         parts.shift(); // Remove 'евро'
-    } else if (parts[0] === 'наматрасник.') {
+    } else if (parts[0].startsWith('наматрасник.')) {
         model = 'Наматрасник';
-        const size = parts[1].replace('.', '');
-        const pattern = parts[2];
-        specs.size = size;
+        const sizePart = parts[0].split('.')[1];
+        const pattern = parts[1] || '';
+        specs.size = sizePart;
         specs.pattern = pattern;
         specs.season = null;
-        specs.color = parseInt(size) >= 160 ? 'dark-green' : 'light-green';
-        description = parseInt(size) >= 160 ? 'Темно-зеленый, большой' : 'Салатовый, маленький';
-        return { model, make: `${size.charAt(0).toUpperCase() + size.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`, description, specs };
+        specs.color = parseInt(sizePart, 10) >= 160 ? 'dark-green' : 'light-green';
+        description = parseInt(sizePart, 10) >= 160 ? 'Темно-зеленый, большой' : 'Салатовый, маленький';
+        make = `${sizePart.charAt(0).toUpperCase() + sizePart.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`;
+        return { model, make, description, specs };
     } else {
         model = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
     }
 
     // Make - rest capitalized
-    make = parts.slice(1).map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    make = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 
     // Description hardcoded
     switch (model.toLowerCase()) {
@@ -78,12 +78,13 @@ const deriveFieldsFromId = (id: string) => {
             specs.color = 'green';
             break;
     }
-    // Season/pattern
+
+    // Season/pattern in russian
     if (parts.includes('зима')) {
-        specs.season = 'zima';
+        specs.season = 'зима';
         description += ', полузакрытая';
     } else if (parts.includes('лето')) {
-        specs.season = 'leto';
+        specs.season = 'лето';
         description += ', полосочка';
     }
     specs.pattern = parts[parts.length - 1].replace(/[0-9]/g, '').trim();
@@ -91,7 +92,7 @@ const deriveFieldsFromId = (id: string) => {
     return { model, make, description, specs };
 };
 
-async function getWarehouseItems(): Promise<{
+export async function getWarehouseItems(): Promise<{
     success: boolean;
     data?: WarehouseItem[];
     error?: string;
@@ -104,6 +105,7 @@ async function getWarehouseItems(): Promise<{
             .eq("type", "wb_item")
             .order("model");
         if (error) throw error;
+        logger.info(`Fetched ${data?.length || 0} warehouse items from Supabase.`);
         return { success: true, data };
     } catch (error) {
         logger.error("[getWarehouseItems] Error:", error);
@@ -137,13 +139,16 @@ export async function uploadWarehouseCsv(
     }
 
     try {
-        // Fetch existing items
         const itemIds = batch.map((row: any) => (row["Артикул"] || row["id"])?.toLowerCase()).filter(Boolean);
+        logger.info(`Fetching existing items for ${itemIds.length} IDs.`);
         const { data: existingItems } = await supabaseAdmin.from("cars").select("*").in("id", itemIds);
 
         const itemsToUpsert = batch.map((row: any) => {
             const itemId = (row["Артикул"] || row["id"])?.toLowerCase();
-            if (!itemId) return null;
+            if (!itemId) {
+                logger.warn(`Skipping row without id/Артикул: ${JSON.stringify(row)}`);
+                return null;
+            }
 
             const existingItem = existingItems?.find(item => item.id === itemId);
 
@@ -152,14 +157,7 @@ export async function uploadWarehouseCsv(
             let model = row.model || derived.model || "Unknown Model";
             let description = row.description || derived.description || "No Description";
 
-            let specs = {};
-            if (row.specs) {
-                try {
-                    specs = JSON.parse(row.specs);
-                } catch {}
-            } else {
-                specs = derived.specs;
-            }
+            let specs = row.specs ? JSON.parse(row.specs) : derived.specs;
 
             let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
             if (!specs.warehouse_locations || specs.warehouse_locations.length === 0) {
@@ -181,31 +179,43 @@ export async function uploadWarehouseCsv(
 
             if (existingItem) {
                 itemToUpsert.specs = { ...existingItem.specs, ...itemToUpsert.specs };
+                itemToUpsert.quantity = quantity; // Update total
             }
 
+            logger.info(`Prepared upsert for ${itemId}: quantity ${quantity}`);
             return itemToUpsert;
         }).filter(Boolean);
 
         if (itemsToUpsert.length === 0) return { success: false, error: "No valid items" };
 
+        logger.info(`Upserting ${itemsToUpsert.length} items to Supabase.`);
         const { error } = await supabaseAdmin.from("cars").upsert(itemsToUpsert, { onConflict: "id" });
         if (error) throw error;
 
         return { success: true, message: `Upserted ${itemsToUpsert.length} items.` };
     } catch (error) {
+        logger.error("Upload error:", error);
         return { success: false, error: (error as Error).message };
     }
 }
 
-export async function exportDiffToAdmin(diffData: any[], isTelegram: boolean = false): Promise<{ success: boolean; csv?: string }> {
-  const csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
+export async function exportDiffToAdmin(diffData: any[], isTelegram: boolean = false, summarized: boolean = false): Promise<{ success: boolean; csv?: string }> {
+  let csvData;
+  if (summarized) {
+    csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
+      'Артикул': d.id,
+      'Количество': d.diffQty,
+    })), { header: true, delimiter: ',', quotes: true });
+  } else {
+    csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
       'Артикул': d.id,
       'Изменение': d.diffQty,
       'Ячейка': d.voxel
     })), { header: true, delimiter: ',', quotes: true });
+  }
 
   if (isTelegram) {
-    return { success: true, csv: csvData }; // Return for clipboard
+    return { success: true, csv: csvData };
   } else {
     await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
       attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
@@ -214,8 +224,16 @@ export async function exportDiffToAdmin(diffData: any[], isTelegram: boolean = f
   }
 }
 
-export async function exportCurrentStock(items: any[], isTelegram: boolean = false): Promise<{ success: boolean; csv?: string }> {
-  const stockData = items.map((item) => ({
+export async function exportCurrentStock(items: any[], isTelegram: boolean = false, summarized: boolean = false): Promise<{ success: boolean; csv?: string }> {
+  let csvData;
+  if (summarized) {
+    const stockData = items.map((item) => ({
+      'Артикул': item.id,
+      'Количество': item.total_quantity,
+    }));
+    csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
+  } else {
+    const stockData = items.map((item) => ({
       'Артикул': item.id,
       'Название': item.name,
       'Общее Количество': item.total_quantity,
@@ -225,7 +243,8 @@ export async function exportCurrentStock(items: any[], isTelegram: boolean = fal
       'Цвет': item.color || "N/A",
       'Размер': item.size || "N/A",
     }));
-  const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
+    csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
+  }
 
   if (isTelegram) {
     return { success: true, csv: csvData };

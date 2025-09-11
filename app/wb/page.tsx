@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { FileUp, Download, Save, RotateCcw, Upload } from "lucide-react";
+import { FileUp, Download, Save, RotateCcw, Upload, FileText } from "lucide-react";
 import { useWarehouse } from "@/hooks/useWarehouse";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -18,6 +18,7 @@ import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { VOXELS } from "@/app/wb/common";
 import { useAppContext } from "@/contexts/AppContext";
+import Link from "next/link";
 
 const DEFAULT_CSV = `Артикул,Изменение,Ячейка
 евро лето кружева,2,A1
@@ -77,7 +78,7 @@ export default function WBPage() {
   const isTelegram = !!tg;
 
   useEffect(() => {
-    loadItems(); // Ensure load on mount
+    loadItems();
     if (error) toast.error(error);
   }, [error, loadItems]);
 
@@ -94,7 +95,7 @@ export default function WBPage() {
         setIsUploading(false);
         if (result.success) {
           toast.success(result.message || "CSV uploaded!");
-          loadItems(); // Reload after upload
+          loadItems();
         } else {
           toast.error(result.error);
         }
@@ -141,11 +142,19 @@ export default function WBPage() {
     }
   };
 
-  const handleExportStock = async () => {
-    const result = await exportCurrentStock(items, isTelegram);
+  const handleExportStock = async (summarized = false) => {
+    const result = await exportCurrentStock(items, isTelegram, summarized);
     if (isTelegram && result.csv) {
       navigator.clipboard.writeText(result.csv);
       toast.success("CSV скопирован в буфер обмена!");
+    } else if (result.csv) {
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
+      a.click();
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -199,9 +208,9 @@ export default function WBPage() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
-  const [editContents, setEditContents] = useState<any[]>([]); // Content type from common
+  const [editContents, setEditContents] = useState<any[]>([]);
 
-const handleResetFilters = () => {
+  const handleResetFilters = () => {
     setFilterSeason(null);
     setFilterPattern(null);
     setFilterColor(null);
@@ -225,10 +234,14 @@ const handleResetFilters = () => {
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><Download size={12} /></Button>
-          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportStock}><FileUp size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock()}><FileUp size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
           <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv" />
           <Button size="sm" variant="outline" className="text-[10px]" onClick={handleTestImport} disabled={isUploading}>Тест CSV</Button>
+          <Link href="/csv-compare">
+            <Button size="sm" variant="outline" className="text-[10px]">CSV Сравнение</Button>
+          </Link>
         </div>
         <FilterAccordion
           filterSeason={filterSeason}

@@ -56,29 +56,40 @@ export function useWarehouse() {
   const loadItems = useCallback(async () => {
     setLoading(true);
     const { success, data, error: fetchError } = await getWarehouseItems();
+    logger.info(`loadItems: Fetch success: ${success}, items count: ${data?.length || 0}, error: ${fetchError || 'none'}`);
 
     if (success && data) {
-      const mappedItems: Item[] = data.map((i: WarehouseItem) => ({
-        id: i.id,
-        name: `${i.make} ${i.model}`,
-        description: i.description,
-        image: i.image_url,
-        locations: i.specs?.warehouse_locations?.map((l: any) => ({
+      const mappedItems: Item[] = data.map((i: WarehouseItem) => {
+        const locations = i.specs?.warehouse_locations?.map((l: any) => ({
           voxel: l.voxel_id,
           quantity: l.quantity,
           min_qty: l.voxel_id.startsWith("B") ? 3 : undefined,
-        })) || [],
-        total_quantity: i.quantity || i.specs?.warehouse_locations?.reduce((acc: number, l: any) => acc + l.quantity, 0) || 0,
-        season: i.specs?.season || null,
-        pattern: i.specs?.pattern,
-        color: i.specs?.color || "gray",
-        size: i.specs?.size || "",
-      }));
+        })) || [];
+        const sumQty = locations.reduce((acc, l) => acc + l.quantity, 0);
+        const total = i.quantity || sumQty || 0;
+        return {
+          id: i.id,
+          name: `${i.make} ${i.model}`,
+          description: i.description,
+          image: i.image_url,
+          locations,
+          total_quantity: total,
+          season: i.specs?.season || null,
+          pattern: i.specs?.pattern,
+          color: i.specs?.color || "gray",
+          size: i.specs?.size || "",
+        };
+      });
+      logger.info(`loadItems: Mapped ${mappedItems.length} items. Sample: ${JSON.stringify(mappedItems[0] || 'none')}`);
       setItems(mappedItems);
       setCheckpoint(mappedItems.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
+      if (mappedItems.length === 0) {
+        toast.warning("Нет товаров в складе. Загрузите CSV.");
+      }
       setLoading(false);
     } else {
       setError(fetchError || "Failed to load items");
+      toast.error(fetchError || "Ошибка загрузки товаров");
       setLoading(false);
     }
   }, []);
@@ -90,8 +101,9 @@ export function useWarehouse() {
   }, [loadItems]);
 
   const handleUpdateLocationQty = useCallback(
-    async (itemId: string, voxelId: string, quantity: number, isGameAction: boolean = false) => {
-      const { success, error: updateError } = await updateItemLocationQty(itemId, voxelId, quantity);
+    async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
+      logger.info(`Updating qty for ${itemId} in ${voxelId} by ${delta}`);
+      const { success, error: updateError } = await updateItemLocationQty(itemId, voxelId, delta);
       if (success) {
         setItems((prev) =>
           prev.map((i) =>
@@ -99,12 +111,9 @@ export function useWarehouse() {
               ? {
                   ...i,
                   locations: i.locations.map((l) =>
-                    l.voxel === voxelId ? { ...l, quantity: Math.max(0, l.quantity + quantity) } : l, // Delta
+                    l.voxel === voxelId ? { ...l, quantity: Math.max(0, l.quantity + delta) } : l,
                   ).filter((l) => l.quantity > 0),
-                  total_quantity: i.locations.reduce(
-                    (acc, l) => acc + (l.voxel === voxelId ? Math.max(0, l.quantity + quantity) : l.quantity),
-                    0,
-                  ),
+                  total_quantity: i.total_quantity + delta,
                 }
               : i,
           ),
