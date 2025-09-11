@@ -66,7 +66,7 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
 
 
 
-ChatGPT4 | Midjourney:
+
 export async function uploadWarehouseCsv(
     batch: any[],
     userId: string | undefined
