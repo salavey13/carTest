@@ -66,7 +66,7 @@ export function useWarehouse() {
           min_qty: l.voxel_id.startsWith("B") ? 3 : undefined,
         })) || [];
         const sumQty = locations.reduce((acc, l) => acc + l.quantity, 0);
-        const total = i.quantity || sumQty || 0;
+        const total = sumQty || 0; // Ignore i.quantity, always use sum to avoid mismatches
         return {
           id: i.id,
           name: `${i.make} ${i.model}`,
@@ -210,14 +210,19 @@ export function useWarehouse() {
       );
       if (gameMode === "onload") {
         if (content.length === 0) {
-          // Logic in page
+          // Add to random item in this voxel (create new location)
+          const randomItem = items[Math.floor(Math.random() * items.length)];
+          handleUpdateLocationQty(randomItem.id, voxelId, 1, true);
         } else {
-          // Logic in page
+          // Add to random existing item in this voxel
+          const { item } = content[Math.floor(Math.random() * content.length)];
+          handleUpdateLocationQty(item.id, voxelId, 1, true);
         }
       } else if (gameMode === "offload") {
         if (content.length > 0) {
-          const { item, quantity } = content[0];
-          handleUpdateLocationQty(item.id, voxelId, -1, true); // Delta -1 for offload
+          // Subtract from random item in this voxel
+          const { item } = content[Math.floor(Math.random() * content.length)];
+          handleUpdateLocationQty(item.id, voxelId, -1, true);
         }
       }
     },
@@ -226,17 +231,32 @@ export function useWarehouse() {
 
   const handleItemClick = useCallback(
     (item: Item) => {
+      const delta = gameMode === "onload" ? 1 : -1;
+      let voxel: string | null = null;
+
       if (gameMode === "onload") {
-        if (item.locations.length === 0) return toast.error("No location for item");
-        const primaryLoc = item.locations[0];
-        handleUpdateLocationQty(item.id, primaryLoc.voxel, 1, true); // Delta +1
+        voxel = selectedVoxel || item.locations[0]?.voxel || "A1";
       } else if (gameMode === "offload") {
-        if (item.locations.length === 0) return toast.error("No location for item");
-        const primaryLoc = item.locations[0];
-        handleUpdateLocationQty(item.id, primaryLoc.voxel, -1, true); // Delta -1
+        if (selectedVoxel) {
+          const loc = item.locations.find((l) => l.voxel === selectedVoxel);
+          if (loc && loc.quantity > 0) {
+            voxel = selectedVoxel;
+          } else {
+            return toast.error("Товар отсутствует в выбранной ячейке");
+          }
+        } else {
+          if (item.locations.length === 0 || item.total_quantity <= 0) {
+            return toast.error("Нет локаций или количества для выгрузки");
+          }
+          voxel = item.locations[0].voxel;
+        }
+      }
+
+      if (voxel) {
+        handleUpdateLocationQty(item.id, voxel, delta, true);
       }
     },
-    [gameMode, handleUpdateLocationQty],
+    [gameMode, selectedVoxel, handleUpdateLocationQty],
   );
 
   // Filters
