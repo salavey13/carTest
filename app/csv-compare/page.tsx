@@ -5,17 +5,20 @@ import { parse, unparse } from "papaparse";
 import { toast } from "sonner";
 import { uploadWarehouseCsv } from "@/app/wb/actions";
 import { useAppContext } from "@/contexts/AppContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Clipboard, Download, Upload } from "lucide-react";
 
 interface InventoryItem {
     id: string;
     quantity: number;
 }
 
-// Define a more specific type for your CSV data
 interface CsvRow {
     Артикул: string;
     Количество: string;
-    [key: string]: string; // Allow other columns
+    [key: string]: string;
 }
 
 const CSVCompare = () => {
@@ -54,17 +57,13 @@ const CSVCompare = () => {
                                 }
                             }
                         } catch (e) {
-                            // if specs is not an JSON, try to parse value from row.quantity, example: row["warehouse_locations"]
                             try {
-
                                 if (row["warehouse_locations"]) {
                                     quantity = parseInt(row["warehouse_locations"].toString(), 10) || 0;
                                 } 
-}catch (ee: any) {
-            toast.error(ee?.message || "Error during upload.");
-            console.error("Upload Error:", ee);
-            
-            
+                            } catch (ee: any) {
+                                toast.error(ee?.message || "Ошибка при загрузке.");
+                                console.error("Ошибка загрузки:", ee);
                             }
                         }
 
@@ -83,8 +82,8 @@ const CSVCompare = () => {
                     setInventory(inventoryList);
                 },
                 error: (error) => {
-                    console.error("CSV parsing error:", error);
-                    alert("Error parsing CSV. Check console for details.");
+                    console.error("Ошибка парсинга CSV:", error);
+                    toast.error("Ошибка парсинга CSV. Проверьте консоль.");
                 },
             });
         },
@@ -103,10 +102,10 @@ const CSVCompare = () => {
         const diffCounts: { [id: string]: number } = {};
 
         if (addedItems.length > 0) {
-            diffs.push(`Added items: ${addedItems.join(", ")}`);
+            diffs.push(`Добавленные товары: ${addedItems.join(", ")}`);
         }
         if (removedItems.length > 0) {
-            diffs.push(`Removed items: ${removedItems.join(", ")}`);
+            diffs.push(`Удаленные товары: ${removedItems.join(", ")}`);
         }
 
         modifiedItems.forEach((id) => {
@@ -116,15 +115,14 @@ const CSVCompare = () => {
             const qty2 = item2?.quantity || 0;
             const diff = qty2 - qty1;
             if (diff !== 0) {
-                diffs.push(`${id}: ${qty1} -> ${qty2} (Diff: ${diff})`);
-                diffCounts[id] = diff; // Store the difference
+                diffs.push(`${id}: ${qty1} -> ${qty2} (Разница: ${diff})`);
+                diffCounts[id] = diff;
             }
         });
 
         setDifferences(diffs);
-        setDiffCounts(diffCounts); // Update diffCounts state
+        setDiffCounts(diffCounts);
 
-        // Basic analytics: Most popular items (example)
         const allItems = [...inventory1, ...inventory2];
         const itemCount: { [id: string]: number } = {};
 
@@ -134,7 +132,7 @@ const CSVCompare = () => {
 
         const sortedItems = Object.entries(itemCount)
             .sort(([, countA], [, countB]) => countB - countA)
-            .slice(0, 13) // Top 13
+            .slice(0, 13)
             .map(([id, count]) => ({ id, count }));
         setPopularItems(sortedItems);
     }, [inventory1, inventory2]);
@@ -156,7 +154,7 @@ const CSVCompare = () => {
         includeZeroQuantities: boolean = false
     ): string => {
         const csvData = inventory
-            .filter((item) => includeZeroQuantities || item.quantity > 0) // Apply filter
+            .filter((item) => includeZeroQuantities || item.quantity > 0)
             .map((item) => ({
                 Артикул: item.id,
                 Количество: item.quantity,
@@ -170,81 +168,76 @@ const CSVCompare = () => {
     const handleUploadToSupabase = useCallback(async () => {
         setUploading(true);
         try {
-            const csvData = csv2;  // Directly using the CSV 2 content
+            const csvData = csv2;
             if (!csvData.trim()) {
-                toast.error("No data to upload.");
+                toast.error("Нет данных для загрузки.");
                 return;
             }
-            const cleanCsvData = csvData.replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove zero-width spaces and BOM
+            const cleanCsvData = csvData.replace(/[\u200B-\u200D\uFEFF]/g, '');
 
-            // Define processData inside the useCallback to ensure it's created before parse
             const processData = async (data: CsvRow[]) => {
                 const BATCH_SIZE = 13;
                 const rows = data;
 
                 for (let i = 0; i < rows.length; i += BATCH_SIZE) {
                     const batch = rows.slice(i, i + BATCH_SIZE);
-                   //** CRITICAL AWAIT **//
                     const result = await uploadWarehouseCsv(batch, user?.id);
 
                     if (!result.success) {
-                        toast.error(result.error || "Failed to upload batch to Supabase.");
+                        toast.error(result.error || "Ошибка загрузки партии в Supabase.");
                         setUploading(false);
                         return;
                     } else {
                         console.log(
-                            `Uploaded batch ${i / BATCH_SIZE + 1}/${Math.ceil(
+                            `Загружена партия ${i / BATCH_SIZE + 1}/${Math.ceil(
                                 rows.length / BATCH_SIZE
                             )}`
                         );
                     }
                 }
 
-                toast.success("All data uploaded to Supabase!");
-                setUploading(false); // Set uploading to false only after successful completion
+                toast.success("Все данные загружены в Supabase!");
+                setUploading(false);
             };
 
-            // Parse the CSV data using PapaParse
             const parsedCsv = parse<CsvRow>(cleanCsvData, {
                 header: true,
                 skipEmptyLines: true,
-                dynamicTyping: false, // Important for avoiding type conversion issues
-                quoteChar: '"', // Specify the quote character
-                escapeChar: '\\', // Specify the escape character
-                strict: false, // Disable strict mode to handle malformed quotes
+                dynamicTyping: false,
+                quoteChar: '"',
+                escapeChar: '\\',
+                strict: false,
                 complete: (results) => {
                     if (results.errors.length > 0) {
-                        console.warn("CSV Parsing Errors:", results.errors);  // Log ALL errors
+                        console.warn("Ошибки парсинга CSV:", results.errors);
 
-                        // Attempt to recover:  Filter out rows with errors.  This MIGHT lose data.
                         const validData = results.data.filter((row, index) => {
                             return !results.errors.some(err => err.row === index);
                         });
 
                         if (validData.length === 0) {
-                            toast.error("No valid data after error recovery.");
+                            toast.error("Нет валидных данных после восстановления.");
                             setUploading(false);
                             return;
                         }
 
-                        // Proceed with `validData` instead of `results.data`
-                        processData(validData); // Call function to process the (potentially) filtered data.
+                        processData(validData);
                     } else {
-                        processData(results.data);  // No errors, proceed as normal
+                        processData(results.data);
                     }
                 },
                 error: (error) => {
-                    console.error("CSV parsing error:", error);
-                    toast.error(`CSV Parsing Error: ${error.message}`);
+                    console.error("Ошибка парсинга CSV:", error);
+                    toast.error(`Ошибка парсинга CSV: ${error.message}`);
                     setUploading(false);
                 }
             });
         } catch (err: any) {
-            toast.error(err?.message || "Error during upload.");
-            console.error("Upload Error:", err);
+            toast.error(err?.message || "Ошибка при загрузке.");
+            console.error("Ошибка загрузки:", err);
             setUploading(false);
         }
-    }, [csv2, user, uploadWarehouseCsv, toast]); // Add dependencies for useCallback
+    }, [csv2, user, uploadWarehouseCsv, toast]);
 
     const filteredInventory1 = hideZeroQuantity
         ? inventory1.filter((item) => item.quantity > 0)
@@ -254,29 +247,47 @@ const CSVCompare = () => {
         : inventory2;
 
     return (
-        
-            <div className="container mx-auto p-4 pt-24">
-                <h1 className="text-2xl font-bold mb-4">CSV Inventory Comparison</h1>
+        <div className="container mx-auto p-4 pt-24 max-w-4xl">
+            <h1 className="text-2xl font-bold mb-4 text-center">Сравнение инвентаря CSV</h1>
+            
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle>Инструкции</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ul className="list-disc pl-5 space-y-2">
+                        <li>Вставьте содержимое первого CSV в левое поле, второго - в правое.</li>
+                        <li>Нажмите "Сравнить инвентари" для анализа различий.</li>
+                        <li>Используйте чекбокс для скрытия нулевых количеств.</li>
+                        <li>Экспорт списков в CSV для скачивания.</li>
+                        <li>Загрузка второго CSV в Supabase для обновления склада (только админы).</li>
+                        <li>Топ-13 популярных товаров и таблица различий отображаются после сравнения.</li>
+                    </ul>
+                </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <h2 className="text-lg font-semibold mb-2">CSV 1</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>CSV 1 (Старый)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <textarea
-                            className="w-full h-64 p-2 border rounded"
-                            placeholder="Paste CSV 1 content here"
+                            className="w-full h-64 p-2 border rounded resize-y"
+                            placeholder="Вставьте содержимое CSV 1 здесь"
                             value={csv1}
                             onChange={handleCsv1Change}
                         />
-                        <h3 className="text-md font-semibold mt-2">Inventory 1</h3>
-                        <ul>
+                        <h3 className="text-md font-semibold mt-2">Инвентарь 1</h3>
+                        <ul className="max-h-32 overflow-y-auto">
                             {filteredInventory1.map((item) => (
                                 <li key={item.id}>
                                     {item.id}: {item.quantity}
                                 </li>
                             ))}
                         </ul>
-                        <button
-                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
+                        <Button
+                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2 w-full"
                             onClick={() => {
                                 const csv = inventoryToCsv(inventory1);
                                 const blob = new Blob([csv], { type: "text/csv" });
@@ -290,28 +301,32 @@ const CSVCompare = () => {
                                 window.URL.revokeObjectURL(url);
                             }}
                         >
-                            List to CSV 1
-                        </button>
-                    </div>
+                            <Download className="mr-2 h-4 w-4" /> Экспорт CSV 1
+                        </Button>
+                    </CardContent>
+                </Card>
 
-                    <div>
-                        <h2 className="text-lg font-semibold mb-2">CSV 2</h2>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>CSV 2 (Новый)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <textarea
-                            className="w-full h-64 p-2 border rounded"
-                            placeholder="Paste CSV 2 content here"
+                            className="w-full h-64 p-2 border rounded resize-y"
+                            placeholder="Вставьте содержимое CSV 2 здесь"
                             value={csv2}
                             onChange={handleCsv2Change}
                         />
-                        <h3 className="text-md font-semibold mt-2">Inventory 2</h3>
-                        <ul>
+                        <h3 className="text-md font-semibold mt-2">Инвентарь 2</h3>
+                        <ul className="max-h-32 overflow-y-auto">
                             {filteredInventory2.map((item) => (
                                 <li key={item.id}>
                                     {item.id}: {item.quantity}
                                 </li>
                             ))}
                         </ul>
-                        <button
-                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
+                        <Button
+                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2 w-full"
                             onClick={() => {
                                 const csv = inventoryToCsv(inventory2);
                                 const blob = new Blob([csv], { type: "text/csv" });
@@ -325,84 +340,115 @@ const CSVCompare = () => {
                                 window.URL.revokeObjectURL(url);
                             }}
                         >
-                            List to CSV 2
-                        </button>
-                    </div>
-                </div>
+                            <Download className="mr-2 h-4 w-4" /> Экспорт CSV 2
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
 
-                <div className="mb-4">
-                    <label className="inline-flex items-center">
-                        <input
-                            type="checkbox"
-                            className="mr-2"
-                            checked={hideZeroQuantity}
-                            onChange={(e) => setHideZeroQuantity(e.target.checked)}
-                        />
-                        <span className="text-gray-700">Hide 0 Quantity Items</span>
-                    </label>
-                </div>
-
-                <button
-                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            <div className="mb-4 flex items-center space-x-4">
+                <label className="inline-flex items-center">
+                    <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={hideZeroQuantity}
+                        onChange={(e) => setHideZeroQuantity(e.target.checked)}
+                    />
+                    <span className="text-gray-700">Скрыть товары с 0 количеством</span>
+                </label>
+                <Button
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1"
                     onClick={compareInventories}
                 >
-                    Compare Inventories
-                </button>
+                    Сравнить инвентари
+                </Button>
+            </div>
 
-                {differences.length > 0 && (
-                    <div className="mt-4">
-                        <h2 className="text-xl font-semibold">Differences</h2>
-                        <ul>
+            {differences.length > 0 && (
+                <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>Различия</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ul className="space-y-1">
                             {differences.map((diff, index) => (
                                 <li key={index}>{diff}</li>
                             ))}
                         </ul>
-                    </div>
-                )}
+                    </CardContent>
+                </Card>
+            )}
 
-                {popularItems.length > 0 && (
-                    <div className="mt-4">
-                        <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
-                        <ul>
-                            {popularItems.map((item, index) => (
-                                <li key={index}>
-                                    {item.id}: {item.count}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
+            {popularItems.length > 0 && (
+                <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>Самые популярные товары (Топ 13)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Количество</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {popularItems.map((item, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>{item.id}</TableCell>
+                                        <TableCell>{item.count}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
 
-                {Object.keys(diffCounts).length > 0 && (
-                    <div className="mt-4">
-                        <h2 className="text-xl font-semibold">Quantity Differences</h2>
-                        <ul>
-                            {Object.entries(diffCounts).map(([id, diff], index) => (
-                                <li key={index}>
-                                    {id}: {diff}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
+            {Object.keys(diffCounts).length > 0 && (
+                <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>Различия в количествах</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Разница</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {Object.entries(diffCounts).map(([id, diff], index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>{id}</TableCell>
+                                        <TableCell>{diff}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
 
-                <div className="mt-4">
-                    <h2 className="text-xl font-semibold">Wildberries and Ozon Tools</h2>
-                    <p>
-                        These tools would integrate with Wildberries and Ozon APIs to
-                        facilitate inventory management and product updates.
+            <Card className="mt-4">
+                <CardHeader>
+                    <CardTitle>Инструменты Wildberries и Ozon</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="mb-4">
+                        Эти инструменты интегрируются с API Wildberries и Ozon для управления инвентарем и обновления продуктов.
                     </p>
-
-                    <button
-                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
+                    <Button
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded w-full"
                         onClick={handleUploadToSupabase}
                         disabled={uploading}
                     >
-                        {uploading ? "Uploading..." : "Upload to Supabase"}
-                    </button>
-                </div>
-            </div>
-        
+                        <Upload className="mr-2 h-4 w-4" /> {uploading ? "Загрузка..." : "Загрузить в Supabase"}
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
     );
 };
 
