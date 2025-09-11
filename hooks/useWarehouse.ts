@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
 import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
@@ -52,6 +52,14 @@ export function useWarehouse() {
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
   const { dbUser } = useAppContext();
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Фильтры — инициализированы до filteredItems
+  const [search, setSearch] = useState("");
+  const [filterSeason, setFilterSeason] = useState<string | null>(null);
+  const [filterPattern, setFilterPattern] = useState<string | null>(null);
+  const [filterColor, setFilterColor] = useState<string | null>(null);
+  const [filterSize, setFilterSize] = useState<string | null>(null);
+  const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -205,8 +213,7 @@ export function useWarehouse() {
 
   const handlePlateClick = useCallback(
     (voxelId: string) => {
-      // Removed random bullshit; now only selects voxel for location-based actions
-      // Modals/edit handled in page.tsx
+      // Только селект — модалы в компоненте
     },
     [],
   );
@@ -243,15 +250,8 @@ export function useWarehouse() {
     [gameMode, selectedVoxel, handleUpdateLocationQty],
   );
 
-  // Filters
-  const [search, setSearch] = useState("");
-  const [filterSeason, setFilterSeason] = useState<string | null>(null);
-  const [filterPattern, setFilterPattern] = useState<string | null>(null);
-  const [filterColor, setFilterColor] = useState<string | null>(null);
-  const [filterSize, setFilterSize] = useState<string | null>(null);
-  const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
-
-  const filteredItems = items.filter((item) => {
+  // useMemo для filteredItems — предотвращает TDZ в зависимостях
+  const filteredItems = useMemo(() => items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
     const matchesSeason = !filterSeason || item.season === filterSeason;
     const matchesPattern = !filterPattern || item.pattern === filterPattern;
@@ -275,7 +275,7 @@ export function useWarehouse() {
 
     // Finally, sort by color (alphabetical)
     return a.color.localeCompare(b.color);
-  });
+  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]);
 
   // --- Sorting Options ---
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
@@ -323,7 +323,7 @@ export function useWarehouse() {
     });
   }, [sortOption]);
 
-  const sortedFilteredItems = sortItems(filteredItems);
+  const sortedFilteredItems = useMemo(() => sortItems(filteredItems), [filteredItems, sortItems]);
 
   return {
     items,
