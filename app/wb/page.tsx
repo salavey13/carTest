@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { FileUp, Download, Save, RotateCcw, Upload, FileText } from "lucide-react";
+import { FileUp, Download, Save, RotateCcw, Upload, FileText, X } from "lucide-react";
 import { useWarehouse } from "@/hooks/useWarehouse";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -87,7 +87,6 @@ export default function WBPage() {
     if (file) {
       setIsUploading(true);
       const reader = new FileReader();
-
       reader.onload = async (event) => {
         const csv = event.target?.result as string;
         const parsed = parse(csv, { header: true }).data;
@@ -133,8 +132,8 @@ export default function WBPage() {
         const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
         const diffQty = loc.quantity - (checkpointLoc?.quantity || 0);
         return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
-      }),
-    ).filter(Boolean);
+      }).filter(Boolean)
+    );
     const result = await exportDiffToAdmin(diffData, isTelegram);
     if (isTelegram && result.csv) {
       navigator.clipboard.writeText(result.csv);
@@ -174,7 +173,7 @@ export default function WBPage() {
         toast.info(`Выберите товар для добавления в ${voxelId}`);
       } else {
         setEditVoxel(voxelId);
-        setEditContents(content);
+        setEditContents(content.map(c => ({ ...c, newQuantity: c.quantity })));
         setEditDialogOpen(true);
       }
     } else if (gameMode === "offload") {
@@ -197,10 +196,12 @@ export default function WBPage() {
   };
 
   const saveEditQty = async (itemId: string, newQty: number) => {
-    if (editVoxel) {
-      await handleUpdateLocationQty(itemId, editVoxel, newQty, !!gameMode);
+    if (editVoxel && newQty >= 0) {
+      await handleUpdateLocationQty(itemId, editVoxel, newQty - (editContents.find(c => c.item.id === itemId)?.quantity || 0), true);
       toast.success("Количество обновлено");
       setEditDialogOpen(false);
+    } else {
+      toast.error("Недопустимое количество");
     }
   };
 
@@ -208,7 +209,7 @@ export default function WBPage() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
-  const [editContents, setEditContents] = useState<any[]>([]);
+  const [editContents, setEditContents] = useState<{ item: Item; quantity: number; newQuantity: number }[]>([]);
 
   const handleResetFilters = () => {
     setFilterSeason(null);
@@ -273,7 +274,6 @@ export default function WBPage() {
                 key={item.id}
                 item={item}
                 onClick={() => handleItemClickCustom(item)}
-                isHighlighted={workflowItems.some((w) => w.id === item.id) || (gameMode === "onload" && !!selectedVoxel)}
               />
             ))}
           </CardContent>
@@ -305,7 +305,6 @@ export default function WBPage() {
         />
       </div>
 
-      {/* Workflow Dialog */}
       {workflowItems.length > 0 && (
         <Dialog open={true}>
           <DialogContent>
@@ -331,27 +330,55 @@ export default function WBPage() {
         </Dialog>
       )}
 
-      {/* Edit Dialog for filled voxels */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="p-4">
           <DialogHeader>
-            <DialogTitle>Редактировать ячейку {editVoxel}</DialogTitle>
+            <DialogTitle className="text-sm">Редактировать ячейку {editVoxel}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {editContents.map(({ item, quantity }) => (
-              <div key={item.id} className="flex items-center gap-2">
-                <span className="flex-1">{item.name}</span>
+          <div className="space-y-2">
+            {editContents.map(({ item, quantity, newQuantity }, idx) => (
+              <div key={item.id} className="flex items-center gap-2 text-[10px]">
+                <span className="flex-1 truncate">{item.name}</span>
                 <Input
                   type="number"
-                  defaultValue={quantity}
-                  onBlur={(e) => {
-                    const newQty = parseInt(e.target.value);
-                    if (!isNaN(newQty)) saveEditQty(item.id, newQty);
+                  min="0"
+                  step="1"
+                  value={newQuantity}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (!isNaN(value) && value >= 0) {
+                      setEditContents(prev => prev.map((c, i) => i === idx ? { ...c, newQuantity: value } : c));
+                    }
                   }}
-                  className="w-20"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      saveEditQty(item.id, newQuantity);
+                    }
+                  }}
+                  className="w-16 h-6 text-[10px]"
+                  autoFocus={idx === 0}
                 />
               </div>
             ))}
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button
+              size="sm"
+              className="flex-1 h-6 text-[10px]"
+              onClick={() => {
+                Promise.all(editContents.map(({ item, newQuantity }) => saveEditQty(item.id, newQuantity))).then(() => setEditDialogOpen(false));
+              }}
+            >
+              Сохранить все
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 h-6 text-[10px]"
+              onClick={() => setEditDialogOpen(false)}
+            >
+              <X className="mr-1 h-3 w-3" /> Отмена
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
