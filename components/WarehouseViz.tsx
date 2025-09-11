@@ -1,5 +1,4 @@
-"use client";
-
+"use client"
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { WarehouseVizProps } from "@/app/wb/common";
@@ -26,7 +25,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, gameMode, on
               "rounded-md border p-1 text-center cursor-pointer",
               selectedVoxel === voxel.id ? "border-blue-500 bg-blue-100" : "border-gray-300",
               isEmpty ? "bg-gray-100" : colorClass,
-              gameMode ? "text-xs" : "text-sm",
+              "text-sm",
             )}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -35,7 +34,7 @@ export function WarehouseViz({ items, selectedVoxel, onSelectVoxel, gameMode, on
             {!isEmpty && (
               <div className="space-y-1">
                 {content.map(({ item, quantity }, idx) => (
-                  <div key={idx} className="truncate text-[10px]"> {/* Increased text size */}
+                  <div key={idx} className="truncate text-[12px]">
                     {item.name}: {quantity}
                   </div>
                 ))}
