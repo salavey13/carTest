@@ -59,8 +59,8 @@ const CSVCompare = () => {
 
                                 if (row["warehouse_locations"]) {
                                     quantity = parseInt(row["warehouse_locations"].toString(), 10) || 0;
+                                } catch (ee) {
                                 }
-                            } catch (ee) {
                             }
                         }
 
@@ -180,6 +180,7 @@ const CSVCompare = () => {
 
                 for (let i = 0; i < rows.length; i += BATCH_SIZE) {
                     const batch = rows.slice(i, i + BATCH_SIZE);
+                   //** CRITICAL AWAIT **//
                     const result = await uploadWarehouseCsv(batch, user?.id);
 
                     if (!result.success) {
@@ -249,152 +250,155 @@ const CSVCompare = () => {
         : inventory2;
 
     return (
-        <div className="container mx-auto p-4 pt-24">
-            <h1 className="text-2xl font-bold mb-4">CSV Inventory Comparison</h1>
+        
+            <div className="container mx-auto p-4 pt-24">
+                <h1 className="text-2xl font-bold mb-4">CSV Inventory Comparison</h1>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <h2 className="text-lg font-semibold mb-2">CSV 1</h2>
-                    <textarea
-                        className="w-full h-64 p-2 border rounded"
-                        placeholder="Paste CSV 1 content here"
-                        value={csv1}
-                        onChange={handleCsv1Change}
-                    />
-                    <h3 className="text-md font-semibold mt-2">Inventory 1</h3>
-                    <ul>
-                        {filteredInventory1.map((item) => (
-                            <li key={item.id}>
-                                {item.id}: {item.quantity}
-                            </li>
-                        ))}
-                    </ul>
-                    <button
-                        className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
-                        onClick={() => {
-                            const csv = inventoryToCsv(inventory1);
-                            const blob = new Blob([csv], { type: "text/csv" });
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = "inventory1.csv";
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(url);
-                        }}
-                    >
-                        List to CSV 1
-                    </button>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <h2 className="text-lg font-semibold mb-2">CSV 1</h2>
+                        <textarea
+                            className="w-full h-64 p-2 border rounded"
+                            placeholder="Paste CSV 1 content here"
+                            value={csv1}
+                            onChange={handleCsv1Change}
+                        />
+                        <h3 className="text-md font-semibold mt-2">Inventory 1</h3>
+                        <ul>
+                            {filteredInventory1.map((item) => (
+                                <li key={item.id}>
+                                    {item.id}: {item.quantity}
+                                </li>
+                            ))}
+                        </ul>
+                        <button
+                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
+                            onClick={() => {
+                                const csv = inventoryToCsv(inventory1);
+                                const blob = new Blob([csv], { type: "text/csv" });
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = "inventory1.csv";
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                            }}
+                        >
+                            List to CSV 1
+                        </button>
+                    </div>
+
+                    <div>
+                        <h2 className="text-lg font-semibold mb-2">CSV 2</h2>
+                        <textarea
+                            className="w-full h-64 p-2 border rounded"
+                            placeholder="Paste CSV 2 content here"
+                            value={csv2}
+                            onChange={handleCsv2Change}
+                        />
+                        <h3 className="text-md font-semibold mt-2">Inventory 2</h3>
+                        <ul>
+                            {filteredInventory2.map((item) => (
+                                <li key={item.id}>
+                                    {item.id}: {item.quantity}
+                                </li>
+                            ))}
+                        </ul>
+                        <button
+                            className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
+                            onClick={() => {
+                                const csv = inventoryToCsv(inventory2);
+                                const blob = new Blob([csv], { type: "text/csv" });
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = "inventory2.csv";
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                window.URL.revokeObjectURL(url);
+                            }}
+                        >
+                            List to CSV 2
+                        </button>
+                    </div>
                 </div>
 
-                <div>
-                    <h2 className="text-lg font-semibold mb-2">CSV 2</h2>
-                    <textarea
-                        className="w-full h-64 p-2 border rounded"
-                        placeholder="Paste CSV 2 content here"
-                        value={csv2}
-                        onChange={handleCsv2Change}
-                    />
-                    <h3 className="text-md font-semibold mt-2">Inventory 2</h3>
-                    <ul>
-                        {filteredInventory2.map((item) => (
-                            <li key={item.id}>
-                                {item.id}: {item.quantity}
-                            </li>
-                        ))}
-                    </ul>
-                    <button
-                        className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2"
-                        onClick={() => {
-                            const csv = inventoryToCsv(inventory2);
-                            const blob = new Blob([csv], { type: "text/csv" });
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = "inventory2.csv";
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(url);
-                        }}
-                    >
-                        List to CSV 2
-                    </button>
+                <div className="mb-4">
+                    <label className="inline-flex items-center">
+                        <input
+                            type="checkbox"
+                            className="mr-2"
+                            checked={hideZeroQuantity}
+                            onChange={(e) => setHideZeroQuantity(e.target.checked)}
+                        />
+                        <span className="text-gray-700">Hide 0 Quantity Items</span>
+                    </label>
                 </div>
-            </div>
-
-            <div className="mb-4">
-                <label className="inline-flex items-center">
-                    <inputtype="checkbox"
-                        className="mr-2"
-                        checked={hideZeroQuantity}
-                        onChange={(e) => setHideZeroQuantity(e.target.checked)}
-                    />
-                    <span className="text-gray-700">Hide 0 Quantity Items</span>
-                </label>
-            </div>
-
-            <button
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                onClick={compareInventories}
-            >
-                Compare Inventories
-            </button>
-
-            {differences.length > 0 && (
-                <div className="mt-4">
-                    <h2 className="text-xl font-semibold">Differences</h2>
-                    <ul>
-                        {differences.map((diff, index) => (
-                            <li key={index}>{diff}</li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {popularItems.length > 0 && (
-                <div className="mt-4">
-                    <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
-                    <ul>
-                        {popularItems.map((item, index) => (
-                            <li key={index}>
-                                {item.id}: {item.count}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {Object.keys(diffCounts).length > 0 && (
-                <div className="mt-4">
-                    <h2 className="text-xl font-semibold">Quantity Differences</h2>
-                    <ul>
-                        {Object.entries(diffCounts).map(([id, diff], index) => (
-                            <li key={index}>
-                                {id}: {diff}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            <div className="mt-4">
-                <h2 className="text-xl font-semibold">Wildberries and Ozon Tools</h2>
-                <p>
-                    These tools would integrate with Wildberries and Ozon APIs to
-                    facilitate inventory management and product updates.
-                </p>
 
                 <button
-                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
-                    onClick={handleUploadToSupabase}
-                    disabled={uploading}
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                    onClick={compareInventories}
                 >
-                    {uploading ? "Uploading..." : "Upload to Supabase"}
+                    Compare Inventories
                 </button>
+
+                {differences.length > 0 && (
+                    <div className="mt-4">
+                        <h2 className="text-xl font-semibold">Differences</h2>
+                        <ul>
+                            {differences.map((diff, index) => (
+                                <li key={index}>{diff}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {popularItems.length > 0 && (
+                    <div className="mt-4">
+                        <h2 className="text-xl font-semibold">Most Popular Items (Top 13)</h2>
+                        <ul>
+                            {popularItems.map((item, index) => (
+                                <li key={index}>
+                                    {item.id}: {item.count}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {Object.keys(diffCounts).length > 0 && (
+                    <div className="mt-4">
+                        <h2 className="text-xl font-semibold">Quantity Differences</h2>
+                        <ul>
+                            {Object.entries(diffCounts).map(([id, diff], index) => (
+                                <li key={index}>
+                                    {id}: {diff}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                <div className="mt-4">
+                    <h2 className="text-xl font-semibold">Wildberries and Ozon Tools</h2>
+                    <p>
+                        These tools would integrate with Wildberries and Ozon APIs to
+                        facilitate inventory management and product updates.
+                    </p>
+
+                    <button
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4"
+                        onClick={handleUploadToSupabase}
+                        disabled={uploading}
+                    >
+                        {uploading ? "Uploading..." : "Upload to Supabase"}
+                    </button>
+                </div>
             </div>
-        </div>
+        
     );
 };
 
