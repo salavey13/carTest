@@ -62,8 +62,7 @@ const CSVCompare = () => {
                                 } catch (ee: any) {
             toast.error(ee?.message || "Error during upload.");
             console.error("Upload Error:", ee);
-            catch (err: any) {
-            toast.error(err?.message || "Error during upload.");
+            
             
                             }
                         }
