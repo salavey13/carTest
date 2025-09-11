@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -8,7 +7,6 @@ import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
 import { parse } from "papaparse"; // Make sure that you import parse from papaparse
-
 import Papa from "papaparse"; // Make sure that you import Papa from papaparse
 
 // Helper function to generate image URL
@@ -58,6 +56,7 @@ const deriveFieldsFromId = (id: string) => {
     switch (model.toLowerCase()) {
         case '1.5':
             description = 'Серая';
+
             specs.color = 'gray';
             specs.size = '150x200';
             break;
@@ -146,7 +145,7 @@ export async function uploadWarehouseCsv(
         logger.info(`Fetching existing items for ${itemIds.length} IDs.`);
         const { data: existingItems } = await supabaseAdmin.from("cars").select("*").in("id", itemIds);
 
-        const itemsToUpsert = batch.map((row: any) => {
+        const itemsToUpsert = batch.map(async (row: any) => {
             const itemId = (row["Артикул"] || row["id"])?.toLowerCase();
             if (!itemId) {
                 logger.warn(`Skipping row without id/Артикул: ${JSON.stringify(row)}`);
@@ -163,10 +162,18 @@ export async function uploadWarehouseCsv(
             let specs = row.specs ? JSON.parse(row.specs) : derived.specs;
 
             let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
-            if (!specs.warehouse_locations || specs.warehouse_locations.length === 0) {
-                specs.warehouse_locations = [{ voxel_id: "A1", quantity }];
+
+            // Ensure warehouse_locations exists and is an array
+            if (!specs.warehouse_locations || !Array.isArray(specs.warehouse_locations)) {
+                specs.warehouse_locations = [];
+            }
+
+            // Update warehouse locations based on quantity
+            if (specs.warehouse_locations.length === 0) {
+                specs.warehouse_locations = [{ voxel_id: "A1", quantity }]; // Default location
             } else {
-                quantity = specs.warehouse_locations.reduce((acc: number, l: any) => acc + (parseInt(l.quantity) || 0), 0);
+                // Assuming ONE location for simplicity; adjust if needed
+                specs.warehouse_locations[0].quantity = quantity;
             }
 
             const itemToUpsert = {
@@ -177,22 +184,24 @@ export async function uploadWarehouseCsv(
                 type: "wb_item",
                 specs,
                 image_url: row.image_url || generateImageUrl(itemId),
-                quantity, // Set quantity field
+                // quantity, // REMOVE Quantity Field here.
             };
 
+            //Recalculate for existing Items.
             if (existingItem) {
-                itemToUpsert.specs = { ...existingItem.specs, ...itemToUpsert.specs };
-                itemToUpsert.quantity = quantity; // Update total
+                itemToUpsert.specs = { ...existingItem.specs, ...itemToUpsert.specs }; //Merge
             }
 
-            logger.info(`Prepared upsert for ${itemId}: quantity ${quantity}`);
+            logger.info(`Prepared upsert for ${itemId} with quantity ${quantity}: ${JSON.stringify(itemToUpsert)}`);
             return itemToUpsert;
         }).filter(Boolean);
 
         if (itemsToUpsert.length === 0) return { success: false, error: "No valid items" };
 
         logger.info(`Upserting ${itemsToUpsert.length} items to Supabase.`);
-        const { error } = await supabaseAdmin.from("cars").upsert(itemsToUpsert, { onConflict: "id" });
+        // @ts-ignore
+        const { error } = await supabaseAdmin.from("cars").upsert(await Promise.all(itemsToUpsert), { onConflict: "id" });
+
         if (error) throw error;
 
         return { success: true, message: `Upserted ${itemsToUpsert.length} items.` };
@@ -202,59 +211,121 @@ export async function uploadWarehouseCsv(
     }
 }
 
-export async function exportDiffToAdmin(diffData: any[], isTelegram: boolean = false, summarized: boolean = false): Promise<{ success: boolean; csv?: string }> {
-  let csvData;
-  if (summarized) {
-    csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
-      'Артикул': d.id,
-      'Количество': d.diffQty,
-    })), { header: true, delimiter: ',', quotes: true });
-  } else {
-    csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
-      'Артикул': d.id,
-      'Изменение': d.diffQty,
-      'Ячейка': d.voxel
-    })), { header: true, delimiter: ',', quotes: true });
-  }
+export async function updateItemLocationQty(
+    itemId: string,
+    voxelId: string,
+    delta: number
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const { data: existingItem, error: selectError } = await supabaseAdmin
+            .from("cars")
+            .select("specs")
+            .eq("id", itemId)
+            .single();
 
-  if (isTelegram) {
-    return { success: true, csv: csvData };
-  } else {
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
-      attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
-    });
-    return { success: true };
-  }
+        if (selectError) {
+            logger.error(`Error fetching item ${itemId} for location update:`, selectError);
+            return { success: false, error: `Failed to fetch item: ${selectError.message}` };
+        }
+
+        if (!existingItem?.specs) {
+            logger.warn(`Item ${itemId} not found or missing specs.`);
+            return { success: false, error: "Item not found or missing specs." };
+        }
+
+        let specs = existingItem.specs;
+
+        // Ensure warehouse_locations exists and is an array
+        if (!specs.warehouse_locations || !Array.isArray(specs.warehouse_locations)) {
+            specs.warehouse_locations = [];
+        }
+
+        // Find the location, or create it if it doesn't exist
+        let location = specs.warehouse_locations.find((l: any) => l.voxel_id === voxelId);
+        if (!location) {
+            location = { voxel_id: voxelId, quantity: 0 };
+            specs.warehouse_locations.push(location);
+        }
+
+        // Apply the delta, ensuring quantity doesn't go below 0
+        location.quantity = Math.max(0, (location.quantity || 0) + delta);
+
+        // Remove location if quantity is 0 - OPTIONAL: depends on your needs.
+        specs.warehouse_locations = specs.warehouse_locations.filter((l: any) => l.quantity > 0);
+
+        const totalQuantity = specs.warehouse_locations.reduce((acc: number, l: any) => acc + l.quantity, 0);
+
+        const { error: updateError } = await supabaseAdmin
+            .from("cars")
+            .update({ specs }) // Removed quantity: totalQuantity to avoid mismatches
+            .eq("id", itemId);
+
+        if (updateError) {
+            logger.error(`Error updating item ${itemId} location ${voxelId}:`, updateError);
+            return { success: false, error: `Failed to update item: ${updateError.message}` };
+        }
+
+        logger.info(`Successfully updated item ${itemId} location ${voxelId} by ${delta}. New total: ${totalQuantity}`);
+        return { success: true };
+    } catch (error) {
+        logger.error("Error in updateItemLocationQty:", error);
+        return { success: false, error: (error as Error).message };
+    }
+}
+
+export async function exportDiffToAdmin(diffData: any[], isTelegram: boolean = false, summarized: boolean = false): Promise<{ success: boolean; csv?: string }> {
+    let csvData;
+    if (summarized) {
+        csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
+            'Артикул': d.id,
+            'Количество': d.diffQty,
+        })), { header: true, delimiter: ',', quotes: true });
+    } else {
+        csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
+            'Артикул': d.id,
+            'Изменение': d.diffQty,
+            'Ячейка': d.voxel
+        })), { header: true, delimiter: ',', quotes: true });
+    }
+
+    if (isTelegram) {
+        return { success: true, csv: csvData };
+    } else {
+        await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
+            attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
+        });
+        return { success: true };
+    }
 }
 
 export async function exportCurrentStock(items: any[], isTelegram: boolean = false, summarized: boolean = false): Promise<{ success: boolean; csv?: string }> {
-  let csvData;
-  if (summarized) {
-    const stockData = items.map((item) => ({
-      'Артикул': item.id,
-      'Количество': item.total_quantity,
-    }));
-    csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
-  } else {
-    const stockData = items.map((item) => ({
-      'Артикул': item.id,
-      'Название': item.name,
-      'Общее Количество': item.total_quantity,
-      'Локации': item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
-      'Сезон': item.season || "N/A",
-      'Узор': item.pattern || "N/A",
-      'Цвет': item.color || "N/A",
-      'Размер': item.size || "N/A",
-    }));
-    csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
-  }
+    let csvData;
+    if (summarized) {
+        const stockData = items.map((item) => ({
+            'Артикул': item.id,
+            'Количество': item.total_quantity,
+        }));
+        csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
+    } else {
+        const stockData = items.map((item) => ({
+            'Артикул': item.id,
+            'Название': item.name,
+            'Общее Количество': item.total_quantity,
+            'Локации': item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
+            'Сезон': item.season || "N/A",
+            'Узор': item.pattern || "N/A",
+            'Цвет': item.color || "N/A",
+            'Размер': item.size || "N/A",
+        }));
+        csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
+    }
 
-  if (isTelegram) {
-    return { success: true, csv: csvData };
-  } else {
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в CSV.", [], {
-      attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
-    });
-    return { success: true };
-  }
+    if (isTelegram) {
+        return { success: true, csv: csvData };
+    } else {
+        await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в CSV.", [], {
+            attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
+        });
+        return { success: true };
+    }
 }
