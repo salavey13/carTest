@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -62,6 +63,10 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   return user.status === 'admin';
 }
 
+
+
+
+ChatGPT4 | Midjourney:
 export async function uploadWarehouseCsv(
     batch: any[],
     userId: string | undefined
@@ -69,7 +74,6 @@ export async function uploadWarehouseCsv(
     const isAdmin = await verifyAdmin(userId);
     if (!isAdmin) {
         logger.warn(`Unauthorized warehouse CSV upload by ${userId || 'Unknown'}`);
-
         return { success: false, error: "Permission denied. Admin required." };
     }
 
@@ -79,8 +83,12 @@ export async function uploadWarehouseCsv(
 
     try {
         // Fetch existing items from Supabase to compare
-        //** KEY CHANGE: Now using "Артикул" consistently  **//
-        const itemIds = batch.map((row: any) => row["Артикул"]?.toLowerCase()).filter(Boolean);
+        const itemIds = batch.map((row: any) => {
+            //** KEY CHANGE: Check for "Артикул" first, then fallback to "id" **//
+            const itemId = row["Артикул"] || row["id"];
+            return itemId?.toLowerCase();
+        }).filter(Boolean);
+
         logger.info(`Fetching existing items for IDs: ${JSON.stringify(itemIds)}`);
 
         const { data: existingItems, error: existingItemsError } = await supabaseAdmin
@@ -96,14 +104,15 @@ export async function uploadWarehouseCsv(
         logger.info(`Successfully fetched ${existingItems?.length || 0} existing items.`);
 
         const itemsToUpsert = batch.map((row: any) => {
-            //** KEY CHANGE: Now using "Артикул" consistently  **//
-            const itemId = row["Артикул"]?.toLowerCase();
+            //** KEY CHANGE: Check for "Артикул" first, then fallback to "id" **//
+            const itemId = row["Артикул"] || row["id"];
+
             if (!itemId) {
-                logger.warn(`Skipping row with missing Артикул: ${JSON.stringify(row)}`);
+                logger.warn(`Skipping row with missing Артикул or id: ${JSON.stringify(row)}`);
                 return null;
             }
 
-            const existingItem = existingItems?.find(item => item.id === itemId);
+            const existingItem = existingItems?.find(item => item.id === itemId.toLowerCase());
 
             // Parse quantity from the simplified CSV or default to 0 if not found
             let quantity = 0;
@@ -114,6 +123,7 @@ export async function uploadWarehouseCsv(
                 }
             } catch (e) {
                 logger.warn(`Could not parse specs for item ${itemId}, using quantity from CSV if available. Error: ${e}`);
+
                 quantity = parseInt(row["Количество"] || '0', 10) || 0;
             }
 
@@ -138,13 +148,13 @@ export async function uploadWarehouseCsv(
             } else {
                 logger.info(`Item ${itemId} does not exist, creating new item.`);
                 itemToUpsert = {
-                    id: itemId,
+                    id: itemId.toLowerCase(),
                     make: row["make"] || "Unknown Make",
                     model: row["model"] || "Unknown Model",
                     description: row["description"] || "No Description",
                     type: "wb_item",
                     specs: { warehouse_locations: [{ voxel_id: "A1", quantity }] },
-                    image_url: generateImageUrl(itemId),
+                    image_url: generateImageUrl(itemId.toLowerCase()),
                 };
             }
             return itemToUpsert;
@@ -152,7 +162,7 @@ export async function uploadWarehouseCsv(
 
         if (itemsToUpsert.length === 0) {
             logger.warn("No valid items to upsert in this batch.");
-            return { success: false, error:"No valid items to upsert in this batch." };
+            return { success: false, error: "No valid items to upsert in this batch." };
         }
 
         logger.info(`Upserting ${itemsToUpsert.length} items.`);
@@ -175,6 +185,9 @@ export async function uploadWarehouseCsv(
         return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
 }
+
+
+
 
 export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
