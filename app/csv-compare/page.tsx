@@ -55,9 +55,7 @@ const CSVCompare = () => {
                             }
                         } catch (e) {
                             // if specs is not an JSON, try to parse value from row.quantity, example: row["warehouse_locations"]
-                            try {
-
-                                if (row["warehouse_locations"]) {
+                            try {                                if (row["warehouse_locations"]) {
                                     quantity = parseInt(row["warehouse_locations"].toString(), 10) || 0;
                                 }
                             } catch (ee) {
@@ -209,13 +207,14 @@ const CSVCompare = () => {
                 }
             });
 
-           const processData = (data: CsvRow[]) => {
+           // Moved processData declaration outside of handleUploadToSupabase to fix the error
+            const processData = async (data: CsvRow[]) => {
                 const BATCH_SIZE = 13;
                 const rows = data;
 
                 for (let i = 0; i < rows.length; i += BATCH_SIZE) {
                     const batch = rows.slice(i, i + BATCH_SIZE);
-                    const result =  uploadWarehouseCsv(batch, user?.id);
+                    const result = await uploadWarehouseCsv(batch, user?.id);
 
                     if (!result.success) {
                         toast.error(result.error || "Failed to upload batch to Supabase.");
@@ -328,7 +327,8 @@ const CSVCompare = () => {
                     <input
                         type="checkbox"
                         className="mr-2"
-                        checked={hideZeroQuantity}
+
+checked={hideZeroQuantity}
                         onChange={(e) => setHideZeroQuantity(e.target.checked)}
                     />
                     <span className="text-gray-700">Hide 0 Quantity Items</span>
