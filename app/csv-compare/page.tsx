@@ -59,7 +59,8 @@ const CSVCompare = () => {
 
                                 if (row["warehouse_locations"]) {
                                     quantity = parseInt(row["warehouse_locations"].toString(), 10) || 0;
-                                } catch (ee: any) {
+                                } 
+}catch (ee: any) {
             toast.error(ee?.message || "Error during upload.");
             console.error("Upload Error:", ee);
             
