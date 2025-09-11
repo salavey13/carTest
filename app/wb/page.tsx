@@ -70,14 +70,16 @@ export default function WBPage() {
     sortOption,
     setSortOption,
   } = useWarehouse();
-  const { user } = useAppContext();
+  const { user, tg } = useAppContext();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const isTelegram = !!tg;
 
   useEffect(() => {
+    loadItems(); // Ensure load on mount
     if (error) toast.error(error);
-  }, [error]);
+  }, [error, loadItems]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,11 +89,12 @@ export default function WBPage() {
 
       reader.onload = async (event) => {
         const csv = event.target?.result as string;
-        const result = await uploadWarehouseCsv(csv, user?.id);
+        const parsed = parse(csv, { header: true }).data;
+        const result = await uploadWarehouseCsv(parsed, user?.id);
         setIsUploading(false);
         if (result.success) {
           toast.success(result.message || "CSV uploaded!");
-          loadItems();
+          loadItems(); // Reload after upload
         } else {
           toast.error(result.error);
         }
@@ -102,7 +105,8 @@ export default function WBPage() {
 
   const handleTestImport = async () => {
     setIsUploading(true);
-    const result = await uploadWarehouseCsv(DEFAULT_CSV, user?.id);
+    const parsed = parse(DEFAULT_CSV, { header: true }).data;
+    const result = await uploadWarehouseCsv(parsed, user?.id);
     setIsUploading(false);
     if (result.success) {
       toast.success(result.message || "Test CSV uploaded!");
@@ -130,11 +134,19 @@ export default function WBPage() {
         return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
       }),
     ).filter(Boolean);
-    await exportDiffToAdmin(diffData);
+    const result = await exportDiffToAdmin(diffData, isTelegram);
+    if (isTelegram && result.csv) {
+      navigator.clipboard.writeText(result.csv);
+      toast.success("CSV скопирован в буфер обмена!");
+    }
   };
 
   const handleExportStock = async () => {
-    await exportCurrentStock(items);
+    const result = await exportCurrentStock(items, isTelegram);
+    if (isTelegram && result.csv) {
+      navigator.clipboard.writeText(result.csv);
+      toast.success("CSV скопирован в буфер обмена!");
+    }
   };
 
   const handlePlateClickCustom = (voxelId: string) => {

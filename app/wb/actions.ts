@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -7,26 +6,90 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
-import { parse } from "papaparse"; // Correct Import
+import { parse } from "papaparse";
+import Papa from "papaparse";
 
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
     const baseURL = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(".supabase.co", ".inmctohsodgdohamhzag.supabase.co") + "/storage/v1/object/public/wb/";
     let filename = id.replace(/^1\.5/, "poltorashka").replace(/^2/, "dvushka").replace(/ /g, "-") + ".jpg";
-
     return baseURL + filename;
 };
 
-interface WarehouseCsvRow {
-  id: string;
-  make: string;
-  model: string;
-  description: string;
-  type: string;
-  specs: string;
-  image_url: string;
-  Количество?: string; // Quantity may exist in some original csv values
-}
+// Helper to derive fields from id
+const deriveFieldsFromId = (id: string) => {
+    const parts = id.toLowerCase().split(' ');
+    let model = '';
+    let make = '';
+    let description = '';
+    let specs: any = { warehouse_locations: [] };
+
+    // Models
+    if (parts[0] === '1.5') {
+        model = '1.5';
+    } else if (parts[0] === '2') {
+        model = '2';
+    } else if (parts[0] === 'евро' && parts[1] !== 'макси') {
+        model = 'Евро';
+    } else if (parts[0] === 'евро' && parts[1] === 'макси') {
+        model = 'Евро Макси';
+        parts.shift(); // Remove 'евро'
+    } else if (parts[0] === 'наматрасник.') {
+        model = 'Наматрасник';
+        const size = parts[1].replace('.', '');
+        const pattern = parts[2];
+        specs.size = size;
+        specs.pattern = pattern;
+        specs.season = null;
+        specs.color = parseInt(size) >= 160 ? 'dark-green' : 'light-green';
+        description = parseInt(size) >= 160 ? 'Темно-зеленый, большой' : 'Салатовый, маленький';
+        return { model, make: `${size.charAt(0).toUpperCase() + size.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`, description, specs };
+    } else {
+        model = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    }
+
+    // Make - rest capitalized
+    make = parts.slice(1).map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+
+    // Description hardcoded
+    switch (model.toLowerCase()) {
+        case '1.5':
+            description = 'Серая';
+            specs.color = 'gray';
+            specs.size = '150x200';
+            break;
+        case '2':
+            description = 'Голубая';
+            specs.color = 'blue';
+            specs.size = '200x220';
+            break;
+        case 'евро':
+            description = 'Бежевая';
+            specs.color = 'beige';
+            specs.size = '180x220';
+            break;
+        case 'евро макси':
+            description = 'Красная';
+            specs.color = 'red';
+            specs.size = '220x240';
+            break;
+        case 'наматрасник':
+            description = 'Зеленая';
+            specs.color = 'green';
+            break;
+    }
+    // Season/pattern
+    if (parts.includes('зима')) {
+        specs.season = 'zima';
+        description += ', полузакрытая';
+    } else if (parts.includes('лето')) {
+        specs.season = 'leto';
+        description += ', полосочка';
+    }
+    specs.pattern = parts[parts.length - 1].replace(/[0-9]/g, '').trim();
+
+    return { model, make, description, specs };
+};
 
 async function getWarehouseItems(): Promise<{
     success: boolean;
@@ -46,11 +109,6 @@ async function getWarehouseItems(): Promise<{
         logger.error("[getWarehouseItems] Error:", error);
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
-}
-
-async function getItemSpecs(itemId: string): Promise<any> {
-  const { data } = await supabaseAdmin.from("cars").select("specs").eq("id", itemId).single();
-  return data?.specs || {};
 }
 
 async function verifyAdmin(userId: string | undefined): Promise<boolean> {
@@ -79,188 +137,102 @@ export async function uploadWarehouseCsv(
     }
 
     try {
-        // Fetch existing items from Supabase to compare
-        const itemIds = batch.map((row: any) => {
-            //** KEY CHANGE: Check for "Артикул" first, then fallback to "id" **//
-            const itemId = row["Артикул"] || row["id"];
-            return itemId?.toLowerCase();
-        }).filter(Boolean);
-
-        logger.info(`Fetching existing items for IDs: ${JSON.stringify(itemIds)}`);
-
-        const { data: existingItems, error: existingItemsError } = await supabaseAdmin
-            .from("cars")
-            .select("*")
-            .in("id", itemIds);
-
-        if (existingItemsError) {
-            logger.error("Error fetching existing items:", existingItemsError);
-            return { success: false, error: `Error fetching existing items: ${existingItemsError.message}` };
-        }
-
-        logger.info(`Successfully fetched ${existingItems?.length || 0} existing items.`);
+        // Fetch existing items
+        const itemIds = batch.map((row: any) => (row["Артикул"] || row["id"])?.toLowerCase()).filter(Boolean);
+        const { data: existingItems } = await supabaseAdmin.from("cars").select("*").in("id", itemIds);
 
         const itemsToUpsert = batch.map((row: any) => {
-            //** KEY CHANGE: Check for "Артикул" first, then fallback to "id" **//
-            const itemId = row["Артикул"] || row["id"];
+            const itemId = (row["Артикул"] || row["id"])?.toLowerCase();
+            if (!itemId) return null;
 
-            if (!itemId) {
-                logger.warn(`Skipping row with missing Артикул or id: ${JSON.stringify(row)}`);
-                return null;
-            }
+            const existingItem = existingItems?.find(item => item.id === itemId);
 
-            const existingItem = existingItems?.find(item => item.id === itemId.toLowerCase());
+            let derived = deriveFieldsFromId(itemId);
+            let make = row.make || derived.make || "Unknown Make";
+            let model = row.model || derived.model || "Unknown Model";
+            let description = row.description || derived.description || "No Description";
 
-            // Parse quantity from the simplified CSV or default to 0 if not found
-            let quantity = 0;
-            try {
-                //** KEY FIX: Validate and safely parse specs data **//
-                let specs = {};
+            let specs = {};
+            if (row.specs) {
                 try {
-                    if (typeof row["specs"] === 'string' && row["specs"].trim() !== "") {
-                        specs = JSON.parse(row["specs"]);
-                    } else {
-                        logger.warn(`Specs for item ${itemId} is empty or not a string.  Skipping parsing.`);
-                    }
-
-                } catch (specParseError: any) {
-                    logger.error(`Could not parse specs for item ${itemId}. Skipping. Error: ${specParseError.message}`);
-                }
-
-                logger.info(`Specs for item ${itemId}: ${JSON.stringify(specs)}`); // ADDED LOGGING
-
-                if (specs?.warehouse_locations && Array.isArray(specs.warehouse_locations)) {
-                    quantity = specs.warehouse_locations.reduce((acc, l) => {
-                        const parsedQuantity = parseInt(l.quantity, 10) || 0;
-                        logger.info(`Location: ${JSON.stringify(l)}, Parsed Quantity: ${parsedQuantity}`);  //ADDED LOGGING
-                        return acc + parsedQuantity;
-                    }, 0);
-                }
-            } catch (e) {
-                logger.warn(`Could not parse warehouse_locations from specs for item ${itemId}, using quantity from CSV if available. Error: ${e}`);
-                quantity = parseInt(row["Количество"] || '0', 10) || 0;
-                logger.info(`Quantity from CSV for item ${itemId}: ${quantity}`); // ADDED LOGGING
-            }
-
-            if (isNaN(quantity)) {
-                logger.warn(`Skipping invalid quantity for item ${itemId}: ${JSON.stringify(row)}`);
-                return null;
-            }
-
-            let itemToUpsert: any;
-            if (existingItem) {
-                logger.info(`Item ${itemId} exists, merging data.`);
-                try {
-                    //** KEY FIX: Validate and safely parse specs data **//
-                    let parsedSpecs = {};
-                    try {
-                        if (typeof row["specs"] === 'string' && row["specs"].trim() !== "") {
-                            parsedSpecs = JSON.parse(row["specs"]);
-                        } else {
-                            logger.warn(`Specs for existing item ${itemId} is empty or not a string.  Skipping parsing.`);
-                        }
-                    } catch (specParseError: any) {
-                        logger.error(`Failed to parse and merge specs for existing item ${itemId}. Skipping. Error: ${specParseError.message}`);
-                        return null;  // Skip this item if we can't parse the specs
-                    }
-
-                    itemToUpsert = {
-                        ...existingItem,
-                        specs: { ...existingItem.specs, ...parsedSpecs, warehouse_locations: [{ voxel_id: "A1", quantity }] }
-                    };
-                } catch (e) {
-                    logger.error(`Failed to merge specs for existing item ${itemId}:`, e);
-                    return null;
-                }
+                    specs = JSON.parse(row.specs);
+                } catch {}
             } else {
-                logger.info(`Item ${itemId} does not exist, creating new item.`);
-                itemToUpsert = {
-                    id: itemId.toLowerCase(),
-                    make: row["make"] || "Unknown Make",
-                    model: row["model"] || "Unknown Model",
-                    description: row["description"] || "No Description",
-                    type: "wb_item",
-                    specs: { warehouse_locations: [{ voxel_id: "A1", quantity }] },
-                    image_url: generateImageUrl(itemId.toLowerCase()),
-                };
+                specs = derived.specs;
             }
-            itemToUpsert.specs.warehouse_locations[0].quantity = quantity;
-            logger.info(`Item to upsert ${itemId}: ${JSON.stringify(itemToUpsert)}`);
+
+            let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
+            if (!specs.warehouse_locations || specs.warehouse_locations.length === 0) {
+                specs.warehouse_locations = [{ voxel_id: "A1", quantity }];
+            } else {
+                quantity = specs.warehouse_locations.reduce((acc: number, l: any) => acc + (parseInt(l.quantity) || 0), 0);
+            }
+
+            const itemToUpsert = {
+                id: itemId,
+                make,
+                model,
+                description,
+                type: "wb_item",
+                specs,
+                image_url: row.image_url || generateImageUrl(itemId),
+                quantity, // Set quantity field
+            };
+
+            if (existingItem) {
+                itemToUpsert.specs = { ...existingItem.specs, ...itemToUpsert.specs };
+            }
+
             return itemToUpsert;
-        }).filter(item => item !== null);
+        }).filter(Boolean);
 
-        if (itemsToUpsert.length === 0) {
-            logger.warn("No valid items to upsert in this batch.");
-            return { success: false, error: "No valid items to upsert in this batch." };
-        }
+        if (itemsToUpsert.length === 0) return { success: false, error: "No valid items" };
 
-        logger.info(`Upserting ${itemsToUpsert.length} items.`);
+        const { error } = await supabaseAdmin.from("cars").upsert(itemsToUpsert, { onConflict: "id" });
+        if (error) throw error;
 
-        const { data, error } = await supabaseAdmin
-            .from("cars")
-            .upsert(itemsToUpsert, { onConflict: "id" })
-            .select();
-
-        if (error) {
-            logger.error("Error during upsert:", error);
-            return { success: false, error: `Supabase upsert error: ${error.message}` };
-        }
-
-        logger.info(`Successfully upserted ${itemsToUpsert.length} items.`);
-        return { success: true, message: `Successfully upserted ${itemsToUpsert.length} items.` };
-
+        return { success: true, message: `Upserted ${itemsToUpsert.length} items.` };
     } catch (error) {
-        logger.error("Unexpected error during upload:", error);
-        return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
+        return { success: false, error: (error as Error).message };
     }
 }
 
-export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
-  try {
-    // Add UTF-8 BOM to the beginning of the string
-    const csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
+export async function exportDiffToAdmin(diffData: any[], isTelegram: boolean = false): Promise<{ success: boolean; csv?: string }> {
+  const csvData = '\uFEFF' + Papa.unparse(diffData.map(d => ({
       'Артикул': d.id,
       'Изменение': d.diffQty,
       'Ячейка': d.voxel
     })), { header: true, delimiter: ',', quotes: true });
-    const message = "Изменения склада в CSV.";
-    await notifyAdmins(message);
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
-      attachment: {
-        type: "document",
-        content: csvData,
-        filename: "warehouse_diff.csv",
-      },
+
+  if (isTelegram) {
+    return { success: true, csv: csvData }; // Return for clipboard
+  } else {
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
     });
-  } catch (error) {
-    logger.error("[exportDiffToAdmin] Error:", error);
+    return { success: true };
   }
 }
 
-export async function exportCurrentStock(items: any[]): Promise<void> {
-  try {
-    const stockData = items.map((item) => ({
-      'Артикул': d.id,
-      'Название': d.name,
+export async function exportCurrentStock(items: any[], isTelegram: boolean = false): Promise<{ success: boolean; csv?: string }> {
+  const stockData = items.map((item) => ({
+      'Артикул': item.id,
+      'Название': item.name,
       'Общее Количество': item.total_quantity,
       'Локации': item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
-      'Сезон': d.season || "N/A",
-      'Узор': d.pattern || "N/A",
-      'Цвет': d.color || "N/A",
-      'Размер': d.size || "N/A",
+      'Сезон': item.season || "N/A",
+      'Узор': item.pattern || "N/A",
+      'Цвет': item.color || "N/A",
+      'Размер': item.size || "N/A",
     }));
-    // Add UTF-8 BOM to the beginning of the string
-    const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true })
-    const message = "Текущее состояние склада в CSV.";
-    await notifyAdmins(message);
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", message, [], {
-      attachment: {
-        type: "document",
-        content: csvData,
-        filename: "warehouse_stock.csv",
-      },
+  const csvData = '\uFEFF' + Papa.unparse(stockData, { header: true, delimiter: ',', quotes: true });
+
+  if (isTelegram) {
+    return { success: true, csv: csvData };
+  } else {
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в CSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
     });
-  } catch (error) {
-    logger.error("[exportCurrentStock] Error:", error);
+    return { success: true };
   }
 }
