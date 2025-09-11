@@ -55,7 +55,9 @@ const CSVCompare = () => {
                             }
                         } catch (e) {
                             // if specs is not an JSON, try to parse value from row.quantity, example: row["warehouse_locations"]
-                            try {                                if (row["warehouse_locations"]) {
+                            try {
+
+                                if (row["warehouse_locations"]) {
                                     quantity = parseInt(row["warehouse_locations"].toString(), 10) || 0;
                                 }
                             } catch (ee) {
@@ -161,7 +163,7 @@ const CSVCompare = () => {
         });
     };
 
-    const handleUploadToSupabase = async () => {
+    const handleUploadToSupabase = useCallback(async () => {
         setUploading(true);
         try {
             const csvData = csv2;  // Directly using the CSV 2 content
@@ -170,6 +172,32 @@ const CSVCompare = () => {
                 return;
             }
             const cleanCsvData = csvData.replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove zero-width spaces and BOM
+
+            // Define processData inside the useCallback to ensure it's created before parse
+            const processData = async (data: CsvRow[]) => {
+                const BATCH_SIZE = 13;
+                const rows = data;
+
+                for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+                    const batch = rows.slice(i, i + BATCH_SIZE);
+                    const result = await uploadWarehouseCsv(batch, user?.id);
+
+                    if (!result.success) {
+                        toast.error(result.error || "Failed to upload batch to Supabase.");
+                        setUploading(false);
+                        return;
+                    } else {
+                        console.log(
+                            `Uploaded batch ${i / BATCH_SIZE + 1}/${Math.ceil(
+                                rows.length / BATCH_SIZE
+                            )}`
+                        );
+                    }
+                }
+
+                toast.success("All data uploaded to Supabase!");
+                setUploading(false); // Set uploading to false only after successful completion
+            };
 
             // Parse the CSV data using PapaParse
             const parsedCsv = parse<CsvRow>(cleanCsvData, {
@@ -206,42 +234,16 @@ const CSVCompare = () => {
                     setUploading(false);
                 }
             });
-
-           // Moved processData declaration outside of handleUploadToSupabase to fix the error
-            const processData = async (data: CsvRow[]) => {
-                const BATCH_SIZE = 13;
-                const rows = data;
-
-                for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-                    const batch = rows.slice(i, i + BATCH_SIZE);
-                    const result = await uploadWarehouseCsv(batch, user?.id);
-
-                    if (!result.success) {
-                        toast.error(result.error || "Failed to upload batch to Supabase.");
-                        setUploading(false);
-                        return;
-                    } else {
-                        console.log(
-                            `Uploaded batch ${i / BATCH_SIZE + 1}/${Math.ceil(
-                                rows.length / BATCH_SIZE
-                            )}`
-                        );
-                    }
-                }
-
-                toast.success("All data uploaded to Supabase!");
-                setUploading(false); // Set uploading to false only after successful completion
-            };
         } catch (err: any) {
             toast.error(err?.message || "Error during upload.");
             console.error("Upload Error:", err);
             setUploading(false);
         }
-    };
+    }, [csv2, user, uploadWarehouseCsv, toast]); // Add dependencies for useCallback
 
     const filteredInventory1 = hideZeroQuantity
         ? inventory1.filter((item) => item.quantity > 0)
-        : inventory1;
+        :inventory1;
     const filteredInventory2 = hideZeroQuantity
         ? inventory2.filter((item) => item.quantity > 0)
         : inventory2;
@@ -324,11 +326,9 @@ const CSVCompare = () => {
 
             <div className="mb-4">
                 <label className="inline-flex items-center">
-                    <input
-                        type="checkbox"
+                    <inputtype="checkbox"
                         className="mr-2"
-
-checked={hideZeroQuantity}
+                        checked={hideZeroQuantity}
                         onChange={(e) => setHideZeroQuantity(e.target.checked)}
                     />
                     <span className="text-gray-700">Hide 0 Quantity Items</span>
