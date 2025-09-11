@@ -243,7 +243,7 @@ const CSVCompare = () => {
 
     const filteredInventory1 = hideZeroQuantity
         ? inventory1.filter((item) => item.quantity > 0)
-        :inventory1;
+        : inventory1;
     const filteredInventory2 = hideZeroQuantity
         ? inventory2.filter((item) => item.quantity > 0)
         : inventory2;
