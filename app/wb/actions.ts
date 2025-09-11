@@ -63,11 +63,6 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   return user.status === 'admin';
 }
 
-
-
-
-
-
 export async function uploadWarehouseCsv(
     batch: any[],
     userId: string | undefined
@@ -131,12 +126,19 @@ export async function uploadWarehouseCsv(
                     logger.error(`Could not parse specs for item ${itemId}. Skipping. Error: ${specParseError.message}`);
                 }
 
+                logger.info(`Specs for item ${itemId}: ${JSON.stringify(specs)}`); // ADDED LOGGING
+
                 if (specs?.warehouse_locations && Array.isArray(specs.warehouse_locations)) {
-                    quantity = specs.warehouse_locations.reduce((acc, l) => acc + (parseInt(l.quantity, 10) || 0), 0);
+                    quantity = specs.warehouse_locations.reduce((acc, l) => {
+                        const parsedQuantity = parseInt(l.quantity, 10) || 0;
+                        logger.info(`Location: ${JSON.stringify(l)}, Parsed Quantity: ${parsedQuantity}`);  //ADDED LOGGING
+                        return acc + parsedQuantity;
+                    }, 0);
                 }
             } catch (e) {
                 logger.warn(`Could not parse warehouse_locations from specs for item ${itemId}, using quantity from CSV if available. Error: ${e}`);
                 quantity = parseInt(row["Количество"] || '0', 10) || 0;
+                logger.info(`Quantity from CSV for item ${itemId}: ${quantity}`); // ADDED LOGGING
             }
 
             if (isNaN(quantity)) {
@@ -181,6 +183,8 @@ export async function uploadWarehouseCsv(
                     image_url: generateImageUrl(itemId.toLowerCase()),
                 };
             }
+            itemToUpsert.specs.warehouse_locations[0].quantity = quantity;
+            logger.info(`Item to upsert ${itemId}: ${JSON.stringify(itemToUpsert)}`);
             return itemToUpsert;
         }).filter(item => item !== null);
 
@@ -209,8 +213,6 @@ export async function uploadWarehouseCsv(
         return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
 }
-
-
 
 export async function exportDiffToAdmin(diffData: any[]): Promise<void> {
   try {
