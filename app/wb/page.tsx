@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,17 +8,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { FileUp, Download, Save, RotateCcw, Upload, FileText, X } from "lucide-react";
+import { FileUp, Download, Save, RotateCcw, Upload, FileText } from "lucide-react";
 import { useWarehouse } from "@/hooks/useWarehouse";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
+import WarehouseModals from "@/components/WarehouseModals";
 import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv } from "@/app/wb/actions";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { VOXELS } from "@/app/wb/common";
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
+import { parse } from "papaparse";
 
 const DEFAULT_CSV = `Артикул,Изменение,Ячейка
 евро лето кружева,2,A1
@@ -77,10 +79,21 @@ export default function WBPage() {
   const [isUploading, setIsUploading] = useState(false);
   const isTelegram = !!tg;
 
+  // Модальные состояния — вынесены наверх для избежания TDZ
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editVoxel, setEditVoxel] = useState<string | null>(null);
+  const [editContents, setEditContents] = useState<{ item: any; quantity: number; newQuantity: number }[]>([]);
+
   useEffect(() => {
     loadItems();
     if (error) toast.error(error);
   }, [error, loadItems]);
+
+  const bgStyle = useMemo(() => 
+    gameMode === "onload" ? { background: "linear-gradient(to bottom, #fff, #ffd)" } : 
+    gameMode === "offload" ? { background: "linear-gradient(to bottom, #333, #000)" } : 
+    {}, [gameMode]
+  );
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,7 +173,7 @@ export default function WBPage() {
   const handlePlateClickCustom = (voxelId: string) => {
     handlePlateClick(voxelId);
     const content = items.flatMap((i) =>
-      i.locations.filter((l) => l.voxel === voxelId).map((l) => ({ item: i, quantity: l.quantity })),
+      i.locations.filter((l) => l.voxel === voxelId).map((l) => ({ item: i, quantity: l.quantity }))
     );
     if (gameMode === "onload") {
       if (content.length === 0) {
@@ -172,6 +185,7 @@ export default function WBPage() {
         setSearch("");
         toast.info(`Выберите товар для добавления в ${voxelId}`);
       } else {
+        // Открываем модал редактирования только если нужно (опционально)
         setEditVoxel(voxelId);
         setEditContents(content.map(c => ({ ...c, newQuantity: c.quantity })));
         setEditDialogOpen(true);
@@ -179,16 +193,19 @@ export default function WBPage() {
     } else if (gameMode === "offload") {
       if (content.length > 0) {
         const { item, quantity } = content[0];
-        handleUpdateLocationQty(item.id, voxelId, quantity - 1, true);
+        if (quantity > 0) {
+          handleUpdateLocationQty(item.id, voxelId, -1, true);
+        }
       }
     }
   };
 
-  const handleItemClickCustom = (item: Item) => {
+  const handleItemClickCustom = (item: any) => {
+    if (!item) return; // Защита от undefined
     if (gameMode === "onload" && selectedVoxel) {
-      const loc = item.locations.find((l) => l.voxel === selectedVoxel);
+      const loc = item.locations?.find((l: any) => l.voxel === selectedVoxel);
       const currentQty = loc ? loc.quantity : 0;
-      handleUpdateLocationQty(item.id, selectedVoxel, currentQty + 1, true);
+      handleUpdateLocationQty(item.id, selectedVoxel, 1, true);
       toast.success(`Добавлено в ${selectedVoxel}`);
     } else {
       handleItemClick(item);
@@ -196,20 +213,17 @@ export default function WBPage() {
   };
 
   const saveEditQty = async (itemId: string, newQty: number) => {
-    if (editVoxel && newQty >= 0) {
-      await handleUpdateLocationQty(itemId, editVoxel, newQty - (editContents.find(c => c.item.id === itemId)?.quantity || 0), true);
-      toast.success("Количество обновлено");
-      setEditDialogOpen(false);
-    } else {
+    if (!editVoxel || newQty < 0) {
       toast.error("Недопустимое количество");
+      return;
     }
+    const currentContent = editContents.find(c => c.item.id === itemId);
+    if (!currentContent) return;
+    const delta = newQty - currentContent.quantity;
+    await handleUpdateLocationQty(itemId, editVoxel, delta, !!gameMode);
+    toast.success("Количество обновлено");
+    setEditDialogOpen(false);
   };
-
-  const bgStyle = gameMode === "onload" ? { background: "linear-gradient(to bottom, #fff, #ffd" } : gameMode === "offload" ? { background: "linear-gradient(to bottom, #333, #000" } : {};
-
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editVoxel, setEditVoxel] = useState<string | null>(null);
-  const [editContents, setEditContents] = useState<{ item: Item; quantity: number; newQuantity: number }[]>([]);
 
   const handleResetFilters = () => {
     setFilterSeason(null);
@@ -305,83 +319,23 @@ export default function WBPage() {
         />
       </div>
 
-      {workflowItems.length > 0 && (
-        <Dialog open={true}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Операция {currentWorkflowIndex + 1}/{workflowItems.length}</DialogTitle>
-            </DialogHeader>
-            {currentWorkflowIndex < workflowItems.length && (
-              <div className="space-y-2 text-sm">
-                <p>Товар: {workflowItems[currentWorkflowIndex].id}, Изм: {workflowItems[currentWorkflowIndex].change}</p>
-                <Select value={selectedWorkflowVoxel || ""} onValueChange={setSelectedWorkflowVoxel}>
-                  <SelectTrigger><SelectValue placeholder="Ячейка" /></SelectTrigger>
-                  <SelectContent>
-                    {VOXELS.map((v) => <SelectItem key={v.id} value={v.id}>{v.id}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="flex gap-2">
-                  <Button onClick={handleWorkflowNext} className="flex-1">Обновить</Button>
-                  <Button onClick={handleSkipItem} variant="outline" className="flex-1">Нет в наличии</Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="p-4">
-          <DialogHeader>
-            <DialogTitle className="text-sm">Редактировать ячейку {editVoxel}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            {editContents.map(({ item, quantity, newQuantity }, idx) => (
-              <div key={item.id} className="flex items-center gap-2 text-[10px]">
-                <span className="flex-1 truncate">{item.name}</span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={newQuantity}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (!isNaN(value) && value >= 0) {
-                      setEditContents(prev => prev.map((c, i) => i === idx ? { ...c, newQuantity: value } : c));
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      saveEditQty(item.id, newQuantity);
-                    }
-                  }}
-                  className="w-16 h-6 text-[10px]"
-                  autoFocus={idx === 0}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-2">
-            <Button
-              size="sm"
-              className="flex-1 h-6 text-[10px]"
-              onClick={() => {
-                Promise.all(editContents.map(({ item, newQuantity }) => saveEditQty(item.id, newQuantity))).then(() => setEditDialogOpen(false));
-              }}
-            >
-              Сохранить все
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 h-6 text-[10px]"
-              onClick={() => setEditDialogOpen(false)}
-            >
-              <X className="mr-1 h-3 w-3" /> Отмена
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Модалы вынесены в компонент */}
+      <WarehouseModals
+        workflowItems={workflowItems}
+        currentWorkflowIndex={currentWorkflowIndex}
+        selectedWorkflowVoxel={selectedWorkflowVoxel}
+        setSelectedWorkflowVoxel={setSelectedWorkflowVoxel}
+        handleWorkflowNext={handleWorkflowNext}
+        handleSkipItem={handleSkipItem}
+        editDialogOpen={editDialogOpen}
+        setEditDialogOpen={setEditDialogOpen}
+        editVoxel={editVoxel}
+        editContents={editContents}
+        setEditContents={setEditContents}
+        saveEditQty={saveEditQty}
+        gameMode={gameMode}
+        VOXELS={VOXELS}
+      />
     </div>
   );
 }
