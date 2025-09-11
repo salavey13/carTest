@@ -205,28 +205,10 @@ export function useWarehouse() {
 
   const handlePlateClick = useCallback(
     (voxelId: string) => {
-      const content = items.flatMap((i) =>
-        i.locations.filter((l) => l.voxel === voxelId).map((l) => ({ item: i, quantity: l.quantity })),
-      );
-      if (gameMode === "onload") {
-        if (content.length === 0) {
-          // Add to random item in this voxel (create new location)
-          const randomItem = items[Math.floor(Math.random() * items.length)];
-          handleUpdateLocationQty(randomItem.id, voxelId, 1, true);
-        } else {
-          // Add to random existing item in this voxel
-          const { item } = content[Math.floor(Math.random() * content.length)];
-          handleUpdateLocationQty(item.id, voxelId, 1, true);
-        }
-      } else if (gameMode === "offload") {
-        if (content.length > 0) {
-          // Subtract from random item in this voxel
-          const { item } = content[Math.floor(Math.random() * content.length)];
-          handleUpdateLocationQty(item.id, voxelId, -1, true);
-        }
-      }
+      // Removed random bullshit; now only selects voxel for location-based actions
+      // Modals/edit handled in page.tsx
     },
-    [gameMode, items, handleUpdateLocationQty],
+    [],
   );
 
   const handleItemClick = useCallback(
@@ -252,8 +234,10 @@ export function useWarehouse() {
         }
       }
 
-      if (voxel) {
+      if (voxel && (delta > 0 || item.locations.find((l) => l.voxel === voxel)?.quantity > 0)) {
         handleUpdateLocationQty(item.id, voxel, delta, true);
+      } else if (delta < 0) {
+        toast.error("Нельзя уменьшить ниже 0");
       }
     },
     [gameMode, selectedVoxel, handleUpdateLocationQty],
