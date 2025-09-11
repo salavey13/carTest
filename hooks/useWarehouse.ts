@@ -31,7 +31,6 @@ const getSeasonPriority = (season: string | null): number => {
   return seasonOrder[season] || 3; // Default priority for unknown seasons
 };
 
-
 export function useWarehouse() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +68,7 @@ export function useWarehouse() {
           quantity: l.quantity,
           min_qty: l.voxel_id.startsWith("B") ? 3 : undefined,
         })) || [],
-        total_quantity: i.specs?.warehouse_locations?.reduce((acc: number, l: any) => acc + l.quantity, 0) || 0,
+        total_quantity: i.quantity || i.specs?.warehouse_locations?.reduce((acc: number, l: any) => acc + l.quantity, 0) || 0,
         season: i.specs?.season || null,
         pattern: i.specs?.pattern,
         color: i.specs?.color || "gray",
@@ -310,7 +309,6 @@ export function useWarehouse() {
       }
     });
   }, [sortOption]);
-
 
   const sortedFilteredItems = sortItems(filteredItems);
 
