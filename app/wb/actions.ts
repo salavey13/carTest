@@ -67,6 +67,7 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
 
 
 
+
 export async function uploadWarehouseCsv(
     batch: any[],
     userId: string | undefined
@@ -117,13 +118,24 @@ export async function uploadWarehouseCsv(
             // Parse quantity from the simplified CSV or default to 0 if not found
             let quantity = 0;
             try {
-                const specs = JSON.parse(row["specs"]);
+                //** KEY FIX: Validate and safely parse specs data **//
+                let specs = {};
+                try {
+                    if (typeof row["specs"] === 'string' && row["specs"].trim() !== "") {
+                        specs = JSON.parse(row["specs"]);
+                    } else {
+                        logger.warn(`Specs for item ${itemId} is empty or not a string.  Skipping parsing.`);
+                    }
+
+                } catch (specParseError: any) {
+                    logger.error(`Could not parse specs for item ${itemId}. Skipping. Error: ${specParseError.message}`);
+                }
+
                 if (specs?.warehouse_locations && Array.isArray(specs.warehouse_locations)) {
                     quantity = specs.warehouse_locations.reduce((acc, l) => acc + (parseInt(l.quantity, 10) || 0), 0);
                 }
             } catch (e) {
-                logger.warn(`Could not parse specs for item ${itemId}, using quantity from CSV if available. Error: ${e}`);
-
+                logger.warn(`Could not parse warehouse_locations from specs for item ${itemId}, using quantity from CSV if available. Error: ${e}`);
                 quantity = parseInt(row["Количество"] || '0', 10) || 0;
             }
 
@@ -136,13 +148,25 @@ export async function uploadWarehouseCsv(
             if (existingItem) {
                 logger.info(`Item ${itemId} exists, merging data.`);
                 try {
-                    const parsedSpecs = JSON.parse(row["specs"] || "{}"); // Safely parse the specs
+                    //** KEY FIX: Validate and safely parse specs data **//
+                    let parsedSpecs = {};
+                    try {
+                        if (typeof row["specs"] === 'string' && row["specs"].trim() !== "") {
+                            parsedSpecs = JSON.parse(row["specs"]);
+                        } else {
+                            logger.warn(`Specs for existing item ${itemId} is empty or not a string.  Skipping parsing.`);
+                        }
+                    } catch (specParseError: any) {
+                        logger.error(`Failed to parse and merge specs for existing item ${itemId}. Skipping. Error: ${specParseError.message}`);
+                        return null;  // Skip this item if we can't parse the specs
+                    }
+
                     itemToUpsert = {
                         ...existingItem,
                         specs: { ...existingItem.specs, ...parsedSpecs, warehouse_locations: [{ voxel_id: "A1", quantity }] }
                     };
                 } catch (e) {
-                    logger.error(`Failed to parse and merge specs for existing item ${itemId}:`, e);
+                    logger.error(`Failed to merge specs for existing item ${itemId}:`, e);
                     return null;
                 }
             } else {
@@ -185,7 +209,6 @@ export async function uploadWarehouseCsv(
         return { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
 }
-
 
 
 
