@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clipboard, Download, Upload } from "lucide-react";
+import Link from "next/link";
 
 interface InventoryItem {
     id: string;
@@ -20,6 +21,20 @@ interface CsvRow {
     Количество: string;
     [key: string]: string;
 }
+
+const deriveFieldsFromIdForCsv = (id: string, quantity: number) => {
+  const derived = deriveFieldsFromId(id); // Assume deriveFieldsFromId exported or copied
+  derived.specs.warehouse_locations = [{ voxel_id: "A1", quantity }];
+  return {
+    id,
+    make: derived.make,
+    model: derived.model,
+    description: derived.description,
+    type: "wb_item",
+    specs: JSON.stringify(derived.specs),
+    image_url: generateImageUrl(id), // Assume generateImageUrl exported
+  };
+};
 
 const CSVCompare = () => {
     const [csv1, setCsv1] = useState("");
@@ -43,28 +58,20 @@ const CSVCompare = () => {
                     const inventoryMap: { [id: string]: number } = {};
 
                     results.data.forEach((row: any) => {
-                        const id = row["id"];
-                        let quantity = 0;
+                        const id = row["Артикул"] || row["id"];
+                        let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
                         try {
-                            const specs = JSON.parse(row["specs"]);
-                            if (specs && specs.warehouse_locations) {
-                                if (Array.isArray(specs.warehouse_locations)) {
-                                    specs.warehouse_locations.forEach(
-                                        (location: { quantity: string | number }) => {
-                                            quantity += parseInt(location.quantity.toString(), 10) || 0;
-                                        }
+                            if (row["specs"]) {
+                                const specs = JSON.parse(row["specs"]);
+                                if (specs && specs.warehouse_locations && Array.isArray(specs.warehouse_locations)) {
+                                    quantity = specs.warehouse_locations.reduce(
+                                        (acc, location: { quantity: string | number }) => acc + (parseInt(location.quantity.toString(), 10) || 0),
+                                        0
                                     );
                                 }
                             }
                         } catch (e) {
-                            try {
-                                if (row["warehouse_locations"]) {
-                                    quantity = parseInt(row["warehouse_locations"].toString(), 10) || 0;
-                                } 
-                            } catch (ee: any) {
-                                toast.error(ee?.message || "Ошибка при загрузке.");
-                                console.error("Ошибка загрузки:", ee);
-                            }
+                            console.error("Error parsing specs:", e);
                         }
 
                         if (id) {
@@ -151,18 +158,48 @@ const CSVCompare = () => {
 
     const inventoryToCsv = (
         inventory: InventoryItem[],
-        includeZeroQuantities: boolean = false
+        includeZeroQuantities: boolean = false,
+        dbReady: boolean = false
     ): string => {
-        const csvData = inventory
+        let csvData;
+        if (dbReady) {
+          csvData = inventory
+            .filter((item) => includeZeroQuantities || item.quantity > 0)
+            .map((item) => deriveFieldsFromIdForCsv(item.id, item.quantity));
+        } else {
+          csvData = inventory
             .filter((item) => includeZeroQuantities || item.quantity > 0)
             .map((item) => ({
                 Артикул: item.id,
                 Количество: item.quantity,
             }));
+        }
         return unparse(csvData, {
             header: true,
             quotes: true,
         });
+    };
+
+    const handleConvertToDbReady = () => {
+      const csv = inventoryToCsv(inventory2, false, true);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "inventory_db_ready.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    };
+
+    const handleConvertToSummarized = () => {
+      const csv = inventoryToCsv(inventory2);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "inventory_summarized.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
     };
 
     const handleUploadToSupabase = useCallback(async () => {
@@ -295,9 +332,7 @@ const CSVCompare = () => {
                                 const a = document.createElement("a");
                                 a.href = url;
                                 a.download = "inventory1.csv";
-                                document.body.appendChild(a);
                                 a.click();
-                                document.body.removeChild(a);
                                 window.URL.revokeObjectURL(url);
                             }}
                         >
@@ -334,9 +369,7 @@ const CSVCompare = () => {
                                 const a = document.createElement("a");
                                 a.href = url;
                                 a.download = "inventory2.csv";
-                                document.body.appendChild(a);
                                 a.click();
-                                document.body.removeChild(a);
                                 window.URL.revokeObjectURL(url);
                             }}
                         >
@@ -446,8 +479,23 @@ const CSVCompare = () => {
                     >
                         <Upload className="mr-2 h-4 w-4" /> {uploading ? "Загрузка..." : "Загрузить в Supabase"}
                     </Button>
+                    <Button
+                        className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mt-2 w-full"
+                        onClick={handleConvertToDbReady}
+                    >
+                        <Download className="mr-2 h-4 w-4" /> Конвертировать в DB-ready CSV
+                    </Button>
+                    <Button
+                        className="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded mt-2 w-full"
+                        onClick={handleConvertToSummarized}
+                    >
+                        <Download className="mr-2 h-4 w-4" /> Конвертировать в суммированный CSV
+                    </Button>
                 </CardContent>
             </Card>
+            <Link href="/wb">
+                <Button size="sm" variant="outline" className="text-[10px] mt-4 w-full">Вернуться в WB</Button>
+            </Link>
         </div>
     );
 };
