@@ -20,8 +20,8 @@ interface FilterAccordionProps {
   includeSearch?: boolean;
   search?: string;
   setSearch?: (value: string) => void;
-  sortOption: 'size_season_color' | 'color_size' | 'season_size_color'; // New prop
-  setSortOption: (option: 'size_season_color' | 'color_size' | 'season_size_color') => void; // New prop
+  sortOption?: 'size_season_color' | 'color_size' | 'season_size_color' | null;
+  setSortOption: (option: 'size_season_color' | 'color_size' | 'season_size_color' | null) => void;
 }
 
 export default function FilterAccordion({
@@ -38,8 +38,8 @@ export default function FilterAccordion({
   includeSearch = false,
   search = "",
   setSearch = () => {},
-  sortOption, // New prop
-  setSortOption, // New prop
+  sortOption = 'size_season_color',
+  setSortOption,
 }: FilterAccordionProps) {
   const uniqueSeasons = Array.from(new Set(items.map((i) => i.season).filter(Boolean)));
   const uniquePatterns = Array.from(new Set(items.map((i) => i.pattern).filter(Boolean)));
@@ -92,7 +92,7 @@ export default function FilterAccordion({
       </Select>
       {/* Sort Option Select */}
       <div className="col-span-2">
-        <Select value={sortOption} onValueChange={(value) => setSortOption(value as 'size_season_color' | 'color_size' | 'season_size_color')}>
+        <Select value={sortOption || ""} onValueChange={(value) => setSortOption((value as 'size_season_color' | 'color_size' | 'season_size_color') || 'size_season_color')}>
           <SelectTrigger className="h-6 text-[10px] w-full">
             <SelectValue placeholder="Сортировка" />
           </SelectTrigger>
