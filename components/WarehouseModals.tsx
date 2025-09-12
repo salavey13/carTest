@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,19 +41,25 @@ export default function WarehouseModals({
   gameMode,
   VOXELS,
 }: WarehouseModalsProps) {
-  const [localEditContents, setLocalEditContents] = useState(editContents);
+  const [localEditContents, setLocalEditContents] = useState(editContents || []);
 
-  // Синхронизация с пропсами
-  useState(() => {
-    setLocalEditContents(editContents);
+  // CORRECT SYNC: useEffect, not useState hack
+  useEffect(() => {
+    setLocalEditContents(editContents || []);
   }, [editContents]);
 
   const handleSaveAll = async () => {
+    if (!localEditContents || localEditContents.length === 0) {
+      setEditDialogOpen(false);
+      return;
+    }
     await Promise.all(
       localEditContents.map(({ item, newQuantity }) => saveEditQty(item.id, newQuantity))
     );
     setEditDialogOpen(false);
   };
+
+  const anyNegative = localEditContents.some(c => (c?.newQuantity ?? 0) < 0);
 
   return (
     <>
@@ -99,55 +105,70 @@ export default function WarehouseModals({
           <DialogHeader>
             <DialogTitle className="text-sm">Редактировать {editVoxel}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {localEditContents.map(({ item, quantity, newQuantity }, idx) => (
-              <div key={item.id} className="flex items-center gap-2 text-[10px]">
-                <span className="flex-1 truncate pr-2">{item.name}</span>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={newQuantity}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value, 10);
-                    if (!isNaN(value) && value >= 0) {
-                      setLocalEditContents((prev) =>
-                        prev.map((c, i) => (i === idx ? { ...c, newQuantity: value } : c))
-                      );
-                      setEditContents((prev) =>
-                        prev.map((c, i) => (i === idx ? { ...c, newQuantity: value } : c))
-                      );
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      saveEditQty(item.id, newQuantity);
-                    }
-                  }}
-                  className="w-16 h-6 text-[10px]"
-                  autoFocus={idx === 0}
-                />
+
+          {/* If no contents — show a friendly read-only view */}
+          {(!localEditContents || localEditContents.length === 0) ? (
+            <div className="p-4 text-center space-y-3">
+              <div className="text-sm font-medium">Ячейка пуста</div>
+              <div className="text-[12px] opacity-80">В этой ячейке нет товаров — нечего редактировать. Можно закрыть окно и продолжить работу.</div>
+              <div className="flex justify-center mt-3">
+                <Button onClick={() => setEditDialogOpen(false)} className="h-8">Закрыть</Button>
               </div>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-3 pt-2 border-t">
-            <Button
-              size="sm"
-              className="flex-1 h-8 text-[10px]"
-              onClick={handleSaveAll}
-              disabled={localEditContents.some(c => c.newQuantity < 0)}
-            >
-              Сохранить все
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 h-8 text-[10px]"
-              onClick={() => setEditDialogOpen(false)}
-            >
-              <X className="mr-1 h-3 w-3" size={12} /> Отмена
-            </Button>
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {localEditContents.map(({ item, quantity, newQuantity }, idx) => (
+                  <div key={item.id} className="flex items-center gap-2 text-[10px]">
+                    <span className="flex-1 truncate pr-2">{item.name}</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={newQuantity}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const value = raw === "" ? 0 : parseInt(raw, 10);
+                        if (!isNaN(value) && value >= 0) {
+                          setLocalEditContents((prev) =>
+                            prev.map((c, i) => (i === idx ? { ...c, newQuantity: value } : c))
+                          );
+                          setEditContents((prev) =>
+                            prev.map((c, i) => (i === idx ? { ...c, newQuantity: value } : c))
+                          );
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          saveEditQty(item.id, newQuantity);
+                        }
+                      }}
+                      className="w-16 h-6 text-[10px]"
+                      autoFocus={idx === 0}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-3 pt-2 border-t">
+                <Button
+                  size="sm"
+                  className="flex-1 h-8 text-[10px]"
+                  onClick={handleSaveAll}
+                  disabled={anyNegative || localEditContents.length === 0}
+                >
+                  Сохранить все
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-8 text-[10px]"
+                  onClick={() => setEditDialogOpen(false)}
+                >
+                  <X className="mr-1 h-3 w-3" size={12} /> Отмена
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>
