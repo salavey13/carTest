@@ -16,7 +16,7 @@ import WarehouseModals from "@/components/WarehouseModals";
 import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv, updateItemLocationQty } from "@/app/wb/actions";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
-import { VOXELS } from "@/app/wb/common";
+import { VOXELS, SIZE_PACK } from "@/app/wb/common";
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { parse } from "papaparse";
@@ -105,25 +105,38 @@ export default function WBPage() {
     [gameMode]
   );
 
-  // --- Helpers used for sorting locally (copied logic from hook) ---
+  // --- Size / season priority helpers (robust)
+  const sizeOrderArray = Object.keys(SIZE_PACK || {});
+  const sizeOrderMap: { [k: string]: number } = {};
+  sizeOrderArray.forEach((s, idx) => (sizeOrderMap[s.toLowerCase()] = idx + 1));
+
+  const normalizeSizeKey = (size?: string | null) => {
+    if (!size) return "";
+    return size.toString().toLowerCase().trim().replace(/\s/g, "").replace(/×/g, "x");
+  };
+
   const getSizePriority = (size: string | null): number => {
     if (!size) return 999;
-    const sizeOrder: { [key: string]: number } = {
-      "1.5": 1,
-      "2": 2,
-      "евро": 3,
-      "евро макси": 4,
-    };
-    return sizeOrder[size] || 5;
+    const key = normalizeSizeKey(size);
+    // legacy markers
+    if (key === "1.5") return 0;
+    if (key === "2") return 1;
+    if (key === "евро") return 2;
+    if (key === "евромакси" || key === "евро макси") return 3;
+
+    if (sizeOrderMap[key]) return sizeOrderMap[key];
+
+    const num = parseInt(key.replace(/[^\d]/g, ""), 10);
+    if (!isNaN(num)) return 100 + num;
+    return 999;
   };
 
   const getSeasonPriority = (season: string | null): number => {
     if (!season) return 999;
-    const seasonOrder: { [key: string]: number } = {
-      "лето": 1,
-      "зима": 2,
-    };
-    return seasonOrder[season] || 3;
+    const s = season.toString().toLowerCase();
+    if (s === "лето" || s === "leto") return 1;
+    if (s === "зима" || s === "zima") return 2;
+    return 3;
   };
 
   // --- Файловая загрузка/импорт (accept csv/txt) ---
@@ -136,6 +149,8 @@ export default function WBPage() {
       try {
         const text = (event.target?.result as string) || "";
         const parsed = parse(text, { header: true, skipEmptyLines: true }).data as any[];
+
+        // keep previous behavior: admin-upsert CSV
         const result = await uploadWarehouseCsv(parsed, user?.id);
         setIsUploading(false);
         if (result.success) {
@@ -194,17 +209,27 @@ export default function WBPage() {
     toast.success("Reset to checkpoint!");
   };
 
+  // compute processed stats INCLUDING packings & stars
   const computeProcessedStats = useCallback(() => {
-    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0 };
-    const changedCount = (localItems || []).reduce((acc, it) => {
+    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, packings: 0, stars: 0 };
+    let changedCount = 0;
+    let totalDelta = 0;
+    let packings = 0;
+
+    (localItems || []).forEach((it) => {
       const cp = checkpoint.find((c) => c.id === it.id);
-      return acc + (cp && (cp.total_quantity !== it.total_quantity) ? 1 : 0);
-    }, 0);
-    const totalDelta = (localItems || []).reduce((acc, it) => {
-      const cp = checkpoint.find((c) => c.id === it.id);
-      return acc + Math.abs((it.total_quantity || 0) - (cp?.total_quantity || 0));
-    }, 0);
-    return { changedCount, totalDelta };
+      if (!cp) return;
+      const delta = Math.abs((it.total_quantity || 0) - (cp.total_quantity || 0));
+      if (delta > 0) changedCount += 1;
+      totalDelta += delta;
+
+      const sizeKey = normalizeSizeKey(it.size);
+      const piecesPerPack = (SIZE_PACK && SIZE_PACK[sizeKey]) ? SIZE_PACK[sizeKey] : 1;
+      packings += Math.floor(delta / piecesPerPack);
+    });
+
+    const stars = packings * 25; // 1 packing = 25 stars
+    return { changedCount, totalDelta, packings, stars };
   }, [localItems, checkpoint]);
 
   const handleExportDiff = async () => {
@@ -278,38 +303,34 @@ export default function WBPage() {
   };
 
   // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
-// paste into /app/wb/page.tsx — replace existing handlePlateClickCustom
-const handlePlateClickCustom = (voxelId: string) => {
-  handlePlateClick(voxelId);
+  const handlePlateClickCustom = (voxelId: string) => {
+    handlePlateClick(voxelId);
 
-  const content = localItems
-    .flatMap((i) => (i.locations || []).filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0)
-      .map((l:any) => ({ item: i, quantity: l.quantity }))
-    );
+    const content = localItems
+      .flatMap((i) => (i.locations || []).filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0)
+        .map((l:any) => ({ item: i, quantity: l.quantity }))
+      );
 
-  // If we are in "onload" or "offload" — do NOT open modals, just select voxel silently
-  if (gameMode === "onload" || gameMode === "offload") {
-    setSelectedVoxel(voxelId);
-    // subtle UX hint instead of modal:
-    if (gameMode === "onload") {
-      toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточку` : `Выбрана ячейка ${voxelId}`);
-    } else {
-      toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
+    // If we are in "onload" or "offload" — do NOT open modals, just select voxel silently
+    if (gameMode === "onload" || gameMode === "offload") {
+      setSelectedVoxel(voxelId);
+      if (gameMode === "onload") {
+        toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточки` : `Выбрана ячейка ${voxelId}`);
+      } else {
+        toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
+      }
+      return;
     }
-    // DO NOT call setEditDialogOpen or setEditContents here
-    return;
-  }
 
-  // default behaviour for neutral mode:
-  if (content.length > 0) {
-    setEditVoxel(voxelId);
-    setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-    setEditDialogOpen(true);
-  } else {
-    setSelectedVoxel(voxelId);
-  }
-};
-
+    // default behaviour for neutral mode:
+    if (content.length > 0) {
+      setEditVoxel(voxelId);
+      setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
+      setEditDialogOpen(true);
+    } else {
+      setSelectedVoxel(voxelId);
+    }
+  };
 
   // item click still does qty changes (optimistic)
   const handleItemClickCustom = async (item: any) => {
@@ -387,7 +408,7 @@ const handlePlateClickCustom = (voxelId: string) => {
     return sorted;
   }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
 
-  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta } = computeProcessedStats();
+  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars } = computeProcessedStats();
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
 
   return (
@@ -476,6 +497,9 @@ const handlePlateClickCustom = (voxelId: string) => {
               </div>
               <div className="text-[12px] mt-1 opacity-80">
                 Изм. позиций: <b>{checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0)}</b> · Изменённое кол-во: <b>{checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0)}</b>
+                <div className="mt-1 text-[11px] opacity-80">
+                  Упаковок: <b>{checkpointStart ? livePackings : 0}</b> · Звёзд: <b>{checkpointStart ? liveStars : 0}</b> <span className="opacity-60 text-[10px]"> (1 упаковка = 25⭐)</span>
+                </div>
               </div>
             </div>
           </div>
