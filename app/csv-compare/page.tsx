@@ -49,17 +49,30 @@ const CSVCompare = () => {
     const [diffCounts, setDiffCounts] = useState<{ [id: string]: number }>({});
     const { user } = useAppContext();
 
+    // --- ИЗМЕНЕНО: Добавлен флаг strictMode для построчного сравнения без суммирования ---
+    const [strictMode, setStrictMode] = useState(false);
+
     const parseCSV = useCallback(
         (csvText: string, setInventory: (items: InventoryItem[]) => void) => {
             parse(csvText, {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
+                    // --- ИЗМЕНЕНО: В strictMode не суммируем, а сохраняем все строки как уникальные с суффиксом rowIndex ---
                     const inventoryMap: { [id: string]: number } = {};
+                    const strictRows: InventoryItem[] = [];
 
-                    results.data.forEach((row: any) => {
-                        const id = row["Артикул"] || row["id"];
+                    results.data.forEach((row: any, index: number) => {
+                        let id = (row["Артикул"] || row["id"])?.toLowerCase(); // --- ИЗМЕНЕНО: toLowerCase для consistency ---
+                        if (!id) return; // Skip invalid rows
+
                         let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
+                        // --- ИЗМЕНЕНО: Проверка на negative quantity ---
+                        if (quantity < 0) {
+                            console.warn(`Negative quantity in row ${index}: ${quantity}. Setting to 0.`);
+                            quantity = 0;
+                        }
+
                         try {
                             if (row["specs"]) {
                                 const specs = JSON.parse(row["specs"]);
@@ -74,19 +87,26 @@ const CSVCompare = () => {
                             console.error("Error parsing specs:", e);
                         }
 
-                        if (id) {
+                        if (strictMode) {
+                            // --- ИЗМЕНЕНО: В strict — уникальный ID per row ---
+                            const uniqueId = `${id}_row${index}`;
+                            strictRows.push({ id: uniqueId, quantity });
+                        } else {
                             inventoryMap[id] = (inventoryMap[id] || 0) + quantity;
                         }
                     });
 
-                    const inventoryList: InventoryItem[] = Object.entries(inventoryMap).map(
-                        ([id, quantity]) => ({
-                            id,
-                            quantity,
-                        })
-                    );
-
-                    setInventory(inventoryList);
+                    if (strictMode) {
+                        setInventory(strictRows);
+                    } else {
+                        const inventoryList: InventoryItem[] = Object.entries(inventoryMap).map(
+                            ([id, quantity]) => ({
+                                id,
+                                quantity,
+                            })
+                        );
+                        setInventory(inventoryList);
+                    }
                 },
                 error: (error) => {
                     console.error("Ошибка парсинга CSV:", error);
@@ -94,7 +114,7 @@ const CSVCompare = () => {
                 },
             });
         },
-        []
+        [strictMode] // --- ИЗМЕНЕНО: Зависимость от strictMode ---
     );
 
     const compareInventories = useCallback(() => {
@@ -113,6 +133,14 @@ const CSVCompare = () => {
         }
         if (removedItems.length > 0) {
             diffs.push(`Удаленные товары: ${removedItems.join(", ")}`);
+        }
+
+        // --- ИЗМЕНЕНО: В strictMode выявляем дубликаты строк ---
+        if (strictMode) {
+            const dupes1 = findDuplicates(inventory1.map(i => i.id.split('_row')[0]));
+            const dupes2 = findDuplicates(inventory2.map(i => i.id.split('_row')[0]));
+            if (dupes1.length > 0) diffs.push(`Дубликаты в CSV1: ${dupes1.join(", ")}`);
+            if (dupes2.length > 0) diffs.push(`Дубликаты в CSV2: ${dupes2.join(", ")}`);
         }
 
         modifiedItems.forEach((id) => {
@@ -142,7 +170,7 @@ const CSVCompare = () => {
             .slice(0, 13)
             .map(([id, count]) => ({ id, count }));
         setPopularItems(sortedItems);
-    }, [inventory1, inventory2]);
+    }, [inventory1, inventory2, strictMode]); // --- ИЗМЕНЕНО: Зависимость от strictMode ---
 
     const handleCsv1Change = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newCsv1 = e.target.value;
@@ -283,6 +311,13 @@ const CSVCompare = () => {
         ? inventory2.filter((item) => item.quantity > 0)
         : inventory2;
 
+    // --- ИЗМЕНЕНО: Helper для поиска дубликатов ID ---
+    const findDuplicates = (ids: string[]) => {
+        const countMap: { [key: string]: number } = {};
+        ids.forEach(id => countMap[id] = (countMap[id] || 0) + 1);
+        return Object.keys(countMap).filter(id => countMap[id] > 1);
+    };
+
     return (
         <div className="container mx-auto p-4 pt-24 max-w-4xl">
             <h1 className="text-2xl font-bold mb-4 text-center">Сравнение инвентаря CSV</h1>
@@ -299,9 +334,24 @@ const CSVCompare = () => {
                         <li>Экспорт списков в CSV для скачивания.</li>
                         <li>Загрузка второго CSV в Supabase для обновления склада (только админы).</li>
                         <li>Топ-13 популярных товаров и таблица различий отображаются после сравнения.</li>
+                        {/* --- ИЗМЕНЕНО: Добавлена инструкция по strict --- */}
+                        <li>Включите "Strict Mode" для построчного сравнения (без суммирования дубликатов ID).</li>
                     </ul>
                 </CardContent>
             </Card>
+
+            {/* --- ИЗМЕНЕНО: Добавлен toggle для strictMode --- */}
+            <div className="mb-4 flex items-center space-x-4">
+                <label className="inline-flex items-center">
+                    <input
+                        type="checkbox"
+                        className="mr-2"
+                        checked={strictMode}
+                        onChange={(e) => setStrictMode(e.target.checked)}
+                    />
+                    <span className="text-gray-700">Strict Mode (без суммирования)</span>
+                </label>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <Card>
