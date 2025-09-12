@@ -278,45 +278,38 @@ export default function WBPage() {
   };
 
   // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
-  const handlePlateClickCustom = (voxelId: string) => {
-    handlePlateClick(voxelId);
+// paste into /app/wb/page.tsx — replace existing handlePlateClickCustom
+const handlePlateClickCustom = (voxelId: string) => {
+  handlePlateClick(voxelId);
 
-    const content = localItems
-      .flatMap((i) => i.locations.filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0).map((l:any) => ({ item: i, quantity: l.quantity })));
+  const content = localItems
+    .flatMap((i) => (i.locations || []).filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0)
+      .map((l:any) => ({ item: i, quantity: l.quantity }))
+    );
 
+  // If we are in "onload" or "offload" — do NOT open modals, just select voxel silently
+  if (gameMode === "onload" || gameMode === "offload") {
+    setSelectedVoxel(voxelId);
+    // subtle UX hint instead of modal:
     if (gameMode === "onload") {
-      if (content.length === 0) {
-        setSelectedVoxel(voxelId);
-        setFilterSeason(null);
-        setFilterPattern(null);
-        setFilterColor(null);
-        setFilterSize(null);
-        setSearch("");
-        toast.info(`Выберите товар для добавления в ${voxelId}`);
-      } else {
-        setEditVoxel(voxelId);
-        setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-        setEditDialogOpen(true);
-      }
-    } else if (gameMode === "offload") {
-      if (content.length > 0) {
-        setEditVoxel(voxelId);
-        setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-        setEditDialogOpen(true);
-        toast.info("Касание по карточке товара списывает позицию. Плитка только открывает обзор.");
-      } else {
-        toast.info("В этой ячейке нет товаров");
-      }
+      toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточку` : `Выбрана ячейка ${voxelId}`);
     } else {
-      if (content.length > 0) {
-        setEditVoxel(voxelId);
-        setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-        setEditDialogOpen(true);
-      } else {
-        setSelectedVoxel(voxelId);
-      }
+      toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
     }
-  };
+    // DO NOT call setEditDialogOpen or setEditContents here
+    return;
+  }
+
+  // default behaviour for neutral mode:
+  if (content.length > 0) {
+    setEditVoxel(voxelId);
+    setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
+    setEditDialogOpen(true);
+  } else {
+    setSelectedVoxel(voxelId);
+  }
+};
+
 
   // item click still does qty changes (optimistic)
   const handleItemClickCustom = async (item: any) => {

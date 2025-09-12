@@ -20,6 +20,10 @@ import { leaderboardCommand } from "./leaderboard";
 import { sosCommand, handleSosPaymentChoice } from "./sos";
 import { actionsCommand, handleActionChoice } from "./actions";
 import { shiftCommand } from "./shift"; 
+import { wbCommand } from "./wb";
+
+
+
 import { escapeTelegramMarkdown } from "@/lib/utils"; // Helper для Markdown escape
 
 export async function handleCommand(update: any) {
@@ -85,6 +89,8 @@ export async function handleCommand(update: any) {
             "/seed_market": () => seedMarketCommand(chatId, userIdStr),
             "/leaderboard": () => leaderboardCommand(chatId, userIdStr),
             "/board": () => leaderboardCommand(chatId, userIdStr),
+// в commandMap
+"/wb": () => wbCommand(chatId, userIdStr),
             "/leads": () => leadsCommand(chatId, userId),
             "/sauce": () => sauceCommand(chatId, userId),
             "/file": () => fileCommand(chatId, userId, args),
