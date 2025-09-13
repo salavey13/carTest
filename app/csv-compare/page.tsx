@@ -8,6 +8,7 @@ import { notifyAdmins } from "@/app/actions"; // Assuming this is available; if 
 import { useAppContext } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clipboard, Download, Upload } from "lucide-react";
 import Link from "next/link";
@@ -58,6 +59,7 @@ const CSVCompare = () => {
     const { user } = useAppContext();
     const [strictMode, setStrictMode] = useState(false);
     const [alarms, setAlarms] = useState<WarehouseItem[]>([]);
+    const [days, setDays] = useState(1);
 
     const parseCSV = useCallback(
         (csvText: string, setInventory: (inv: Inventory) => void) => {
@@ -159,15 +161,18 @@ const CSVCompare = () => {
             if (dupes2.length > 0) diffs.push(`Дубликаты в CSV2: ${dupes2.join(", ")}`);
         } else {
             // Demand calculation and alarms only in non-strict mode
-            let days = 1;
+            let calculatedDays = 1;
             if (inventory1.ts && inventory2.ts) {
                 const diffMs = inventory2.ts.getTime() - inventory1.ts.getTime();
-                if (diffMs <= 0) {
+                if (diffMs > 0) {
+                    calculatedDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                    setDays(calculatedDays);
+                } else {
                     toast.error("Invalid timestamps: new <= old");
                     return;
                 }
-                days = diffMs / (1000 * 60 * 60 * 24);
             }
+            const effectiveDays = days;
 
             const demands: { [id: string]: number } = {};
             modifiedItems.forEach((id) => {
@@ -175,7 +180,7 @@ const CSVCompare = () => {
                 const qty2 = inventory2.items.find((i) => i.id === id)?.quantity || 0;
                 const demand = Math.max(0, qty1 - qty2);
                 if (demand > 0) {
-                    demands[id] = demand / days;
+                    demands[id] = demand / effectiveDays;
                 }
             });
 
@@ -268,7 +273,7 @@ const CSVCompare = () => {
             .slice(0, 13)
             .map(([id, count]) => ({ id, count }));
         setPopularItems(sortedItems);
-    }, [inventory1, inventory2, strictMode]);
+    }, [inventory1, inventory2, strictMode, days]);
 
     const handleCsv1Change = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newCsv1 = e.target.value;
@@ -426,6 +431,7 @@ const CSVCompare = () => {
                         <li>Загрузка второго CSV в Supabase для обновления склада (только админы).</li>
                         <li>Топ-13 популярных товаров и таблица различий отображаются после сравнения.</li>
                         <li>Включите "Strict Mode" для построчного сравнения (без суммирования).</li>
+                        <li>Укажите количество дней между CSV для расчета спроса (автозаполнение, если есть timestamps).</li>
                     </ul>
                 </CardContent>
             </Card>
@@ -528,6 +534,17 @@ const CSVCompare = () => {
                     />
                     <span className="text-gray-700">Скрыть товары с 0 количеством</span>
                 </label>
+                <div className="flex items-center space-x-2">
+                    <label className="text-gray-700">Дней между CSV:</label>
+                    <Input
+                        type="number"
+                        value={days}
+                        onChange={(e) => setDays(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20"
+                        min={1}
+                    />
+                    <Button onClick={() => setDays((d) => d + 1)}>+1</Button>
+                </div>
                 <Button
                     className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1"
                     onClick={compareInventories}
