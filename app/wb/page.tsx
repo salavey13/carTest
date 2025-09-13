@@ -13,6 +13,7 @@ import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import WarehouseModals from "@/components/WarehouseModals";
+import WarehouseStats from "@/components/WarehouseStats";
 import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv, updateItemLocationQty } from "@/app/wb/actions";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
@@ -411,17 +412,44 @@ export default function WBPage() {
   const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars } = computeProcessedStats();
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
 
+  // Precompute some formatted strings for stats component
+  const checkpointDisplayMain = checkpointStart ? formatSec(elapsedSec) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--");
+  const checkpointDisplaySub = checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался");
+  const processedChangedCount = checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0);
+  const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0);
+  const processedPackings = checkpointStart ? livePackings : 0;
+  const processedStars = checkpointStart ? liveStars : 0;
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="p-2 flex flex-col gap-2">
         <div className="flex justify-between items-center gap-2">
-          <Select value={gameMode || ""} onValueChange={(v:any)=> setGameMode(v || null)}>
-            <SelectTrigger className="w-24 text-[10px]">
+          {/* Select: explicit "none" option mapped to null */}
+          <Select
+            value={gameMode === null ? "none" : gameMode}
+            onValueChange={(v: any) => setGameMode(v === "none" ? null : v)}
+          >
+            <SelectTrigger className="w-28 text-[10px]">
               <SelectValue placeholder="Режим" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="onload"><VibeContentRenderer content="::fasun:: Прием" /></SelectItem>
-              <SelectItem value="offload"><VibeContentRenderer content="::famoon:: Выдача" /></SelectItem>
+              <SelectItem value="none">
+                <div className="flex items-center gap-2">
+                  <FileText size={12} /> <span>Без режима</span>
+                </div>
+              </SelectItem>
+
+              <SelectItem value="onload">
+                <div className="flex items-center gap-2">
+                  <Upload size={12} /> <span>Прием</span>
+                </div>
+              </SelectItem>
+
+              <SelectItem value="offload">
+                <div className="flex items-center gap-2">
+                  <Download size={12} /> <span>Выдача</span>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
 
@@ -474,62 +502,41 @@ export default function WBPage() {
           </CardContent>
         </Card>
 
-        <div className="mt-2 p-3 bg-muted rounded-lg text-[12px] space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Статистика</h3>
-            <div className="text-[11px] opacity-80">Элементов: <b>{localItems.length}</b> · Уникальных ID: <b>{new Set(localItems.map(i => i.id)).size}</b></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-white/5 rounded flex flex-col gap-1">
-              <div className="text-[11px]">Эффективность</div>
-              <div className="text-lg font-bold">{score} <span className="text-xs opacity-70"> (Вал: {Math.floor(score/100)})</span></div>
-              <div className="text-[11px] opacity-70">Ур: {level} · Серия: {streak} · Дни: {dailyStreak}</div>
-            </div>
-
-            <div className={cn("p-2 rounded", checkpointStart ? "bg-emerald-600/10 border border-emerald-300" : "bg-yellow-600/5 border border-yellow-300")}>
-              <div className="text-[11px]">Checkpoint</div>
-              <div className="flex items-baseline gap-3">
-                <div className="text-2xl font-mono font-bold">{checkpointStart ? formatSec(elapsedSec) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--")}</div>
-                <div className="text-[11px] opacity-80">
-                  {checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался")}
-                </div>
-              </div>
-              <div className="text-[12px] mt-1 opacity-80">
-                Изм. позиций: <b>{checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0)}</b> · Изменённое кол-во: <b>{checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0)}</b>
-                <div className="mt-1 text-[11px] opacity-80">
-                  Упаковок: <b>{checkpointStart ? livePackings : 0}</b> · Звёзд: <b>{checkpointStart ? liveStars : 0}</b> <span className="opacity-60 text-[10px]"> (1 упаковка = 25⭐)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-[11px]">
-            <div>Достижения: <span className="font-medium">{achievements.join(", ") || "—"}</span></div>
-            <div className="mt-1">Время сессии: <b>{Math.floor((Date.now() - sessionStart) / 1000)}</b> сек · Ошибки: <b>{errorCount}</b></div>
-            {bossMode && <div className="text-destructive">Критическая! Осталось: <b>{Math.floor(bossTimer/1000)}</b> сек</div>}
-          </div>
-
-          <div>
-            <div className="text-[11px]">Рейтинг:</div>
-            <ol className="list-decimal pl-4 text-[10px]">
-              {leaderboard.map((entry, idx) => (
-                <li key={idx}>{entry.name}: {entry.score} ({entry.date})</li>
-              ))}
-            </ol>
-          </div>
+        {/* WarehouseViz прямо под товарами */}
+        <div className="mt-2">
+          <WarehouseViz
+            items={localItems}
+            selectedVoxel={selectedVoxel}
+            onSelectVoxel={setSelectedVoxel}
+            onUpdateLocationQty={(itemId:string, voxelId:string, qty:number) => optimisticUpdate(itemId, voxelId, qty)}
+            gameMode={gameMode}
+            onPlateClick={handlePlateClickCustom}
+          />
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto p-2" style={bgStyle}>
-        <WarehouseViz
-          items={localItems}
-          selectedVoxel={selectedVoxel}
-          onSelectVoxel={setSelectedVoxel}
-          onUpdateLocationQty={(itemId:string, voxelId:string, qty:number) => optimisticUpdate(itemId, voxelId, qty)}
-          gameMode={gameMode}
-          onPlateClick={handlePlateClickCustom}
-        />
+        {/* Статистика вынесена в отдельный компонент и находится ниже viz */}
+        <div className="mt-4">
+          <WarehouseStats
+            itemsCount={localItems.length}
+            uniqueIds={new Set(localItems.map(i => i.id)).size}
+            score={score}
+            level={level}
+            streak={streak}
+            dailyStreak={dailyStreak}
+            checkpointMain={checkpointDisplayMain}
+            checkpointSub={checkpointDisplaySub}
+            changedCount={processedChangedCount}
+            totalDelta={processedTotalDelta}
+            packings={processedPackings}
+            stars={processedStars}
+            achievements={achievements}
+            sessionStart={sessionStart}
+            errorCount={errorCount}
+            bossMode={bossMode}
+            bossTimer={bossTimer}
+            leaderboard={leaderboard}
+          />
+        </div>
       </div>
 
       <WarehouseModals
