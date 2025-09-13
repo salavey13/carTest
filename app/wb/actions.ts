@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -316,5 +317,47 @@ export async function exportCurrentStock(items: any[], isTelegram: boolean = fal
       attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
     });
     return { success: true };
+  }
+}
+
+export async function updateItemMinQty(
+  itemId: string,
+  minQty: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: existingItem, error: selectError } = await supabaseAdmin
+      .from("cars")
+      .select("specs")
+      .eq("id", itemId)
+      .single();
+
+    if (selectError) {
+      logger.error(`Error fetching item ${itemId} for min_qty update:`, selectError);
+      return { success: false, error: `Failed to fetch item: ${selectError.message}` };
+    }
+
+    if (!existingItem?.specs) {
+      logger.warn(`Item ${itemId} not found or missing specs.`);
+      return { success: false, error: "Item not found or missing specs." };
+    }
+
+    let specs = existingItem.specs;
+    specs.min_quantity = Math.floor(minQty); // Floor to integer
+
+    const { error: updateError } = await supabaseAdmin
+      .from("cars")
+      .update({ specs })
+      .eq("id", itemId);
+
+    if (updateError) {
+      logger.error(`Error updating item ${itemId} min_qty:`, updateError);
+      return { success: false, error: `Failed to update item: ${updateError.message}` };
+    }
+
+    logger.info(`Successfully updated item ${itemId} min_qty to ${minQty}.`);
+    return { success: true };
+  } catch (error) {
+    logger.error("Error in updateItemMinQty:", error);
+    return { success: false, error: (error as Error).message };
   }
 }

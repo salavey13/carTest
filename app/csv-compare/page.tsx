@@ -3,23 +3,32 @@
 import React, { useState, useCallback } from "react";
 import { parse, unparse } from "papaparse";
 import { toast } from "sonner";
-import { uploadWarehouseCsv } from "@/app/wb/actions";
+import { uploadWarehouseCsv, getWarehouseItems, updateItemMinQty } from "@/app/wb/actions";
+import { notifyAdmins } from "@/app/actions"; // Assuming this is available; if not, replace with sendComplexMessage to admin
 import { useAppContext } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Clipboard, Download, Upload } from "lucide-react";
 import Link from "next/link";
+import AlarmDashboard from "@/components/AlarmDashboard";
+import type { WarehouseItem } from "@/app/wb/common";
 
 interface InventoryItem {
     id: string;
     quantity: number;
 }
 
+interface Inventory {
+    items: InventoryItem[];
+    ts?: Date;
+}
+
 interface CsvRow {
     Артикул: string;
     Количество: string;
-    [key: string]: string;
+    Timestamp?: string;
+    [key: string]: string | undefined;
 }
 
 const deriveFieldsFromIdForCsv = (id: string, quantity: number) => {
@@ -39,35 +48,32 @@ const deriveFieldsFromIdForCsv = (id: string, quantity: number) => {
 const CSVCompare = () => {
     const [csv1, setCsv1] = useState("");
     const [csv2, setCsv2] = useState("");
-    const [inventory1, setInventory1] = useState<InventoryItem[]>([]);
-    const [inventory2, setInventory2] = useState<InventoryItem[]>([]);
+    const [inventory1, setInventory1] = useState<Inventory>({ items: [] });
+    const [inventory2, setInventory2] = useState<Inventory>({ items: [] });
     const [differences, setDifferences] = useState<string[]>([]);
     const [hideZeroQuantity, setHideZeroQuantity] = useState(false);
     const [uploading, setUploading] = useState(false);
-
     const [popularItems, setPopularItems] = useState<any[]>([]);
     const [diffCounts, setDiffCounts] = useState<{ [id: string]: number }>({});
     const { user } = useAppContext();
-
-    // --- ИЗМЕНЕНО: Добавлен флаг strictMode для построчного сравнения без суммирования ---
     const [strictMode, setStrictMode] = useState(false);
+    const [alarms, setAlarms] = useState<WarehouseItem[]>([]);
 
     const parseCSV = useCallback(
-        (csvText: string, setInventory: (items: InventoryItem[]) => void) => {
+        (csvText: string, setInventory: (inv: Inventory) => void) => {
+            let ts: Date | null = null;
             parse(csvText, {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    // --- ИЗМЕНЕНО: В strictMode не суммируем, а сохраняем все строки как уникальные с суффиксом rowIndex ---
                     const inventoryMap: { [id: string]: number } = {};
                     const strictRows: InventoryItem[] = [];
 
                     results.data.forEach((row: any, index: number) => {
-                        let id = (row["Артикул"] || row["id"])?.toLowerCase(); // --- ИЗМЕНЕНО: toLowerCase для consistency ---
-                        if (!id) return; // Skip invalid rows
+                        let id = (row["Артикул"] || row["id"])?.toLowerCase();
+                        if (!id) return;
 
                         let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
-                        // --- ИЗМЕНЕНО: Проверка на negative quantity ---
                         if (quantity < 0) {
                             console.warn(`Negative quantity in row ${index}: ${quantity}. Setting to 0.`);
                             quantity = 0;
@@ -87,8 +93,12 @@ const CSVCompare = () => {
                             console.error("Error parsing specs:", e);
                         }
 
+                        if (row.Timestamp && !ts) {
+                            const potentialTs = new Date(row.Timestamp);
+                            if (!isNaN(potentialTs.getTime())) ts = potentialTs;
+                        }
+
                         if (strictMode) {
-                            // --- ИЗМЕНЕНО: В strict — уникальный ID per row ---
                             const uniqueId = `${id}_row${index}`;
                             strictRows.push({ id: uniqueId, quantity });
                         } else {
@@ -96,17 +106,18 @@ const CSVCompare = () => {
                         }
                     });
 
+                    let items: InventoryItem[];
                     if (strictMode) {
-                        setInventory(strictRows);
+                        items = strictRows;
                     } else {
-                        const inventoryList: InventoryItem[] = Object.entries(inventoryMap).map(
+                        items = Object.entries(inventoryMap).map(
                             ([id, quantity]) => ({
                                 id,
                                 quantity,
                             })
                         );
-                        setInventory(inventoryList);
                     }
+                    setInventory({ items, ts });
                 },
                 error: (error) => {
                     console.error("Ошибка парсинга CSV:", error);
@@ -114,12 +125,18 @@ const CSVCompare = () => {
                 },
             });
         },
-        [strictMode] // --- ИЗМЕНЕНО: Зависимость от strictMode ---
+        [strictMode]
     );
 
-    const compareInventories = useCallback(() => {
-        const id1 = new Set(inventory1.map((i) => i.id));
-        const id2 = new Set(inventory2.map((i) => i.id));
+    const findDuplicates = (ids: string[]) => {
+        const countMap: { [key: string]: number } = {};
+        ids.forEach(id => countMap[id] = (countMap[id] || 0) + 1);
+        return Object.keys(countMap).filter(id => countMap[id] > 1);
+    };
+
+    const compareInventories = useCallback(async () => {
+        const id1 = new Set(inventory1.items.map((i) => i.id));
+        const id2 = new Set(inventory2.items.map((i) => i.id));
 
         const addedItems = [...id2].filter((id) => !id1.has(id));
         const removedItems = [...id1].filter((id) => !id2.has(id));
@@ -135,17 +152,98 @@ const CSVCompare = () => {
             diffs.push(`Удаленные товары: ${removedItems.join(", ")}`);
         }
 
-        // --- ИЗМЕНЕНО: В strictMode выявляем дубликаты строк ---
         if (strictMode) {
-            const dupes1 = findDuplicates(inventory1.map(i => i.id.split('_row')[0]));
-            const dupes2 = findDuplicates(inventory2.map(i => i.id.split('_row')[0]));
+            const dupes1 = findDuplicates(inventory1.items.map(i => i.id.split('_row')[0]));
+            const dupes2 = findDuplicates(inventory2.items.map(i => i.id.split('_row')[0]));
             if (dupes1.length > 0) diffs.push(`Дубликаты в CSV1: ${dupes1.join(", ")}`);
             if (dupes2.length > 0) diffs.push(`Дубликаты в CSV2: ${dupes2.join(", ")}`);
+        } else {
+            // Demand calculation and alarms only in non-strict mode
+            let days = 1;
+            if (inventory1.ts && inventory2.ts) {
+                const diffMs = inventory2.ts.getTime() - inventory1.ts.getTime();
+                if (diffMs <= 0) {
+                    toast.error("Invalid timestamps: new <= old");
+                    return;
+                }
+                days = diffMs / (1000 * 60 * 60 * 24);
+            }
+
+            const demands: { [id: string]: number } = {};
+            modifiedItems.forEach((id) => {
+                const qty1 = inventory1.items.find((i) => i.id === id)?.quantity || 0;
+                const qty2 = inventory2.items.find((i) => i.id === id)?.quantity || 0;
+                const demand = Math.max(0, qty1 - qty2);
+                if (demand > 0) {
+                    demands[id] = demand / days;
+                }
+            });
+
+            if (Object.keys(demands).length > 0) {
+                const res = await getWarehouseItems();
+                if (!res.success || !res.data) {
+                    toast.error("Failed to fetch warehouse items");
+                    return;
+                }
+                const allItems = res.data;
+                const itemMap = new Map(allItems.map((i) => [i.id.toLowerCase(), i]));
+
+                for (const [id, dailyDemand] of Object.entries(demands)) {
+                    const lowerId = id.toLowerCase();
+                    const item = itemMap.get(lowerId);
+                    if (!item) continue;
+                    const oldMin = item.specs?.min_quantity || 0;
+                    const newMin = oldMin === 0 ? dailyDemand : (oldMin + dailyDemand) / 2;
+                    const upRes = await updateItemMinQty(item.id, newMin);
+                    if (!upRes.success) {
+                        toast.warn(`Failed to update min_qty for ${id}`);
+                    } else {
+                        item.specs.min_quantity = newMin;
+                    }
+                }
+
+                const csv2Map = new Map(
+                    inventory2.items.map((i) => [i.id.toLowerCase(), i.quantity])
+                );
+                const alarmItems = allItems.filter((i) => {
+                    const lowerId = i.id.toLowerCase();
+                    const currentQty = csv2Map.has(lowerId)
+                        ? csv2Map.get(lowerId)!
+                        : i.total_quantity || 0;
+                    const minQty = i.specs?.min_quantity || 0;
+                    return currentQty < minQty;
+                }).map(i => {
+                    const lowerId = i.id.toLowerCase();
+                    const currentQty = csv2Map.has(lowerId)
+                        ? csv2Map.get(lowerId)!
+                        : i.total_quantity || 0;
+                    return { ...i, total_quantity: currentQty };
+                });
+
+                setAlarms(alarmItems);
+
+                if (alarmItems.length > 0) {
+                    const msg =
+                        "Low stock alarms:\n" +
+                        alarmItems
+                            .map(
+                                (i) =>
+                                    `${i.id}: ${i.total_quantity} < ${i.specs?.min_quantity} (${i.make} ${i.model})`
+                            )
+                            .join("\n");
+                    const notifyRes = await notifyAdmins(msg);
+                    if (!notifyRes.success) {
+                        toast.error("Failed to notify admins");
+                    }
+                } else {
+                    toast.info("No low stock alarms.");
+                }
+            }
         }
 
         modifiedItems.forEach((id) => {
-            const item1 = inventory1.find((i) => i.id === id);
-            const item2 = inventory2.find((i) => i.id === id);
+            const item1 = inventory1.items.find((i) => i.id === id);
+            const item2 = inventory2.items.find((i) => i.id === id);
             const qty1 = item1?.quantity || 0;
             const qty2 = item2?.quantity || 0;
             const diff = qty2 - qty1;
@@ -158,7 +256,7 @@ const CSVCompare = () => {
         setDifferences(diffs);
         setDiffCounts(diffCounts);
 
-        const allItems = [...inventory1, ...inventory2];
+        const allItems = [...inventory1.items, ...inventory2.items];
         const itemCount: { [id: string]: number } = {};
 
         allItems.forEach((item) => {
@@ -170,7 +268,7 @@ const CSVCompare = () => {
             .slice(0, 13)
             .map(([id, count]) => ({ id, count }));
         setPopularItems(sortedItems);
-    }, [inventory1, inventory2, strictMode]); // --- ИЗМЕНЕНО: Зависимость от strictMode ---
+    }, [inventory1, inventory2, strictMode]);
 
     const handleCsv1Change = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newCsv1 = e.target.value;
@@ -209,7 +307,7 @@ const CSVCompare = () => {
     };
 
     const handleConvertToDbReady = () => {
-      const csv = inventoryToCsv(inventory2, false, true);
+      const csv = inventoryToCsv(inventory2.items, false, true);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -220,7 +318,7 @@ const CSVCompare = () => {
     };
 
     const handleConvertToSummarized = () => {
-      const csv = inventoryToCsv(inventory2);
+      const csv = inventoryToCsv(inventory2.items);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -302,21 +400,14 @@ const CSVCompare = () => {
             console.error("Ошибка загрузки:", err);
             setUploading(false);
         }
-    }, [csv2, user, uploadWarehouseCsv, toast]);
+    }, [csv2, user]);
 
     const filteredInventory1 = hideZeroQuantity
-        ? inventory1.filter((item) => item.quantity > 0)
-        : inventory1;
+        ? inventory1.items.filter((item) => item.quantity > 0)
+        : inventory1.items;
     const filteredInventory2 = hideZeroQuantity
-        ? inventory2.filter((item) => item.quantity > 0)
-        : inventory2;
-
-    // --- ИЗМЕНЕНО: Helper для поиска дубликатов ID ---
-    const findDuplicates = (ids: string[]) => {
-        const countMap: { [key: string]: number } = {};
-        ids.forEach(id => countMap[id] = (countMap[id] || 0) + 1);
-        return Object.keys(countMap).filter(id => countMap[id] > 1);
-    };
+        ? inventory2.items.filter((item) => item.quantity > 0)
+        : inventory2.items;
 
     return (
         <div className="container mx-auto p-4 pt-24 max-w-4xl">
@@ -334,13 +425,11 @@ const CSVCompare = () => {
                         <li>Экспорт списков в CSV для скачивания.</li>
                         <li>Загрузка второго CSV в Supabase для обновления склада (только админы).</li>
                         <li>Топ-13 популярных товаров и таблица различий отображаются после сравнения.</li>
-                        {/* --- ИЗМЕНЕНО: Добавлена инструкция по strict --- */}
-                        <li>Включите "Strict Mode" для построчного сравнения (без суммирования дубликатов ID).</li>
+                        <li>Включите "Strict Mode" для построчного сравнения (без суммирования).</li>
                     </ul>
                 </CardContent>
             </Card>
 
-            {/* --- ИЗМЕНЕНО: Добавлен toggle для strictMode --- */}
             <div className="mb-4 flex items-center space-x-4">
                 <label className="inline-flex items-center">
                     <input
@@ -376,7 +465,7 @@ const CSVCompare = () => {
                         <Button
                             className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2 w-full"
                             onClick={() => {
-                                const csv = inventoryToCsv(inventory1);
+                                const csv = inventoryToCsv(inventory1.items);
                                 const blob = new Blob([csv], { type: "text/csv" });
                                 const url = window.URL.createObjectURL(blob);
                                 const a = document.createElement("a");
@@ -413,7 +502,7 @@ const CSVCompare = () => {
                         <Button
                             className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded mt-2 w-full"
                             onClick={() => {
-                                const csv = inventoryToCsv(inventory2);
+                                const csv = inventoryToCsv(inventory2.items);
                                 const blob = new Blob([csv], { type: "text/csv" });
                                 const url = window.URL.createObjectURL(blob);
                                 const a = document.createElement("a");
@@ -513,6 +602,8 @@ const CSVCompare = () => {
                     </CardContent>
                 </Card>
             )}
+
+            <AlarmDashboard alarms={alarms} />
 
             <Card className="mt-4">
                 <CardHeader>
