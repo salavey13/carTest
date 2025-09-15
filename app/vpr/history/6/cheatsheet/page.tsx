@@ -1,399 +1,218 @@
 "use client";
 
-import React from 'react';
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    FaLandmark, FaBookOpen, FaScroll, FaCalendarDays, FaUserShield, FaShieldHalved,
-    FaCross, FaGavel, FaMoneyBill1,
-    FaMapLocationDot,
-    FaRoute, FaFeather, FaPalette,
-    FaChurch, FaGraduationCap, FaUsers, FaBuildingColumns, FaShip, FaCrown, FaChessKing,
-    FaBookBible, FaPlaceOfWorship, FaUniversity, FaBalanceScale, FaHandsPraying,
-    FaMedal, FaStar, FaMonument, FaMusic,
-    FaMap
+  FaLandmark, FaCalendarDays, FaUserShield, FaShieldHalved,
+  FaScroll, FaGraduationCap, FaBuildingColumns, FaStar, FaMap
 } from "react-icons/fa6";
-import Link from "next/link";
 import Image from "next/image";
 
-// --- Component ---
+const imageUrls: Record<string, string> = {
+  historyVarangians: "https://upload.wikimedia.org/wikipedia/commons/1/16/%D0%92%D0%B0%D1%80%D1%8F%D0%B3%D0%B8.jpg",
+  historyBaptism: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/the-baptism-of-russia-1896.jpg!Large-71324dba-453c-4b24-b587-ef83b807fd17.jpg",
+  historyYaroslav: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Yaroslav_the_Wise-09415836-fa19-4ee5-9816-47a06ac717ed.jpg",
+  historyMongols: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1573709092_batyja-na-rus-miniatjura-iz-zhitija-evfrosini-suzdalskoj-xvii-vek-2e27ed16-3791-472a-84fd-37d982c8ab6b.jpg",
+  historyNevsky: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/0027_NEVSKY-FINAL-FRAME-1750x875-5599046e-d438-49ea-a57b-1cb458c5098e.jpg",
+  historyKulikovo: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1299747-84c22ba5-9f6d-4fc9-be34-bdb06f69d557.jpg",
+  historyIvan3: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/album_alb3350347-007001aa-c7c3-40b7-89fe-50a4491004ca.jpg",
+  historyFeudalism: "https://ru-static.z-dn.net/files/d62/328673063ea0e22a24d9392a9c99959e.jpg",
+  historyCrusades: "https://upload.wikimedia.org/wikipedia/commons/d/d3/SiegeofAntioch.jpeg",
+  historyWW2Victory: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250420_135854-b056be47-8e5b-44f9-bccd-d14ca75fd294.jpg",
+  historyWW2Monument: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motherland-calls.jpg-660bb17c-5de2-4b61-9744-f03b780bf455.jpg",
+};
+
+const Pill: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span className="inline-block bg-white/5 text-xs px-2 py-0.5 rounded-full mr-2">{children}</span>
+);
+
+const Takeaway: React.FC<{ text: string }> = ({ text }) => (
+  <li className="text-sm md:text-base text-gray-300 list-disc list-inside ml-4">🔑 {text}</li>
+);
+
+const QuestionBlock: React.FC<{ q: string; a: string }> = ({ q, a }) => (
+  <details className="bg-white/3 p-3 rounded-md border border-white/5">
+    <summary className="cursor-pointer font-medium text-gray-100">{q} <span className="text-xs text-gray-400">— проверить</span></summary>
+    <div className="mt-2 text-gray-300">
+      <strong>Ответ:</strong> <span className="ml-1">{a}</span>
+    </div>
+  </details>
+);
+
+const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string }> = ({ icon, title, subtitle }) => (
+  <div>
+    <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-green mb-2">
+      <span className="mr-3 text-brand-green/90">{icon}</span>
+      {title}
+    </h2>
+    {subtitle && <p className="text-sm text-gray-400 mb-3">{subtitle}</p>}
+  </div>
+);
+
 const VprHistoryCheatsheet: React.FC = () => {
-
-  // == UPDATED Image URLs == (оставлены как в исходнике, без изменений)
-  const imageUrls: Record<string, string> = {
-      'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/1/16/%D0%92%D0%B0%D1%80%D1%8F%D0%B3%D0%B8.jpg", // 16:9
-      'history-baptism.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/the-baptism-of-russia-1896.jpg!Large-71324dba-453c-4b24-b587-ef83b807fd17.jpg", // 9:16
-      'history-yaroslav.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Yaroslav_the_Wise-09415836-fa19-4ee5-9816-47a06ac717ed.jpg", // 9:16
-      'history-mongols.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1573709092_batyja-na-rus-miniatjura-iz-zhitija-evfrosini-suzdalskoj-xvii-vek-2e27ed16-3791-472a-84fd-37d982c8ab6b.jpg", // 1:1
-      'history-nevsky.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/0027_NEVSKY-FINAL-FRAME-1750x875-5599046e-d438-49ea-a57b-1cb458c5098e.jpg", // 16:9
-      'history-kulikovo.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1299747-84c22ba5-9f6d-4fc9-be34-bdb06f69d557.jpg", // 9:16
-      'history-ivan3.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/album_alb3350347-007001aa-c7c3-40b7-89fe-50a4491004ca.jpg", // 16:9
-      'history-feudalism.png': "https://ru-static.z-dn.net/files/d62/328673063ea0e22a24d9392a9c99959e.jpg", // 16:10
-      'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/d/d3/SiegeofAntioch.jpeg", // 1:1
-      'history-ww2-victory.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250420_135854-b056be47-8e5b-44f9-bccd-d14ca75fd294.jpg", // 9:16
-      'history-ww2-monument.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motherland-calls.jpg-660bb17c-5de2-4b61-9744-f03b780bf455.jpg", // 16:9
-  };
-
   return (
-    <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
-       <div
-        className="absolute inset-0 bg-repeat opacity-5 z-0"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(0, 255, 157, 0.2) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(0, 255, 157, 0.2) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px',
-        }}
-      ></div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200 py-12 px-4">
+      <div className="max-w-5xl mx-auto">
+        <Card className="bg-black/80 border border-brand-green/30 rounded-2xl shadow-lg">
+          <CardHeader className="text-center border-b border-brand-green/20 p-6">
+            <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green">ВПР История 6 класс — Шпаргалка-Квест</CardTitle>
+            <p className="text-gray-300 mt-2">Эпично, мемно и полезно: понимаем этапы, запоминаем хаки, тренируемся в тесте.</p>
+          </CardHeader>
 
-          <div className="relative z-10 container mx-auto px-4">
-            <Card className="max-w-5xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-green/30 shadow-[0_0_25px_rgba(0,255,157,0.4)]">
-              <CardHeader className="text-center border-b border-brand-green/20 pb-4">
-                <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="ВПР История 6 класс: Эпичная Шпаргалка с Мемами и Хакми">
-                  ВПР История 6 класс: Эпичная Шпаргалка с Мемами и Хакми
-                </CardTitle>
-                <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-                  Готовься к ВПР как к квесту в игре: с аналогиями, шуточками и самотестами. Не нудно, а круто! 🚀
-                </p>
-              </CardHeader>
+          <CardContent className="p-6 space-y-8">
 
-              <CardContent className="space-y-12 p-4 md:p-8">
+            {/* TIMELINE CHEAT */}
+            <section className="bg-white/2 p-4 rounded-lg border border-white/5">
+              <h3 className="font-semibold text-lg text-gray-100 mb-2">🔭 Быстрый таймлайн (чек-поинты)</h3>
+              <div className="flex flex-wrap gap-2">
+                <Pill>862 — Призвание варягов (Рюрик)</Pill>
+                <Pill>882 — Олег в Киеве</Pill>
+                <Pill>988 — Крещение Руси</Pill>
+                <Pill>1237–1241 — Нашествие Батыя</Pill>
+                <Pill>1240/1242 — Невская / Ледовое</Pill>
+                <Pill>1380 — Куликово</Pill>
+                <Pill>1480 — Стояние на Угре (конец ига)</Pill>
+                <Pill>IX–XV вв. — Средневековая Европа (квесты и крестовые походы)</Pill>
+                <Pill>1941–1945 — ВОВ (День Победы 9 мая)</Pill>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">Хочешь одно правило: помни крупные этапы, потом уже даты. Сначала сюжет — потом цифры.</p>
+            </section>
 
-                {/* Section: Древняя Русь */}
-                <section className="space-y-4">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-blue-400 mb-4">
-                    <FaLandmark className="mr-3 text-blue-400/80" /> 🇷🇺 Древняя Русь (до XIII в.): Как Славяне Собрали "Команду" и Апгрейдили Страну
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Представь: древние славяне живут в лесах и реках, как в большом Minecraft-сервере. Им нужны правила и босс — вот они и "приглашают" варягов (викингов из Скандинавии) в 862 г. Рюрик становится первым князем. Это как звать соседа-супергероя помочь с фермой, а в итоге он строит целый замок. В 882 г. Олег хитро захватывает Киев и делает его столицей: "Киев — мама городам русским!" Теперь Русь — единый сервер от Новгорода до Киева.
-                  </p>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Кульминация: 988 г. — Владимир Святой крестит Русь. Это апгрейд ОС — Русь подключается к византийской "сети" (христианство, церкви, книги). Ярослав Мудрый (расцвет в XI в.) строит Софийский собор, пишет "Русскую Правду" (первые законы, как кодекс в игре) и женит дочек на европейских королях — дипломатия на уровне!
-                  </p>
+            {/* Section: Древняя Русь */}
+            <section className="space-y-4">
+              <SectionHeader icon={<FaLandmark />} title="Древняя Русь (до XIII в.) — как собирали государство" subtitle="РОВ — Рюрик, Олег, Владимир: запомнили?"/>
+              <p className="text-gray-300 leading-relaxed">
+                Коротко: славяне жили как в большом мире-песочнице. В 862 г. — призвали варягов (Рюрик) — пришёл «админ». 882 г. — Олег сделал Киев столицей. 988 г. — Владимир «обновил систему» — принято христианство, культура ускорилась.
+              </p>
 
-                  {/* Subsection: Ключевые Даты и События */}
-                  <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                     <FaCalendarDays className="mr-2 text-blue-300/80" /> Ключевые Даты: Не Зубри, Запоминай как Сюжет
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                    <li><strong className="text-blue-400 font-semibold">862 г.</strong> — Призвание варягов (Рюрик). Мем: "Славяне постят в чат: 'Нужен админ!'"</li>
-                    <li><strong className="text-blue-400 font-semibold">882 г.</strong> — Олег объединяет Новгород и Киев. Аналогия: "Сливает два сервера в один мега-мир."</li>
-                    <li><strong className="text-blue-400 font-semibold">988 г.</strong> — Крещение Руси (Владимир). "Русь переходит на новый патч с церквями и иконами."</li>
-                    <li><strong className="text-blue-400 font-semibold">1097 г.</strong> — Любечский съезд: князья делят земли, начало раздробленности (как когда гильдия распадается).</li>
-                    <li><strong className="text-blue-400 font-semibold">1147 г.</strong> — Первое упоминание Москвы (маленький форпост, который вырастет в столицу).</li>
-                    <li><strong className="text-blue-400 font-semibold">1223 г.</strong> — Битва на Калке: первая встреча с монголами (спойлер: не дружеская).</li>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm text-gray-300 font-medium mb-2">Мнемоника</h4>
+                  <ul className="text-gray-300 list-disc list-inside ml-4 space-y-1">
+                    <Takeaway text="РОВ — Рюрик (862), Олег (882), Владимир (988) — запоминаем как короткую комбо-цепочку." />
+                    <Takeaway text="Крещение = культурный апгрейд: письма, иконы, связи с Византией." />
+                    <Takeaway text="«Дружина» — сквад князя; «Вече» — народный чат." />
                   </ul>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                    <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                             <Image
-                               src={imageUrls['history-varangians.png']}
-                               alt="Варяги — викинги, которых позвали править"
-                               width={400}
-                               height={225}
-                               className="w-full h-full object-cover"
-                               loading="lazy"
-                               unoptimized
-                              />
-                           </div>
-                        <p className="text-xs text-center text-gray-400 mt-1 italic">Варяги: "Пришли править, как в викинг-сериале!"</p>
-                    </div>
-                    <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
-                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                               <Image
-                                 src={imageUrls['history-baptism.png']}
-                                 alt="Крещение Руси: апгрейд веры"
-                                 width={400}
-                                 height={711}
-                                 className="w-full h-full object-cover"
-                                 loading="lazy"
-                                 unoptimized
-                               />
-                              </div>
-                         <p className="text-xs text-center text-gray-400 mt-1 italic">Крещение: "Вся Русь в бассейне с новой религией!"</p>
-                    </div>
+                </div>
+
+                <div className="rounded-md overflow-hidden border border-white/5">
+                  <div className="aspect-video relative w-full">
+                    <Image src={imageUrls.historyVarangians} alt="Варяги" fill className="object-cover" unoptimized/>
                   </div>
+                  <div className="p-3 bg-black/60 text-gray-300 text-sm">Варяги: как викинг-админы, которых позвали управлять сервером.</div>
+                </div>
+              </div>
 
-                   {/* Subsection: Важные Правители */}
-                   <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                     <FaUserShield className="mr-2 text-blue-300/80" /> Боссы Руси: Кто Правил и Что Сделал
-                   </h3>
-                   <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                     <li><strong>Рюрик, Олег, Игорь, Ольга, Святослав:</strong> Первые князья — строители государства. Ольга — хитрая княгиня, первая христианка (как босс-леди).</li>
-                     <li><strong>Владимир I Святой:</strong> Креститель. Мем: "Выбрал веру, как тариф на телефон — византийский оказался топ."</li>
-                     <li><strong>Ярослав Мудрый:</strong> Расцвет! Законы, церкви, альянсы. Аналогия: "Сделал Русь 'премиум-аккаунтом' в Европе."</li>
-                     <li><strong>Владимир Мономах:</strong> Боролся с половцами, написал "Поучение детям" (типа, отцовский гайд по жизни).</li>
-                     <li><strong>Юрий Долгорукий, Андрей Боголюбский:</strong> Рост Севера. Юрий основал Москву (маленький форт, но с потенциалом).</li>
-                   </ul>
-                   <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto">
-                          <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                            <Image
-                              src={imageUrls['history-yaroslav.png']}
-                              alt="Ярослав Мудрый: король расцвета"
-                              width={400}
-                              height={711}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              unoptimized
-                             />
-                          </div>
-                     <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав: "Мудрый босс с топ-законами и связями."</p>
-                   </div>
+              <div className="space-y-2">
+                <QuestionBlock q="Когда произошло крещение Руси и почему это важно?" a="988 г. — подключение к византийской культуре: письма, храмы, усиление власти князя." />
+                <QuestionBlock q="Кто такой Ярослав Мудрый и что он сделал важного?" a="Организовал законы (Русская Правда), строил соборы, заключал династические браки — укрепил государство." />
+              </div>
+            </section>
 
-                   {/* Subsection: Термины и Культура */}
-                   <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                     <FaScroll className="mr-2 text-blue-300/80" /> Термины и Культура: Гаджеты и Правила Игры
-                   </h3>
-                   <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                     <li><strong>Термины:</strong> Варяги (викинги-админы), Полюдье (сбор дани на колесах), Уроки (фиксированный налог, ввела Ольга), Вече (народный чат), Дружина (княжеский сквад), Бояре (богатые советники), Смерды (свободные фермеры), Закупы (должники на подработке), Холопы (рабы).</li>
-                     <li><strong>Законы:</strong> "Русская Правда" — кодекс, как правила в Fortnite.</li>
-                     <li><strong>Культура:</strong> Кириллица (азбука от Кирилла и Мефодия — первый "смартфон" для письма), "Повесть временных лет" (летопись-сериал от Нестора), иконы, фрески, София Киевская (как космический собор).</li>
-                   </ul>
+            {/* Section: Монгольское иго */}
+            <section className="space-y-4 border-t border-white/5 pt-6">
+              <SectionHeader icon={<FaShieldHalved />} title="Монгольское иго (XIII–XV вв.) — когда пришёл 'босс' игра" subtitle="Хак: БНК — Батый, Невский, Куликово/Конец"/>
+              <p className="text-gray-300 leading-relaxed">
+                Батый и монголы — словно большой рейд: захват, разрушения, и потом система вассалитета (ярлыки и дань). Но появились герои — Невский и Донской — которые отбивали внешние угрозы и дали шанс Москве стать центром объединения.
+              </p>
 
-                  {/* Самопроверка */}
-                  <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                    <FaGraduationCap className="mr-2 text-blue-300/80" /> Самопроверка: Тест как в ВПР
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                    <li>Когда призвали варягов и кто такой Рюрик? (862 г., первый князь-варяг)</li>
-                    <li>Что случилось в 988 г.? (Крещение Руси Владимиром — апгрейд культуры)</li>
-                    <li>Кто Ярослав Мудрый и почему "мудрый"? (Расцвет, законы, церкви, альянсы)</li>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <ul className="text-gray-300 list-disc list-inside ml-4 space-y-1">
+                    <Takeaway text="1237–1241 — нашествие Батыя: города разорены, начинается зависимость от Орды." />
+                    <Takeaway text="Ярлык = бумажка от хана, без неё князь как игрок без пропуска." />
+                    <Takeaway text="1380 — Куликово: Донской наносит удар, 1480 — Стояние на Угре — символ конца ига." />
                   </ul>
-                </section>
+                </div>
 
-                {/* Section: Русь в XIII-XV вв. */}
-                <section className="space-y-4 border-t border-blue-500/20 pt-8">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-blue-400 mb-4">
-                    <FaShieldHalved className="mr-3 text-blue-400/80" /> 🛡️ Русь под Игом и Объединение (XIII-XV вв.): От "Боссов-Монголов" к Независимости
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Глобальный этап: Монголы приходят как "новый босс" в игру — Русь платит дань, но герои сопротивляются. Конец — Москва собирает земли, как в Monopoly, и скидывает иго.
-                  </p>
-
-                  {/* Subsection: Монгольское нашествие и Иго */}
-                  <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                     <FaShieldHalved className="mr-2 text-blue-300/80" /> Монгольское Нашествие: "Игровое Вторжение"
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                    <li><strong>1237-1241 гг.:</strong> Батый проходит по Руси как туча — разграбил города. Аналогия: "Монголы — читеры с конями и луками."</li>
-                    <li><strong>Иго:</strong> Зависимость от Орды — плати "выход" (дань), бери ярлык (грамоту на княжение). Баскаки — налоговые "боссы". Мем: "Русь в подписке на Орду."</li>
-                  </ul>
-                  <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30">
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                             <Image
-                               src={imageUrls['history-mongols.png']}
-                               alt="Нашествие Батыя: монголы как апокалипсис"
-                               width={600}
-                               height={600}
-                               className="w-full h-full object-cover"
-                               loading="lazy"
-                               unoptimized
-                              />
-                           </div>
-                    <p className="text-xs text-center text-gray-400 mt-1 italic">Батый: "Пришли, увидели, взяли дань."</p>
+                <div className="rounded-md overflow-hidden border border-white/5">
+                  <div className="aspect-video relative w-full">
+                    <Image src={imageUrls.historyMongols} alt="Монголы" fill className="object-cover" unoptimized/>
                   </div>
+                  <div className="p-3 bg-black/60 text-gray-300 text-sm">Монголы пришли как читеры — на время сломали правила, но систему пересобрали.</div>
+                </div>
+              </div>
 
-                  {/* Subsection: Борьба с захватчиками */}
-                   <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                     <FaUserShield className="mr-2 text-blue-300/80" /> Герои Сопротивления: Битвы как Босс-Файты
-                   </h3>
-                   <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                     <li><strong>Александр Невский:</strong> Невская битва (1240) — отбил шведов; Ледовое побоище (1242) — разбил рыцарей на льду. Аналогия: "Невский — как танк в игре."</li>
-                     <li><strong>Дмитрий Донской:</strong> Куликовская битва (1380) — разбил Мамая. Мем: "Первый удар по Орде — как бить финального босса."</li>
-                   </ul>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30">
-                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                               <Image
-                                 src={imageUrls['history-nevsky.png']}
-                                 alt="Ледовое побоище: битва на льду"
-                                 width={400}
-                                 height={225}
-                                 className="w-full h-full object-cover"
-                                 loading="lazy"
-                                 unoptimized
-                               />
-                              </div>
-                         <p className="text-xs text-center text-gray-400 mt-1 italic">Невский: "Лёд трещит, рыцари тонут!"</p>
-                      </div>
-                     <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30">
-                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                                <Image
-                                  src={imageUrls['history-kulikovo.png']}
-                                  alt="Куликовская битва: перелом"
-                                  width={400}
-                                  height={711}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                  unoptimized
-                                />
-                              </div>
-                         <p className="text-xs text-center text-gray-400 mt-1 italic">Донской: "Орда, уходи!"</p>
-                       </div>
-                   </div>
+              <div className="space-y-2">
+                <QuestionBlock q="Что такое ярлык и баскаки?" a="Ярлык — грамота от хана на княжение; баскаки — сборщики дани/чиновники Орды." />
+                <QuestionBlock q="Какие битвы связаны с именем Александра Невского?" a="Невская битва (1240) и Ледовое побоище (1242)." />
+              </div>
+            </section>
 
-                  {/* Subsection: Объединение Руси */}
-                  <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                     <FaUsers className="mr-2 text-blue-300/80" /> Объединение вокруг Москвы: "Сбор Пазла"
-                  </h3>
-                   <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                     <li><strong>Центр:</strong> Москва (Иван Калита собирал дань, Дмитрий Донской бился).</li>
-                     <li><strong>Иван III:</strong> Присоединил Новгород, Тверь; конец ига (Стояние на Угре, 1480); Судебник 1497 (законы для всех). Аналогия: "Москва — как столица в Civilization."</li>
-                   </ul>
-                   <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto">
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                              <Image
-                                src={imageUrls['history-ivan3.png']}
-                                alt="Стояние на Угре: конец ига"
-                                width={500}
-                                height={281}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                                unoptimized
-                               />
-                            </div>
-                       <p className="text-xs text-center text-gray-400 mt-1 italic">Иван III: "Стоим и побеждаем!"</p>
-                    </div>
+            {/* Section: Средние века (Зарубежная) */}
+            <section className="space-y-4 border-t border-white/5 pt-6">
+              <SectionHeader icon={<FaBuildingColumns />} title="Средние века в Европе — рыцари, короли, квесты" subtitle="Формула: Крестовые походы + Феодализм + Императоры = мега-сериал"/>
+              <p className="text-gray-300 leading-relaxed">
+                Представь: Европа — огромный RPG-сервер. Короли выдают земли вассалам, те дают защиту — это феодализм. Крестовые походы — масштабные рейды за святынями. Карл Великий — как босс, которого короновал папа (800 г.).
+              </p>
 
-                  {/* Самопроверка */}
-                  <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
-                    <FaGraduationCap className="mr-2 text-blue-300/80" /> Самопроверка: Тест как в ВПР
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                    <li>Что такое иго и как оно кончилось? (Зависимость от Орды, конец в 1480 на Угре)</li>
-                    <li>Кто Невский и Донской? (Герои битв с захватчиками)</li>
-                    <li>Что такое ярлык и баскаки? (Грамота от хана, сборщики дани)</li>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <ul className="text-gray-300 list-disc list-inside ml-4 space-y-1">
+                    <Takeaway text="Готика = высокие соборы и витражи; университеты — первые «академии»." />
+                    <Takeaway text="1215 г. — Великая хартия вольностей в Англии: ограничение власти короля." />
+                    <Takeaway text="Крестовые походы (XI–XIII вв.) — цель: вернуть Иерусалим." />
                   </ul>
-                </section>
+                </div>
 
-                {/* Section: Средние века (Зарубежная) */}
-                <section className="space-y-4 border-t border-purple-500/20 pt-8">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-purple-400 mb-4">
-                    <FaBuildingColumns className="mr-3 text-purple-400/80" /> 🌍 Средние Века в Европе: Рыцари, Походы и "Феодальный Сервер"
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Глобальный вайб: Европа — как большой RPG-сервер с рыцарями, королями и квестами. Византия — старая империя, феодализм — иерархия, крестовые походы — эпичные рейды.
-                  </p>
-                  <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
-                    <li><strong className="text-purple-400">Византия:</strong> Юстиниан (VI в.) строит Св. Софию; раскол церквей (1054); падение Константинополя (1453) туркам. Аналогия: "Византия — старый сервер, который хакнули."</li>
-                    <li><strong className="text-purple-400">Франки:</strong> Карл Великий (800 г.) — император. Мем: "Папа коронует: 'Ты теперь босс Европы!'"</li>
-                    <li><strong className="text-purple-400">Феодализм:</strong> Сеньоры (боссы) дают феоды вассалам за службу. Крестьяне пашут. Как в Among Us — все зависят друг от друга.</li>
-                    <li><strong className="text-purple-400">Англия:</strong> Великая хартия (1215) — лимит на власть короля; парламент. "Король не может просто так брать налоги!"</li>
-                    <li><strong className="text-purple-400">Франция:</strong> Столетняя война (1337-1453), Жанна д`Арк — героиня. Аналогия: "Долгий матч Англия vs Франция."</li>
-                    <li><strong className="text-purple-400">Крестовые походы:</strong> XI-XIII вв. — рейды за Святую Землю. Мем: "Папа: 'Вперёд за лутом в Иерусалим!'"</li>
-                    <li><strong className="text-purple-400">Города:</strong> Цехи, гильдии — как кланы ремесленников.</li>
-                    <li><strong className="text-purple-400">Культура:</strong> Готика (Нотр-Дам — как космический корабль), университеты (Болонья — первые "академии").</li>
+                <div className="rounded-md overflow-hidden border border-white/5">
+                  <div className="aspect-square relative w-full">
+                    <Image src={imageUrls.historyCrusades} alt="Крестовые походы" fill className="object-cover" unoptimized/>
+                  </div>
+                  <div className="p-3 bg-black/60 text-gray-300 text-sm">Крестовые походы — масштабные религиозные рейды с политическими целями.</div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <QuestionBlock q="Кто такой Карл Великий и почему он важен?" a="Император франков, коронован в 800 г., объединил большую часть Западной Европы." />
+                <QuestionBlock q="Что такое феодализм?" a="Система отношений: сеньор даёт землю вассалу за службу; крестьяне работают на земле." />
+              </div>
+            </section>
+
+            {/* Section: Память о ВОВ */}
+            <section className="space-y-4 border-t border-white/5 pt-6">
+              <SectionHeader icon={<FaStar />} title="Память о ВОВ (1941-1945) — почему это в ВПР?" subtitle="День Победы — главное: 9 мая, память, символы."/>
+              <p className="text-gray-300 leading-relaxed">
+                Это не древняя история — это то, что хранит память общества. ВПР часто спрашивает про символы, даты и смысл: почему люди чтят память, какие битвы были переломными и какие памятники — знаковые.
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <ul className="text-gray-300 list-disc list-inside ml-4 space-y-1">
+                    <Takeaway text="9 мая — День Победы (подписание капитуляции Германии в 1945)." />
+                    <Takeaway text="Главные битвы: Московская, Сталинградская, Курская — ключевые повороты войны." />
+                    <Takeaway text="Символы: Знамя Победы, Георгиевская ленточка, 'Родина-мать'." />
                   </ul>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30">
-                             <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                               <Image
-                                 src={imageUrls['history-feudalism.png']}
-                                 alt="Феодализм: иерархия как лестница"
-                                 width={400}
-                                 height={250}
-                                 className="w-full h-full object-contain bg-white p-1"
-                                 loading="lazy"
-                                 unoptimized
-                               />
-                              </div>
-                        <p className="text-xs text-center text-gray-400 mt-1 italic">Феодализм: "Лестница власти от короля до крестьянина."</p>
-                     </div>
-                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30">
-                             <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                               <Image
-                                 src={imageUrls['history-crusades.png']}
-                                 alt="Крестовые походы: осада Антиохии"
-                                 width={400}
-                                 height={400}
-                                 className="w-full h-full object-cover"
-                                 loading="lazy"
-                                 unoptimized
-                               />
-                              </div>
-                        <p className="text-xs text-center text-gray-400 mt-1 italic">Походы: "Рейд за Святой Землёй."</p>
-                     </div>
-                   </div>
+                </div>
 
-                  {/* Самопроверка */}
-                  <h3 className="flex items-center text-xl font-semibold text-purple-300 mt-6 mb-2">
-                    <FaGraduationCap className="mr-2 text-purple-300/80" /> Самопроверка: Тест как в ВПР
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                    <li>Что такое феодализм? (Иерархия сеньоров и вассалов)</li>
-                    <li>Кто Карл Великий? (Император франков, 800 г.)</li>
-                    <li>Цели крестовых походов? (Освобождение Иерусалима)</li>
-                  </ul>
-                </section>
+                <div className="rounded-md overflow-hidden border border-white/5">
+                  <div className="aspect-video relative w-full">
+                    <Image src={imageUrls.historyWW2Monument} alt="Родина-мать" fill className="object-cover" unoptimized/>
+                  </div>
+                  <div className="p-3 bg-black/60 text-gray-300 text-sm">Память — это не только даты, это истории людей и их подвиг.</div>
+                </div>
+              </div>
 
-                {/* Section: Память о ВОВ */}
-                <section className="space-y-4 border-t border-red-500/20 pt-8">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-red-500 mb-4">
-                    <FaStar className="mr-3 text-red-500/80" /> ⭐ Память о Великой Отечественной Войне (1941-1945): Герои, Символы и Почему Это Навсегда
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Это не древность, но важный блок ВПР. ВОВ — как эпический босс-файт всего народа. 9 мая — День Победы: радость с слезами (победа над фашистами, но миллионы потерь).
-                  </p>
-                  <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
-                    <li><strong className="text-red-500">Праздник:</strong> 9 мая — парады, салюты, "Бессмертный полк" (несёшь фото деда-героя).</li>
-                    <li><strong className="text-red-500">Смысл:</strong> Подвиг народа: "Радость со слезами" — выиграли, но цена огромная.</li>
-                    <li><strong className="text-red-500">Битвы:</strong> Московская (остановили у столицы), Сталинградская (перелом), Курская (танки в деле).</li>
-                    <li><strong className="text-red-500">Символы:</strong> "Священная война" (песня-крик), Знамя над Рейхстагом, георгиевская ленточка.</li>
-                    <li><strong className="text-red-500">Памятники:</strong> Мамаев курган ("Родина-мать" — статуя зовёт в бой).</li>
-                  </ul>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30">
-                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                                <Image
-                                  src={imageUrls['history-ww2-victory.png']}
-                                  alt="Знамя над Рейхстагом: символ Победы"
-                                  width={400}
-                                  height={711}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                  unoptimized
-                                 />
-                              </div>
-                          <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя: "Мы победили!"</p>
-                     </div>
-                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30">
-                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30">
-                               <Image
-                                  src={imageUrls['history-ww2-monument.png']}
-                                  alt="Родина-мать: зовёт к подвигу"
-                                  width={400}
-                                  height={225}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                  unoptimized
-                                />
-                              </div>
-                          <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина зовёт!"</p>
-                     </div>
-                   </div>
+              <div className="space-y-2">
+                <QuestionBlock q="Когда отмечают День Победы?" a="9 мая (1945 г.)." />
+                <QuestionBlock q="Назови один символ Победы и один памятник." a="Знамя Победы; Мамаев курган — статуя Родины-матери." />
+              </div>
+            </section>
 
-                  {/* Самопроверка */}
-                  <h3 className="flex items-center text-xl font-semibold text-red-300 mt-6 mb-2">
-                    <FaGraduationCap className="mr-2 text-red-300/80" /> Самопроверка: Тест как в ВПР
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
-                    <li>Когда День Победы? (9 мая)</li>
-                    <li>Ключевые битвы? (Москва, Сталинград, Курск)</li>
-                    <li>Символы? (Знамя, песня "Священная война", "Родина-мать")</li>
-                  </ul>
-                </section>
+            {/* FINAL HACK */}
+            <section className="border-t border-white/5 pt-6">
+              <h3 className="text-lg md:text-xl font-semibold">Финальный хак: как учить, чтобы не сойти с ума</h3>
+              <ul className="text-gray-300 list-disc list-inside ml-4 space-y-1">
+                <li>Учись как в игре: сначала сюжет (главные этапы), потом квесты (битвы) и в конце — даты (чекпоинты).</li>
+                <li>Рисуй карту — отмечай 5 точек: Киев, Новгород, Владимир/Москва, Константинополь, места битв (Невское, Куликово, Угра).</li>
+                <li>Повтори три раза три ключевые идеи каждой секции (3×3 = 9 — в голове останется лучше).</li>
+              </ul>
+              <p className="text-sm text-gray-400 mt-3">Хочешь — сделаю экспорт в Markdown/PDF или отдельную версию с вопросами без ответов (для тренировок). Готов подправить вайб — скажи лишь: «еще мемов» или «убери мемы» — как прикажешь, капитан.</p>
+            </section>
 
-                {/* Final Tip */}
-                <section className="border-t border-brand-green/20 pt-8 mt-10 text-center">
-                  <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
-                    <FaMap className="mr-3 text-brand-green/80" /> Финальный Хак: Карта — Твой Секретный Оружие!
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    В ВПР может быть контурная карта — запоминай ключевые точки как чекпоинты в игре: Киев (столица древняя), Новгород (северный хаб), Владимир/Москва (центр объединения), Константинополь (византийский босс), реки Днепр/Волга/Нева (торговые трассы), Золотая Орда (восточный враг). Успехов на ВПР — ты справишься, как Невский на льду! 🔥
-                  </p>
-                </section>
-
-              </CardContent>
-            </Card>
-          </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
