@@ -524,7 +524,7 @@ const CSVCompare = () => {
                 </Card>
             </div>
 
-            <div className="mb-4 flex items-center space-x-4">
+            <div className="mb-4 flex items-center space-x-4 flex-wrap">
                 <label className="inline-flex items-center">
                     <input
                         type="checkbox"
