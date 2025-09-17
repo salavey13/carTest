@@ -1,11 +1,10 @@
-// /components/WarehouseSyncButtons.tsx
 "use client"
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { syncWbStocks, syncOzonStocks } from "@/app/wb/actions";
 
-const WarehouseSyncButtons: React.FC = () => {
+export function WarehouseSyncButtons() {
   const handleSyncWb = async () => {
     const res = await syncWbStocks();
     toast[res.success ? "success" : "error"](res.success ? "WB synced!" : res.error);
@@ -36,5 +35,3 @@ const WarehouseSyncButtons: React.FC = () => {
     </div>
   );
 };
-
-export default WarehouseSyncButtons;
