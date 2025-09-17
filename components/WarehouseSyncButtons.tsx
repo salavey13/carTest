@@ -19,13 +19,13 @@ const WarehouseSyncButtons: React.FC = () => {
   return (
     <div className="space-y-2">
       <Button
-        className="bg-[#E313BF] hover:bg-[#C010A8] text-white w-full"  // WB purple
+        className="bg-[#E313BF] hover:bg-[#C010A8] text-white w-full"
         onClick={handleSyncWb}
       >
         Sync WB
       </Button>
       <Button
-        className="bg-[#005BFF] hover:bg-[#0048CC] text-white w-full"  // Ozon blue
+        className="bg-[#005BFF] hover:bg-[#0048CC] text-white w-full"  
         onClick={handleSyncOzon}
       >
         Sync Ozon
