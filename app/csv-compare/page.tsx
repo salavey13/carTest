@@ -14,6 +14,7 @@ import { Clipboard, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import AlarmDashboard from "@/components/AlarmDashboard";
 import type { WarehouseItem } from "@/app/wb/common";
+import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons”
 
 interface InventoryItem {
     id: string;
@@ -651,6 +652,7 @@ const CSVCompare = () => {
                     </Button>
                 </CardContent>
             </Card>
+            <WarehouseSyncButtons />
             <Link href="/wb">
                 <Button size="sm" variant="outline" className="text-[10px] mt-4 w-full">Вернуться в WB</Button>
             </Link>
