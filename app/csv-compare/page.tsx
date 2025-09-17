@@ -14,7 +14,7 @@ import { Clipboard, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import AlarmDashboard from "@/components/AlarmDashboard";
 import type { WarehouseItem } from "@/app/wb/common";
-import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons”
+import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons"
 
 interface InventoryItem {
     id: string;
