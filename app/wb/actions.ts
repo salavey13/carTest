@@ -420,3 +420,95 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
     return { success: false, error: (err as Error).message };
   }
 }
+
+// New: Fetch stocks from WB
+export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
+  const WB_TOKEN = process.env.WB_API_TOKEN;
+  const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
+  if (!WB_TOKEN || !WB_WAREHOUSE_ID) return { success: false, error: "WB credentials missing" };
+
+  try {
+    // Fetch all local SKUs
+    const { data: items } = await supabaseAdmin.from("cars").select("id, specs").eq("type", "wb_item");
+    if (!items) return { success: false, error: "No local items" };
+
+    const skus = items.map(i => (i.specs?.wb_sku as string) || i.id);
+
+    const response = await fetch(`https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`, {
+      method: "POST",
+      headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ skus }),
+    });
+
+    if (!response.ok) {
+      const errData = await response.json();
+      return { success: false, error: errData.error || "WB API error" };
+    }
+
+    const data = await response.json();
+    const stocks = data.stocks.map((s: any) => ({ sku: s.sku, amount: s.amount }));
+
+    logger.info(`Fetched ${stocks.length} stocks from WB.`);
+    return { success: true, data: stocks };
+  } catch (err) {
+    logger.error("fetchWbStocks error:", err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// New: Fetch stocks from Ozon
+export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
+  const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
+  const OZON_API_KEY = process.env.OZON_API_KEY;
+  if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, error: "Ozon credentials missing" };
+
+  try {
+    // Fetch all local SKUs
+    const { data: items } = await supabaseAdmin.from("cars").select("id, specs").eq("type", "wb_item");
+    if (!items) return { success: false, error: "No local items" };
+
+    const offerIds = items.map(i => (i.specs?.ozon_sku as string) || i.id);
+
+    let allStocks: { sku: string; amount: number }[] = [];
+    let lastId = "";
+    const limit = 1000;
+
+    while (true) {
+      const body = {
+        filter: { offer_id: offerIds, visibility: "ALL" },
+        last_id: lastId,
+        limit,
+      };
+
+      const response = await fetch("https://api-seller.ozon.ru/v4/product/info/stocks", {
+        method: "POST",
+        headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        return { success: false, error: errData.error || "Ozon API error" };
+      }
+
+      const data = await response.json();
+      const itemsStocks = data.result.items.flatMap((item: any) =>
+        item.stocks.map((stock: any) => ({
+          sku: item.offer_id,
+          amount: stock.present - stock.reserved,  // Available stock
+        }))
+      );
+
+      allStocks = [...allStocks, ...itemsStocks];
+
+      lastId = data.result.last_id;
+      if (data.result.total < limit) break;
+    }
+
+    logger.info(`Fetched ${allStocks.length} stocks from Ozon.`);
+    return { success: true, data: allStocks };
+  } catch (err) {
+    logger.error("fetchOzonStocks error:", err);
+    return { success: false, error: (err as Error).message };
+  }
+}
