@@ -32,6 +32,8 @@ import {
   generateWbBarcodes,
   createWbProductCards,
   getWbProductCardsList,
+  getWbWarehouses,
+
 } from "@/app/wb/actions";
 import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 
@@ -47,7 +49,9 @@ export default function WarehouseTestPage(): JSX.Element {
 
   // WB API test states
   const [wbApiResult, setWbApiResult] = useState<ApiRes | null>(null);
-  const [subjectId, setSubjectId] = useState<string>("");
+  
+const [warehouses, setWarehouses] = useState<any[]>([]); // <- новое состояние
+const [subjectId, setSubjectId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [parentID, setParentID] = useState<string>("");
   const [barcodeCount, setBarcodeCount] = useState<number>(1);
@@ -86,6 +90,25 @@ export default function WarehouseTestPage(): JSX.Element {
       setLoading(false);
     }
   };
+
+const handleGetWarehouses = async () => {
+  setLoading(true);
+  try {
+    const res = await getWbWarehouses();
+    setWbApiResult(res);
+    if (res?.success && Array.isArray(res.data)) {
+      setWarehouses(res.data);
+      toast.success(`Найдено ${res.data.length} склад(ов)`);
+    } else {
+      toast.error(res?.error ?? "Ошибка получения списка складов");
+    }
+  } catch (err: any) {
+    toast.error(err?.message ?? "Ошибка запроса складов");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleFetchLocal = async () => {
     setLoading(true);
@@ -473,6 +496,8 @@ export default function WarehouseTestPage(): JSX.Element {
               </p>
             </div>
 
+
+
             <div>
               <div className="flex gap-2">
                 <Input
@@ -586,11 +611,35 @@ export default function WarehouseTestPage(): JSX.Element {
             </div>
           </div>
 
+<div>
+  <Button className="w-full text-xs" onClick={handleGetWarehouses}>
+    Получить Warehouses (склады)
+  </Button>
+  <p className="text-xs mt-1 text-muted-foreground">
+    Для чего: Получает список ваших складов в Wildberries. Используется, чтобы узнать корректный numeric warehouseId для синха.
+  </p>
+</div>
+
+
           {wbApiResult && (
             <pre className="bg-muted p-2 rounded overflow-auto text-xs max-h-64">
               {JSON.stringify(wbApiResult, null, 2)}
             </pre>
           )}
+
+{warehouses.length > 0 && (
+  <Card className="mt-2 mb-4 text-xs">
+    <CardHeader className="p-2">
+      <CardTitle className="text-sm">Найденные склады WB</CardTitle>
+    </CardHeader>
+    <CardContent className="p-2 overflow-auto">
+      <pre className="text-xs max-h-48 overflow-auto">
+        {JSON.stringify(warehouses.map(w => ({ id: w.id, name: w.name, isActive: w.isActive })), null, 2)}
+      </pre>
+    </CardContent>
+  </Card>
+)}
+
         </CardContent>
       </Card>
     </div>
