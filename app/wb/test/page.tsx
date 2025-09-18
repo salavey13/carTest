@@ -318,17 +318,16 @@ export default function WarehouseTestPage() {
           <CardTitle className="text-sm">WB API Тесты</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-4">
+          <div className="space-y-2">
             <div>
               <Button className="w-full text-xs" onClick={handleGetParentCategories}>Получить Parent Categories</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список родительских категорий товаров на WB. Используется для выбора категории при создании карточек товаров.<br />
-                <strong>Пример:</strong> Выводит список категорий, например, `[{ "id": 123, "name": "Одежда" }, { "id": 124, "name": "Обувь" }]`.
+                Для чего: Получает список родительских категорий товаров на WB. Используется для выбора категории при создании карточек товаров.<br />
+                Пример: Выводит список категорий, например, `[{ "id": 123, "name": "Одежда" }, { "id": 124, "name": "Обувь" }]`.
               </p>
             </div>
-
             <div>
-              <div className="flex gap-2 mb-2">
+              <div className="flex gap-2">
                 <Input
                   placeholder="Search name (e.g., Постельное белье)"
                   value={searchQuery}
@@ -344,75 +343,67 @@ export default function WarehouseTestPage() {
               </div>
               <Button className="w-full text-xs" onClick={handleGetSubjects}>Получить Subjects</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список подкатегорий (subjects) для выбранной родительской категории. Используется для уточнения категории товара.<br />
-                <strong>Пример:</strong> Введите `Parent ID: 123` и `Search: Постельное`, получите `[{ "id": 456, "name": "Постельное белье" }, ...]`.
+                Для чего: Получает список подкатегорий (subjects) для выбранной родительской категории. Используется для уточнения категории товара.<br />
+                Пример: Введите `Parent ID: 123` и `Search: Постельное`, получите `[{ "id": 456, "name": "Постельное белье" }, ...]`.
               </p>
             </div>
-
             <div>
               <Input
                 placeholder="Subject ID (e.g., 456)"
                 value={subjectId}
                 onChange={(e) => setSubjectId(e.target.value)}
-                className="text-xs mb-2"
+                className="text-xs"
               />
               <Button className="w-full text-xs" onClick={handleGetSubjectCharcs}>Получить Characteristics</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает характеристики для указанного subject ID. Нужны для заполнения карточек товаров.<br />
-                <strong>Пример:</strong> Введите `Subject ID: 456`, получите `[{ "name": "Материал", "type": "string", "required": true }, ...]`.
+                Для чего: Получает характеристики для указанного subject ID. Нужны для заполнения карточек товаров.<br />
+                Пример: Введите `Subject ID: 456`, получите `[{ "name": "Материал", "type": "string", "required": true }, ...]`.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetColors}>Получить Colors</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список доступных цветов для товаров на WB. Используется для выбора цвета в карточке.<br />
-                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Белый" }, { "id": 2, "name": "Черный" }, ...]`.
+                Для чего: Получает список доступных цветов для товаров на WB. Используется для выбора цвета в карточке.<br />
+                Пример: Выводит `[{ "id": 1, "name": "Белый" }, { "id": 2, "name": "Черный" }, ...]`.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetGenders}>Получить Genders</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список полов (например, мужской, женский) для товаров. Нужен для товаров с гендерной привязкой.<br />
-                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Мужской" }, { "id": 2, "name": "Женский" }, ...]`.
+                Для чего: Получает список полов (например, мужской, женский) для товаров. Нужен для товаров с гендерной привязкой.<br />
+                Пример: Выводит `[{ "id": 1, "name": "Мужской" }, { "id": 2, "name": "Женский" }, ...]`.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetCountries}>Получить Countries</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список стран производства. Используется для указания страны в карточке товара.<br />
-                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Россия" }, { "id": 2, "name": "Китай" }, ...]`.
+                Для чего: Получает список стран производства. Используется для указания страны в карточке товара.<br />
+                Пример: Выводит `[{ "id": 1, "name": "Россия" }, { "id": 2, "name": "Китай" }, ...]`.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetSeasons}>Получить Seasons</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список сезонов (например, зима, лето). Используется для сезонных товаров.<br />
-                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Зима" }, { "id": 2, "name": "Лето" }, ...]`.
+                Для чего: Получает список сезонов (например, зима, лето). Используется для сезонных товаров.<br />
+                Пример: Выводит `[{ "id": 1, "name": "Зима" }, { "id": 2, "name": "Лето" }, ...]`.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetVat}>Получить VAT</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает доступные ставки НДС. Нужны для финансовых настроек карточки товара.<br />
-                <strong>Пример:</strong> Выводит `["0%", "10%", "20%"]`.
+                Для чего: Получает доступные ставки НДС. Нужны для финансовых настроек карточки товара.<br />
+                Пример: Выводит `["0%", "10%", "20%"]`.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetTnved}>Получить TNVED</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает коды ТН ВЭД для указанного subject ID. Нужны для таможенной классификации.<br />
-                <strong>Пример:</strong> Введите `Subject ID: 456`, получите `[{ "code": "6302210000", "name": "Постельное белье" }, ...]`.
+                Для чего: Получает коды ТН ВЭД для указанного subject ID. Нужны для таможенной классификации.<br />
+                Пример: Введите `Subject ID: 456`, получите `[{ "code": "6302210000", "name": "Постельное белье" }, ...]`.
               </p>
             </div>
-
             <div>
-              <div className="flex gap-2 mb-2">
+              <div className="flex gap-2">
                 <Input
                   type="number"
                   placeholder="Count (e.g., 1)"
@@ -423,30 +414,28 @@ export default function WarehouseTestPage() {
                 <Button className="w-full text-xs" onClick={handleGenerateBarcodes}>Генерировать Barcodes</Button>
               </div>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Генерирует уникальные штрихкоды для новых карточек товаров.<br />
-                <strong>Пример:</strong> Введите `Count: 2`, получите `["4601234567890", "4601234567891"]`.
+                Для чего: Генерирует уникальные штрихкоды для новых карточек товаров.<br />
+                Пример: Введите `Count: 2`, получите `["4601234567890", "4601234567891"]`.
               </p>
             </div>
-
             <div>
               <Input
                 placeholder="Product Cards JSON (e.g., [{...}])"
                 value={productCards}
                 onChange={(e) => setProductCards(e.target.value)}
-                className="text-xs mb-2"
+                className="text-xs"
               />
               <Button className="w-full text-xs" onClick={handleCreateProductCards}>Создать Product Cards</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Создает новые карточки товаров на WB. Требуется JSON с данными карточек.<br />
-                <strong>Пример:</strong> Введите `[{"nmId": 123, "subjectId": 456, "vendorCode": "ABC123", ...}]`, создаст карточку.
+                Для чего: Создает новые карточки товаров на WB. Требуется JSON с данными карточек.<br />
+                Пример: Введите `[{"nmId": 123, "subjectId": 456, "vendorCode": "ABC123", ...}]`, создаст карточку.
               </p>
             </div>
-
             <div>
               <Button className="w-full text-xs" onClick={handleGetProductCardsList}>Получить Product Cards List</Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                <strong>Для чего:</strong> Получает список существующих карточек товаров на WB с фильтрацией.<br />
-                <strong>Пример:</strong> Выводит `[{ "nmId": 123, "vendorCode": "ABC123", "title": "Постельное белье" }, ...]`.
+                Для чего: Получает список существующих карточек товаров на WB с фильтрацией.<br />
+                Пример: Выводит `[{ "nmId": 123, "vendorCode": "ABC123", "title": "Постельное белье" }, ...]`.
               </p>
             </div>
           </div>
