@@ -15,13 +15,13 @@ export default function WarehouseTestPage() {
   const [localItems, setLocalItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Новые состояния для WB API тестов
+  // Состояния для WB API тестов
   const [wbApiResult, setWbApiResult] = useState<any>(null);
   const [subjectId, setSubjectId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [parentID, setParentID] = useState("");
   const [barcodeCount, setBarcodeCount] = useState(1);
-  const [productCards, setProductCards] = useState("[]"); // JSON string для ввода
+  const [productCards, setProductCards] = useState("[]");
 
   const handleFetchWb = async () => {
     setLoading(true);
@@ -66,7 +66,7 @@ export default function WarehouseTestPage() {
     const res = await updateItemLocationQty(itemId, voxelId, delta);
     if (res.success) {
       toast.success(`Обновлено ${itemId} на ${delta}`);
-      handleFetchLocal();  // Refresh local
+      handleFetchLocal(); // Refresh local
     } else {
       toast.error(res.error);
     }
@@ -76,7 +76,6 @@ export default function WarehouseTestPage() {
     const res = platform === 'wb' ? await syncWbStocks() : await syncOzonStocks();
     if (res.success) {
       toast.success(`${platform.toUpperCase()} синхронизировано!`);
-      // Refresh all
       handleFetchWb();
       handleFetchOzon();
       handleFetchLocal();
@@ -85,7 +84,7 @@ export default function WarehouseTestPage() {
     }
   };
 
-  // Новые handlers для WB API
+  // Handlers для WB API
   const handleGetParentCategories = async () => {
     const res = await getWbParentCategories();
     setWbApiResult(res);
@@ -160,7 +159,7 @@ export default function WarehouseTestPage() {
   };
 
   const handleGetProductCardsList = async () => {
-    const settings = { // Пример settings, адаптировать
+    const settings = {
       settings: {
         cursor: { limit: 100 },
         filter: { withPhoto: -1 }
@@ -177,12 +176,12 @@ export default function WarehouseTestPage() {
     const ozon = ozonStocks.find(o => o.sku === local.id);
     const mismatch = !wb || !ozon || local.amount !== wb?.amount || local.amount !== ozon?.amount;
     return { id: local.id, local: local.amount, wb: wb?.amount || 'N/A', ozon: ozon?.amount || 'N/A', mismatch };
-  }).filter(c => c.mismatch);  // Show only mismatches
+  }).filter(c => c.mismatch);
 
   return (
     <div className="container mx-auto p-2 text-sm">
       <h1 className="text-lg font-bold mb-2">Тестовая страница склада</h1>
-      
+
       <div className="flex flex-wrap gap-2 mb-2">
         <Button className="text-xs py-1 px-2" onClick={handleFetchWb} disabled={loading}>Загрузить WB</Button>
         <Button className="text-xs py-1 px-2" onClick={handleFetchOzon} disabled={loading}>Загрузить Ozon</Button>
@@ -190,6 +189,24 @@ export default function WarehouseTestPage() {
       </div>
 
       <WarehouseSyncButtons />
+
+      {/* Инструкция по синхронизации */}
+      <Card className="mb-4 text-xs">
+        <CardHeader className="p-2">
+          <CardTitle className="text-sm">Инструкция по устранению расхождений</CardTitle>
+        </CardHeader>
+        <CardContent className="p-2">
+          <p>Если в таблице "Сравнение (расхождения)" есть записи, выполните следующие шаги:</p>
+          <ol className="list-decimal pl-4">
+            <li><strong>Проверьте источник правды</strong>: Локальная база Supabase считается основным источником данных о запасах.</li>
+            <li><strong>Обновите локальные данные</strong>: Используйте кнопки "+1"/"-1" для корректировки количества в Supabase, если данные неверны.</li>
+            <li><strong>Синхронизируйте с платформами</strong>: Нажмите "Синхронизировать с WB" и "Синхронизировать с Ozon" в компоненте WarehouseSyncButtons, чтобы отправить данные из Supabase на платформы.</li>
+            <li><strong>Повторно загрузите данные</strong>: Нажмите "Загрузить WB", "Загрузить Ozon" и "Загрузить локальные" для проверки синхронизации.</li>
+            <li><strong>Повторите при необходимости</strong>: Если расхождения остались, проверьте логи (в консоли или через админ-панель) и устраните возможные ошибки (например, неверные SKU).</li>
+          </ol>
+          <p className="mt-2"><strong>Примечание</strong>: Всегда обновляйте Supabase перед синхронизацией, чтобы избежать потери данных.</p>
+        </CardContent>
+      </Card>
 
       <Card className="mb-2 text-xs">
         <CardHeader className="p-2">
@@ -268,7 +285,7 @@ export default function WarehouseTestPage() {
         </CardContent>
       </Card>
 
-      <Card className="text-xs">
+      <Card className="mb-4 text-xs">
         <CardHeader className="p-2">
           <CardTitle className="text-sm">Сравнение (расхождения)</CardTitle>
         </CardHeader>
@@ -296,60 +313,142 @@ export default function WarehouseTestPage() {
         </CardContent>
       </Card>
 
-      {/* Новый раздел для WB API тестов */}
       <Card className="mt-4">
         <CardHeader>
           <CardTitle className="text-sm">WB API Тесты</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Button className="w-full text-xs" onClick={handleGetParentCategories}>Получить Parent Categories</Button>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search name"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-xs"
-              />
-              <Input
-                placeholder="Parent ID"
-                value={parentID}
-                onChange={(e) => setParentID(e.target.value)}
-                className="text-xs"
-              />
+          <div className="space-y-4">
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetParentCategories}>Получить Parent Categories</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список родительских категорий товаров на WB. Используется для выбора категории при создании карточек товаров.<br />
+                <strong>Пример:</strong> Выводит список категорий, например, `[{ "id": 123, "name": "Одежда" }, { "id": 124, "name": "Обувь" }]`.
+              </p>
             </div>
-            <Button className="w-full text-xs" onClick={handleGetSubjects}>Получить Subjects</Button>
-            <Input
-              placeholder="Subject ID"
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className="text-xs"
-            />
-            <Button className="w-full text-xs" onClick={handleGetSubjectCharcs}>Получить Characteristics</Button>
-            <Button className="w-full text-xs" onClick={handleGetColors}>Получить Colors</Button>
-            <Button className="w-full text-xs" onClick={handleGetGenders}>Получить Genders</Button>
-            <Button className="w-full text-xs" onClick={handleGetCountries}>Получить Countries</Button>
-            <Button className="w-full text-xs" onClick={handleGetSeasons}>Получить Seasons</Button>
-            <Button className="w-full text-xs" onClick={handleGetVat}>Получить VAT</Button>
-            <Button className="w-full text-xs" onClick={handleGetTnved}>Получить TNVED</Button>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Count"
-                value={barcodeCount}
-                onChange={(e) => setBarcodeCount(parseInt(e.target.value) || 1)}
-                className="text-xs"
-              />
-              <Button className="w-full text-xs" onClick={handleGenerateBarcodes}>Генерировать Barcodes</Button>
+
+            <div>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="Search name (e.g., Постельное белье)"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="text-xs"
+                />
+                <Input
+                  placeholder="Parent ID (e.g., 123)"
+                  value={parentID}
+                  onChange={(e) => setParentID(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+              <Button className="w-full text-xs" onClick={handleGetSubjects}>Получить Subjects</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список подкатегорий (subjects) для выбранной родительской категории. Используется для уточнения категории товара.<br />
+                <strong>Пример:</strong> Введите `Parent ID: 123` и `Search: Постельное`, получите `[{ "id": 456, "name": "Постельное белье" }, ...]`.
+              </p>
             </div>
-            <Input
-              placeholder="Product Cards JSON"
-              value={productCards}
-              onChange={(e) => setProductCards(e.target.value)}
-              className="text-xs"
-            />
-            <Button className="w-full text-xs" onClick={handleCreateProductCards}>Создать Product Cards</Button>
-            <Button className="w-full text-xs" onClick={handleGetProductCardsList}>Получить Product Cards List</Button>
+
+            <div>
+              <Input
+                placeholder="Subject ID (e.g., 456)"
+                value={subjectId}
+                onChange={(e) => setSubjectId(e.target.value)}
+                className="text-xs mb-2"
+              />
+              <Button className="w-full text-xs" onClick={handleGetSubjectCharcs}>Получить Characteristics</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает характеристики для указанного subject ID. Нужны для заполнения карточек товаров.<br />
+                <strong>Пример:</strong> Введите `Subject ID: 456`, получите `[{ "name": "Материал", "type": "string", "required": true }, ...]`.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetColors}>Получить Colors</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список доступных цветов для товаров на WB. Используется для выбора цвета в карточке.<br />
+                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Белый" }, { "id": 2, "name": "Черный" }, ...]`.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetGenders}>Получить Genders</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список полов (например, мужской, женский) для товаров. Нужен для товаров с гендерной привязкой.<br />
+                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Мужской" }, { "id": 2, "name": "Женский" }, ...]`.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetCountries}>Получить Countries</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список стран производства. Используется для указания страны в карточке товара.<br />
+                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Россия" }, { "id": 2, "name": "Китай" }, ...]`.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetSeasons}>Получить Seasons</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список сезонов (например, зима, лето). Используется для сезонных товаров.<br />
+                <strong>Пример:</strong> Выводит `[{ "id": 1, "name": "Зима" }, { "id": 2, "name": "Лето" }, ...]`.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetVat}>Получить VAT</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает доступные ставки НДС. Нужны для финансовых настроек карточки товара.<br />
+                <strong>Пример:</strong> Выводит `["0%", "10%", "20%"]`.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetTnved}>Получить TNVED</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает коды ТН ВЭД для указанного subject ID. Нужны для таможенной классификации.<br />
+                <strong>Пример:</strong> Введите `Subject ID: 456`, получите `[{ "code": "6302210000", "name": "Постельное белье" }, ...]`.
+              </p>
+            </div>
+
+            <div>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  type="number"
+                  placeholder="Count (e.g., 1)"
+                  value={barcodeCount}
+                  onChange={(e) => setBarcodeCount(parseInt(e.target.value) || 1)}
+                  className="text-xs"
+                />
+                <Button className="w-full text-xs" onClick={handleGenerateBarcodes}>Генерировать Barcodes</Button>
+              </div>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Генерирует уникальные штрихкоды для новых карточек товаров.<br />
+                <strong>Пример:</strong> Введите `Count: 2`, получите `["4601234567890", "4601234567891"]`.
+              </p>
+            </div>
+
+            <div>
+              <Input
+                placeholder="Product Cards JSON (e.g., [{...}])"
+                value={productCards}
+                onChange={(e) => setProductCards(e.target.value)}
+                className="text-xs mb-2"
+              />
+              <Button className="w-full text-xs" onClick={handleCreateProductCards}>Создать Product Cards</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Создает новые карточки товаров на WB. Требуется JSON с данными карточек.<br />
+                <strong>Пример:</strong> Введите `[{"nmId": 123, "subjectId": 456, "vendorCode": "ABC123", ...}]`, создаст карточку.
+              </p>
+            </div>
+
+            <div>
+              <Button className="w-full text-xs" onClick={handleGetProductCardsList}>Получить Product Cards List</Button>
+              <p className="text-xs mt-1 text-muted-foreground">
+                <strong>Для чего:</strong> Получает список существующих карточек товаров на WB с фильтрацией.<br />
+                <strong>Пример:</strong> Выводит `[{ "nmId": 123, "vendorCode": "ABC123", "title": "Постельное белье" }, ...]`.
+              </p>
+            </div>
           </div>
 
           {wbApiResult && (
