@@ -3,148 +3,231 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { fetchWbStocks, fetchOzonStocks, getWarehouseItems, updateItemLocationQty, syncWbStocks, syncOzonStocks, getWbParentCategories, getWbSubjects, getWbSubjectCharcs, getWbColors, getWbGenders, getWbCountries, getWbSeasons, getWbVat, getWbTnved, generateWbBarcodes, createWbProductCards, getWbProductCardsList } from "@/app/wb/actions";
+import {
+  fetchWbStocks,
+  fetchOzonStocks,
+  getWarehouseItems,
+  updateItemLocationQty,
+  syncWbStocks,
+  syncOzonStocks,
+  getWbParentCategories,
+  getWbSubjects,
+  getWbSubjectCharcs,
+  getWbColors,
+  getWbGenders,
+  getWbCountries,
+  getWbSeasons,
+  getWbVat,
+  getWbTnved,
+  generateWbBarcodes,
+  createWbProductCards,
+  getWbProductCardsList,
+} from "@/app/wb/actions";
 import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 
-export default function WarehouseTestPage() {
-  const [wbStocks, setWbStocks] = useState<{ sku: string; amount: number }[]>([]);
-  const [ozonStocks, setOzonStocks] = useState<{ sku: string; amount: number }[]>([]);
-  const [localItems, setLocalItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+type Stock = { sku: string; amount: number };
+type LocalItem = { id: string; amount: number };
+type ApiRes = any;
 
-  // Состояния для WB API тестов
-  const [wbApiResult, setWbApiResult] = useState<any>(null);
-  const [subjectId, setSubjectId] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [parentID, setParentID] = useState("");
-  const [barcodeCount, setBarcodeCount] = useState(1);
-  const [productCards, setProductCards] = useState("[]");
+export default function WarehouseTestPage(): JSX.Element {
+  const [wbStocks, setWbStocks] = useState<Stock[]>([]);
+  const [ozonStocks, setOzonStocks] = useState<Stock[]>([]);
+  const [localItems, setLocalItems] = useState<LocalItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // WB API test states
+  const [wbApiResult, setWbApiResult] = useState<ApiRes | null>(null);
+  const [subjectId, setSubjectId] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [parentID, setParentID] = useState<string>("");
+  const [barcodeCount, setBarcodeCount] = useState<number>(1);
+  const [productCards, setProductCards] = useState<string>("[]");
 
   const handleFetchWb = async () => {
     setLoading(true);
-    const res = await fetchWbStocks();
-    setLoading(false);
-    if (res.success && res.data) {
-      setWbStocks(res.data);
-      toast.success(`Загружено ${res.data.length} товаров из WB`);
-    } else {
-      toast.error(res.error || "Ошибка загрузки стоков WB");
+    try {
+      const res = await fetchWbStocks();
+      if (res?.success && res.data) {
+        setWbStocks(res.data);
+        toast.success(`Загружено ${res.data.length} товаров из WB`);
+      } else {
+        toast.error(res?.error ?? "Ошибка загрузки стоков WB");
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Ошибка запроса WB");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleFetchOzon = async () => {
     setLoading(true);
-    const res = await fetchOzonStocks();
-    setLoading(false);
-    if (res.success && res.data) {
-      setOzonStocks(res.data);
-      toast.success(`Загружено ${res.data.length} товаров из Ozon`);
-    } else {
-      toast.error(res.error || "Ошибка загрузки стоков Ozon");
+    try {
+      const res = await fetchOzonStocks();
+      if (res?.success && res.data) {
+        setOzonStocks(res.data);
+        toast.success(`Загружено ${res.data.length} товаров из Ozon`);
+      } else {
+        toast.error(res?.error ?? "Ошибка загрузки стоков Ozon");
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Ошибка запроса Ozon");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleFetchLocal = async () => {
     setLoading(true);
-    const res = await getWarehouseItems();
-    setLoading(false);
-    if (res.success && res.data) {
-      setLocalItems(res.data.map(i => ({
-        id: i.id,
-        amount: i.specs?.warehouse_locations?.reduce((sum: number, loc: any) => sum + loc.quantity, 0) || 0
-      })));
-      toast.success(`Загружено ${res.data.length} локальных товаров`);
-    } else {
-      toast.error(res.error || "Ошибка загрузки локальных товаров");
+    try {
+      const res = await getWarehouseItems();
+      if (res?.success && Array.isArray(res.data)) {
+        const items = res.data.map((i: any) => ({
+          id: i.id,
+          amount:
+            i.specs?.warehouse_locations?.reduce(
+              (sum: number, loc: any) => sum + (loc?.quantity ?? 0),
+              0
+            ) ?? 0,
+        }));
+        setLocalItems(items);
+        toast.success(`Загружено ${res.data.length} локальных товаров`);
+      } else {
+        toast.error(res?.error ?? "Ошибка загрузки локальных товаров");
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Ошибка запроса локальных товаров");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUpdate = async (itemId: string, delta: number, voxelId: string = "A1") => {
-    const res = await updateItemLocationQty(itemId, voxelId, delta);
-    if (res.success) {
-      toast.success(`Обновлено ${itemId} на ${delta}`);
-      handleFetchLocal(); // Refresh local
-    } else {
-      toast.error(res.error);
+  const handleUpdate = async (
+    itemId: string,
+    delta: number,
+    voxelId: string = "A1"
+  ) => {
+    try {
+      const res = await updateItemLocationQty(itemId, voxelId, delta);
+      if (res?.success) {
+        toast.success(`Обновлено ${itemId} на ${delta}`);
+        await handleFetchLocal();
+      } else {
+        toast.error(res?.error ?? "Ошибка обновления");
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Ошибка обновления");
     }
   };
 
-  const handleSync = async (platform: 'wb' | 'ozon') => {
-    const res = platform === 'wb' ? await syncWbStocks() : await syncOzonStocks();
-    if (res.success) {
-      toast.success(`${platform.toUpperCase()} синхронизировано!`);
-      handleFetchWb();
-      handleFetchOzon();
-      handleFetchLocal();
-    } else {
-      toast.error(res.error);
+  const handleSync = async (platform: "wb" | "ozon") => {
+    try {
+      const res = platform === "wb" ? await syncWbStocks() : await syncOzonStocks();
+      if (res?.success) {
+        toast.success(`${platform.toUpperCase()} синхронизировано!`);
+        // refresh
+        await Promise.all([handleFetchWb(), handleFetchOzon(), handleFetchLocal()]);
+      } else {
+        toast.error(res?.error ?? "Ошибка синхронизации");
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Ошибка синхронизации");
     }
   };
 
-  // Handlers для WB API
+  // WB API handlers (explicit if/else for toast)
   const handleGetParentCategories = async () => {
     const res = await getWbParentCategories();
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Категории получены" : res.error);
+    if (res?.success) toast.success("Категории получены");
+    else toast.error(res?.error ?? "Ошибка получения категорий");
   };
 
   const handleGetSubjects = async () => {
-    const res = await getWbSubjects('ru', searchQuery, 30, 0, parentID ? parseInt(parentID) : undefined);
+    const res = await getWbSubjects(
+      "ru",
+      searchQuery,
+      30,
+      0,
+      parentID ? parseInt(parentID, 10) : undefined
+    );
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Субъекты получены" : res.error);
+    if (res?.success) toast.success("Субъекты получены");
+    else toast.error(res?.error ?? "Ошибка получения subjects");
   };
 
   const handleGetSubjectCharcs = async () => {
-    if (!subjectId) return toast.error("Введите subjectId");
-    const res = await getWbSubjectCharcs(parseInt(subjectId));
+    if (!subjectId) {
+      toast.error("Введите subjectId");
+      return;
+    }
+    const res = await getWbSubjectCharcs(parseInt(subjectId, 10));
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Характеристики получены" : res.error);
+    if (res?.success) toast.success("Характеристики получены");
+    else toast.error(res?.error ?? "Ошибка получения характеристик");
   };
 
   const handleGetColors = async () => {
     const res = await getWbColors();
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Цвета получены" : res.error);
+    if (res?.success) toast.success("Цвета получены");
+    else toast.error(res?.error ?? "Ошибка получения цветов");
   };
 
   const handleGetGenders = async () => {
     const res = await getWbGenders();
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Полы получены" : res.error);
+    if (res?.success) toast.success("Пoлы получены");
+    else toast.error(res?.error ?? "Ошибка получения полов");
   };
 
   const handleGetCountries = async () => {
     const res = await getWbCountries();
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Страны получены" : res.error);
+    if (res?.success) toast.success("Страны получены");
+    else toast.error(res?.error ?? "Ошибка получения стран");
   };
 
   const handleGetSeasons = async () => {
     const res = await getWbSeasons();
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Сезоны получены" : res.error);
+    if (res?.success) toast.success("Сезоны получены");
+    else toast.error(res?.error ?? "Ошибка получения сезонов");
   };
 
   const handleGetVat = async () => {
     const res = await getWbVat();
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "НДС получен" : res.error);
+    if (res?.success) toast.success("НДС получен");
+    else toast.error(res?.error ?? "Ошибка получения НДС");
   };
 
   const handleGetTnved = async () => {
-    if (!subjectId) return toast.error("Введите subjectID");
-    const res = await getWbTnved(parseInt(subjectId), searchQuery);
+    if (!subjectId) {
+      toast.error("Введите subjectID");
+      return;
+    }
+    const res = await getWbTnved(parseInt(subjectId, 10), searchQuery);
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "ТН ВЭД получены" : res.error);
+    if (res?.success) toast.success("ТН ВЭД получены");
+    else toast.error(res?.error ?? "Ошибка получения ТН ВЭД");
   };
 
   const handleGenerateBarcodes = async () => {
     const res = await generateWbBarcodes(barcodeCount);
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Баркоды сгенерированы" : res.error);
+    if (res?.success) toast.success("Баркоды сгенерированы");
+    else toast.error(res?.error ?? "Ошибка генерации баркодов");
   };
 
   const handleCreateProductCards = async () => {
@@ -152,8 +235,9 @@ export default function WarehouseTestPage() {
       const cards = JSON.parse(productCards);
       const res = await createWbProductCards(cards);
       setWbApiResult(res);
-      toast[res.success ? "success" : "error"](res.success ? "Карточки созданы" : res.error);
-    } catch (e) {
+      if (res?.success) toast.success("Карточки созданы");
+      else toast.error(res?.error ?? "Ошибка создания карточек");
+    } catch (e: any) {
       toast.error("Неверный JSON для карточек");
     }
   };
@@ -162,30 +246,58 @@ export default function WarehouseTestPage() {
     const settings = {
       settings: {
         cursor: { limit: 100 },
-        filter: { withPhoto: -1 }
-      }
+        filter: { withPhoto: -1 },
+      },
     };
     const res = await getWbProductCardsList(settings);
     setWbApiResult(res);
-    toast[res.success ? "success" : "error"](res.success ? "Список карточек получен" : res.error);
+    if (res?.success) toast.success("Список карточек получен");
+    else toast.error(res?.error ?? "Ошибка получения списка карточек");
   };
 
-  // Compare lists
-  const comparisons = localItems.map(local => {
-    const wb = wbStocks.find(w => w.sku === local.id);
-    const ozon = ozonStocks.find(o => o.sku === local.id);
-    const mismatch = !wb || !ozon || local.amount !== wb?.amount || local.amount !== ozon?.amount;
-    return { id: local.id, local: local.amount, wb: wb?.amount || 'N/A', ozon: ozon?.amount || 'N/A', mismatch };
-  }).filter(c => c.mismatch);
+  // Compare lists (show only mismatches)
+  const comparisons = localItems
+    .map((local) => {
+      const wb = wbStocks.find((w) => w.sku === local.id);
+      const ozon = ozonStocks.find((o) => o.sku === local.id);
+      const mismatch =
+        !wb || !ozon || local.amount !== wb?.amount || local.amount !== ozon?.amount;
+      return {
+        id: local.id,
+        local: local.amount,
+        wb: wb?.amount ?? "N/A",
+        ozon: ozon?.amount ?? "N/A",
+        mismatch,
+      };
+    })
+    .filter((c) => c.mismatch);
 
   return (
     <div className="container mx-auto p-2 text-sm">
       <h1 className="text-lg font-bold mb-2">Тестовая страница склада</h1>
 
       <div className="flex flex-wrap gap-2 mb-2">
-        <Button className="text-xs py-1 px-2" onClick={handleFetchWb} disabled={loading}>Загрузить WB</Button>
-        <Button className="text-xs py-1 px-2" onClick={handleFetchOzon} disabled={loading}>Загрузить Ozon</Button>
-        <Button className="text-xs py-1 px-2" onClick={handleFetchLocal} disabled={loading}>Загрузить локальные</Button>
+        <Button
+          className="text-xs py-1 px-2"
+          onClick={handleFetchWb}
+          disabled={loading}
+        >
+          Загрузить WB
+        </Button>
+        <Button
+          className="text-xs py-1 px-2"
+          onClick={handleFetchOzon}
+          disabled={loading}
+        >
+          Загрузить Ozon
+        </Button>
+        <Button
+          className="text-xs py-1 px-2"
+          onClick={handleFetchLocal}
+          disabled={loading}
+        >
+          Загрузить локальные
+        </Button>
       </div>
 
       <WarehouseSyncButtons />
@@ -196,18 +308,37 @@ export default function WarehouseTestPage() {
           <CardTitle className="text-sm">Инструкция по устранению расхождений</CardTitle>
         </CardHeader>
         <CardContent className="p-2">
-          <p>Если в таблице "Сравнение (расхождения)" есть записи, выполните следующие шаги:</p>
+          <p>
+            Если в таблице "Сравнение (расхождения)" есть записи, выполните следующие шаги:
+          </p>
           <ol className="list-decimal pl-4">
-            <li><strong>Проверьте источник правды</strong>: Локальная база Supabase считается основным источником данных о запасах.</li>
-            <li><strong>Обновите локальные данные</strong>: Используйте кнопки "+1"/"-1" для корректировки количества в Supabase, если данные неверны.</li>
-            <li><strong>Синхронизируйте с платформами</strong>: Нажмите "Синхронизировать с WB" и "Синхронизировать с Ozon" в компоненте WarehouseSyncButtons, чтобы отправить данные из Supabase на платформы.</li>
-            <li><strong>Повторно загрузите данные</strong>: Нажмите "Загрузить WB", "Загрузить Ozon" и "Загрузить локальные" для проверки синхронизации.</li>
-            <li><strong>Повторите при необходимости</strong>: Если расхождения остались, проверьте логи (в консоли или через админ-панель) и устраните возможные ошибки (например, неверные SKU).</li>
+            <li>
+              <strong>Проверьте источник правды</strong>: Локальная база Supabase
+              считается основным источником данных о запасах.
+            </li>
+            <li>
+              <strong>Обновите локальные данные</strong>: Используйте кнопки "+1"/"-1"
+              для корректировки количества в Supabase, если данные неверны.
+            </li>
+            <li>
+              <strong>Синхронизируйте с платформами</strong>: Нажмите соответствующие
+              кнопки в компоненте WarehouseSyncButtons, чтобы отправить данные из Supabase на платформы.
+            </li>
+            <li>
+              <strong>Повторно загрузите данные</strong>: Нажмите "Загрузить WB", "Загрузить Ozon" и "Загрузить локальные".
+            </li>
+            <li>
+              <strong>Повторите при необходимости</strong>: Если расхождения остались,
+              проверьте логи и SKU.
+            </li>
           </ol>
-          <p className="mt-2"><strong>Примечание</strong>: Всегда обновляйте Supabase перед синхронизацией, чтобы избежать потери данных.</p>
+          <p className="mt-2">
+            <strong>Примечание</strong>: Всегда обновляйте Supabase перед синхронизацией, чтобы избежать потери данных.
+          </p>
         </CardContent>
       </Card>
 
+      {/* WB stocks */}
       <Card className="mb-2 text-xs">
         <CardHeader className="p-2">
           <CardTitle className="text-sm">Стоки WB</CardTitle>
@@ -232,6 +363,7 @@ export default function WarehouseTestPage() {
         </CardContent>
       </Card>
 
+      {/* Ozon stocks */}
       <Card className="mb-2 text-xs">
         <CardHeader className="p-2">
           <CardTitle className="text-sm">Стоки Ozon</CardTitle>
@@ -256,6 +388,7 @@ export default function WarehouseTestPage() {
         </CardContent>
       </Card>
 
+      {/* Local items */}
       <Card className="mb-2 text-xs">
         <CardHeader className="p-2">
           <CardTitle className="text-sm">Локальные товары (Supabase)</CardTitle>
@@ -275,8 +408,18 @@ export default function WarehouseTestPage() {
                   <TableCell className="text-xs">{item.id}</TableCell>
                   <TableCell className="text-xs">{item.amount}</TableCell>
                   <TableCell className="flex gap-1">
-                    <Button className="text-xs py-0 px-1 bg-gradient-to-r from-green-500 to-green-700" onClick={() => handleUpdate(item.id, 1)}>+1</Button>
-                    <Button className="text-xs py-0 px-1 bg-gradient-to-r from-red-500 to-red-700" onClick={() => handleUpdate(item.id, -1)}>-1</Button>
+                    <Button
+                      className="text-xs py-0 px-1"
+                      onClick={() => handleUpdate(item.id, 1)}
+                    >
+                      +1
+                    </Button>
+                    <Button
+                      className="text-xs py-0 px-1"
+                      onClick={() => handleUpdate(item.id, -1)}
+                    >
+                      -1
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -285,6 +428,7 @@ export default function WarehouseTestPage() {
         </CardContent>
       </Card>
 
+      {/* Comparisons */}
       <Card className="mb-4 text-xs">
         <CardHeader className="p-2">
           <CardTitle className="text-sm">Сравнение (расхождения)</CardTitle>
@@ -313,6 +457,7 @@ export default function WarehouseTestPage() {
         </CardContent>
       </Card>
 
+      {/* WB API Tests */}
       <Card className="mt-4">
         <CardHeader>
           <CardTitle className="text-sm">WB API Тесты</CardTitle>
@@ -320,123 +465,124 @@ export default function WarehouseTestPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div>
-              <Button className="w-full text-xs" onClick={handleGetParentCategories}>Получить Parent Categories</Button>
+              <Button className="w-full text-xs" onClick={handleGetParentCategories}>
+                Получить Parent Categories
+              </Button>
               <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список родительских категорий товаров на WB. Используется для выбора категории при создании карточек товаров.<br />
-                Пример: Выводит список категорий, например, `[{ "id": 123, "name": "Одежда" }, { "id": 124, "name": "Обувь" }]`.
+                Для чего: Получает список родительских категорий товаров на WB.
               </p>
             </div>
+
             <div>
               <div className="flex gap-2">
                 <Input
                   placeholder="Search name (e.g., Постельное белье)"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setSearchQuery(e.target.value)
+                  }
                   className="text-xs"
                 />
                 <Input
                   placeholder="Parent ID (e.g., 123)"
                   value={parentID}
-                  onChange={(e) => setParentID(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setParentID(e.target.value)
+                  }
                   className="text-xs"
                 />
               </div>
-              <Button className="w-full text-xs" onClick={handleGetSubjects}>Получить Subjects</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список подкатегорий (subjects) для выбранной родительской категории. Используется для уточнения категории товара.<br />
-                Пример: Введите `Parent ID: 123` и `Search: Постельное`, получите `[{ "id": 456, "name": "Постельное белье" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetSubjects}>
+                Получить Subjects
+              </Button>
             </div>
+
             <div>
               <Input
                 placeholder="Subject ID (e.g., 456)"
                 value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSubjectId(e.target.value)
+                }
                 className="text-xs"
               />
-              <Button className="w-full text-xs" onClick={handleGetSubjectCharcs}>Получить Characteristics</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает характеристики для указанного subject ID. Нужны для заполнения карточек товаров.<br />
-                Пример: Введите `Subject ID: 456`, получите `[{ "name": "Материал", "type": "string", "required": true }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetSubjectCharcs}>
+                Получить Characteristics
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetColors}>Получить Colors</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список доступных цветов для товаров на WB. Используется для выбора цвета в карточке.<br />
-                Пример: Выводит `[{ "id": 1, "name": "Белый" }, { "id": 2, "name": "Черный" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetColors}>
+                Получить Colors
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetGenders}>Получить Genders</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список полов (например, мужской, женский) для товаров. Нужен для товаров с гендерной привязкой.<br />
-                Пример: Выводит `[{ "id": 1, "name": "Мужской" }, { "id": 2, "name": "Женский" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetGenders}>
+                Получить Genders
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetCountries}>Получить Countries</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список стран производства. Используется для указания страны в карточке товара.<br />
-                Пример: Выводит `[{ "id": 1, "name": "Россия" }, { "id": 2, "name": "Китай" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetCountries}>
+                Получить Countries
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetSeasons}>Получить Seasons</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список сезонов (например, зима, лето). Используется для сезонных товаров.<br />
-                Пример: Выводит `[{ "id": 1, "name": "Зима" }, { "id": 2, "name": "Лето" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetSeasons}>
+                Получить Seasons
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetVat}>Получить VAT</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает доступные ставки НДС. Нужны для финансовых настроек карточки товара.<br />
-                Пример: Выводит `["0%", "10%", "20%"]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetVat}>
+                Получить VAT
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetTnved}>Получить TNVED</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает коды ТН ВЭД для указанного subject ID. Нужны для таможенной классификации.<br />
-                Пример: Введите `Subject ID: 456`, получите `[{ "code": "6302210000", "name": "Постельное белье" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetTnved}>
+                Получить TNVED
+              </Button>
             </div>
+
             <div>
               <div className="flex gap-2">
                 <Input
                   type="number"
                   placeholder="Count (e.g., 1)"
-                  value={barcodeCount}
-                  onChange={(e) => setBarcodeCount(parseInt(e.target.value) || 1)}
+                  value={String(barcodeCount)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const v = parseInt(e.target.value, 10);
+                    setBarcodeCount(Number.isNaN(v) ? 1 : v);
+                  }}
                   className="text-xs"
                 />
-                <Button className="w-full text-xs" onClick={handleGenerateBarcodes}>Генерировать Barcodes</Button>
+                <Button className="w-full text-xs" onClick={handleGenerateBarcodes}>
+                  Генерировать Barcodes
+                </Button>
               </div>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Генерирует уникальные штрихкоды для новых карточек товаров.<br />
-                Пример: Введите `Count: 2`, получите `["4601234567890", "4601234567891"]`.
-              </p>
             </div>
+
             <div>
               <Input
                 placeholder="Product Cards JSON (e.g., [{...}])"
                 value={productCards}
-                onChange={(e) => setProductCards(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setProductCards(e.target.value)
+                }
                 className="text-xs"
               />
-              <Button className="w-full text-xs" onClick={handleCreateProductCards}>Создать Product Cards</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Создает новые карточки товаров на WB. Требуется JSON с данными карточек.<br />
-                Пример: Введите `[{"nmId": 123, "subjectId": 456, "vendorCode": "ABC123", ...}]`, создаст карточку.
-              </p>
+              <Button className="w-full text-xs" onClick={handleCreateProductCards}>
+                Создать Product Cards
+              </Button>
             </div>
+
             <div>
-              <Button className="w-full text-xs" onClick={handleGetProductCardsList}>Получить Product Cards List</Button>
-              <p className="text-xs mt-1 text-muted-foreground">
-                Для чего: Получает список существующих карточек товаров на WB с фильтрацией.<br />
-                Пример: Выводит `[{ "nmId": 123, "vendorCode": "ABC123", "title": "Постельное белье" }, ...]`.
-              </p>
+              <Button className="w-full text-xs" onClick={handleGetProductCardsList}>
+                Получить Product Cards List
+              </Button>
             </div>
           </div>
 
