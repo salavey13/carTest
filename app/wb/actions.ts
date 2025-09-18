@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -7,6 +8,7 @@ import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
 import Papa from "papaparse";
+import dns from "dns/promises"
 
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
@@ -365,30 +367,87 @@ export async function updateItemMinQty(
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
-  if (!WB_TOKEN || !WB_WAREHOUSE_ID) return { success: false, error: "WB credentials missing" };
+  logger.info(`syncWbStocks start. WB_WAREHOUSE_ID present: ${!!WB_WAREHOUSE_ID}, WB_TOKEN present: ${!!WB_TOKEN}`);
 
-  const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
-  if (error || !items) return { success: false, error: error?.message || "No items found" };
-
-  const stocks = items.map(i => ({
-    sku: (i.specs?.wb_sku as string) || i.id,  // Fallback to ID
-    amount: (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0),
-    warehouseId: parseInt((i.specs?.wb_warehouse_id as string) || WB_WAREHOUSE_ID, 10),
-  }));
+  if (!WB_TOKEN || !WB_WAREHOUSE_ID) {
+    logger.error("WB credentials missing in env.");
+    return { success: false, error: "WB credentials missing" };
+  }
 
   try {
-    const response = await fetch("https://suppliers-api.wildberries.ru/api/v5/stocks", {
+    const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
+    if (error || !items) {
+      logger.error("syncWbStocks: failed to fetch local items", error);
+      return { success: false, error: error?.message || "No items found" };
+    }
+
+    const stocks = items.map(i => ({
+      sku: (i.specs?.wb_sku as string) || i.id,
+      amount: (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0),
+      warehouseId: parseInt((i.specs?.wb_warehouse_id as string) || WB_WAREHOUSE_ID, 10),
+    }));
+
+    const url = "https://suppliers-api.wildberries.ru/api/v5/stocks";
+    const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
+
+    logger.info("syncWbStocks -> About to POST", {
+      url,
+      method: "POST",
+      token: maskedToken,
+      stocksCount: stocks.length,
+      sampleStock: stocks[0] || null,
+    });
+
+    // DNS check (helps to know if ENOTFOUND is coming from DNS)
+    try {
+      const lookup = await dns.lookup("suppliers-api.wildberries.ru");
+      logger.info("syncWbStocks DNS lookup result", lookup);
+    } catch (dnsErr: any) {
+      logger.warn("syncWbStocks DNS lookup failed", dnsErr?.code || dnsErr?.message || dnsErr);
+    }
+
+    // timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({ stocks }),
+      signal: controller.signal,
     });
-    const data = await response.json();
-    if (data.error) return { success: false, error: data.errorText };
+
+    clearTimeout(timeout);
+
+    let parsed;
+    try {
+      parsed = await response.json();
+    } catch (e) {
+      logger.error("syncWbStocks: failed to parse JSON response", { status: response.status, statusText: response.statusText });
+      return { success: false, error: `WB API returned non-JSON (status ${response.status})` };
+    }
+
+    logger.info("syncWbStocks response", { status: response.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
+
+    if (!response.ok) {
+      return { success: false, error: parsed?.errorText || parsed?.error || `WB API error status ${response.status}` };
+    }
+
+    if (parsed?.error) {
+      return { success: false, error: parsed?.errorText || parsed?.error };
+    }
+
     return { success: true };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
+  } catch (err: any) {
+    logger.error("syncWbStocks error:", {
+      message: err?.message,
+      stack: err?.stack,
+      cause: err?.cause,
+    });
+    return { success: false, error: err?.message || "Unknown error in syncWbStocks" };
   }
 }
+
 
 // Ozon Sync
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
@@ -424,34 +483,91 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
 export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
-  if (!WB_TOKEN || !WB_WAREHOUSE_ID) return { success: false, error: "WB credentials missing" };
+  logger.info(`fetchWbStocks start. WB_WAREHOUSE_ID: ${WB_WAREHOUSE_ID ? WB_WAREHOUSE_ID : "MISSING"}, tokenPresent: ${!!WB_TOKEN}`);
+
+  if (!WB_TOKEN || !WB_WAREHOUSE_ID) {
+    logger.error("fetchWbStocks: missing WB credentials");
+    return { success: false, error: "WB credentials missing" };
+  }
 
   try {
-    // Fetch all local SKUs
+    // Fetch local SKUs
     const { data: items } = await supabaseAdmin.from("cars").select("id, specs").eq("type", "wb_item");
-    if (!items) return { success: false, error: "No local items" };
+    if (!items) {
+      logger.warn("fetchWbStocks: no local items returned from Supabase");
+      return { success: false, error: "No local items" };
+    }
 
     const skus = items.map(i => (i.specs?.wb_sku as string) || i.id);
+    const url = `https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
+    const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
-    const response = await fetch(`https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`, {
+    // Validate warehouse id
+    if (isNaN(Number(WB_WAREHOUSE_ID))) {
+      logger.warn("fetchWbStocks: WB_WAREHOUSE_ID is not numeric", { WB_WAREHOUSE_ID });
+    }
+
+    logger.info("fetchWbStocks -> About to POST", {
+      url,
       method: "POST",
-      headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ skus }),
+      token: maskedToken,
+      skusCount: skus.length,
+      sampleSkus: skus.slice(0, 20),
     });
 
+    // DNS lookup diagnostic (useful when ENOTFOUND)
+    try {
+      const lookup = await dns.lookup("suppliers-api.wildberries.ru");
+      logger.info("fetchWbStocks DNS lookup result", lookup);
+    } catch (dnsErr: any) {
+      logger.warn("fetchWbStocks DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message });
+    }
+
+    const body = { skus };
+    const bodyStr = JSON.stringify(body);
+    logger.debug("fetchWbStocks request body (truncated)", { bodySample: bodyStr.slice(0, 4000) });
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
+      body: bodyStr,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
     if (!response.ok) {
-      const errData = await response.json();
-      return { success: false, error: errData.error || "WB API error" };
+      let errData;
+      try {
+        errData = await response.json();
+      } catch (parseErr) {
+        logger.error("fetchWbStocks: failed to parse error body", { status: response.status, statusText: response.statusText });
+        return { success: false, error: `WB API returned status ${response.status}` };
+      }
+      logger.error("fetchWbStocks: WB API returned non-OK", { status: response.status, bodySample: JSON.stringify(errData).slice(0, 2000) });
+      return { success: false, error: errData?.error || errData?.errorText || `WB API error ${response.status}` };
     }
 
     const data = await response.json();
-    const stocks = data.stocks.map((s: any) => ({ sku: s.sku, amount: s.amount }));
+    if (!data || !Array.isArray(data.stocks)) {
+      logger.warn("fetchWbStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) });
+      return { success: false, error: "WB returned unexpected payload" };
+    }
 
+    const stocks = data.stocks.map((s: any) => ({ sku: s.sku, amount: s.amount }));
     logger.info(`Fetched ${stocks.length} stocks from WB.`);
     return { success: true, data: stocks };
-  } catch (err) {
-    logger.error("fetchWbStocks error:", err);
-    return { success: false, error: (err as Error).message };
+  } catch (err: any) {
+    // include cause if undici/network error
+    logger.error("fetchWbStocks error:", {
+      message: err?.message,
+      stack: err?.stack,
+      cause: err?.cause ? { code: err.cause?.code, syscall: err.cause?.syscall, hostname: err.cause?.hostname } : undefined,
+    });
+    return { success: false, error: err?.message || "Unknown error in fetchWbStocks" };
   }
 }
 
