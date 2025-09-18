@@ -719,4 +719,27 @@ export async function getWbProductCardsList(settings: any, locale: string = 'ru'
   return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);
 }
 
+// добавь в /app/wb/actions.ts
+export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  const token = process.env.WB_API_TOKEN;
+  if (!token) return { success: false, error: "WB_API_TOKEN missing" };
+
+  try {
+    const res = await fetch("https://marketplace-api.wildberries.ru/api/v2/warehouses", {
+      headers: { "Authorization": token, "Content-Type": "application/json" },
+      method: "GET",
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, error: `WB returned ${res.status}: ${text}` };
+    }
+    const data = await res.json();
+    // пример структуры: [{ id: 12345, name: "WB Warehouse X", isActive: true }, ...]
+    return { success: true, data };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Network error" };
+  }
+}
+
+
 // More integrations can be added similarly...
