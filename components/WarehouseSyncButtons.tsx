@@ -2,35 +2,47 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { syncWbStocks, syncOzonStocks } from "@/app/wb/actions";
+import { syncWbStocks, syncOzonStocks, uploadWarehouseCsv } from "@/app/wb/actions";  // Assuming uploadWarehouseCsv for Supabase sync example
 
 export function WarehouseSyncButtons() {
   const handleSyncWb = async () => {
     const res = await syncWbStocks();
-    toast[res.success ? "success" : "error"](res.success ? "WB synced!" : res.error);
+    toast[res.success ? "success" : "error"](res.success ? "WB синхронизировано!" : res.error);
   };
 
   const handleSyncOzon = async () => {
     const res = await syncOzonStocks();
-    toast[res.success ? "success" : "error"](res.success ? "Ozon synced!" : res.error);
+    toast[res.success ? "success" : "error"](res.success ? "Ozon синхронизировано!" : res.error);
+  };
+
+  const handleSyncSupabase = async () => {
+    // Example: Sync to Supabase, adjust as needed (e.g., fetch and upload)
+    const res = await uploadWarehouseCsv([], "userId");  // Placeholder, implement actual sync
+    toast[res.success ? "success" : "error"](res.success ? "Supabase синхронизировано!" : res.error);
   };
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-wrap gap-2">
       <Button
-        className="bg-[#E313BF] hover:bg-[#C010A8] text-white w-full"
+        className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
         onClick={handleSyncWb}
       >
-        Sync WB
+        Синк WB
       </Button>
       <Button
-        className="bg-[#005BFF] hover:bg-[#0048CC] text-white w-full"  
+        className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white"
         onClick={handleSyncOzon}
       >
-        Sync Ozon
+        Синк Ozon
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Note: Auto-sync runs every midnight. Use buttons for manual sync as backup.
+      <Button
+        className="bg-gradient-to-r from-[#3ECF8E] to-[#2EAE74] hover:from-[#2EAE74] hover:to-[#228C5B] text-white"
+        onClick={handleSyncSupabase}
+      >
+        Синк Supabase
+      </Button>
+      <p className="text-xs text-muted-foreground w-full">
+        Примечание: Авто-синк каждую полночь. Используйте кнопки для ручного синка.
       </p>
     </div>
   );
