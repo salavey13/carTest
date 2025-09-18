@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -512,3 +511,96 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
     return { success: false, error: (err as Error).message };
   }
 }
+
+// --- Новые интеграции WB API ---
+
+const WB_CONTENT_TOKEN = process.env.WB_CONTENT_TOKEN; // Токен для Content category
+const WB_PRICES_TOKEN = process.env.WB_PRICES_TOKEN; // Токен для Prices and Discounts
+
+async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, token: string = WB_CONTENT_TOKEN) {
+  try {
+    const response = await fetch(`https://content-api.wildberries.ru${endpoint}`, {
+      method,
+      headers: {
+        "Authorization": token,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      const errData = await response.json();
+      return { success: false, error: errData.errorText || "WB API error" };
+    }
+    const data = await response.json();
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// Get Products Parent Categories
+export async function getWbParentCategories(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  return wbApiCall(`/content/v2/object/parent/all?locale=${locale}`);
+}
+
+// Get Subjects List
+export async function getWbSubjects(locale: string = 'ru', name?: string, limit: number = 30, offset: number = 0, parentID?: number): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  let query = `/content/v2/object/all?locale=${locale}&limit=${limit}&offset=${offset}`;
+  if (name) query += `&name=${encodeURIComponent(name)}`;
+  if (parentID) query += `&parentID=${parentID}`;
+  return wbApiCall(query);
+}
+
+// Get Subject Characteristics
+export async function getWbSubjectCharcs(subjectId: number, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  return wbApiCall(`/content/v2/object/charcs/${subjectId}?locale=${locale}`);
+}
+
+// Get Colors
+export async function getWbColors(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  return wbApiCall(`/content/v2/directory/colors?locale=${locale}`);
+}
+
+// Get Genders
+export async function getWbGenders(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  return wbApiCall(`/content/v2/directory/kinds?locale=${locale}`);
+}
+
+// Get Countries
+export async function getWbCountries(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  return wbApiCall(`/content/v2/directory/countries?locale=${locale}`);
+}
+
+// Get Seasons
+export async function getWbSeasons(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  return wbApiCall(`/content/v2/directory/seasons?locale=${locale}`);
+}
+
+// Get VAT Rates
+export async function getWbVat(locale: string = 'ru'): Promise<{ success: boolean; data?: string[]; error?: string }> {
+  return wbApiCall(`/content/v2/directory/vat?locale=${locale}`);
+}
+
+// Get HS Codes
+export async function getWbTnved(subjectID: number, search?: string, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  let query = `/content/v2/directory/tnved?subjectID=${subjectID}&locale=${locale}`;
+  if (search) query += `&search=${search}`;
+  return wbApiCall(query);
+}
+
+// Generate Barcodes
+export async function generateWbBarcodes(count: number = 1): Promise<{ success: boolean; data?: string[]; error?: string }> {
+  return wbApiCall('/content/v2/barcodes', 'POST', { count });
+}
+
+// Create Product Cards
+export async function createWbProductCards(cards: any[]): Promise<{ success: boolean; error?: string }> {
+  return wbApiCall('/content/v2/cards/upload', 'POST', cards);
+}
+
+// Get Product Cards List
+export async function getWbProductCardsList(settings: any, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
+  return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);
+}
+
+// More integrations can be added similarly...
