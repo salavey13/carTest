@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { fetchWbStocks, fetchOzonStocks, getWarehouseItems, updateItemLocationQty, syncWbStocks, syncOzonStocks } from "@/app/wb/actions";
+import { fetchWbStocks, fetchOzonStocks, getWarehouseItems, updateItemLocationQty, syncWbStocks, syncOzonStocks, getWbParentCategories, getWbSubjects, getWbSubjectCharcs, getWbColors, getWbGenders, getWbCountries, getWbSeasons, getWbVat, getWbTnved, generateWbBarcodes, createWbProductCards, getWbProductCardsList } from "@/app/wb/actions";
 import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 
 export default function WarehouseTestPage() {
@@ -13,6 +14,14 @@ export default function WarehouseTestPage() {
   const [ozonStocks, setOzonStocks] = useState<{ sku: string; amount: number }[]>([]);
   const [localItems, setLocalItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Новые состояния для WB API тестов
+  const [wbApiResult, setWbApiResult] = useState<any>(null);
+  const [subjectId, setSubjectId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [parentID, setParentID] = useState("");
+  const [barcodeCount, setBarcodeCount] = useState(1);
+  const [productCards, setProductCards] = useState("[]"); // JSON string для ввода
 
   const handleFetchWb = async () => {
     setLoading(true);
@@ -74,6 +83,92 @@ export default function WarehouseTestPage() {
     } else {
       toast.error(res.error);
     }
+  };
+
+  // Новые handlers для WB API
+  const handleGetParentCategories = async () => {
+    const res = await getWbParentCategories();
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Категории получены" : res.error);
+  };
+
+  const handleGetSubjects = async () => {
+    const res = await getWbSubjects('ru', searchQuery, 30, 0, parentID ? parseInt(parentID) : undefined);
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Субъекты получены" : res.error);
+  };
+
+  const handleGetSubjectCharcs = async () => {
+    if (!subjectId) return toast.error("Введите subjectId");
+    const res = await getWbSubjectCharcs(parseInt(subjectId));
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Характеристики получены" : res.error);
+  };
+
+  const handleGetColors = async () => {
+    const res = await getWbColors();
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Цвета получены" : res.error);
+  };
+
+  const handleGetGenders = async () => {
+    const res = await getWbGenders();
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Полы получены" : res.error);
+  };
+
+  const handleGetCountries = async () => {
+    const res = await getWbCountries();
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Страны получены" : res.error);
+  };
+
+  const handleGetSeasons = async () => {
+    const res = await getWbSeasons();
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Сезоны получены" : res.error);
+  };
+
+  const handleGetVat = async () => {
+    const res = await getWbVat();
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "НДС получен" : res.error);
+  };
+
+  const handleGetTnved = async () => {
+    if (!subjectId) return toast.error("Введите subjectID");
+    const res = await getWbTnved(parseInt(subjectId), searchQuery);
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "ТН ВЭД получены" : res.error);
+  };
+
+  const handleGenerateBarcodes = async () => {
+    const res = await generateWbBarcodes(barcodeCount);
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Баркоды сгенерированы" : res.error);
+  };
+
+  const handleCreateProductCards = async () => {
+    try {
+      const cards = JSON.parse(productCards);
+      const res = await createWbProductCards(cards);
+      setWbApiResult(res);
+      toast[res.success ? "success" : "error"](res.success ? "Карточки созданы" : res.error);
+    } catch (e) {
+      toast.error("Неверный JSON для карточек");
+    }
+  };
+
+  const handleGetProductCardsList = async () => {
+    const settings = { // Пример settings, адаптировать
+      settings: {
+        cursor: { limit: 100 },
+        filter: { withPhoto: -1 }
+      }
+    };
+    const res = await getWbProductCardsList(settings);
+    setWbApiResult(res);
+    toast[res.success ? "success" : "error"](res.success ? "Список карточек получен" : res.error);
   };
 
   // Compare lists
@@ -198,6 +293,70 @@ export default function WarehouseTestPage() {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Новый раздел для WB API тестов */}
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="text-sm">WB API Тесты</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Button className="w-full text-xs" onClick={handleGetParentCategories}>Получить Parent Categories</Button>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search name"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="text-xs"
+              />
+              <Input
+                placeholder="Parent ID"
+                value={parentID}
+                onChange={(e) => setParentID(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+            <Button className="w-full text-xs" onClick={handleGetSubjects}>Получить Subjects</Button>
+            <Input
+              placeholder="Subject ID"
+              value={subjectId}
+              onChange={(e) => setSubjectId(e.target.value)}
+              className="text-xs"
+            />
+            <Button className="w-full text-xs" onClick={handleGetSubjectCharcs}>Получить Characteristics</Button>
+            <Button className="w-full text-xs" onClick={handleGetColors}>Получить Colors</Button>
+            <Button className="w-full text-xs" onClick={handleGetGenders}>Получить Genders</Button>
+            <Button className="w-full text-xs" onClick={handleGetCountries}>Получить Countries</Button>
+            <Button className="w-full text-xs" onClick={handleGetSeasons}>Получить Seasons</Button>
+            <Button className="w-full text-xs" onClick={handleGetVat}>Получить VAT</Button>
+            <Button className="w-full text-xs" onClick={handleGetTnved}>Получить TNVED</Button>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Count"
+                value={barcodeCount}
+                onChange={(e) => setBarcodeCount(parseInt(e.target.value) || 1)}
+                className="text-xs"
+              />
+              <Button className="w-full text-xs" onClick={handleGenerateBarcodes}>Генерировать Barcodes</Button>
+            </div>
+            <Input
+              placeholder="Product Cards JSON"
+              value={productCards}
+              onChange={(e) => setProductCards(e.target.value)}
+              className="text-xs"
+            />
+            <Button className="w-full text-xs" onClick={handleCreateProductCards}>Создать Product Cards</Button>
+            <Button className="w-full text-xs" onClick={handleGetProductCardsList}>Получить Product Cards List</Button>
+          </div>
+
+          {wbApiResult && (
+            <pre className="bg-muted p-2 rounded overflow-auto text-xs max-h-64">
+              {JSON.stringify(wbApiResult, null, 2)}
+            </pre>
+          )}
         </CardContent>
       </Card>
     </div>
