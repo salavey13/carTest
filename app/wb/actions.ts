@@ -761,12 +761,12 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
 }
 */
 
-/* 
+
 //this works, but gets only first 100 items:
 export async function getWbProductCardsList(settings: any, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
 return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);}
-*/
 
+/*
 // Доработанная функция: offset-based пагинация по умолчанию, cursor как опция
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
@@ -820,7 +820,7 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
 }
-
+*/
 // Новая helper: парсинг cards to minimal map {vendorCode: {nmID, barcodes: [], quantity: 0}}
 async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
   const map: { [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
