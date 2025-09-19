@@ -145,9 +145,21 @@ export default function WarehouseTestPage(): JSX.Element {
 
   const handleUpdateManualMap = (type: 'wb' | 'ozon', key: string, value: string) => {
     if (type === 'wb') {
-      setManualMapWb(prev => ({ ...prev, [key]: value }));
+      const newMap = { ...manualMapWb };
+      if (value === "fallback") {
+        delete newMap[key];
+      } else {
+        newMap[key] = value;
+      }
+      setManualMapWb(newMap);
     } else {
-      setManualMapOzon(prev => ({ ...prev, [key]: value }));
+      const newMap = { ...manualMapOzon };
+      if (value === "fallback") {
+        delete newMap[key];
+      } else {
+        newMap[key] = value;
+      }
+      setManualMapOzon(newMap);
     }
   };
 
@@ -291,14 +303,14 @@ export default function WarehouseTestPage(): JSX.Element {
           <CardTitle className="text-sm">Инструкции по Матчингу & SQL</CardTitle>
         </CardHeader>
         <CardContent className="text-xs space-y-2">
-          <p>1. Нажмите Fetch WB Cards — загрузит vendorCode, nmID etc. из WB (полная пагинация).</p>
-          <p>2. Fetch Ozon Products — загрузит offer_id, product_id, quantity из Ozon.</p>
-          <p>3. Fetch Supa Items — загрузит id из Supabase (wb_item).</p>
-          <p>4. Extract & Match IDs — вычислит unmatched, покажет таблицы для manual select.</p>
-          <p>Пример матчинга: WB "1.5 зима адель" не matched? Select Supa "1.5 зима адель". Если fallback id — оставьте пустым, SQL использует id item'а.</p>
-          <p>5. Generate SQL — создаст UPDATE specs с wb/ozon sku/quantity/warehouse. Skipped unmatched с комментарием.</p>
-          <p>Tip: Проверьте env WB_WAREHOUSE_ID/OZON_WAREHOUSE_ID, else first active WB wh used. Unmatched Supa — items без WB/Ozon, ignore or add manually.</p>
-          <p>Best practice: Матчьте 100% перед SQL. Copy и run in Supabase editor.</p>
+          <p>0. Setup ENV: Убедись в .env WB_CONTENT_TOKEN, WB_API_TOKEN для WB; OZON_CLIENT_ID, OZON_API_KEY для Ozon. Без них fetch fail с toast "credentials missing". Warehouse IDs optional — auto first active.</p>
+          <p>1. Fetch WB Cards — полная пагинация, vendorCode/nmID/barcodes/quantity. Если мало (e.g., 2) — проверь token/аккаунт cards.</p>
+          <p>2. Fetch Ozon Products — offer_id/product_id/quantity. Skip if no keys — toast warn.</p>
+          <p>3. Fetch Supa Items — id из wb_item. Must for matching.</p>
+          <p>4. Extract & Match IDs — auto-match по lower, show unmatched tables. Select to manual match.</p>
+          <p>Пример: WB "1.5-зима-адель" unmatched? Select Supa "1.5 зима адель". Fallback — select "Fallback to ID" (uses item.id).</p>
+          <p>5. Generate SQL — UPDATE specs с sku/quantity/wh. Skipped unmatched with comment. Copy & run in Supabase.</p>
+          <p>Troubleshoot: Few WB cards — check WB seller panel. No Ozon — add keys & restart. Unmatched many — check naming consistency.</p>
         </CardContent>
       </Card>
 
@@ -332,12 +344,12 @@ export default function WarehouseTestPage(): JSX.Element {
                     <TableRow key={wbId}>
                       <TableCell>{wbId}</TableCell>
                       <TableCell>
-                        <Select value={manualMapWb[wbId] || ""} onValueChange={(v) => handleUpdateManualMap('wb', wbId, v)}>
+                        <Select value={manualMapWb[wbId] || "fallback"} onValueChange={(v) => handleUpdateManualMap('wb', wbId, v)}>
                           <SelectTrigger className="text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Fallback to ID</SelectItem>
+                            <SelectItem value="fallback">Fallback to ID</SelectItem>
                             {supaItems.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
@@ -364,12 +376,12 @@ export default function WarehouseTestPage(): JSX.Element {
                     <TableRow key={ozonId}>
                       <TableCell>{ozonId}</TableCell>
                       <TableCell>
-                        <Select value={manualMapOzon[ozonId] || ""} onValueChange={(v) => handleUpdateManualMap('ozon', ozonId, v)}>
+                        <Select value={manualMapOzon[ozonId] || "fallback"} onValueChange={(v) => handleUpdateManualMap('ozon', ozonId, v)}>
                           <SelectTrigger className="text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Fallback to ID</SelectItem>
+                            <SelectItem value="fallback">Fallback to ID</SelectItem>
                             {supaItems.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                           </SelectContent>
                         </Select>
