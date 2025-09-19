@@ -5,7 +5,6 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { notifyAdmins } from "@/app/actions";
 import Papa from "papaparse";
 import dns from "dns/promises";
 
@@ -17,17 +16,13 @@ const generateImageUrl = (id: string): string => {
   return baseURL + filename;
 };
 
-// Helper to derive fields from id (existing logic, slightly hardened)
-export const deriveFieldsFromId = (id: string) => {
-  const parts = (id || "").toLowerCase().split(' ');
+// Helper to derive fields from id
+const deriveFieldsFromId = (id: string) => {
+  const parts = id.toLowerCase().split(' ');
   let model = '';
   let make = '';
   let description = '';
   let specs: any = { warehouse_locations: [] };
-
-  if (!parts || parts.length === 0) {
-    return { model, make, description, specs };
-  }
 
   if (parts[0] === '1.5') {
     model = '1.5';
@@ -40,14 +35,14 @@ export const deriveFieldsFromId = (id: string) => {
     parts.shift();
   } else if (parts[0].startsWith('наматрасник.') || parts[0].startsWith('наматрас.')) {
     model = 'Наматрасник';
-    const sizePart = parts[0].split('.')[1] || '';
-    const pattern = parts[1] || '';
-    specs.size = sizePart || null;
-    specs.pattern = pattern || null;
+    const sizePart = parts[0].split('.')[1] || parts[1] || '';
+    const pattern = parts.find(p => p.match(/[а-яё]+/i) && !['наматрасник', 'наматрас', sizePart].includes(p)) || parts[2] || '';
+    specs.size = sizePart;
+    specs.pattern = pattern || '';
     specs.season = null;
     specs.color = parseInt(sizePart, 10) >= 160 ? 'dark-green' : 'light-green';
     description = parseInt(sizePart, 10) >= 160 ? 'Темно-зеленый, большой' : 'Салатовый, маленький';
-    make = `${sizePart ? sizePart.charAt(0).toUpperCase() + sizePart.slice(1) : ''} ${pattern ? pattern.charAt(0).toUpperCase() + pattern.slice(1) : ''}`.trim();
+    make = `${sizePart ? (sizePart.charAt(0).toUpperCase() + sizePart.slice(1)) : ''} ${pattern ? (pattern.charAt(0).toUpperCase() + pattern.slice(1)) : ''}`.trim();
     return { model, make, description, specs };
   } else {
     model = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
@@ -55,7 +50,7 @@ export const deriveFieldsFromId = (id: string) => {
 
   make = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 
-  switch ((model || "").toLowerCase()) {
+  switch (model.toLowerCase()) {
     case '1.5':
       description = 'Серая';
       specs.color = 'gray';
@@ -89,7 +84,7 @@ export const deriveFieldsFromId = (id: string) => {
     specs.season = 'лето';
     description += ', полосочка';
   }
-  specs.pattern = (parts[parts.length - 1] || '').replace(/[0-9]/g, '').trim();
+  specs.pattern = parts[parts.length - 1].replace(/[0-9]/g, '').trim();
 
   return { model, make, description, specs };
 };
@@ -145,7 +140,6 @@ export async function uploadWarehouseCsv(
     logger.info(`Fetching existing items for ${itemIds.length} IDs.`);
     const { data: existingItems } = await supabaseAdmin.from("cars").select("*").in("id", itemIds);
 
-    // Build promises, resolve, then filter
     const itemsToUpsertPromises = batch.map(async (row: any) => {
       const itemId = (row["Артикул"] || row["id"])?.toLowerCase();
       if (!itemId) {
@@ -160,7 +154,7 @@ export async function uploadWarehouseCsv(
       const model = row.model || derived.model || "Unknown Model";
       const description = row.description || derived.description || "No Description";
 
-      let specs = row.specs ? JSON.parse(row.specs) : derived.specs || {};
+      let specs = row.specs ? JSON.parse(row.specs) : (derived.specs || { warehouse_locations: [] });
 
       let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
 
@@ -174,6 +168,15 @@ export async function uploadWarehouseCsv(
         specs.warehouse_locations[0].quantity = quantity;
       }
 
+      // Ensure common fields that may be used by sync
+      if (!specs.wb_warehouse_id && process.env.WB_WAREHOUSE_ID) {
+        specs.wb_warehouse_id = process.env.WB_WAREHOUSE_ID;
+      }
+      if (!specs.ozon_warehouse_id && process.env.OZON_WAREHOUSE_ID) {
+        specs.ozon_warehouse_id = process.env.OZON_WAREHOUSE_ID;
+      }
+
+      // Compose item
       const itemToUpsert: any = {
         id: itemId,
         make,
@@ -184,7 +187,10 @@ export async function uploadWarehouseCsv(
         image_url: row.image_url || generateImageUrl(itemId),
       };
 
-      if (existingItem) {
+      // If item is new — tag specs accordingly
+      if (!existingItem) {
+        itemToUpsert.specs = { ...itemToUpsert.specs, status: "new item", created_at: new Date().toISOString() };
+      } else {
         itemToUpsert.specs = { ...existingItem.specs, ...itemToUpsert.specs };
       }
 
@@ -366,7 +372,7 @@ export async function updateItemMinQty(
   }
 }
 
-// WB Sync (unchanged)
+// WB Sync
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -449,7 +455,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
   }
 }
 
-// Ozon Sync (unchanged)
+// Ozon Sync
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -460,7 +466,7 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
   if (error || !items) return { success: false, error: error?.message || "No items found" };
 
   const stocks = items.map(i => ({
-    offer_id: (i.specs?.ozon_sku as string) || i.id,  // Fallback to ID
+    offer_id: (i.specs?.ozon_sku as string) || i.id,
     stock: (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0),
     warehouse_id: parseInt((i.specs?.ozon_warehouse_id as string) || OZON_WAREHOUSE_ID, 10),
   }));
@@ -479,7 +485,7 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
   }
 }
 
-// New: Fetch stocks from WB
+// New: Fetch stocks from WB (simple, returns all skus amounts for provided sku list)
 export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   let WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -629,9 +635,9 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
   }
 }
 
-// --- WB Content API helpers ---
-const WB_CONTENT_TOKEN = process.env.WB_CONTENT_TOKEN; // Токен для Content category
-const WB_PRICES_TOKEN = process.env.WB_PRICES_TOKEN; // Токен для Prices and Discounts
+// --- WB Content API wrappers & helpers ---
+
+const WB_CONTENT_TOKEN = process.env.WB_CONTENT_TOKEN;
 
 async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, token: string = WB_CONTENT_TOKEN) {
   try {
@@ -666,43 +672,63 @@ async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, t
 export async function getWbParentCategories(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/object/parent/all?locale=${locale}`);
 }
+
+// Get Subjects List
 export async function getWbSubjects(locale: string = 'ru', name?: string, limit: number = 30, offset: number = 0, parentID?: number): Promise<{ success: boolean; data?: any[]; error?: string }> {
   let query = `/content/v2/object/all?locale=${locale}&limit=${limit}&offset=${offset}`;
   if (name) query += `&name=${encodeURIComponent(name)}`;
   if (parentID) query += `&parentID=${parentID}`;
   return wbApiCall(query);
 }
+
+// Get Subject Characteristics
 export async function getWbSubjectCharcs(subjectId: number, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/object/charcs/${subjectId}?locale=${locale}`);
 }
+
+// Get Colors
 export async function getWbColors(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/colors?locale=${locale}`);
 }
+
+// Get Genders
 export async function getWbGenders(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/kinds?locale=${locale}`);
 }
+
+// Get Countries
 export async function getWbCountries(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/countries?locale=${locale}`);
 }
+
+// Get Seasons
 export async function getWbSeasons(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/seasons?locale=${locale}`);
 }
+
+// Get VAT Rates
 export async function getWbVat(locale: string = 'ru'): Promise<{ success: boolean; data?: string[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/vat?locale=${locale}`);
 }
+
+// Get HS Codes
 export async function getWbTnved(subjectID: number, search?: string, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   let query = `/content/v2/directory/tnved?subjectID=${subjectID}&locale=${locale}`;
   if (search) query += `&search=${search}`;
   return wbApiCall(query);
 }
+
+// Generate Barcodes
 export async function generateWbBarcodes(count: number = 1): Promise<{ success: boolean; data?: string[]; error?: string }> {
   return wbApiCall('/content/v2/barcodes', 'POST', { count });
 }
+
+// Create Product Cards
 export async function createWbProductCards(cards: any[]): Promise<{ success: boolean; error?: string }> {
   return wbApiCall('/content/v2/cards/upload', 'POST', cards);
 }
 
-// Get warehouses
+// Get warehouses list (suppliers-api)
 export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
   if (!token) return { success: false, error: "WB_API_TOKEN missing" };
@@ -717,16 +743,16 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
       return { success: false, error: `WB returned ${res.status}: ${text}` };
     }
     const data = await res.json();
-    return { success: true, data };
+    return { success: true, data };  // data: [{id, name, officeId, isActive, ...}]
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
   }
 }
 
-// getWbProductCardsList - cursor-based pagination (robust)
+// Get product cards list (cursor-based)
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
-  let cursor: any = { limit: Math.min(settings.limit || 100, 100) };
+  let cursor: any = { limit: Math.min(settings.limit || 100, 100) };  // Clamp <=100
   let total = 0;
   let pageData: any = null;
 
@@ -759,56 +785,7 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
   return { success: true, data: { cards: allCards, total: allCards.length } };
 }
 
-// parseWbCardsToMinimal: build minimal map and fetch stocks by barcodes
-export async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
-  const map: { [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
-
-  cards.forEach((card: any) => {
-    const vc = (card.vendorCode || "").toLowerCase();
-    // sizes may be missing for some cards; handle safe
-    const barcodes: string[] = Array.isArray(card.sizes) ? card.sizes.flatMap((size: any) => size.skus || []) : (card.barcodes || []);
-    map[vc] = { nmID: card.nmID, barcodes, quantity: 0 };
-  });
-
-  const allBarcodes = Object.values(map).flatMap(m => m.barcodes);
-  if (allBarcodes.length > 0) {
-    const stocksRes = await fetchWbStocksForBarcodes(allBarcodes, warehouseId);
-    if (stocksRes.success && stocksRes.data) {
-      stocksRes.data.forEach((stock: any) => {
-        Object.entries(map).forEach(([vc, info]) => {
-          if (info.barcodes.includes(stock.sku)) {
-            info.quantity += stock.amount;
-          }
-        });
-      });
-    } else {
-      logger.warn("No stocks fetched for WB quantities");
-    }
-  }
-
-  return map;
-}
-
-// fetchWbStocksForBarcodes
-export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  const token = process.env.WB_API_TOKEN;
-  if (!token) return { success: false, error: "Token missing" };
-
-  try {
-    const res = await fetch(`https://suppliers-api.wildberries.ru/api/v3/stocks/${warehouseId}`, {
-      method: "POST",
-      headers: { "Authorization": token, "Content-Type": "application/json" },
-      body: JSON.stringify({ skus: barcodes }),
-    });
-    if (!res.ok) return { success: false, error: await res.text() };
-    const data = await res.json();
-    return { success: true, data: data.stocks };
-  } catch (e: any) {
-    return { success: false, error: e.message };
-  }
-}
-
-// Ozon product list
+// Ozon: Fetch product list with pagination
 export async function getOzonProductList(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -839,233 +816,50 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
     }
 
     logger.info(`Fetched ${allItems.length} products from Ozon.`);
-    return { success: true, data: allItems };
+    return { success: true, data: allItems };  // [{offer_id, product_id, ...}]
   } catch (err) {
     logger.error("getOzonProductList error:", err);
     return { success: false, error: (err as Error).message };
   }
 }
 
-export async function parseOzonToMinimal(products: any[], stocks: { sku: string; amount: number }[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
+// parseOzonToMinimal (keeps current behavior)
+async function parseOzonToMinimal(products: any[], stocks: { sku: string; amount: number }[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
   const map: { [offerId: string]: { product_id?: number; quantity: number } } = {};
 
   products.forEach((prod: any) => {
-    const offerId = (prod.offer_id || "").toLowerCase();
-    const stock = (stocks || []).find(s => s.sku.toLowerCase() === offerId);
+    const offerId = prod.offer_id.toLowerCase();
+    const stock = stocks.find(s => s.sku.toLowerCase() === offerId);
     map[offerId] = { product_id: prod.product_id, quantity: stock?.amount || 0 };
   });
 
   return map;
 }
 
-// ------------------ FUZZY MATCHING HELPERS -----------------------
-const KNOWN_MODELS = ["1.5", "2", "евро макси", "евро", "наматрасник"];
-const KNOWN_SEASONS = ["зима", "лето"];
-
-function normalizeSpaces(s: string) {
-  return s.replace(/[\u00A0]+/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function levenshtein(a: string, b: string): number {
-  const al = a.length, bl = b.length;
-  if (al === 0) return bl;
-  if (bl === 0) return al;
-  const dp: number[][] = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
-  for (let i = 0; i <= al; i++) dp[i][0] = i;
-  for (let j = 0; j <= bl; j++) dp[0][j] = j;
-  for (let i = 1; i <= al; i++) {
-    for (let j = 1; j <= bl; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
-    }
-  }
-  return dp[al][bl];
-}
-
-function similarRatio(a: string, b: string): number {
-  if (!a && !b) return 1;
-  if (!a || !b) return 0;
-  const lev = levenshtein(a, b);
-  const maxl = Math.max(a.length, b.length);
-  return maxl === 0 ? 1 : 1 - lev / maxl;
-}
-
-function applySynonyms(s: string): string {
-  let res = (s || "").toLowerCase();
-  res = res.replace(/ё/g, "е");
-  res = res.replace(/[._\-]+/g, " ");
-  res = res.replace(/\bевр?о\s*макс(и|и)?\b/g, "евро макси");
-  res = res.replace(/\bевромакси\b/g, "евро макси");
-  res = res.replace(/\bевро макс\b/g, "евро макси");
-  res = res.replace(/\bнаматрасн\b/g, "наматрасник");
-  res = res.replace(/\bнаматрас\b/g, "наматрасник");
-  res = res.replace(/\bобл(егч?ен|егч?енн)?\b/g, "лето");
-  res = res.replace(/\bоблегченн[аяо]\b/g, "лето");
-  res = normalizeSpaces(res);
-  return res;
-}
-
-function canonicalizeId(raw: string) {
-  const cleaned = applySynonyms(raw || "");
-  const tokens = cleaned.split(" ").filter(Boolean);
-  let model = "";
-  let season = "";
-  let patternTokens: string[] = [];
-
-  const joined = tokens.join(" ");
-  if (joined.includes("евро макси")) {
-    model = "евро макси";
-    const idx = joined.indexOf("евро макси");
-    const before = joined.slice(0, idx).trim();
-    const after = joined.slice(idx + "евро макси".length).trim();
-    const rest = (before + " " + after).trim();
-    const restT = rest ? rest.split(" ").filter(Boolean) : [];
-    restT.forEach(tok => {
-      if (KNOWN_SEASONS.includes(tok)) season = tok;
-      else patternTokens.push(tok);
-    });
-    const pattern = patternTokens.join(" ").trim();
-    const canonical = [model, season, pattern].filter(Boolean).join(" ").trim();
-    return { model, season, pattern, canonical };
-  }
-
-  for (const t of tokens) {
-    if (KNOWN_MODELS.includes(t)) {
-      model = t;
-      break;
-    }
-  }
-
-  if (!model) {
-    const maybe = tokens.find(t => t === "1.5" || t === "2");
-    if (maybe) model = maybe;
-  }
-
-  for (const t of tokens) {
-    if (KNOWN_SEASONS.includes(t)) {
-      season = t;
-      break;
-    }
-  }
-
-  patternTokens = tokens.filter(t => t !== model && t !== season);
-  if (!model && tokens.length > 0) {
-    const first = tokens[0];
-    if (["1.5", "2"].includes(first) || first.startsWith("евро") || first.startsWith("наматрас")) {
-      model = first;
-      patternTokens = tokens.slice(1).filter(t => t !== season);
-    }
-  }
-
-  const pattern = patternTokens.join(" ").trim();
-  const canonical = [model, season, pattern].filter(Boolean).join(" ").trim();
-  return { model, season, pattern, canonical };
-}
-
-function scoreMatch(aRaw: string, bRaw: string) {
-  const a = canonicalizeId(aRaw);
-  const b = canonicalizeId(bRaw);
-
-  if (a.canonical && b.canonical && a.canonical === b.canonical) return 1;
-
-  let score = 0;
-  if (a.model && b.model) {
-    score += a.model === b.model ? 0.5 : 0;
-  } else if (!a.model && !b.model) {
-    score += 0.1;
-  }
-
-  if (a.season && b.season) {
-    score += a.season === b.season ? 0.2 : 0;
-  }
-
-  const patScore = similarRatio(a.pattern || "", b.pattern || "");
-  score += patScore * 0.3;
-
-  return Math.min(1, score);
-}
-
-async function findBestSupaMatch(sourceId: string, supaIds: string[]) {
-  let best = { id: "", score: 0 };
-  for (const s of supaIds) {
-    const sc = scoreMatch(sourceId, s);
-    if (sc > best.score) {
-      best = { id: s, score: sc };
-    }
-    if (best.score >= 0.99) break;
-  }
-  return best;
-}
-// ------------------ END FUZZY HELPERS -----------------------------
-
-// extractIdsFromSources: returns autoMatches
+// extract IDs from sources
 export async function extractIdsFromSources(): Promise<{
   success: boolean;
   wbIds: Set<string>;
   ozonIds: Set<string>;
   supaIds: Set<string>;
   unmatched: { wb: string[]; ozon: string[]; supa: string[] };
-  autoMatches?: { wb: { [wbId: string]: { supaId?: string; score: number } }; ozon: { [ozonId: string]: { supaId?: string; score: number } } };
   error?: string;
 }> {
   try {
-    // WB
     const wbRes = await getWbProductCardsList();
     if (!wbRes.success) throw new Error(wbRes.error || "WB fetch failed");
-    const wbCards = wbRes.data?.cards || [];
-    const wbIdsArr = wbCards.map((c: any) => (c.vendorCode || "").toLowerCase());
-    const wbIds = new Set(wbIdsArr);
+    const wbIds = new Set((wbRes.data?.cards || []).map((c: any) => c.vendorCode.toLowerCase()));
 
-    // Ozon
     const ozonRes = await getOzonProductList();
-    const ozonArr = (ozonRes.data || []).map((p: any) => (p.offer_id || "").toLowerCase());
-    const ozonIds = new Set(ozonArr);
+    const ozonIds = new Set((ozonRes.data || []).map((p: any) => p.offer_id.toLowerCase()));
 
-    // Supa
     const supaRes = await getWarehouseItems();
     if (!supaRes.success) throw new Error(supaRes.error || "Supa fetch failed");
-    const supaArr = (supaRes.data || []).map((i: any) => (i.id || "").toLowerCase());
-    const supaIds = new Set(supaArr);
+    const supaIds = new Set((supaRes.data || []).map((i: any) => i.id.toLowerCase()));
 
-    const supaList = [...supaIds];
-    const wbList = [...wbIds];
-    const ozonList = [...ozonIds];
-
-    const autoMatches: any = { wb: {}, ozon: {} };
-
-    for (const wbId of wbList) {
-      const best = await findBestSupaMatch(wbId, supaList);
-      if (best.score > 0) autoMatches.wb[wbId] = { supaId: best.id || undefined, score: Number(best.score.toFixed(3)) };
-      else autoMatches.wb[wbId] = { supaId: undefined, score: 0 };
-    }
-
-    for (const ozId of ozonList) {
-      const best = await findBestSupaMatch(ozId, supaList);
-      if (best.score > 0) autoMatches.ozon[ozId] = { supaId: best.id || undefined, score: Number(best.score.toFixed(3)) };
-      else autoMatches.ozon[ozId] = { supaId: undefined, score: 0 };
-    }
-
-    const threshold = 0.75;
-    const matchedSupa = new Set<string>();
-    const unmatchedWb: string[] = [];
-    for (const w of wbList) {
-      const m = autoMatches.wb[w];
-      if (m?.supaId && m.score >= threshold) {
-        matchedSupa.add(m.supaId);
-      } else {
-        unmatchedWb.push(w);
-      }
-    }
-    const unmatchedOzon: string[] = [];
-    for (const o of ozonList) {
-      const m = autoMatches.ozon[o];
-      if (m?.supaId && m.score >= threshold) {
-        matchedSupa.add(m.supaId);
-      } else {
-        unmatchedOzon.push(o);
-      }
-    }
-    const unmatchedSupa = [...supaList].filter(s => !matchedSupa.has(s) && !wbList.includes(s) && !ozonList.includes(s));
+    const unmatchedWb = [...wbIds].filter(id => !supaIds.has(id));
+    const unmatchedOzon = [...ozonIds].filter(id => !supaIds.has(id));
+    const unmatchedSupa = [...supaIds].filter(id => !wbIds.has(id) && !ozonIds.has(id));
 
     return {
       success: true,
@@ -1073,24 +867,27 @@ export async function extractIdsFromSources(): Promise<{
       ozonIds,
       supaIds,
       unmatched: { wb: unmatchedWb, ozon: unmatchedOzon, supa: unmatchedSupa },
-      autoMatches,
     };
   } catch (e: any) {
-    logger.error("extractIdsFromSources error:", e);
     return { success: false, wbIds: new Set(), ozonIds: new Set(), supaIds: new Set(), unmatched: { wb: [], ozon: [], supa: [] }, error: e.message };
   }
 }
 
-// generateUpdateSql (unchanged but uses parse helpers)
+// Simplified generateUpdateSql (production-safe): does not call heavy warehouse enumeration.
 async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }; ozon: { [ozonOffer: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
   const wbWhRes = await getWbWarehouses();
   const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.find((w: any) => w.isActive)?.id) || "12345";
-
   const ozonWhId = process.env.OZON_WAREHOUSE_ID || "67890";
 
   const cardsRes = await getWbProductCardsList();
   if (!cardsRes.success) return "-- Error fetching WB cards";
-  const wbMap = await parseWbCardsToMinimal(cardsRes.data.cards, wbWhId);
+  const cards = cardsRes.data.cards || [];
+
+  const wbMapSimple: { [k: string]: { nmID: number; quantity: number } } = {};
+  cards.forEach((c: any) => {
+    const vc = (c.vendorCode || "").toLowerCase();
+    wbMapSimple[vc] = { nmID: c.nmID, quantity: 0 };
+  });
 
   const ozonProdRes = await getOzonProductList();
   const ozonStockRes = await fetchOzonStocks();
@@ -1107,18 +904,15 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
     const wbVendor = Object.keys(manualMap.wb).find(k => manualMap.wb[k] === item.id) || idLower;
     const ozonOffer = Object.keys(manualMap.ozon).find(k => manualMap.ozon[k] === item.id) || idLower;
 
-    if (!wbMap[wbVendor] && !manualMap.wb[wbVendor]) {
-      sqlLines.push(`-- Skipped unmatched WB for '${item.id}'`);
-    }
-    if (!ozonMap[ozonOffer] && !manualMap.ozon[ozonOffer]) {
-      sqlLines.push(`-- Skipped unmatched Ozon for '${item.id}'`);
-    }
-    if (!wbMap[wbVendor] && !ozonMap[ozonOffer]) return;
-
-    const wb = wbMap[wbVendor] || {};
+    const wb = wbMapSimple[wbVendor] || {};
     const ozon = ozonMap[ozonOffer] || {};
 
-    const json = {
+    if (!wb && !ozon) {
+      sqlLines.push(`-- Skipped unmatched for '${item.id}'`);
+      return;
+    }
+
+    const json: any = {
       wb_sku: wb.nmID || item.id,
       ozon_sku: ozon.product_id || item.id,
       wb_warehouse_id: wbWhId,
@@ -1135,59 +929,11 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
   return sqlLines.join("\n");
 }
 
-// getWarehouseSql exported
 export async function getWarehouseSql(manualMap?: { wb: { [key: string]: string }; ozon: { [key: string]: string } }): Promise<{ success: boolean; sql?: string; error?: string }> {
   try {
-    const sql = await generateUpdateSql(manualMap);
+    const sql = await generateUpdateSql(manualMap || { wb: {}, ozon: {} });
     return { success: true, sql };
   } catch (e: any) {
     return { success: false, error: e.message };
-  }
-}
-
-// ------------------ createMissingSupaItems (auto-create minimal items with sane specs) ----------------
-export async function createMissingSupaItems(ids: string[], createdBy?: string): Promise<{ success: boolean; created: string[]; error?: string }> {
-  if (!Array.isArray(ids) || ids.length === 0) return { success: true, created: [] };
-  try {
-    // Normalize IDs and dedupe
-    const uniqIds = Array.from(new Set(ids.map(id => (id || "").toLowerCase().trim()))).filter(Boolean);
-
-    const itemsToCreate = uniqIds.map(id => {
-      const derived = deriveFieldsFromId(id);
-      // Build robust specs
-      const baseSpecs: any = {
-        wb_sku: derived?.model ? undefined : id, // keep fallback
-        warehouse_locations: [{ voxel_id: "A1", quantity: 0 }],
-        size: derived?.specs?.size || derived?.specs?.size || null,
-        pattern: derived?.specs?.pattern || null,
-        season: derived?.specs?.season || null,
-        color: derived?.specs?.color || null,
-        min_quantity: 0,
-        wb_warehouse_id: process.env.WB_WAREHOUSE_ID || null,
-        ozon_warehouse_id: process.env.OZON_WAREHOUSE_ID || null,
-        created_by: createdBy || "automation",
-      };
-
-      // Merge derived.specs deeper
-      const mergedSpecs = { ...derived.specs, ...baseSpecs };
-
-      return {
-        id,
-        make: derived.make || id,
-        model: derived.model || "Unknown",
-        description: derived.description || "",
-        type: "wb_item",
-        specs: mergedSpecs,
-        image_url: generateImageUrl(id),
-      };
-    });
-
-    const { error } = await supabaseAdmin.from("cars").upsert(itemsToCreate, { onConflict: "id" });
-    if (error) throw error;
-    logger.info(`Created ${itemsToCreate.length} missing supa items (automation).`);
-    return { success: true, created: itemsToCreate.map(i => i.id) };
-  } catch (e: any) {
-    logger.error("createMissingSupaItems error:", e);
-    return { success: false, created: [], error: e.message };
   }
 }
