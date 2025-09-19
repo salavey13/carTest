@@ -874,6 +874,7 @@ export async function extractIdsFromSources(): Promise<{
 }
 
 // Simplified generateUpdateSql (production-safe): does not call heavy warehouse enumeration.
+// Uses vendorCode -> nmID mapping from WB cards and local items. Quantities are best-effort (0 if unknown).
 async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }; ozon: { [ozonOffer: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
   const wbWhRes = await getWbWarehouses();
   const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.find((w: any) => w.isActive)?.id) || "12345";
@@ -883,10 +884,11 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
   if (!cardsRes.success) return "-- Error fetching WB cards";
   const cards = cardsRes.data.cards || [];
 
+  // Build simple wbMap: vendorCode -> { nmID, quantity: 0 }
   const wbMapSimple: { [k: string]: { nmID: number; quantity: number } } = {};
   cards.forEach((c: any) => {
     const vc = (c.vendorCode || "").toLowerCase();
-    wbMapSimple[vc] = { nmID: c.nmID, quantity: 0 };
+    wbMapSimple[vc] = { nmID: c.nmID, quantity: 0 }; // qty unknown here (use 0)
   });
 
   const ozonProdRes = await getOzonProductList();
@@ -901,13 +903,26 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
   const sqlLines: string[] = [];
   localRes.data?.forEach((item: any) => {
     const idLower = item.id.toLowerCase();
-    const wbVendor = Object.keys(manualMap.wb).find(k => manualMap.wb[k] === item.id) || idLower;
-    const ozonOffer = Object.keys(manualMap.ozon).find(k => manualMap.ozon[k] === item.id) || idLower;
 
-    const wb = wbMapSimple[wbVendor] || {};
-    const ozon = ozonMap[ozonOffer] || {};
+    // Try to find a wb vendor that was manually mapped to this local item
+    let wbVendor: string | undefined;
+    if (manualMap && manualMap.wb) {
+      wbVendor = Object.keys(manualMap.wb).find(k => {
+        const v = manualMap.wb[k];
+        if (!v) return false;
+        return v === item.id || v === idLower;
+      });
+    }
 
-    if (!wb && !ozon) {
+    // Fallback: assume local id equals vendor code
+    const effectiveWbVendor = (wbVendor || idLower).toLowerCase();
+    const effectiveOzonOffer = (Object.keys(manualMap?.ozon || {}).find(k => (manualMap!.ozon[k] === item.id || manualMap!.ozon[k] === idLower)) || idLower).toLowerCase();
+
+    const wb = wbMapSimple[effectiveWbVendor] || {};
+    const ozon = ozonMap[effectiveOzonOffer] || {};
+
+    // If both unmatched, skip with comment
+    if ((!wb || !wb.nmID) && (!ozon || !ozon.product_id)) {
       sqlLines.push(`-- Skipped unmatched for '${item.id}'`);
       return;
     }
@@ -921,8 +936,9 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
       ozon_api_quantity: ozon.quantity || 0,
     };
 
+    const jsonStr = JSON.stringify(json).replace(/'/g, "''"); // escape single quotes for SQL literal
     sqlLines.push(
-      `UPDATE public.cars SET specs = specs || '${JSON.stringify(json)}'::jsonb WHERE id = '${item.id}' AND type = 'wb_item';`
+      `UPDATE public.cars SET specs = specs || '${jsonStr}'::jsonb WHERE id = '${item.id}' AND type = 'wb_item';`
     );
   });
 
