@@ -748,11 +748,15 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
   }
 }
 
-// Доработанная функция: cursor-based с обязательным body/filter
+
+
+
+// Исправленная функция: cursor-based с обязательным body/filter
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
   let cursor: any = { limit: Math.min(settings.limit || 100, 100) };  // Clamp <=100 по докам
   let total = 0;  // Будем суммировать, т.к. cursor.total — для остатка?
+  let pageData: any = null; // <-- объявляем здесь, чтобы while видел переменную
 
   do {
     // Формируем settings с filter, если нет
@@ -766,19 +770,30 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
     const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
     if (!res.success) return res;
 
-    const pageData = res.data;
-    allCards = [...allCards, ...pageData.cards];
-    total = pageData.cursor?.total || 0;  // cursor.total — кол-во оставшихся?
+    pageData = res.data || {};
+    const cards = Array.isArray(pageData.cards) ? pageData.cards : [];
+
+    allCards = [...allCards, ...cards];
+    // Если API отдаёт cursor.total — можно использовать, иначе оставляем 0
+    total = pageData.cursor?.total ?? total;
+
     cursor = {
       limit: cursor.limit,
       updatedAt: pageData.cursor?.updatedAt,
       nmID: pageData.cursor?.nmID,
     };
-    logger.info(`Page fetched: ${pageData.cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`);
-  } while (cursor.updatedAt && cursor.nmID && pageData.cards.length >= cursor.limit);  // Пока есть next и full page
+
+    logger.info(`Page fetched: ${cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`);
+  // Пока есть cursor.next (updatedAt и nmID) и полученная страница была полной (>= limit)
+  } while ((cursor.updatedAt && cursor.nmID) && ((pageData?.cards?.length ?? 0) >= cursor.limit));
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
 }
+
+
+
+
+
 
 // Новая helper: парсинг cards to minimal map {vendorCode: {nmID, barcodes: [], quantity: 0}}
 async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
