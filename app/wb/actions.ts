@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -781,6 +782,8 @@ async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise
           }
         });
       });
+    } else {
+      logger.warn("No stocks fetched for WB quantities");
     }
   }
 
