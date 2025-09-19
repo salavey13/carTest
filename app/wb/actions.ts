@@ -743,7 +743,7 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
 // Доработанная функция: полная пагинация, сбор всех карточек
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
-  let cursor = { limit: 1000 };  // Макс limit по док = 1000
+  let cursor = { limit: 200 };  // Макс limit по док = 1000
   let total = 0;
 
   do {
@@ -754,7 +754,7 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
     const pageData = res.data;
     allCards = [...allCards, ...pageData.cards];
     total = pageData.cursor.total;
-    cursor = { ...pageData.cursor, limit: 1000 };  // nextCursor in cursor
+    cursor = { ...pageData.cursor, limit: 200 };  // nextCursor in cursor
   } while (total > allCards.length);
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
