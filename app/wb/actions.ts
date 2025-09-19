@@ -448,7 +448,6 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
   }
 }
 
-
 // Ozon Sync
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
@@ -715,18 +714,22 @@ export async function createWbProductCards(cards: any[]): Promise<{ success: boo
 }
 
 // Get Product Cards List
+/*
 export async function getWbProductCardsList(settings: any, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);
 }
+*/
 
-// добавь в /app/wb/actions.ts
+
+
+// Исправленная функция для складов
 export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
   if (!token) return { success: false, error: "WB_API_TOKEN missing" };
 
   try {
-    const res = await fetch("https://marketplace-api.wildberries.ru/api/v2/warehouses", {
-      headers: { "Authorization": token, "Content-Type": "application/json" },
+    const res = await fetch("https://suppliers-api.wildberries.ru/api/v3/warehouses", {
+      headers: { "Authorization": token },
       method: "GET",
     });
     if (!res.ok) {
@@ -734,12 +737,140 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
       return { success: false, error: `WB returned ${res.status}: ${text}` };
     }
     const data = await res.json();
-    // пример структуры: [{ id: 12345, name: "WB Warehouse X", isActive: true }, ...]
-    return { success: true, data };
+    return { success: true, data };  // data: [{id, name, officeId, isActive, ...}]
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
   }
 }
 
+// Доработанная функция: полная пагинация, сбор всех карточек
+export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
+  let allCards: any[] = [];
+  let cursor = { limit: 1000 };  // Макс limit по док = 1000
+  let total = 0;
 
-// More integrations can be added similarly...
+  do {
+    const body = { ...settings, cursor };
+    const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
+    if (!res.success) return res;
+
+    const pageData = res.data;
+    allCards = [...allCards, ...pageData.cards];
+    total = pageData.cursor.total;
+    cursor = { ...pageData.cursor, limit: 1000 };  // nextCursor in cursor
+  } while (total > allCards.length);
+
+  return { success: true, data: { cards: allCards, total: allCards.length } };
+}
+
+// Новая helper: парсинг cards to minimal map {vendorCode: {nmID, barcodes: [], quantity: 0}}
+async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
+  const map: { [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
+
+  cards.forEach((card: any) => {
+    const vc = card.vendorCode.toLowerCase();
+    const barcodes: string[] = card.sizes.flatMap((size: any) => size.skus || []);
+    map[vc] = { nmID: card.nmID, barcodes, quantity: 0 };
+  });
+
+  // Fetch stocks for all barcodes
+  const allBarcodes = Object.values(map).flatMap(m => m.barcodes);
+  if (allBarcodes.length > 0) {
+    const stocksRes = await fetchWbStocksForBarcodes(allBarcodes, warehouseId);  // Новая функция ниже
+    if (stocksRes.success && stocksRes.data) {
+      stocksRes.data.forEach((stock: any) => {
+        Object.entries(map).forEach(([vc, info]) => {
+          if (info.barcodes.includes(stock.sku)) {
+            info.quantity += stock.amount;
+          }
+        });
+      });
+    }
+  }
+
+  return map;
+}
+
+// Новая: fetch stocks for barcodes (POST /api/v3/stocks/{warehouseId} with {skus})
+async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  const token = process.env.WB_API_TOKEN;
+  if (!token) return { success: false, error: "Token missing" };
+
+  try {
+    const res = await fetch(`https://suppliers-api.wildberries.ru/api/v3/stocks/${warehouseId}`, {
+      method: "POST",
+      headers: { "Authorization": token, "Content-Type": "application/json" },
+      body: JSON.stringify({ skus: barcodes }),
+    });
+    if (!res.ok) return { success: false, error: await res.text() };
+    const data = await res.json();
+    return { success: true, data: data.stocks };  // [{sku, amount, ...}]
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+// Аналог для Ozon: уже есть fetchOzonStocks, возвращает {sku (offer_id), amount}
+async function parseOzonToMinimal(stocks: Stock[]): Promise<{ [offerId: string]: { fbsSku?: number; quantity: number } }> {
+  const map: { [offerId: string]: { fbsSku?: number; quantity: number } } = {};
+  stocks.forEach(s => {
+    const id = s.sku.toLowerCase();
+    map[id] = { quantity: s.amount };  // fbsSku from another API if needed
+  });
+  return map;
+}
+
+// Новая: generate SQL from parsed data
+async function generateUpdateSql(): Promise<string> {
+  // Get warehouses
+  const wbWhRes = await getWbWarehouses();
+  const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.[0]?.id) || "12345";
+
+  const ozonWhId = process.env.OZON_WAREHOUSE_ID || "67890";
+
+  // Get all cards
+  const cardsRes = await getWbProductCardsList();
+  if (!cardsRes.success) return "-- Error fetching WB cards";
+
+  const wbMap = await parseWbCardsToMinimal(cardsRes.data.cards, wbWhId);
+
+  // Get Ozon stocks
+  const ozonRes = await fetchOzonStocks();
+  const ozonMap = ozonRes.success ? await parseOzonToMinimal(ozonRes.data || []) : {};
+
+  // Get local items from Supabase
+  const localRes = await getWarehouseItems();
+  if (!localRes.success) return "-- Error fetching local items";
+
+  const sqlLines: string[] = [];
+  localRes.data?.forEach((item: any) => {
+    const idLower = item.id.toLowerCase();
+    const wb = wbMap[idLower] || {};
+    const ozon = ozonMap[idLower] || {};
+
+    const json = {
+      wb_sku: wb.nmID || item.id,
+      ozon_sku: ozon.fbsSku || item.id,  // if no fbsSku, use id
+      wb_warehouse_id: wbWhId,
+      ozon_warehouse_id: ozonWhId,
+      wb_api_quantity: wb.quantity || 0,
+      ozon_api_quantity: ozon.quantity || 0,
+    };
+
+    sqlLines.push(
+      `UPDATE public.cars SET specs = specs || '${JSON.stringify(json)}'::jsonb WHERE id = '${item.id}' AND type = 'wb_item';`
+    );
+  });
+
+  return sqlLines.join("\n");
+}
+
+// Экспорт SQL (в тест page или где нужно)
+export async function getWarehouseSql(): Promise<{ success: boolean; sql?: string; error?: string }> {
+  try {
+    const sql = await generateUpdateSql();
+    return { success: true, sql };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
