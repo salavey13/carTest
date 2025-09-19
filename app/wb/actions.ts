@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -741,6 +740,7 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
 }
 
 // Доработанная функция: полная пагинация, сбор всех карточек
+/*
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
   let cursor = { limit: 200 };  // Макс limit по док = 1000
@@ -756,6 +756,67 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
     total = pageData.cursor.total;
     cursor = { ...pageData.cursor, limit: 200 };  // nextCursor in cursor
   } while (total > allCards.length);
+
+  return { success: true, data: { cards: allCards, total: allCards.length } };
+}
+*/
+
+/* 
+//this works, but gets only first 100 items:
+export async function getWbProductCardsList(settings: any, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
+return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);}
+*/
+
+// Доработанная функция: offset-based пагинация по умолчанию, cursor как опция
+export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
+  let allCards: any[] = [];
+  const useCursor = settings.useCursor || false;  // Опция для cursor-mode
+  const limit = settings.limit || 200;  // Дефолт 200 для стабильности
+
+  if (useCursor) {
+    // Cursor-mode (для инкрементальных обновлений)
+    let cursor: any = { limit };
+    if (settings.updatedAt) cursor.updatedAt = settings.updatedAt;  // Опционально для старта с даты
+    let total = 0;
+
+    do {
+      const body = { ...settings, cursor };
+      delete body.useCursor;  // Удаляем опцию
+      const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
+      if (!res.success) return res;
+
+      const pageData = res.data;
+      allCards = [...allCards, ...pageData.cards];
+      total = pageData.cursor?.total || 0;
+      cursor = { ...pageData.cursor, limit };  // Восстанавливаем limit
+      logger.info(`Cursor page fetched: ${pageData.cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}`);
+    } while (total > allCards.length);
+
+  } else {
+    // Offset-based (для полного списка, надёжный)
+    let offset = 0;
+    const sortSettings = {
+      sort: settings.sort || "nmID",
+      order: settings.order || "asc",
+      ...settings,
+    };
+    delete sortSettings.limit;  // Используем наш limit
+
+    while (true) {
+      const body = { ...sortSettings, limit, offset };
+      const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
+      if (!res.success) return res;
+
+      const pageData = res.data;
+      if (!pageData.cards || pageData.cards.length === 0) break;
+
+      allCards = [...allCards, ...pageData.cards];
+      logger.info(`Offset page fetched: ${pageData.cards.length} cards at offset ${offset}, total so far: ${allCards.length}`);
+
+      if (pageData.cards.length < limit) break;
+      offset += limit;
+    }
+  }
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
 }
