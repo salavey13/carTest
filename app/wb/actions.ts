@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -870,6 +869,7 @@ export async function extractIdsFromSources(): Promise<{
   try {
     // WB
     const wbRes = await getWbProductCardsList();
+    if (!wbRes.success) throw new Error(wbRes.error || "WB fetch failed");
     const wbIds = new Set((wbRes.data?.cards || []).map((c: any) => c.vendorCode.toLowerCase()));
 
     // Ozon
@@ -878,6 +878,7 @@ export async function extractIdsFromSources(): Promise<{
 
     // Supa
     const supaRes = await getWarehouseItems();
+    if (!supaRes.success) throw new Error(supaRes.error || "Supa fetch failed");
     const supaIds = new Set((supaRes.data || []).map((i: any) => i.id.toLowerCase()));
 
     // Unmatched
@@ -924,13 +925,16 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
   const sqlLines: string[] = [];
   localRes.data?.forEach((item: any) => {
     const idLower = item.id.toLowerCase();
-    const wbVendor = [...Object.keys(wbMap), ...Object.keys(manualMap.wb)].find(k => k === idLower || manualMap.wb[k] === item.id) || idLower;
-    const ozonOffer = [...Object.keys(ozonMap), ...Object.keys(manualMap.ozon)].find(k => k === idLower || manualMap.ozon[k] === item.id) || idLower;
+    const wbVendor = Object.keys(manualMap.wb).find(k => manualMap.wb[k] === item.id) || idLower;
+    const ozonOffer = Object.keys(manualMap.ozon).find(k => manualMap.ozon[k] === item.id) || idLower;
 
-    if (!wbMap[wbVendor] && !ozonMap[ozonOffer]) {
-      sqlLines.push(`-- Skipped unmatched item '${item.id}'`);
-      return;
+    if (!wbMap[wbVendor] && !manualMap.wb[wbVendor]) {
+      sqlLines.push(`-- Skipped unmatched WB for '${item.id}'`);
     }
+    if (!ozonMap[ozonOffer] && !manualMap.ozon[ozonOffer]) {
+      sqlLines.push(`-- Skipped unmatched Ozon for '${item.id}'`);
+    }
+    if (!wbMap[wbVendor] && !ozonMap[ozonOffer]) return;
 
     const wb = wbMap[wbVendor] || {};
     const ozon = ozonMap[ozonOffer] || {};
