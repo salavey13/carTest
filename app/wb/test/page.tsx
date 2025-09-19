@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   extractIdsFromSources,
   getWarehouseSql,
-  getWbProductCardsList,
   getOzonProductList,
   fetchWbStocks,
   fetchOzonStocks,
@@ -36,6 +35,13 @@ import {
   createWbProductCards,
   getWbWarehouses,
 } from "@/app/wb/actions";
+
+import {
+  fetchWbCardsWithWarehouseInfo,
+  parseWbCardsToMinimal,
+  fetchWbStocksForBarcodes,
+} from "@/app/wb/test/actions";
+
 import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 import { Clipboard } from "lucide-react";
 
@@ -53,7 +59,6 @@ export default function WarehouseTestPage(): JSX.Element {
   const [sqlScript, setSqlScript] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Other states for less useful
   const [wbApiResult, setWbApiResult] = useState<ApiRes | null>(null);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [subjectId, setSubjectId] = useState<string>("");
@@ -62,20 +67,31 @@ export default function WarehouseTestPage(): JSX.Element {
   const [barcodeCount, setBarcodeCount] = useState<number>(1);
   const [productCards, setProductCards] = useState<string>("[]");
 
+  const [warehousesInfoLog, setWarehousesInfoLog] = useState<any>(null);
+  const [chosenWarehouseLog, setChosenWarehouseLog] = useState<string | null>(null);
+
   const handleFetchWbCards = async () => {
     setLoading(true);
     try {
-      const res = await getWbProductCardsList();
+      const res = await fetchWbCardsWithWarehouseInfo();
       if (res?.success) {
-        setWbCards(res.data.cards.map((c: any) => ({
-          vendorCode: c.vendorCode,
-          nmID: c.nmID,
-          barcodes: c.sizes.flatMap((s: any) => s.skus),
-          quantity: c.quantity || 0,
-        })));
-        toast.success(`Загружено ${res.data.total} карточек WB`);
+        const cards = res.cards || [];
+        const minimalMap = res.minimalMap || {};
+        const rows = cards.map((c: any) => {
+          const vc = (c.vendorCode || "").toLowerCase();
+          const mm = minimalMap[vc] || { nmID: c.nmID, barcodes: [], quantity: 0 };
+          return {
+            vendorCode: c.vendorCode,
+            nmID: c.nmID,
+            quantity: mm.quantity || 0,
+          };
+        });
+        setWbCards(rows);
+        setWarehousesInfoLog(res.warehousesInfo || []);
+        setChosenWarehouseLog(res.chosenWarehouseId ?? null);
+        toast.success(`Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length })`);
       } else {
-        toast.error(res?.error ?? "Ошибка");
+        toast.error(res?.error ?? "Ошибка при загрузке карточек WB");
       }
     } catch (err: any) {
       toast.error(err?.message ?? "Ошибка запроса");
@@ -304,24 +320,22 @@ export default function WarehouseTestPage(): JSX.Element {
           <CardTitle className="text-sm">Инструкции по Матчингу & SQL</CardTitle>
         </CardHeader>
         <CardContent className="text-xs space-y-2">
-          <p>0. Setup ENV: Убедись в .env WB_CONTENT_TOKEN, WB_API_TOKEN для WB; OZON_CLIENT_ID, OZON_API_KEY для Ozon. Без них fetch fail с toast "credentials missing". Warehouse IDs optional — auto first active. Example .env: WB_CONTENT_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</p>
-          <p>1. Fetch WB Cards — полная пагинация, vendorCode/nmID/barcodes/quantity. Если мало (e.g., 2) — проверь token/аккаунт cards in WB panel, or scope (content API access).</p>
+          <p>0. Setup ENV: Убедись в .env WB_CONTENT_TOKEN, WB_API_TOKEN для WB; OZON_CLIENT_ID, OZON_API_KEY для Ozon. Warehouse IDs optional — auto first active. </p>
+          <p>1. Fetch WB Cards — полная пагинация, vendorCode/nmID/quantity (парсер тестовой страницы может проверить все склады по barcode'ам и выбрать лучший).</p>
           <p>2. Fetch Ozon Products — offer_id/product_id/quantity. Skip if no keys — toast warn.</p>
           <p>3. Fetch Supa Items — id из wb_item. Must for matching.</p>
           <p>4. Extract & Match IDs — auto-match по lower, show unmatched tables. Select to manual match.</p>
-          <p>Пример: WB "1.5-зима-адель" unmatched? Select Supa "1.5 зима адель". Fallback — select "Fallback to ID" (uses item.id).</p>
           <p>5. Generate SQL — UPDATE specs с sku/quantity/wh. Skipped unmatched with comment. Copy & run in Supabase.</p>
-          <p>Troubleshoot: Few WB cards — check WB seller panel or token scopes. Quantities 0 — check stocks API or warehouse ID. No Ozon — add keys & restart.</p>
         </CardContent>
       </Card>
 
       <Card className="mb-4">
         <CardHeader>
-          <CardTitle className="text-sm">Экстракция & Матчинг</CardTitle>
+          <CardTitle className="text-sm">Экстракция & Матчинг (тест)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-2">
-            <Button size="sm" onClick={handleFetchWbCards} disabled={loading}>Fetch WB Cards</Button>
+            <Button size="sm" onClick={handleFetchWbCards} disabled={loading}>Fetch WB Cards (enhanced)</Button>
             <Button size="sm" onClick={handleFetchOzonProducts} disabled={loading}>Fetch Ozon Products</Button>
             <Button size="sm" onClick={handleFetchSupaItems} disabled={loading}>Fetch Supa Items</Button>
           </div>
@@ -334,7 +348,6 @@ export default function WarehouseTestPage(): JSX.Element {
                   <TableRow>
                     <TableHead>VendorCode</TableHead>
                     <TableHead>nmID</TableHead>
-                    <TableHead>Barcodes</TableHead>
                     <TableHead>Qty</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -343,7 +356,6 @@ export default function WarehouseTestPage(): JSX.Element {
                     <TableRow key={idx}>
                       <TableCell>{c.vendorCode}</TableCell>
                       <TableCell>{c.nmID}</TableCell>
-                      <TableCell>{c.barcodes.join(", ")}</TableCell>
                       <TableCell>{c.quantity}</TableCell>
                     </TableRow>
                   ))}
@@ -464,6 +476,23 @@ export default function WarehouseTestPage(): JSX.Element {
               </Button>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-sm">Warehouse detection log (test)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-xs mb-2">
+            <strong>Chosen Warehouse:</strong> {chosenWarehouseLog ?? "N/A"}
+          </div>
+          <div className="text-xs">
+            <strong>Warehouses Info:</strong>
+            <pre className="bg-muted p-2 rounded text-xs max-h-48 overflow-auto">
+              {JSON.stringify(warehousesInfoLog, null, 2)}
+            </pre>
+          </div>
         </CardContent>
       </Card>
 
