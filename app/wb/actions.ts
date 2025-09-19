@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -8,7 +7,7 @@ import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { notifyAdmins } from "@/app/actions";
 import Papa from "papaparse";
-import dns from "dns/promises"
+import dns from "dns/promises";
 
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
@@ -18,13 +17,17 @@ const generateImageUrl = (id: string): string => {
   return baseURL + filename;
 };
 
-// Helper to derive fields from id
-const deriveFieldsFromId = (id: string) => {
-  const parts = id.toLowerCase().split(' ');
+// Helper to derive fields from id (existing logic, slightly hardened)
+export const deriveFieldsFromId = (id: string) => {
+  const parts = (id || "").toLowerCase().split(' ');
   let model = '';
   let make = '';
   let description = '';
   let specs: any = { warehouse_locations: [] };
+
+  if (!parts || parts.length === 0) {
+    return { model, make, description, specs };
+  }
 
   if (parts[0] === '1.5') {
     model = '1.5';
@@ -35,16 +38,16 @@ const deriveFieldsFromId = (id: string) => {
   } else if (parts[0] === 'евро' && parts[1] === 'макси') {
     model = 'Евро Макси';
     parts.shift();
-  } else if (parts[0].startsWith('наматрасник.')) {
+  } else if (parts[0].startsWith('наматрасник.') || parts[0].startsWith('наматрас.')) {
     model = 'Наматрасник';
-    const sizePart = parts[0].split('.')[1];
+    const sizePart = parts[0].split('.')[1] || '';
     const pattern = parts[1] || '';
-    specs.size = sizePart;
-    specs.pattern = pattern;
+    specs.size = sizePart || null;
+    specs.pattern = pattern || null;
     specs.season = null;
     specs.color = parseInt(sizePart, 10) >= 160 ? 'dark-green' : 'light-green';
     description = parseInt(sizePart, 10) >= 160 ? 'Темно-зеленый, большой' : 'Салатовый, маленький';
-    make = `${sizePart.charAt(0).toUpperCase() + sizePart.slice(1)} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`;
+    make = `${sizePart ? sizePart.charAt(0).toUpperCase() + sizePart.slice(1) : ''} ${pattern ? pattern.charAt(0).toUpperCase() + pattern.slice(1) : ''}`.trim();
     return { model, make, description, specs };
   } else {
     model = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
@@ -52,7 +55,7 @@ const deriveFieldsFromId = (id: string) => {
 
   make = parts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 
-  switch (model.toLowerCase()) {
+  switch ((model || "").toLowerCase()) {
     case '1.5':
       description = 'Серая';
       specs.color = 'gray';
@@ -86,7 +89,7 @@ const deriveFieldsFromId = (id: string) => {
     specs.season = 'лето';
     description += ', полосочка';
   }
-  specs.pattern = parts[parts.length - 1].replace(/[0-9]/g, '').trim();
+  specs.pattern = (parts[parts.length - 1] || '').replace(/[0-9]/g, '').trim();
 
   return { model, make, description, specs };
 };
@@ -157,7 +160,7 @@ export async function uploadWarehouseCsv(
       const model = row.model || derived.model || "Unknown Model";
       const description = row.description || derived.description || "No Description";
 
-      let specs = row.specs ? JSON.parse(row.specs) : derived.specs;
+      let specs = row.specs ? JSON.parse(row.specs) : derived.specs || {};
 
       let quantity = parseInt(row["Количество"] || row.quantity || '0', 10) || 0;
 
@@ -363,7 +366,7 @@ export async function updateItemMinQty(
   }
 }
 
-// WB Sync
+// WB Sync (unchanged)
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -398,7 +401,6 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       sampleStock: stocks[0] || null,
     });
 
-    // DNS check (helps to know if ENOTFOUND is coming from DNS)
     try {
       const lookup = await dns.lookup("suppliers-api.wildberries.ru");
       logger.info("syncWbStocks DNS lookup result", lookup);
@@ -406,7 +408,6 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       logger.warn("syncWbStocks DNS lookup failed", dnsErr?.code || dnsErr?.message || dnsErr);
     }
 
-    // timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
@@ -448,7 +449,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
   }
 }
 
-// Ozon Sync
+// Ozon Sync (unchanged)
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -496,7 +497,6 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
   }
 
   try {
-    // Fetch local SKUs
     const { data: items } = await supabaseAdmin.from("cars").select("id, specs").eq("type", "wb_item");
     if (!items) {
       logger.warn("fetchWbStocks: no local items returned from Supabase");
@@ -507,7 +507,6 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     const url = `https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
-    // Validate warehouse id
     if (isNaN(Number(WB_WAREHOUSE_ID))) {
       logger.warn("fetchWbStocks: WB_WAREHOUSE_ID is not numeric", { WB_WAREHOUSE_ID });
     }
@@ -520,7 +519,6 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
       sampleSkus: skus.slice(0, 20),
     });
 
-    // DNS lookup diagnostic (useful when ENOTFOUND)
     try {
       const lookup = await dns.lookup("suppliers-api.wildberries.ru");
       logger.info("fetchWbStocks DNS lookup result", lookup);
@@ -566,7 +564,6 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     logger.info(`Fetched ${stocks.length} stocks from WB.`);
     return { success: true, data: stocks };
   } catch (err: any) {
-    // include cause if undici/network error
     logger.error("fetchWbStocks error:", {
       message: err?.message,
       stack: err?.stack,
@@ -583,7 +580,6 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
   if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, error: "Ozon credentials missing" };
 
   try {
-    // Fetch all local SKUs
     const { data: items } = await supabaseAdmin.from("cars").select("id, specs").eq("type", "wb_item");
     if (!items) return { success: false, error: "No local items" };
 
@@ -615,7 +611,7 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       const itemsStocks = data.result.items.flatMap((item: any) =>
         item.stocks.map((stock: any) => ({
           sku: item.offer_id,
-          amount: stock.present - stock.reserved,  // Available stock
+          amount: stock.present - stock.reserved,
         }))
       );
 
@@ -633,8 +629,7 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
   }
 }
 
-// --- Новые интеграции WB API ---
-
+// --- WB Content API helpers ---
 const WB_CONTENT_TOKEN = process.env.WB_CONTENT_TOKEN; // Токен для Content category
 const WB_PRICES_TOKEN = process.env.WB_PRICES_TOKEN; // Токен для Prices and Discounts
 
@@ -671,63 +666,43 @@ async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, t
 export async function getWbParentCategories(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/object/parent/all?locale=${locale}`);
 }
-
-// Get Subjects List
 export async function getWbSubjects(locale: string = 'ru', name?: string, limit: number = 30, offset: number = 0, parentID?: number): Promise<{ success: boolean; data?: any[]; error?: string }> {
   let query = `/content/v2/object/all?locale=${locale}&limit=${limit}&offset=${offset}`;
   if (name) query += `&name=${encodeURIComponent(name)}`;
   if (parentID) query += `&parentID=${parentID}`;
   return wbApiCall(query);
 }
-
-// Get Subject Characteristics
 export async function getWbSubjectCharcs(subjectId: number, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/object/charcs/${subjectId}?locale=${locale}`);
 }
-
-// Get Colors
 export async function getWbColors(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/colors?locale=${locale}`);
 }
-
-// Get Genders
 export async function getWbGenders(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/kinds?locale=${locale}`);
 }
-
-// Get Countries
 export async function getWbCountries(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/countries?locale=${locale}`);
 }
-
-// Get Seasons
 export async function getWbSeasons(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/seasons?locale=${locale}`);
 }
-
-// Get VAT Rates
 export async function getWbVat(locale: string = 'ru'): Promise<{ success: boolean; data?: string[]; error?: string }> {
   return wbApiCall(`/content/v2/directory/vat?locale=${locale}`);
 }
-
-// Get HS Codes
 export async function getWbTnved(subjectID: number, search?: string, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   let query = `/content/v2/directory/tnved?subjectID=${subjectID}&locale=${locale}`;
   if (search) query += `&search=${search}`;
   return wbApiCall(query);
 }
-
-// Generate Barcodes
 export async function generateWbBarcodes(count: number = 1): Promise<{ success: boolean; data?: string[]; error?: string }> {
   return wbApiCall('/content/v2/barcodes', 'POST', { count });
 }
-
-// Create Product Cards
 export async function createWbProductCards(cards: any[]): Promise<{ success: boolean; error?: string }> {
   return wbApiCall('/content/v2/cards/upload', 'POST', cards);
 }
 
-// Исправленная функция для складов
+// Get warehouses
 export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
   if (!token) return { success: false, error: "WB_API_TOKEN missing" };
@@ -742,30 +717,26 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
       return { success: false, error: `WB returned ${res.status}: ${text}` };
     }
     const data = await res.json();
-    return { success: true, data };  // data: [{id, name, officeId, isActive, ...}]
+    return { success: true, data };
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
   }
 }
 
-
-
-
-// Исправленная функция: cursor-based с обязательным body/filter
+// getWbProductCardsList - cursor-based pagination (robust)
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
-  let cursor: any = { limit: Math.min(settings.limit || 100, 100) };  // Clamp <=100 по докам
-  let total = 0;  // Будем суммировать, т.к. cursor.total — для остатка?
-  let pageData: any = null; // <-- объявляем здесь, чтобы while видел переменную
+  let cursor: any = { limit: Math.min(settings.limit || 100, 100) };
+  let total = 0;
+  let pageData: any = null;
 
   do {
-    // Формируем settings с filter, если нет
     const effectiveSettings = {
       ...settings,
-      filter: settings.filter || { withPhoto: -1 },  // Default filter: все
+      filter: settings.filter || { withPhoto: -1 },
       cursor,
     };
-    const body = { settings: effectiveSettings };  // Wrap в {settings: {...}}
+    const body = { settings: effectiveSettings };
 
     const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
     if (!res.success) return res;
@@ -774,7 +745,6 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
     const cards = Array.isArray(pageData.cards) ? pageData.cards : [];
 
     allCards = [...allCards, ...cards];
-    // Если API отдаёт cursor.total — можно использовать, иначе оставляем 0
     total = pageData.cursor?.total ?? total;
 
     cursor = {
@@ -784,31 +754,25 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
     };
 
     logger.info(`Page fetched: ${cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`);
-  // Пока есть cursor.next (updatedAt и nmID) и полученная страница была полной (>= limit)
   } while ((cursor.updatedAt && cursor.nmID) && ((pageData?.cards?.length ?? 0) >= cursor.limit));
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
 }
 
-
-
-
-
-
-// Новая helper: парсинг cards to minimal map {vendorCode: {nmID, barcodes: [], quantity: 0}}
-async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
+// parseWbCardsToMinimal: build minimal map and fetch stocks by barcodes
+export async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
   const map: { [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
 
   cards.forEach((card: any) => {
-    const vc = card.vendorCode.toLowerCase();
-    const barcodes: string[] = card.sizes.flatMap((size: any) => size.skus || []);
+    const vc = (card.vendorCode || "").toLowerCase();
+    // sizes may be missing for some cards; handle safe
+    const barcodes: string[] = Array.isArray(card.sizes) ? card.sizes.flatMap((size: any) => size.skus || []) : (card.barcodes || []);
     map[vc] = { nmID: card.nmID, barcodes, quantity: 0 };
   });
 
-  // Fetch stocks for all barcodes
   const allBarcodes = Object.values(map).flatMap(m => m.barcodes);
   if (allBarcodes.length > 0) {
-    const stocksRes = await fetchWbStocksForBarcodes(allBarcodes, warehouseId);  // Новая функция ниже
+    const stocksRes = await fetchWbStocksForBarcodes(allBarcodes, warehouseId);
     if (stocksRes.success && stocksRes.data) {
       stocksRes.data.forEach((stock: any) => {
         Object.entries(map).forEach(([vc, info]) => {
@@ -825,8 +789,8 @@ async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise
   return map;
 }
 
-// Новая: fetch stocks for barcodes (POST /api/v3/stocks/{warehouseId} with {skus})
-async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+// fetchWbStocksForBarcodes
+export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
   if (!token) return { success: false, error: "Token missing" };
 
@@ -838,13 +802,13 @@ async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId: string)
     });
     if (!res.ok) return { success: false, error: await res.text() };
     const data = await res.json();
-    return { success: true, data: data.stocks };  // [{sku, amount, ...}]
+    return { success: true, data: data.stocks };
   } catch (e: any) {
     return { success: false, error: e.message };
   }
 }
 
-// Ozon: Fetch product list with pagination
+// Ozon product list
 export async function getOzonProductList(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -875,54 +839,233 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
     }
 
     logger.info(`Fetched ${allItems.length} products from Ozon.`);
-    return { success: true, data: allItems };  // [{offer_id, product_id, ...}]
+    return { success: true, data: allItems };
   } catch (err) {
     logger.error("getOzonProductList error:", err);
     return { success: false, error: (err as Error).message };
   }
 }
 
-// Update parseOzonToMinimal to use product list + stocks
-async function parseOzonToMinimal(products: any[], stocks: { sku: string; amount: number }[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
+export async function parseOzonToMinimal(products: any[], stocks: { sku: string; amount: number }[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
   const map: { [offerId: string]: { product_id?: number; quantity: number } } = {};
 
   products.forEach((prod: any) => {
-    const offerId = prod.offer_id.toLowerCase();
-    const stock = stocks.find(s => s.sku.toLowerCase() === offerId);
+    const offerId = (prod.offer_id || "").toLowerCase();
+    const stock = (stocks || []).find(s => s.sku.toLowerCase() === offerId);
     map[offerId] = { product_id: prod.product_id, quantity: stock?.amount || 0 };
   });
 
   return map;
 }
 
-// Новая: extract IDs from sources
+// ------------------ FUZZY MATCHING HELPERS -----------------------
+const KNOWN_MODELS = ["1.5", "2", "евро макси", "евро", "наматрасник"];
+const KNOWN_SEASONS = ["зима", "лето"];
+
+function normalizeSpaces(s: string) {
+  return s.replace(/[\u00A0]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  const al = a.length, bl = b.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+  const dp: number[][] = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+  for (let i = 0; i <= al; i++) dp[i][0] = i;
+  for (let j = 0; j <= bl; j++) dp[0][j] = j;
+  for (let i = 1; i <= al; i++) {
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[al][bl];
+}
+
+function similarRatio(a: string, b: string): number {
+  if (!a && !b) return 1;
+  if (!a || !b) return 0;
+  const lev = levenshtein(a, b);
+  const maxl = Math.max(a.length, b.length);
+  return maxl === 0 ? 1 : 1 - lev / maxl;
+}
+
+function applySynonyms(s: string): string {
+  let res = (s || "").toLowerCase();
+  res = res.replace(/ё/g, "е");
+  res = res.replace(/[._\-]+/g, " ");
+  res = res.replace(/\bевр?о\s*макс(и|и)?\b/g, "евро макси");
+  res = res.replace(/\bевромакси\b/g, "евро макси");
+  res = res.replace(/\bевро макс\b/g, "евро макси");
+  res = res.replace(/\bнаматрасн\b/g, "наматрасник");
+  res = res.replace(/\bнаматрас\b/g, "наматрасник");
+  res = res.replace(/\bобл(егч?ен|егч?енн)?\b/g, "лето");
+  res = res.replace(/\bоблегченн[аяо]\b/g, "лето");
+  res = normalizeSpaces(res);
+  return res;
+}
+
+function canonicalizeId(raw: string) {
+  const cleaned = applySynonyms(raw || "");
+  const tokens = cleaned.split(" ").filter(Boolean);
+  let model = "";
+  let season = "";
+  let patternTokens: string[] = [];
+
+  const joined = tokens.join(" ");
+  if (joined.includes("евро макси")) {
+    model = "евро макси";
+    const idx = joined.indexOf("евро макси");
+    const before = joined.slice(0, idx).trim();
+    const after = joined.slice(idx + "евро макси".length).trim();
+    const rest = (before + " " + after).trim();
+    const restT = rest ? rest.split(" ").filter(Boolean) : [];
+    restT.forEach(tok => {
+      if (KNOWN_SEASONS.includes(tok)) season = tok;
+      else patternTokens.push(tok);
+    });
+    const pattern = patternTokens.join(" ").trim();
+    const canonical = [model, season, pattern].filter(Boolean).join(" ").trim();
+    return { model, season, pattern, canonical };
+  }
+
+  for (const t of tokens) {
+    if (KNOWN_MODELS.includes(t)) {
+      model = t;
+      break;
+    }
+  }
+
+  if (!model) {
+    const maybe = tokens.find(t => t === "1.5" || t === "2");
+    if (maybe) model = maybe;
+  }
+
+  for (const t of tokens) {
+    if (KNOWN_SEASONS.includes(t)) {
+      season = t;
+      break;
+    }
+  }
+
+  patternTokens = tokens.filter(t => t !== model && t !== season);
+  if (!model && tokens.length > 0) {
+    const first = tokens[0];
+    if (["1.5", "2"].includes(first) || first.startsWith("евро") || first.startsWith("наматрас")) {
+      model = first;
+      patternTokens = tokens.slice(1).filter(t => t !== season);
+    }
+  }
+
+  const pattern = patternTokens.join(" ").trim();
+  const canonical = [model, season, pattern].filter(Boolean).join(" ").trim();
+  return { model, season, pattern, canonical };
+}
+
+function scoreMatch(aRaw: string, bRaw: string) {
+  const a = canonicalizeId(aRaw);
+  const b = canonicalizeId(bRaw);
+
+  if (a.canonical && b.canonical && a.canonical === b.canonical) return 1;
+
+  let score = 0;
+  if (a.model && b.model) {
+    score += a.model === b.model ? 0.5 : 0;
+  } else if (!a.model && !b.model) {
+    score += 0.1;
+  }
+
+  if (a.season && b.season) {
+    score += a.season === b.season ? 0.2 : 0;
+  }
+
+  const patScore = similarRatio(a.pattern || "", b.pattern || "");
+  score += patScore * 0.3;
+
+  return Math.min(1, score);
+}
+
+async function findBestSupaMatch(sourceId: string, supaIds: string[]) {
+  let best = { id: "", score: 0 };
+  for (const s of supaIds) {
+    const sc = scoreMatch(sourceId, s);
+    if (sc > best.score) {
+      best = { id: s, score: sc };
+    }
+    if (best.score >= 0.99) break;
+  }
+  return best;
+}
+// ------------------ END FUZZY HELPERS -----------------------------
+
+// extractIdsFromSources: returns autoMatches
 export async function extractIdsFromSources(): Promise<{
   success: boolean;
   wbIds: Set<string>;
   ozonIds: Set<string>;
   supaIds: Set<string>;
   unmatched: { wb: string[]; ozon: string[]; supa: string[] };
+  autoMatches?: { wb: { [wbId: string]: { supaId?: string; score: number } }; ozon: { [ozonId: string]: { supaId?: string; score: number } } };
   error?: string;
 }> {
   try {
     // WB
     const wbRes = await getWbProductCardsList();
     if (!wbRes.success) throw new Error(wbRes.error || "WB fetch failed");
-    const wbIds = new Set((wbRes.data?.cards || []).map((c: any) => c.vendorCode.toLowerCase()));
+    const wbCards = wbRes.data?.cards || [];
+    const wbIdsArr = wbCards.map((c: any) => (c.vendorCode || "").toLowerCase());
+    const wbIds = new Set(wbIdsArr);
 
     // Ozon
     const ozonRes = await getOzonProductList();
-    const ozonIds = new Set((ozonRes.data || []).map((p: any) => p.offer_id.toLowerCase()));
+    const ozonArr = (ozonRes.data || []).map((p: any) => (p.offer_id || "").toLowerCase());
+    const ozonIds = new Set(ozonArr);
 
     // Supa
     const supaRes = await getWarehouseItems();
     if (!supaRes.success) throw new Error(supaRes.error || "Supa fetch failed");
-    const supaIds = new Set((supaRes.data || []).map((i: any) => i.id.toLowerCase()));
+    const supaArr = (supaRes.data || []).map((i: any) => (i.id || "").toLowerCase());
+    const supaIds = new Set(supaArr);
 
-    // Unmatched
-    const unmatchedWb = [...wbIds].filter(id => !supaIds.has(id));
-    const unmatchedOzon = [...ozonIds].filter(id => !supaIds.has(id));
-    const unmatchedSupa = [...supaIds].filter(id => !wbIds.has(id) && !ozonIds.has(id));
+    const supaList = [...supaIds];
+    const wbList = [...wbIds];
+    const ozonList = [...ozonIds];
+
+    const autoMatches: any = { wb: {}, ozon: {} };
+
+    for (const wbId of wbList) {
+      const best = await findBestSupaMatch(wbId, supaList);
+      if (best.score > 0) autoMatches.wb[wbId] = { supaId: best.id || undefined, score: Number(best.score.toFixed(3)) };
+      else autoMatches.wb[wbId] = { supaId: undefined, score: 0 };
+    }
+
+    for (const ozId of ozonList) {
+      const best = await findBestSupaMatch(ozId, supaList);
+      if (best.score > 0) autoMatches.ozon[ozId] = { supaId: best.id || undefined, score: Number(best.score.toFixed(3)) };
+      else autoMatches.ozon[ozId] = { supaId: undefined, score: 0 };
+    }
+
+    const threshold = 0.75;
+    const matchedSupa = new Set<string>();
+    const unmatchedWb: string[] = [];
+    for (const w of wbList) {
+      const m = autoMatches.wb[w];
+      if (m?.supaId && m.score >= threshold) {
+        matchedSupa.add(m.supaId);
+      } else {
+        unmatchedWb.push(w);
+      }
+    }
+    const unmatchedOzon: string[] = [];
+    for (const o of ozonList) {
+      const m = autoMatches.ozon[o];
+      if (m?.supaId && m.score >= threshold) {
+        matchedSupa.add(m.supaId);
+      } else {
+        unmatchedOzon.push(o);
+      }
+    }
+    const unmatchedSupa = [...supaList].filter(s => !matchedSupa.has(s) && !wbList.includes(s) && !ozonList.includes(s));
 
     return {
       success: true,
@@ -930,33 +1073,31 @@ export async function extractIdsFromSources(): Promise<{
       ozonIds,
       supaIds,
       unmatched: { wb: unmatchedWb, ozon: unmatchedOzon, supa: unmatchedSupa },
+      autoMatches,
     };
   } catch (e: any) {
+    logger.error("extractIdsFromSources error:", e);
     return { success: false, wbIds: new Set(), ozonIds: new Set(), supaIds: new Set(), unmatched: { wb: [], ozon: [], supa: [] }, error: e.message };
   }
 }
 
-// Новая: generate SQL from parsed data, with manual map
+// generateUpdateSql (unchanged but uses parse helpers)
 async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }; ozon: { [ozonOffer: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
-  // Get warehouses
   const wbWhRes = await getWbWarehouses();
   const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.find((w: any) => w.isActive)?.id) || "12345";
 
   const ozonWhId = process.env.OZON_WAREHOUSE_ID || "67890";
 
-  // Get WB cards & parse
   const cardsRes = await getWbProductCardsList();
   if (!cardsRes.success) return "-- Error fetching WB cards";
   const wbMap = await parseWbCardsToMinimal(cardsRes.data.cards, wbWhId);
 
-  // Get Ozon products & stocks
   const ozonProdRes = await getOzonProductList();
   const ozonStockRes = await fetchOzonStocks();
-  const ozonMap = (ozonProdRes.success && ozonStockRes.success) 
-    ? await parseOzonToMinimal(ozonProdRes.data || [], ozonStockRes.data || []) 
+  const ozonMap = (ozonProdRes.success && ozonStockRes.success)
+    ? await parseOzonToMinimal(ozonProdRes.data || [], ozonStockRes.data || [])
     : {};
 
-  // Get local items from Supabase
   const localRes = await getWarehouseItems();
   if (!localRes.success) return "-- Error fetching local items";
 
@@ -994,12 +1135,59 @@ async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }
   return sqlLines.join("\n");
 }
 
-// Экспорт SQL
+// getWarehouseSql exported
 export async function getWarehouseSql(manualMap?: { wb: { [key: string]: string }; ozon: { [key: string]: string } }): Promise<{ success: boolean; sql?: string; error?: string }> {
   try {
     const sql = await generateUpdateSql(manualMap);
     return { success: true, sql };
   } catch (e: any) {
     return { success: false, error: e.message };
+  }
+}
+
+// ------------------ createMissingSupaItems (auto-create minimal items with sane specs) ----------------
+export async function createMissingSupaItems(ids: string[], createdBy?: string): Promise<{ success: boolean; created: string[]; error?: string }> {
+  if (!Array.isArray(ids) || ids.length === 0) return { success: true, created: [] };
+  try {
+    // Normalize IDs and dedupe
+    const uniqIds = Array.from(new Set(ids.map(id => (id || "").toLowerCase().trim()))).filter(Boolean);
+
+    const itemsToCreate = uniqIds.map(id => {
+      const derived = deriveFieldsFromId(id);
+      // Build robust specs
+      const baseSpecs: any = {
+        wb_sku: derived?.model ? undefined : id, // keep fallback
+        warehouse_locations: [{ voxel_id: "A1", quantity: 0 }],
+        size: derived?.specs?.size || derived?.specs?.size || null,
+        pattern: derived?.specs?.pattern || null,
+        season: derived?.specs?.season || null,
+        color: derived?.specs?.color || null,
+        min_quantity: 0,
+        wb_warehouse_id: process.env.WB_WAREHOUSE_ID || null,
+        ozon_warehouse_id: process.env.OZON_WAREHOUSE_ID || null,
+        created_by: createdBy || "automation",
+      };
+
+      // Merge derived.specs deeper
+      const mergedSpecs = { ...derived.specs, ...baseSpecs };
+
+      return {
+        id,
+        make: derived.make || id,
+        model: derived.model || "Unknown",
+        description: derived.description || "",
+        type: "wb_item",
+        specs: mergedSpecs,
+        image_url: generateImageUrl(id),
+      };
+    });
+
+    const { error } = await supabaseAdmin.from("cars").upsert(itemsToCreate, { onConflict: "id" });
+    if (error) throw error;
+    logger.info(`Created ${itemsToCreate.length} missing supa items (automation).`);
+    return { success: true, created: itemsToCreate.map(i => i.id) };
+  } catch (e: any) {
+    logger.error("createMissingSupaItems error:", e);
+    return { success: false, created: [], error: e.message };
   }
 }
