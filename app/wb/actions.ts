@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -648,12 +649,20 @@ async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, t
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!response.ok) {
-      const errData = await response.json();
-      return { success: false, error: errData.errorText || "WB API error" };
+      let errText;
+      try {
+        const errData = await response.json();
+        errText = errData.errorText || errData.error || "WB API error";
+      } catch {
+        errText = await response.text() || "Unknown error";
+      }
+      logger.error(`wbApiCall failed: ${response.status} - ${errText}`);
+      return { success: false, error: errText };
     }
     const data = await response.json();
     return { success: true, data };
   } catch (err) {
+    logger.error("wbApiCall network error:", err);
     return { success: false, error: (err as Error).message };
   }
 }
@@ -739,88 +748,38 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
   }
 }
 
-// Доработанная функция: полная пагинация, сбор всех карточек
-/*
+// Доработанная функция: cursor-based с обязательным body/filter
 export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
   let allCards: any[] = [];
-  let cursor = { limit: 200 };  // Макс limit по док = 1000
-  let total = 0;
+  let cursor: any = { limit: Math.min(settings.limit || 100, 100) };  // Clamp <=100 по докам
+  let total = 0;  // Будем суммировать, т.к. cursor.total — для остатка?
 
   do {
-    const body = { ...settings, cursor };
+    // Формируем settings с filter, если нет
+    const effectiveSettings = {
+      ...settings,
+      filter: settings.filter || { withPhoto: -1 },  // Default filter: все
+      cursor,
+    };
+    const body = { settings: effectiveSettings };  // Wrap в {settings: {...}}
+
     const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
     if (!res.success) return res;
 
     const pageData = res.data;
     allCards = [...allCards, ...pageData.cards];
-    total = pageData.cursor.total;
-    cursor = { ...pageData.cursor, limit: 200 };  // nextCursor in cursor
-  } while (total > allCards.length);
-
-  return { success: true, data: { cards: allCards, total: allCards.length } };
-}
-*/
-
-
-//this works, but gets only first 100 items:
-export async function getWbProductCardsList(settings: any, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
-return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);}
-
-/*
-// Доработанная функция: offset-based пагинация по умолчанию, cursor как опция
-export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
-  let allCards: any[] = [];
-  const useCursor = settings.useCursor || false;  // Опция для cursor-mode
-  const limit = settings.limit || 200;  // Дефолт 200 для стабильности
-
-  if (useCursor) {
-    // Cursor-mode (для инкрементальных обновлений)
-    let cursor: any = { limit };
-    if (settings.updatedAt) cursor.updatedAt = settings.updatedAt;  // Опционально для старта с даты
-    let total = 0;
-
-    do {
-      const body = { ...settings, cursor };
-      delete body.useCursor;  // Удаляем опцию
-      const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
-      if (!res.success) return res;
-
-      const pageData = res.data;
-      allCards = [...allCards, ...pageData.cards];
-      total = pageData.cursor?.total || 0;
-      cursor = { ...pageData.cursor, limit };  // Восстанавливаем limit
-      logger.info(`Cursor page fetched: ${pageData.cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}`);
-    } while (total > allCards.length);
-
-  } else {
-    // Offset-based (для полного списка, надёжный)
-    let offset = 0;
-    const sortSettings = {
-      sort: settings.sort || "nmID",
-      order: settings.order || "asc",
-      ...settings,
+    total = pageData.cursor?.total || 0;  // cursor.total — кол-во оставшихся?
+    cursor = {
+      limit: cursor.limit,
+      updatedAt: pageData.cursor?.updatedAt,
+      nmID: pageData.cursor?.nmID,
     };
-    delete sortSettings.limit;  // Используем наш limit
-
-    while (true) {
-      const body = { ...sortSettings, limit, offset };
-      const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
-      if (!res.success) return res;
-
-      const pageData = res.data;
-      if (!pageData.cards || pageData.cards.length === 0) break;
-
-      allCards = [...allCards, ...pageData.cards];
-      logger.info(`Offset page fetched: ${pageData.cards.length} cards at offset ${offset}, total so far: ${allCards.length}`);
-
-      if (pageData.cards.length < limit) break;
-      offset += limit;
-    }
-  }
+    logger.info(`Page fetched: ${pageData.cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`);
+  } while (cursor.updatedAt && cursor.nmID && pageData.cards.length >= cursor.limit);  // Пока есть next и full page
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
 }
-*/
+
 // Новая helper: парсинг cards to minimal map {vendorCode: {nmID, barcodes: [], quantity: 0}}
 async function parseWbCardsToMinimal(cards: any[], warehouseId: string): Promise<{ [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } }> {
   const map: { [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
@@ -909,7 +868,7 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
 }
 
 // Update parseOzonToMinimal to use product list + stocks
-async function parseOzonToMinimal(products: any[], stocks: Stock[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
+async function parseOzonToMinimal(products: any[], stocks: { sku: string; amount: number }[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
   const map: { [offerId: string]: { product_id?: number; quantity: number } } = {};
 
   products.forEach((prod: any) => {
