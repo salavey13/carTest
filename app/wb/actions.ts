@@ -481,7 +481,13 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
 // New: Fetch stocks from WB
 export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
-  const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
+  let WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
+  if (!WB_WAREHOUSE_ID) {
+    const whRes = await getWbWarehouses();
+    if (whRes.success) {
+      WB_WAREHOUSE_ID = whRes.data?.find((w: any) => w.isActive)?.id.toString();
+    }
+  }
   logger.info(`fetchWbStocks start. WB_WAREHOUSE_ID: ${WB_WAREHOUSE_ID ? WB_WAREHOUSE_ID : "MISSING"}, tokenPresent: ${!!WB_TOKEN}`);
 
   if (!WB_TOKEN || !WB_WAREHOUSE_ID) {
@@ -713,15 +719,6 @@ export async function createWbProductCards(cards: any[]): Promise<{ success: boo
   return wbApiCall('/content/v2/cards/upload', 'POST', cards);
 }
 
-// Get Product Cards List
-/*
-export async function getWbProductCardsList(settings: any, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
-  return wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', settings);
-}
-*/
-
-
-
 // Исправленная функция для складов
 export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
@@ -810,33 +807,115 @@ async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId: string)
   }
 }
 
-// Аналог для Ozon: уже есть fetchOzonStocks, возвращает {sku (offer_id), amount}
-async function parseOzonToMinimal(stocks: Stock[]): Promise<{ [offerId: string]: { fbsSku?: number; quantity: number } }> {
-  const map: { [offerId: string]: { fbsSku?: number; quantity: number } } = {};
-  stocks.forEach(s => {
-    const id = s.sku.toLowerCase();
-    map[id] = { quantity: s.amount };  // fbsSku from another API if needed
+// Ozon: Fetch product list with pagination
+export async function getOzonProductList(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
+  const OZON_API_KEY = process.env.OZON_API_KEY;
+  if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, error: "Ozon credentials missing" };
+
+  try {
+    let allItems: any[] = [];
+    let last_id = "";
+    const limit = 1000;
+
+    while (true) {
+      const body = { filter: {}, last_id, limit };
+      const response = await fetch("https://api-seller.ozon.ru/v2/product/list", {
+        method: "POST",
+        headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        return { success: false, error: errData.error || "Ozon API error" };
+      }
+
+      const data = await response.json();
+      allItems = [...allItems, ...data.result.items];
+      last_id = data.result.last_id;
+      if (!last_id) break;
+    }
+
+    logger.info(`Fetched ${allItems.length} products from Ozon.`);
+    return { success: true, data: allItems };  // [{offer_id, product_id, ...}]
+  } catch (err) {
+    logger.error("getOzonProductList error:", err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// Update parseOzonToMinimal to use product list + stocks
+async function parseOzonToMinimal(products: any[], stocks: Stock[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
+  const map: { [offerId: string]: { product_id?: number; quantity: number } } = {};
+
+  products.forEach((prod: any) => {
+    const offerId = prod.offer_id.toLowerCase();
+    const stock = stocks.find(s => s.sku.toLowerCase() === offerId);
+    map[offerId] = { product_id: prod.product_id, quantity: stock?.amount || 0 };
   });
+
   return map;
 }
 
-// Новая: generate SQL from parsed data
-async function generateUpdateSql(): Promise<string> {
+// Новая: extract IDs from sources
+export async function extractIdsFromSources(): Promise<{
+  success: boolean;
+  wbIds: Set<string>;
+  ozonIds: Set<string>;
+  supaIds: Set<string>;
+  unmatched: { wb: string[]; ozon: string[]; supa: string[] };
+  error?: string;
+}> {
+  try {
+    // WB
+    const wbRes = await getWbProductCardsList();
+    const wbIds = new Set((wbRes.data?.cards || []).map((c: any) => c.vendorCode.toLowerCase()));
+
+    // Ozon
+    const ozonRes = await getOzonProductList();
+    const ozonIds = new Set((ozonRes.data || []).map((p: any) => p.offer_id.toLowerCase()));
+
+    // Supa
+    const supaRes = await getWarehouseItems();
+    const supaIds = new Set((supaRes.data || []).map((i: any) => i.id.toLowerCase()));
+
+    // Unmatched
+    const unmatchedWb = [...wbIds].filter(id => !supaIds.has(id));
+    const unmatchedOzon = [...ozonIds].filter(id => !supaIds.has(id));
+    const unmatchedSupa = [...supaIds].filter(id => !wbIds.has(id) && !ozonIds.has(id));
+
+    return {
+      success: true,
+      wbIds,
+      ozonIds,
+      supaIds,
+      unmatched: { wb: unmatchedWb, ozon: unmatchedOzon, supa: unmatchedSupa },
+    };
+  } catch (e: any) {
+    return { success: false, wbIds: new Set(), ozonIds: new Set(), supaIds: new Set(), unmatched: { wb: [], ozon: [], supa: [] }, error: e.message };
+  }
+}
+
+// Новая: generate SQL from parsed data, with manual map
+async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }; ozon: { [ozonOffer: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
   // Get warehouses
   const wbWhRes = await getWbWarehouses();
-  const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.[0]?.id) || "12345";
+  const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.find((w: any) => w.isActive)?.id) || "12345";
 
   const ozonWhId = process.env.OZON_WAREHOUSE_ID || "67890";
 
-  // Get all cards
+  // Get WB cards & parse
   const cardsRes = await getWbProductCardsList();
   if (!cardsRes.success) return "-- Error fetching WB cards";
-
   const wbMap = await parseWbCardsToMinimal(cardsRes.data.cards, wbWhId);
 
-  // Get Ozon stocks
-  const ozonRes = await fetchOzonStocks();
-  const ozonMap = ozonRes.success ? await parseOzonToMinimal(ozonRes.data || []) : {};
+  // Get Ozon products & stocks
+  const ozonProdRes = await getOzonProductList();
+  const ozonStockRes = await fetchOzonStocks();
+  const ozonMap = (ozonProdRes.success && ozonStockRes.success) 
+    ? await parseOzonToMinimal(ozonProdRes.data || [], ozonStockRes.data || []) 
+    : {};
 
   // Get local items from Supabase
   const localRes = await getWarehouseItems();
@@ -845,12 +924,20 @@ async function generateUpdateSql(): Promise<string> {
   const sqlLines: string[] = [];
   localRes.data?.forEach((item: any) => {
     const idLower = item.id.toLowerCase();
-    const wb = wbMap[idLower] || {};
-    const ozon = ozonMap[idLower] || {};
+    const wbVendor = [...Object.keys(wbMap), ...Object.keys(manualMap.wb)].find(k => k === idLower || manualMap.wb[k] === item.id) || idLower;
+    const ozonOffer = [...Object.keys(ozonMap), ...Object.keys(manualMap.ozon)].find(k => k === idLower || manualMap.ozon[k] === item.id) || idLower;
+
+    if (!wbMap[wbVendor] && !ozonMap[ozonOffer]) {
+      sqlLines.push(`-- Skipped unmatched item '${item.id}'`);
+      return;
+    }
+
+    const wb = wbMap[wbVendor] || {};
+    const ozon = ozonMap[ozonOffer] || {};
 
     const json = {
       wb_sku: wb.nmID || item.id,
-      ozon_sku: ozon.fbsSku || item.id,  // if no fbsSku, use id
+      ozon_sku: ozon.product_id || item.id,
       wb_warehouse_id: wbWhId,
       ozon_warehouse_id: ozonWhId,
       wb_api_quantity: wb.quantity || 0,
@@ -865,10 +952,10 @@ async function generateUpdateSql(): Promise<string> {
   return sqlLines.join("\n");
 }
 
-// Экспорт SQL (в тест page или где нужно)
-export async function getWarehouseSql(): Promise<{ success: boolean; sql?: string; error?: string }> {
+// Экспорт SQL
+export async function getWarehouseSql(manualMap?: { wb: { [key: string]: string }; ozon: { [key: string]: string } }): Promise<{ success: boolean; sql?: string; error?: string }> {
   try {
-    const sql = await generateUpdateSql();
+    const sql = await generateUpdateSql(manualMap);
     return { success: true, sql };
   } catch (e: any) {
     return { success: false, error: e.message };
