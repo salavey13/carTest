@@ -8,8 +8,21 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import Papa from "papaparse";
 import dns from "dns/promises";
 
-// Re-export all from content-actions to preserve imports
-export * from "./content-actions";
+// Explicit re-exports of async functions from content-actions to preserve imports
+export {
+  getWbParentCategories,
+  getWbSubjects,
+  getWbSubjectCharcs,
+  getWbColors,
+  getWbGenders,
+  getWbCountries,
+  getWbSeasons,
+  getWbVat,
+  getWbTnved,
+  generateWbBarcodes,
+  createWbProductCards,
+  getWbProductCardsList
+} from "./content-actions";
 
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
