@@ -8,6 +8,9 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import Papa from "papaparse";
 import dns from "dns/promises";
 
+// Re-export all from content-actions to preserve imports
+export * from "./content-actions";
+
 // Helper function to generate image URL
 const generateImageUrl = (id: string): string => {
   const baseURL = (process.env.NEXT_PUBLIC_SUPABASE_URL || "")
@@ -372,7 +375,7 @@ export async function updateItemMinQty(
   }
 }
 
-// WB Sync
+// WB Sync (to platform from Supabase)
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -390,13 +393,25 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: error?.message || "No items found" };
     }
 
-    const stocks = items.map(i => ({
-      sku: (i.specs?.wb_sku as string) || i.id,
-      amount: (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0),
-      warehouseId: parseInt((i.specs?.wb_warehouse_id as string) || WB_WAREHOUSE_ID, 10),
-    }));
+    const stocks = items
+      .map(i => {
+        const sku = i.specs?.wb_sku as string | undefined;
+        if (!sku) {
+          logger.warn(`Skipping item ${i.id} without wb_sku in specs.`);
+          return null;
+        }
+        const amount = (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0);
+        const warehouseId = parseInt((i.specs?.wb_warehouse_id as string) || WB_WAREHOUSE_ID, 10);
+        return { sku, amount, warehouseId };
+      })
+      .filter(Boolean) as { sku: string; amount: number; warehouseId: number }[];
 
-    const url = "https://suppliers-api.wildberries.ru/api/v5/stocks";
+    if (stocks.length === 0) {
+      logger.warn("No items with wb_sku to sync.");
+      return { success: false, error: "No syncable items (check wb_sku setup)" };
+    }
+
+    const url = "https://suppliers-api.wildberries.ru/api/v3/stocks";
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
     logger.info("syncWbStocks -> About to POST", {
@@ -414,31 +429,26 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       logger.warn("syncWbStocks DNS lookup failed", dnsErr?.code || dnsErr?.message || dnsErr);
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ stocks }),
-      signal: controller.signal,
+    const response = await withRetry(async () => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify({ stocks }),
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return res;
     });
 
-    clearTimeout(timeout);
-
+    const text = await response.text();
     let parsed;
     try {
-      parsed = await response.json();
+      parsed = JSON.parse(text);
     } catch (e) {
-      logger.error("syncWbStocks: failed to parse JSON response", { status: response.status, statusText: response.statusText });
-      return { success: false, error: `WB API returned non-JSON (status ${response.status})` };
+      logger.error("syncWbStocks: failed to parse JSON response", { text });
+      return { success: false, error: "Invalid JSON from WB" };
     }
 
     logger.info("syncWbStocks response", { status: response.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
-
-    if (!response.ok) {
-      return { success: false, error: parsed?.errorText || parsed?.error || `WB API error status ${response.status}` };
-    }
 
     if (parsed?.error) {
       return { success: false, error: parsed?.errorText || parsed?.error };
@@ -455,7 +465,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
   }
 }
 
-// Ozon Sync
+// Ozon Sync (to platform from Supabase)
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -472,20 +482,102 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
   }));
 
   try {
-    const response = await fetch("https://api-seller.ozon.ru/v3/products/stocks", {
-      method: "POST",
-      headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ stocks }),
+    const response = await withRetry(async () => {
+      const res = await fetch("https://api-seller.ozon.ru/v3/products/stocks", {
+        method: "POST",
+        headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ stocks }),
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return res;
     });
-    const data = await response.json();
+
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      logger.error("syncOzonStocks: failed to parse JSON response", { text });
+      return { success: false, error: "Invalid JSON from Ozon" };
+    }
+
     if (data.result?.errors?.length > 0) return { success: false, error: data.result.errors[0].message };
     return { success: true };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
+  } catch (err: any) {
+    logger.error("syncOzonStocks error:", err);
+    return { success: false, error: err.message };
   }
 }
 
-// New: Fetch stocks from WB (simple, returns all skus amounts for provided sku list)
+// New: Setup WB barcodes (sku) in Supabase specs
+export async function setWbBarcodes(): Promise<{ success: boolean; updated?: number; error?: string }> {
+  try {
+    const cardsRes = await getWbProductCardsList();
+    if (!cardsRes.success) return { success: false, error: cardsRes.error || "Failed to fetch WB cards" };
+
+    const cards = cardsRes.data.cards || [];
+
+    const localRes = await getWarehouseItems();
+    if (!localRes.success) return { success: false, error: localRes.error || "Failed to fetch local items" };
+
+    const updates: any[] = [];
+
+    for (const card of cards) {
+      const vc = (card.vendorCode || "").toLowerCase();
+      const item = localRes.data?.find(i => i.id.toLowerCase() === vc);
+      if (!item) {
+        logger.debug(`No local item for WB vendorCode ${vc}`);
+        continue;
+      }
+
+      const sizes = Array.isArray(card.sizes) ? card.sizes : [];
+      const barcodes: string[] = sizes.flatMap((size: any) => Array.isArray(size.skus) ? size.skus : []);
+
+      if (barcodes.length === 0) {
+        logger.warn(`No barcodes for card ${vc}`);
+        continue;
+      }
+
+      // Take first barcode as main wb_sku, save all as wb_barcodes
+      const specs = { ...item.specs, wb_sku: barcodes[0], wb_barcodes: barcodes };
+
+      updates.push({
+        id: item.id,
+        specs,
+      });
+    }
+
+    if (updates.length > 0) {
+      const { error } = await supabaseAdmin.from("cars").upsert(updates, { onConflict: "id" });
+      if (error) throw error;
+      logger.info(`Updated ${updates.length} items with WB barcodes.`);
+    } else {
+      logger.info("No updates needed for WB barcodes.");
+    }
+
+    return { success: true, updated: updates.length };
+  } catch (e: any) {
+    logger.error("setWbBarcodes error:", e);
+    return { success: false, error: e.message || "Unknown error setting WB barcodes" };
+  }
+}
+
+// Helper: Retry wrapper for fetches
+async function withRetry<T>(fn: () => Promise<T>, retries: number = 3, delayMs: number = 1000): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      logger.warn(`Retry ${i + 1}/${retries} failed: ${e?.message || e}`);
+      await new Promise(resolve => setTimeout(resolve, delayMs * (i + 1)));
+    }
+  }
+  throw lastError;
+}
+
+// WB Fetch stocks (with retry and safe parse)
 export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   let WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -509,13 +601,14 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
       return { success: false, error: "No local items" };
     }
 
-    const skus = items.map(i => (i.specs?.wb_sku as string) || i.id);
+    const skus = items.map(i => (i.specs?.wb_sku as string) || i.id).filter(Boolean);
+    if (skus.length === 0) {
+      logger.warn("fetchWbStocks: no skus/barcodes available");
+      return { success: false, error: "No skus for fetch (setup barcodes first)" };
+    }
+
     const url = `https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
-
-    if (isNaN(Number(WB_WAREHOUSE_ID))) {
-      logger.warn("fetchWbStocks: WB_WAREHOUSE_ID is not numeric", { WB_WAREHOUSE_ID });
-    }
 
     logger.info("fetchWbStocks -> About to POST", {
       url,
@@ -532,35 +625,30 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
       logger.warn("fetchWbStocks DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message });
     }
 
-    const body = { skus };
-    const bodyStr = JSON.stringify(body);
-    logger.debug("fetchWbStocks request body (truncated)", { bodySample: bodyStr.slice(0, 4000) });
+    const bodyStr = JSON.stringify({ skus });
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
-      body: bodyStr,
-      signal: controller.signal,
+    const response = await withRetry(async () => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Authorization": WB_TOKEN, "Content-Type": "application/json" },
+        body: bodyStr,
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`WB returned ${res.status}: ${errText}`);
+      }
+      return res;
     });
 
-    clearTimeout(timeout);
-
-    if (!response.ok) {
-      let errData;
-      try {
-        errData = await response.json();
-      } catch (parseErr) {
-        logger.error("fetchWbStocks: failed to parse error body", { status: response.status, statusText: response.statusText });
-        return { success: false, error: `WB API returned status ${response.status}` };
-      }
-      logger.error("fetchWbStocks: WB API returned non-OK", { status: response.status, bodySample: JSON.stringify(errData).slice(0, 2000) });
-      return { success: false, error: errData?.error || errData?.errorText || `WB API error ${response.status}` };
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      logger.error("fetchWbStocks: invalid JSON", { text });
+      return { success: false, error: "Invalid JSON from WB" };
     }
 
-    const data = await response.json();
     if (!data || !Array.isArray(data.stocks)) {
       logger.warn("fetchWbStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) });
       return { success: false, error: "WB returned unexpected payload" };
@@ -579,7 +667,7 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
   }
 }
 
-// New: Fetch stocks from Ozon
+// Ozon Fetch stocks (with retry and safe parse)
 export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -602,18 +690,28 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
         limit,
       };
 
-      const response = await fetch("https://api-seller.ozon.ru/v4/product/info/stocks", {
-        method: "POST",
-        headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const response = await withRetry(async () => {
+        const res = await fetch("https://api-seller.ozon.ru/v4/product/info/stocks", {
+          method: "POST",
+          headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Ozon returned ${res.status}: ${errText}`);
+        }
+        return res;
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        return { success: false, error: errData.error || "Ozon API error" };
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        logger.error("fetchOzonStocks: invalid JSON", { text });
+        return { success: false, error: "Invalid JSON from Ozon" };
       }
 
-      const data = await response.json();
       const itemsStocks = data.result.items.flatMap((item: any) =>
         item.stocks.map((stock: any) => ({
           sku: item.offer_id,
@@ -629,103 +727,10 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
 
     logger.info(`Fetched ${allStocks.length} stocks from Ozon.`);
     return { success: true, data: allStocks };
-  } catch (err) {
+  } catch (err: any) {
     logger.error("fetchOzonStocks error:", err);
-    return { success: false, error: (err as Error).message };
+    return { success: false, error: err.message };
   }
-}
-
-// --- WB Content API wrappers & helpers ---
-
-const WB_CONTENT_TOKEN = process.env.WB_CONTENT_TOKEN;
-
-async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, token: string = WB_CONTENT_TOKEN) {
-  try {
-    const response = await fetch(`https://content-api.wildberries.ru${endpoint}`, {
-      method,
-      headers: {
-        "Authorization": token,
-        "Content-Type": "application/json",
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!response.ok) {
-      let errText;
-      try {
-        const errData = await response.json();
-        errText = errData.errorText || errData.error || "WB API error";
-      } catch {
-        errText = await response.text() || "Unknown error";
-      }
-      logger.error(`wbApiCall failed: ${response.status} - ${errText}`);
-      return { success: false, error: errText };
-    }
-    const data = await response.json();
-    return { success: true, data };
-  } catch (err) {
-    logger.error("wbApiCall network error:", err);
-    return { success: false, error: (err as Error).message };
-  }
-}
-
-// Get Products Parent Categories
-export async function getWbParentCategories(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  return wbApiCall(`/content/v2/object/parent/all?locale=${locale}`);
-}
-
-// Get Subjects List
-export async function getWbSubjects(locale: string = 'ru', name?: string, limit: number = 30, offset: number = 0, parentID?: number): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  let query = `/content/v2/object/all?locale=${locale}&limit=${limit}&offset=${offset}`;
-  if (name) query += `&name=${encodeURIComponent(name)}`;
-  if (parentID) query += `&parentID=${parentID}`;
-  return wbApiCall(query);
-}
-
-// Get Subject Characteristics
-export async function getWbSubjectCharcs(subjectId: number, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  return wbApiCall(`/content/v2/object/charcs/${subjectId}?locale=${locale}`);
-}
-
-// Get Colors
-export async function getWbColors(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  return wbApiCall(`/content/v2/directory/colors?locale=${locale}`);
-}
-
-// Get Genders
-export async function getWbGenders(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  return wbApiCall(`/content/v2/directory/kinds?locale=${locale}`);
-}
-
-// Get Countries
-export async function getWbCountries(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  return wbApiCall(`/content/v2/directory/countries?locale=${locale}`);
-}
-
-// Get Seasons
-export async function getWbSeasons(locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  return wbApiCall(`/content/v2/directory/seasons?locale=${locale}`);
-}
-
-// Get VAT Rates
-export async function getWbVat(locale: string = 'ru'): Promise<{ success: boolean; data?: string[]; error?: string }> {
-  return wbApiCall(`/content/v2/directory/vat?locale=${locale}`);
-}
-
-// Get HS Codes
-export async function getWbTnved(subjectID: number, search?: string, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
-  let query = `/content/v2/directory/tnved?subjectID=${subjectID}&locale=${locale}`;
-  if (search) query += `&search=${search}`;
-  return wbApiCall(query);
-}
-
-// Generate Barcodes
-export async function generateWbBarcodes(count: number = 1): Promise<{ success: boolean; data?: string[]; error?: string }> {
-  return wbApiCall('/content/v2/barcodes', 'POST', { count });
-}
-
-// Create Product Cards
-export async function createWbProductCards(cards: any[]): Promise<{ success: boolean; error?: string }> {
-  return wbApiCall('/content/v2/cards/upload', 'POST', cards);
 }
 
 // Get warehouses list (suppliers-api)
@@ -749,42 +754,6 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
   }
 }
 
-// Get product cards list (cursor-based)
-export async function getWbProductCardsList(settings: any = {}, locale: string = 'ru'): Promise<{ success: boolean; data?: any; error?: string }> {
-  let allCards: any[] = [];
-  let cursor: any = { limit: Math.min(settings.limit || 100, 100) };  // Clamp <=100
-  let total = 0;
-  let pageData: any = null;
-
-  do {
-    const effectiveSettings = {
-      ...settings,
-      filter: settings.filter || { withPhoto: -1 },
-      cursor,
-    };
-    const body = { settings: effectiveSettings };
-
-    const res = await wbApiCall(`/content/v2/get/cards/list?locale=${locale}`, 'POST', body);
-    if (!res.success) return res;
-
-    pageData = res.data || {};
-    const cards = Array.isArray(pageData.cards) ? pageData.cards : [];
-
-    allCards = [...allCards, ...cards];
-    total = pageData.cursor?.total ?? total;
-
-    cursor = {
-      limit: cursor.limit,
-      updatedAt: pageData.cursor?.updatedAt,
-      nmID: pageData.cursor?.nmID,
-    };
-
-    logger.info(`Page fetched: ${cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`);
-  } while ((cursor.updatedAt && cursor.nmID) && ((pageData?.cards?.length ?? 0) >= cursor.limit));
-
-  return { success: true, data: { cards: allCards, total: allCards.length } };
-}
-
 // Ozon: Fetch product list with pagination
 export async function getOzonProductList(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
@@ -798,18 +767,28 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
 
     while (true) {
       const body = { filter: {}, last_id, limit };
-      const response = await fetch("https://api-seller.ozon.ru/v2/product/list", {
-        method: "POST",
-        headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const response = await withRetry(async () => {
+        const res = await fetch("https://api-seller.ozon.ru/v2/product/list", {
+          method: "POST",
+          headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Ozon returned ${res.status}: ${errText}`);
+        }
+        return res;
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        return { success: false, error: errData.error || "Ozon API error" };
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        logger.error("getOzonProductList: invalid JSON", { text });
+        return { success: false, error: "Invalid JSON from Ozon" };
       }
 
-      const data = await response.json();
       allItems = [...allItems, ...data.result.items];
       last_id = data.result.last_id;
       if (!last_id) break;
@@ -817,7 +796,7 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
 
     logger.info(`Fetched ${allItems.length} products from Ozon.`);
     return { success: true, data: allItems };  // [{offer_id, product_id, ...}]
-  } catch (err) {
+  } catch (err: any) {
     logger.error("getOzonProductList error:", err);
     return { success: false, error: (err as Error).message };
   }
@@ -875,7 +854,7 @@ export async function extractIdsFromSources(): Promise<{
 
 // Simplified generateUpdateSql (production-safe): does not call heavy warehouse enumeration.
 // Uses vendorCode -> nmID mapping from WB cards and local items. Quantities are best-effort (0 if unknown).
-async function generateUpdateSql(manualMap: { wb: { [wbVendor: string]: string }; ozon: { [ozonOffer: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
+async function generateUpdateSql(manualMap: { wb: { [key: string]: string }; ozon: { [key: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
   const wbWhRes = await getWbWarehouses();
   const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.find((w: any) => w.isActive)?.id) || "12345";
   const ozonWhId = process.env.OZON_WAREHOUSE_ID || "67890";
