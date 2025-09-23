@@ -29,20 +29,20 @@ export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId?:
       });
       if (!res.ok) {
         const text = await res.text().catch(() => "no-body");
-        logger.warn(`WB stocks for warehouse ${whId} returned status ${res.status}: ${text}`);
+        console.warn(`WB stocks for warehouse ${whId} returned status ${res.status}: ${text}`); // enhanced log
         return { ok: false, stocks: [] as any[] };
       }
       const json = await res.json();
       return { ok: true, stocks: Array.isArray(json.stocks) ? json.stocks : [] };
     } catch (e: any) {
-      logger.warn(`Network error fetching stocks for warehouse ${whId}: ${e?.message || e}`);
+      console.warn(`Network error fetching stocks for warehouse ${whId}: ${e?.message || e}`); // enhanced log
       return { ok: false, stocks: [] as any[] };
     }
   };
 
   try {
     if (warehouseId) {
-      logger.info(`fetchWbStocksForBarcodes: using provided warehouseId ${warehouseId}`);
+      console.info(`fetchWbStocksForBarcodes: using provided warehouseId ${warehouseId}`); // enhanced log
       const single = await doRequestForWarehouse(warehouseId);
       if (!single.ok) return { success: false, error: `WB returned non-OK for warehouse ${warehouseId}` };
       const mapped = (single.stocks || []).map((s: any) => ({ sku: String(s.sku), amount: Number(s.amount || 0) }));
@@ -51,7 +51,7 @@ export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId?:
 
     const whRes = await getWbWarehouses();
     if (!whRes.success || !Array.isArray(whRes.data) || whRes.data.length === 0) {
-      logger.warn("fetchWbStocksForBarcodes: no warehouses found via API; falling back to env WB_WAREHOUSE_ID if set");
+      console.warn("fetchWbStocksForBarcodes: no warehouses found via API; falling back to env WB_WAREHOUSE_ID if set"); // enhanced log
       const envWh = process.env.WB_WAREHOUSE_ID;
       if (envWh) {
         const single = await doRequestForWarehouse(envWh);
@@ -69,16 +69,16 @@ export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId?:
     }
 
     const warehouses = [...whRes.data].sort((a: any, b: any) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0));
-    logger.info(`fetchWbStocksForBarcodes: discovered ${warehouses.length} warehouses; trying in order (active first). IDs: ${warehouses.map((w:any)=>w.id).join(",")}`);
+    console.info(`fetchWbStocksForBarcodes: discovered ${warehouses.length} warehouses; trying in order (active first). IDs: ${warehouses.map((w:any)=>w.id).join(",")}`); // enhanced log
 
     const perSkuTotals = new Map<string, number>();
     const warehousesInfo: { id: string; nonZeroCount: number; totalAmount: number }[] = [];
 
     try {
       const lookup = await dns.lookup("suppliers-api.wildberries.ru");
-      logger.info("fetchWbStocksForBarcodes DNS lookup result", lookup);
+      console.info("fetchWbStocksForBarcodes DNS lookup result", lookup); // enhanced log
     } catch (dnsErr: any) {
-      logger.warn("fetchWbStocksForBarcodes DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message });
+      console.warn("fetchWbStocksForBarcodes DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message }); // enhanced log
     }
 
     for (const wh of warehouses) {
@@ -91,15 +91,17 @@ export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId?:
       const stocks: any[] = resp.stocks || [];
       let nonZero = 0;
       let totalAmount = 0;
+      let matchedBarcodes = 0;
       stocks.forEach(s => {
         const sku = String(s.sku);
         const amt = Number(s.amount || 0);
         perSkuTotals.set(sku, (perSkuTotals.get(sku) || 0) + amt);
         if (amt > 0) nonZero++;
         totalAmount += amt;
+        if (barcodes.includes(sku)) matchedBarcodes++; // check if matched our barcodes
       });
       warehousesInfo.push({ id: whId, nonZeroCount: nonZero, totalAmount });
-      logger.info(`fetchWbStocksForBarcodes: warehouse ${whId} -> nonZero ${nonZero}, totalAmount ${totalAmount}`);
+      console.info(`fetchWbStocksForBarcodes: warehouse ${whId} -> nonZero ${nonZero}, totalAmount ${totalAmount}, matched barcodes ${matchedBarcodes}/${barcodes.length}`); // enhanced log
     }
 
     warehousesInfo.sort((a, b) => {
@@ -110,16 +112,23 @@ export async function fetchWbStocksForBarcodes(barcodes: string[], warehouseId?:
     let chosen: string | null = null;
     if (warehousesInfo.length > 0 && warehousesInfo[0].nonZeroCount > 0) {
       chosen = warehousesInfo[0].id;
-      logger.info(`fetchWbStocksForBarcodes: chosen warehouse ${chosen} (best non-zero coverage)`);
+      console.info(`fetchWbStocksForBarcodes: chosen warehouse ${chosen} (best non-zero coverage)`); // enhanced log
     } else if (warehousesInfo.length > 0) {
       chosen = warehousesInfo[0].id;
-      logger.info(`fetchWbStocksForBarcodes: no non-zero stocks found; choosing ${chosen} as fallback`);
+      console.info(`fetchWbStocksForBarcodes: no non-zero stocks found; choosing ${chosen} as fallback`); // enhanced log
+    } else {
+      console.warn("No warehouses responded with data"); // enhanced log
     }
 
     const combined = Array.from(perSkuTotals.entries()).map(([sku, amount]) => ({ sku, amount }));
+    console.info(`fetchWbStocksForBarcodes: final totals - non-zero SKUs: ${combined.filter(c => c.amount > 0).length}, total amount: ${combined.reduce((sum, c) => sum + c.amount, 0)}`); // enhanced log
+    if (combined.filter(c => c.amount > 0).length === 0) {
+      console.warn("No stock found for any barcode across all warehouses — check barcodes or token/warehouse access"); // enhanced log
+    }
+
     return { success: true, data: combined, chosenWarehouseId: chosen, warehousesInfo };
   } catch (e: any) {
-    logger.error("fetchWbStocksForBarcodes error:", e);
+    console.error("fetchWbStocksForBarcodes error:", e); // enhanced log
     return { success: false, error: e?.message || "Unknown error fetching WB stocks for barcodes" };
   }
 }
@@ -141,19 +150,19 @@ export async function parseWbCardsToMinimal(cards: any[], warehouseId?: string):
     const map: { [vendorCode: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
     cards.forEach((card: any) => {
       const vc = (card.vendorCode || "").toLowerCase();
-      const barcodes: string[] = Array.isArray(card.sizes) ? card.sizes.flatMap((size: any) => size.skus || []) : [];
+      const barcodes: string[] = Array.isArray(card.sizes) ? card.sizes.flatMap((size: any) => Array.isArray(size.skus) ? size.skus : []) : [];
       map[vc] = { nmID: card.nmID, barcodes, quantity: 0 };
     });
 
     const allBarcodes = Object.values(map).flatMap(m => m.barcodes);
     if (allBarcodes.length === 0) {
-      logger.info("parseWbCardsToMinimal: no barcodes in cards; returning map with zero quantities");
+      console.info("parseWbCardsToMinimal: no barcodes in cards; returning map with zero quantities"); // enhanced log
       return { success: true, map, chosenWarehouseId: null, warehousesInfo: [] };
     }
 
     const stocksRes = await fetchWbStocksForBarcodes(allBarcodes, warehouseId);
     if (!stocksRes.success || !stocksRes.data) {
-      logger.warn("parseWbCardsToMinimal: failed to fetch stocks", { error: stocksRes.error });
+      console.warn("parseWbCardsToMinimal: failed to fetch stocks", { error: stocksRes.error }); // enhanced log
       return { success: true, map, chosenWarehouseId: stocksRes.chosenWarehouseId ?? null, warehousesInfo: stocksRes.warehousesInfo ?? [] };
     }
 
@@ -168,9 +177,10 @@ export async function parseWbCardsToMinimal(cards: any[], warehouseId?: string):
       info.quantity = sum;
     });
 
+    console.info(`parseWbCardsToMinimal: aggregated quantities for ${Object.keys(map).length} vendorCodes, total stock: ${Object.values(map).reduce((sum, m) => sum + m.quantity, 0)}`); // enhanced log
     return { success: true, map, chosenWarehouseId: stocksRes.chosenWarehouseId ?? null, warehousesInfo: stocksRes.warehousesInfo ?? [] };
   } catch (e: any) {
-    logger.error("parseWbCardsToMinimal error:", e);
+    console.error("parseWbCardsToMinimal error:", e); // enhanced log
     return { success: false, error: e?.message || "Unknown error in parseWbCardsToMinimal" };
   }
 }
@@ -200,7 +210,7 @@ export async function fetchWbCardsWithWarehouseInfo(warehouseId?: string): Promi
       error: parsed.error,
     };
   } catch (e: any) {
-    logger.error("fetchWbCardsWithWarehouseInfo error:", e);
+    console.error("fetchWbCardsWithWarehouseInfo error:", e); // enhanced log
     return { success: false, error: e?.message || "Unknown error in fetchWbCardsWithWarehouseInfo" };
   }
 }
