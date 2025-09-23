@@ -83,13 +83,14 @@ export default function WarehouseTestPage(): JSX.Element {
           return {
             vendorCode: c.vendorCode,
             nmID: c.nmID,
+            barcodes: mm.barcodes || [],
             quantity: mm.quantity || 0,
           };
         });
         setWbCards(rows);
         setWarehousesInfoLog(res.warehousesInfo || []);
         setChosenWarehouseLog(res.chosenWarehouseId ?? null);
-        toast.success(`Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length })`);
+        toast.success(`Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length }, chosen: ${res.chosenWarehouseId || 'auto'}. Quantities: ${rows.reduce((sum, r) => sum + r.quantity, 0)} total)`);
       } else {
         toast.error(res?.error ?? "Ошибка при загрузке карточек WB");
       }
@@ -107,12 +108,13 @@ export default function WarehouseTestPage(): JSX.Element {
       if (res?.success) {
         const stockRes = await fetchOzonStocks();
         const stocksMap = new Map((stockRes.data || []).map(s => [s.sku.toLowerCase(), s.amount]));
-        setOzonProducts(res.data.map((p: any) => ({
+        const mapped = res.data.map((p: any) => ({
           offer_id: p.offer_id,
           product_id: p.product_id,
           quantity: stocksMap.get(p.offer_id.toLowerCase()) || 0,
-        })));
-        toast.success(`Загружено ${res.data.length} продуктов Ozon`);
+        }));
+        setOzonProducts(mapped);
+        toast.success(`Загружено ${res.data.length} продуктов Ozon (total qty: ${mapped.reduce((sum, p) => sum + p.quantity, 0)})`);
       } else {
         toast.warn(res?.error ?? "No Ozon keys, skipping");
         setOzonProducts([]);
@@ -321,7 +323,7 @@ export default function WarehouseTestPage(): JSX.Element {
         </CardHeader>
         <CardContent className="text-xs space-y-2">
           <p>0. Setup ENV: Убедись в .env WB_CONTENT_TOKEN, WB_API_TOKEN для WB; OZON_CLIENT_ID, OZON_API_KEY для Ozon. Warehouse IDs optional — auto first active. </p>
-          <p>1. Fetch WB Cards — полная пагинация, vendorCode/nmID/quantity (парсер тестовой страницы может проверить все склады по barcode'ам и выбрать лучший).</p>
+          <p>1. Fetch WB Cards — полная пагинация, vendorCode/nmID/barcodes/quantity (multi-warehouse logic for stocks).</p>
           <p>2. Fetch Ozon Products — offer_id/product_id/quantity. Skip if no keys — toast warn.</p>
           <p>3. Fetch Supa Items — id из wb_item. Must for matching.</p>
           <p>4. Extract & Match IDs — auto-match по lower, show unmatched tables. Select to manual match.</p>
@@ -348,6 +350,7 @@ export default function WarehouseTestPage(): JSX.Element {
                   <TableRow>
                     <TableHead>VendorCode</TableHead>
                     <TableHead>nmID</TableHead>
+                    <TableHead>Barcodes Count</TableHead>
                     <TableHead>Qty</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -356,6 +359,7 @@ export default function WarehouseTestPage(): JSX.Element {
                     <TableRow key={idx}>
                       <TableCell>{c.vendorCode}</TableCell>
                       <TableCell>{c.nmID}</TableCell>
+                      <TableCell>{c.barcodes.length}</TableCell>
                       <TableCell>{c.quantity}</TableCell>
                     </TableRow>
                   ))}

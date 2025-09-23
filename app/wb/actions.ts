@@ -11,7 +11,6 @@ import dns from "dns/promises";
 // WB Content API wrappers & helpers
 const WB_CONTENT_TOKEN = process.env.WB_CONTENT_TOKEN;
 
-
 async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, token: string = WB_CONTENT_TOKEN) {
   try {
     const response = await fetch(`https://content-api.wildberries.ru${endpoint}`, {
@@ -30,13 +29,13 @@ async function wbApiCall(endpoint: string, method: string = 'GET', body?: any, t
       } catch {
         errText = await response.text() || "Unknown error";
       }
-      logger.error(`wbApiCall failed: ${response.status} - ${errText}`);
+      console.warn(`wbApiCall failed: ${response.status} - ${errText}`); // logger -> console for stability
       return { success: false, error: errText };
     }
     const data = await response.json();
     return { success: true, data };
   } catch (err) {
-    logger.error("wbApiCall network error:", err);
+    console.error("wbApiCall network error:", err); // logger -> console
     return { success: false, error: (err as Error).message };
   }
 }
@@ -131,7 +130,7 @@ export async function getWbProductCardsList(settings: any = {}, locale: string =
       nmID: pageData.cursor?.nmID,
     };
 
-    logger.info(`Page fetched: ${cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`);
+    console.info(`Page fetched: ${cards.length} cards, total so far: ${allCards.length}, next cursor: ${JSON.stringify(cursor)}, response total: ${total}`); // logger -> console
   } while ((cursor.updatedAt && cursor.nmID) && ((pageData?.cards?.length ?? 0) >= cursor.limit));
 
   return { success: true, data: { cards: allCards, total: allCards.length } };
@@ -231,10 +230,10 @@ export async function getWarehouseItems(): Promise<{
       .eq("type", "wb_item")
       .order("model");
     if (error) throw error;
-    logger.info(`Fetched ${data?.length || 0} warehouse items from Supabase.`);
+    console.info(`Fetched ${data?.length || 0} warehouse items from Supabase.`); // logger -> console
     return { success: true, data };
   } catch (error) {
-    logger.error("[getWarehouseItems] Error:", error);
+    console.error("[getWarehouseItems] Error:", error); // logger -> console
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
 }
@@ -256,7 +255,7 @@ export async function uploadWarehouseCsv(
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   const isAdmin = await verifyAdmin(userId);
   if (!isAdmin) {
-    logger.warn(`Unauthorized warehouse CSV upload by ${userId || 'Unknown'}`);
+    console.warn(`Unauthorized warehouse CSV upload by ${userId || 'Unknown'}`); // logger -> console
     return { success: false, error: "Permission denied. Admin required." };
   }
 
@@ -266,13 +265,13 @@ export async function uploadWarehouseCsv(
 
   try {
     const itemIds = batch.map((row: any) => (row["Артикул"] || row["id"])?.toLowerCase()).filter(Boolean);
-    logger.info(`Fetching existing items for ${itemIds.length} IDs.`);
+    console.info(`Fetching existing items for ${itemIds.length} IDs.`); // logger -> console
     const { data: existingItems } = await supabaseAdmin.from("cars").select("*").in("id", itemIds);
 
     const itemsToUpsertPromises = batch.map(async (row: any) => {
       const itemId = (row["Артикул"] || row["id"])?.toLowerCase();
       if (!itemId) {
-        logger.warn(`Skipping row without id/Артикул: ${JSON.stringify(row)}`);
+        console.warn(`Skipping row without id/Артикул: ${JSON.stringify(row)}`); // logger -> console
         return null;
       }
 
@@ -323,7 +322,7 @@ export async function uploadWarehouseCsv(
         itemToUpsert.specs = { ...existingItem.specs, ...itemToUpsert.specs };
       }
 
-      logger.info(`Prepared upsert for ${itemId} with quantity ${quantity}: ${JSON.stringify(itemToUpsert)}`);
+      console.info(`Prepared upsert for ${itemId} with quantity ${quantity}: ${JSON.stringify(itemToUpsert)}`); // logger -> console
       return itemToUpsert;
     });
 
@@ -332,14 +331,14 @@ export async function uploadWarehouseCsv(
 
     if (itemsToUpsert.length === 0) return { success: false, error: "No valid items" };
 
-    logger.info(`Upserting ${itemsToUpsert.length} items to Supabase.`);
+    console.info(`Upserting ${itemsToUpsert.length} items to Supabase.`); // logger -> console
     const { error } = await supabaseAdmin.from("cars").upsert(itemsToUpsert, { onConflict: "id" });
 
     if (error) throw error;
 
     return { success: true, message: `Upserted ${itemsToUpsert.length} items.` };
   } catch (error) {
-    logger.error("Upload error:", error);
+    console.error("Upload error:", error); // logger -> console
     return { success: false, error: (error as Error).message };
   }
 }
@@ -357,12 +356,12 @@ export async function updateItemLocationQty(
       .single();
 
     if (selectError) {
-      logger.error(`Error fetching item ${itemId} for location update:`, selectError);
+      console.error(`Error fetching item ${itemId} for location update:`, selectError); // logger -> console
       return { success: false, error: `Failed to fetch item: ${selectError.message}` };
     }
 
     if (!existingItem?.specs) {
-      logger.warn(`Item ${itemId} not found or missing specs.`);
+      console.warn(`Item ${itemId} not found or missing specs.`); // logger -> console
       return { success: false, error: "Item not found or missing specs." };
     }
 
@@ -390,14 +389,14 @@ export async function updateItemLocationQty(
       .eq("id", itemId);
 
     if (updateError) {
-      logger.error(`Error updating item ${itemId} location ${voxelId}:`, updateError);
+      console.error(`Error updating item ${itemId} location ${voxelId}:`, updateError); // logger -> console
       return { success: false, error: `Failed to update item: ${updateError.message}` };
     }
 
-    logger.info(`Successfully updated item ${itemId} location ${voxelId} by ${delta}. New total: ${totalQuantity}`);
+    console.info(`Successfully updated item ${itemId} location ${voxelId} by ${delta}. New total: ${totalQuantity}`); // logger -> console
     return { success: true };
   } catch (error) {
-    logger.error("Error in updateItemLocationQty:", error);
+    console.error("Error in updateItemLocationQty:", error); // logger -> console
     return { success: false, error: (error as Error).message };
   }
 }
@@ -471,12 +470,12 @@ export async function updateItemMinQty(
       .single();
 
     if (selectError) {
-      logger.error(`Error fetching item ${itemId} for min_qty update:`, selectError);
+      console.error(`Error fetching item ${itemId} for min_qty update:`, selectError); // logger -> console
       return { success: false, error: `Failed to fetch item: ${selectError.message}` };
     }
 
     if (!existingItem?.specs) {
-      logger.warn(`Item ${itemId} not found or missing specs.`);
+      console.warn(`Item ${itemId} not found or missing specs.`); // logger -> console
       return { success: false, error: "Item not found or missing specs." };
     }
 
@@ -489,14 +488,14 @@ export async function updateItemMinQty(
       .eq("id", itemId);
 
     if (updateError) {
-      logger.error(`Error updating item ${itemId} min_qty:`, updateError);
+      console.error(`Error updating item ${itemId} min_qty:`, updateError); // logger -> console
       return { success: false, error: `Failed to update item: ${updateError.message}` };
     }
 
-    logger.info(`Successfully updated item ${itemId} min_qty to ${minQty}.`);
+    console.info(`Successfully updated item ${itemId} min_qty to ${minQty}.`); // logger -> console
     return { success: true };
   } catch (error) {
-    logger.error("Error in updateItemMinQty:", error);
+    console.error("Error in updateItemMinQty:", error); // logger -> console
     return { success: false, error: (error as Error).message };
   }
 }
@@ -505,17 +504,17 @@ export async function updateItemMinQty(
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
-  logger.info(`syncWbStocks start. WB_WAREHOUSE_ID present: ${!!WB_WAREHOUSE_ID}, WB_TOKEN present: ${!!WB_TOKEN}`);
+  console.info(`syncWbStocks start. WB_WAREHOUSE_ID present: ${!!WB_WAREHOUSE_ID}, WB_TOKEN present: ${!!WB_TOKEN}`); // logger -> console
 
   if (!WB_TOKEN || !WB_WAREHOUSE_ID) {
-    logger.error("WB credentials missing in env.");
+    console.error("WB credentials missing in env."); // logger -> console
     return { success: false, error: "WB credentials missing" };
   }
 
   try {
     const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
     if (error || !items) {
-      logger.error("syncWbStocks: failed to fetch local items", error);
+      console.error("syncWbStocks: failed to fetch local items", error); // logger -> console
       return { success: false, error: error?.message || "No items found" };
     }
 
@@ -523,7 +522,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       .map(i => {
         const sku = i.specs?.wb_sku as string | undefined;
         if (!sku) {
-          logger.warn(`Skipping item ${i.id} without wb_sku in specs.`);
+          console.warn(`Skipping item ${i.id} without wb_sku in specs.`); // logger -> console
           return null;
         }
         const amount = (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0);
@@ -533,14 +532,14 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       .filter(Boolean) as { sku: string; amount: number; warehouseId: number }[];
 
     if (stocks.length === 0) {
-      logger.warn("No items with wb_sku to sync.");
+      console.warn("No items with wb_sku to sync."); // logger -> console
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
     const url = "https://suppliers-api.wildberries.ru/api/v3/stocks";
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
-    logger.info("syncWbStocks -> About to POST", {
+    console.info("syncWbStocks -> About to POST", { // logger -> console
       url,
       method: "POST",
       token: maskedToken,
@@ -550,9 +549,9 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
 
     try {
       const lookup = await dns.lookup("suppliers-api.wildberries.ru");
-      logger.info("syncWbStocks DNS lookup result", lookup);
+      console.info("syncWbStocks DNS lookup result", lookup); // logger -> console
     } catch (dnsErr: any) {
-      logger.warn("syncWbStocks DNS lookup failed", dnsErr?.code || dnsErr?.message || dnsErr);
+      console.warn("syncWbStocks DNS lookup failed", dnsErr?.code || dnsErr?.message || dnsErr); // logger -> console
     }
 
     const response = await withRetry(async () => {
@@ -570,11 +569,11 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      logger.error("syncWbStocks: failed to parse JSON response", { text });
+      console.error("syncWbStocks: failed to parse JSON response", { text }); // logger -> console
       return { success: false, error: "Invalid JSON from WB" };
     }
 
-    logger.info("syncWbStocks response", { status: response.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
+    console.info("syncWbStocks response", { status: response.status, bodySample: JSON.stringify(parsed).slice(0, 2000) }); // logger -> console
 
     if (parsed?.error) {
       return { success: false, error: parsed?.errorText || parsed?.error };
@@ -582,7 +581,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
 
     return { success: true };
   } catch (err: any) {
-    logger.error("syncWbStocks error:", {
+    console.error("syncWbStocks error:", { // logger -> console
       message: err?.message,
       stack: err?.stack,
       cause: err?.cause,
@@ -623,14 +622,14 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
     try {
       data = JSON.parse(text);
     } catch (e) {
-      logger.error("syncOzonStocks: failed to parse JSON response", { text });
+      console.error("syncOzonStocks: failed to parse JSON response", { text }); // logger -> console
       return { success: false, error: "Invalid JSON from Ozon" };
     }
 
     if (data.result?.errors?.length > 0) return { success: false, error: data.result.errors[0].message };
     return { success: true };
   } catch (err: any) {
-    logger.error("syncOzonStocks error:", err);
+    console.error("syncOzonStocks error:", err); // logger -> console
     return { success: false, error: err.message };
   }
 }
@@ -652,7 +651,7 @@ export async function setWbBarcodes(): Promise<{ success: boolean; updated?: num
       const vc = (card.vendorCode || "").toLowerCase();
       const item = localRes.data?.find(i => i.id.toLowerCase() === vc);
       if (!item) {
-        logger.debug(`No local item for WB vendorCode ${vc}`);
+        console.debug(`No local item for WB vendorCode ${vc}`); // logger -> console
         continue;
       }
 
@@ -660,7 +659,7 @@ export async function setWbBarcodes(): Promise<{ success: boolean; updated?: num
       const barcodes: string[] = sizes.flatMap((size: any) => Array.isArray(size.skus) ? size.skus : []);
 
       if (barcodes.length === 0) {
-        logger.warn(`No barcodes for card ${vc}`);
+        console.warn(`No barcodes for card ${vc}`); // logger -> console
         continue;
       }
 
@@ -676,14 +675,14 @@ export async function setWbBarcodes(): Promise<{ success: boolean; updated?: num
     if (updates.length > 0) {
       const { error } = await supabaseAdmin.from("cars").upsert(updates, { onConflict: "id" });
       if (error) throw error;
-      logger.info(`Updated ${updates.length} items with WB barcodes.`);
+      console.info(`Updated ${updates.length} items with WB barcodes.`); // logger -> console
     } else {
-      logger.info("No updates needed for WB barcodes.");
+      console.info("No updates needed for WB barcodes."); // logger -> console
     }
 
     return { success: true, updated: updates.length };
   } catch (e: any) {
-    logger.error("setWbBarcodes error:", e);
+    console.error("setWbBarcodes error:", e); // logger -> console
     return { success: false, error: e.message || "Unknown error setting WB barcodes" };
   }
 }
@@ -696,7 +695,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries: number = 3, delayMs: 
       return await fn();
     } catch (e) {
       lastError = e;
-      logger.warn(`Retry ${i + 1}/${retries} failed: ${e?.message || e}`);
+      console.warn(`Retry ${i + 1}/${retries} failed: ${e?.message || e}`); // logger -> console
       await new Promise(resolve => setTimeout(resolve, delayMs * (i + 1)));
     }
   }
@@ -713,30 +712,30 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
       WB_WAREHOUSE_ID = whRes.data?.find((w: any) => w.isActive)?.id.toString();
     }
   }
-  logger.info(`fetchWbStocks start. WB_WAREHOUSE_ID: ${WB_WAREHOUSE_ID ? WB_WAREHOUSE_ID : "MISSING"}, tokenPresent: ${!!WB_TOKEN}`);
+  console.info(`fetchWbStocks start. WB_WAREHOUSE_ID: ${WB_WAREHOUSE_ID ? WB_WAREHOUSE_ID : "MISSING"}, tokenPresent: ${!!WB_TOKEN}`); // logger -> console
 
   if (!WB_TOKEN || !WB_WAREHOUSE_ID) {
-    logger.error("fetchWbStocks: missing WB credentials");
+    console.error("fetchWbStocks: missing WB credentials"); // logger -> console
     return { success: false, error: "WB credentials missing" };
   }
 
   try {
     const { data: items } = await supabaseAdmin.from("cars").select("id, specs").eq("type", "wb_item");
     if (!items) {
-      logger.warn("fetchWbStocks: no local items returned from Supabase");
+      console.warn("fetchWbStocks: no local items returned from Supabase"); // logger -> console
       return { success: false, error: "No local items" };
     }
 
     const skus = items.map(i => (i.specs?.wb_sku as string) || i.id).filter(Boolean);
     if (skus.length === 0) {
-      logger.warn("fetchWbStocks: no skus/barcodes available");
+      console.warn("fetchWbStocks: no skus/barcodes available"); // logger -> console
       return { success: false, error: "No skus for fetch (setup barcodes first)" };
     }
 
     const url = `https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
-    logger.info("fetchWbStocks -> About to POST", {
+    console.info("fetchWbStocks -> About to POST", { // logger -> console
       url,
       method: "POST",
       token: maskedToken,
@@ -746,9 +745,9 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
 
     try {
       const lookup = await dns.lookup("suppliers-api.wildberries.ru");
-      logger.info("fetchWbStocks DNS lookup result", lookup);
+      console.info("fetchWbStocks DNS lookup result", lookup); // logger -> console
     } catch (dnsErr: any) {
-      logger.warn("fetchWbStocks DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message });
+      console.warn("fetchWbStocks DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message }); // logger -> console
     }
 
     const bodyStr = JSON.stringify({ skus });
@@ -771,20 +770,20 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     try {
       data = JSON.parse(text);
     } catch (e) {
-      logger.error("fetchWbStocks: invalid JSON", { text });
+      console.error("fetchWbStocks: invalid JSON", { text }); // logger -> console
       return { success: false, error: "Invalid JSON from WB" };
     }
 
     if (!data || !Array.isArray(data.stocks)) {
-      logger.warn("fetchWbStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) });
+      console.warn("fetchWbStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) }); // logger -> console
       return { success: false, error: "WB returned unexpected payload" };
     }
 
     const stocks = data.stocks.map((s: any) => ({ sku: s.sku, amount: s.amount }));
-    logger.info(`Fetched ${stocks.length} stocks from WB.`);
+    console.info(`Fetched ${stocks.length} stocks from WB.`); // logger -> console
     return { success: true, data: stocks };
   } catch (err: any) {
-    logger.error("fetchWbStocks error:", {
+    console.error("fetchWbStocks error:", { // logger -> console
       message: err?.message,
       stack: err?.stack,
       cause: err?.cause ? { code: err.cause?.code, syscall: err.cause?.syscall, hostname: err.cause?.hostname } : undefined,
@@ -834,7 +833,7 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       try {
         data = JSON.parse(text);
       } catch (e) {
-        logger.error("fetchOzonStocks: invalid JSON", { text });
+        console.error("fetchOzonStocks: invalid JSON", { text }); // logger -> console
         return { success: false, error: "Invalid JSON from Ozon" };
       }
 
@@ -851,10 +850,10 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       if (data.result.total < limit) break;
     }
 
-    logger.info(`Fetched ${allStocks.length} stocks from Ozon.`);
+    console.info(`Fetched ${allStocks.length} stocks from Ozon.`); // logger -> console
     return { success: true, data: allStocks };
   } catch (err: any) {
-    logger.error("fetchOzonStocks error:", err);
+    console.error("fetchOzonStocks error:", err); // logger -> console
     return { success: false, error: err.message };
   }
 }
@@ -884,7 +883,10 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
 export async function getOzonProductList(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
-  if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, error: "Ozon credentials missing" };
+  if (!OZON_CLIENT_ID || !OZON_API_KEY) {
+    console.warn("No Ozon keys, skipping fetch"); // logger -> console
+    return { success: false, error: "Ozon credentials missing" };
+  }
 
   try {
     let allItems: any[] = [];
@@ -911,7 +913,7 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
       try {
         data = JSON.parse(text);
       } catch (e) {
-        logger.error("getOzonProductList: invalid JSON", { text });
+        console.error("getOzonProductList: invalid JSON", { text }); // logger -> console
         return { success: false, error: "Invalid JSON from Ozon" };
       }
 
@@ -920,10 +922,10 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
       if (!last_id) break;
     }
 
-    logger.info(`Fetched ${allItems.length} products from Ozon.`);
+    console.info(`Fetched ${allItems.length} products from Ozon.`); // logger -> console
     return { success: true, data: allItems };  // [{offer_id, product_id, ...}]
   } catch (err: any) {
-    logger.error("getOzonProductList error:", err);
+    console.error("getOzonProductList error:", err); // logger -> console
     return { success: false, error: (err as Error).message };
   }
 }
