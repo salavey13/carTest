@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
 import dns from "dns/promises";
 
