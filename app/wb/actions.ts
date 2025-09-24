@@ -246,7 +246,7 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
     .eq('user_id', userId)
     .single();
   if (error || !user) return false;
-  return user.status === 'admin';
+  return user.status = 'admin';
 }
 
 export async function uploadWarehouseCsv(
@@ -896,7 +896,7 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
     while (true) {
       const body = { filter: {}, last_id, limit };
       const response = await withRetry(async () => {
-        const res = await fetch("https://api-seller.ozon.ru/v2/product/list", {
+        const res = await fetch("https://api-seller.ozon.ru/v3/product/list", {
           method: "POST",
           headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
           body: JSON.stringify(body),

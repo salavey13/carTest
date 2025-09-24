@@ -90,7 +90,10 @@ export default function WarehouseTestPage(): JSX.Element {
         setWbCards(rows);
         setWarehousesInfoLog(res.warehousesInfo || []);
         setChosenWarehouseLog(res.chosenWarehouseId ?? null);
-        toast.success(`Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length }, chosen: ${res.chosenWarehouseId || 'auto'}. Quantities: ${rows.reduce((sum, r) => sum + r.quantity, 0)} total)`);
+        const totalQty = rows.reduce((sum, r) => sum + r.quantity, 0);
+        let msg = `Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length }, chosen: ${res.chosenWarehouseId || 'auto'}. Quantities: ${totalQty} total)`;
+        if (totalQty === 0) msg += " (возможно, стоки пусты или склад не имеет доступа — проверь logs)";
+        toast.success(msg);
       } else {
         toast.error(res?.error ?? "Ошибка при загрузке карточек WB");
       }
@@ -350,7 +353,7 @@ export default function WarehouseTestPage(): JSX.Element {
                   <TableRow>
                     <TableHead>VendorCode</TableHead>
                     <TableHead>nmID</TableHead>
-                    <TableHead>Barcodes Count</TableHead>
+                    <TableHead>Barcodes</TableHead>
                     <TableHead>Qty</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -359,7 +362,7 @@ export default function WarehouseTestPage(): JSX.Element {
                     <TableRow key={idx}>
                       <TableCell>{c.vendorCode}</TableCell>
                       <TableCell>{c.nmID}</TableCell>
-                      <TableCell>{c.barcodes.length}</TableCell>
+                      <TableCell>{c.barcodes.join(', ')}</TableCell>
                       <TableCell>{c.quantity}</TableCell>
                     </TableRow>
                   ))}
