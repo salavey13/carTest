@@ -33,10 +33,10 @@ import {
   getWbGenders,
   getWbCountries,
   getWbSeasons,
-  getWbVat,
   getWbTnved,
   generateWbBarcodes,
   createWbProductCards,
+  getWbProductCardsList,
 } from "@/app/wb/content-actions";
 
 import {
@@ -355,8 +355,8 @@ export default function WarehouseTestPage(): JSX.Element {
                 <TableBody>
                   {wbCards.map((c, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>{c.vendorCode}</TableCell>
-                      <TableCell>{c.barcodes.join(', ')}</TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">{c.vendorCode}</TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">{c.barcodes.join(', ')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -376,7 +376,7 @@ export default function WarehouseTestPage(): JSX.Element {
                 <TableBody>
                   {ozonProducts.map((p, idx) => (
                     <TableRow key={idx}>
-                      <TableCell>{p.offer_id}</TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">{p.offer_id}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -401,8 +401,8 @@ export default function WarehouseTestPage(): JSX.Element {
                 <TableBody>
                   {unmatchedWb.map((wbId) => (
                     <TableRow key={wbId}>
-                      <TableCell>{wbId}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">{wbId}</TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">
                         <Select value={manualMapWb[wbId] || "fallback"} onValueChange={(v) => handleUpdateManualMap('wb', wbId, v)}>
                           <SelectTrigger className="text-xs">
                             <SelectValue />
@@ -433,8 +433,8 @@ export default function WarehouseTestPage(): JSX.Element {
                 <TableBody>
                   {unmatchedOzon.map((ozonId) => (
                     <TableRow key={ozonId}>
-                      <TableCell>{ozonId}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">{ozonId}</TableCell>
+                      <TableCell className="py-1 px-2 text-xs leading-tight">
                         <Select value={manualMapOzon[ozonId] || "fallback"} onValueChange={(v) => handleUpdateManualMap('ozon', ozonId, v)}>
                           <SelectTrigger className="text-xs">
                             <SelectValue />
