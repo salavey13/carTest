@@ -1,7 +1,9 @@
+// /app/wb/test/actions.ts
 "use server";
 
 import { logger } from "@/lib/logger";
-import { getWbProductCardsList, getWbWarehouses } from "@/app/wb/actions";
+import { getWbWarehouses } from "@/app/wb/actions";
+import { getWbProductCardsList } from "@/app/wb/content-actions";
 import dns from "dns/promises";
 
 /**
