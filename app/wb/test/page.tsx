@@ -22,6 +22,10 @@ import {
   fetchWbStocks,
   fetchOzonStocks,
   getWarehouseItems,
+  getWbWarehouses,
+} from "@/app/wb/actions";
+
+import {
   getWbParentCategories,
   getWbSubjects,
   getWbSubjectCharcs,
@@ -33,8 +37,7 @@ import {
   getWbTnved,
   generateWbBarcodes,
   createWbProductCards,
-  getWbWarehouses,
-} from "@/app/wb/actions";
+} from "@/app/wb/content-actions";
 
 import {
   fetchWbCardsWithWarehouseInfo,
@@ -79,21 +82,16 @@ export default function WarehouseTestPage(): JSX.Element {
         const minimalMap = res.minimalMap || {};
         const rows = cards.map((c: any) => {
           const vc = (c.vendorCode || "").toLowerCase();
-          const mm = minimalMap[vc] || { nmID: c.nmID, barcodes: [], quantity: 0 };
+          const mm = minimalMap[vc] || { barcodes: [] };
           return {
             vendorCode: c.vendorCode,
-            nmID: c.nmID,
             barcodes: mm.barcodes || [],
-            quantity: mm.quantity || 0,
           };
         });
         setWbCards(rows);
         setWarehousesInfoLog(res.warehousesInfo || []);
         setChosenWarehouseLog(res.chosenWarehouseId ?? null);
-        const totalQty = rows.reduce((sum, r) => sum + r.quantity, 0);
-        let msg = `Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length }, chosen: ${res.chosenWarehouseId || 'auto'}. Quantities: ${totalQty} total)`;
-        if (totalQty === 0) msg += " (возможно, стоки пусты или склад не имеет доступа — проверь logs)";
-        toast.success(msg);
+        toast.success(`Загружено ${rows.length} карточек WB (склады: ${ (res.warehousesInfo||[]).length }, chosen: ${res.chosenWarehouseId || 'auto'})`);
       } else {
         toast.error(res?.error ?? "Ошибка при загрузке карточек WB");
       }
@@ -114,10 +112,9 @@ export default function WarehouseTestPage(): JSX.Element {
         const mapped = res.data.map((p: any) => ({
           offer_id: p.offer_id,
           product_id: p.product_id,
-          quantity: stocksMap.get(p.offer_id.toLowerCase()) || 0,
         }));
         setOzonProducts(mapped);
-        toast.success(`Загружено ${res.data.length} продуктов Ozon (total qty: ${mapped.reduce((sum, p) => sum + p.quantity, 0)})`);
+        toast.success(`Загружено ${res.data.length} продуктов Ozon`);
       } else {
         toast.warn(res?.error ?? "No Ozon keys, skipping");
         setOzonProducts([]);
@@ -352,18 +349,14 @@ export default function WarehouseTestPage(): JSX.Element {
                 <TableHeader>
                   <TableRow>
                     <TableHead>VendorCode</TableHead>
-                    <TableHead>nmID</TableHead>
                     <TableHead>Barcodes</TableHead>
-                    <TableHead>Qty</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {wbCards.map((c, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{c.vendorCode}</TableCell>
-                      <TableCell>{c.nmID}</TableCell>
                       <TableCell>{c.barcodes.join(', ')}</TableCell>
-                      <TableCell>{c.quantity}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -378,16 +371,12 @@ export default function WarehouseTestPage(): JSX.Element {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Offer ID</TableHead>
-                    <TableHead>Product ID</TableHead>
-                    <TableHead>Qty</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ozonProducts.map((p, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{p.offer_id}</TableCell>
-                      <TableCell>{p.product_id}</TableCell>
-                      <TableCell>{p.quantity}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

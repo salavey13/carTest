@@ -1,4 +1,3 @@
-// /app/csv-compare/page.tsx
 "use client";
 
 import React, { useState, useCallback } from "react";
@@ -250,7 +249,7 @@ const CSVCompare = () => {
 
         modifiedItems.forEach((id) => {
             const item1 = inventory1.items.find((i) => i.id === id);
-            const item2 = inventory2.items.find((i) => i.id === id);o
+            const item2 = inventory2.items.find((i) => i.id === id);
             const qty1 = item1?.quantity || 0;
             const qty2 = item2?.quantity || 0;
             const diff = qty2 - qty1;
@@ -340,7 +339,7 @@ const CSVCompare = () => {
         try {
             const csvData = csv2;
             if (!csvData.trim()) {
-                toast.error("Нет данных для загрузки.");
+                toast.error("Empty data for upload.");
                 return;
             }
             const cleanCsvData = csvData.replace(/[\u200B-\u200D\uFEFF]/g, '');
