@@ -73,11 +73,6 @@ export async function getWbSeasons(locale: string = 'ru'): Promise<{ success: bo
   return wbApiCall(`/content/v2/directory/seasons?locale=${locale}`);
 }
 
-// Get VAT Rates
-export async function getWbVat(locale: string = 'ru'): Promise<{ success: boolean; data?: string[]; error?: string }> {
-  return wbApiCall(`/content/v2/directory/vat?locale=${locale}`);
-}
-
 // Get HS Codes
 export async function getWbTnved(subjectID: number, search?: string, locale: string = 'ru'): Promise<{ success: boolean; data?: any[]; error?: string }> {
   let query = `/content/v2/directory/tnved?subjectID=${subjectID}&locale=${locale}`;

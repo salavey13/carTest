@@ -80,7 +80,7 @@ export default function WarehouseTestPage(): JSX.Element {
       if (res?.success) {
         const cards = res.cards || [];
         const minimalMap = res.minimalMap || {};
-        const rows = cards.map((c: any) => {
+        let rows = cards.map((c: any) => {
           const vc = (c.vendorCode || "").toLowerCase();
           const mm = minimalMap[vc] || { barcodes: [] };
           return {
@@ -88,6 +88,7 @@ export default function WarehouseTestPage(): JSX.Element {
             barcodes: mm.barcodes || [],
           };
         });
+        rows = rows.sort((a, b) => a.vendorCode.localeCompare(b.vendorCode)); // Sort by vendorCode
         setWbCards(rows);
         setWarehousesInfoLog(res.warehousesInfo || []);
         setChosenWarehouseLog(res.chosenWarehouseId ?? null);
@@ -109,10 +110,11 @@ export default function WarehouseTestPage(): JSX.Element {
       if (res?.success) {
         const stockRes = await fetchOzonStocks();
         const stocksMap = new Map((stockRes.data || []).map(s => [s.sku.toLowerCase(), s.amount]));
-        const mapped = res.data.map((p: any) => ({
+        let mapped = res.data.map((p: any) => ({
           offer_id: p.offer_id,
           product_id: p.product_id,
         }));
+        mapped = mapped.sort((a, b) => a.offer_id.localeCompare(b.offer_id)); // Sort by offer_id
         setOzonProducts(mapped);
         toast.success(`Загружено ${res.data.length} продуктов Ozon`);
       } else {
@@ -260,13 +262,6 @@ export default function WarehouseTestPage(): JSX.Element {
     const res = await getWbSeasons();
     setWbApiResult(res);
     if (res?.success) toast.success("Сезоны получены");
-    else toast.error(res?.error ?? "Ошибка");
-  };
-
-  const handleGetVat = async () => {
-    const res = await getWbVat();
-    setWbApiResult(res);
-    if (res?.success) toast.success("НДС получен");
     else toast.error(res?.error ?? "Ошибка");
   };
 
@@ -521,9 +516,6 @@ export default function WarehouseTestPage(): JSX.Element {
             </Button>
             <Button size="sm" className="w-full text-xs" onClick={handleGetSeasons}>
               Seasons
-            </Button>
-            <Button size="sm" className="w-full text-xs" onClick={handleGetVat}>
-              VAT
             </Button>
             <Button size="sm" className="w-full text-xs" onClick={handleGetTnved}>
               TNVED

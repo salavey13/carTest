@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
-import { getWbProductCardsList } from "@/app/wb/content-actions";
+import { getWbProductCardsList, getWbWarehouses } from "@/app/wb/content-actions";
 import Papa from "papaparse";
 import dns from "dns/promises";
 
@@ -627,6 +627,11 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       } catch (e) {
         console.error("fetchOzonStocks: invalid JSON", { text }); // logger -> console
         return { success: false, error: "Invalid JSON from Ozon" };
+      }
+
+      if (!data || !data.result || !Array.isArray(data.result.items)) {
+        console.warn("fetchOzonStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) }); // enhanced log
+        return { success: false, error: "Ozon returned unexpected payload" };
       }
 
       const itemsStocks = data.result.items.flatMap((item: any) =>
