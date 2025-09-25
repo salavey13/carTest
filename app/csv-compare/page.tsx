@@ -38,9 +38,9 @@ const deriveFieldsFromIdForCsv = (id: string, quantity: number) => {
   derived.specs.warehouse_locations = [{ voxel_id: "A1", quantity }];
   return {
     id,
-    make: derived.make,
-    model: derived.model,
-    description: derived.description,
+    make: derived.make || "Unknown Make",
+    model: derived.model || "Unknown Model",
+    description: derived.description || "No Description",
     type: "wb_item",
     specs: JSON.stringify(derived.specs),
     image_url: generateImageUrl(id), // Assume generateImageUrl exported
@@ -437,7 +437,7 @@ const CSVCompare = () => {
                 </CardContent>
             </Card>
 
-            <div className="mb-4 flex items-center space-x-4">
+            <div className="mb-4 flex items-center space-x-4 flex-wrap">
                 <label className="inline-flex items-center">
                     <input
                         type="checkbox"
@@ -447,6 +447,23 @@ const CSVCompare = () => {
                     />
                     <span className="text-gray-700">Strict Mode (без суммирования)</span>
                 </label>
+                <div className="flex items-center space-x-2">
+                    <label className="text-gray-700">Дней между CSV:</label>
+                    <Input
+                        type="number"
+                        value={days}
+                        onChange={(e) => setDays(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20"
+                        min={1}
+                    />
+                    <Button onClick={() => setDays((d) => d + 1)}>+1</Button>
+                </div>
+                <Button
+                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex-1"
+                    onClick={compareInventories}
+                >
+                    Сравнить инвентари
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
