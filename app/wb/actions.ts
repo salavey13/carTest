@@ -392,11 +392,21 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
   const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
   if (error || !items) return { success: false, error: error?.message || "No items found" };
 
-  const stocks = items.map(i => ({
-    offer_id: (i.specs?.ozon_sku as string) || i.id,
-    stock: (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0),
-    warehouse_id: parseInt((i.specs?.ozon_warehouse_id as string) || OZON_WAREHOUSE_ID, 10),
-  }));
+  const stocks = items.map(i => {
+    const offer_id = i.specs?.ozon_sku as string | undefined;
+    if (!offer_id) {
+      console.warn(`Skipping item ${i.id} without ozon_sku in specs.`); // logger -> console
+      return null;
+    }
+    const stock = (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0);
+    const warehouse_id = parseInt((i.specs?.ozon_warehouse_id as string) || OZON_WAREHOUSE_ID, 10);
+    return { offer_id, stock, warehouse_id };
+  }).filter(Boolean) as { offer_id: string; stock: number; warehouse_id: number }[];
+
+  if (stocks.length === 0) {
+    console.warn("No items with ozon_sku to sync."); // logger -> console
+    return { success: false, error: "No syncable items (check ozon_sku setup)" };
+  }
 
   try {
     const response = await withRetry(async () => {
@@ -460,7 +470,12 @@ export async function setWbBarcodes(): Promise<{ success: boolean; updated?: num
 
       updates.push({
         id: item.id,
+        make: item.make,
+        model: item.model,
+        description: item.description,
+        type: item.type,
         specs,
+        image_url: item.image_url,
       });
     }
 
@@ -625,16 +640,16 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       try {
         data = JSON.parse(text);
       } catch (e) {
-        console.error("fetchOzonStocks: invalid JSON", { text }); // logger -> console
+        console.error("fetchOzonStocks: invalid JSON parse", { text }); // enhanced log full text
         return { success: false, error: "Invalid JSON from Ozon" };
       }
 
-      if (!data || !data.result || !Array.isArray(data.result.items)) {
+      if (!data || !Array.isArray(data.items)) {
         console.warn("fetchOzonStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) }); // enhanced log
         return { success: false, error: "Ozon returned unexpected payload" };
       }
 
-      const itemsStocks = data.result.items.flatMap((item: any) =>
+      const itemsStocks = data.items.flatMap((item: any) =>
         item.stocks.map((stock: any) => ({
           sku: item.offer_id,
           amount: stock.present - stock.reserved,
@@ -643,8 +658,8 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
 
       allStocks = [...allStocks, ...itemsStocks];
 
-      lastId = data.result.last_id;
-      if (data.result.total < limit) break;
+      lastId = data.last_id;
+      if (data.total < limit) break;
     }
 
     console.info(`Fetched ${allStocks.length} stocks from Ozon.`); // logger -> console
