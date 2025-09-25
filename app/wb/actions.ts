@@ -827,10 +827,12 @@ async function generateUpdateSql(manualMap: { wb: { [key: string]: string }; ozo
     const ozon = ozonMap[effectiveOzonOffer] || {};
 
     // If both unmatched, skip with comment
-    if ((!wb || !wb.barcodes.length) && (!ozon || !ozon.product_id)) {
+    if ((!wb.barcodes || !Array.isArray(wb.barcodes) || wb.barcodes.length === 0) && (!ozon.product_id)) {
       sqlLines.push(`-- Skipped unmatched for '${item.id}'`);
       return;
     }
+
+    sqlLines.push(`-- Update for ${item.id} (WB vendor: ${effectiveWbVendor || 'none'}, Ozon offer: ${effectiveOzonOffer || 'none'})`);
 
     const json: any = {
       wb_sku: wb.barcodes[0] || item.id, // Use first barcode as wb_sku
@@ -838,8 +840,6 @@ async function generateUpdateSql(manualMap: { wb: { [key: string]: string }; ozo
       ozon_sku: ozon.product_id || item.id,
       wb_warehouse_id: wbWhId,
       ozon_warehouse_id: ozonWhId,
-      wb_api_quantity: wb.quantity || 0,
-      ozon_api_quantity: ozon.quantity || 0,
     };
 
     const jsonStr = JSON.stringify(json).replace(/'/g, "''"); // escape single quotes for SQL literal
