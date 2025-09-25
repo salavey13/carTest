@@ -12,6 +12,8 @@ export function WarehouseSyncButtons() {
   const [loading, setLoading] = useState(false);
   const [itemsLoaded, setItemsLoaded] = useState(false);
   const [needSetup, setNeedSetup] = useState(false); // True if some items miss wb_sku
+  const [hasSyncableWb, setHasSyncableWb] = useState(false); // True if some have wb_sku
+  const [hasSyncableOzon, setHasSyncableOzon] = useState(false); // True if some have ozon_sku
 
   useEffect(() => {
     const loadItems = async () => {
@@ -20,7 +22,11 @@ export function WarehouseSyncButtons() {
       setLoading(false);
       if (res.success && res.data) {
         const missingBarcodes = res.data.some((i: any) => !i.specs?.wb_sku);
+        const syncableWb = res.data.some((i: any) => !!i.specs?.wb_sku);
+        const syncableOzon = res.data.some((i: any) => !!i.specs?.ozon_sku);
         setNeedSetup(missingBarcodes);
+        setHasSyncableWb(syncableWb);
+        setHasSyncableOzon(syncableOzon);
         setItemsLoaded(true);
         toast.success(`Загружено ${res.data.length} items из Supabase. ${missingBarcodes ? "Нужна настройка баркодов." : "Всё готово к синку!"}`);
       } else {
@@ -40,7 +46,11 @@ export function WarehouseSyncButtons() {
       const itemsRes = await getWarehouseItems();
       if (itemsRes.success && itemsRes.data) {
         const stillMissing = itemsRes.data.some((i: any) => !i.specs?.wb_sku);
+        const syncableWb = itemsRes.data.some((i: any) => !!i.specs?.wb_sku);
+        const syncableOzon = itemsRes.data.some((i: any) => !!i.specs?.ozon_sku);
         setNeedSetup(stillMissing);
+        setHasSyncableWb(syncableWb);
+        setHasSyncableOzon(syncableOzon);
       }
     } else {
       toast.error(res.error || "Ошибка настройки WB SKU");
@@ -88,13 +98,13 @@ export function WarehouseSyncButtons() {
             <Button
               className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
               onClick={handleSyncWb}
-              disabled={loading || !itemsLoaded || needSetup}
+              disabled={loading || !itemsLoaded || !hasSyncableWb}
             >
               <RefreshCcw className="mr-1 h-3 w-3" /> WB
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{needSetup ? "Сначала настрой баркоды" : "Синк стоков WB из Supabase"}</p>
+            <p>{!hasSyncableWb ? "Нет items с wb_sku" : "Синк стоков WB из Supabase"}</p>
           </TooltipContent>
         </Tooltip>
         <Tooltip>
@@ -102,13 +112,13 @@ export function WarehouseSyncButtons() {
             <Button
               className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white"
               onClick={handleSyncOzon}
-              disabled={loading || !itemsLoaded}
+              disabled={loading || !itemsLoaded || !hasSyncableOzon}
             >
               <RefreshCcw className="mr-1 h-3 w-3" /> Ozon
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Синк стоков Ozon из Supabase</p>
+            <p>{!hasSyncableOzon ? "Нет items с ozon_sku" : "Синк стоков Ozon из Supabase"}</p>
           </TooltipContent>
         </Tooltip>
         <p className="text-xs text-muted-foreground w-full">
