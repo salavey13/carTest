@@ -850,7 +850,7 @@ async function generateUpdateSql(manualMap: { wb: { [key: string]: string }; ozo
     sqlLines.push(`-- Update for ${item.id} (WB vendor: ${effectiveWbVendor || 'none'}, Ozon offer: ${effectiveOzonOffer || 'none'})`);
 
     const json: any = {
-      wb_sku: wb.barcodes[0] || item.id, // Use first barcode as wb_sku
+      wb_sku: wb.barcodes?.[0] || item.id, // Use first barcode as wb_sku
       wb_barcodes: wb.barcodes || [],
       ozon_sku: ozon.product_id || item.id,
       wb_warehouse_id: wbWhId,
