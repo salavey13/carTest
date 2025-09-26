@@ -328,7 +328,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
-    const url = "https://suppliers-api.wildberries.ru/api/v3/stocks";
+    const url = "https://supplies-api.wildberries.ru/api/v3/stocks";
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
     console.info("syncWbStocks -> About to POST", { // logger -> console
@@ -340,7 +340,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
     });
 
     try {
-      const lookup = await dns.lookup("suppliers-api.wildberries.ru");
+      const lookup = await dns.lookup("supplies-api.wildberries.ru");
       console.info("syncWbStocks DNS lookup result", lookup); // logger -> console
     } catch (dnsErr: any) {
       console.warn("syncWbStocks DNS lookup failed", dnsErr?.code || dnsErr?.message || dnsErr); // logger -> console
@@ -410,7 +410,7 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
 
   try {
     const response = await withRetry(async () => {
-      const res = await fetch("https://api-seller.ozon.ru/v3/products/stocks", {
+      const res = await fetch("https://api-seller.ozon.ru/v2/product/import/stocks", {
         method: "POST",
         headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({ stocks }),
@@ -539,7 +539,7 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
       return { success: false, error: "No skus for fetch (setup barcodes first)" };
     }
 
-    const url = `https://suppliers-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
+    const url = `https://supplies-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
     console.info("fetchWbStocks -> About to POST", { // logger -> console
@@ -551,7 +551,7 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     });
 
     try {
-      const lookup = await dns.lookup("suppliers-api.wildberries.ru");
+      const lookup = await dns.lookup("supplies-api.wildberries.ru");
       console.info("fetchWbStocks DNS lookup result", lookup); // logger -> console
     } catch (dnsErr: any) {
       console.warn("fetchWbStocks DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message }); // logger -> console
@@ -670,13 +670,13 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
   }
 }
 
-// Get warehouses list (suppliers-api)
+// Get warehouses list (supplies-api)
 export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
   if (!token) return { success: false, error: "WB_API_TOKEN missing" };
 
   try {
-    const res = await fetch("https://suppliers-api.wildberries.ru/api/v3/warehouses", {
+    const res = await fetch("https://supplies-api.wildberries.ru/api/v3/warehouses", {
       headers: { "Authorization": token },
       method: "GET",
     });
