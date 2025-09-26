@@ -72,7 +72,7 @@ export function useWarehouse() {
           voxel: l.voxel_id,
           quantity: l.quantity,
           min_qty: l.voxel_id.startsWith("B") ? 3 : undefined,
-        })) || [];
+        })) || [].sort((a, b) => a.voxel.localeCompare(b.voxel)); // Sort locations A-Z
         const sumQty = locations.reduce((acc, l) => acc + l.quantity, 0);
         const total = sumQty || 0; // Ignore i.quantity, always use sum to avoid mismatches
         return {
@@ -120,7 +120,7 @@ export function useWarehouse() {
                   ...i,
                   locations: i.locations.map((l) =>
                     l.voxel === voxelId ? { ...l, quantity: Math.max(0, l.quantity + delta) } : l,
-                  ).filter((l) => l.quantity > 0),
+                  ).filter((l) => l.quantity > 0).sort((a, b) => a.voxel.localeCompare(b.voxel)),
                   total_quantity: i.total_quantity + delta,
                 }
               : i,
