@@ -3,9 +3,14 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { unstable_noStore as noStore } from "next/cache";
 import type { WarehouseItem } from "@/app/wb/common";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
 import dns from "dns/promises";
 
+/**
+ * Utilities
+ */
 type Maybe<T> = T | null | undefined;
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): Promise<T> {
@@ -22,9 +27,10 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): 
   throw lastError;
 }
 
-/**
- * Простые утилиты / типы
- */
+/* =========================
+   Core: Warehouse CRUD & CSV upload
+   ========================= */
+
 export async function getWarehouseItems(): Promise<{
   success: boolean;
   data?: WarehouseItem[];
@@ -57,9 +63,6 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
   return user.status === "admin";
 }
 
-/**
- * Upload CSV -> Supabase (existing logic, чуть аккуратнее обработка specs)
- */
 export async function uploadWarehouseCsv(
   batch: any[],
   userId: string | undefined
@@ -138,9 +141,10 @@ export async function uploadWarehouseCsv(
   }
 }
 
-/**
- * Update single item location quantity (server-side atomic-ish)
- */
+/* =========================
+   Update single location qty
+   ========================= */
+
 export async function updateItemLocationQty(
   itemId: string,
   voxelId: string,
@@ -194,9 +198,10 @@ export async function updateItemLocationQty(
   }
 }
 
-/**
- * CSV Export helpers (telegram/admin)
- */
+/* =========================
+   CSV Export helpers
+   ========================= */
+
 export async function exportDiffToAdmin(diffData: any[], isTelegram = false, summarized = false): Promise<{ success: boolean; csv?: string }> {
   let csvData;
   if (summarized) {
@@ -208,8 +213,9 @@ export async function exportDiffToAdmin(diffData: any[], isTelegram = false, sum
   if (isTelegram) {
     return { success: true, csv: csvData };
   } else {
-    // sendComplexMessage — оставляем существующую интеграцию (импортируй по необходимости)
-    // await sendComplexMessage(...);
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
+    });
     return { success: true, csv: csvData };
   }
 }
@@ -232,14 +238,17 @@ export async function exportCurrentStock(items: any[], isTelegram = false, summa
   if (isTelegram) {
     return { success: true, csv: csvData };
   } else {
-    // await sendComplexMessage(...)
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в CSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
+    });
     return { success: true, csv: csvData };
   }
 }
 
-/**
- * Update min qty
- */
+/* =========================
+   Update min qty
+   ========================= */
+
 export async function updateItemMinQty(itemId: string, minQty: number): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: existingItem, error: selectError } = await supabaseAdmin.from("cars").select("specs").eq("id", itemId).single();
@@ -267,17 +276,9 @@ export async function updateItemMinQty(itemId: string, minQty: number): Promise<
 }
 
 /* =======================
-   ===  Wildberries sync  ==
+   Wildberries sync (send stocks)
    ======================= */
 
-/**
- * Sync to Wildberries (отправить остатки)
- *
- * ВАЖНО:
- * - Используем полный путь с warehouseId в path.
- * - Метод PUT (как рекомендовано в большинстве интеграций для обновления).
- * - Логируем тело ответа при ошибке, чтобы не гадать.
- */
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -313,7 +314,6 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
-    // NOTE: path must include warehouse id for many WB endpoints
     const url = `https://supplies-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
 
@@ -373,13 +373,9 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
 }
 
 /* =======================
-   ===  Ozon sync  =======
+   Ozon sync (import stocks)
    ======================= */
 
-/**
- * Ozon: импорт остатков
- * Пробуем использовать v1 endpoint — если ваш аккаунт требует v2, поменяй сюда.
- */
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -434,7 +430,6 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
       return { success: false, error: "Invalid JSON from Ozon" };
     }
 
-    // Ozon returns object with result / errors
     if (data.result?.errors?.length > 0) {
       console.error("syncOzonStocks -> Ozon returned errors:", data.result.errors);
       return { success: false, error: data.result.errors[0].message || "Ozon error" };
@@ -448,11 +443,10 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
   }
 }
 
-/* ==============
-   Остальное (fetch/parse helpers)
-   ============== */
+/* =======================
+   Fetch helpers: WB & Ozon reads
+   ======================= */
 
-// Fetch WB stocks (read)
 export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
   let WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
@@ -519,7 +513,6 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
   }
 }
 
-// Ozon fetch helpers (left mostly as-is but with better logs)
 export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sku: string; amount: number }[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
   const OZON_API_KEY = process.env.OZON_API_KEY;
@@ -581,10 +574,9 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
   }
 }
 
-/* ================
-   Доп. вспомогательные функции (getWbWarehouses, getOzonProductList, etc.)
-   Оставляем реализации как в оригинале, но с подсвеченным логированием.
-   ================ */
+/* =======================
+   Support: getWbWarehouses, getOzonProductList, parse helpers
+   ======================= */
 
 export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const token = process.env.WB_API_TOKEN;
@@ -605,10 +597,6 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
     return { success: false, error: e?.message || "Network error" };
   }
 }
-
-/* Остальные функции (getOzonProductList, parseOzonToMinimal, extractIdsFromSources, generateUpdateSql, getWarehouseSql)
-   мы оставляем без радикальных изменений — при необходимости дам full dump.
-*/
 
 export async function getOzonProductList(): Promise<{ success: boolean; data?: any[]; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
@@ -659,3 +647,198 @@ export async function getOzonProductList(): Promise<{ success: boolean; data?: a
     return { success: false, error: err?.message || "Unknown error in getOzonProductList" };
   }
 }
+
+async function parseOzonToMinimal(products: any[], stocks: { sku: string; amount: number }[]): Promise<{ [offerId: string]: { product_id?: number; quantity: number } }> {
+  const map: { [offerId: string]: { product_id?: number; quantity: number } } = {};
+
+  products.forEach((prod: any) => {
+    const offerId = prod.offer_id.toLowerCase();
+    const stock = stocks.find(s => s.sku.toLowerCase() === offerId);
+    map[offerId] = { product_id: prod.product_id, quantity: stock?.amount || 0 };
+  });
+
+  return map;
+}
+
+/* =======================
+   Cross-source helpers: extractIds, SQL generation
+   ======================= */
+
+export async function extractIdsFromSources(): Promise<{
+  success: boolean;
+  wbIds: Set<string>;
+  ozonIds: Set<string>;
+  supaIds: Set<string>;
+  unmatched: { wb: string[]; ozon: string[]; supa: string[] };
+  error?: string;
+}> {
+  try {
+    const wbRes = await getWbProductCardsList();
+    if (!wbRes.success) throw new Error(wbRes.error || "WB fetch failed");
+    const wbIds = new Set((wbRes.data?.cards || []).map((c: any) => c.vendorCode.toLowerCase()));
+
+    const ozonRes = await getOzonProductList();
+    const ozonIds = new Set((ozonRes.data || []).map((p: any) => p.offer_id.toLowerCase()));
+
+    const supaRes = await getWarehouseItems();
+    if (!supaRes.success) throw new Error(supaRes.error || "Supa fetch failed");
+    const supaIds = new Set((supaRes.data || []).map((i: any) => i.id.toLowerCase()));
+
+    const unmatchedWb = [...wbIds].filter(id => !supaIds.has(id));
+    const unmatchedOzon = [...ozonIds].filter(id => !supaIds.has(id));
+    const unmatchedSupa = [...supaIds].filter(id => !wbIds.has(id) && !ozonIds.has(id));
+
+    return {
+      success: true,
+      wbIds,
+      ozonIds,
+      supaIds,
+      unmatched: { wb: unmatchedWb, ozon: unmatchedOzon, supa: unmatchedSupa },
+    };
+  } catch (e: any) {
+    return { success: false, wbIds: new Set(), ozonIds: new Set(), supaIds: new Set(), unmatched: { wb: [], ozon: [], supa: [] }, error: e.message };
+  }
+}
+
+// Simplified generateUpdateSql (production-safe): does not call heavy warehouse enumeration.
+// Uses vendorCode -> nmID mapping from WB cards and local items. Quantities are best-effort (0 if unknown).
+async function generateUpdateSql(manualMap: { wb: { [key: string]: string }; ozon: { [key: string]: string } } = { wb: {}, ozon: {} }): Promise<string> {
+  const wbWhRes = await getWbWarehouses();
+  const wbWhId = process.env.WB_WAREHOUSE_ID || (wbWhRes.success && wbWhRes.data?.find((w: any) => w.isActive)?.id) || "12345";
+  const ozonWhId = process.env.OZON_WAREHOUSE_ID || "67890";
+
+  const cardsRes = await getWbProductCardsList();
+  if (!cardsRes.success) return "-- Error fetching WB cards";
+  const cards = cardsRes.data.cards || [];
+
+  const wbMap: { [k: string]: { nmID: number; barcodes: string[]; quantity: number } } = {};
+  cards.forEach((c: any) => {
+    const vc = (c.vendorCode || "").toLowerCase();
+    const barcodes: string[] = Array.isArray(c.sizes) ? c.sizes.flatMap((size: any) => Array.isArray(size.skus) ? size.skus : []) : [];
+    wbMap[vc] = { nmID: c.nmID, barcodes, quantity: 0 };
+  });
+
+  const ozonProdRes = await getOzonProductList();
+  const ozonStockRes = await fetchOzonStocks();
+  const ozonMap = (ozonProdRes.success && ozonStockRes.success)
+    ? await parseOzonToMinimal(ozonProdRes.data || [], ozonStockRes.data || [])
+    : {};
+
+  const localRes = await getWarehouseItems();
+  if (!localRes.success) return "-- Error fetching local items";
+
+  const sqlLines: string[] = [];
+  localRes.data?.forEach((item: any) => {
+    const idLower = item.id.toLowerCase();
+
+    let wbVendor: string | undefined;
+    if (manualMap && manualMap.wb) {
+      wbVendor = Object.keys(manualMap.wb).find(k => {
+        const v = manualMap.wb[k];
+        if (!v) return false;
+        return v === item.id || v === idLower;
+      });
+    }
+
+    const effectiveWbVendor = (wbVendor || idLower).toLowerCase();
+    const effectiveOzonOffer = (Object.keys(manualMap?.ozon || {}).find(k => (manualMap!.ozon[k] === item.id || manualMap!.ozon[k] === idLower)) || idLower).toLowerCase();
+
+    const wb = wbMap[effectiveWbVendor] || {};
+    const ozon = ozonMap[effectiveOzonOffer] || {};
+
+    if ((!wb.barcodes || !Array.isArray(wb.barcodes) || wb.barcodes.length === 0) && (!ozon.product_id)) {
+      sqlLines.push(`-- Skipped unmatched for '${item.id}'`);
+      return;
+    }
+
+    sqlLines.push(`-- Update for ${item.id} (WB vendor: ${effectiveWbVendor || 'none'}, Ozon offer: ${effectiveOzonOffer || 'none'})`);
+
+    const json: any = {
+      wb_sku: wb.barcodes?.[0] || item.id,
+      wb_barcodes: wb.barcodes || [],
+      ozon_sku: ozon.product_id || item.id,
+      wb_warehouse_id: wbWhId,
+      ozon_warehouse_id: ozonWhId,
+    };
+
+    const jsonStr = JSON.stringify(json).replace(/'/g, "''");
+    sqlLines.push(
+      `UPDATE public.cars SET specs = specs || '${jsonStr}'::jsonb WHERE id = '${item.id}' AND type = 'wb_item';`
+    );
+  });
+
+  return sqlLines.join("\n");
+}
+
+export async function getWarehouseSql(manualMap?: { wb: { [key: string]: string }; ozon: { [key: string]: string } }): Promise<{ success: boolean; sql?: string; error?: string }> {
+  try {
+    const sql = await generateUpdateSql(manualMap || { wb: {}, ozon: {} });
+    return { success: true, sql };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+/* =======================
+   Optional: setWbBarcodes helper (fetch cards -> upsert barcodes into local specs)
+   ======================= */
+
+export async function setWbBarcodes(): Promise<{ success: boolean; updated?: number; error?: string }> {
+  try {
+    const cardsRes = await getWbProductCardsList();
+    if (!cardsRes.success) return { success: false, error: cardsRes.error || "Failed to fetch WB cards" };
+
+    const cards = cardsRes.data.cards || [];
+
+    const localRes = await getWarehouseItems();
+    if (!localRes.success) return { success: false, error: localRes.error || "Failed to fetch local items" };
+
+    const updates: any[] = [];
+
+    for (const card of cards) {
+      const vc = (card.vendorCode || "").toLowerCase();
+      const item = localRes.data?.find(i => i.id.toLowerCase() === vc);
+      if (!item) {
+        console.debug(`No local item for WB vendorCode ${vc}`);
+        continue;
+      }
+
+      const sizes = Array.isArray(card.sizes) ? card.sizes : [];
+      const barcodes: string[] = sizes.flatMap((size: any) => Array.isArray(size.skus) ? size.skus : []);
+
+      if (barcodes.length === 0) {
+        console.warn(`No barcodes for card ${vc}`);
+        continue;
+      }
+
+      const specs = { ...item.specs, wb_sku: barcodes[0], wb_barcodes: barcodes };
+
+      updates.push({
+        id: item.id,
+        make: item.make,
+        model: item.model,
+        description: item.description,
+        type: item.type,
+        specs,
+        image_url: item.image_url,
+      });
+    }
+
+    if (updates.length > 0) {
+      const { error } = await supabaseAdmin.from("cars").upsert(updates, { onConflict: "id" });
+      if (error) throw error;
+      console.info(`Updated ${updates.length} items with WB barcodes.`);
+    } else {
+      console.info("No updates needed for WB barcodes.");
+    }
+
+    return { success: true, updated: updates.length };
+  } catch (e: any) {
+    console.error("setWbBarcodes error:", e);
+    return { success: false, error: e.message || "Unknown error setting WB barcodes" };
+  }
+}
+
+/* =======================
+   End of file
+   ======================= */
