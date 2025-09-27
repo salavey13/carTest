@@ -1,4 +1,3 @@
-// /app/webhook-handlers/commands/wb.ts
 import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { getWarehouseItems, exportCurrentStock } from "@/app/wb/actions";
 import { logger } from "@/lib/logger";
@@ -15,19 +14,22 @@ export async function wbCommand(chatId: number, userId: string) {
     }
     const items = res.data;
 
-    // Summarize by make
-    const summaryByMake: { [make: string]: number } = {};
+    // Summarize by model (size + season, ditching last word)
+    const summaryByModel: { [modelKey: string]: number } = {};
     items.forEach(i => {
-      const make = i.make || "Unknown Make";
+      const parts = i.model?.split(" ") || [];
+      const modelKey = parts.slice(0, -1).join(" ") || "Unknown Model"; // Ditch last word
       const qty = i.specs?.warehouse_locations?.reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0) || 0;
-      summaryByMake[make] = (summaryByMake[make] || 0) + qty;
+      summaryByModel[modelKey] = (summaryByModel[modelKey] || 0) + qty;
     });
 
-    // Format summary as Markdown
+    // Format summary as Markdown (monospace code for padding)
     const summaryText = [
       `Склад: ${items.length} позиций.`,
-      `Сумма по make:`,
-      ...Object.entries(summaryByMake).map(([make, qty]) => `*${escapeTelegramMarkdown(make)}*: ${qty}`)
+      `Сумма по модели:`,
+      '```',
+      ...Object.entries(summaryByModel).map(([modelKey, qty]) => `${modelKey.padEnd(20, ' ')} ${qty}`),
+      '```'
     ].join("\n");
 
     // Generate WB CSV: "баркод","количество"
