@@ -427,48 +427,147 @@ export default function WBPage() {
   const processedPackings = checkpointStart ? livePackings : 0;
   const processedStars = checkpointStart ? liveStars : 0;
 
-  return {
-    items,
-    loading,
-    error,
-    checkpoint,
-    workflowItems,
-    currentWorkflowIndex,
-    selectedWorkflowVoxel,
-    setSelectedWorkflowVoxel,
-    gameMode,
-    setGameMode,
-    score,
-    level,
-    streak,
-    dailyStreak,
-    achievements,
-    errorCount,
-    sessionStart,
-    bossMode,
-    bossTimer,
-    leaderboard,
-    loadItems,
-    handleUpdateLocationQty,
-    handleWorkflowNext,
-    handleSkipItem,
-    handlePlateClick,
-    handleItemClick,
-    search,
-    setSearch,
-    filterSeason,
-    setFilterSeason,
-    filterPattern,
-    setFilterPattern,
-    filterColor,
-    setFilterColor,
-    filterSize,
-    setFilterSize,
-    selectedVoxel,
-    setSelectedVoxel,
-    filteredItems: sortedFilteredItems, // Use the sorted items
-    setCheckpoint,
-    sortOption, // Expose the sort option
-    setSortOption, // Expose the setSortOption function
-  };
+  return (
+    <div className="flex flex-col min-h-screen bg-background text-foreground">
+      <header className="p-2 flex flex-col gap-2">
+        <div className="flex justify-between items-center gap-2">
+          {/* Select: explicit "none" option mapped to null */}
+          <Select
+            value={gameMode === null ? "none" : gameMode}
+            onValueChange={(v: any) => setGameMode(v === "none" ? null : v)}
+          >
+            <SelectTrigger className="w-28 text-[10px]">
+              <SelectValue placeholder="Режим" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">
+                <div className="flex items-center gap-2">
+                  <FileText size={12} /> <span>Без режима</span>
+                </div>
+              </SelectItem>
+
+              <SelectItem value="onload">
+                <div className="flex items-center gap-2">
+                  <Upload size={12} /> <span>Прием</span>
+                </div>
+              </SelectItem>
+
+              <SelectItem value="offload">
+                <div className="flex items-center gap-2">
+                  <Download size={12} /> <span>Выдача</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1">
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><Download size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
+            <Link href="/csv-compare">
+              <Button size="sm" variant="outline" className="text-[10px]">CSV Сравнение</Button>
+            </Link>
+          </div>
+        </div>
+
+        <FilterAccordion
+          filterSeason={filterSeason}
+          setFilterSeason={setFilterSeason}
+          filterPattern={filterPattern}
+          setFilterPattern={setFilterPattern}
+          filterColor={filterColor}
+          setFilterColor={setFilterColor}
+          filterSize={filterSize}
+          setFilterSize={setFilterSize}
+          items={localItems}
+          onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
+          includeSearch={true}
+          search={search}
+          setSearch={setSearch}
+          sortOption={sortOption}
+          setSortOption={setSortOption}
+        />
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-2">
+        <Card className="mb-2">
+          <CardHeader className="p-2">
+            <CardTitle className="text-xs">Товары ({localFilteredItems.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-5 gap-2 p-2 max-h-[69vh] overflow-y-auto">
+            {localFilteredItems.map((item) => (
+              <WarehouseItemCard
+                key={item.id}
+                item={item}
+                onClick={() => handleItemClickCustom(item)}
+              />
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* WarehouseViz прямо под товарами */}
+        <div className="mt-2">
+          <WarehouseViz
+            items={localItems}
+            selectedVoxel={selectedVoxel}
+            onSelectVoxel={setSelectedVoxel}
+            onUpdateLocationQty={(itemId:string, voxelId:string, qty:number) => optimisticUpdate(itemId, voxelId, qty)}
+            gameMode={gameMode}
+            onPlateClick={handlePlateClickCustom}
+          />
+        </div>
+
+        {/* Статистика вынесена в отдельный компонент и находится ниже viz */}
+        <div className="mt-4">
+          <WarehouseStats
+            itemsCount={localItems.length}
+            uniqueIds={new Set(localItems.map(i => i.id)).size}
+            score={score}
+            level={level}
+            streak={streak}
+            dailyStreak={dailyStreak}
+            checkpointMain={checkpointDisplayMain}
+            checkpointSub={checkpointDisplaySub}
+            changedCount={processedChangedCount}
+            totalDelta={processedTotalDelta}
+            packings={processedPackings}
+            stars={processedStars}
+            achievements={achievements}
+            sessionStart={sessionStart}
+            errorCount={errorCount}
+            bossMode={bossMode}
+            bossTimer={bossTimer}
+            leaderboard={leaderboard}
+          />
+        </div>
+      </div>
+
+      <WarehouseModals
+        workflowItems={workflowItems}
+        currentWorkflowIndex={currentWorkflowIndex}
+        selectedWorkflowVoxel={selectedWorkflowVoxel}
+        setSelectedWorkflowVoxel={setSelectedWorkflowVoxel}
+        handleWorkflowNext={handleWorkflowNext}
+        handleSkipItem={handleSkipItem}
+        editDialogOpen={editDialogOpen}
+        setEditDialogOpen={setEditDialogOpen}
+        editVoxel={editVoxel}
+        editContents={editContents}
+        setEditContents={setEditContents}
+        saveEditQty={async (itemId: string, newQty: number) => {
+          if (!editVoxel) return;
+          const currentContent = editContents.find(c => c.item.id === itemId);
+          if (!currentContent) return;
+          const delta = newQty - currentContent.quantity;
+          optimisticUpdate(itemId, editVoxel, delta);
+        }}
+        gameMode={gameMode}
+        VOXELS={VOXELS}
+      />
+    </div>
+  );
 }
