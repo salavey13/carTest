@@ -7,7 +7,7 @@ import { Item } from "./common";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAppContext } from "@/hooks/useAppContext";
+import { useAppContext } from "@/contexts/AppContext";
 
 type LocalItem = {
   id: string;
