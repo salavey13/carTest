@@ -220,6 +220,11 @@ export function useWarehouse() {
 
   const handleItemClick = useCallback(
     (item: Item) => {
+      if (!gameMode) {
+        toast.info(item.description || "Описание отсутствует");
+        return;
+      }
+
       const delta = gameMode === "onload" ? 1 : -1;
       let voxel: string | null = null;
 
