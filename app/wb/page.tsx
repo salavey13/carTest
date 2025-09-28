@@ -388,13 +388,13 @@ export default function WBPage() {
           }
         }
       } else {
-        // no voxel selected: prefer single non-empty location; if many, pick largest (fallback)
+        // no voxel selected: prefer single non-empty location; if many, require selection
         const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
         if (nonEmpty.length === 0 || item.total_quantity <= 0) return toast.error("Нет товара на складе");
-        loc = nonEmpty.length === 1 ? nonEmpty[0] : nonEmpty.sort((a:any,b:any) => (b.quantity || 0) - (a.quantity || 0))[0];
         if (nonEmpty.length > 1) {
-          toast.info(`Списываю из ${loc.voxel} (наибольшая ячейка — fallback).`);
+          return toast.error("Выберите ячейку для выдачи (несколько локаций)");
         }
+        loc = nonEmpty[0]; // single: auto
       }
 
       if (loc) {

@@ -263,24 +263,7 @@ export function useWarehouse() {
     const matchesColor = !filterColor || item.color === filterColor;
     const matchesSize = !filterSize || item.size === filterSize;
     return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-  }).sort((a, b) => {
-    // Sort by size first
-    const sizeA = getSizePriority(a.size);
-    const sizeB = getSizePriority(b.size);
-    if (sizeA !== sizeB) {
-      return sizeA - sizeB;
-    }
-
-    // Then sort by season
-    const seasonA = getSeasonPriority(a.season);
-    const seasonB = getSeasonPriority(b.season);
-    if (seasonA !== seasonB) {
-      return seasonA - seasonB;
-    }
-
-    // Finally, sort by color (alphabetical)
-    return a.color.localeCompare(b.color);
-  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]);
+  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]); // Removed redundant .sort here
 
   // --- Sorting Options ---
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
