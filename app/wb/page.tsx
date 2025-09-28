@@ -234,25 +234,32 @@ export default function WBPage() {
 
   // compute processed stats INCLUDING packings & stars
   const computeProcessedStats = useCallback(() => {
-    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, packings: 0, stars: 0 };
+    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0 };
     let changedCount = 0;
     let totalDelta = 0;
     let packings = 0;
+    let offloadUnits = 0;
 
     (localItems || []).forEach((it) => {
       const cp = checkpoint.find((c) => c.id === it.id);
       if (!cp) return;
-      const delta = Math.abs((it.total_quantity || 0) - (cp.total_quantity || 0));
-      if (delta > 0) changedCount += 1;
-      totalDelta += delta;
+      const rawDelta = (it.total_quantity || 0) - (cp.total_quantity || 0);
+      const absDelta = Math.abs(rawDelta);
+      if (absDelta > 0) changedCount += 1;
+      totalDelta += absDelta;
+
+      if (rawDelta < 0) {
+        offloadUnits += absDelta; // Sum negative changes as positive units offloaded
+      }
 
       const sizeKey = normalizeSizeKey(it.size);
       const piecesPerPack = (SIZE_PACK && SIZE_PACK[sizeKey]) ? SIZE_PACK[sizeKey] : 1;
-      packings += Math.floor(delta / piecesPerPack);
+      packings += Math.floor(absDelta / piecesPerPack);
     });
 
     const stars = packings * 25; // 1 packing = 25 stars
-    return { changedCount, totalDelta, packings, stars };
+    const salary = offloadUnits * 50; // 1 offload unit = 50 rub
+    return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
   }, [localItems, checkpoint]);
 
   const handleExportDiff = async () => {
@@ -460,7 +467,7 @@ export default function WBPage() {
     return sorted;
   }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
 
-  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars } = computeProcessedStats();
+  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars, offloadUnits: liveOffloadUnits, salary: liveSalary } = computeProcessedStats();
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
 
   // Precompute some formatted strings for stats component
@@ -470,6 +477,8 @@ export default function WBPage() {
   const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0);
   const processedPackings = checkpointStart ? livePackings : 0;
   const processedStars = checkpointStart ? liveStars : 0;
+  const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
+  const processedSalary = checkpointStart ? liveSalary : 0;
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -580,6 +589,8 @@ export default function WBPage() {
             totalDelta={processedTotalDelta}
             packings={processedPackings}
             stars={processedStars}
+            offloadUnits={processedOffloadUnits}
+            salary={processedSalary}
             achievements={achievements}
             sessionStart={sessionStart}
             errorCount={errorCount}

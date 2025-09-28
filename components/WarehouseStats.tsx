@@ -22,6 +22,8 @@ interface WarehouseStatsProps {
   totalDelta: number;
   packings: number;
   stars: number;
+  offloadUnits: number;
+  salary: number;
   achievements: string[];
   sessionStart: number;
   errorCount: number;
@@ -44,6 +46,8 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
     totalDelta,
     packings,
     stars,
+    offloadUnits,
+    salary,
     achievements,
     sessionStart,
     errorCount,
@@ -78,6 +82,9 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
           </div>
           <div className="text-[12px] mt-1 opacity-80">
             Изм. позиций: <b>{changedCount}</b> · Изменённое кол-во: <b>{totalDelta}</b>
+            <div className="mt-1 text-[11px] opacity-80">
+              Выдано единиц: <b>{offloadUnits}</b> · Зарплата: <b>{salary}</b> руб <span className="opacity-60 text-[10px]"> (50 руб/единица)</span>
+            </div>
             <div className="mt-1 text-[11px] opacity-80">
               Упаковок: <b>{packings}</b> · Звёзд: <b>{stars}</b> <span className="opacity-60 text-[10px]"> (1 упаковка = 25⭐)</span>
             </div>
