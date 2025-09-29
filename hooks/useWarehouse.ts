@@ -1,3 +1,4 @@
+// /hooks/useWarehouse.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
@@ -52,6 +53,9 @@ export function useWarehouse() {
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
   const { dbUser } = useAppContext();
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [onloadCount, setOnloadCount] = useState(0);
+  const [offloadCount, setOffloadCount] = useState(0);
+  const [editCount, setEditCount] = useState(0);
 
   // Фильтры — инициализированы до filteredItems
   const [search, setSearch] = useState("");
@@ -103,6 +107,23 @@ export function useWarehouse() {
   }, []);
 
   useEffect(() => {
+    const resumeSession = localStorage.getItem('warehouse_session');
+    if (resumeSession) {
+      const { mode, checkpointData, onload, offload, edits } = JSON.parse(resumeSession);
+      if (mode === 'offload' && checkpointData) {
+        const resume = window.confirm('Обнаружен незавершенный offload. Продолжить?');
+        if (resume) {
+          setGameMode(mode);
+          setCheckpoint(checkpointData);
+          setOnloadCount(onload || 0);
+          setOffloadCount(offload || 0);
+          setEditCount(edits || 0);
+          toast.info('Offload возобновлен.');
+        } else {
+          localStorage.removeItem('warehouse_session');
+        }
+      }
+    }
     loadItems();
     const savedLeaderboard = JSON.parse(localStorage.getItem("warehouse_leaderboard") || "[]");
     setLeaderboard(savedLeaderboard);
@@ -133,12 +154,30 @@ export function useWarehouse() {
           if (streak % 5 === 4) {}
           checkAchievements();
         }
+
+        // Separate counters
+        if (gameMode === 'onload') {
+          setOnloadCount(prev => prev + Math.abs(delta));
+        } else if (gameMode === 'offload') {
+          setOffloadCount(prev => prev + Math.abs(delta));
+        } else {
+          setEditCount(prev => prev + Math.abs(delta));
+        }
+
+        // Save session for recovery
+        localStorage.setItem('warehouse_session', JSON.stringify({
+          mode: gameMode,
+          checkpointData: checkpoint,
+          onload: onloadCount + (gameMode === 'onload' ? Math.abs(delta) : 0),
+          offload: offloadCount + (gameMode === 'offload' ? Math.abs(delta) : 0),
+          edits: editCount + (!gameMode ? Math.abs(delta) : 0),
+        }));
       } else {
         toast.error(updateError || "Failed to update quantity");
         if (isGameAction) setErrorCount((prev) => prev + 1);
       }
     },
-    [gameMode, level, streak],
+    [gameMode, level, streak, checkpoint, onloadCount, offloadCount, editCount],
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -209,6 +248,7 @@ export function useWarehouse() {
     localStorage.setItem("warehouse_leaderboard", JSON.stringify(newLeaderboard));
     setGameMode(null);
     setSessionStart(Date.now());
+    localStorage.removeItem('warehouse_session');
   };
 
   const handlePlateClick = useCallback(
@@ -318,6 +358,7 @@ export function useWarehouse() {
     loading,
     error,
     checkpoint,
+    setCheckpoint,
     workflowItems,
     currentWorkflowIndex,
     selectedWorkflowVoxel,
@@ -353,8 +394,10 @@ export function useWarehouse() {
     selectedVoxel,
     setSelectedVoxel,
     filteredItems: sortedFilteredItems, // Use the sorted items
-    setCheckpoint,
     sortOption, // Expose the sort option
     setSortOption, // Expose the setSortOption function
+    onloadCount,
+    offloadCount,
+    editCount,
   };
 }
