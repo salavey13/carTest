@@ -1,4 +1,3 @@
-// /hooks/useWarehouse.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
@@ -6,30 +5,24 @@ import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
 
-// Helper function to determine size priority
 const getSizePriority = (size: string | null): number => {
-  if (!size) return 999; // Sort null or undefined sizes last
-
+  if (!size) return 999;
   const sizeOrder: { [key: string]: number } = {
     "1.5": 1,
     "2": 2,
     "евро": 3,
     "евро макси": 4,
   };
-
-  return sizeOrder[size] || 5; // Default priority for unknown sizes
+  return sizeOrder[size] || 5;
 };
 
-// Helper function to determine season priority
 const getSeasonPriority = (season: string | null): number => {
-  if (!season) return 999; // Sort null or undefined seasons last
-
+  if (!season) return 999;
   const seasonOrder: { [key: string]: number } = {
     "лето": 1,
     "зима": 2,
   };
-
-  return seasonOrder[season] || 3; // Default priority for unknown seasons
+  return seasonOrder[season] || 3;
 };
 
 export function useWarehouse() {
@@ -57,7 +50,6 @@ export function useWarehouse() {
   const [offloadCount, setOffloadCount] = useState(0);
   const [editCount, setEditCount] = useState(0);
 
-  // Фильтры — инициализированы до filteredItems
   const [search, setSearch] = useState("");
   const [filterSeason, setFilterSeason] = useState<string | null>(null);
   const [filterPattern, setFilterPattern] = useState<string | null>(null);
@@ -72,27 +64,29 @@ export function useWarehouse() {
 
     if (success && data) {
       const mappedItems: Item[] = data.map((i: WarehouseItem) => {
-        const locations = i.specs?.warehouse_locations?.map((l: any) => ({
+        const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
           voxel: l.voxel_id,
           quantity: l.quantity,
-          min_qty: l.voxel_id.startsWith("B") ? 3 : undefined,
-        })) || [].sort((a, b) => a.voxel.localeCompare(b.voxel)); // Sort locations A-Z
-        const sumQty = locations.reduce((acc, l) => acc + l.quantity, 0);
-        const total = sumQty || 0; // Ignore i.quantity, always use sum to avoid mismatches
+          min_qty: l.voxel_id?.startsWith?.("B") ? 3 : undefined,
+        })).sort((a: any, b: any) => (a.voxel || "").localeCompare(b.voxel || ""));
+
+        const sumQty = locations.reduce((acc, l) => acc + (l.quantity || 0), 0);
+        const total = sumQty || 0;
         return {
           id: i.id,
           name: `${i.make} ${i.model}`,
-          description: i.description,
+          description: i.description || "",
           image: i.image_url,
           locations,
           total_quantity: total,
           season: i.specs?.season || null,
-          pattern: i.specs?.pattern,
+          pattern: i.specs?.pattern || null,
           color: i.specs?.color || "gray",
           size: i.specs?.size || "",
         };
       });
-      logger.info(`loadItems: Mapped ${mappedItems.length} items. Sample: ${JSON.stringify(mappedItems[0] || 'none')}`);
+
+      logger.info(`loadItems: Mapped ${mappedItems.length} items.`);
       setItems(mappedItems);
       setCheckpoint(mappedItems.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
       if (mappedItems.length === 0) {
@@ -135,27 +129,51 @@ export function useWarehouse() {
       const { success, error: updateError } = await updateItemLocationQty(itemId, voxelId, delta);
       if (success) {
         setItems((prev) =>
-          prev.map((i) =>
-            i.id === itemId
-              ? {
-                  ...i,
-                  locations: i.locations.map((l) =>
-                    l.voxel === voxelId ? { ...l, quantity: Math.max(0, l.quantity + delta) } : l,
-                  ).filter((l) => l.quantity > 0).sort((a, b) => a.voxel.localeCompare(b.voxel)),
-                  total_quantity: i.total_quantity + delta,
+          prev.map((i) => {
+            if (i.id !== itemId) return i;
+            const locs = (i.locations || []).map((l) => ({ ...l }));
+            const idx = locs.findIndex((l) => (l.voxel || "") === voxelId);
+
+            if (idx !== -1) {
+              const newQty = Math.max(0, (locs[idx].quantity || 0) + delta);
+              locs[idx] = { ...locs[idx], quantity: newQty };
+            } else if (delta > 0) {
+              locs.push({
+                voxel: voxelId,
+                quantity: delta,
+                min_qty: voxelId?.startsWith?.("B") ? 3 : undefined,
+              });
+            } else {
+              // delta < 0 and voxel not found - try deducting from largest location (defensive)
+              if (locs.length === 1) {
+                locs[0] = { ...locs[0], quantity: Math.max(0, (locs[0].quantity || 0) + delta) };
+              } else if (locs.length > 1) {
+                const biggest = [...locs].sort((a, b) => (b.quantity || 0) - (a.quantity || 0))[0];
+                const idxBig = locs.findIndex((l) => l.voxel === biggest.voxel);
+                if (idxBig !== -1) {
+                  locs[idxBig] = { ...locs[idxBig], quantity: Math.max(0, (locs[idxBig].quantity || 0) + delta) };
                 }
-              : i,
-          ),
+              }
+            }
+
+            const filtered = locs.filter((l) => (l.quantity || 0) > 0).sort((a, b) => (a.voxel || "").localeCompare(b.voxel || ""));
+            const newTotal = filtered.reduce((acc, l) => acc + (l.quantity || 0), 0);
+
+            return {
+              ...i,
+              locations: filtered,
+              total_quantity: newTotal,
+            };
+          })
         );
+
         if (isGameAction) {
           const points = gameMode === "onload" ? 10 : 5;
           setScore((prev) => prev + points * (level / 2));
           setStreak((prev) => prev + 1);
-          if (streak % 5 === 4) {}
           checkAchievements();
         }
 
-        // Separate counters
         const absDelta = Math.abs(delta);
         if (gameMode === 'onload' && delta > 0) {
           setOnloadCount(prev => prev + absDelta);
@@ -165,7 +183,6 @@ export function useWarehouse() {
           setEditCount(prev => prev + absDelta);
         }
 
-        // Save session for recovery
         localStorage.setItem('warehouse_session', JSON.stringify({
           mode: gameMode,
           checkpointData: checkpoint,
@@ -178,7 +195,7 @@ export function useWarehouse() {
         if (isGameAction) setErrorCount((prev) => prev + 1);
       }
     },
-    [gameMode, level, streak, checkpoint, onloadCount, offloadCount, editCount],
+    [gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount],
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -214,7 +231,7 @@ export function useWarehouse() {
       if (streak === 20 && !newAch.includes("Streak Master")) newAch.push("Streak Master");
       if (score > 1000 && !newAch.includes("High Scorer")) newAch.push("High Scorer");
       if (workflowItems.length > 20 && errorCount === 0 && !newAch.includes("Perfect Run")) newAch.push("Perfect Run");
-      if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 3600 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon"); // Adjusted to 1h for ~20 units
+      if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 3600 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon");
       if (workflowItems.length > 20 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
       if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
       return newAch;
@@ -254,7 +271,7 @@ export function useWarehouse() {
 
   const handlePlateClick = useCallback(
     (voxelId: string) => {
-      // Только селект — модалы в компоненте
+      // Only select - modal handling is done in page component
     },
     [],
   );
@@ -296,7 +313,6 @@ export function useWarehouse() {
     [gameMode, selectedVoxel, handleUpdateLocationQty],
   );
 
-  // useMemo для filteredItems — предотвращает TDZ в зависимостях
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
     const matchesSeason = !filterSeason || item.season === filterSeason;
@@ -304,50 +320,32 @@ export function useWarehouse() {
     const matchesColor = !filterColor || item.color === filterColor;
     const matchesSize = !filterSize || item.size === filterSize;
     return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]); // Removed redundant .sort here
+  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]);
 
-  // --- Sorting Options ---
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
 
   const sortItems = useCallback((itemsToSort: Item[]) => {
     return [...itemsToSort].sort((a, b) => {
       let comparison = 0;
-
       switch (sortOption) {
         case 'size_season_color':
-          // Size
           comparison = getSizePriority(a.size) - getSizePriority(b.size);
           if (comparison !== 0) return comparison;
-
-          // Season
           comparison = getSeasonPriority(a.season) - getSeasonPriority(b.season);
           if (comparison !== 0) return comparison;
-
-          // Color
           return a.color.localeCompare(b.color);
-
         case 'color_size':
-          // Color
           comparison = a.color.localeCompare(b.color);
           if (comparison !== 0) return comparison;
-
-          // Size
           return getSizePriority(a.size) - getSizePriority(b.size);
-
         case 'season_size_color':
-          // Season
           comparison = getSeasonPriority(a.season) - getSeasonPriority(b.season);
           if (comparison !== 0) return comparison;
-
-          // Size
           comparison = getSizePriority(a.size) - getSizePriority(b.size);
           if (comparison !== 0) return comparison;
-
-          // Color
           return a.color.localeCompare(b.color);
-
         default:
-          return 0; // No sorting
+          return 0;
       }
     });
   }, [sortOption]);
@@ -394,14 +392,14 @@ export function useWarehouse() {
     setFilterSize,
     selectedVoxel,
     setSelectedVoxel,
-    filteredItems: sortedFilteredItems, // Use the sorted items
-    sortOption, // Expose the sort option
-    setSortOption, // Expose the setSortOption function
+    filteredItems: sortedFilteredItems,
+    sortOption,
+    setSortOption,
     onloadCount,
     offloadCount,
     editCount,
-setOnloadCount,
-   setOffloadCount,
-   setEditCount,
+    setOnloadCount,
+    setOffloadCount,
+    setEditCount,
   };
 }
