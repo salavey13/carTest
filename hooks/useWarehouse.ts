@@ -1,4 +1,3 @@
-// /hooks/useWarehouse.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
@@ -210,11 +209,11 @@ export function useWarehouse() {
   const checkAchievements = useCallback(() => {
     setAchievements((prev) => {
       const newAch = [...prev];
-      if (streak === 10 && !newAch.includes("Streak Master")) newAch.push("Streak Master");
+      if (streak === 20 && !newAch.includes("Streak Master")) newAch.push("Streak Master");
       if (score > 1000 && !newAch.includes("High Scorer")) newAch.push("High Scorer");
       if (workflowItems.length > 20 && errorCount === 0 && !newAch.includes("Perfect Run")) newAch.push("Perfect Run");
-      if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 300 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon");
-      if (workflowItems.length > 10 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
+      if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 180 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon"); // 20 units/hour good -> 3min on 1 unit, but for workflow>0, <3min total? Adjust to realistic
+      if (workflowItems.length > 20 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
       if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
       return newAch;
     });
