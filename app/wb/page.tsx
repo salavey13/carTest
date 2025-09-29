@@ -102,7 +102,7 @@ export default function WBPage() {
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
 
-const formatSec = (sec: number | null) => {
+  const formatSec = (sec: number | null) => {
     if (sec === null) return "--:--";
     const mm = Math.floor(sec / 60).toString().padStart(2, "0");
     const ss = (sec % 60).toString().padStart(2, "0");
