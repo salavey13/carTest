@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from "@/hooks/supabase";
 import { unstable_noStore as noStore } from "next/cache";
-import type { WarehouseItem } from "@/app/wb/common";
+import type { WarehouseItem } from " @/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
@@ -202,13 +202,8 @@ export async function updateItemLocationQty(
    CSV Export helpers
    ========================= */
 
-export async function exportDiffToAdmin(diffData: any[], isTelegram = false, summarized = false): Promise<{ success: boolean; csv?: string }> {
-  let csvData;
-  if (summarized) {
-    csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Количество: d.diffQty })), { header: true, delimiter: ",", quotes: true });
-  } else {
-    csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Изменение: d.diffQty, Ячейка: d.voxel })), { header: true, delimiter: ",", quotes: true });
-  }
+export async function exportDiffToAdmin(diffData: any[], isTelegram = false): Promise<{ success: boolean; csv?: string }> {
+  let csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Изменение: d.diffQty, Ячейка: d.voxel })), { header: true, delimiter: ",", quotes: true });
 
   if (isTelegram) {
     return { success: true, csv: csvData };
@@ -836,6 +831,75 @@ export async function setWbBarcodes(): Promise<{ success: boolean; updated?: num
   } catch (e: any) {
     console.error("setWbBarcodes error:", e);
     return { success: false, error: e.message || "Unknown error setting WB barcodes" };
+  }
+}
+
+/* =======================
+   Pending Count Fetchers
+   ======================= */
+
+export async function fetchWbPendingCount(): Promise<{ success: boolean; count: number; error?: string }> {
+  const WB_TOKEN = process.env.WB_API_TOKEN;
+  const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
+  if (!WB_TOKEN || !WB_WAREHOUSE_ID) return { success: false, count: 0, error: "WB credentials missing" };
+
+  try {
+    const url = 'https://supplies-api.wildberries.ru/api/v4/fbs/posting/list';
+    const body = {
+      filter: { status: 'awaiting_packaging' },
+      limit: 1, // Just to get total
+      next: 0
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, count: 0, error: `WB: ${res.status} - ${text}` };
+    }
+
+    const data = await res.json();
+    const total = data?.total || 0;
+    return { success: true, count: total };
+  } catch (err: any) {
+    return { success: false, count: 0, error: err.message };
+  }
+}
+
+export async function fetchOzonPendingCount(): Promise<{ success: boolean; count: number; error?: string }> {
+  const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
+  const OZON_API_KEY = process.env.OZON_API_KEY;
+  if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, count: 0, error: "Ozon credentials missing" };
+
+  try {
+    const url = 'https://api-seller.ozon.ru/v3/posting/fbs/list';
+    const body = {
+      dir: 'ASC',
+      filter: { status: 'awaiting_packaging' },
+      limit: 1, // Just for total
+      offset: 0
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { success: false, count: 0, error: `Ozon: ${res.status} - ${text}` };
+    }
+
+    const data = await res.json();
+    const total = data?.result?.total || 0;
+    return { success: true, count: total };
+  } catch (err: any) {
+    return { success: false, count: 0, error: err.message };
   }
 }
 
