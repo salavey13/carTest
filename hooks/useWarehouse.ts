@@ -155,21 +155,22 @@ export function useWarehouse() {
         }
 
         // Separate counters
-        if (gameMode === 'onload') {
-          setOnloadCount(prev => prev + Math.abs(delta));
-        } else if (gameMode === 'offload') {
-          setOffloadCount(prev => prev + Math.abs(delta));
-        } else {
-          setEditCount(prev => prev + Math.abs(delta));
+        const absDelta = Math.abs(delta);
+        if (gameMode === 'onload' && delta > 0) {
+          setOnloadCount(prev => prev + absDelta);
+        } else if (gameMode === 'offload' && delta < 0) {
+          setOffloadCount(prev => prev + absDelta);
+        } else if (!gameMode) {
+          setEditCount(prev => prev + absDelta);
         }
 
         // Save session for recovery
         localStorage.setItem('warehouse_session', JSON.stringify({
           mode: gameMode,
           checkpointData: checkpoint,
-          onload: onloadCount + (gameMode === 'onload' ? Math.abs(delta) : 0),
-          offload: offloadCount + (gameMode === 'offload' ? Math.abs(delta) : 0),
-          edits: editCount + (!gameMode ? Math.abs(delta) : 0),
+          onload: onloadCount,
+          offload: offloadCount,
+          edits: editCount,
         }));
       } else {
         toast.error(updateError || "Failed to update quantity");
