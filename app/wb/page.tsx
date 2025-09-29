@@ -149,21 +149,27 @@ export default function WBPage() {
 
   const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     const normalizedVoxel = (voxelId || "").toString();
-
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
         const locs = (i.locations || []).map((l: any) => ({ ...l }));
         const idx = locs.findIndex((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-        if (idx === -1) {
-          if (delta > 0) locs.push({ voxel: normalizedVoxel, quantity: delta });
-          else if (locs.length === 1) locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
-          else if (locs.length > 1) {
+        let actualVoxel = normalizedVoxel;
+        if (idx !== -1) {
+          actualVoxel = locs[idx].voxel;
+          locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
+        } else {
+          if (delta > 0) {
+            locs.push({ voxel: normalizedVoxel, quantity: delta });
+            actualVoxel = normalizedVoxel;
+          } else if (locs.length === 1) {
+            locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
+            actualVoxel = locs[0].voxel;
+          } else if (locs.length > 1) {
             const biggest = [...locs].sort((a: any, b: any) => (b.quantity || 0) - (a.quantity || 0))[0];
             biggest.quantity = Math.max(0, (biggest.quantity || 0) + delta);
+            actualVoxel = biggest.voxel;
           }
-        } else {
-          locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
         }
         const filtered = locs.filter((l) => (l.quantity || 0) > 0);
         const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
@@ -173,11 +179,18 @@ export default function WBPage() {
           if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) setSelectedVoxel(null);
         }
 
-        return { ...i, locations: filtered, total_quantity: total };
+        return { ...i, locations: filtered, total_quantity: total, __lastOptimisticVoxel: actualVoxel };
       })
     );
 
-    handleUpdateLocationQty(itemId, normalizedVoxel, delta, true).catch(() => {
+    const itemAfterOptimistic = localItems.find((it) => it.id === itemId);
+    let serverVoxel = voxelId;
+    if (itemAfterOptimistic) {
+      const match = (itemAfterOptimistic.locations || []).find((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
+      if (match) serverVoxel = match.voxel;
+    }
+
+    handleUpdateLocationQty(itemId, serverVoxel, delta, true).catch(() => {
       loadItems();
       toast.error("Ошибка при сохранении изменений на сервере — данные перезагружены.");
     });
