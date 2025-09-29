@@ -88,6 +88,16 @@ export default function WBPage() {
   const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
 
+  // State for computed stats to avoid TDZ
+  const [statsObj, setStatsObj] = useState({
+    changedCount: 0,
+    totalDelta: 0,
+    packings: 0,
+    stars: 0,
+    offloadUnits: 0,
+    salary: 0
+  });
+
   useEffect(() => setLocalItems(hookItems || []), [hookItems]);
 
   useEffect(() => {
@@ -268,6 +278,14 @@ export default function WBPage() {
     return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
   }, [localItems, checkpoint, offloadCount]);
 
+  // UseEffect for stats computation to avoid TDZ in render
+  useEffect(() => {
+    const stats = computeProcessedStats();
+    setStatsObj(stats);
+  }, [localItems, checkpoint, offloadCount, onloadCount, editCount, computeProcessedStats]); // Deps include all counters
+
+  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars, offloadUnits: liveOffloadUnits, salary: liveSalary } = statsObj;
+
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
 
   // Precompute some formatted strings for stats component
@@ -279,227 +297,6 @@ export default function WBPage() {
   const processedStars = checkpointStart ? liveStars : 0;
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
   const processedSalary = checkpointStart ? liveSalary : 0;
-
-  const handleExportDiff = async () => {
-    const diffData = (localItems || [])
-      .flatMap((item) =>
-        (item.locations || [])
-          .map((loc:any) => {
-            const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
-            const diffQty = loc.quantity - (checkpointLoc?.quantity || 0);
-            return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
-          })
-          .filter(Boolean)
-      )
-      .filter(Boolean);
-
-    const result = await exportDiffToAdmin(diffData as any, isTelegram);
-
-    if (isTelegram && result.csv) {
-      navigator.clipboard.writeText(result.csv);
-      toast.success("CSV скопирован в буфер обмена!");
-    } else if (result && result.csv) {
-      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "diff_export.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    if (checkpointStart) {
-      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-      setLastCheckpointDurationSec(durSec);
-      const { changedCount } = computeProcessedStats();
-      setLastProcessedCount(changedCount);
-      setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
-
-      // Notify admin if offload
-      if (gameMode === 'offload') {
-        const { offloadUnits, salary } = computeProcessedStats();
-        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
-        await notifyAdmin(message);
-      }
-    }
-  };
-
-  const handleExportStock = async (summarized = false) => {
-    const result = await exportCurrentStock(localItems, isTelegram, summarized);
-    if (isTelegram && result.csv) {
-      navigator.clipboard.writeText(result.csv);
-      toast.success("CSV скопирован в буфер обмена!");
-    } else if (result.csv) {
-      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
-
-    if (checkpointStart) {
-      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-      setLastCheckpointDurationSec(durSec);
-      const { changedCount } = computeProcessedStats();
-      setLastProcessedCount(changedCount);
-      setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
-
-      // Notify admin if offload
-      if (gameMode === 'offload') {
-        const { offloadUnits, salary } = computeProcessedStats();
-        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
-        await notifyAdmin(message);
-      }
-    }
-  };
-
-  const formatSec = (sec: number | null) => {
-    if (sec === null) return "--:--";
-    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
-    const ss = (sec % 60).toString().padStart(2, "0");
-    return `${mm}:${ss}`;
-  };
-
-  // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
-  const handlePlateClickCustom = (voxelId: string) => {
-    handlePlateClick(voxelId);
-
-    const content = localItems
-      .flatMap((i) => (i.locations || []).filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0)
-        .map((l:any) => ({ item: i, quantity: l.quantity }))
-      );
-
-    // If we are in "onload" or "offload" — do NOT open modals, just select voxel silently
-    if (gameMode === "onload" || gameMode === "offload") {
-      setSelectedVoxel(voxelId);
-      if (gameMode === "onload") {
-        toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточки` : `Выбрана ячейка ${voxelId}`);
-      } else {
-        toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
-      }
-      return;
-    }
-
-    // default behaviour for neutral mode:
-    if (content.length > 0) {
-      setEditVoxel(voxelId);
-      setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-      setEditDialogOpen(true);
-    } else {
-      setSelectedVoxel(voxelId);
-    }
-  };
-
-  // item click still does qty changes (optimistic)
-  const handleItemClickCustom = async (item: any) => {
-    if (!item) return;
-
-    if (gameMode === "onload") {
-      const targetVoxel = selectedVoxel || "A1";
-      setSelectedVoxel(targetVoxel);
-      optimisticUpdate(item.id, targetVoxel, 1);
-      toast.success(`Добавлено в ${targetVoxel}`);
-      return;
-    }
-
-    if (gameMode === "offload") {
-      let loc;
-
-      // Case-insensitive matching helper
-      const selVoxelNorm = selectedVoxel ? selectedVoxel.toString().toLowerCase() : null;
-
-      if (selectedVoxel) {
-        // try selected voxel (case-insensitive)
-        loc = (item.locations || []).find((l:any) => (l.voxel || "").toString().toLowerCase() === selVoxelNorm && (l.quantity || 0) > 0);
-        if (!loc) {
-          // selected voxel empty: check if item has exactly one non-empty location — if so, use it
-          const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
-          if (nonEmpty.length === 1) {
-            loc = nonEmpty[0];
-            toast.info(`В выбранной ячейке нет товара — списываю из ${loc.voxel} (единственная ячейка с товаром).`);
-          } else {
-            // multiple non-empty or none -> do not silently choose
-            return toast.error("Нет товара в выбранной ячейке");
-          }
-        }
-      } else {
-        // no voxel selected: prefer single non-empty location; if many, require selection
-        const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
-        if (nonEmpty.length === 0 || item.total_quantity <= 0) return toast.error("Нет товара на складе");
-        if (nonEmpty.length > 1) {
-          return toast.error("Выберите ячейку для выдачи (несколько локаций)");
-        }
-        loc = nonEmpty[0]; // single: auto
-      }
-
-      if (loc) {
-        const voxel = loc.voxel;
-        optimisticUpdate(item.id, voxel, -1);
-
-        // After optimistic update we already clear selectedVoxel inside optimisticUpdate if that voxel became empty.
-        // Additional small safeguard: if selectedVoxel matched this voxel (case-insensitive) and item now has no such location, clear it.
-        // (optimisticUpdate already handles this, so this is just a defensive no-op.)
-        toast.success(`Выдано из ${voxel}`);
-      } else {
-        toast.error("Нет товара на складе");
-      }
-      return;
-    }
-
-    handleItemClick(item);
-  };
-
-  // localFilteredItems: now respects filters AND sortOption
-  const localFilteredItems = useMemo(() => {
-    const arr = (localItems || []).filter((item) => {
-      const searchLower = (search || "").toLowerCase();
-      const matchesSearch =
-        (item.name || "").toLowerCase().includes(searchLower) ||
-        (item.description || "").toLowerCase().includes(searchLower);
-
-      const matchesSeason = !filterSeason || item.season === filterSeason;
-      const matchesPattern = !filterPattern || item.pattern === filterPattern;
-      const matchesColor = !filterColor || item.color === filterColor;
-      const matchesSize = !filterSize || item.size === filterSize;
-
-      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-    });
-
-    // apply sorting according to sortOption from hook
-    const sorted = [...arr].sort((a, b) => {
-      switch (sortOption) {
-        case 'size_season_color': {
-          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
-          if (sizeCmp !== 0) return sizeCmp;
-          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
-          if (seasonCmp !== 0) return seasonCmp;
-          return (a.color || "").localeCompare(b.color || "");
-        }
-        case 'color_size': {
-          const colorCmp = (a.color || "").localeCompare(b.color || "");
-          if (colorCmp !== 0) return colorCmp;
-          return getSizePriority(a.size) - getSizePriority(b.size);
-        }
-        case 'season_size_color': {
-          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
-          if (seasonCmp !== 0) return seasonCmp;
-          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
-          if (sizeCmp !== 0) return sizeCmp;
-          return (a.color || "").localeCompare(b.color || "");
-        }
-        default:
-          return 0;
-      }
-    });
-
-    return sorted;
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
-
-  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars, offloadUnits: liveOffloadUnits, salary: liveSalary } = computeProcessedStats();
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -585,7 +382,7 @@ export default function WBPage() {
 
         {/* WarehouseViz прямо под товарами */}
         <div className="mt-2">
-          <WarehouseViz
+  <WarehouseViz
             items={localItems}
             selectedVoxel={selectedVoxel}
             onSelectVoxel={setSelectedVoxel}
@@ -598,27 +395,27 @@ export default function WBPage() {
         {/* Статистика вынесена в отдельный компонент и находится ниже viz */}
         <div className="mt-4">
           <WarehouseStats
-            itemsCount={localItems.length}
-            uniqueIds={new Set(localItems.map(i => i.id)).size}
-            score={score}
-            level={level}
-            streak={streak}
-            dailyStreak={dailyStreak}
-            checkpointMain={checkpointDisplayMain}
-            checkpointSub={checkpointDisplaySub}
-            changedCount={processedChangedCount}
-            totalDelta={processedTotalDelta}
-            packings={processedPackings}
-            stars={processedStars}
-            offloadUnits={processedOffloadUnits}
-            salary={processedSalary}
-            achievements={achievements}
-            sessionStart={sessionStart}
-            errorCount={errorCount}
-            bossMode={bossMode}
-            bossTimer={bossTimer}
-            leaderboard={leaderboard}
-          />
+        itemsCount={localItems.length}
+        uniqueIds={new Set(localItems.map(i => i.id)).size}
+        score={score}
+        level={level}
+        streak={streak}
+        dailyStreak={dailyStreak}
+        checkpointMain={checkpointDisplayMain}
+        checkpointSub={checkpointDisplaySub}
+        changedCount={processedChangedCount}
+        totalDelta={processedTotalDelta}
+        packings={processedPackings}
+        stars={processedStars}
+        offloadUnits={processedOffloadUnits}
+        salary={processedSalary}
+        achievements={achievements}
+        sessionStart={sessionStart}
+        errorCount={errorCount}
+        bossMode={bossMode}
+        bossTimer={bossTimer}
+        leaderboard={leaderboard}
+      />
         </div>
       </div>
 
