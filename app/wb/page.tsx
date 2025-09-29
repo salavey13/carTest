@@ -102,6 +102,13 @@ export default function WBPage() {
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
 
+  const formatSec = (sec: number | null) => {
+    if (sec === null) return "--:--";
+    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
+    const ss = (sec % 60).toString().padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
   useEffect(() => setLocalItems(hookItems || []), [hookItems]);
 
   useEffect(() => {
@@ -302,13 +309,6 @@ export default function WBPage() {
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
   const processedSalary = checkpointStart ? liveSalary : 0;
 
-  const formatSec = (sec: number | null) => {
-    if (sec === null) return "--:--";
-    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
-    const ss = (sec % 60).toString().padStart(2, "0");
-    return `${mm}:${ss}`;
-  };
-
   const handleExportDiff = async () => {
     const diffData = (localItems || [])
       .flatMap((item) =>
@@ -385,8 +385,6 @@ export default function WBPage() {
       }
     }
   };
-
-  
 
   // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
   const handlePlateClickCustom = (voxelId: string) => {
