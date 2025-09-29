@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -149,48 +149,41 @@ export default function WBPage() {
 
   const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     const normalizedVoxel = (voxelId || "").toString();
+
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
         const locs = (i.locations || []).map((l: any) => ({ ...l }));
         const idx = locs.findIndex((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-        let actualVoxel = normalizedVoxel;
-        if (idx !== -1) {
-          actualVoxel = locs[idx].voxel;
-          locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
-        } else {
-          if (delta > 0) {
-            locs.push({ voxel: normalizedVoxel, quantity: delta });
-            actualVoxel = normalizedVoxel;
-          } else if (locs.length === 1) {
-            locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
-            actualVoxel = locs[0].voxel;
-          } else if (locs.length > 1) {
+
+        if (idx === -1) {
+          if (delta > 0) locs.push({ voxel: normalizedVoxel, quantity: delta });
+          else if (locs.length === 1) locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
+          else if (locs.length > 1) {
             const biggest = [...locs].sort((a: any, b: any) => (b.quantity || 0) - (a.quantity || 0))[0];
-            biggest.quantity = Math.max(0, (biggest.quantity || 0) + delta);
-            actualVoxel = biggest.voxel;
+            const bIdx = locs.findIndex((l: any) => l.voxel === biggest.voxel);
+            locs[bIdx].quantity = Math.max(0, (locs[bIdx].quantity || 0) + delta);
           }
+        } else {
+          locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
         }
+
         const filtered = locs.filter((l) => (l.quantity || 0) > 0);
         const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
 
         if (delta < 0 && selectedVoxel) {
           const stillPresent = filtered.some((l) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-          if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) setSelectedVoxel(null);
+          if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) {
+            setSelectedVoxel(null);
+          }
         }
 
-        return { ...i, locations: filtered, total_quantity: total, __lastOptimisticVoxel: actualVoxel };
+        return { ...i, locations: filtered, total_quantity: total };
       })
     );
 
-    const itemAfterOptimistic = localItems.find((it) => it.id === itemId);
-    let serverVoxel = voxelId;
-    if (itemAfterOptimistic) {
-      const match = (itemAfterOptimistic.locations || []).find((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-      if (match) serverVoxel = match.voxel;
-    }
-
-    handleUpdateLocationQty(itemId, serverVoxel, delta, true).catch(() => {
+    // Send the same normalized voxel to the server — the hook will add location on positive delta if needed.
+    handleUpdateLocationQty(itemId, normalizedVoxel, delta, true).catch(() => {
       loadItems();
       toast.error("Ошибка при сохранении изменений на сервере — данные перезагружены.");
     });
@@ -255,6 +248,7 @@ export default function WBPage() {
     let totalDelta = 0;
     let packings = 0;
     let offloadUnits = offloadCount || 0;
+
     (localItems || []).forEach((it) => {
       const cp = checkpoint.find((c) => c.id === it.id);
       if (!cp) return;
@@ -262,10 +256,12 @@ export default function WBPage() {
       const absDelta = Math.abs(rawDelta);
       if (absDelta > 0) changedCount += 1;
       totalDelta += absDelta;
+
       const sizeKey = normalizeSizeKey(it.size);
       const piecesPerPack = (SIZE_PACK && SIZE_PACK[sizeKey]) ? SIZE_PACK[sizeKey] : 1;
       packings += Math.floor(absDelta / piecesPerPack);
     });
+
     const stars = packings * 25;
     const salary = offloadUnits * 50;
     return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
