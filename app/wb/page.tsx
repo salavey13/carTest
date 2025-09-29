@@ -14,7 +14,7 @@ import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
-import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv, updateItemLocationQty, fetchWbPendingCount, fetchOzonPendingCount } from "@/app/wb/actions";
+import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv, fetchWbPendingCount, fetchOzonPendingCount } from "@/app/wb/actions";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 import { VOXELS, SIZE_PACK } from "@/app/wb/common";
@@ -193,52 +193,55 @@ export default function WBPage() {
     reader.readAsText(file);
   };
 
-  // optimistic update helper (keeps UI instant)
-  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
-    // Normalize voxelId for matching but keep the provided string for server
-    const normalizedVoxel = (voxelId || "").toString();
+// optimistic update helper (keeps UI instant)
+const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
+  // Normalize voxelId for matching but keep the provided string for server
+  const normalizedVoxel = (voxelId || "").toString();
 
-    setLocalItems((prev) =>
-      prev.map((i) => {
-        if (i.id !== itemId) return i;
-        const locs = (i.locations || []).map((l: any) => ({ ...l }));
-        const idx = locs.findIndex((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-        if (idx === -1) {
-          if (delta > 0) locs.push({ voxel: normalizedVoxel, quantity: delta });
-          // if negative and not present, we will attempt to deduct from largest below
-          else if (locs.length === 1) {
-            locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
-          } else if (locs.length > 1) {
-            const biggest = locs.sort((a: any, b: any) => (b.quantity || 0) - (a.quantity || 0))[0];
-            biggest.quantity = Math.max(0, (biggest.quantity || 0) + delta);
-          }
-        } else {
-          locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
+  setLocalItems((prev) =>
+    prev.map((i) => {
+      if (i.id !== itemId) return i;
+      const locs = (i.locations || []).map((l: any) => ({ ...l }));
+      const idx = locs.findIndex((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
+      if (idx === -1) {
+        if (delta > 0) locs.push({ voxel: normalizedVoxel, quantity: delta });
+        // if negative and not present, we will attempt to deduct from largest below
+        else if (locs.length === 1) {
+          locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
+        } else if (locs.length > 1) {
+          const biggest = locs.sort((a: any, b: any) => (b.quantity || 0) - (a.quantity || 0))[0];
+          biggest.quantity = Math.max(0, (biggest.quantity || 0) + delta);
         }
-        const filtered = locs.filter((l) => (l.quantity || 0) > 0);
-        const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
-
-        // If the voxel we decremented became empty and it's the currently selectedVoxel, clear selection
-        // (case-insensitive compare)
-        if (delta < 0 && selectedVoxel) {
-          const stillPresent = filtered.some((l) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-          if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) {
-            // clear selection (safe to call here)
-            setSelectedVoxel(null);
-          }
-        }
-
-        return { ...i, locations: filtered, total_quantity: total };
-      })
-    );
-
-    updateItemLocationQty(itemId, voxelId, delta).then((res) => {
-      if (!res.success) {
-        toast.error(res.error || "Ошибка сервера при обновлении");
-        loadItems();
+      } else {
+        locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
       }
-    }).catch(() => loadItems());
-  };
+      const filtered = locs.filter((l) => (l.quantity || 0) > 0);
+      const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
+
+      // If the voxel we decremented became empty and it's the currently selectedVoxel, clear selection
+      // (case-insensitive compare)
+      if (delta < 0 && selectedVoxel) {
+        const stillPresent = filtered.some((l) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
+        if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) {
+          // clear selection (safe to call here)
+          setSelectedVoxel(null);
+        }
+      }
+
+      return { ...i, locations: filtered, total_quantity: total };
+    })
+  );
+
+  // IMPORTANT: use hook's handler to update server **and** counters (onload/offload/edit).
+  // handleUpdateLocationQty is provided by useWarehouse and manages counters + server update.
+  // We call it after optimistic UI change so counters stay in sync.
+  handleUpdateLocationQty(itemId, normalizedVoxel, delta, true).catch(() => {
+    // In case of error, reload authoritative data to avoid permanent desync
+    loadItems();
+    toast.error("Ошибка при сохранении изменений на сервере — данные перезагружены.");
+  });
+};
+
 
   const handleCheckpoint = () => {
     setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l:any)=>({...l})) })));
