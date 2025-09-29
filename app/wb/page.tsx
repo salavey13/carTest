@@ -21,6 +21,7 @@ import { VOXELS, SIZE_PACK } from "@/app/wb/common";
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { parse } from "papaparse";
+import { notifyAdmin } from "@/app/actions";
 
 export default function WBPage() {
   const {
@@ -66,6 +67,9 @@ export default function WBPage() {
     filteredItems: hookFilteredItems,
     sortOption,
     setSortOption,
+    onloadCount,
+    offloadCount,
+    editCount,
   } = useWarehouse();
 
   const { user, tg } = useAppContext();
@@ -220,6 +224,9 @@ export default function WBPage() {
     setCheckpointStart(Date.now());
     setLastCheckpointDurationSec(null);
     setLastProcessedCount(null);
+    setOnloadCount(0);
+    setOffloadCount(0);
+    setEditCount(0);
     toast.success("Checkpoint saved!");
   };
 
@@ -229,6 +236,9 @@ export default function WBPage() {
       return;
     }
     setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l:any)=>({...l})) })));
+    setOnloadCount(0);
+    setOffloadCount(0);
+    setEditCount(0);
     toast.success("Reset to checkpoint!");
   };
 
@@ -238,7 +248,7 @@ export default function WBPage() {
     let changedCount = 0;
     let totalDelta = 0;
     let packings = 0;
-    let offloadUnits = 0;
+    let offloadUnits = offloadCount;
 
     (localItems || []).forEach((it) => {
       const cp = checkpoint.find((c) => c.id === it.id);
@@ -248,10 +258,6 @@ export default function WBPage() {
       if (absDelta > 0) changedCount += 1;
       totalDelta += absDelta;
 
-      if (rawDelta < 0) {
-        offloadUnits += absDelta; // Sum negative changes as positive units offloaded
-      }
-
       const sizeKey = normalizeSizeKey(it.size);
       const piecesPerPack = (SIZE_PACK && SIZE_PACK[sizeKey]) ? SIZE_PACK[sizeKey] : 1;
       packings += Math.floor(absDelta / piecesPerPack);
@@ -260,7 +266,19 @@ export default function WBPage() {
     const stars = packings * 25; // 1 packing = 25 stars
     const salary = offloadUnits * 50; // 1 offload unit = 50 rub
     return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
-  }, [localItems, checkpoint]);
+  }, [localItems, checkpoint, offloadCount]);
+
+  const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
+
+  // Precompute some formatted strings for stats component
+  const checkpointDisplayMain = checkpointStart ? formatSec(elapsedSec) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--");
+  const checkpointDisplaySub = checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался");
+  const processedChangedCount = checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0);
+  const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0);
+  const processedPackings = checkpointStart ? livePackings : 0;
+  const processedStars = checkpointStart ? liveStars : 0;
+  const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
+  const processedSalary = checkpointStart ? liveSalary : 0;
 
   const handleExportDiff = async () => {
     const diffData = (localItems || [])
@@ -297,6 +315,13 @@ export default function WBPage() {
       setLastProcessedCount(changedCount);
       setCheckpointStart(null);
       toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
+
+      // Notify admin if offload
+      if (gameMode === 'offload') {
+        const { offloadUnits, salary } = computeProcessedStats();
+        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
+        await notifyAdmin(message);
+      }
     }
   };
 
@@ -322,6 +347,13 @@ export default function WBPage() {
       setLastProcessedCount(changedCount);
       setCheckpointStart(null);
       toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
+
+      // Notify admin if offload
+      if (gameMode === 'offload') {
+        const { offloadUnits, salary } = computeProcessedStats();
+        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
+        await notifyAdmin(message);
+      }
     }
   };
 
@@ -468,17 +500,6 @@ export default function WBPage() {
   }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
 
   const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars, offloadUnits: liveOffloadUnits, salary: liveSalary } = computeProcessedStats();
-  const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
-
-  // Precompute some formatted strings for stats component
-  const checkpointDisplayMain = checkpointStart ? formatSec(elapsedSec) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--");
-  const checkpointDisplaySub = checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался");
-  const processedChangedCount = checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0);
-  const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0);
-  const processedPackings = checkpointStart ? livePackings : 0;
-  const processedStars = checkpointStart ? liveStars : 0;
-  const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
-  const processedSalary = checkpointStart ? liveSalary : 0;
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
