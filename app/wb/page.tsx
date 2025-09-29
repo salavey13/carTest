@@ -309,6 +309,90 @@ export default function WBPage() {
     return `${mm}:${ss}`;
   };
 
+  const handleExportDiff = async () => {
+    const diffData = (localItems || [])
+      .flatMap((item) =>
+        (item.locations || [])
+          .map((loc:any) => {
+            const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
+            const diffQty = loc.quantity - (checkpointLoc?.quantity || 0);
+            return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
+          })
+          .filter(Boolean)
+      )
+      .filter(Boolean);
+
+    const result = await exportDiffToAdmin(diffData as any, isTelegram);
+
+    if (isTelegram && result.csv) {
+      navigator.clipboard.writeText(result.csv);
+      toast.success("CSV скопирован в буфер обмена!");
+    } else if (result && result.csv) {
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "diff_export.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    if (checkpointStart) {
+      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+      setLastCheckpointDurationSec(durSec);
+      const { changedCount } = computeProcessedStats();
+      setLastProcessedCount(changedCount);
+      setCheckpointStart(null);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
+
+      // Notify admin if offload
+      if (gameMode === 'offload') {
+        const { offloadUnits, salary } = computeProcessedStats();
+        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
+        await notifyAdmin(message);
+      }
+    }
+  };
+
+  const handleExportStock = async (summarized = false) => {
+    const result = await exportCurrentStock(localItems, isTelegram, summarized);
+    if (isTelegram && result.csv) {
+      navigator.clipboard.writeText(result.csv);
+      toast.success("CSV скопирован в буфер обмена!");
+    } else if (result.csv) {
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    if (checkpointStart) {
+      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+      setLastCheckpointDurationSec(durSec);
+      const { changedCount } = computeProcessedStats();
+      setLastProcessedCount(changedCount);
+      setCheckpointStart(null);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
+
+      // Notify admin if offload
+      if (gameMode === 'offload') {
+        const { offloadUnits, salary } = computeProcessedStats();
+        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
+        await notifyAdmin(message);
+      }
+    }
+  };
+
+  const formatSec = (sec: number | null) => {
+    if (sec === null) return "--:--";
+    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
+    const ss = (sec % 60).toString().padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
   // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
   const handlePlateClickCustom = (voxelId: string) => {
     handlePlateClick(voxelId);
