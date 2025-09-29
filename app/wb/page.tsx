@@ -70,6 +70,10 @@ export default function WBPage() {
     onloadCount,
     offloadCount,
     editCount,
+    // setters (added in hook) — нужны для ресета/восстановления сессии
+    setOnloadCount,
+    setOffloadCount,
+    setEditCount,
   } = useWarehouse();
 
   const { user, tg } = useAppContext();
@@ -88,6 +92,13 @@ export default function WBPage() {
   const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
 
+  // persist final stats after checkpoint/export so UI can show them
+  const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
+  const [lastProcessedPackings, setLastProcessedPackings] = useState<number | null>(null);
+  const [lastProcessedStars, setLastProcessedStars] = useState<number | null>(null);
+  const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
+  const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
+
   // State for computed stats to avoid TDZ
   const [statsObj, setStatsObj] = useState({
     changedCount: 0,
@@ -95,7 +106,7 @@ export default function WBPage() {
     packings: 0,
     stars: 0,
     offloadUnits: 0,
-    salary: 0
+    salary: 0,
   });
 
   // Pending checker states
@@ -193,61 +204,67 @@ export default function WBPage() {
     reader.readAsText(file);
   };
 
-// optimistic update helper (keeps UI instant)
-const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
-  // Normalize voxelId for matching but keep the provided string for server
-  const normalizedVoxel = (voxelId || "").toString();
+  // optimistic update helper (keeps UI instant) — теперь вызывает handleUpdateLocationQty для синхронизации счётчиков
+  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
+    // Normalize voxelId for matching but keep the provided string for server
+    const normalizedVoxel = (voxelId || "").toString();
 
-  setLocalItems((prev) =>
-    prev.map((i) => {
-      if (i.id !== itemId) return i;
-      const locs = (i.locations || []).map((l: any) => ({ ...l }));
-      const idx = locs.findIndex((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-      if (idx === -1) {
-        if (delta > 0) locs.push({ voxel: normalizedVoxel, quantity: delta });
-        // if negative and not present, we will attempt to deduct from largest below
-        else if (locs.length === 1) {
-          locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
-        } else if (locs.length > 1) {
-          const biggest = locs.sort((a: any, b: any) => (b.quantity || 0) - (a.quantity || 0))[0];
-          biggest.quantity = Math.max(0, (biggest.quantity || 0) + delta);
+    setLocalItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== itemId) return i;
+        const locs = (i.locations || []).map((l: any) => ({ ...l }));
+        const idx = locs.findIndex((l: any) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
+        if (idx === -1) {
+          if (delta > 0) locs.push({ voxel: normalizedVoxel, quantity: delta });
+          // if negative and not present, we will attempt to deduct from largest below
+          else if (locs.length === 1) {
+            locs[0].quantity = Math.max(0, (locs[0].quantity || 0) + delta);
+          } else if (locs.length > 1) {
+            const biggest = locs.sort((a: any, b: any) => (b.quantity || 0) - (a.quantity || 0))[0];
+            biggest.quantity = Math.max(0, (biggest.quantity || 0) + delta);
+          }
+        } else {
+          locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
         }
-      } else {
-        locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
-      }
-      const filtered = locs.filter((l) => (l.quantity || 0) > 0);
-      const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
+        const filtered = locs.filter((l) => (l.quantity || 0) > 0);
+        const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
 
-      // If the voxel we decremented became empty and it's the currently selectedVoxel, clear selection
-      // (case-insensitive compare)
-      if (delta < 0 && selectedVoxel) {
-        const stillPresent = filtered.some((l) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
-        if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) {
-          // clear selection (safe to call here)
-          setSelectedVoxel(null);
+        // If the voxel we decremented became empty and it's the currently selectedVoxel, clear selection
+        // (case-insensitive compare)
+        if (delta < 0 && selectedVoxel) {
+          const stillPresent = filtered.some((l) => (l.voxel || "").toString().toLowerCase() === normalizedVoxel.toLowerCase());
+          if (!stillPresent && selectedVoxel.toString().toLowerCase() === normalizedVoxel.toLowerCase()) {
+            // clear selection (safe to call here)
+            setSelectedVoxel(null);
+          }
         }
-      }
 
-      return { ...i, locations: filtered, total_quantity: total };
-    })
-  );
+        return { ...i, locations: filtered, total_quantity: total };
+      })
+    );
 
-  // IMPORTANT: use hook's handler to update server **and** counters (onload/offload/edit).
-  // handleUpdateLocationQty is provided by useWarehouse and manages counters + server update.
-  // We call it after optimistic UI change so counters stay in sync.
-  handleUpdateLocationQty(itemId, normalizedVoxel, delta, true).catch(() => {
-    // In case of error, reload authoritative data to avoid permanent desync
-    loadItems();
-    toast.error("Ошибка при сохранении изменений на сервере — данные перезагружены.");
-  });
-};
-
+    // IMPORTANT: use hook's handler to update server **and** counters (onload/offload/edit).
+    // handleUpdateLocationQty is provided by useWarehouse and manages counters + server update.
+    // We call it after optimistic UI change so counters stay in sync.
+    handleUpdateLocationQty(itemId, normalizedVoxel, delta, true).catch(() => {
+      // In case of error, reload authoritative data to avoid permanent desync
+      loadItems();
+      toast.error("Ошибка при сохранении изменений на сервере — данные перезагружены.");
+    });
+  };
 
   const handleCheckpoint = () => {
-    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l:any)=>({...l})) })));
+    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l: any) => ({ ...l })) })));
     setCheckpointStart(Date.now());
     setLastCheckpointDurationSec(null);
     setLastProcessedCount(null);
+    // reset persisted final stats so UI doesn't show stale results
+    setLastProcessedTotalDelta(null);
+    setLastProcessedPackings(null);
+    setLastProcessedStars(null);
+    setLastProcessedOffloadUnits(null);
+    setLastProcessedSalary(null);
+
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
@@ -259,7 +276,7 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
       toast.error("Нет сохранённого чекпоинта");
       return;
     }
-    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l:any)=>({...l})) })));
+    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) })));
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
@@ -305,18 +322,20 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
   // Precompute some formatted strings for stats component
   const checkpointDisplayMain = checkpointStart ? formatSec(elapsedSec) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--");
   const checkpointDisplaySub = checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался");
+
+  // Use live values while checkpoint is running, otherwise fallback to saved lastProcessed* values
   const processedChangedCount = checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0);
-  const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedCount ? liveTotalDelta : 0);
-  const processedPackings = checkpointStart ? livePackings : 0;
-  const processedStars = checkpointStart ? liveStars : 0;
-  const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
-  const processedSalary = checkpointStart ? liveSalary : 0;
+  const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedTotalDelta ?? 0);
+  const processedPackings = checkpointStart ? livePackings : (lastProcessedPackings ?? 0);
+  const processedStars = checkpointStart ? liveStars : (lastProcessedStars ?? 0);
+  const processedOffloadUnits = checkpointStart ? liveOffloadUnits : (lastProcessedOffloadUnits ?? 0);
+  const processedSalary = checkpointStart ? liveSalary : (lastProcessedSalary ?? 0);
 
   const handleExportDiff = async () => {
     const diffData = (localItems || [])
       .flatMap((item) =>
         (item.locations || [])
-          .map((loc:any) => {
+          .map((loc: any) => {
             const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
             const diffQty = loc.quantity - (checkpointLoc?.quantity || 0);
             return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
@@ -348,15 +367,21 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     if (checkpointStart) {
       const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
       setLastCheckpointDurationSec(durSec);
-      const { changedCount } = computeProcessedStats();
-      setLastProcessedCount(changedCount);
+      const stats = computeProcessedStats();
+
+      setLastProcessedCount(stats.changedCount);
+      setLastProcessedTotalDelta(stats.totalDelta);
+      setLastProcessedPackings(stats.packings);
+      setLastProcessedStars(stats.stars);
+      setLastProcessedOffloadUnits(stats.offloadUnits);
+      setLastProcessedSalary(stats.salary);
+
       setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
 
       // Notify admin if offload
       if (gameMode === 'offload') {
-        const { offloadUnits, salary } = computeProcessedStats();
-        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
+        const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
         await notifyAdmin(message);
       }
     }
@@ -380,15 +405,21 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     if (checkpointStart) {
       const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
       setLastCheckpointDurationSec(durSec);
-      const { changedCount } = computeProcessedStats();
-      setLastProcessedCount(changedCount);
+      const stats = computeProcessedStats();
+
+      setLastProcessedCount(stats.changedCount);
+      setLastProcessedTotalDelta(stats.totalDelta);
+      setLastProcessedPackings(stats.packings);
+      setLastProcessedStars(stats.stars);
+      setLastProcessedOffloadUnits(stats.offloadUnits);
+      setLastProcessedSalary(stats.salary);
+
       setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${changedCount}`);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
 
       // Notify admin if offload
       if (gameMode === 'offload') {
-        const { offloadUnits, salary } = computeProcessedStats();
-        const message = `Offload завершен:\nВыдано единиц: ${offloadUnits}\nЗарплата: ${salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${changedCount}`;
+        const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
         await notifyAdmin(message);
       }
     }
@@ -469,8 +500,8 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     handlePlateClick(voxelId);
 
     const content = localItems
-      .flatMap((i) => (i.locations || []).filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0)
-        .map((l:any) => ({ item: i, quantity: l.quantity }))
+      .flatMap((i) => (i.locations || []).filter((l: any) => l.voxel === voxelId && (l.quantity || 0) > 0)
+        .map((l: any) => ({ item: i, quantity: l.quantity }))
       );
 
     // If we are in "onload" or "offload" — do NOT open modals, just select voxel silently
@@ -514,10 +545,10 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
 
       if (selectedVoxel) {
         // try selected voxel (case-insensitive)
-        loc = (item.locations || []).find((l:any) => (l.voxel || "").toString().toLowerCase() === selVoxelNorm && (l.quantity || 0) > 0);
+        loc = (item.locations || []).find((l: any) => (l.voxel || "").toString().toLowerCase() === selVoxelNorm && (l.quantity || 0) > 0);
         if (!loc) {
           // selected voxel empty: check if item has exactly one non-empty location — if so, use it
-          const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
+          const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
           if (nonEmpty.length === 1) {
             loc = nonEmpty[0];
             toast.info(`В выбранной ячейке нет товара — списываю из ${loc.voxel} (единственная ячейка с товаром).`);
@@ -528,7 +559,7 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
         }
       } else {
         // no voxel selected: prefer single non-empty location; if many, require selection
-        const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
+        const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
         if (nonEmpty.length === 0 || item.total_quantity <= 0) return toast.error("Нет товара на складе");
         if (nonEmpty.length > 1) {
           return toast.error("Выберите ячейку для выдачи (несколько локаций)");
@@ -644,7 +675,7 @@ const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
             items={localItems}
             selectedVoxel={selectedVoxel}
             onSelectVoxel={setSelectedVoxel}
-            onUpdateLocationQty={(itemId:string, voxelId:string, qty:number) => optimisticUpdate(itemId, voxelId, qty)}
+            onUpdateLocationQty={(itemId: string, voxelId: string, qty: number) => optimisticUpdate(itemId, voxelId, qty)}
             gameMode={gameMode}
             onPlateClick={handlePlateClickCustom}
           />
