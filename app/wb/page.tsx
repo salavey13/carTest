@@ -102,7 +102,7 @@ export default function WBPage() {
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
 
-  const formatSec = (sec: number | null) => {
+const formatSec = (sec: number | null) => {
     if (sec === null) return "--:--";
     const mm = Math.floor(sec / 60).toString().padStart(2, "0");
     const ss = (sec % 60).toString().padStart(2, "0");
@@ -322,6 +322,11 @@ export default function WBPage() {
       )
       .filter(Boolean);
 
+    if (diffData.length === 0) {
+      toast.info('No changes to export');
+      return;
+    }
+
     const result = await exportDiffToAdmin(diffData as any, isTelegram);
 
     if (isTelegram && result.csv) {
@@ -385,141 +390,6 @@ export default function WBPage() {
       }
     }
   };
-
-  // ====== IMPORTANT CHANGE: plate click NO LONGER decrements qty for offload ======
-  const handlePlateClickCustom = (voxelId: string) => {
-    handlePlateClick(voxelId);
-
-    const content = localItems
-      .flatMap((i) => (i.locations || []).filter((l:any) => l.voxel === voxelId && (l.quantity || 0) > 0)
-        .map((l:any) => ({ item: i, quantity: l.quantity }))
-      );
-
-    // If we are in "onload" or "offload" — do NOT open modals, just select voxel silently
-    if (gameMode === "onload" || gameMode === "offload") {
-      setSelectedVoxel(voxelId);
-      if (gameMode === "onload") {
-        toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточки` : `Выбрана ячейка ${voxelId}`);
-      } else {
-        toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
-      }
-      return;
-    }
-
-    // default behaviour for neutral mode:
-    if (content.length > 0) {
-      setEditVoxel(voxelId);
-      setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-      setEditDialogOpen(true);
-    } else {
-      setSelectedVoxel(voxelId);
-    }
-  };
-
-  // item click still does qty changes (optimistic)
-  const handleItemClickCustom = async (item: any) => {
-    if (!item) return;
-
-    if (gameMode === "onload") {
-      const targetVoxel = selectedVoxel || "A1";
-      setSelectedVoxel(targetVoxel);
-      optimisticUpdate(item.id, targetVoxel, 1);
-      toast.success(`Добавлено в ${targetVoxel}`);
-      return;
-    }
-
-    if (gameMode === "offload") {
-      let loc;
-
-      // Case-insensitive matching helper
-      const selVoxelNorm = selectedVoxel ? selectedVoxel.toString().toLowerCase() : null;
-
-      if (selectedVoxel) {
-        // try selected voxel (case-insensitive)
-        loc = (item.locations || []).find((l:any) => (l.voxel || "").toString().toLowerCase() === selVoxelNorm && (l.quantity || 0) > 0);
-        if (!loc) {
-          // selected voxel empty: check if item has exactly one non-empty location — if so, use it
-          const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
-          if (nonEmpty.length === 1) {
-            loc = nonEmpty[0];
-            toast.info(`В выбранной ячейке нет товара — списываю из ${loc.voxel} (единственная ячейка с товаром).`);
-          } else {
-            // multiple non-empty or none -> do not silently choose
-            return toast.error("Нет товара в выбранной ячейке");
-          }
-        }
-      } else {
-        // no voxel selected: prefer single non-empty location; if many, require selection
-        const nonEmpty = (item.locations || []).filter((l:any) => (l.quantity || 0) > 0);
-        if (nonEmpty.length === 0 || item.total_quantity <= 0) return toast.error("Нет товара на складе");
-        if (nonEmpty.length > 1) {
-          return toast.error("Выберите ячейку для выдачи (несколько локаций)");
-        }
-        loc = nonEmpty[0]; // single: auto
-      }
-
-      if (loc) {
-        const voxel = loc.voxel;
-        optimisticUpdate(item.id, voxel, -1);
-
-        // After optimistic update we already clear selectedVoxel inside optimisticUpdate if that voxel became empty.
-        // Additional small safeguard: if selectedVoxel matched this voxel (case-insensitive) and item now has no such location, clear it.
-        // (optimisticUpdate already handles this, so this is just a defensive no-op.)
-        toast.success(`Выдано из ${voxel}`);
-      } else {
-        toast.error("Нет товара на складе");
-      }
-      return;
-    }
-
-    handleItemClick(item);
-  };
-
-  // localFilteredItems: now respects filters AND sortOption
-  const localFilteredItems = useMemo(() => {
-    const arr = (localItems || []).filter((item) => {
-      const searchLower = (search || "").toLowerCase();
-      const matchesSearch =
-        (item.name || "").toLowerCase().includes(searchLower) ||
-        (item.description || "").toLowerCase().includes(searchLower);
-
-      const matchesSeason = !filterSeason || item.season === filterSeason;
-      const matchesPattern = !filterPattern || item.pattern === filterPattern;
-      const matchesColor = !filterColor || item.color === filterColor;
-      const matchesSize = !filterSize || item.size === filterSize;
-
-      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-    });
-
-    // apply sorting according to sortOption from hook
-    const sorted = [...arr].sort((a, b) => {
-      switch (sortOption) {
-        case 'size_season_color': {
-          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
-          if (sizeCmp !== 0) return sizeCmp;
-          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
-          if (seasonCmp !== 0) return seasonCmp;
-          return (a.color || "").localeCompare(b.color || "");
-        }
-        case 'color_size': {
-          const colorCmp = (a.color || "").localeCompare(b.color || "");
-          if (colorCmp !== 0) return colorCmp;
-          return getSizePriority(a.size) - getSizePriority(b.size);
-        }
-        case 'season_size_color': {
-          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
-          if (seasonCmp !== 0) return seasonCmp;
-          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
-          if (sizeCmp !== 0) return sizeCmp;
-          return (a.color || "").localeCompare(b.color || "");
-        }
-        default:
-          return 0;
-      }
-    });
-
-    return sorted;
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
 
   // Pending checker handler
   const handleCheckPending = async () => {
