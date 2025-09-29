@@ -302,12 +302,7 @@ export default function WBPage() {
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : 0;
   const processedSalary = checkpointStart ? liveSalary : 0;
 
-  const formatSec = (sec: number | null) => {
-    if (sec === null) return "--:--";
-    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
-    const ss = (sec % 60).toString().padStart(2, "0");
-    return `${mm}:${ss}`;
-  };
+  
 
   const handleExportDiff = async () => {
     const diffData = (localItems || [])
