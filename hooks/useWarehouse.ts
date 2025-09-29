@@ -1,3 +1,4 @@
+// /hooks/useWarehouse.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
@@ -399,5 +400,8 @@ export function useWarehouse() {
     onloadCount,
     offloadCount,
     editCount,
+setOnloadCount,
+   setOffloadCount,
+   setEditCount,
   };
 }
