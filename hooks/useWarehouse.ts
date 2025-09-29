@@ -1,35 +1,34 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { getWarehouseItems, updateItemLocationQty } from "@/app/wb/actions";
-import { COLOR_MAP, Item, WarehouseItem, VOXELS } from "@/app/wb/common";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
 
 const getSizePriority = (size: string | null): number => {
   if (!size) return 999;
-  const sizeOrder: { [key: string]: number } = {
+  const sizeOrder: Record<string, number> = {
     "1.5": 1,
     "2": 2,
     "евро": 3,
     "евро макси": 4,
   };
-  return sizeOrder[size] || 5;
+  return sizeOrder[size as string] || 5;
 };
 
 const getSeasonPriority = (season: string | null): number => {
   if (!season) return 999;
-  const seasonOrder: { [key: string]: number } = {
+  const seasonOrder: Record<string, number> = {
     "лето": 1,
     "зима": 2,
   };
-  return seasonOrder[season] || 3;
+  return seasonOrder[season as string] || 3;
 };
 
 export function useWarehouse() {
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [checkpoint, setCheckpoint] = useState<Item[]>([]);
+  const [checkpoint, setCheckpoint] = useState<any[]>([]);
   const [workflowItems, setWorkflowItems] = useState<{ id: string; change: number; voxel?: string }[]>([]);
   const [currentWorkflowIndex, setCurrentWorkflowIndex] = useState(0);
   const [selectedWorkflowVoxel, setSelectedWorkflowVoxel] = useState<string | null>(null);
@@ -63,14 +62,14 @@ export function useWarehouse() {
     logger.info(`loadItems: Fetch success: ${success}, items count: ${data?.length || 0}, error: ${fetchError || 'none'}`);
 
     if (success && data) {
-      const mappedItems: Item[] = data.map((i: WarehouseItem) => {
+      const mappedItems: any[] = data.map((i: any) => {
         const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
           voxel: l.voxel_id,
           quantity: l.quantity,
           min_qty: l.voxel_id?.startsWith?.("B") ? 3 : undefined,
         })).sort((a: any, b: any) => (a.voxel || "").localeCompare(b.voxel || ""));
 
-        const sumQty = locations.reduce((acc, l) => acc + (l.quantity || 0), 0);
+        const sumQty = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
         const total = sumQty || 0;
         return {
           id: i.id,
@@ -88,7 +87,7 @@ export function useWarehouse() {
 
       logger.info(`loadItems: Mapped ${mappedItems.length} items.`);
       setItems(mappedItems);
-      setCheckpoint(mappedItems.map((i) => ({ ...i, locations: i.locations.map((l) => ({ ...l })) })));
+      setCheckpoint(mappedItems.map((it) => ({ ...it, locations: it.locations.map((l: any) => ({ ...l })) })));
       if (mappedItems.length === 0) {
         toast.warning("Нет товаров в складе. Загрузите CSV.");
       }
@@ -103,25 +102,42 @@ export function useWarehouse() {
   useEffect(() => {
     const resumeSession = localStorage.getItem('warehouse_session');
     if (resumeSession) {
-      const { mode, checkpointData, onload, offload, edits } = JSON.parse(resumeSession);
-      if (mode === 'offload' && checkpointData) {
-        const resume = window.confirm('Обнаружен незавершенный offload. Продолжить?');
-        if (resume) {
-          setGameMode(mode);
-          setCheckpoint(checkpointData);
-          setOnloadCount(onload || 0);
-          setOffloadCount(offload || 0);
-          setEditCount(edits || 0);
-          toast.info('Offload возобновлен.');
-        } else {
-          localStorage.removeItem('warehouse_session');
+      try {
+        const { mode, checkpointData, onload, offload, edits } = JSON.parse(resumeSession);
+        if (mode === 'offload' && checkpointData) {
+          const resume = window.confirm('Обнаружен незавершенный offload. Продолжить?');
+          if (resume) {
+            setGameMode(mode);
+            setCheckpoint(checkpointData);
+            setOnloadCount(onload || 0);
+            setOffloadCount(offload || 0);
+            setEditCount(edits || 0);
+            toast.info('Offload возобновлен.');
+          } else {
+            localStorage.removeItem('warehouse_session');
+          }
         }
+      } catch (e) {
+        // ignore parse errors
       }
     }
     loadItems();
     const savedLeaderboard = JSON.parse(localStorage.getItem("warehouse_leaderboard") || "[]");
     setLeaderboard(savedLeaderboard);
   }, [loadItems]);
+
+  const checkAchievements = useCallback(() => {
+    setAchievements((prev) => {
+      const newAch = [...prev];
+      if (streak === 20 && !newAch.includes("Streak Master")) newAch.push("Streak Master");
+      if (score > 1000 && !newAch.includes("High Scorer")) newAch.push("High Scorer");
+      if (workflowItems.length > 20 && errorCount === 0 && !newAch.includes("Perfect Run")) newAch.push("Perfect Run");
+      if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 3600 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon");
+      if (workflowItems.length > 20 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
+      if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
+      return newAch;
+    });
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode]);
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
@@ -131,8 +147,8 @@ export function useWarehouse() {
         setItems((prev) =>
           prev.map((i) => {
             if (i.id !== itemId) return i;
-            const locs = (i.locations || []).map((l) => ({ ...l }));
-            const idx = locs.findIndex((l) => (l.voxel || "") === voxelId);
+            const locs = (i.locations || []).map((l: any) => ({ ...l }));
+            const idx = locs.findIndex((l: any) => (l.voxel || "") === voxelId);
 
             if (idx !== -1) {
               const newQty = Math.max(0, (locs[idx].quantity || 0) + delta);
@@ -144,7 +160,6 @@ export function useWarehouse() {
                 min_qty: voxelId?.startsWith?.("B") ? 3 : undefined,
               });
             } else {
-              // delta < 0 and voxel not found - try deducting from largest location (defensive)
               if (locs.length === 1) {
                 locs[0] = { ...locs[0], quantity: Math.max(0, (locs[0].quantity || 0) + delta) };
               } else if (locs.length > 1) {
@@ -215,7 +230,7 @@ export function useWarehouse() {
     }
   }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty]);
 
-  const handleSkipItem = () => {
+  const handleSkipItem = useCallback(() => {
     setCurrentWorkflowIndex((prev) => prev + 1);
     setErrorCount((prev) => prev + 1);
     if (currentWorkflowIndex + 1 === workflowItems.length) {
@@ -223,20 +238,7 @@ export function useWarehouse() {
       setWorkflowItems([]);
       endGameSession();
     }
-  };
-
-  const checkAchievements = useCallback(() => {
-    setAchievements((prev) => {
-      const newAch = [...prev];
-      if (streak === 20 && !newAch.includes("Streak Master")) newAch.push("Streak Master");
-      if (score > 1000 && !newAch.includes("High Scorer")) newAch.push("High Scorer");
-      if (workflowItems.length > 20 && errorCount === 0 && !newAch.includes("Perfect Run")) newAch.push("Perfect Run");
-      if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 3600 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon");
-      if (workflowItems.length > 20 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
-      if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
-      return newAch;
-    });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode]);
+  }, [currentWorkflowIndex, workflowItems.length]);
 
   const startBossMode = () => {
     setBossMode(true);
@@ -269,49 +271,43 @@ export function useWarehouse() {
     localStorage.removeItem('warehouse_session');
   };
 
-  const handlePlateClick = useCallback(
-    (voxelId: string) => {
-      // Only select - modal handling is done in page component
-    },
-    [],
-  );
+  const handlePlateClick = useCallback((voxelId: string) => {
+    // placeholder - UI handles modal logic
+  }, []);
 
-  const handleItemClick = useCallback(
-    (item: Item) => {
-      if (!gameMode) {
-        toast.info(item.description || "Описание отсутствует");
-        return;
-      }
+  const handleItemClick = useCallback((item: any) => {
+    if (!gameMode) {
+      toast.info(item.description || "Описание отсутствует");
+      return;
+    }
 
-      const delta = gameMode === "onload" ? 1 : -1;
-      let voxel: string | null = null;
+    const delta = gameMode === "onload" ? 1 : -1;
+    let voxel: string | null = null;
 
-      if (gameMode === "onload") {
-        voxel = selectedVoxel || item.locations[0]?.voxel || "A1";
-      } else if (gameMode === "offload") {
-        if (selectedVoxel) {
-          const loc = item.locations.find((l) => l.voxel === selectedVoxel);
-          if (loc && loc.quantity > 0) {
-            voxel = selectedVoxel;
-          } else {
-            return toast.error("Товар отсутствует в выбранной ячейке");
-          }
+    if (gameMode === "onload") {
+      voxel = selectedVoxel || item.locations[0]?.voxel || "A1";
+    } else if (gameMode === "offload") {
+      if (selectedVoxel) {
+        const loc = item.locations.find((l: any) => l.voxel === selectedVoxel);
+        if (loc && loc.quantity > 0) {
+          voxel = selectedVoxel;
         } else {
-          if (item.locations.length === 0 || item.total_quantity <= 0) {
-            return toast.error("Нет локаций или количества для выгрузки");
-          }
-          voxel = item.locations[0].voxel;
+          return toast.error("Товар отсутствует в выбранной ячейке");
         }
+      } else {
+        if (item.locations.length === 0 || item.total_quantity <= 0) {
+          return toast.error("Нет локаций или количества для выгрузки");
+        }
+        voxel = item.locations[0].voxel;
       }
+    }
 
-      if (voxel && (delta > 0 || item.locations.find((l) => l.voxel === voxel)?.quantity > 0)) {
-        handleUpdateLocationQty(item.id, voxel, delta, true);
-      } else if (delta < 0) {
-        toast.error("Нельзя уменьшить ниже 0");
-      }
-    },
-    [gameMode, selectedVoxel, handleUpdateLocationQty],
-  );
+    if (voxel && (delta > 0 || item.locations.find((l: any) => l.voxel === voxel)?.quantity > 0)) {
+      handleUpdateLocationQty(item.id, voxel, delta, true);
+    } else if (delta < 0) {
+      toast.error("Нельзя уменьшить ниже 0");
+    }
+  }, [gameMode, selectedVoxel, handleUpdateLocationQty]);
 
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
@@ -324,8 +320,8 @@ export function useWarehouse() {
 
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
 
-  const sortItems = useCallback((itemsToSort: Item[]) => {
-    return [...itemsToSort].sort((a, b) => {
+  const sortItems = useCallback((itemsToSort: any[]) => {
+    return [...itemsToSort].sort((a: any, b: any) => {
       let comparison = 0;
       switch (sortOption) {
         case 'size_season_color':
