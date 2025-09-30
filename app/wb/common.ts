@@ -1,4 +1,3 @@
-// /app/wb/common.ts
 import type { Database } from "@/types/database.types";
 
 export const COLOR_MAP: {[key: string]: string} = {
@@ -24,6 +23,7 @@ export const SIZE_PACK: {[key: string]: number} = {
   '180': 8,
   '200': 8,
   '150x200': 6,
+  '50x70': 10,
 };
 
 export const VOXELS = [
