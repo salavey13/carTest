@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Settings, RefreshCcw, Check, X, Clock, Copy } from "lucide-react";
+import { Loader2, Settings, RefreshCcw, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Tooltip,
@@ -16,82 +16,29 @@ import {
   syncOzonStocks,
   syncYmStocks,
   setWbBarcodes,
-  setYmSku,
   getWarehouseItems,
-  checkYmToken, // <- серверная проверка token/campaign
+  getYmCampaigns,
+  checkYmToken,
+  setYmSku,
 } from "@/app/wb/actions";
 
-type RunStatus = {
-  status: "idle" | "running" | "success" | "error";
-  updatedAt?: string; // ISO
-  message?: string;
-  sent?: number;
-  failed?: number;
-};
-
-const Pill: React.FC<{ state: RunStatus }> = ({ state }) => {
-  const { status, updatedAt, sent, failed } = state;
-  const timeLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
-  const base = "inline-flex items-center text-xs rounded-full px-2 py-0.5 gap-1 select-none";
-  if (status === "running") {
-    return (
-      <span className={`${base} bg-slate-100 text-slate-800`} aria-live="polite">
-        <Loader2 className="h-3 w-3 animate-spin" /> Running
-      </span>
-    );
-  }
-  if (status === "success") {
-    return (
-      <span className={`${base} bg-green-100 text-green-800`} title={timeLabel}>
-        <Check className="h-3 w-3" /> OK {sent ? `· ${sent}` : ""} {failed ? `· ✖${failed}` : ""}
-      </span>
-    );
-  }
-  if (status === "error") {
-    return (
-      <span className={`${base} bg-rose-100 text-rose-800`} title={timeLabel}>
-        <X className="h-3 w-3" /> Err {failed ? `· ✖${failed}` : ""}
-      </span>
-    );
-  }
-  return (
-    <span className={`${base} bg-yellow-50 text-yellow-800`} title={timeLabel}>
-      <Clock className="h-3 w-3" /> {timeLabel ? timeLabel.split(",")[0] : "idle"}
-    </span>
-  );
-};
-
 export function WarehouseSyncButtons() {
-  // per-button run states
-  const [wbState, setWbState] = useState<RunStatus>({ status: "idle" });
-  const [ozonState, setOzonState] = useState<RunStatus>({ status: "idle" });
-  const [ymState, setYmState] = useState<RunStatus>({ status: "idle" });
-
-  // setup buttons states
-  const [setupWbLoading, setSetupWbLoading] = useState(false);
-  const [setupYmLoading, setSetupYmLoading] = useState(false);
-
-  // items loaded & syncable flags
+  const [loading, setLoading] = useState(false);
   const [itemsLoaded, setItemsLoaded] = useState(false);
-  const [hasWb, setHasWb] = useState(false);
-  const [hasOzon, setHasOzon] = useState(false);
-  const [hasYm, setHasYm] = useState(false);
-  const [needWbSetup, setNeedWbSetup] = useState(false);
+  const [needSetup, setNeedSetup] = useState(false);
+  const [hasSyncableWb, setHasSyncableWb] = useState(false);
+  const [hasSyncableOzon, setHasSyncableOzon] = useState(false);
+  const [hasSyncableYm, setHasSyncableYm] = useState(false);
 
-  // YM token check state
-  const [ymCheckLoading, setYmCheckLoading] = useState(false);
-  const [ymCheckResult, setYmCheckResult] = useState<{
-    listStatus?: number;
-    listJson?: any;
-    campStatus?: number;
-    campJson?: any;
-    rawList?: string;
-    rawCamp?: string;
-  } | null>(null);
-  const [showYmCheck, setShowYmCheck] = useState(false);
+  // YM specific
+  const [campaigns, setCampaigns] = useState<any[] | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [checkingToken, setCheckingToken] = useState(false);
+  const [tokenStatusText, setTokenStatusText] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const loadItems = async () => {
+      setLoading(true);
       try {
         const res = await getWarehouseItems();
         if (res.success && res.data) {
@@ -99,407 +46,261 @@ export function WarehouseSyncButtons() {
           const syncableWb = res.data.some((i: any) => !!i.specs?.wb_sku);
           const syncableOzon = res.data.some((i: any) => !!i.specs?.ozon_sku);
           const syncableYm = res.data.some((i: any) => !!i.specs?.ym_sku);
-          setNeedWbSetup(missingBarcodes);
-          setHasWb(syncableWb);
-          setHasOzon(syncableOzon);
-          setHasYm(syncableYm);
+          setNeedSetup(missingBarcodes);
+          setHasSyncableWb(syncableWb);
+          setHasSyncableOzon(syncableOzon);
+          setHasSyncableYm(syncableYm);
           setItemsLoaded(true);
+          toast.success(
+            `Загружено ${res.data.length} items из Supabase. ${
+              missingBarcodes ? "Нужна настройка баркодов." : "Всё готово к синку!"
+            }`
+          );
         } else {
           toast.error(res.error || "Ошибка загрузки items");
         }
-      } catch (e) {
-        console.error("loadItems error", e);
+      } catch (err: any) {
+        console.error("WarehouseSyncButtons.loadItems error:", err);
         toast.error("Ошибка при загрузке items (см. логи)");
+      } finally {
+        setLoading(false);
       }
-    })();
+    };
+
+    // Load items + campaigns in parallel
+    loadItems();
+    loadCampaigns();
   }, []);
 
-  // helpers: update run state with timestamp
-  const markSuccess = (setter: React.Dispatch<React.SetStateAction<RunStatus>>, payload?: Partial<RunStatus>) =>
-    setter({ status: "success", updatedAt: new Date().toISOString(), ...payload });
-  const markError = (setter: React.Dispatch<React.SetStateAction<RunStatus>>, message?: string, payload?: Partial<RunStatus>) =>
-    setter({ status: "error", updatedAt: new Date().toISOString(), message, ...payload });
-  const markRunning = (setter: React.Dispatch<React.SetStateAction<RunStatus>>) => setter({ status: "running", updatedAt: new Date().toISOString() });
-
-  // Handlers
-  const handleSetupWb = async () => {
-    setSetupWbLoading(true);
-    setWbState({ status: "running" });
+  const loadCampaigns = async () => {
+    setCheckingToken(true);
     try {
-      const res = await setWbBarcodes();
+      const res = await getYmCampaigns();
       if (res.success) {
-        toast.success(`WB setup: обновлено ${res.updated ?? 0}`);
-        const itemsRes = await getWarehouseItems();
-        if (itemsRes.success && itemsRes.data) {
-          setNeedWbSetup(itemsRes.data.some((i: any) => !i.specs?.wb_sku));
-          setHasWb(itemsRes.data.some((i: any) => !!i.specs?.wb_sku));
-        }
-        markSuccess(setWbState, {});
+        setCampaigns(res.campaigns || []);
+        // auto-select any AVAILABLE campaign (prefer existing selected or env handled server-side)
+        const avail = (res.campaigns || []).find((c: any) => c.apiAvailability === "AVAILABLE");
+        if (avail) setSelectedCampaign(String(avail.id));
+        toast.success(`YM: найдено ${res.campaigns?.length || 0} кампаний`);
       } else {
-        toast.error(res.error || "Ошибка setup WB");
-        markError(setWbState, res.error);
+        toast.error(res.error || "Не удалось получить кампании YM");
       }
-    } catch (e: any) {
-      console.error("handleSetupWb", e);
-      toast.error("Ошибка setup WB (см. логи)");
-      markError(setWbState, e?.message);
+    } catch (err: any) {
+      console.error("loadCampaigns error:", err);
+      toast.error("Ошибка при получении списка кампаний YM");
     } finally {
-      setSetupWbLoading(false);
+      setCheckingToken(false);
     }
   };
 
-  const handleSetupYm = async () => {
-    setSetupYmLoading(true);
-    setYmState({ status: "running" });
+  const handleCheckYm = async () => {
+    setCheckingToken(true);
     try {
-      const res = await setYmSku();
+      // checkYmToken returns diagnostics (server fn)
+      const res = await checkYmToken(undefined as any, selectedCampaign || undefined);
+      // normalize text for UI
+      const summary = `list: ${res?.listStatus || "?"}, camp: ${res?.campStatus || "?"}`;
+      setTokenStatusText(summary);
+      toast.success("Проверка токена выполнена (см. статус)");
+      console.info("checkYmToken result:", res);
+    } catch (err: any) {
+      console.error("handleCheckYm error:", err);
+      toast.error("Ошибка проверки токена YM (см. логи)");
+    } finally {
+      setCheckingToken(false);
+    }
+  };
+
+  const handleSetupWbSku = async () => {
+    setLoading(true);
+    try {
+      const res = await setWbBarcodes();
       if (res.success) {
-        toast.success(`YM setup: обновлено ${res.updated ?? 0}`);
+        toast.success(`Обновлено ${res.updated} items с WB баркодами!`);
         const itemsRes = await getWarehouseItems();
         if (itemsRes.success && itemsRes.data) {
-          setHasYm(itemsRes.data.some((i: any) => !!i.specs?.ym_sku));
+          const stillMissing = itemsRes.data.some((i: any) => !i.specs?.wb_sku);
+          const syncableWb = itemsRes.data.some((i: any) => !!i.specs?.wb_sku);
+          const syncableOzon = itemsRes.data.some((i: any) => !!i.specs?.ozon_sku);
+          const syncableYm = itemsRes.data.some((i: any) => !!i.specs?.ym_sku);
+          setNeedSetup(stillMissing);
+          setHasSyncableWb(syncableWb);
+          setHasSyncableOzon(syncableOzon);
+          setHasSyncableYm(syncableYm);
         }
-        markSuccess(setYmState, {});
       } else {
-        toast.error(res.error || "Ошибка setup YM");
-        markError(setYmState, res.error);
+        toast.error(res.error || "Ошибка настройки WB SKU");
       }
-    } catch (e: any) {
-      console.error("handleSetupYm", e);
-      toast.error("Ошибка setup YM (см. логи)");
-      markError(setYmState, e?.message);
+    } catch (err: any) {
+      console.error("handleSetupWbSku error:", err);
+      toast.error("Ошибка при setup WB SKU (см. логи)");
     } finally {
-      setSetupYmLoading(false);
+      setLoading(false);
     }
   };
 
   const handleSyncWb = async () => {
-    markRunning(setWbState);
+    setLoading(true);
     try {
       const res = await syncWbStocks();
-      if (res.success) {
-        toast.success("WB синхронизировано!");
-        markSuccess(setWbState);
-      } else {
-        toast.error(res.error || "Ошибка синка WB");
-        markError(setWbState, res.error);
-      }
-    } catch (e: any) {
-      console.error("syncWb error", e);
+      toast[res.success ? "success" : "error"](res.success ? "WB синхронизировано!" : res.error);
+    } catch (err: any) {
+      console.error("handleSyncWb error:", err);
       toast.error("Ошибка синка WB (см. логи)");
-      markError(setWbState, e?.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSyncOzon = async () => {
-    markRunning(setOzonState);
+    setLoading(true);
     try {
       const res = await syncOzonStocks();
-      if (res.success) {
-        toast.success("Ozon синхронизировано!");
-        markSuccess(setOzonState);
-      } else {
-        toast.error(res.error || "Ошибка синка Ozon");
-        markError(setOzonState, res.error);
-      }
-    } catch (e: any) {
-      console.error("syncOzon error", e);
+      toast[res.success ? "success" : "error"](res.success ? "Ozon синхронизировано!" : res.error);
+    } catch (err: any) {
+      console.error("handleSyncOzon error:", err);
       toast.error("Ошибка синка Ozon (см. логи)");
-      markError(setOzonState, e?.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSyncYm = async () => {
-    markRunning(setYmState);
+    setLoading(true);
     try {
-      const res: any = await syncYmStocks();
+      const res = await syncYmStocks(selectedCampaign || undefined);
       if (res.success) {
-        toast.success(`YM синхронизировано! Отправлено: ${res.sent ?? 0}`);
-        markSuccess(setYmState, { sent: res.sent, failed: res.failed });
+        toast.success(`YM синхронизировано! Отправлено: ${res.sent || "?"} items. Кампания: ${res.campaignId || "?"}`);
       } else {
-        toast.error(res.error || `YM sync failed: ${res.failed ?? 0}`);
-        markError(setYmState, res.error, { sent: res.sent, failed: res.failed });
+        toast.error(res.error || "Ошибка синка YM");
       }
-    } catch (e: any) {
-      console.error("syncYm error", e);
+    } catch (err: any) {
+      console.error("handleSyncYm error:", err);
       toast.error("Ошибка синка YM (см. логи)");
-      markError(setYmState, e?.message);
-    }
-  };
-
-  // NEW: check YM token/campaign
-  const handleCheckYmToken = async () => {
-    setYmCheckLoading(true);
-    setShowYmCheck(true);
-    setYmCheckResult(null);
-    try {
-      const res: any = await checkYmToken(); // server action (no args, uses env)
-      // res: { listStatus, listText, campStatus, campText }
-      const parsedList = tryParseJsonSafe(res.listText);
-      const parsedCamp = tryParseJsonSafe(res.campText);
-      setYmCheckResult({
-        listStatus: res.listStatus,
-        listJson: parsedList.parsed,
-        campStatus: res.campStatus,
-        campJson: parsedCamp.parsed,
-        rawList: parsedList.raw,
-        rawCamp: parsedCamp.raw,
-      });
-
-      // Update YM pill based on campaign check status
-      if (res.campStatus === 200) {
-        markSuccess(setYmState);
-      } else if (res.campStatus === 403) {
-        markError(setYmState, "Forbidden: token lacks access to campaign");
-      } else {
-        markError(setYmState, `Campaign check returned ${res.campStatus}`);
-      }
-    } catch (e: any) {
-      console.error("handleCheckYmToken", e);
-      setYmCheckResult({
-        listStatus: (e?.status as number) || undefined,
-        listJson: undefined,
-        campStatus: (e?.status as number) || undefined,
-        campJson: undefined,
-        rawList: String(e?.message || e),
-        rawCamp: "",
-      });
-      markError(setYmState, String(e?.message || "check Ym token failed"));
-      toast.error("Ошибка проверки YM токена (см. логи)");
     } finally {
-      setYmCheckLoading(false);
+      setLoading(false);
     }
   };
 
-  const tryParseJsonSafe = (txt: any) => {
-    if (!txt || typeof txt !== "string") return { parsed: null, raw: String(txt || "") };
+  const handleSetYmSku = async () => {
+    setLoading(true);
     try {
-      return { parsed: JSON.parse(txt), raw: txt };
-    } catch {
-      return { parsed: null, raw: txt };
+      const res = await setYmSku();
+      if (res.success) {
+        toast.success(`setYmSku: updated ${res.updated || 0} items`);
+        const itemsRes = await getWarehouseItems();
+        if (itemsRes.success && itemsRes.data) {
+          const syncableYm = itemsRes.data.some((i: any) => !!i.specs?.ym_sku);
+          setHasSyncableYm(syncableYm);
+        }
+      } else {
+        toast.error(res.error || "Ошибка setYmSku");
+      }
+    } catch (err: any) {
+      console.error("handleSetYmSku error:", err);
+      toast.error("Ошибка setYmSku (см. логи)");
+    } finally {
+      setLoading(false);
     }
   };
-
-  const copyToClipboard = async (txt?: string) => {
-    if (!txt) return;
-    try {
-      await navigator.clipboard.writeText(txt);
-      toast.success("Скопировано в буфер");
-    } catch {
-      toast.error("Не удалось скопировать");
-    }
-  };
-
-  // visuals
-  const btnBase = "flex items-center gap-2 px-3 py-2 rounded-2xl shadow-sm text-sm";
-  const transformPulse = { whileTap: { scale: 0.98 }, whileHover: { scale: 1.02 } };
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col md:flex-row md:items-center md:gap-4 gap-3 w-full">
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Setup WB */}
-          {needWbSetup && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  {...transformPulse}
-                  onClick={handleSetupWb}
-                  disabled={setupWbLoading || wbState.status === "running"}
-                  className={`${btnBase} bg-gradient-to-r from-[#E313BF] to-[#C010A8] text-white`}
-                  aria-label="Setup WB"
-                >
-                  {setupWbLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
-                  <span className="font-medium">Setup WB</span>
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Подтянуть barcodes с WB и проставить в локальных items.</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+      <div className="flex flex-wrap gap-2 items-center">
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
 
-          {/* Setup YM */}
+        {needSetup && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <motion.button
-                {...transformPulse}
-                onClick={handleSetupYm}
-                disabled={setupYmLoading || ymState.status === "running"}
-                className={`${btnBase} bg-gradient-to-r from-[#FFD54F] to-[#FFB300] text-black`}
-                aria-label="Setup YM"
-              >
-                {setupYmLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
-                <span className="font-medium">Setup YM</span>
-              </motion.button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Проставляет ym_sku = id и ym_warehouse_id = 7252771 для тех, у кого пусто.</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Check YM Token */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <motion.button
-                {...transformPulse}
-                onClick={handleCheckYmToken}
-                disabled={ymCheckLoading}
-                className={`${btnBase} bg-gradient-to-r from-[#00C853] to-[#009624] text-white`}
-                aria-label="Check YM Token"
-              >
-                {ymCheckLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                <span className="font-medium">Check YM Token</span>
-              </motion.button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Проверяет доступность Api-Key и видит ли он кампанию (7252771).</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* WB Sync */}
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  {...transformPulse}
-                  onClick={handleSyncWb}
-                  disabled={wbState.status === "running" || !itemsLoaded || !hasWb}
-                  className={`${btnBase} bg-gradient-to-r from-[#E313BF] to-[#C010A8] text-white`}
-                  aria-label="Sync WB"
-                >
-                  {wbState.status === "running" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                  <span className="font-semibold">{wbState.status === "running" ? "Syncing WB…" : "WB"}</span>
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{!hasWb ? "Нет items с wb_sku" : "Синхронизировать остатки в Wildberries"}</p>
-              </TooltipContent>
-            </Tooltip>
-            <Pill state={wbState} />
-          </div>
-
-          {/* Ozon Sync */}
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  {...transformPulse}
-                  onClick={handleSyncOzon}
-                  disabled={ozonState.status === "running" || !itemsLoaded || !hasOzon}
-                  className={`${btnBase} bg-gradient-to-r from-[#005BFF] to-[#0048CC] text-white`}
-                  aria-label="Sync Ozon"
-                >
-                  {ozonState.status === "running" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                  <span className="font-semibold">{ozonState.status === "running" ? "Syncing Ozon…" : "Ozon"}</span>
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{!hasOzon ? "Нет items с ozon_sku" : "Синхронизировать остатки в Ozon"}</p>
-              </TooltipContent>
-            </Tooltip>
-            <Pill state={ozonState} />
-          </div>
-
-          {/* YM Sync */}
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <motion.button
-                  {...transformPulse}
-                  onClick={handleSyncYm}
-                  disabled={ymState.status === "running" || !itemsLoaded || !hasYm}
-                  className={`${btnBase} bg-gradient-to-r from-[#FFC107] to-[#FF9800] text-black`}
-                  aria-label="Sync YM"
-                >
-                  {ymState.status === "running" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                  <span className="font-semibold">{ymState.status === "running" ? "Syncing YM…" : "YM"}</span>
-                </motion.button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{!hasYm ? "Нет items с ym_sku" : "Синхронизировать остатки в Yandex.Market"}</p>
-              </TooltipContent>
-            </Tooltip>
-            <Pill state={ymState} />
-          </div>
-        </div>
-
-        {/* YM Check panel */}
-        {showYmCheck && (
-          <div className="mt-3 w-full bg-white border rounded-lg p-3 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <strong>YM token check</strong>
-                  <span className="text-xs text-muted-foreground">({ymCheckResult?.listStatus ?? "—"} / {ymCheckResult?.campStatus ?? "—"})</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {ymCheckResult?.campStatus === 200 ? (
-                    <span className="text-green-700">Кампания доступна</span>
-                  ) : ymCheckResult?.campStatus === 403 ? (
-                    <span className="text-rose-700">Доступ к кампании запрещён (403)</span>
-                  ) : (
-                    <span className="text-yellow-700">Проверка не выполнялась или вернулась ошибка</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
+              <motion.div initial={{ scale: 1 }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1, repeat: Infinity }}>
                 <Button
-                  className="inline-flex items-center gap-2 px-2 py-1 text-xs"
-                  onClick={() => {
-                    setShowYmCheck(false);
-                    setYmCheckResult(null);
-                  }}
+                  className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
+                  onClick={handleSetupWbSku}
+                  disabled={loading}
                 >
-                  Закрыть
+                  <Settings className="mr-1 h-3 w-3" /> Setup WB
                 </Button>
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">Список кампаний (GET /v2/campaigns)</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-50"
-                      onClick={() => copyToClipboard(ymCheckResult?.rawList)}
-                    >
-                      <Copy className="h-3 w-3" /> Copy
-                    </button>
-                  </div>
-                </div>
-                <pre className="mt-2 max-h-44 overflow-auto text-[12px] bg-slate-50 p-2 rounded">
-                  {ymCheckResult?.listJson ? JSON.stringify(ymCheckResult.listJson, null, 2) : (ymCheckResult?.rawList ?? "—")}
-                </pre>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">Кампания {process.env.NEXT_PUBLIC_YM_WAREHOUSE_ID || "7252771"} (GET /v2/campaigns/:id)</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-50"
-                      onClick={() => copyToClipboard(ymCheckResult?.rawCamp)}
-                    >
-                      <Copy className="h-3 w-3" /> Copy
-                    </button>
-                  </div>
-                </div>
-                <pre className="mt-2 max-h-44 overflow-auto text-[12px] bg-slate-50 p-2 rounded">
-                  {ymCheckResult?.campJson ? JSON.stringify(ymCheckResult.campJson, null, 2) : (ymCheckResult?.rawCamp ?? "—")}
-                </pre>
-              </div>
-            </div>
-          </div>
+              </motion.div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Настроить баркоды для синка (missing у некоторых items)</p>
+            </TooltipContent>
+          </Tooltip>
         )}
 
-        {/* Footer hint */}
-        <div className="ml-auto text-xs text-muted-foreground w-full md:w-auto">
-          <div className="italic text-[12px]">Вайб: кликай аккуратно. Статусы показывают последний запуск.</div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
+              onClick={handleSyncWb}
+              disabled={loading || !itemsLoaded || !hasSyncableWb}
+            >
+              <RefreshCcw className="mr-1 h-3 w-3" /> WB
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{!hasSyncableWb ? "Нет items с wb_sku" : "Синк стоков WB из Supabase"}</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white"
+              onClick={handleSyncOzon}
+              disabled={loading || !itemsLoaded || !hasSyncableOzon}
+            >
+              <RefreshCcw className="mr-1 h-3 w-3" /> Ozon
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{!hasSyncableOzon ? "Нет items с ozon_sku" : "Синк стоков Ozon из Supabase"}</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* YM Controls */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border rounded-md px-2 py-1 bg-white">
+            <label className="text-xs mr-2 text-muted-foreground">YM кампания</label>
+            <div className="relative">
+              <select
+                className="text-sm p-1 bg-transparent"
+                value={selectedCampaign || ""}
+                onChange={(e) => setSelectedCampaign(e.target.value || null)}
+                disabled={checkingToken || !campaigns}
+              >
+                <option value="">(auto select AVAILABLE)</option>
+                {(campaigns || []).map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.domain} — {c.id} {c.apiAvailability ? `(${c.apiAvailability})` : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 pr-1">
+                <ChevronDown className="h-4 w-4" />
+              </span>
+            </div>
+            <Button className="ml-2" onClick={handleCheckYm} disabled={checkingToken}>
+              {checkingToken ? <Loader2 className="h-3 w-3 animate-spin" /> : "Check token"}
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-[#FFC107] to-[#FF9800] hover:from-[#FF9800] hover:to-[#F57C00] text-white ml-2"
+              onClick={handleSyncYm}
+              disabled={loading || !itemsLoaded || !hasSyncableYm}
+            >
+              <RefreshCcw className="mr-1 h-3 w-3" /> YM
+            </Button>
+          </div>
+          <Button onClick={handleSetYmSku} disabled={loading} title="Заполнить ym_sku = id для тех у кого пусто">
+            set ym_sku
+          </Button>
         </div>
+
+        <p className="text-xs text-muted-foreground w-full">
+          Вайб: Авто-загрузка из Supabase. {needSetup ? "Настрой баркоды для WB." : "Всё готово — синкни и вайби!"} Авто-синк nightly.
+        </p>
+
+        {tokenStatusText && <p className="text-xs text-muted-foreground w-full">YM token: {tokenStatusText}</p>}
       </div>
     </TooltipProvider>
   );
