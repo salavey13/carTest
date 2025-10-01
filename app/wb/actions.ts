@@ -43,7 +43,7 @@ function decodeJwtPayloadSafe(token: string): any | null {
 }
 
 // WB token diagnostics: decode JWT + ping supplies + warehouses
-async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; hasSupplies?: boolean; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
+async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; hasMarketplace?: boolean; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
   try {
     if (!WB_TOKEN) return { ok: false, reason: 'no_token' };
 
@@ -56,19 +56,19 @@ async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehou
     }
 
     const sValue = payload && payload.s ? parseInt(String(payload.s), 10) || 0 : 0;
-    const hasSupplies = !!(sValue && (sValue & (1 << (10 - 1))));
+    const hasMarketplace = !!(sValue && (sValue & (1 << 4)));
     const isTest = !!payload?.t;
-    console.info('WB token diagnostics:', { sid: payload?.sid, hasSupplies, isTest });
+    console.info('WB token diagnostics:', { sid: payload?.sid, hasMarketplace, isTest });
 
-    if (!hasSupplies) {
-      return { ok: false, reason: 'no_supplies_scope', payload, hasSupplies: false };
+    if (!hasMarketplace) {
+      return { ok: false, reason: 'no_marketplace_scope', payload, hasMarketplace: false };
     }
     if (isTest) {
       console.warn('WB token is test/sandbox — use prod for live sync');
     }
 
-    // Ping supplies-api
-    const pingRes = await fetch('https://supplies-api.wildberries.ru/ping', {
+    // Ping marketplace-api
+    const pingRes = await fetch('https://marketplace-api.wildberries.ru/ping', {
       method: 'GET',
       headers: { Authorization: WB_TOKEN },
     });
@@ -97,7 +97,7 @@ async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehou
       console.info('Fallback to active warehouseId:', warehouseId);
     }
 
-    return { ok: true, warehouseId, payload, hasSupplies, isTest, warehouses };
+    return { ok: true, warehouseId, payload, hasMarketplace, isTest, warehouses };
   } catch (e: any) {
     return { ok: false, reason: 'exception', message: e?.message || e };
   }
@@ -392,18 +392,17 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
-    const url = `https://supplies-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
-    const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
-    const body = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })) };
+    // Use POST /api/v5/stocks with warehouseId in body
+    const urlV5 = "https://supplies-api.wildberries.ru/api/v5/stocks";
+    const bodyV5 = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })), warehouseId: parseInt(String(WB_WAREHOUSE_ID), 10) };
 
-    console.info("syncWbStocks -> About to PUT v3", {
-      url,
-      method: "PUT",
+    const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
+
+    console.info("syncWbStocks -> About to POST v5", {
+      url: urlV5,
       token: maskedToken,
       stocksCount: stocks.length,
-      sampleStock: stocks[0] || null,
-      sampleBody: JSON.stringify(body).slice(0, 500) + "...",
-      warehouseId: WB_WAREHOUSE_ID
+      sampleBody: JSON.stringify(bodyV5).slice(0, 800) + "..."
     });
 
     try {
@@ -415,44 +414,40 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
 
     try {
       const response = await withRetry(async () => {
-        const res = await fetch(url, {
-          method: "PUT",
+        const res = await fetch(urlV5, {
+          method: "POST",
           headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(bodyV5),
         });
-        if (!res.ok && res.status >= 500) { // Retry only on server errors
+        if (!res.ok && res.status >= 500) {
           const errText = await res.text();
           throw new Error(`Status ${res.status}: ${errText}`);
         }
         if (!res.ok) {
-          const errText = await res.text();
-          const requestId = errText.match(/"requestId": "([a-f0-9-]+)"/)?.[1] || 'unknown';
-          const timestamp = errText.match(/"timestamp": "([0-9T:Z-]+)"/)?.[1] || 'unknown';
-          console.error("syncWbStocks: non-OK response", { status: res.status, errText, requestId, timestamp });
-          return { ok: false, status: res.status, text: errText, requestId, timestamp };
+          const text = await res.text().catch(() => '');
+          return { ok: false, status: res.status, text };
         }
         return { ok: true, res };
       });
 
       if (!response.ok) {
-        return { success: false, error: `WB API error: ${response.status} - ${response.text} (requestId: ${response.requestId || 'unknown'}, timestamp: ${response.timestamp || 'unknown'})` };
+        const text = response.text || '';
+        let parsedErr = null;
+        try { parsedErr = JSON.parse(text); } catch {}
+        const requestId = parsedErr?.requestId || text.match(/"requestId"\s*:\s*"([^"]+)"/)?.[1] || 'unknown';
+        const timestamp = parsedErr?.timestamp || text.match(/"timestamp"\s*:\s*"([^"]+)"/)?.[1] || 'unknown';
+        console.error("syncWbStocks: non-OK", { status: response.status, text, requestId, timestamp });
+
+        if (response.status === 404) {
+          return { success: false, error: `WB API 404 (path not found). requestId: ${requestId}, timestamp: ${timestamp}. Check token permissions / warehouseId.` };
+        }
+        return { success: false, error: `WB API error: ${response.status} - ${text}` };
       }
 
-      const text = await response.res.text();
+      const okText = await response.res.text().catch(() => '');
       let parsed;
-      try {
-        parsed = JSON.parse(text || "{}");
-      } catch (e) {
-        console.error("syncWbStocks: failed to parse JSON response", { text });
-        return { success: false, error: "Invalid JSON from WB" };
-      }
-
-      console.info("syncWbStocks response", { status: (parsed && (parsed.status || "unknown")) || response.res.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
-
-      if (parsed?.error) {
-        return { success: false, error: parsed?.errorText || parsed?.error };
-      }
-
+      try { parsed = JSON.parse(okText || "{}"); } catch { parsed = okText; }
+      console.info("syncWbStocks response OK", { sample: JSON.stringify(parsed).slice(0,2000) });
       return { success: true };
     } catch (err: any) {
       console.error("syncWbStocks error (after retries):", { message: err?.message, stack: err?.stack });
@@ -588,11 +583,11 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     const skus = items.map((i) => (i.specs?.wb_sku as string) || i.id).filter(Boolean);
     if (skus.length === 0) return { success: false, error: "No skus for fetch (setup barcodes first)" };
 
-    const url = `https://supplies-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
+    const url = `https://marketplace-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     console.info("fetchWbStocks -> About to POST", { url, skusCount: skus.length, sampleSkus: skus.slice(0, 20) });
 
     try {
-      const lookup = await dns.lookup("supplies-api.wildberries.ru");
+      const lookup = await dns.lookup("marketplace-api.wildberries.ru");
       console.info("fetchWbStocks DNS lookup result", lookup);
     } catch (dnsErr: any) {
       console.warn("fetchWbStocks DNS lookup failed", { code: dnsErr?.code, message: dnsErr?.message });
@@ -706,7 +701,7 @@ export async function getWbWarehouses(): Promise<{ success: boolean; data?: any[
   if (!token) return { success: false, error: "WB_API_TOKEN missing" };
 
   try {
-    const res = await fetch("https://supplies-api.wildberries.ru/api/v3/warehouses", {
+    const res = await fetch("https://marketplace-api.wildberries.ru/api/v3/warehouses", {
       headers: { Authorization: token },
       method: "GET",
     });
