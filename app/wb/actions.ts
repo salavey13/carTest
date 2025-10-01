@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from "@/hooks/supabase";
 import { unstable_noStore as noStore } from "next/cache";
-import type { WarehouseItem } from " @/app/wb/common";
+import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
@@ -271,7 +271,7 @@ export async function updateItemMinQty(itemId: string, minQty: number): Promise<
 }
 
 /* =======================
-   Wildberries sync (send stocks)
+   Wildberries sync (send stocks) - FIXED: v5 POST /api/v5/stocks
    ======================= */
 
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
@@ -309,15 +309,17 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
-    const url = `https://supplies-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
+    const url = `https://supplies-api.wildberries.ru/api/v5/stocks`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
+    const body = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })), warehouseId: parseInt(WB_WAREHOUSE_ID, 10) };
 
-    console.info("syncWbStocks -> About to PUT", {
+    console.info("syncWbStocks -> About to POST", {
       url,
-      method: "PUT",
+      method: "POST",
       token: maskedToken,
       stocksCount: stocks.length,
       sampleStock: stocks[0] || null,
+      sampleBody: JSON.stringify(body).slice(0, 500) + "..."
     });
 
     try {
@@ -330,18 +332,27 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
     try {
       const response = await withRetry(async () => {
         const res = await fetch(url, {
-          method: "PUT",
+          method: "POST",
           headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
-          body: JSON.stringify({ stocks }),
+          body: JSON.stringify(body),
         });
-        if (!res.ok) {
+        if (!res.ok && res.status >= 500) { // Retry only on server errors
           const errText = await res.text();
           throw new Error(`Status ${res.status}: ${errText}`);
         }
-        return res;
+        if (!res.ok) {
+          const errText = await res.text();
+          return { ok: false, status: res.status, text: errText }; // Don't throw, handle below
+        }
+        return { ok: true, res };
       });
 
-      const text = await response.text();
+      if (!response.ok) {
+        console.error("syncWbStocks: API returned non-OK", { status: response.status, text: response.text });
+        return { success: false, error: `WB API error: ${response.status} - ${response.text}` };
+      }
+
+      const text = await response.res.text();
       let parsed;
       try {
         parsed = JSON.parse(text || "{}");
@@ -350,7 +361,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
         return { success: false, error: "Invalid JSON from WB" };
       }
 
-      console.info("syncWbStocks response", { status: (parsed && (parsed.status || "unknown")) || response.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
+      console.info("syncWbStocks response", { status: (parsed && (parsed.status || "unknown")) || response.res.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
 
       if (parsed?.error) {
         return { success: false, error: parsed?.errorText || parsed?.error };
@@ -368,8 +379,10 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
 }
 
 /* =======================
-   Ozon sync (import stocks)
+   Ozon sync (import stocks) - FIXED: v2 POST /v2/products/stocks + product_id mapping
    ======================= */
+
+let ozonProductCache: { [offer_id: string]: number } | null = null; // Cache product_id by offer_id
 
 export async function syncOzonStocks(): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
@@ -380,6 +393,21 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
   const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
   if (error || !items) return { success: false, error: error?.message || "No items found" };
 
+  // Fetch/cache product_ids
+  if (!ozonProductCache) {
+    const prodRes = await getOzonProductList();
+    if (prodRes.success && prodRes.data) {
+      ozonProductCache = {};
+      prodRes.data.forEach((p: any) => {
+        ozonProductCache[p.offer_id] = p.product_id;
+      });
+      console.info(`Ozon product cache built: ${Object.keys(ozonProductCache).length} offer_ids mapped`);
+    } else {
+      console.error("Failed to fetch Ozon products for mapping");
+      return { success: false, error: "Failed to map offer_id to product_id" };
+    }
+  }
+
   const stocks = items
     .map((i) => {
       const offer_id = i.specs?.ozon_sku as string | undefined;
@@ -387,20 +415,25 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
         console.warn(`Skipping item ${i.id} without ozon_sku in specs.`);
         return null;
       }
+      const product_id = ozonProductCache[offer_id];
+      if (!product_id) {
+        console.warn(`Skipping item ${i.id}: no product_id for offer_id ${offer_id}`);
+        return null;
+      }
       const stock = (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0);
       const warehouse_id = parseInt((i.specs?.ozon_warehouse_id as string) || OZON_WAREHOUSE_ID, 10);
-      return { offer_id, stock, warehouse_id };
+      return { offer_id, product_id, stock, warehouse_id };
     })
-    .filter(Boolean) as { offer_id: string; stock: number; warehouse_id: number }[];
+    .filter(Boolean) as { offer_id: string; product_id: number; stock: number; warehouse_id: number }[];
 
   if (stocks.length === 0) {
-    console.warn("No items with ozon_sku to sync.");
-    return { success: false, error: "No syncable items (check ozon_sku setup)" };
+    console.warn("No items with ozon_sku and product_id to sync.");
+    return { success: false, error: "No syncable items (check ozon_sku setup and mapping)" };
   }
 
-  // Try v1 endpoint first — many accounts expect v1 for import stocks
-  const url = "https://api-seller.ozon.ru/v1/product/import/stocks";
-  console.info("syncOzonStocks -> About to POST", { url, count: stocks.length });
+  // v2 endpoint
+  const url = "https://api-seller.ozon.ru/v2/products/stocks";
+  console.info("syncOzonStocks -> About to POST", { url, count: stocks.length, sample: stocks[0] });
 
   try {
     const response = await withRetry(async () => {
@@ -409,14 +442,23 @@ export async function syncOzonStocks(): Promise<{ success: boolean; error?: stri
         headers: { "Client-Id": OZON_CLIENT_ID, "Api-Key": OZON_API_KEY, "Content-Type": "application/json" },
         body: JSON.stringify({ stocks }),
       });
-      if (!res.ok) {
+      if (!res.ok && res.status >= 500) { // Retry only on server errors
         const errText = await res.text();
         throw new Error(`Status ${res.status}: ${errText}`);
       }
-      return res;
+      if (!res.ok) {
+        const errText = await res.text();
+        return { ok: false, status: res.status, text: errText }; // Don't throw, handle below
+      }
+      return { ok: true, res };
     });
 
-    const text = await response.text();
+    if (!response.ok) {
+      console.error("syncOzonStocks: API returned non-OK", { status: response.status, text: response.text });
+      return { success: false, error: `Ozon API error: ${response.status} - ${response.text}` };
+    }
+
+    const text = await response.res.text();
     let data;
     try {
       data = JSON.parse(text || "{}");
