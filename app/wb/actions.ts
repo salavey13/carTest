@@ -43,6 +43,125 @@ function decodeJwtPayloadSafe(token: string): any | null {
   }
 }
 
+// Возвращает список кампаний (parsed) и сырый ответ для диагностики
+export async function getYmCampaigns(): Promise<{ success: boolean; campaigns?: any[]; raw?: any; error?: string; status?: number }> {
+  const YM_API_TOKEN = (process.env.YM_API_TOKEN || "").toString().trim();
+  if (!YM_API_TOKEN) return { success: false, error: "YM_API_TOKEN missing" };
+
+  try {
+    const res = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
+      headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
+    });
+    const status = res.status;
+    const text = await res.text().catch(() => "");
+    let json: any = {};
+    try { json = JSON.parse(text || "{}"); } catch (e) { /* ignore parse error */ }
+
+    const campaigns = Array.isArray(json.campaigns) ? json.campaigns : [];
+    return { success: true, campaigns, raw: json, status };
+  } catch (e: any) {
+    console.error("getYmCampaigns error:", e);
+    return { success: false, error: e?.message || "Network error" };
+  }
+}
+
+/**
+ * Обновлена: syncYmStocks принимает optional campaignId.
+ * Если передан campaignId — используем его; иначе поведение как раньше (env/fallback).
+ */
+export async function syncYmStocks(campaignId?: string): Promise<{ success: boolean; error?: string; sent?: number; campaignId?: string }> {
+  const YM_API_TOKEN = process.env.YM_API_TOKEN;
+  if (!YM_API_TOKEN) return { success: false, error: "Yandex.Market credentials missing" };
+
+  // Получаем товары
+  const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
+  if (error || !items) return { success: false, error: error?.message || "No items found" };
+
+  const skus = items.map((i) => {
+    const sku = (i.specs?.ym_sku as string) || i.id;
+    if (!sku) return null;
+    const count = (i.specs?.warehouse_locations || []).reduce((sum: number, loc: any) => sum + (loc.quantity || 0), 0);
+    return { sku, items: [{ count, updatedAt: new Date().toISOString() }] };
+  }).filter(Boolean) as { sku: string; items: { count: number; updatedAt: string }[] }[];
+
+  if (skus.length === 0) return { success: false, error: "No syncable items (check ym_sku setup)" };
+
+  // If campaignId provided - try to use it; else consult campaigns list and pick AVAILABLE
+  let YM_WAREHOUSE_ID = (campaignId || process.env.YM_WAREHOUSE_ID || process.env.NEXT_PUBLIC_YM_WAREHOUSE_ID || "").toString().trim();
+
+  // Get campaigns to verify availability and fallback
+  try {
+    const listRes = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
+      headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
+    });
+    const listText = await listRes.text().catch(() => "");
+    let listJson: any = {};
+    try { listJson = JSON.parse(listText || "{}"); } catch (_) {}
+    const campaigns: any[] = Array.isArray(listJson?.campaigns) ? listJson.campaigns : [];
+
+    // If provided campaignId, check availability
+    if (YM_WAREHOUSE_ID) {
+      const found = campaigns.find(c => String(c.id) === String(YM_WAREHOUSE_ID));
+      if (!found || found.apiAvailability !== "AVAILABLE") {
+        console.warn("syncYmStocks: requested campaign not AVAILABLE or not found, will fallback to first AVAILABLE", { requested: YM_WAREHOUSE_ID, found });
+        YM_WAREHOUSE_ID = "";
+      }
+    }
+
+    if (!YM_WAREHOUSE_ID) {
+      const available = campaigns.find(c => c.apiAvailability === "AVAILABLE");
+      if (available) YM_WAREHOUSE_ID = String(available.id);
+      else {
+        console.error("syncYmStocks: no AVAILABLE campaigns", { campaigns, raw: listJson });
+        return { success: false, error: "No AVAILABLE campaigns for this token. Check token/campaigns.", campaignId: undefined };
+      }
+    }
+  } catch (e: any) {
+    console.warn("syncYmStocks: failed to fetch campaigns, will still try using existing campaignId/env", e?.message || e);
+    // proceed with YM_WAREHOUSE_ID (maybe set via env)
+  }
+
+  const url = `https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}/offers/stocks`;
+  console.info("syncYmStocks -> About to PUT", { url, count: skus.length, sample: skus[0] });
+
+  try {
+    const response = await withRetry(async () => {
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify({ skus }),
+      });
+      if (!res.ok && res.status >= 500) {
+        const errText = await res.text();
+        throw new Error(`Status ${res.status}: ${errText}`);
+      }
+      if (!res.ok) {
+        const errText = await res.text();
+        return { ok: false, status: res.status, text: errText };
+      }
+      return { ok: true, res };
+    });
+
+    if (!response.ok) {
+      console.error("syncYmStocks: API non-OK", { status: response.status, text: response.text });
+      return { success: false, error: `Yandex API error: ${response.status} - ${response.text}`, campaignId: YM_WAREHOUSE_ID };
+    }
+
+    const data = await response.res.json().catch(() => ({}));
+    if (data.errors && data.errors.length > 0) {
+      console.error("syncYmStocks: Yandex returned errors:", data.errors);
+      return { success: false, error: data.errors[0].message || "Yandex API error", campaignId: YM_WAREHOUSE_ID };
+    }
+
+    console.info("syncYmStocks successful", { sent: skus.length, campaignId: YM_WAREHOUSE_ID });
+    return { success: true, sent: skus.length, campaignId: YM_WAREHOUSE_ID };
+  } catch (err: any) {
+    console.error("syncYmStocks error:", err);
+    return { success: false, error: err?.message || "Unknown error in syncYmStocks", campaignId: YM_WAREHOUSE_ID };
+  }
+}
+
+
 export async function checkYmToken(token?: string | null, campaignId?: string | null) {
   // Read from env when not provided
   const YM_API_TOKEN = (token || process.env.YM_API_TOKEN || "").toString().trim();
@@ -1084,89 +1203,8 @@ export async function fetchOzonPendingCount(): Promise<{ success: boolean; count
   }
 }
 
-export async function syncYmStocks(): Promise<{ success: boolean; error?: string }> {
-  const YM_API_TOKEN = process.env.YM_API_TOKEN;
-  const YM_WAREHOUSE_ID = process.env.YM_WAREHOUSE_ID; // используется как campaignId
-  if (!YM_API_TOKEN || !YM_WAREHOUSE_ID) {
-    return { success: false, error: "Yandex.Market credentials missing" };
-  }
 
-  // Получаем товары из Supabase
-  const { data: items, error } = await supabaseAdmin
-    .from("cars")
-    .select("*")
-    .eq("type", "wb_item");
-  if (error || !items) {
-    return { success: false, error: error?.message || "No items found" };
-  }
 
-  // Формируем массив остатков по спецификации ЯМ
-  const skus = items.map((i) => {
-    const sku = (i.specs?.ym_sku as string) || i.id; // используем ym_sku или id
-    if (!sku) {
-      console.warn(`Skipping item ${i.id}: missing ym_sku and id`);
-      return null;
-    }
-    // Суммируем количество по всем локациям склада
-    const count = (i.specs?.warehouse_locations || []).reduce(
-      (sum: number, loc: any) => sum + (loc.quantity || 0),
-      0
-    );
-    // Формируем объект для API
-    return { sku, items: [{ count, updatedAt: new Date().toISOString() }] };
-  }).filter(Boolean) as { sku: string; items: { count: number; updatedAt: string }[] }[];
-
-  if (skus.length === 0) {
-    console.warn("No items with ym_sku to sync.");
-    return { success: false, error: "No syncable items (check ym_sku setup)" };
-  }
-
-  const url = `https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}/offers/stocks`;
-  console.info("syncYmStocks -> About to PUT", { url, count: skus.length, sample: skus[0] });
-
-  try {
-    const response = await withRetry(async () => {
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify({ skus }),
-      });
-      // Повторяем при ошибках 5xx
-      if (!res.ok && res.status >= 500) {
-        const errText = await res.text();
-        throw new Error(`Status ${res.status}: ${errText}`);
-      }
-      if (!res.ok) {
-        const errText = await res.text();
-        return { ok: false, status: res.status, text: errText };
-      }
-      return { ok: true, res };
-    });
-
-    if (!response.ok) {
-      console.error("syncYmStocks: API returned non-OK", {
-        status: response.status,
-        text: response.text,
-      });
-      return { success: false, error: `Yandex API error: ${response.status} - ${response.text}` };
-    }
-
-    // Парсим JSON и проверяем наличие ошибок в ответе
-    const data = await response.res.json();
-    if (data.errors && data.errors.length > 0) {
-      console.error("syncYmStocks: Yandex returned errors:", data.errors);
-      return { success: false, error: data.errors[0].message || "Yandex API error" };
-    }
-
-    console.info("syncYmStocks successful");
-    return { success: true };
-  } catch (err: any) {
-    console.error("syncYmStocks error:", err);
-    return { success: false, error: err?.message || "Unknown error in syncYmStocks" };
-  }
-}
-
-// Добавить в app/wb/actions.ts (например рядом с setWbBarcodes)
 export async function setYmSku(): Promise<{ success: boolean; updated?: number; error?: string }> {
   try {
     // Получаем локальные items (используем существующий helper)
