@@ -1110,6 +1110,57 @@ export async function syncYmStocks(): Promise<{ success: boolean; error?: string
   }
 }
 
+// Добавить в app/wb/actions.ts (например рядом с setWbBarcodes)
+export async function setYmSku(): Promise<{ success: boolean; updated?: number; error?: string }> {
+  try {
+    // Получаем локальные items (используем существующий helper)
+    const localRes = await getWarehouseItems();
+    if (!localRes.success || !localRes.data) {
+      return { success: false, error: localRes.error || "Failed to fetch local items" };
+    }
+
+    const updates: any[] = [];
+    const TARGET_WAREHOUSE = '7252771';
+
+    for (const item of localRes.data) {
+      const id = item.id;
+      const specs = item.specs || {};
+      const currentYm = (specs?.ym_sku || "").toString().trim();
+      if (currentYm) continue; // у этого item уже есть ym_sku — пропускаем
+
+      // Собираем объект для апсерта (сохраняем остальное в specs)
+      const newSpecs = { ...specs, ym_sku: id, ym_warehouse_id: TARGET_WAREHOUSE };
+      updates.push({
+        id: item.id,
+        make: item.make,
+        model: item.model,
+        description: item.description,
+        type: item.type,
+        specs: newSpecs,
+        image_url: item.image_url,
+      });
+    }
+
+    if (updates.length === 0) {
+      console.info("setYmSku: nothing to update (all items already have ym_sku)");
+      return { success: true, updated: 0 };
+    }
+
+    const { error } = await supabaseAdmin.from("cars").upsert(updates, { onConflict: "id" });
+    if (error) {
+      console.error("setYmSku upsert error:", error);
+      return { success: false, error: error.message || "Upsert failed" };
+    }
+
+    console.info(`setYmSku: updated ${updates.length} items`);
+    return { success: true, updated: updates.length };
+  } catch (e: any) {
+    console.error("setYmSku error:", e);
+    return { success: false, error: e?.message || "Unknown error in setYmSku" };
+  }
+}
+
+
 /* =======================
    End of file
    ======================= */
