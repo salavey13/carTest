@@ -43,7 +43,7 @@ function decodeJwtPayloadSafe(token: string): any | null {
   }
 }
 
-async function checkYmToken(token: string, campaignId: string) {
+export async function checkYmToken(token: string, campaignId: string) {
   const listRes = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
     headers: { "Api-Key": token, "Content-Type": "application/json" },
   });
