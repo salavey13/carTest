@@ -388,17 +388,18 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
-    // Use POST /api/v5/stocks with warehouseId in body
-    const urlV5 = "https://marketplace-api.wildberries.ru/api/v5/stocks";
-    const bodyV5 = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })), warehouseId: parseInt(String(WB_WAREHOUSE_ID), 10) };
-
+    const url = `https://marketplace-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
+    const body = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })) };
 
-    console.info("syncWbStocks -> About to POST v5", {
-      url: urlV5,
+    console.info("syncWbStocks -> About to PUT v3", {
+      url,
+      method: "PUT",
       token: maskedToken,
       stocksCount: stocks.length,
-      sampleBody: JSON.stringify(bodyV5).slice(0, 800) + "..."
+      sampleStock: stocks[0] || null,
+      sampleBody: JSON.stringify(body).slice(0, 500) + "...",
+      warehouseId: WB_WAREHOUSE_ID
     });
 
     try {
@@ -410,40 +411,44 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
 
     try {
       const response = await withRetry(async () => {
-        const res = await fetch(urlV5, {
-          method: "POST",
+        const res = await fetch(url, {
+          method: "PUT",
           headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
-          body: JSON.stringify(bodyV5),
+          body: JSON.stringify(body),
         });
-        if (!res.ok && res.status >= 500) {
+        if (!res.ok && res.status >= 500) { // Retry only on server errors
           const errText = await res.text();
           throw new Error(`Status ${res.status}: ${errText}`);
         }
         if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          return { ok: false, status: res.status, text };
+          const errText = await res.text();
+          const requestId = errText.match(/"requestId": "([a-f0-9-]+)"/)?.[1] || 'unknown';
+          const timestamp = errText.match(/"timestamp": "([0-9T:Z-]+)"/)?.[1] || 'unknown';
+          console.error("syncWbStocks: non-OK response", { status: res.status, errText, requestId, timestamp });
+          return { ok: false, status: res.status, text: errText, requestId, timestamp };
         }
         return { ok: true, res };
       });
 
       if (!response.ok) {
-        const text = response.text || '';
-        let parsedErr = null;
-        try { parsedErr = JSON.parse(text); } catch {}
-        const requestId = parsedErr?.requestId || text.match(/"requestId"\s*:\s*"([^"]+)"/)?.[1] || 'unknown';
-        const timestamp = parsedErr?.timestamp || text.match(/"timestamp"\s*:\s*"([^"]+)"/)?.[1] || 'unknown';
-        console.error("syncWbStocks: non-OK", { status: response.status, text, requestId, timestamp });
-
-        if (response.status === 404) {
-          return { success: false, error: `WB API 404 (path not found). requestId: ${requestId}, timestamp: ${timestamp}. Check token permissions / warehouseId.` };
-        }
-        return { success: false, error: `WB API error: ${response.status} - ${text}` };
+        return { success: false, error: `WB API error: ${response.status} - ${response.text} (requestId: ${response.requestId || 'unknown'}, timestamp: ${response.timestamp || 'unknown'})` };
       }
 
-      const okText = await response.res.text().catch(() => '');
+      const text = await response.res.text();
       let parsed;
-      try { parsed = JSON.parse(okText || "{}"); } catch { parsed = okText; }
-      console.info("syncWbStocks response OK", { sample: JSON.stringify(parsed).slice(0,2000) });
+      try {
+        parsed = JSON.parse(text || "{}");
+      } catch (e) {
+        console.error("syncWbStocks: failed to parse JSON response", { text });
+        return { success: false, error: "Invalid JSON from WB" };
+      }
+
+      console.info("syncWbStocks response", { status: (parsed && (parsed.status || "unknown")) || response.res.status, bodySample: JSON.stringify(parsed).slice(0, 2000) });
+
+      if (parsed?.error) {
+        return { success: false, error: parsed?.errorText || parsed?.error };
+      }
+
       return { success: true };
     } catch (err: any) {
       console.error("syncWbStocks error (after retries):", { message: err?.message, stack: err?.stack });
@@ -666,7 +671,7 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       }
 
       if (!data || !Array.isArray(data.items)) {
-        console.warn("fetchOzonStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) });
+        console.warn("fetchOzonStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) };
         return { success: false, error: "Ozon returned unexpected payload" };
       }
 
