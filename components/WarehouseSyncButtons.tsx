@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Settings, RefreshCcw, Check, X, Clock } from "lucide-react";
+import { Loader2, Settings, RefreshCcw, Check, X, Clock, Copy } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Tooltip,
@@ -18,6 +18,7 @@ import {
   setWbBarcodes,
   setYmSku,
   getWarehouseItems,
+  checkYmToken, // <- серверная проверка token/campaign
 } from "@/app/wb/actions";
 
 type RunStatus = {
@@ -31,7 +32,7 @@ type RunStatus = {
 const Pill: React.FC<{ state: RunStatus }> = ({ state }) => {
   const { status, updatedAt, sent, failed } = state;
   const timeLabel = updatedAt ? new Date(updatedAt).toLocaleString() : null;
-  const base = "inline-flex items-center text-xs rounded-full px-2 py-0.5 gap-1";
+  const base = "inline-flex items-center text-xs rounded-full px-2 py-0.5 gap-1 select-none";
   if (status === "running") {
     return (
       <span className={`${base} bg-slate-100 text-slate-800`} aria-live="polite">
@@ -77,6 +78,18 @@ export function WarehouseSyncButtons() {
   const [hasYm, setHasYm] = useState(false);
   const [needWbSetup, setNeedWbSetup] = useState(false);
 
+  // YM token check state
+  const [ymCheckLoading, setYmCheckLoading] = useState(false);
+  const [ymCheckResult, setYmCheckResult] = useState<{
+    listStatus?: number;
+    listJson?: any;
+    campStatus?: number;
+    campJson?: any;
+    rawList?: string;
+    rawCamp?: string;
+  } | null>(null);
+  const [showYmCheck, setShowYmCheck] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -116,13 +129,11 @@ export function WarehouseSyncButtons() {
       const res = await setWbBarcodes();
       if (res.success) {
         toast.success(`WB setup: обновлено ${res.updated ?? 0}`);
-        // refresh flags
         const itemsRes = await getWarehouseItems();
         if (itemsRes.success && itemsRes.data) {
           setNeedWbSetup(itemsRes.data.some((i: any) => !i.specs?.wb_sku));
           setHasWb(itemsRes.data.some((i: any) => !!i.specs?.wb_sku));
         }
-        // success pill on WB only
         markSuccess(setWbState, {});
       } else {
         toast.error(res.error || "Ошибка setup WB");
@@ -216,6 +227,69 @@ export function WarehouseSyncButtons() {
     }
   };
 
+  // NEW: check YM token/campaign
+  const handleCheckYmToken = async () => {
+    setYmCheckLoading(true);
+    setShowYmCheck(true);
+    setYmCheckResult(null);
+    try {
+      const res: any = await checkYmToken(); // server action (no args, uses env)
+      // res: { listStatus, listText, campStatus, campText }
+      const parsedList = tryParseJsonSafe(res.listText);
+      const parsedCamp = tryParseJsonSafe(res.campText);
+      setYmCheckResult({
+        listStatus: res.listStatus,
+        listJson: parsedList.parsed,
+        campStatus: res.campStatus,
+        campJson: parsedCamp.parsed,
+        rawList: parsedList.raw,
+        rawCamp: parsedCamp.raw,
+      });
+
+      // Update YM pill based on campaign check status
+      if (res.campStatus === 200) {
+        markSuccess(setYmState);
+      } else if (res.campStatus === 403) {
+        markError(setYmState, "Forbidden: token lacks access to campaign");
+      } else {
+        markError(setYmState, `Campaign check returned ${res.campStatus}`);
+      }
+    } catch (e: any) {
+      console.error("handleCheckYmToken", e);
+      setYmCheckResult({
+        listStatus: (e?.status as number) || undefined,
+        listJson: undefined,
+        campStatus: (e?.status as number) || undefined,
+        campJson: undefined,
+        rawList: String(e?.message || e),
+        rawCamp: "",
+      });
+      markError(setYmState, String(e?.message || "check Ym token failed"));
+      toast.error("Ошибка проверки YM токена (см. логи)");
+    } finally {
+      setYmCheckLoading(false);
+    }
+  };
+
+  const tryParseJsonSafe = (txt: any) => {
+    if (!txt || typeof txt !== "string") return { parsed: null, raw: String(txt || "") };
+    try {
+      return { parsed: JSON.parse(txt), raw: txt };
+    } catch {
+      return { parsed: null, raw: txt };
+    }
+  };
+
+  const copyToClipboard = async (txt?: string) => {
+    if (!txt) return;
+    try {
+      await navigator.clipboard.writeText(txt);
+      toast.success("Скопировано в буфер");
+    } catch {
+      toast.error("Не удалось скопировать");
+    }
+  };
+
   // visuals
   const btnBase = "flex items-center gap-2 px-3 py-2 rounded-2xl shadow-sm text-sm";
   const transformPulse = { whileTap: { scale: 0.98 }, whileHover: { scale: 1.02 } };
@@ -261,6 +335,25 @@ export function WarehouseSyncButtons() {
             </TooltipTrigger>
             <TooltipContent>
               <p>Проставляет ym_sku = id и ym_warehouse_id = 7252771 для тех, у кого пусто.</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Check YM Token */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <motion.button
+                {...transformPulse}
+                onClick={handleCheckYmToken}
+                disabled={ymCheckLoading}
+                className={`${btnBase} bg-gradient-to-r from-[#00C853] to-[#009624] text-white`}
+                aria-label="Check YM Token"
+              >
+                {ymCheckLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                <span className="font-medium">Check YM Token</span>
+              </motion.button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Проверяет доступность Api-Key и видит ли он кампанию (7252771).</p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -332,6 +425,76 @@ export function WarehouseSyncButtons() {
             <Pill state={ymState} />
           </div>
         </div>
+
+        {/* YM Check panel */}
+        {showYmCheck && (
+          <div className="mt-3 w-full bg-white border rounded-lg p-3 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <strong>YM token check</strong>
+                  <span className="text-xs text-muted-foreground">({ymCheckResult?.listStatus ?? "—"} / {ymCheckResult?.campStatus ?? "—"})</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {ymCheckResult?.campStatus === 200 ? (
+                    <span className="text-green-700">Кампания доступна</span>
+                  ) : ymCheckResult?.campStatus === 403 ? (
+                    <span className="text-rose-700">Доступ к кампании запрещён (403)</span>
+                  ) : (
+                    <span className="text-yellow-700">Проверка не выполнялась или вернулась ошибка</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  className="inline-flex items-center gap-2 px-2 py-1 text-xs"
+                  onClick={() => {
+                    setShowYmCheck(false);
+                    setYmCheckResult(null);
+                  }}
+                >
+                  Закрыть
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Список кампаний (GET /v2/campaigns)</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-50"
+                      onClick={() => copyToClipboard(ymCheckResult?.rawList)}
+                    >
+                      <Copy className="h-3 w-3" /> Copy
+                    </button>
+                  </div>
+                </div>
+                <pre className="mt-2 max-h-44 overflow-auto text-[12px] bg-slate-50 p-2 rounded">
+                  {ymCheckResult?.listJson ? JSON.stringify(ymCheckResult.listJson, null, 2) : (ymCheckResult?.rawList ?? "—")}
+                </pre>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Кампания {process.env.NEXT_PUBLIC_YM_WAREHOUSE_ID || "7252771"} (GET /v2/campaigns/:id)</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-50"
+                      onClick={() => copyToClipboard(ymCheckResult?.rawCamp)}
+                    >
+                      <Copy className="h-3 w-3" /> Copy
+                    </button>
+                  </div>
+                </div>
+                <pre className="mt-2 max-h-44 overflow-auto text-[12px] bg-slate-50 p-2 rounded">
+                  {ymCheckResult?.campJson ? JSON.stringify(ymCheckResult.campJson, null, 2) : (ymCheckResult?.rawCamp ?? "—")}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer hint */}
         <div className="ml-auto text-xs text-muted-foreground w-full md:w-auto">
