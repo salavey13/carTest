@@ -78,7 +78,6 @@ export function WarehouseSyncButtons() {
       const res = await getYmCampaigns();
       if (res.success) {
         setCampaigns(res.campaigns || []);
-        // auto-select any AVAILABLE campaign (prefer existing selected or env handled server-side)
         const avail = (res.campaigns || []).find((c: any) => c.apiAvailability === "AVAILABLE");
         if (avail) setSelectedCampaign(String(avail.id));
         toast.success(`YM: найдено ${res.campaigns?.length || 0} кампаний`);
@@ -96,9 +95,7 @@ export function WarehouseSyncButtons() {
   const handleCheckYm = async () => {
     setCheckingToken(true);
     try {
-      // checkYmToken returns diagnostics (server fn)
       const res = await checkYmToken(undefined as any, selectedCampaign || undefined);
-      // normalize text for UI
       const summary = `list: ${res?.listStatus || "?"}, camp: ${res?.campStatus || "?"}`;
       setTokenStatusText(summary);
       toast.success("Проверка токена выполнена (см. статус)");
@@ -206,101 +203,132 @@ export function WarehouseSyncButtons() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-wrap gap-2 items-center">
-        {loading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+      {/* Outer: full width, prevent horizontal overflow */}
+      <div className="w-full min-w-0">
+        {/* Buttons container: column on mobile, row (wrap) on sm+ */}
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch w-full">
+          {/* Left controls: setup + WB + Ozon */}
+          <div className="flex flex-row sm:flex-nowrap flex-wrap gap-2 items-center min-w-0">
+            {loading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
 
-        {needSetup && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <motion.div initial={{ scale: 1 }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+            {needSetup && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <motion.div
+                    initial={{ scale: 1 }}
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <Button
+                      className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
+                      onClick={handleSetupWbSku}
+                      disabled={loading}
+                    >
+                      <Settings className="mr-1 h-3 w-3" /> Setup WB
+                    </Button>
+                  </motion.div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Настроить баркоды для синка (missing у некоторых items)</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
-                  onClick={handleSetupWbSku}
-                  disabled={loading}
+                  onClick={handleSyncWb}
+                  disabled={loading || !itemsLoaded || !hasSyncableWb}
                 >
-                  <Settings className="mr-1 h-3 w-3" /> Setup WB
+                  <RefreshCcw className="mr-1 h-3 w-3" /> WB
                 </Button>
-              </motion.div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Настроить баркоды для синка (missing у некоторых items)</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{!hasSyncableWb ? "Нет items с wb_sku" : "Синк стоков WB из Supabase"}</p>
+              </TooltipContent>
+            </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
-              onClick={handleSyncWb}
-              disabled={loading || !itemsLoaded || !hasSyncableWb}
-            >
-              <RefreshCcw className="mr-1 h-3 w-3" /> WB
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{!hasSyncableWb ? "Нет items с wb_sku" : "Синк стоков WB из Supabase"}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white"
-              onClick={handleSyncOzon}
-              disabled={loading || !itemsLoaded || !hasSyncableOzon}
-            >
-              <RefreshCcw className="mr-1 h-3 w-3" /> Ozon
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{!hasSyncableOzon ? "Нет items с ozon_sku" : "Синк стоков Ozon из Supabase"}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* YM Controls */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center border rounded-md px-2 py-1 bg-white">
-            <label className="text-xs mr-2 text-muted-foreground">YM кампания</label>
-            <div className="relative">
-              <select
-                className="text-sm p-1 bg-transparent"
-                value={selectedCampaign || ""}
-                onChange={(e) => setSelectedCampaign(e.target.value || null)}
-                disabled={checkingToken || !campaigns}
-              >
-                <option value="">(auto select AVAILABLE)</option>
-                {(campaigns || []).map((c: any) => (
-                  <option key={c.id} value={c.id}>
-                    {c.domain} — {c.id} {c.apiAvailability ? `(${c.apiAvailability})` : ""}
-                  </option>
-                ))}
-              </select>
-              <span className="absolute right-0 top-1/2 -translate-y-1/2 pr-1">
-                <ChevronDown className="h-4 w-4" />
-              </span>
-            </div>
-            <Button className="ml-2" onClick={handleCheckYm} disabled={checkingToken}>
-              {checkingToken ? <Loader2 className="h-3 w-3 animate-spin" /> : "Check token"}
-            </Button>
-            <Button
-              className="bg-gradient-to-r from-[#FFC107] to-[#FF9800] hover:from-[#FF9800] hover:to-[#F57C00] text-white ml-2"
-              onClick={handleSyncYm}
-              disabled={loading || !itemsLoaded || !hasSyncableYm}
-            >
-              <RefreshCcw className="mr-1 h-3 w-3" /> YM
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white"
+                  onClick={handleSyncOzon}
+                  disabled={loading || !itemsLoaded || !hasSyncableOzon}
+                >
+                  <RefreshCcw className="mr-1 h-3 w-3" /> Ozon
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{!hasSyncableOzon ? "Нет items с ozon_sku" : "Синк стоков Ozon из Supabase"}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
-          <Button onClick={handleSetYmSku} disabled={loading} title="Заполнить ym_sku = id для тех у кого пусто">
-            set ym_sku
-          </Button>
+
+          {/* YM block: it should wrap on small screens */}
+          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center border rounded-md px-3 py-2 bg-white min-w-0 w-full sm:w-auto">
+              <label className="text-xs mr-2 text-muted-foreground whitespace-nowrap">YM кампания</label>
+
+              {/* container for select to allow truncation */}
+              <div className="min-w-0 flex-1">
+                <div className="relative">
+                  <select
+                    aria-label="Выберите кампанию Yandex.Market"
+                    className="text-sm p-2 bg-transparent w-full min-w-0 truncate"
+                    value={selectedCampaign || ""}
+                    onChange={(e) => setSelectedCampaign(e.target.value || null)}
+                    disabled={checkingToken || !campaigns}
+                  >
+                    <option value="">(auto select AVAILABLE)</option>
+                    {(campaigns || []).map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.domain} — {c.id} {c.apiAvailability ? `(${c.apiAvailability})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <ChevronDown className="h-4 w-4" />
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <Button className="whitespace-nowrap" onClick={handleCheckYm} disabled={checkingToken}>
+                  {checkingToken ? <Loader2 className="h-3 w-3 animate-spin" /> : "Check token"}
+                </Button>
+
+                <Button
+                  className="bg-gradient-to-r from-[#FFC107] to-[#FF9800] hover:from-[#FF9800] hover:to-[#F57C00] text-white whitespace-nowrap"
+                  onClick={handleSyncYm}
+                  disabled={loading || !itemsLoaded || !hasSyncableYm}
+                >
+                  <RefreshCcw className="mr-1 h-3 w-3" /> YM
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleSetYmSku}
+                disabled={loading}
+                title="Заполнить ym_sku = id для тех у кого пусто"
+                className="whitespace-nowrap"
+              >
+                set ym_sku
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <p className="text-xs text-muted-foreground w-full">
-          Вайб: Авто-загрузка из Supabase. {needSetup ? "Настрой баркоды для WB." : "Всё готово — синкни и вайби!"} Авто-синк nightly.
-        </p>
-
-        {tokenStatusText && <p className="text-xs text-muted-foreground w-full">YM token: {tokenStatusText}</p>}
+        <div className="mt-2">
+          <p className="text-xs text-muted-foreground">
+            Вайб: Авто-загрузка из Supabase. {needSetup ? "Настрой баркоды для WB." : "Всё готово — синкни и вайби!"} Авто-синк nightly.
+          </p>
+          {tokenStatusText && (
+            <p className="text-xs text-muted-foreground mt-1 break-words">YM token: {tokenStatusText}</p>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );
