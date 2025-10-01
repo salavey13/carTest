@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Settings, RefreshCcw, ChevronDown } from "lucide-react";
-import { motion } from "framer-motion";
+import { Loader2, Settings, RefreshCcw, ChevronDown, CheckCircle, AlertCircle, Play, Zap } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Tooltip,
   TooltipContent,
@@ -21,24 +21,35 @@ import {
   checkYmToken,
   setYmSku,
 } from "@/app/wb/actions";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 export function WarehouseSyncButtons() {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState({
+    setup: false,
+    wb: false,
+    ozon: false,
+    ym: false,
+    ymSku: false,
+    checkToken: false,
+    general: false
+  });
   const [itemsLoaded, setItemsLoaded] = useState(false);
   const [needSetup, setNeedSetup] = useState(false);
   const [hasSyncableWb, setHasSyncableWb] = useState(false);
   const [hasSyncableOzon, setHasSyncableOzon] = useState(false);
   const [hasSyncableYm, setHasSyncableYm] = useState(false);
+  const [itemsCount, setItemsCount] = useState(0);
 
   // YM specific
   const [campaigns, setCampaigns] = useState<any[] | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
-  const [checkingToken, setCheckingToken] = useState(false);
   const [tokenStatusText, setTokenStatusText] = useState<string | null>(null);
 
   useEffect(() => {
     const loadItems = async () => {
-      setLoading(true);
+      setLoading(prev => ({ ...prev, general: true }));
       try {
         const res = await getWarehouseItems();
         if (res.success && res.data) {
@@ -50,70 +61,95 @@ export function WarehouseSyncButtons() {
           setHasSyncableWb(syncableWb);
           setHasSyncableOzon(syncableOzon);
           setHasSyncableYm(syncableYm);
+          setItemsCount(res.data.length);
           setItemsLoaded(true);
+          
           toast.success(
-            `Загружено ${res.data.length} items из Supabase. ${
-              missingBarcodes ? "Нужна настройка баркодов." : "Всё готово к синку!"
-            }`
+            `Загружено ${res.data.length} товаров`,
+            {
+              description: missingBarcodes 
+                ? "Нужна настройка баркодов для некоторых товаров" 
+                : "Все товары готовы к синхронизации"
+            }
           );
         } else {
-          toast.error(res.error || "Ошибка загрузки items");
+          toast.error("Ошибка загрузки товаров", {
+            description: res.error || "Попробуйте обновить страницу"
+          });
         }
       } catch (err: any) {
         console.error("WarehouseSyncButtons.loadItems error:", err);
-        toast.error("Ошибка при загрузке items (см. логи)");
+        toast.error("Ошибка при загрузке товаров", {
+          description: "Подробности в консоли разработчика"
+        });
       } finally {
-        setLoading(false);
+        setLoading(prev => ({ ...prev, general: false }));
       }
     };
 
-    // Load items + campaigns in parallel
     loadItems();
     loadCampaigns();
   }, []);
 
   const loadCampaigns = async () => {
-    setCheckingToken(true);
+    setLoading(prev => ({ ...prev, checkToken: true }));
     try {
       const res = await getYmCampaigns();
       if (res.success) {
         setCampaigns(res.campaigns || []);
         const avail = (res.campaigns || []).find((c: any) => c.apiAvailability === "AVAILABLE");
         if (avail) setSelectedCampaign(String(avail.id));
-        toast.success(`YM: найдено ${res.campaigns?.length || 0} кампаний`);
+        
+        if (res.campaigns?.length) {
+          toast.success("Кампании Яндекс.Маркет загружены", {
+            description: `Найдено ${res.campaigns.length} кампаний`
+          });
+        }
       } else {
-        toast.error(res.error || "Не удалось получить кампании YM");
+        toast.error("Ошибка загрузки кампаний", {
+          description: res.error || "Проверьте настройки Яндекс.Маркет"
+        });
       }
     } catch (err: any) {
       console.error("loadCampaigns error:", err);
-      toast.error("Ошибка при получении списка кампаний YM");
+      toast.error("Ошибка при получении кампаний", {
+        description: "Проверьте подключение к интернету"
+      });
     } finally {
-      setCheckingToken(false);
+      setLoading(prev => ({ ...prev, checkToken: false }));
     }
   };
 
   const handleCheckYm = async () => {
-    setCheckingToken(true);
+    setLoading(prev => ({ ...prev, checkToken: true }));
     try {
       const res = await checkYmToken(undefined as any, selectedCampaign || undefined);
-      const summary = `list: ${res?.listStatus || "?"}, camp: ${res?.campStatus || "?"}`;
+      const summary = `Списки: ${res?.listStatus || "?"}, Кампания: ${res?.campStatus || "?"}`;
       setTokenStatusText(summary);
-      toast.success("Проверка токена выполнена (см. статус)");
+      
+      toast.success("Проверка токена выполнена", {
+        description: summary
+      });
       console.info("checkYmToken result:", res);
     } catch (err: any) {
       console.error("handleCheckYm error:", err);
-      toast.error("Ошибка проверки токена YM (см. логи)");
+      toast.error("Ошибка проверки токена", {
+        description: "Подробности в консоли разработчика"
+      });
     } finally {
-      setCheckingToken(false);
+      setLoading(prev => ({ ...prev, checkToken: false }));
     }
   };
 
   const handleSetupWbSku = async () => {
-    setLoading(true);
+    setLoading(prev => ({ ...prev, setup: true }));
     try {
       const res = await setWbBarcodes();
       if (res.success) {
-        toast.success(`Обновлено ${res.updated} items с WB баркодами!`);
+        toast.success("Баркоды настроены", {
+          description: `Обновлено ${res.updated} товаров`
+        });
+        
         const itemsRes = await getWarehouseItems();
         if (itemsRes.success && itemsRes.data) {
           const stillMissing = itemsRes.data.some((i: any) => !i.specs?.wb_sku);
@@ -124,212 +160,371 @@ export function WarehouseSyncButtons() {
           setHasSyncableWb(syncableWb);
           setHasSyncableOzon(syncableOzon);
           setHasSyncableYm(syncableYm);
+          setItemsCount(itemsRes.data.length);
         }
       } else {
-        toast.error(res.error || "Ошибка настройки WB SKU");
+        toast.error("Ошибка настройки баркодов", {
+          description: res.error || "Попробуйте еще раз"
+        });
       }
     } catch (err: any) {
       console.error("handleSetupWbSku error:", err);
-      toast.error("Ошибка при setup WB SKU (см. логи)");
+      toast.error("Ошибка при настройке баркодов", {
+        description: "Подробности в консоли разработчика"
+      });
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, setup: false }));
     }
   };
 
   const handleSyncWb = async () => {
-    setLoading(true);
+    setLoading(prev => ({ ...prev, wb: true }));
     try {
       const res = await syncWbStocks();
-      toast[res.success ? "success" : "error"](res.success ? "WB синхронизировано!" : res.error);
+      if (res.success) {
+        toast.success("Wildberries синхронизирован", {
+          description: "Стоки успешно обновлены"
+        });
+      } else {
+        toast.error("Ошибка синхронизации Wildberries", {
+          description: res.error || "Попробуйте еще раз"
+        });
+      }
     } catch (err: any) {
       console.error("handleSyncWb error:", err);
-      toast.error("Ошибка синка WB (см. логи)");
+      toast.error("Ошибка синхронизации", {
+        description: "Подробности в консоли разработчика"
+      });
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, wb: false }));
     }
   };
 
   const handleSyncOzon = async () => {
-    setLoading(true);
+    setLoading(prev => ({ ...prev, ozon: true }));
     try {
       const res = await syncOzonStocks();
-      toast[res.success ? "success" : "error"](res.success ? "Ozon синхронизировано!" : res.error);
+      if (res.success) {
+        toast.success("Ozon синхронизирован", {
+          description: "Стоки успешно обновлены"
+        });
+      } else {
+        toast.error("Ошибка синхронизации Ozon", {
+          description: res.error || "Попробуйте еще раз"
+        });
+      }
     } catch (err: any) {
       console.error("handleSyncOzon error:", err);
-      toast.error("Ошибка синка Ozon (см. логи)");
+      toast.error("Ошибка синхронизации", {
+        description: "Подробности в консоли разработчика"
+      });
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, ozon: false }));
     }
   };
 
   const handleSyncYm = async () => {
-    setLoading(true);
+    setLoading(prev => ({ ...prev, ym: true }));
     try {
       const res = await syncYmStocks(selectedCampaign || undefined);
       if (res.success) {
-        toast.success(`YM синхронизировано! Отправлено: ${res.sent || "?"} items. Кампания: ${res.campaignId || "?"}`);
+        toast.success("Яндекс.Маркет синхронизирован", {
+          description: `Отправлено ${res.sent || "?"} товаров • Кампания: ${res.campaignId || "?"}`
+        });
       } else {
-        toast.error(res.error || "Ошибка синка YM");
+        toast.error("Ошибка синхронизации Яндекс.Маркет", {
+          description: res.error || "Попробуйте еще раз"
+        });
       }
     } catch (err: any) {
       console.error("handleSyncYm error:", err);
-      toast.error("Ошибка синка YM (см. логи)");
+      toast.error("Ошибка синхронизации", {
+        description: "Подробности в консоли разработчика"
+      });
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, ym: false }));
     }
   };
 
   const handleSetYmSku = async () => {
-    setLoading(true);
+    setLoading(prev => ({ ...prev, ymSku: true }));
     try {
       const res = await setYmSku();
       if (res.success) {
-        toast.success(`setYmSku: updated ${res.updated || 0} items`);
+        toast.success("SKU настроены", {
+          description: `Обновлено ${res.updated || 0} товаров`
+        });
+        
         const itemsRes = await getWarehouseItems();
         if (itemsRes.success && itemsRes.data) {
           const syncableYm = itemsRes.data.some((i: any) => !!i.specs?.ym_sku);
           setHasSyncableYm(syncableYm);
+          setItemsCount(itemsRes.data.length);
         }
       } else {
-        toast.error(res.error || "Ошибка setYmSku");
+        toast.error("Ошибка настройки SKU", {
+          description: res.error || "Попробуйте еще раз"
+        });
       }
     } catch (err: any) {
       console.error("handleSetYmSku error:", err);
-      toast.error("Ошибка setYmSku (см. логи)");
+      toast.error("Ошибка при настройке SKU", {
+        description: "Подробности в консоли разработчика"
+      });
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, ymSku: false }));
     }
+  };
+
+  const getStatusBadge = () => {
+    if (loading.general) {
+      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+        Загрузка...
+      </Badge>;
+    }
+    
+    if (needSetup) {
+      return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+        <AlertCircle className="w-3 h-3 mr-1" />
+        Требуется настройка
+      </Badge>;
+    }
+    
+    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+      <CheckCircle className="w-3 h-3 mr-1" />
+      Готов к работе
+    </Badge>;
   };
 
   return (
     <TooltipProvider>
-      {/* Outer: full width, prevent horizontal overflow */}
-      <div className="w-full min-w-0">
-        {/* Buttons container: column on mobile, row (wrap) on sm+ */}
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 items-stretch w-full">
-          {/* Left controls: setup + WB + Ozon */}
-          <div className="flex flex-row sm:flex-nowrap flex-wrap gap-2 items-center min-w-0">
-            {loading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
-
-            {needSetup && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    initial={{ scale: 1 }}
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  >
-                    <Button
-                      className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
-                      onClick={handleSetupWbSku}
-                      disabled={loading}
-                    >
-                      <Settings className="mr-1 h-3 w-3" /> Setup WB
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Настроить баркоды для синка (missing у некоторых items)</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white"
-                  onClick={handleSyncWb}
-                  disabled={loading || !itemsLoaded || !hasSyncableWb}
-                >
-                  <RefreshCcw className="mr-1 h-3 w-3" /> WB
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{!hasSyncableWb ? "Нет items с wb_sku" : "Синк стоков WB из Supabase"}</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white"
-                  onClick={handleSyncOzon}
-                  disabled={loading || !itemsLoaded || !hasSyncableOzon}
-                >
-                  <RefreshCcw className="mr-1 h-3 w-3" /> Ozon
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{!hasSyncableOzon ? "Нет items с ozon_sku" : "Синк стоков Ozon из Supabase"}</p>
-              </TooltipContent>
-            </Tooltip>
+      <Card className="w-full border-l-4 border-l-blue-500 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5 text-blue-500" />
+                Синхронизация склада
+              </CardTitle>
+              <CardDescription>
+                Управление синхронизацией стоков между маркетплейсами
+              </CardDescription>
+            </div>
+            {getStatusBadge()}
+          </div>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {/* Status Overview */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+              <span className="text-muted-foreground">Товаров</span>
+              <span className="font-semibold text-lg">{itemsCount}</span>
+            </div>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+              <span className="text-muted-foreground">Wildberries</span>
+              <span className={`font-semibold ${hasSyncableWb ? 'text-green-600' : 'text-amber-600'}`}>
+                {hasSyncableWb ? 'Готов' : 'Нет SKU'}
+              </span>
+            </div>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+              <span className="text-muted-foreground">Ozon</span>
+              <span className={`font-semibold ${hasSyncableOzon ? 'text-green-600' : 'text-amber-600'}`}>
+                {hasSyncableOzon ? 'Готов' : 'Нет SKU'}
+              </span>
+            </div>
+            <div className="flex flex-col p-2 bg-slate-50 rounded-lg">
+              <span className="text-muted-foreground">Яндекс.Маркет</span>
+              <span className={`font-semibold ${hasSyncableYm ? 'text-green-600' : 'text-amber-600'}`}>
+                {hasSyncableYm ? 'Готов' : 'Нет SKU'}
+              </span>
+            </div>
           </div>
 
-          {/* YM block: it should wrap on small screens */}
-          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center flex-1 min-w-0">
-            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center border rounded-md px-3 py-2 bg-white min-w-0 w-full sm:w-auto">
-              <label className="text-xs mr-2 text-muted-foreground whitespace-nowrap">YM кампания</label>
+          <Separator />
 
-              {/* container for select to allow truncation */}
-              <div className="min-w-0 flex-1">
-                <div className="relative">
-                  <select
-                    aria-label="Выберите кампанию Yandex.Market"
-                    className="text-sm p-2 bg-transparent w-full min-w-0 truncate"
-                    value={selectedCampaign || ""}
-                    onChange={(e) => setSelectedCampaign(e.target.value || null)}
-                    disabled={checkingToken || !campaigns}
+          {/* Quick Actions */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2 items-center">
+              <AnimatePresence>
+                {needSetup && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
                   >
-                    <option value="">(auto select AVAILABLE)</option>
-                    {(campaigns || []).map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.domain} — {c.id} {c.apiAvailability ? `(${c.apiAvailability})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <ChevronDown className="h-4 w-4" />
-                  </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleSetupWbSku}
+                          disabled={loading.setup || loading.general}
+                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-sm"
+                        >
+                          {loading.setup ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Settings className="w-4 h-4 mr-2" />
+                          )}
+                          Настроить баркоды
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Автоматически настроить баркоды для товаров без WB SKU</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex flex-wrap gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleSyncWb}
+                      disabled={loading.wb || !itemsLoaded || !hasSyncableWb}
+                      className="bg-gradient-to-r from-[#E313BF] to-[#C010A8] hover:from-[#C010A8] hover:to-[#A00E91] text-white shadow-sm"
+                    >
+                      {loading.wb ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4 mr-2" />
+                      )}
+                      Синк WB
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{!hasSyncableWb ? "Нет товаров с WB SKU" : "Синхронизировать стоки Wildberries"}</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleSyncOzon}
+                      disabled={loading.ozon || !itemsLoaded || !hasSyncableOzon}
+                      className="bg-gradient-to-r from-[#005BFF] to-[#0048CC] hover:from-[#0048CC] hover:to-[#0039A6] text-white shadow-sm"
+                    >
+                      {loading.ozon ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="w-4 h-4 mr-2" />
+                      )}
+                      Синк Ozon
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{!hasSyncableOzon ? "Нет товаров с Ozon SKU" : "Синхронизировать стоки Ozon"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+
+            {/* Yandex Market Section */}
+            <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <RefreshCcw className="w-4 h-4 text-amber-600" />
+                  Яндекс.Маркет
+                </h4>
+                <Badge variant="secondary" className="text-xs">
+                  {campaigns?.length || 0} кампаний
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Выбор кампании
+                  </label>
+                  <div className="relative">
+                    <select
+                      aria-label="Выберите кампанию Яндекс.Маркет"
+                      className="w-full text-sm p-2 border rounded-md bg-background pr-8 appearance-none"
+                      value={selectedCampaign || ""}
+                      onChange={(e) => setSelectedCampaign(e.target.value || null)}
+                      disabled={loading.checkToken || !campaigns}
+                    >
+                      <option value="">Автовыбор доступной кампании</option>
+                      {(campaigns || []).map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.domain} — {c.id} {c.apiAvailability ? `(${c.apiAvailability})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCheckYm}
+                    disabled={loading.checkToken}
+                    className="flex-1"
+                  >
+                    {loading.checkToken ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Проверить токен
+                  </Button>
+
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleSyncYm}
+                    disabled={loading.ym || !itemsLoaded || !hasSyncableYm}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm flex-1"
+                  >
+                    {loading.ym ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4 mr-2" />
+                    )}
+                    Синк YM
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex gap-2 items-center">
-                <Button className="whitespace-nowrap" onClick={handleCheckYm} disabled={checkingToken}>
-                  {checkingToken ? <Loader2 className="h-3 w-3 animate-spin" /> : "Check token"}
+              <div className="flex flex-wrap gap-2 items-center justify-between">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSetYmSku}
+                  disabled={loading.ymSku}
+                  className="text-xs h-8"
+                >
+                  {loading.ymSku ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : null}
+                  Настроить YM SKU
                 </Button>
 
-                <Button
-                  className="bg-gradient-to-r from-[#FFC107] to-[#FF9800] hover:from-[#FF9800] hover:to-[#F57C00] text-white whitespace-nowrap"
-                  onClick={handleSyncYm}
-                  disabled={loading || !itemsLoaded || !hasSyncableYm}
-                >
-                  <RefreshCcw className="mr-1 h-3 w-3" /> YM
-                </Button>
+                {tokenStatusText && (
+                  <div className="text-xs text-muted-foreground bg-white px-2 py-1 rounded border">
+                    Статус: {tokenStatusText}
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleSetYmSku}
-                disabled={loading}
-                title="Заполнить ym_sku = id для тех у кого пусто"
-                className="whitespace-nowrap"
-              >
-                set ym_sku
-              </Button>
-            </div>
           </div>
-        </div>
 
-        <div className="mt-2">
-          <p className="text-xs text-muted-foreground">
-            Вайб: Авто-загрузка из Supabase. {needSetup ? "Настрой баркоды для WB." : "Всё готово — синкни и вайби!"} Авто-синк nightly.
-          </p>
-          {tokenStatusText && (
-            <p className="text-xs text-muted-foreground mt-1 break-words">YM token: {tokenStatusText}</p>
-          )}
-        </div>
-      </div>
+          {/* Footer Info */}
+          <div className="text-xs text-muted-foreground pt-2 border-t">
+            <p>
+              Данные автоматически загружаются из Supabase. Автоматическая синхронизация выполняется ежедневно.
+              {needSetup && " Настройте баркоды для товаров без WB SKU."}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </TooltipProvider>
   );
 }
