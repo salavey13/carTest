@@ -27,6 +27,82 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): 
   throw lastError;
 }
 
+function decodeJwtPayloadSafe(token: string): any | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    // base64url -> base64
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const json = Buffer.from(b64, 'base64').toString('utf8');
+    return JSON.parse(json);
+  } catch (e) {
+    console.warn('decodeJwtPayloadSafe failed:', e?.message || e);
+    return null;
+  }
+}
+
+// WB token diagnostics: decode JWT + ping supplies + warehouses
+async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; hasSupplies?: boolean; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
+  try {
+    if (!WB_TOKEN) return { ok: false, reason: 'no_token' };
+
+    // Decode JWT payload using safe helper
+    let payload: any = null;
+    try {
+      payload = decodeJwtPayloadSafe(WB_TOKEN);
+    } catch (e) {
+      console.warn('WB token decode ended with exception', e?.message || e);
+    }
+
+    const sValue = payload && payload.s ? parseInt(String(payload.s), 10) || 0 : 0;
+    const hasSupplies = !!(sValue && (sValue & (1 << (10 - 1))));
+    const isTest = !!payload?.t;
+    console.info('WB token diagnostics:', { sid: payload?.sid, hasSupplies, isTest });
+
+    if (!hasSupplies) {
+      return { ok: false, reason: 'no_supplies_scope', payload, hasSupplies: false };
+    }
+    if (isTest) {
+      console.warn('WB token is test/sandbox — use prod for live sync');
+    }
+
+    // Ping supplies-api
+    const pingRes = await fetch('https://supplies-api.wildberries.ru/ping', {
+      method: 'GET',
+      headers: { Authorization: WB_TOKEN },
+    });
+    if (!pingRes.ok) {
+      const text = await pingRes.text().catch(() => '');
+      console.error('WB ping failed:', { status: pingRes.status, text });
+      return { ok: false, reason: 'ping_failed', status: pingRes.status, text, payload };
+    }
+
+    // Fetch warehouses for validation/fallback
+    const whRes = await getWbWarehouses();
+    if (!whRes.success || !Array.isArray(whRes.data) || whRes.data.length === 0) {
+      return { ok: false, reason: 'no_warehouses' };
+    }
+    const warehouses = whRes.data;
+    console.info('WB warehouses fetched:', { count: warehouses.length, active: warehouses.filter((w: any) => w.isActive).length });
+
+    // Use env if valid/active, else first active
+    let warehouseId = process.env.WB_WAREHOUSE_ID;
+    if (!warehouseId || !warehouses.some((w: any) => String(w.id) === warehouseId && w.isActive)) {
+      const active = warehouses.find((w: any) => w.isActive);
+      if (!active) {
+        return { ok: false, reason: 'no_active_warehouse' };
+      }
+      warehouseId = String(active.id);
+      console.info('Fallback to active warehouseId:', warehouseId);
+    }
+
+    return { ok: true, warehouseId, payload, hasSupplies, isTest, warehouses };
+  } catch (e: any) {
+    return { ok: false, reason: 'exception', message: e?.message || e };
+  }
+}
+
 /* =========================
    Core: Warehouse CRUD & CSV upload
    ========================= */
@@ -271,18 +347,25 @@ export async function updateItemMinQty(itemId: string, minQty: number): Promise<
 }
 
 /* =======================
-   Wildberries sync (send stocks) - FIXED: v5 POST /api/v5/stocks
+   Wildberries sync (send stocks) - FIXED: v3 PUT /api/v3/stocks/{warehouseId}
    ======================= */
 
 export async function syncWbStocks(): Promise<{ success: boolean; error?: string }> {
   const WB_TOKEN = process.env.WB_API_TOKEN;
-  const WB_WAREHOUSE_ID = process.env.WB_WAREHOUSE_ID;
-  console.info(`syncWbStocks start. WB_WAREHOUSE_ID present: ${!!WB_WAREHOUSE_ID}, WB_TOKEN present: ${!!WB_TOKEN}`);
+  console.info(`syncWbStocks start. WB_TOKEN present: ${!!WB_TOKEN}`);
 
-  if (!WB_TOKEN || !WB_WAREHOUSE_ID) {
+  if (!WB_TOKEN) {
     console.error("WB credentials missing in env.");
     return { success: false, error: "WB credentials missing" };
   }
+
+  // Validate token and get warehouseId
+  const diag = await validateWbToken(WB_TOKEN);
+  if (!diag.ok) {
+    console.error('WB diagnostics failed:', diag);
+    return { success: false, error: `WB validation failed: ${diag.reason} - ${diag.message || diag.text || 'check logs'}` };
+  }
+  const WB_WAREHOUSE_ID = diag.warehouseId!;
 
   try {
     const { data: items, error } = await supabaseAdmin.from("cars").select("*").eq("type", "wb_item");
@@ -309,17 +392,18 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
       return { success: false, error: "No syncable items (check wb_sku setup)" };
     }
 
-    const url = `https://supplies-api.wildberries.ru/api/v5/stocks`;
+    const url = `https://supplies-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
     const maskedToken = WB_TOKEN ? `${WB_TOKEN.slice(0, 6)}...` : "MISSING";
-    const body = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })), warehouseId: parseInt(WB_WAREHOUSE_ID, 10) };
+    const body = { stocks: stocks.map(s => ({ sku: s.sku, amount: s.amount })) };
 
-    console.info("syncWbStocks -> About to POST", {
+    console.info("syncWbStocks -> About to PUT v3", {
       url,
-      method: "POST",
+      method: "PUT",
       token: maskedToken,
       stocksCount: stocks.length,
       sampleStock: stocks[0] || null,
-      sampleBody: JSON.stringify(body).slice(0, 500) + "..."
+      sampleBody: JSON.stringify(body).slice(0, 500) + "...",
+      warehouseId: WB_WAREHOUSE_ID
     });
 
     try {
@@ -332,7 +416,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
     try {
       const response = await withRetry(async () => {
         const res = await fetch(url, {
-          method: "POST",
+          method: "PUT",
           headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
@@ -342,14 +426,16 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
         }
         if (!res.ok) {
           const errText = await res.text();
-          return { ok: false, status: res.status, text: errText }; // Don't throw, handle below
+          const requestId = errText.match(/"requestId": "([a-f0-9-]+)"/)?.[1] || 'unknown';
+          const timestamp = errText.match(/"timestamp": "([0-9T:Z-]+)"/)?.[1] || 'unknown';
+          console.error("syncWbStocks: non-OK response", { status: res.status, errText, requestId, timestamp });
+          return { ok: false, status: res.status, text: errText, requestId, timestamp };
         }
         return { ok: true, res };
       });
 
       if (!response.ok) {
-        console.error("syncWbStocks: API returned non-OK", { status: response.status, text: response.text });
-        return { success: false, error: `WB API error: ${response.status} - ${response.text}` };
+        return { success: false, error: `WB API error: ${response.status} - ${response.text} (requestId: ${response.requestId || 'unknown'}, timestamp: ${response.timestamp || 'unknown'})` };
       }
 
       const text = await response.res.text();
