@@ -671,7 +671,7 @@ export async function fetchOzonStocks(): Promise<{ success: boolean; data?: { sk
       }
 
       if (!data || !Array.isArray(data.items)) {
-        console.warn("fetchOzonStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) };
+        console.warn("fetchOzonStocks: unexpected response shape", { sample: JSON.stringify(data).slice(0, 2000) });
         return { success: false, error: "Ozon returned unexpected payload" };
       }
 
