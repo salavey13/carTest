@@ -43,7 +43,7 @@ function decodeJwtPayloadSafe(token: string): any | null {
 }
 
 // WB token diagnostics: decode JWT + ping marketplace + warehouses
-async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; hasMarketplace?: boolean; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
+async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
   try {
     if (!WB_TOKEN) return { ok: false, reason: 'no_token' };
 
@@ -55,14 +55,9 @@ async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehou
       console.warn('WB token decode ended with exception', e?.message || e);
     }
 
-    const sValue = payload && payload.s ? parseInt(String(payload.s), 10) || 0 : 0;
-    const hasMarketplace = !!(sValue && (sValue & (1 << (4 - 1))));
     const isTest = !!payload?.t;
-    console.info('WB token diagnostics:', { sid: payload?.sid, hasMarketplace, isTest });
+    console.info('WB token diagnostics:', { sid: payload?.sid, isTest });
 
-    if (!hasMarketplace) {
-      return { ok: false, reason: 'no_marketplace_scope', payload, hasMarketplace: false };
-    }
     if (isTest) {
       console.warn('WB token is test/sandbox — use prod for live sync');
     }
@@ -98,7 +93,7 @@ async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehou
       console.warn('Using env warehouseId, but not active:', warehouseId);
     }
 
-    return { ok: true, warehouseId, payload, hasMarketplace, isTest, warehouses };
+    return { ok: true, warehouseId, payload, isTest, warehouses };
   } catch (e: any) {
     return { ok: false, reason: 'exception', message: e?.message || e };
   }
