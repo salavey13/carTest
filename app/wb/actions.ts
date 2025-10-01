@@ -43,21 +43,60 @@ function decodeJwtPayloadSafe(token: string): any | null {
   }
 }
 
-export async function checkYmToken(token: string, campaignId: string) {
-  const listRes = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
-    headers: { "Api-Key": token, "Content-Type": "application/json" },
-  });
-  const listText = await listRes.text();
-  console.log("GET /v2/campaigns", listRes.status, listText);
+export async function checkYmToken(token?: string | null, campaignId?: string | null) {
+  // Read from env when not provided
+  const YM_API_TOKEN = (token || process.env.YM_API_TOKEN || "").toString().trim();
+  const YM_WAREHOUSE_ID = (campaignId || process.env.YM_WAREHOUSE_ID || process.env.NEXT_PUBLIC_YM_WAREHOUSE_ID || "").toString().trim();
 
-  const campRes = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}`, {
-    headers: { "Api-Key": token, "Content-Type": "application/json" },
-  });
-  const campText = await campRes.text();
-  console.log(`GET /v2/campaigns/${campaignId}`, campRes.status, campText);
+  // Basic validations
+  if (!YM_API_TOKEN) {
+    console.warn("checkYmToken: no YM_API_TOKEN provided (env or arg).");
+    return { error: "missing_token", message: "YM_API_TOKEN not set (env or arg)", listStatus: 0, campStatus: 0, listText: "", campText: "" };
+  }
+  // Reject obviously malformed tokens: don't start with 'Api-Key' or 'Bearer'
+  if (/^(Api-Key|Bearer)\s+/i.test(YM_API_TOKEN)) {
+    console.warn("checkYmToken: token contains prefix (Api-Key/Bearer). Should be raw key without prefix.");
+    return { error: "token_prefix_invalid", message: "Remove 'Api-Key ' or 'Bearer ' prefix from token; pass raw key.", listStatus: 0, campStatus: 0, listText: "", campText: "" };
+  }
 
-  return { listStatus: listRes.status, listText, campStatus: campRes.status, campText };
+  // Call list campaigns
+  let listStatus = 0;
+  let listText = "";
+  try {
+    const listRes = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
+      headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
+    });
+    listStatus = listRes.status;
+    listText = await listRes.text().catch(() => "");
+    console.info("checkYmToken GET /v2/campaigns", listStatus);
+  } catch (e: any) {
+    console.error("checkYmToken error fetching /v2/campaigns", e?.message || e);
+    return { error: "network_error", message: String(e?.message || e), listStatus: 0, campStatus: 0, listText: "", campText: "" };
+  }
+
+  // If no campaignId provided, return early with list result
+  if (!YM_WAREHOUSE_ID) {
+    return { listStatus, listText, campStatus: 0, campText: "", message: "no campaignId_provided" };
+  }
+
+  // Check specific campaign
+  let campStatus = 0;
+  let campText = "";
+  try {
+    const campRes = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}`, {
+      headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
+    });
+    campStatus = campRes.status;
+    campText = await campRes.text().catch(() => "");
+    console.info(`checkYmToken GET /v2/campaigns/${YM_WAREHOUSE_ID}`, campStatus);
+  } catch (e: any) {
+    console.error("checkYmToken error fetching campaign", e?.message || e);
+    return { error: "network_error_campaign", message: String(e?.message || e), listStatus, campStatus: 0, listText, campText: "" };
+  }
+
+  return { listStatus, listText, campStatus, campText, message: "ok" };
 }
+
 
 
 // WB token diagnostics: decode JWT + ping marketplace + warehouses
