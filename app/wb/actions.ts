@@ -43,6 +43,23 @@ function decodeJwtPayloadSafe(token: string): any | null {
   }
 }
 
+async function checkYmToken(token: string, campaignId: string) {
+  const listRes = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
+    headers: { "Api-Key": token, "Content-Type": "application/json" },
+  });
+  const listText = await listRes.text();
+  console.log("GET /v2/campaigns", listRes.status, listText);
+
+  const campRes = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}`, {
+    headers: { "Api-Key": token, "Content-Type": "application/json" },
+  });
+  const campText = await campRes.text();
+  console.log(`GET /v2/campaigns/${campaignId}`, campRes.status, campText);
+
+  return { listStatus: listRes.status, listText, campStatus: campRes.status, campText };
+}
+
+
 // WB token diagnostics: decode JWT + ping marketplace + warehouses
 async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
   try {
@@ -1159,7 +1176,6 @@ export async function setYmSku(): Promise<{ success: boolean; updated?: number; 
     return { success: false, error: e?.message || "Unknown error in setYmSku" };
   }
 }
-
 
 /* =======================
    End of file
