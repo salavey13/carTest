@@ -502,7 +502,7 @@ export default function WBPage() {
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
             <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
-            <Link href="/csv-compare"><Button size="sm" variant="outline" className="text-[10px]">CSV Сравнение</Button></Link>
+            <Link href="/csv-compare"><Button size="sm" variant="outline" className="text-[10px]">CSV</Button></Link>
           </div>
         </div>
 
