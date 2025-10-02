@@ -2,7 +2,6 @@
 
 import { supabaseAdmin } from "@/hooks/supabase";
 import { updateItemLocationQty } from "@/app/wb/actions";
-import { syncWbSpecific, syncOzonSpecific, syncYmSpecific } from "@/app/wb/actions";
 import { notifyAdmin } from "@/app/actions";
 import { v4 as uuidv4 } from "uuid";
 import Papa from "papaparse";
