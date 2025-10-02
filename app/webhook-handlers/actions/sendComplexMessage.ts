@@ -13,10 +13,8 @@ export interface KeyboardButton {
   callback_data?: string;
 }
 
-// --- NEW: Markdown Sanitizer ---
 function escapeTelegramMarkdown(text: string): string {
     if (!text) return "";
-    // Escapes characters for Telegram's MarkdownV2 parse mode.
     const charsToEscape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
     return text.replace(new RegExp(`[${charsToEscape.join('\\')}]`, 'g'), '\\$&');
 }
@@ -49,24 +47,21 @@ export async function sendComplexMessage(
     messageId?: number,
     keyboardType?: 'inline' | 'reply',
     removeKeyboard?: boolean,
-    parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown' // Allow specifying parse mode
+    parseMode?: 'MarkdownV2' | 'HTML' | 'Markdown',
+    attachment?: { type: 'document'; content: string; filename: string }
   } = {}
 ): Promise<{ success: boolean; error?: string; data?: any }> {
-  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false, parseMode = 'Markdown' } = options;
+  const { imageQuery, messageId, keyboardType = 'inline', removeKeyboard = false, parseMode = 'Markdown', attachment } = options;
 
   if (!TELEGRAM_BOT_TOKEN) {
     logger.error("[sendComplexMessage] Telegram bot token not configured.");
     return { success: false, error: "Telegram bot token not configured." };
   }
   
-  // Sanitize text based on parse mode
-  const sanitizedText = text; // The issue was with special chars in user-generated content, not all markdown. Let's apply more carefully.
-  // The main issue is that usernames and user answers can contain markdown characters.
-  // The text passed to this function for summaries should be pre-sanitized.
-  // We will apply sanitization within the calling function (start.ts) for more control.
+  const sanitizedText = text;
 
   if (sanitizedText.length > TELEGRAM_MESSAGE_LIMIT) {
-    // Splitting logic remains the same
+    // Splitting logic if needed
   }
 
   try {
@@ -78,8 +73,22 @@ export async function sendComplexMessage(
       payload.reply_markup = keyboardType === 'inline' ? { inline_keyboard: buttons } : { keyboard: buttons, resize_keyboard: true, one_time_keyboard: true };
     }
     
-    const endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
-    if (imageUrl) {
+    let endpoint = imageUrl ? 'sendPhoto' : 'sendMessage';
+    if (attachment?.type === 'document') {
+      endpoint = 'sendDocument';
+      const formData = new FormData();
+      formData.append('chat_id', String(chatId));
+      formData.append('document', new Blob([attachment.content], { type: 'text/csv;charset=utf-8' }), attachment.filename);
+      formData.append('caption', sanitizedText);
+      if (payload.reply_markup) formData.append('reply_markup', JSON.stringify(payload.reply_markup));
+
+      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
+        method: "POST", body: formData
+      });
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.description || `Failed to ${endpoint}`);
+      return { success: true, data };
+    } else if (imageUrl) {
       payload.photo = imageUrl;
       payload.caption = sanitizedText;
     } else {
