@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Loader2, Copy, RefreshCcw } from "lucide-react";
 import { getWarehouseItems, getSalaryCalcToday } from "@/app/wb/actions";
-import { processOrder, generateDailySummary } from "@/app/wb/auto-actions";
+import { processOrder, generateDailySummary, getSalesVelocity, getForecastDepletion, getPlatformShare } from "@/app/wb/auto-actions";
 import { v4 as uuidv4 } from "uuid";
 
 export default function TestTriggerPage() {
@@ -18,6 +18,11 @@ export default function TestTriggerPage() {
   const [loading, setLoading] = useState(false);
   const [salaryData, setSalaryData] = useState<any[]>([]);
   const [summaryText, setSummaryText] = useState("");
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [velocityData, setVelocityData] = useState<any[]>([]);
+  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [shareData, setShareData] = useState<any[]>([]);
 
   useEffect(() => {
     fetchSalaryStatus();
@@ -100,6 +105,57 @@ export default function TestTriggerPage() {
     }
   };
 
+  const handleGetVelocity = async () => {
+    setLoading(true);
+    try {
+      const res = await getSalesVelocity(startDate, endDate);
+      if (res.success && res.data) {
+        setVelocityData(res.data);
+        toast.success("Sales velocity calculated");
+      } else {
+        toast.error(res.error || "Failed");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGetForecast = async () => {
+    setLoading(true);
+    try {
+      const res = await getForecastDepletion();
+      if (res.success && res.data) {
+        setForecastData(res.data);
+        toast.success("Forecast calculated");
+      } else {
+        toast.error(res.error || "Failed");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGetShare = async () => {
+    setLoading(true);
+    try {
+      const res = await getPlatformShare(startDate, endDate);
+      if (res.success && res.data) {
+        setShareData(res.data);
+        toast.success("Platform share calculated");
+      } else {
+        toast.error(res.error || "Failed");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <Card className="mb-6">
@@ -166,7 +222,7 @@ export default function TestTriggerPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Generate Daily Summary</CardTitle>
         </CardHeader>
@@ -179,6 +235,84 @@ export default function TestTriggerPage() {
             <div className="p-4 bg-muted rounded-md whitespace-pre-wrap text-sm">
               {summaryText}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Analyses (Date Range)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+
+          <Button onClick={handleGetVelocity} disabled={loading} className="w-full">
+            Get Sales Velocity
+          </Button>
+          {velocityData.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Avg Daily</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {velocityData.map((v, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{v.item_id}</TableCell>
+                    <TableCell>{v.avg_daily}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <Button onClick={handleGetForecast} disabled={loading} className="w-full">
+            Get Forecast Depletion
+          </Button>
+          {forecastData.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Days to Zero</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {forecastData.map((f, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{f.item_id}</TableCell>
+                    <TableCell>{f.days_to_zero}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          <Button onClick={handleGetShare} disabled={loading} className="w-full">
+            Get Platform Share
+          </Button>
+          {shareData.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Platform</TableHead>
+                  <TableHead>Share %</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shareData.map((s, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{s.platform}</TableCell>
+                    <TableCell>{s.percentage}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

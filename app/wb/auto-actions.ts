@@ -6,6 +6,7 @@ import { syncWbSpecific, syncOzonSpecific, syncYmSpecific } from "@/app/wb/actio
 import { notifyAdmin } from "@/app/actions";
 import { v4 as uuidv4 } from "uuid";
 import Papa from "papaparse";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
 export async function registerOzonWebhook(url: string): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
@@ -14,8 +15,8 @@ export async function registerOzonWebhook(url: string): Promise<{ success: boole
 
   try {
     const body = {
-      url, // webhook URL
-      events: ["new_posting", "posting_status_change"], // subscribe to new orders and status
+      url,
+      events: ["new_posting", "posting_status_change"],
     };
     const res = await fetch("https://api-seller.ozon.ru/v1/api/webhook/subscribe", {
       method: "POST",
@@ -37,7 +38,7 @@ export async function registerYmWebhook(url: string, campaignId: string): Promis
   if (!YM_API_TOKEN) return { success: false, error: "YM credentials missing" };
 
   try {
-    const body = { url }; // YM sendNotification for webhook reg
+    const body = { url };
     const res = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}/push-notifications/sendNotification`, {
       method: "POST",
       headers: { "Api-Key": YM_API_TOKEN, "Content-Type": "application/json" },
@@ -70,10 +71,9 @@ async function setLastPollTs(platform: 'wb' | 'ozon' | 'ym', ts: string) {
 
 async function processOrder(orderId: string, platform: 'wb' | 'ozon' | 'ym', items: { sku: string; qty: number }[]) {
   try {
-    // Dedup check
     const { data: existing } = await supabaseAdmin
       .from("processed_orders")
-      .select("order_id") // corrected column
+      .select("order_id")
       .eq("order_id", orderId)
       .eq("platform", platform)
       .single();
@@ -83,7 +83,6 @@ async function processOrder(orderId: string, platform: 'wb' | 'ozon' | 'ym', ite
       return { success: true, message: "Duplicate, skipped" };
     }
 
-    // Process items + insert to salary_calc
     const affectedSkus = new Set<string>();
     const today = new Date().toISOString().split('T')[0];
     for (const it of items) {
@@ -106,9 +105,8 @@ async function processOrder(orderId: string, platform: 'wb' | 'ozon' | 'ym', ite
           decreased_qty: newQty
         }, { onConflict: "date, platform, item_id" });
 
-        await updateItemLocationQty(sku, "A1", -qty); // Default voxel or find
+        await updateItemLocationQty(sku, "A1", -qty);
 
-        // Alarm if low stock
         const { data: item } = await supabaseAdmin.from("cars").select("specs").eq("id", sku).single();
         if (item) {
           const total = item.specs.warehouse_locations.reduce((sum: number, l: any) => sum + l.quantity, 0);
@@ -122,15 +120,13 @@ async function processOrder(orderId: string, platform: 'wb' | 'ozon' | 'ym', ite
       }
     }
 
-    // Add to processed
     await supabaseAdmin.from("processed_orders").insert({
-      order_id: orderId, // corrected column
+      order_id: orderId,
       platform,
       items,
       processed_at: new Date().toISOString(),
     });
 
-    // Precise syncs
     await syncWbSpecific(Array.from(affectedSkus));
     await syncOzonSpecific(Array.from(affectedSkus));
     await syncYmSpecific(Array.from(affectedSkus));
@@ -147,8 +143,8 @@ export async function pollWbOrders(): Promise<{ success: boolean; processed?: nu
   if (!WB_TOKEN) return { success: false, error: "WB credentials missing" };
 
   try {
-    const lastTs = await getLastPollTs('wb') || new Date(Date.now() - 24*60*60*1000).toISOString(); // 24h fallback
-    const since = new Date(lastTs).toISOString().split('.')[0] + 'Z'; // WB format
+    const lastTs = await getLastPollTs('wb') || new Date(Date.now() - 24*60*60*1000).toISOString();
+    const since = new Date(lastTs).toISOString().split('.')[0] + 'Z';
 
     const res = await fetch(`https://marketplace-api.wildberries.ru/api/v5/orders?date_start=${since}&flag=0`, {
       headers: { Authorization: WB_TOKEN },
@@ -414,4 +410,49 @@ async function notifySalaryRows(platform: string, processed: number) {
   await sendComplexMessage(process.env.ADMIN_CHAT_ID!, "Salary CSV:", [], {
     attachment: { type: "document", content: csv, filename: `salary_${platform}_${today}.csv` }
   });
+}
+
+export async function getSalesVelocity(startDate: string, endDate: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    const { data, error } = await supabaseAdmin.from("salary_calc")
+      .select("item_id, avg(decreased_qty) as avg_daily")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .group("item_id");
+    if (error) throw error;
+    return { success: true, data };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getForecastDepletion(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    const { data: velocities } = await supabaseAdmin.rpc("item_velocity");
+    const { data: stocks } = await supabaseAdmin.from("cars").select("id, sum(specs->warehouse_locations->>quantity) as current_stock").group("id");
+    const forecast = velocities.map(v => {
+      const stock = stocks.find(s => s.id === v.item_id)?.current_stock || 0;
+      const days = v.avg_daily > 0 ? Math.round(stock / v.avg_daily) : 'Infinite';
+      return { item_id: v.item_id, days_to_zero: days };
+    });
+    return { success: true, data: forecast };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+export async function getPlatformShare(startDate: string, endDate: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const { data, error } = await supabaseAdmin.from("salary_calc")
+      .select("platform, sum(decreased_qty) as total")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .group("platform");
+    if (error) throw error;
+    const grandTotal = data.reduce((sum, p) => sum + p.total, 0);
+    const shares = data.map(p => ({ platform: p.platform, percentage: Math.round((p.total / grandTotal) * 100) }));
+    return { success: true, data: shares };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
 }
