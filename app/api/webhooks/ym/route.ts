@@ -43,7 +43,6 @@ export async function POST(request: Request) {
     });
 
     // Trigger syncs
-//[captain]: think how to update particular item, not EVERYTHING;)
     await syncWbStocks();
     await syncOzonStocks();
     await syncYmStocks();

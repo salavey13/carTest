@@ -43,7 +43,6 @@ export async function POST(request: Request) {
     });
 
     // Trigger syncs
-//[captain]: looks kinda fork bomb to me:)
     await syncWbStocks();
     await syncOzonStocks();
     await syncYmStocks();
