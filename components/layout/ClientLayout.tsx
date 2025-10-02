@@ -112,7 +112,8 @@ function AppInitializers() {
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
   "elon": "/elon", "musk_market": "/elon", "arbitrage_seeker": "/elon", "topdf_psycho": "/topdf",
-  "settings": "/settings", "profile": "/profile", "sauna": "/sauna-rent", "streamer": "/streamer", "demo": "/about_en"
+  "settings": "/settings", "profile": "/profile", "sauna": "/sauna-rent", "streamer": "/streamer", "demo": "/about_en",
+"wb": "/wb"
 };
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
@@ -182,10 +183,11 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const showBottomNav = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)) || pathname === "/";
   
   useEffect(() => {
-    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" || pathname === "/streamer" || pathname === "/blogger" || pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"));
+    setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" || pathname?.startsWith("/wb") || 
+pathname === "/csv-compare" || pathname === "/streamer" || pathname === "/blogger" || pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"));
   }, [pathname]);
 
-  const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard' ];
+  const TRANSPARENT_LAYOUT_PAGES = [ '/rentals', '/crews', '/paddock', '/admin', '/leaderboard', '/wb' ];
   const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some(p => pathname.startsWith(p)) || theme.isTransparent;
 
   return (
