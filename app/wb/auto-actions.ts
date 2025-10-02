@@ -1,8 +1,11 @@
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
-import { updateItemLocationQty, syncWbStocks, syncOzonStocks, syncYmStocks } from "@/app/wb/actions";
-import { notifyAdmin } from "@/app/actions"; // as per user
+import { updateItemLocationQty } from "@/app/wb/actions";
+import { syncWbSpecific, syncOzonSpecific, syncYmSpecific } from "@/app/wb/actions";
+import { notifyAdmin } from "@/app/actions";
+import { v4 as uuidv4 } from "uuid";
+import Papa from "papaparse";
 
 export async function registerOzonWebhook(url: string): Promise<{ success: boolean; error?: string }> {
   const OZON_CLIENT_ID = process.env.OZON_CLIENT_ID;
@@ -70,33 +73,61 @@ async function processOrder(orderId: string, platform: 'wb' | 'ozon' | 'ym', ite
     // Dedup check
     const { data: existing } = await supabaseAdmin
       .from("processed_orders")
-      .select("orderId")
-      .eq("orderId", orderId)
+      .select("order_id") // corrected column
+      .eq("order_id", orderId)
       .eq("platform", platform)
       .single();
 
     if (existing) {
-      console.info(`${platform.toUpperCase()} poll: duplicate order ${orderId}, skipping`);
+      console.info(`${platform.toUpperCase()} process: duplicate order ${orderId}, skipping`);
       return { success: true, message: "Duplicate, skipped" };
     }
 
-    // Process items
+    // Process items + insert to salary_calc
     const affectedSkus = new Set<string>();
+    const today = new Date().toISOString().split('T')[0];
     for (const it of items) {
       const sku = it.sku;
       const qty = it.qty;
       if (sku) {
+        const { data: current } = await supabaseAdmin.from("salary_calc")
+          .select("decreased_qty")
+          .eq("date", today)
+          .eq("platform", platform)
+          .eq("item_id", sku)
+          .single();
+
+        const newQty = (current?.decreased_qty || 0) + qty;
+
+        await supabaseAdmin.from("salary_calc").upsert({
+          date: today,
+          platform,
+          item_id: sku,
+          decreased_qty: newQty
+        }, { onConflict: "date, platform, item_id" });
+
         await updateItemLocationQty(sku, "A1", -qty); // Default voxel or find
+
+        // Alarm if low stock
+        const { data: item } = await supabaseAdmin.from("cars").select("specs").eq("id", sku).single();
+        if (item) {
+          const total = item.specs.warehouse_locations.reduce((sum: number, l: any) => sum + l.quantity, 0);
+          const min = item.specs.min_quantity || 0;
+          if (total < min) {
+            await notifyAdmin(`Low stock alarm: ${sku} now ${total} < ${min}`);
+          }
+        }
+
         affectedSkus.add(sku);
       }
     }
 
     // Add to processed
     await supabaseAdmin.from("processed_orders").insert({
-      orderId,
+      order_id: orderId, // corrected column
       platform,
       items,
-      processedAt: new Date().toISOString(),
+      processed_at: new Date().toISOString(),
     });
 
     // Precise syncs
@@ -106,7 +137,7 @@ async function processOrder(orderId: string, platform: 'wb' | 'ozon' | 'ym', ite
 
     return { success: true };
   } catch (err: any) {
-    console.error(`${platform.toUpperCase()} poll error processing order ${orderId}:`, err);
+    console.error(`${platform.toUpperCase()} process error for order ${orderId}:`, err);
     return { success: false, error: err.message };
   }
 }
@@ -119,11 +150,8 @@ export async function pollWbOrders(): Promise<{ success: boolean; processed?: nu
     const lastTs = await getLastPollTs('wb') || new Date(Date.now() - 24*60*60*1000).toISOString(); // 24h fallback
     const since = new Date(lastTs).toISOString().split('.')[0] + 'Z'; // WB format
 
-    const res = await fetch('https://marketplace-api.wildberries.ru/api/v3/orders/new', {
-      method: "GET",
+    const res = await fetch(`https://marketplace-api.wildberries.ru/api/v5/orders?date_start=${since}&flag=0`, {
       headers: { Authorization: WB_TOKEN },
-      // WB new orders since param? Adjust if needed, docs say /api/v3/orders/new no since, perhaps /api/v4/fbs/posting/list with filter
-      // Assuming /api/v3/orders?since={since}
     });
     if (!res.ok) {
       const text = await res.text();
@@ -141,6 +169,11 @@ export async function pollWbOrders(): Promise<{ success: boolean; processed?: nu
     }
 
     await setLastPollTs('wb', new Date().toISOString());
+
+    if (processed > 0) {
+      await notifySalaryRows('wb', processed);
+    }
+
     return { success: true, processed };
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
@@ -183,6 +216,11 @@ export async function pollOzonOrders(): Promise<{ success: boolean; processed?: 
     }
 
     await setLastPollTs('ozon', new Date().toISOString());
+
+    if (processed > 0) {
+      await notifySalaryRows('ozon', processed);
+    }
+
     return { success: true, processed };
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
@@ -195,11 +233,10 @@ export async function pollYmOrders(campaignId: string): Promise<{ success: boole
 
   try {
     const lastTs = await getLastPollTs('ym') || new Date(Date.now() - 24*60*60*1000).toISOString();
-    const since = new Date(lastTs).toISOString().split('.')[0] + 'Z';
+    const fromDate = new Date(lastTs).toISOString().split('T')[0]; // YM fromDate format YYYY-MM-DD
 
-    const res = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}/orders?fromDate=${encodeURIComponent(since)}`, {
-      method: "GET",
-      headers: { "Api-Key": YM_API_TOKEN },
+    const res = await fetch(`https://api.partner.market.yandex.ru/campaigns/${campaignId}/orders?fromDate=${fromDate}`, {
+      headers: { "Authorization": `Bearer ${YM_API_TOKEN}` },
     });
     if (!res.ok) {
       const text = await res.text();
@@ -211,12 +248,17 @@ export async function pollYmOrders(campaignId: string): Promise<{ success: boole
     let processed = 0;
     for (const order of orders) {
       const orderId = order.id.toString();
-      const items = order.items.map((i: any) => ({ sku: i.offerId.toString(), qty: i.count || 1 }));
+      const items = order.items.map((i: any) => ({ sku: i.shopSku.toString(), qty: i.count || 1 }));
       const procRes = await processOrder(orderId, 'ym', items);
       if (procRes.success) processed++;
     }
 
     await setLastPollTs('ym', new Date().toISOString());
+
+    if (processed > 0) {
+      await notifySalaryRows('ym', processed);
+    }
+
     return { success: true, processed };
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
@@ -315,4 +357,61 @@ async function syncYmSpecific(skus: string[]): Promise<{ success: boolean; error
   } catch (e: any) {
     return { success: false, error: e?.message || "Network error" };
   }
+}
+
+export async function getSalaryCalcToday(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabaseAdmin.from("salary_calc").select("*").eq("date", today);
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+export async function generateDailySummary(): Promise<{ success: boolean; text?: string; csv?: string; error?: string }> {
+  const today = new Date().toISOString().split('T')[0];
+  try {
+    const { data: rows } = await supabaseAdmin.from("salary_calc")
+      .select("platform, cars!inner(specs->>size as size, specs->>season as season), decreased_qty")
+      .eq("date", today);
+
+    const groups = new Map<string, { wb: number; ozon: number; ym: number; total: number }>();
+    (rows || []).forEach((r: any) => {
+      const key = `${r.size || 'unknown'} ${r.season || 'unknown'}`.trim();
+      const entry = groups.get(key) || { wb: 0, ozon: 0, ym: 0, total: 0 };
+      entry[r.platform] = (entry[r.platform] || 0) + (r.decreased_qty || 0);
+      entry.total += r.decreased_qty || 0;
+      groups.set(key, entry);
+    });
+
+    const textLines = Array.from(groups.entries()).map(([key, vals]) => `${key}: ${vals.wb} | ${vals.ozon} | ${vals.ym} | ${vals.total}`);
+    const text = textLines.join("\n");
+
+    const csvData = Array.from(groups.entries()).map(([key, vals]) => ({ group: key, wb: vals.wb, ozon: vals.ozon, ym: vals.ym, total: vals.total }));
+    const csv = Papa.unparse(csvData);
+
+    await notifyAdmin(`Daily summary for ${today}:\n${text}`);
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID!, "Summary CSV:", [], {
+      attachment: { type: "document", content: csv, filename: `daily_summary_${today}.csv` }
+    });
+
+    return { success: true, text, csv };
+  } catch (e: any) {
+    return { success: false, error: e.message };
+  }
+}
+
+async function notifySalaryRows(platform: string, processed: number) {
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await supabaseAdmin.from("salary_calc")
+    .select("*")
+    .eq("date", today)
+    .eq("platform", platform);
+
+  if (!data || data.length === 0) return;
+
+  const csv = Papa.unparse(data, { header: true });
+  const message = `New salary calc rows for ${platform.toUpperCase()} on ${today}: ${processed} orders processed.`;
+  await notifyAdmin(message);
+  await sendComplexMessage(process.env.ADMIN_CHAT_ID!, "Salary CSV:", [], {
+    attachment: { type: "document", content: csv, filename: `salary_${platform}_${today}.csv` }
+  });
 }

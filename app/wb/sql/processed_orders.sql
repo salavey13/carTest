@@ -1,4 +1,4 @@
--- SQL for processed_orders
+-- processed_orders (dedup)
 CREATE TABLE IF NOT EXISTS processed_orders (
   order_id TEXT NOT NULL,
   platform TEXT NOT NULL CHECK (platform IN ('wb', 'ozon', 'ym')),
@@ -8,13 +8,13 @@ CREATE TABLE IF NOT EXISTS processed_orders (
 );
 CREATE INDEX IF NOT EXISTS idx_order_id ON processed_orders (order_id);
 
--- SQL for config
+-- config (lastPollTs)
 CREATE TABLE IF NOT EXISTS config (
   key TEXT PRIMARY KEY,
   value TEXT
 );
 
--- SQL for salary_calc (daily per item/platform decreased)
+-- salary_calc (daily decreased per item/platform)
 CREATE TABLE IF NOT EXISTS salary_calc (
   date DATE NOT NULL,
   platform TEXT NOT NULL CHECK (platform IN ('wb', 'ozon', 'ym')),
