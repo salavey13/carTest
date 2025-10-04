@@ -1,3 +1,4 @@
+// /app/vpr/math/6/cheatsheet/page.tsx
 "use client";
 
 import React from 'react';
@@ -9,13 +10,13 @@ import { cn } from '@/lib/utils';
 
 // URLs изображений — реальные фри с Pixabay
 const imageUrls: Record<string, string> = {
-  'math-arith-*.png': 'https://cdn.pixabay.com/photo/2016/03/31/20/51/hero-1294494_1280.png', // Супергерой-математика
-  'math-fractions-*.png': 'https://cdn.pixabay.com/photo/2017/08/07/18/06/pizza-2604104_1280.png', // Пицца для дробей
-  'math-percent-*.png': 'https://cdn.pixabay.com/vector/2017/02/20/09/25/pie-chart-2024858_1280.png', // Круговая диаграмма %
-  'math-diagram-*.png': 'https://cdn.pixabay.com/vector/2016/03/31/19/02/chart-1297365_1280.png', // Столбчатая диаграмма
-  'math-coord-*.png': 'https://cdn.pixabay.com/photo/2016/03/31/19/02/graph-1297366_1280.png', // Координатная прямая
-  'math-logic-*.png': 'https://cdn.pixabay.com/vector/2019/12/11/13/36/puzzle-4089811_1280.png', // Пазл-логика
-  'math-geo-*.png': 'https://cdn.pixabay.com/vector/2016/03/31/19/02/shapes-1297364_1280.png', // Геометрия Lego-стиль
+  'math-arith-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m1.jpg', // Супергерой-математика
+  'math-fractions-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m2.jpg', // Пицца для дробей
+  'math-percent-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m3.jpg', // Круговая диаграмма %
+  'math-diagram-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m4.jpg', // Столбчатая диаграмма
+  'math-coord-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m5.jpg', // Координатная прямая
+  'math-logic-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m6.jpg', // Пазл-логика
+  'math-geo-*.png': 'https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/m7.jpg', // Геометрия Lego-стиль
 };
 
 // Подсказки — теперь в капшенах
@@ -126,7 +127,7 @@ const MathCheatsheet: React.FC = () => {
             {/* Раздел 5: Координаты — Дорога с номерами! 🛣️ */}
             <section className="space-y-4 border-b border-blue-200 pb-6">
               <h2 className={cn("flex items-center text-2xl font-bold text-red-700 mb-3")}>
-                <VibeContentRenderer content="<FaMapMarkedAlt />" className="mr-2 text-red-500" /> 5. Координаты: Точки на дороге!
+                <VibeContentRenderer content="<FaMapLocationDot />" className="mr-2 text-red-500" /> 5. Координаты: Точки на дороге!
               </h2>
               <p className="text-gray-700 mb-4">Прямая — как улица: 0 — центр, лево — минус, право — плюс. Точка A слева от B? Выбери меньшее число. Смотри расстояние до меток!</p>
               <ul className="list-disc pl-6 space-y-2 text-gray-700">
