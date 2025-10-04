@@ -9,6 +9,7 @@ import { useAppContext } from "@/contexts/AppContext"; // Keep if needed for use
 import { debugLogger } from "@/lib/debugLogger";
 import { Loader2, Trophy, BookOpen, Info } from "lucide-react"; // Added Info icon
 import { FaMap, FaBookOpen as FaBookOpenFa } from "react-icons/fa6"; // Use FaBookOpenFa to avoid name clash
+import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Добавлен для иконок
 import type { Database } from '@/types/database.types';
 
 // --- Types ---
@@ -87,7 +88,6 @@ const Leaderboard = ({ entries }: { entries: LeaderboardEntry[] }) => (
     </div>
 );
 // --- End Leaderboard ---
-
 
 export default function VprTestsListPage() {
     // --- State and Fetching Logic ---
@@ -209,8 +209,7 @@ export default function VprTestsListPage() {
                                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 border border-blue-500 shadow-md hover:shadow-lg w-full sm:w-auto justify-center"
                                      whileHover={{ scale: 1.05 }}
                                  >
-                                     <FaBookOpenFa className="w-4 h-4"/>
-                                     История (Шпаргалка)
+                                     <VibeContentRenderer content="<FaBookOpen />" className="w-4 h-4" /> История (Шпаргалка)
                                  </motion.a>
                              </Link>
                              <Link href="/vpr/geography/6/cheatsheet" passHref legacyBehavior>
@@ -218,8 +217,7 @@ export default function VprTestsListPage() {
                                      className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors duration-200 border border-teal-500 shadow-md hover:shadow-lg w-full sm:w-auto justify-center"
                                      whileHover={{ scale: 1.05 }}
                                  >
-                                     <FaMap className="w-4 h-4"/>
-                                     География (Шпаргалка)
+                                     <VibeContentRenderer content="<FaMap />" className="w-4 h-4" /> География (Шпаргалка)
                                  </motion.a>
                              </Link>
                              {/* ----- START: ADDED BIOLOGY LINK ----- */}
@@ -228,11 +226,20 @@ export default function VprTestsListPage() {
                                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 border border-emerald-500 shadow-md hover:shadow-lg w-full sm:w-auto justify-center"
                                      whileHover={{ scale: 1.05 }}
                                  >
-                                     <FaBookOpenFa className="w-4 h-4"/> {/* Using same icon for consistency */}
-                                     Биология (Шпаргалка)
+                                     <VibeContentRenderer content="<FaBookOpen />" className="w-4 h-4" /> Биология (Шпаргалка)
                                  </motion.a>
                              </Link>
                              {/* ----- END: ADDED BIOLOGY LINK ----- */}
+                             {/* ----- NEW: ADDED MATH LINK ----- */}
+                             <Link href="/vpr/math/6/cheatsheet" passHref legacyBehavior>
+                                 <motion.a
+                                     className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors duration-200 border border-orange-500 shadow-md hover:shadow-lg w-full sm:w-auto justify-center"
+                                     whileHover={{ scale: 1.05 }}
+                                 >
+                                     <VibeContentRenderer content="<FaCalculator />" className="w-4 h-4" /> Математика (Шпаргалка)
+                                 </motion.a>
+                             </Link>
+                             {/* ----- END: MATH LINK ----- */}
                          </div>
                     </motion.div>
                  )}
