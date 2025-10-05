@@ -1,4 +1,3 @@
-// /app/vpr/history/6/cheatsheet/page.tsx
 "use client";
 
 import React from 'react';
@@ -44,14 +43,14 @@ const VprHistoryCheatsheet: React.FC = () => {
     return key ? captions[key] : 'Шаг за шагом, как в приключении! 🚀';
   };
 
-  const SimpleImage = ({ src, alt, width, height, tooltipKeyPart, aspect = 'square' }: { src: string, alt: string, width: number, height: number, tooltipKeyPart: string, aspect?: 'square' | 'video' }) => (
+  const SimpleImage = ({ src, alt, width, height, tooltipKeyPart }: { src: string, alt: string, width: number, height: number, tooltipKeyPart: string }) => (
     <div className="p-2 border border-blue-300/50 rounded-lg bg-blue-50 hover:shadow-md transition-shadow">
-      <div className={cn(aspect === 'square' ? "aspect-square" : "aspect-video", "w-full overflow-hidden rounded bg-white")}>
+      <div className="aspect-square w-full overflow-hidden rounded bg-white"> {/* 1:1 квадрат! */}
         <Image
           src={src}
           alt={alt}
           width={width}
-          height={height}
+          height={height} // 400x400 для 1:1
           className="w-full h-full object-cover"
           loading="lazy"
           unoptimized
@@ -95,8 +94,8 @@ const VprHistoryCheatsheet: React.FC = () => {
               </ul>
               <p className="italic text-gray-600">Хинт от героя: Олег — "вещий" как волшебник. Ответ: Вещий Олег. Ты хитрец! 🧙‍♂️</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-                <SimpleImage src={imageUrls['history-varangians.png']} alt="Призвание варягов (862)" width={400} height={225} tooltipKeyPart="history-varangians.png" aspect="video" />
-                <SimpleImage src={imageUrls['history-baptism.png']} alt="Крещение Руси (988)" width={400} height={711} tooltipKeyPart="history-baptism.png" aspect="video" />
+                <SimpleImage src={imageUrls['history-varangians.png']} alt="Призвание варягов (862)" width={400} height={400} tooltipKeyPart="history-varangians.png" />
+                <SimpleImage src={imageUrls['history-baptism.png']} alt="Крещение Руси (988)" width={400} height={400} tooltipKeyPart="history-baptism.png" />
               </div>
 
               <h3 className="text-xl font-bold text-blue-600">Миссия 2: Прозвище князя</h3>
@@ -112,7 +111,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                 <li>Вспомни: 1147 год — Юрий Долгорукий пригласил союзника.</li>
               </ul>
               <p className="italic text-gray-600">Хинт: Москва — как день рождения города. Ответ: 1147. Уровень пройден! 🚀</p>
-              <SimpleImage src={imageUrls['history-yaroslav.png']} alt="Ярослав Мудрый - расцвет Руси" width={400} height={711} tooltipKeyPart="history-yaroslav.png" aspect="square" />
+              <SimpleImage src={imageUrls['history-yaroslav.png']} alt="Ярослав Мудрый - расцвет Руси" width={400} height={400} tooltipKeyPart="history-yaroslav.png" />
             </section>
 
             {/* Уровень 2: Русь под Игом — Битвы и свобода! 🛡️ */}
@@ -134,8 +133,8 @@ const VprHistoryCheatsheet: React.FC = () => {
               </ul>
               <p className="italic text-gray-600">Хинт: Не битва, а стояние — как переглядки! Ответ: Стояние на Угре. Свобода! 🎉</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-                <SimpleImage src={imageUrls['history-mongols.png']} alt="Нашествие Батыя (1237-1241)" width={600} height={600} tooltipKeyPart="history-mongols.png" aspect="square" />
-                <SimpleImage src={imageUrls['history-nevsky.png']} alt="Ледовое побоище (1242)" width={400} height={225} tooltipKeyPart="history-nevsky.png" aspect="video" />
+                <SimpleImage src={imageUrls['history-mongols.png']} alt="Нашествие Батыя (1237-1241)" width={400} height={400} tooltipKeyPart="history-mongols.png" />
+                <SimpleImage src={imageUrls['history-nevsky.png']} alt="Ледовое побоище (1242)" width={400} height={400} tooltipKeyPart="history-nevsky.png" />
               </div>
 
               <h3 className="text-xl font-bold text-blue-600">Миссия 2: Битва с рыцарями</h3>
@@ -144,7 +143,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                 <li>Ледовое побоище на Чудском озере.</li>
               </ul>
               <p className="italic text-gray-600">Хинт: Лёд трещал под рыцарями! Ответ: Ледовое побоище. Холодная победа! ❄️</p>
-              <SimpleImage src={imageUrls['history-kulikovo.png']} alt="Куликовская битва (1380)" width={400} height={711} tooltipKeyPart="history-kulikovo.png" aspect="video" />
+              <SimpleImage src={imageUrls['history-kulikovo.png']} alt="Куликовская битва (1380)" width={400} height={400} tooltipKeyPart="history-kulikovo.png" />
 
               <h3 className="text-xl font-bold text-blue-600">Миссия 3: Объединение</h3>
               <p>Задача: Кто центр объединения — Москва, князь Калита?</p>
@@ -152,7 +151,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                 <li>Иван Калита — собирал земли, дань платил, Москву укрепил.</li>
               </ul>
               <p className="italic text-gray-600">Хинт: Калита — "мешок с деньгами", купил земли! Ответ: Иван Калита. Уровень пройден! 🚀</p>
-              <SimpleImage src={imageUrls['history-ivan3.png']} alt="Стояние на Угре (1480)" width={500} height={281} tooltipKeyPart="history-ivan3.png" aspect="video" />
+              <SimpleImage src={imageUrls['history-ivan3.png']} alt="Стояние на Угре (1480)" width={400} height={400} tooltipKeyPart="history-ivan3.png" />
             </section>
 
             {/* Уровень 3: Средние века — Зарубежные приключения! 🌍 */}
@@ -177,8 +176,8 @@ const VprHistoryCheatsheet: React.FC = () => {
               </ul>
               <p className="italic text-gray-600">Хинт: Карл — "великий" как гигант! Ответ: Карл Великий. Ты король! 👑</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-                <SimpleImage src={imageUrls['history-feudalism.png']} alt="Феодальная система" width={400} height={250} tooltipKeyPart="history-feudalism.png" aspect="video" />
-                <SimpleImage src={imageUrls['history-crusades.png']} alt="Крестовые походы" width={400} height={400} tooltipKeyPart="history-crusades.png" aspect="square" />
+                <SimpleImage src={imageUrls['history-feudalism.png']} alt="Феодальная система" width={400} height={400} tooltipKeyPart="history-feudalism.png" />
+                <SimpleImage src={imageUrls['history-crusades.png']} alt="Крестовые походы" width={400} height={400} tooltipKeyPart="history-crusades.png" />
               </div>
 
               <h3 className="text-xl font-bold text-purple-600">Миссия 2: Война</h3>
@@ -215,8 +214,8 @@ const VprHistoryCheatsheet: React.FC = () => {
               </ul>
               <p className="italic text-gray-600">Хинт: Песня первых дней войны. Ответ: "Священная война". Ты герой! ⭐</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-                <SimpleImage src={imageUrls['history-ww2-victory.png']} alt="Знамя Победы" width={400} height={711} tooltipKeyPart="history-ww2-victory.png" aspect="video" />
-                <SimpleImage src={imageUrls['history-ww2-monument.png']} alt="Родина-мать" width={400} height={225} tooltipKeyPart="history-ww2-monument.png" aspect="video" />
+                <SimpleImage src={imageUrls['history-ww2-victory.png']} alt="Знамя Победы" width={400} height={400} tooltipKeyPart="history-ww2-victory.png" />
+                <SimpleImage src={imageUrls['history-ww2-monument.png']} alt="Родина-мать" width={400} height={400} tooltipKeyPart="history-ww2-monument.png" />
               </div>
 
               <h3 className="text-xl font-bold text-red-600">Миссия 2: Битва</h3>
