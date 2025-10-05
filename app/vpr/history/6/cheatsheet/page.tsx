@@ -1,3 +1,4 @@
+// /app/vpr/history/6/cheatsheet/page.tsx
 "use client";
 
 import React from 'react';
@@ -9,17 +10,17 @@ import { cn } from '@/lib/utils';
 
 // URLs изображений — обновлённые, с учётом соотношений
 const imageUrls: Record<string, string> = {
-  'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/1/16/%D0%92%D0%B0%D1%80%D1%8F%D0%B3%D0%B8.jpg", // 16:9
-  'history-baptism.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/the-baptism-of-russia-1896.jpg!Large-71324dba-453c-4b24-b587-ef83b807fd17.jpg", // 9:16 -> crop to square
-  'history-yaroslav.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Yaroslav_the_Wise-09415836-fa19-4ee5-9816-47a06ac717ed.jpg", // 9:16 -> crop
-  'history-mongols.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1573709092_batyja-na-rus-miniatjura-iz-zhitija-evfrosini-suzdalskoj-xvii-vek-2e27ed16-3791-472a-84fd-37d982c8ab6b.jpg", // 1:1
-  'history-nevsky.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/0027_NEVSKY-FINAL-FRAME-1750x875-5599046e-d438-49ea-a57b-1cb458c5098e.jpg", // 16:9
-  'history-kulikovo.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1299747-84c22ba5-9f6d-4fc9-be34-bdb06f69d557.jpg", // 9:16 -> crop
-  'history-ivan3.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/album_alb3350347-007001aa-c7c3-40b7-89fe-50a4491004ca.jpg", // 16:9
-  'history-feudalism.png': "https://ru-static.z-dn.net/files/d62/328673063ea0e22a24d9392a9c99959e.jpg", // 16:10 -> contain
-  'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/d/d3/SiegeofAntioch.jpeg", // 1:1
-  'history-ww2-victory.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250420_135854-b056be47-8e5b-44f9-bccd-d14ca75fd294.jpg", // 9:16 -> crop
-  'history-ww2-monument.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motherland-calls.jpg-660bb17c-5de2-4b61-9744-f03b780bf455.jpg", // 16:9
+  'history-varangians.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/1history-varangians.jpg", // 16:9
+  'history-baptism.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/2history-baptism.jpg", 
+  'history-yaroslav.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/3history-yaroslav.jpg", // 9:16 -> crop
+  'history-mongols.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/4history-mongols.jpg", // 1:1
+  'history-nevsky.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/5history-nevsky.jpg", // 16:9
+  'history-kulikovo.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/6history-kulikovo.jpg", // 9:16 -> crop
+  'history-ivan3.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/7history-ivan3.jpg", // 16:9
+  'history-feudalism.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/8history-feudalism.jpg", // 16:10 -> contain
+  'history-crusades.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/9history-crusades.jpg", // 1:1
+  'history-ww2-victory.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/10history-ww2-victory.jpg", // 9:16 -> crop
+  'history-ww2-monument.png': "https://tyqnthnifewjrrjlvmor.supabase.co/storage/v1/object/public/vprmath/11history-ww2-monument.jpg", // 16:9
 };
 
 // Подсказки — короткие, весёлые, bold для ключей
