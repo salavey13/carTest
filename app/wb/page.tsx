@@ -1,3 +1,4 @@
+// /app/wb/page.tsx
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -570,7 +571,7 @@ export default function WBPage() {
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDailyEntry}><Download size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><FileText size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportStock(true)}><FileText size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
             <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
