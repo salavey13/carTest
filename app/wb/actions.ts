@@ -1,3 +1,4 @@
+// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -489,6 +490,7 @@ export async function exportDailyEntry(
   sumsPrevious: Record<string, number>,
   sumsCurrent: Record<string, number>,
   gameMode: string | null,
+  store: string,
   isTelegram = false
 ): Promise<{ success: boolean; csv?: string; error?: string }> {
   try {
@@ -506,57 +508,47 @@ export async function exportDailyEntry(
       'Navolochka 50x70', 'Navolochka 70h70'
     ];
 
-    let otgruzkaWb = categories.map(() => 0);
-    let otgruzkaOzon = categories.map(() => 0);
-    let privoz = 0;
-    let vozvraty = 0;
-    let totalWb = 0;
-    let totalOzon = 0;
+    let otgruzka = categories.map(() => 0);
+    let extraVal = 0;
+    let total = 0;
 
     categories.forEach((cat, idx) => {
       const prev = sumsPrevious[cat] || 0;
       const curr = sumsCurrent[cat] || 0;
       const delta = prev - curr;
 
-      if (delta > 0) { // decrease - отгрузка
-        otgruzkaWb[idx] = delta;
-        totalWb += delta;
-      } else if (delta < 0) { // increase
-        if (gameMode === 'onload') {
-          privoz += -delta;
-        } else {
-          vozvraty += -delta;
-        }
+      if (delta > 0) {
+        otgruzka[idx] = delta;
+        total += delta;
+      } else if (delta < 0) {
+        extraVal += Math.abs(delta);
       }
     });
 
-    const totalOtgruzhenno = totalWb + totalOzon;
-    const zarplata = (gameMode === 'offload') ? totalOtgruzhenno * 50 : 0;
+    let storeLabel = '';
+    let extraLabel = 'Привоз';
+    let dateStr = `,${dd},${mm},${yyyy},0`;
+    if (store === 'ozon') {
+      storeLabel = 'озон';
+      extraLabel = 'Возвраты';
+      dateStr = ',,';
+    } else if (store === 'wb') {
+      storeLabel = 'вб';
+    } else if (store === 'ym') {
+      storeLabel = 'ym';
+    } else {
+      return { success: false, error: 'Invalid store' };
+    }
 
-    const totalCurrent = Object.values(sumsCurrent).reduce((acc: number, val: number) => acc + val, 0);
+    let csv = "\uFEFF" + `отгрузка ${store} ${dd}.${mm}.${yy},${otgruzka.join(',')},,,${storeLabel},${total},${extraLabel},${extraVal}${dateStr}\n`;
 
-    let csv = "\uFEFF";
-
-    // Отгрузка WB
-    csv += `отгрузка вб ${dd}.${mm}.${yy},${otgruzkaWb.join(',')},,,вб,${totalWb},Привоз,${privoz},${dd},${mm},${yyyy},0\n`;
-
-    // Отгрузка Ozon
-    csv += `отгрузка озон ${dd}.${mm}.${yy},${otgruzkaOzon.join(',')},,,озон,${totalOzon},Возвраты,${vozvraty},,\n`;
-
-    // Остаток
-    const ostArray = categories.map(cat => sumsCurrent[cat] || 0);
-    csv += `остаток ${dd}.${mm}.${yy},${ostArray.join(',')},,${totalCurrent},всего,0,Остаток Вб,${totalCurrent},,\n`;
-
-    // Зарплата
-    csv += `${Array(21).fill('').join(',')},Зарплата Паша,${zarplata},Остаток Озон,${totalCurrent},,\n`;
-
-    console.info("exportDailyEntry successful", { totalOtgruzhenno, zarplata, sampleOtgruzka: otgruzkaWb.slice(0, 5) });
+    console.info("exportDailyEntry successful", { store, total, extraVal });
 
     if (isTelegram) {
       return { success: true, csv };
     } else {
-      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Ежедневная запись в CSV.", [], {
-        attachment: { type: "document", content: csv, filename: "daily_entry.csv" },
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", `Отгрузка для ${store} в CSV.`, [], {
+        attachment: { type: "document", content: csv, filename: `otgruzka_${store}.csv` },
       });
       return { success: true, csv };
     }
