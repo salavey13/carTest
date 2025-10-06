@@ -400,20 +400,23 @@ export default function WBPage() {
       return;
     }
 
+    const store = window.prompt("Which store for offload? (wb/ozon/ym)");
+    if (!store) return;
+
     const sumsPrevious = computeSums(checkpoint);
     const sumsCurrent = computeSums(localItems);
 
-    const result = await exportDailyEntry(sumsPrevious, sumsCurrent, gameMode, isTelegram);
+    const result = await exportDailyEntry(sumsPrevious, sumsCurrent, gameMode, store.toLowerCase(), isTelegram);
 
     if (isTelegram && result?.csv) {
       navigator.clipboard.writeText(result.csv);
-      toast.success("Ежедневная запись скопирована в буфер обмена!");
+      toast.success(`Строка для ${store} скопирована в буфер обмена!`);
     } else if (result && result.csv) {
       const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "daily_entry.csv";
+      a.download = `otgruzka_${store}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
     }
@@ -534,7 +537,7 @@ export default function WBPage() {
       } else {
         const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
         if (nonEmpty.length === 0 || (item.total_quantity || 0) <= 0) return toast.error("Нет товара на складе");
-        if (nonEmpty.length > 1) return toast.error("Выберите ячейку для выдачи (несколько локаций)");
+        if (nonEmpty.length > 1) return toast.error("Выберите ячейка для выдачи (несколько локаций)");
         loc = nonEmpty[0];
       }
       if (loc) {
@@ -565,9 +568,9 @@ export default function WBPage() {
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><Download size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDailyEntry}><Download size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDailyEntry}><FileText size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><FileText size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
             <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
