@@ -12,12 +12,13 @@ import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
-import { exportDiffToAdmin, exportCurrentStock, uploadWarehouseCsv, fetchWbPendingCount, fetchOzonPendingCount } from "@/app/wb/actions";
+import { exportDiffToAdmin, exportCurrentStock, exportDailyEntry, uploadWarehouseCsv, fetchWbPendingCount, fetchOzonPendingCount } from "@/app/wb/actions";
 import { VOXELS, SIZE_PACK } from "@/app/wb/common";
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { parse } from "papaparse";
 import { notifyAdmin } from "@/app/actions";
+import { normalizeSizeKey } from "@/app/wb/common";
 
 export default function WBPage() {
   const {
@@ -108,11 +109,6 @@ export default function WBPage() {
   const sizeOrderArray = Object.keys(SIZE_PACK || {});
   const sizeOrderMap: Record<string, number> = {};
   sizeOrderArray.forEach((s, idx) => (sizeOrderMap[s.toLowerCase()] = idx + 1));
-
-  const normalizeSizeKey = (size?: string | null) => {
-    if (!size) return "";
-    return size.toString().toLowerCase().trim().replace(/\s/g, "").replace(/×/g, "x");
-  };
 
   const getSizePriority = (size: string | null): number => {
     if (!size) return 999;
@@ -368,6 +364,79 @@ export default function WBPage() {
     }
   };
 
+  const computeSums = (items: any[]): Record<string, number> => {
+    const sums: Record<string, number> = {};
+    items.forEach((item) => {
+      const q = item.total_quantity || 0;
+      const size = normalizeSizeKey(item.size);
+      const season = item.season?.toLowerCase() || '';
+      const idLower = item.id.toLowerCase();
+
+      let cat = '';
+      if (idLower.startsWith('namatrasnik.')) {
+        cat = `namatras ${size}`;
+      } else if (season === 'leto' || season === 'zima') {
+        let sizeKey = '';
+        if (size === '1.5') sizeKey = '1.5';
+        else if (size === '2') sizeKey = '2';
+        else if (size === 'евро') sizeKey = 'evro';
+        else if (size === 'евромакси' || size === 'евро макси') sizeKey = 'evromaksi';
+        if (sizeKey) cat = `${sizeKey} ${season}`;
+      } else if (idLower.startsWith('podushka.')) {
+        if (idLower.includes('anatom')) cat = 'Podushka anatom';
+        else cat = `Podushka ${size.replace('x', 'h')}`;
+      } else if (idLower.startsWith('navolochka.')) {
+        cat = `Navolochka ${size}`;
+      }
+
+      if (cat) sums[cat] = (sums[cat] || 0) + q;
+    });
+    return sums;
+  };
+
+  const handleExportDailyEntry = async () => {
+    if (!checkpoint || checkpoint.length === 0) {
+      toast.error("Нет чекпоинта для diff — сначала сохраните checkpoint.");
+      return;
+    }
+
+    const sumsPrevious = computeSums(checkpoint);
+    const sumsCurrent = computeSums(localItems);
+
+    const result = await exportDailyEntry(sumsPrevious, sumsCurrent, gameMode, isTelegram);
+
+    if (isTelegram && result?.csv) {
+      navigator.clipboard.writeText(result.csv);
+      toast.success("Ежедневная запись скопирована в буфер обмена!");
+    } else if (result && result.csv) {
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "daily_entry.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    if (checkpointStart) {
+      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+      setLastCheckpointDurationSec(durSec);
+      const stats = computeProcessedStats();
+      setLastProcessedCount(stats.changedCount);
+      setLastProcessedTotalDelta(stats.totalDelta);
+      setLastProcessedPackings(stats.packings);
+      setLastProcessedStars(stats.stars);
+      setLastProcessedOffloadUnits(stats.offloadUnits);
+      setLastProcessedSalary(stats.salary);
+      setCheckpointStart(null);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
+      if (gameMode === 'offload') {
+        const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+        await notifyAdmin(message);
+      }
+    }
+  };
+
   const handleCheckPending = async () => {
     setCheckingPending(true);
     try {
@@ -498,7 +567,7 @@ export default function WBPage() {
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDiff}><Download size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDailyEntry}><FileText size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
             <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>

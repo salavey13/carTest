@@ -107,3 +107,8 @@ export type WarehouseItem = Database['public']['Tables']['cars']['Row'] & {
     min_quantity?: number;
   };
 };
+
+export function normalizeSizeKey(size?: string | null): string {
+  if (!size) return "";
+  return size.toString().toLowerCase().trim().replace(/\s/g, "").replace(/×/g, "x");
+}

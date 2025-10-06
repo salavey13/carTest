@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -8,6 +7,7 @@ import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMe
 import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
 import dns from "dns/promises";
+import { normalizeSizeKey } from "@/app/wb/common";
 
 /**
  * Utilities
@@ -161,7 +161,6 @@ export async function syncYmStocks(campaignId?: string): Promise<{ success: bool
   }
 }
 
-
 export async function checkYmToken(token?: string | null, campaignId?: string | null) {
   // Read from env when not provided
   const YM_API_TOKEN = (token || process.env.YM_API_TOKEN || "").toString().trim();
@@ -215,8 +214,6 @@ export async function checkYmToken(token?: string | null, campaignId?: string | 
 
   return { listStatus, listText, campStatus, campText, message: "ok" };
 }
-
-
 
 // WB token diagnostics: decode JWT + ping marketplace + warehouses
 async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
@@ -485,6 +482,87 @@ export async function exportCurrentStock(items: any[], isTelegram = false, summa
       attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
     });
     return { success: true, csv: csvData };
+  }
+}
+
+export async function exportDailyEntry(
+  sumsPrevious: Record<string, number>,
+  sumsCurrent: Record<string, number>,
+  gameMode: string | null,
+  isTelegram = false
+): Promise<{ success: boolean; csv?: string; error?: string }> {
+  try {
+    const date = new Date();
+    const dd = date.getDate().toString().padStart(2, '0');
+    const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+    const yy = date.getFullYear().toString().slice(-2);
+    const yyyy = date.getFullYear();
+
+    const categories = [
+      'namatras 90', 'namatras 120', 'namatras 140', 'namatras 160', 'namatras 180', 'namatras 200',
+      '1.5 leto', '2 leto', 'evro leto', 'evromaksi leto',
+      '1.5 zima', '2 zima', 'evro zima', 'evromaksi zima',
+      'Podushka 50h70', 'Podushka 70h70', 'Podushka anatom',
+      'Navolochka 50x70', 'Navolochka 70h70'
+    ];
+
+    let otgruzkaWb = categories.map(() => 0);
+    let otgruzkaOzon = categories.map(() => 0);
+    let privoz = 0;
+    let vozvraty = 0;
+    let totalWb = 0;
+    let totalOzon = 0;
+
+    categories.forEach((cat, idx) => {
+      const prev = sumsPrevious[cat] || 0;
+      const curr = sumsCurrent[cat] || 0;
+      const delta = prev - curr;
+
+      if (delta > 0) { // decrease - отгрузка
+        otgruzkaWb[idx] = delta;
+        totalWb += delta;
+      } else if (delta < 0) { // increase
+        if (gameMode === 'onload') {
+          privoz += -delta;
+        } else {
+          vozvraty += -delta;
+        }
+      }
+    });
+
+    const totalOtgruzhenno = totalWb + totalOzon;
+    const zarplata = (gameMode === 'offload') ? totalOtgruzhenno * 50 : 0;
+
+    const totalCurrent = Object.values(sumsCurrent).reduce((acc: number, val: number) => acc + val, 0);
+
+    let csv = "\uFEFF";
+
+    // Отгрузка WB
+    csv += `отгрузка вб ${dd}.${mm}.${yy},${otgruzkaWb.join(',')},,,вб,${totalWb},Привоз,${privoz},${dd},${mm},${yyyy},0\n`;
+
+    // Отгрузка Ozon
+    csv += `отгрузка озон ${dd}.${mm}.${yy},${otgruzkaOzon.join(',')},,,озон,${totalOzon},Возвраты,${vozvraty},,\n`;
+
+    // Остаток
+    const ostArray = categories.map(cat => sumsCurrent[cat] || 0);
+    csv += `остаток ${dd}.${mm}.${yy},${ostArray.join(',')},,${totalCurrent},всего,0,Остаток Вб,${totalCurrent},,\n`;
+
+    // Зарплата
+    csv += `${Array(21).fill('').join(',')},Зарплата Паша,${zarplata},Остаток Озон,${totalCurrent},,\n`;
+
+    console.info("exportDailyEntry successful", { totalOtgruzhenno, zarplata, sampleOtgruzka: otgruzkaWb.slice(0, 5) });
+
+    if (isTelegram) {
+      return { success: true, csv };
+    } else {
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Ежедневная запись в CSV.", [], {
+        attachment: { type: "document", content: csv, filename: "daily_entry.csv" },
+      });
+      return { success: true, csv };
+    }
+  } catch (err: any) {
+    console.error("exportDailyEntry error:", err);
+    return { success: false, error: err?.message || "Unknown error" };
   }
 }
 
@@ -1202,8 +1280,6 @@ export async function fetchOzonPendingCount(): Promise<{ success: boolean; count
     return { success: false, count: 0, error: err.message };
   }
 }
-
-
 
 export async function setYmSku(): Promise<{ success: boolean; updated?: number; error?: string }> {
   try {
