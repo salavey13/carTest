@@ -96,7 +96,7 @@ export default function WBPage() {
   const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
   const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
 
-  const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0 });
+  const [statsObj, setStatsObj] = useState<any>({ changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0 });
 
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
@@ -327,7 +327,7 @@ export default function WBPage() {
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : (lastProcessedOffloadUnits ?? 0);
   const processedSalary = checkpointStart ? liveSalary : (lastProcessedSalary ?? 0);
 
-  // --- DAILY EXPORT: dynamic import exportDailyEntry and wrapper ---
+  // --- DAILY EXPORT: dynamic import exportDailyEntry + client-side clipboard copy ---
   type ExportDailyParams = {
     sumsPrevious: Record<string, number>;
     sumsCurrent: Record<string, number>;
@@ -344,31 +344,32 @@ export default function WBPage() {
         if (typeof exportDailyEntry !== "function") {
           throw new Error("exportDailyEntry is not available in actions");
         }
-        const res = await exportDailyEntry(params.sumsPrevious, params.sumsCurrent, params.gameMode, params.store, params.isTelegram ?? false);
-        if (res?.success) {
-          toast.success("Daily export done");
-        } else {
-          toast.error("Daily export failed");
-        }
+        const res = await exportDailyEntry(
+          params.sumsPrevious,
+          params.sumsCurrent,
+          params.gameMode,
+          params.store,
+          params.isTelegram ?? false
+        );
         return res;
       } catch (err: any) {
         console.error("callExportDailyEntry error:", err);
-        toast.error(err?.message || "Daily export error");
-        return { success: false, error: err };
+        return { success: false, error: err?.message || "Daily export failed" };
       }
     },
     []
   );
 
   const onExportDailyClick = useCallback(async () => {
-    // Собираем sums из stats или без них — тут простой пример:
+    // Build sums like before (or adapt to your real sums)
     const sumsPrev = (statsObj && (statsObj as any).sumsPrevious) || {};
     const sumsCurr = (statsObj && (statsObj as any).sumsCurrent) || {};
     const store = (user && (user.store || "main")) || "main";
     const gameModeLocal = gameMode || "default";
     const isTelegramLocal = !!tg;
 
-    await callExportDailyEntry({
+    // Call server action
+    const result = await callExportDailyEntry({
       sumsPrevious: sumsPrev,
       sumsCurrent: sumsCurr,
       gameMode: gameModeLocal,
@@ -376,7 +377,50 @@ export default function WBPage() {
       isTelegram: isTelegramLocal,
     });
 
-    // если был чекпоинт — аналогично поведению handleExportDiff/Stock:
+    // If server returned CSV — attempt to copy to clipboard (client-side)
+    if (result?.csv) {
+      const csvText = result.csv as string;
+      // Try clipboard API first
+      let copied = false;
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(csvText);
+          toast.success("CSV скопирован в буфер обмена");
+          copied = true;
+        }
+      } catch (clipErr) {
+        console.warn("Clipboard write failed:", clipErr);
+        // not fatal — we'll fallback to download
+      }
+
+      if (!copied) {
+        try {
+          // Fallback: create blob and trigger download
+          const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `otgruzka_${new Date().toISOString().slice(0,10)}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          toast.success("Копирование в буфер не удалось — CSV скачан как fallback");
+        } catch (dlErr) {
+          console.error("Fallback download failed:", dlErr);
+          toast.error("Не удалось скопировать или скачать CSV. Проверьте права доступа.");
+        }
+      }
+    } else {
+      // No CSV returned — show server feedback
+      if (result?.success) {
+        toast.success("Daily export finished (no CSV returned).");
+      } else {
+        toast.error(`Daily export failed: ${result?.error || "unknown error"}`);
+      }
+    }
+
+    // Preserve existing checkpoint behavior (if you want same semantics as other exports)
     if (checkpointStart) {
       const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
       setLastCheckpointDurationSec(durSec);
@@ -389,7 +433,8 @@ export default function WBPage() {
       setLastProcessedSalary(stats.salary);
       setCheckpointStart(null);
       toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
-      if (gameMode === 'offload') {
+
+      if (gameMode === "offload") {
         try {
           const appActions = await import("@/app/actions");
           const notifyAdmin = appActions?.notifyAdmin;
@@ -658,7 +703,7 @@ export default function WBPage() {
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
-            {/* ЗДЕСЬ: заменил на onExportDailyClick */}
+            {/* ЗДЕСЬ: onExportDailyClick */}
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onExportDailyClick}><Download size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
