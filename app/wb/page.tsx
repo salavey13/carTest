@@ -215,7 +215,7 @@ export default function WBPage() {
   };
 
   const handleCheckpoint = () => {
-    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l: any) => ({ ...l })) })));
+    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l: any) => ({ ...l })) }));
     setCheckpointStart(Date.now());
     setLastCheckpointDurationSec(null);
     setLastProcessedCount(null);
@@ -235,7 +235,7 @@ export default function WBPage() {
       toast.error("Нет сохранённого чекпоинта");
       return;
     }
-    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) })));
+    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) }));
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);

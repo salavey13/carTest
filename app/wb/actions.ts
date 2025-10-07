@@ -6,7 +6,6 @@ import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
-import dns from "dns/promises";
 import { normalizeSizeKey } from "@/app/wb/common";
 
 /**
@@ -43,7 +42,7 @@ function decodeJwtPayloadSafe(token: string): any | null {
   }
 }
 
-// Возвращает список кампаний (parsed) и сырой ответ для диагностики
+// Возвращает список кампаний (parsed) и сырый ответ для диагностики
 export async function getYmCampaigns(): Promise<{ success: boolean; campaigns?: any[]; raw?: any; error?: string; status?: number }> {
   const YM_API_TOKEN = (process.env.YM_API_TOKEN || "").toString().trim();
   if (!YM_API_TOKEN) return { success: false, error: "YM_API_TOKEN missing" };
@@ -627,6 +626,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
     });
 
     try {
+      const dns = await import("dns/promises");
       const lookup = await dns.lookup("marketplace-api.wildberries.ru");
       console.info("syncWbStocks DNS lookup result", lookup);
     } catch (dnsErr: any) {
@@ -812,6 +812,7 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     console.info("fetchWbStocks -> About to POST", { url, skusCount: skus.length, sampleSkus: skus.slice(0, 20) });
 
     try {
+      const dns = await import("dns/promises");
       const lookup = await dns.lookup("marketplace-api.wildberries.ru");
       console.info("fetchWbStocks DNS lookup result", lookup);
     } catch (dnsErr: any) {
