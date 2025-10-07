@@ -167,41 +167,54 @@ export default function WBPage() {
   };
 
   const categorizeItem = useCallback((item: any): string => {
-    const modelLower = (item.model || '').toLowerCase().trim();
-    if (!modelLower) return 'other';
+    const fullLower = (item.id || item.model || '').toLowerCase().trim();
+    if (!fullLower) return 'other';
 
-    // Namatras по размеру
-    if (modelLower.includes('наматрасник') || modelLower.includes('namatras')) {
-      const sizeMatch = modelLower.match(/(90|120|140|160|180|200)/);
-      if (sizeMatch) return `namatras ${sizeMatch[1]}`;
+    // Namatras
+    if (fullLower.includes('наматрасник') || fullLower.includes('namatras')) {
+      const sizeMatch = fullLower.match(/(90|120|140|160|180|200)/);
+      if (sizeMatch) return `namatras ${sizeMatch[0]}`;
     }
 
-    // Leto/zima по размеру
-    const sizePatterns = ['1\\.5', '2', 'евро', 'евромакси', 'евро макси'];
-    const seasonPatterns = { leto: ['лето', 'leto'], zima: ['зима', 'zima'] };
-
-    for (const [seasonKey, patterns] of Object.entries(seasonPatterns)) {
-      if (patterns.some(p => modelLower.includes(p))) {
-        for (const sizePat of sizePatterns) {
-          if (modelLower.match(new RegExp(sizePat))) {
-            const size = sizePat.replace(/\\./g, '.').replace('евро макси', 'evromaksi leto');
-            return `${size} ${seasonKey}`;
-          }
-        }
+    // Linens: size and season - longer sizes first
+    const sizeChecks = [
+      { key: 'евро макси', val: 'evromaksi' },
+      { key: 'евро', val: 'evro' },
+      { key: '1.5', val: '1.5' },
+      { key: '2', val: '2' }
+    ];
+    let detectedSize = null;
+    for (const { key, val } of sizeChecks) {
+      if (fullLower.includes(key)) {
+        detectedSize = val;
+        break;
       }
     }
 
+    const seasonMap = { 'лето': 'leto', 'зима': 'zima', 'leto': 'leto', 'zima': 'zima' };
+    let detectedSeason = null;
+    for (const [key, val] of Object.entries(seasonMap)) {
+      if (fullLower.includes(key)) {
+        detectedSeason = val;
+        break;
+      }
+    }
+
+    if (detectedSize && detectedSeason) {
+      return `${detectedSize} ${detectedSeason}`;
+    }
+
     // Podushka
-    if (modelLower.includes('подушка') || modelLower.includes('podushka')) {
-      if (modelLower.includes('50x70') || modelLower.includes('50h70')) return 'Podushka 50h70';
-      if (modelLower.includes('70x70') || modelLower.includes('70h70')) return 'Podushka 70h70';
-      if (modelLower.includes('анатом')) return 'Podushka anatom';
+    if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
+      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Podushka 50h70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Podushka 70h70';
+      if (fullLower.includes('анатом')) return 'Podushka anatom';
     }
 
     // Navolochka
-    if (modelLower.includes('наволочка') || modelLower.includes('navolochka')) {
-      if (modelLower.includes('50x70') || modelLower.includes('50h70')) return 'Navolochka 50x70';
-      if (modelLower.includes('70x70') || modelLower.includes('70h70')) return 'Navolochka 70h70';
+    if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
+      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70h70';
     }
 
     return 'other';
