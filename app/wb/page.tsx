@@ -72,6 +72,10 @@ export default function WBPage() {
     setOnloadCount,
     setOffloadCount,
     setEditCount,
+    efficiency,
+    avgTimePerItem,
+    dailyGoals,
+    sessionDuration,
   } = useWarehouse();
 
   const { user, tg } = useAppContext();
@@ -255,6 +259,7 @@ export default function WBPage() {
         }
 
         const filtered = locs.filter((l) => (l.quantity || 0) > 0);
+
         const total = filtered.reduce((a: number, b: any) => a + (b.quantity || 0), 0);
 
         if (delta < 0 && selectedVoxel) {
@@ -374,7 +379,7 @@ export default function WBPage() {
     const stars = packings * 25;
     const salary = offloadUnits * 50;
     return { changedCount, totalDelta, packings, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
-  }, [localItems, checkpoint, offloadCount, SIZE_PACK, categorizeItem]);
+  }, [localItems, checkpoint, offloadCount, SIZE_PACK]);
 
   useEffect(() => {
     const stats = computeProcessedStats();
@@ -605,323 +610,327 @@ export default function WBPage() {
             const notifyAdmin = appActions?.notifyAdmin;
             if (typeof notifyAdmin === "function") {
               const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-              await notifyAdmin(message);
-            }
-          } catch (err) {
-            console.warn("notifyAdmin failed:", err);
+            await notifyAdmin(message);
           }
+        } catch (err) {
+          console.warn("notifyAdmin failed:", err);
         }
       }
-    } catch (err: any) {
-      console.error("handleExportDiff error:", err);
-      toast.error(err?.message || "Export diff failed");
     }
-  };
+  } catch (err: any) {
+    console.error("handleExportDiff error:", err);
+    toast.error(err?.message || "Export diff failed");
+  }
+};
 
-  // --- EXPORT STOCK: dynamic import exportCurrentStock ---
-  const handleExportStock = async (summarized = false) => {
-    try {
-      const actionsMod = await import("@/app/wb/actions");
-      const exportCurrentStock = actionsMod?.exportCurrentStock;
-      if (typeof exportCurrentStock !== "function") throw new Error("exportCurrentStock not available");
+// --- EXPORT STOCK: dynamic import exportCurrentStock ---
+const handleExportStock = async (summarized = false) => {
+  try {
+    const actionsMod = await import("@/app/wb/actions");
+    const exportCurrentStock = actionsMod?.exportCurrentStock;
+    if (typeof exportCurrentStock !== "function") throw new Error("exportCurrentStock not available");
 
-      const result = await exportCurrentStock(localItems, isTelegram, summarized);
-      if (isTelegram && result?.csv) {
-        try { await navigator.clipboard.writeText(result.csv); toast.success("CSV скопирован в буфер обмена!"); }
-        catch {
-          // fallback same as daily: try execCommand, then download
-          const ok = copyTextToClipboardFallback(result.csv || "");
-          if (ok) toast.success("CSV скопирован в буфер обмена (fallback)");
-          else {
-            const blob = new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
-            a.click();
-            window.URL.revokeObjectURL(url);
-            toast.success("CSV скачан (fallback)");
+    const result = await exportCurrentStock(localItems, isTelegram, summarized);
+    if (isTelegram && result?.csv) {
+      try { await navigator.clipboard.writeText(result.csv); toast.success("CSV скопирован в буфер обмена!"); }
+      catch {
+        // fallback same as daily: try execCommand, then download
+        const ok = copyTextToClipboardFallback(result.csv || "");
+        if (ok) toast.success("CSV скопирован в буфер обмена (fallback)");
+        else {
+          const blob = new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
+          a.click();
+          window.URL.revokeObjectURL(url);
+          toast.success("CSV скачан (fallback)");
+        }
+      }
+    } else if (result && result.csv) {
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    if (checkpointStart) {
+      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+      setLastCheckpointDurationSec(durSec);
+      const stats = computeProcessedStats();
+      setLastProcessedCount(stats.changedCount);
+      setLastProcessedTotalDelta(stats.totalDelta);
+      setLastProcessedPackings(stats.packings);
+      setLastProcessedStars(stats.stars);
+      setLastProcessedOffloadUnits(stats.offloadUnits);
+      setLastProcessedSalary(stats.salary);
+      setCheckpointStart(null);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
+      if (gameMode === 'offload') {
+        try {
+          const appActions = await import("@/app/actions");
+          const notifyAdmin = appActions?.notifyAdmin;
+          if (typeof notifyAdmin === "function") {
+            const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+            await notifyAdmin(message);
           }
-        }
-      } else if (result && result.csv) {
-        const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
-
-      if (checkpointStart) {
-        const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-        setLastCheckpointDurationSec(durSec);
-        const stats = computeProcessedStats();
-        setLastProcessedCount(stats.changedCount);
-        setLastProcessedTotalDelta(stats.totalDelta);
-        setLastProcessedPackings(stats.packings);
-        setLastProcessedStars(stats.stars);
-        setLastProcessedOffloadUnits(stats.offloadUnits);
-        setLastProcessedSalary(stats.salary);
-        setCheckpointStart(null);
-        toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
-        if (gameMode === 'offload') {
-          try {
-            const appActions = await import("@/app/actions");
-            const notifyAdmin = appActions?.notifyAdmin;
-            if (typeof notifyAdmin === "function") {
-              const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-              await notifyAdmin(message);
-            }
-          } catch (err) {
-            console.warn("notifyAdmin failed:", err);
-          }
+        } catch (err) {
+          console.warn("notifyAdmin failed:", err);
         }
       }
-    } catch (err: any) {
-      console.error("handleExportStock error:", err);
-      toast.error(err?.message || "Export stock failed");
     }
-  };
+  } catch (err: any) {
+    console.error("handleExportStock error:", err);
+    toast.error(err?.message || "Export stock failed");
+  }
+};
 
-  // --- CHECK PENDING: dynamic import fetchWbPendingCount & fetchOzonPendingCount ---
-  const handleCheckPending = async () => {
-    setCheckingPending(true);
-    try {
-      const actionsMod = await import("@/app/wb/actions");
-      const fetchWbPendingCount = actionsMod?.fetchWbPendingCount;
-      const fetchOzonPendingCount = actionsMod?.fetchOzonPendingCount;
-      if (typeof fetchWbPendingCount !== "function" || typeof fetchOzonPendingCount !== "function") {
-        throw new Error("pending count functions unavailable");
+// --- CHECK PENDING: dynamic import fetchWbPendingCount & fetchOzonPendingCount ---
+const handleCheckPending = async () => {
+  setCheckingPending(true);
+  try {
+    const actionsMod = await import("@/app/wb/actions");
+    const fetchWbPendingCount = actionsMod?.fetchWbPendingCount;
+    const fetchOzonPendingCount = actionsMod?.fetchOzonPendingCount;
+    if (typeof fetchWbPendingCount !== "function" || typeof fetchOzonPendingCount !== "function") {
+      throw new Error("pending count functions unavailable");
+    }
+
+    const wbRes = await fetchWbPendingCount();
+    const ozonRes = await fetchOzonPendingCount();
+    const wbCount = wbRes?.success ? wbRes.count : 0;
+    const ozonCount = ozonRes?.success ? ozonRes.count : 0;
+    const total = (wbCount || 0) + (ozonCount || 0);
+    setTargetOffload(total);
+    toast.success(`Pending offloads: WB ${wbCount}, Ozon ${ozonCount}. Target: ${total}`);
+  } catch (err: any) {
+    toast.error('Failed to check pending: ' + (err?.message || 'Unknown'));
+  } finally {
+    setCheckingPending(false);
+  }
+};
+
+const localFilteredItems = useMemo(() => {
+  const arr = (localItems || []).filter((item) => {
+    const searchLower = (search || "").toLowerCase();
+    const matchesSearch = ((item.name || "") + " " + (item.description || "")).toLowerCase().includes(searchLower);
+    const matchesSeason = !filterSeason || item.season === filterSeason;
+    const matchesPattern = !filterPattern || item.pattern === filterPattern;
+    const matchesColor = !filterColor || item.color === filterColor;
+    const matchesSize = !filterSize || item.size === filterSize;
+    return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
+  });
+
+  const sorted = [...arr].sort((a, b) => {
+    switch (sortOption) {
+      case 'size_season_color': {
+        const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
+        if (sizeCmp !== 0) return sizeCmp;
+        const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
+        if (seasonCmp !== 0) return seasonCmp;
+        return (a.color || "").localeCompare(b.color || "");
       }
-
-      const wbRes = await fetchWbPendingCount();
-      const ozonRes = await fetchOzonPendingCount();
-      const wbCount = wbRes?.success ? wbRes.count : 0;
-      const ozonCount = ozonRes?.success ? ozonRes.count : 0;
-      const total = (wbCount || 0) + (ozonCount || 0);
-      setTargetOffload(total);
-      toast.success(`Pending offloads: WB ${wbCount}, Ozon ${ozonCount}. Target: ${total}`);
-    } catch (err: any) {
-      toast.error('Failed to check pending: ' + (err?.message || 'Unknown'));
-    } finally {
-      setCheckingPending(false);
-    }
-  };
-
-  const localFilteredItems = useMemo(() => {
-    const arr = (localItems || []).filter((item) => {
-      const searchLower = (search || "").toLowerCase();
-      const matchesSearch = ((item.name || "") + " " + (item.description || "")).toLowerCase().includes(searchLower);
-      const matchesSeason = !filterSeason || item.season === filterSeason;
-      const matchesPattern = !filterPattern || item.pattern === filterPattern;
-      const matchesColor = !filterColor || item.color === filterColor;
-      const matchesSize = !filterSize || item.size === filterSize;
-      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-    });
-
-    const sorted = [...arr].sort((a, b) => {
-      switch (sortOption) {
-        case 'size_season_color': {
-          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
-          if (sizeCmp !== 0) return sizeCmp;
-          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
-          if (seasonCmp !== 0) return seasonCmp;
-          return (a.color || "").localeCompare(b.color || "");
-        }
-        case 'color_size': {
-          const colorCmp = (a.color || "").localeCompare(b.color || "");
-          if (colorCmp !== 0) return colorCmp;
-          return getSizePriority(a.size) - getSizePriority(b.size);
-        }
-        case 'season_size_color': {
-          const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
-          if (seasonCmp !== 0) return seasonCmp;
-          const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
-          if (sizeCmp !== 0) return sizeCmp;
-          return (a.color || "").localeCompare(b.color || "");
-        }
-        default:
-          return 0;
+      case 'color_size': {
+        const colorCmp = (a.color || "").localeCompare(b.color || "");
+        if (colorCmp !== 0) return colorCmp;
+        return getSizePriority(a.size) - getSizePriority(b.size);
       }
-    });
-
-    return sorted;
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption, SIZE_PACK]);
-
-  const handlePlateClickCustom = (voxelId: string) => {
-    handlePlateClick(voxelId);
-    const content = localItems.flatMap((i) => (i.locations || []).filter((l: any) => l.voxel === voxelId && (l.quantity || 0) > 0).map((l: any) => ({ item: i, quantity: l.quantity })));
-    if (gameMode === "onload" || gameMode === "offload") {
-      setSelectedVoxel(voxelId);
-      if (gameMode === "onload") toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточки` : `Выбрана ячейка ${voxelId}`);
-      else toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
-      return;
+      case 'season_size_color': {
+        const seasonCmp = getSeasonPriority(a.season) - getSeasonPriority(b.season);
+        if (seasonCmp !== 0) return seasonCmp;
+        const sizeCmp = getSizePriority(a.size) - getSizePriority(b.size);
+        if (sizeCmp !== 0) return sizeCmp;
+        return (a.color || "").localeCompare(b.color || "");
+      }
+      default:
+        return 0;
     }
-    if (content.length > 0) {
-      setEditVoxel(voxelId);
-      setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
-      setEditDialogOpen(true);
-    } else setSelectedVoxel(voxelId);
-  };
+  });
 
-  const handleItemClickCustom = async (item: any) => {
-    if (!item) return;
-    if (gameMode === "onload") {
-      const targetVoxel = selectedVoxel || "A1";
-      setSelectedVoxel(targetVoxel);
-      optimisticUpdate(item.id, targetVoxel, 1);
-      toast.success(`Добавлено в ${targetVoxel}`);
-      return;
-    }
-    if (gameMode === "offload") {
-      let loc;
-      const selVoxelNorm = selectedVoxel ? selectedVoxel.toString().toLowerCase() : null;
-      if (selectedVoxel) {
-        loc = (item.locations || []).find((l: any) => (l.voxel || "").toString().toLowerCase() === selVoxelNorm && (l.quantity || 0) > 0);
-        if (!loc) {
-          const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
-          if (nonEmpty.length === 1) {
-            loc = nonEmpty[0];
-            toast.info(`В выбранной ячейке нет товара — списываю из ${loc.voxel} (единственная ячейка с товаром).`);
-          } else return toast.error("Нет товара в выбранной ячейке");
-        }
-      } else {
+  return sorted;
+}, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption, SIZE_PACK]);
+
+const handlePlateClickCustom = (voxelId: string) => {
+  handlePlateClick(voxelId);
+  const content = localItems.flatMap((i) => (i.locations || []).filter((l: any) => l.voxel === voxelId && (l.quantity || 0) > 0).map((l: any) => ({ item: i, quantity: l.quantity })));
+  if (gameMode === "onload" || gameMode === "offload") {
+    setSelectedVoxel(voxelId);
+    if (gameMode === "onload") toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — добавь товар нажатием на карточки` : `Выбрана ячейка ${voxelId}`);
+    else toast.info(content.length === 0 ? `Выбрана ячейка ${voxelId} — нет товаров` : `Выбрана ячейка ${voxelId}`);
+    return;
+  }
+  if (content.length > 0) {
+    setEditVoxel(voxelId);
+    setEditContents(content.map((c) => ({ item: c.item, quantity: c.quantity, newQuantity: c.quantity })));
+    setEditDialogOpen(true);
+  } else setSelectedVoxel(voxelId);
+};
+
+const handleItemClickCustom = async (item: any) => {
+  if (!item) return;
+  if (gameMode === "onload") {
+    const targetVoxel = selectedVoxel || "A1";
+    setSelectedVoxel(targetVoxel);
+    optimisticUpdate(item.id, targetVoxel, 1);
+    toast.success(`Добавлено в ${targetVoxel}`);
+    return;
+  }
+  if (gameMode === "offload") {
+    let loc;
+    const selVoxelNorm = selectedVoxel ? selectedVoxel.toString().toLowerCase() : null;
+    if (selectedVoxel) {
+      loc = (item.locations || []).find((l: any) => (l.voxel || "").toString().toLowerCase() === selVoxelNorm && (l.quantity || 0) > 0);
+      if (!loc) {
         const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
-        if (nonEmpty.length === 0 || (item.total_quantity || 0) <= 0) return toast.error("Нет товара на складе");
-        if (nonEmpty.length > 1) return toast.error("Выберите ячейку для выдачи (несколько локаций)");
-        loc = nonEmpty[0];
+        if (nonEmpty.length === 1) {
+          loc = nonEmpty[0];
+          toast.info(`В выбранной ячейке нет товара — списываю из ${loc.voxel} (единственная ячейка с товаром).`);
+        } else return toast.error("Нет товара в выбранной ячейке");
       }
-      if (loc) {
-        const voxel = loc.voxel;
-        optimisticUpdate(item.id, voxel, -1);
-        toast.success(`Выдано из ${voxel}`);
-      } else toast.error("Нет товара на складе");
-      return;
+    } else {
+      const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
+      if (nonEmpty.length === 0 || (item.total_quantity || 0) <= 0) return toast.error("Нет товара на складе");
+      if (nonEmpty.length > 1) return toast.error("Выберите ячейку для выдачи (несколько локаций)");
+      loc = nonEmpty[0];
     }
-    handleItemClick(item);
-  };
+    if (loc) {
+      const voxel = loc.voxel;
+      optimisticUpdate(item.id, voxel, -1);
+      toast.success(`Выдано из ${voxel}`);
+    } else toast.error("Нет товара на складе");
+    return;
+  }
+  handleItemClick(item);
+};
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="p-2 flex flex-col gap-2">
-        <div className="flex justify-between items-center gap-2">
-          <Select value={gameMode === null ? "none" : gameMode} onValueChange={(v: any) => setGameMode(v === "none" ? null : v)}>
-            <SelectTrigger className="w-28 text-[10px]">
-              <SelectValue placeholder="Режим" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none"><div className="flex items-center gap-2"><FileText size={12} /> <span>Без режима</span></div></SelectItem>
-              <SelectItem value="onload"><div className="flex items-center gap-2"><Upload size={12} /> <span>Прием</span></div></SelectItem>
-              <SelectItem value="offload"><div className="flex items-center gap-2"><Download size={12} /> <span>Выдача</span></div></SelectItem>
-            </SelectContent>
-          </Select>
+return (
+  <div className="flex flex-col min-h-screen bg-background text-foreground">
+    <header className="p-2 flex flex-col gap-2">
+      <div className="flex justify-between items-center gap-2">
+        <Select value={gameMode === null ? "none" : gameMode} onValueChange={(v: any) => setGameMode(v === "none" ? null : v)}>
+          <SelectTrigger className="w-28 text-[10px]">
+            <SelectValue placeholder="Режим" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none"><div className="flex items-center gap-2"><FileText size={12} /> <span>Без режима</span></div></SelectItem>
+            <SelectItem value="onload"><div className="flex items-center gap-2"><Upload size={12} /> <span>Прием</span></div></SelectItem>
+            <SelectItem value="offload"><div className="flex items-center gap-2"><Download size={12} /> <span>Выдача</span></div></SelectItem>
+          </SelectContent>
+        </Select>
 
-          <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
-            {/* ЗДЕСЬ: onExportDailyClick */}
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onExportDailyClick}><Download size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
-            <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
-            <Link href="/csv-compare"><Button size="sm" variant="outline" className="text-[10px]">CSV</Button></Link>
-          </div>
-        </div>
-
-        <FilterAccordion
-          filterSeason={filterSeason}
-          setFilterSeason={setFilterSeason}
-          filterPattern={filterPattern}
-          setFilterPattern={setFilterPattern}
-          filterColor={filterColor}
-          setFilterColor={setFilterColor}
-          filterSize={filterSize}
-          setFilterSize={setFilterSize}
-          items={localItems}
-          onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
-          includeSearch={true}
-          search={search}
-          setSearch={setSearch}
-          sortOption={sortOption}
-          setSortOption={setSortOption}
-        />
-      </header>
-
-      <div className="flex-1 overflow-y-auto p-2">
-        <Card className="mb-2">
-          <CardHeader className="p-2">
-            <CardTitle className="text-xs">Товары ({localFilteredItems.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-5 gap-2 p-2 max-h-[69vh] overflow-y-auto">
-            {localFilteredItems.map((item) => (
-              <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClickCustom(item)} />
-            ))}
-          </CardContent>
-        </Card>
-
-        <div className="mt-2">
-          <WarehouseViz
-            items={localItems}
-            selectedVoxel={selectedVoxel}
-            onSelectVoxel={setSelectedVoxel}
-            onUpdateLocationQty={(itemId: string, voxelId: string, qty: number) => optimisticUpdate(itemId, voxelId, qty)}
-            gameMode={gameMode}
-            onPlateClick={handlePlateClickCustom}
-            VOXELS={VOXELS || []}
-          />
-        </div>
-
-        <div className="mt-4">
-          <WarehouseStats
-            itemsCount={localItems.length}
-            uniqueIds={new Set(localItems.map(i => i.id)).size}
-            score={score}
-            level={level}
-            streak={streak}
-            dailyStreak={dailyStreak}
-            checkpointMain={checkpointDisplayMain}
-            checkpointSub={checkpointDisplaySub}
-            changedCount={processedChangedCount}
-            totalDelta={processedTotalDelta}
-            packings={processedPackings}
-            stars={processedStars}
-            offloadUnits={processedOffloadUnits}
-            salary={processedSalary}
-            achievements={achievements}
-            sessionStart={sessionStart}
-            errorCount={errorCount}
-            bossMode={bossMode}
-            bossTimer={bossTimer}
-            leaderboard={leaderboard}
-          />
+        <div className="flex items-center gap-1">
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
+          {/* ЗДЕСЬ: onExportDailyClick */}
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onExportDailyClick}><Download size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
+          <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
+          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
+          <Link href="/csv-compare"><Button size="sm" variant="outline" className="text-[10px]">CSV</Button></Link>
         </div>
       </div>
 
-      <WarehouseModals
-        workflowItems={workflowItems}
-        currentWorkflowIndex={currentWorkflowIndex}
-        selectedWorkflowVoxel={selectedWorkflowVoxel}
-        setSelectedWorkflowVoxel={setSelectedWorkflowVoxel}
-        handleWorkflowNext={handleWorkflowNext}
-        handleSkipItem={handleSkipItem}
-        editDialogOpen={editDialogOpen}
-        setEditDialogOpen={setEditDialogOpen}
-        editVoxel={editVoxel}
-        editContents={editContents}
-        setEditContents={setEditContents}
-        saveEditQty={async (itemId: string, newQty: number) => {
-          if (!editVoxel) return;
-          const currentContent = editContents.find(c => c.item.id === itemId);
-          if (!currentContent) return;
-          const delta = newQty - currentContent.quantity;
-          optimisticUpdate(itemId, editVoxel, delta);
-        }}
-        gameMode={gameMode}
-        VOXELS={VOXELS || []}
+      <FilterAccordion
+        filterSeason={filterSeason}
+        setFilterSeason={setFilterSeason}
+        filterPattern={filterPattern}
+        setFilterPattern={setFilterPattern}
+        filterColor={filterColor}
+        setFilterColor={setFilterColor}
+        filterSize={filterSize}
+        setFilterSize={setFilterSize}
+        items={localItems}
+        onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
+        includeSearch={true}
+        search={search}
+        setSearch={setSearch}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
       />
+    </header>
+
+    <div className="flex-1 overflow-y-auto p-2">
+      <Card className="mb-2">
+        <CardHeader className="p-2">
+          <CardTitle className="text-xs">Товары ({localFilteredItems.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-5 gap-2 p-2 max-h-[69vh] overflow-y-auto">
+          {localFilteredItems.map((item) => (
+            <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClickCustom(item)} />
+          ))}
+        </CardContent>
+      </Card>
+
+      <div className="mt-2">
+        <WarehouseViz
+          items={localItems}
+          selectedVoxel={selectedVoxel}
+          onSelectVoxel={setSelectedVoxel}
+          onUpdateLocationQty={(itemId: string, voxelId: string, qty: number) => optimisticUpdate(itemId, voxelId, qty)}
+          gameMode={gameMode}
+          onPlateClick={handlePlateClickCustom}
+          VOXELS={VOXELS || []}
+        />
+      </div>
+
+      <div className="mt-4">
+        <WarehouseStats
+          itemsCount={localItems.length}
+          uniqueIds={new Set(localItems.map(i => i.id)).size}
+          score={score}
+          level={level}
+          streak={streak}
+          dailyStreak={dailyStreak}
+          checkpointMain={checkpointDisplayMain}
+          checkpointSub={checkpointDisplaySub}
+          changedCount={processedChangedCount}
+          totalDelta={processedTotalDelta}
+          packings={processedPackings}
+          stars={processedStars}
+          offloadUnits={processedOffloadUnits}
+          salary={processedSalary}
+          achievements={achievements}
+          sessionStart={sessionStart}
+          errorCount={errorCount}
+          bossMode={bossMode}
+          bossTimer={bossTimer}
+          leaderboard={leaderboard}
+          efficiency={efficiency}
+          avgTimePerItem={avgTimePerItem}
+          dailyGoals={dailyGoals}
+          sessionDuration={sessionDuration}
+        />
+      </div>
     </div>
-  );
+
+    <WarehouseModals
+      workflowItems={workflowItems}
+      currentWorkflowIndex={currentWorkflowIndex}
+      selectedWorkflowVoxel={selectedWorkflowVoxel}
+      setSelectedWorkflowVoxel={setSelectedWorkflowVoxel}
+      handleWorkflowNext={handleWorkflowNext}
+      handleSkipItem={handleSkipItem}
+      editDialogOpen={editDialogOpen}
+      setEditDialogOpen={setEditDialogOpen}
+      editVoxel={editVoxel}
+      editContents={editContents}
+      setEditContents={setEditContents}
+      saveEditQty={async (itemId: string, newQty: number) => {
+        if (!editVoxel) return;
+        const currentContent = editContents.find(c => c.item.id === itemId);
+        if (!currentContent) return;
+        const delta = newQty - currentContent.quantity;
+        optimisticUpdate(itemId, editVoxel, delta);
+      }}
+      gameMode={gameMode}
+      VOXELS={VOXELS || []}
+    />
+  </div>
+);
 }

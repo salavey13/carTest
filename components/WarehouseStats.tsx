@@ -1,13 +1,20 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Star, Package, Clock, Zap, Award, AlertTriangle, Users } from "lucide-react";
+import { Star, Package, Clock, Zap, Award, AlertTriangle, Users, TrendingUp, Target, Crown, Share2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useAppContext } from "@/contexts/AppContext";
+import { toast } from "sonner";
 
 interface LeaderboardEntry {
   name: string;
   score: number;
   date: string;
+  xtr: number; // Новое: XTR earned
 }
 
 interface WarehouseStatsProps {
@@ -31,6 +38,10 @@ interface WarehouseStatsProps {
   bossMode: boolean;
   bossTimer: number;
   leaderboard?: LeaderboardEntry[];
+  efficiency?: number; // Новое
+  avgTimePerItem?: number; // Новое
+  dailyGoals?: { units: number; packings: number; errors: number; xtr: number }; // Новое
+  sessionDuration?: number; // Новое
 }
 
 const formatDuration = (sec: number) => {
@@ -41,6 +52,18 @@ const formatDuration = (sec: number) => {
   if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 };
+
+const AchievementBadge: React.FC<{ name: string; xtr?: number }> = ({ name, xtr }) => (
+  <motion.div
+    initial={{ scale: 0.8, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-xs font-semibold text-white shadow-lg"
+  >
+    {name.split(" ")[0]}
+    {xtr && <span className="text-xs">⭐{xtr}</span>}
+  </motion.div>
+);
 
 export default function WarehouseStats(props: WarehouseStatsProps) {
   const {
@@ -64,11 +87,38 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
     bossMode,
     bossTimer,
     leaderboard,
+    efficiency = 0,
+    avgTimePerItem = 0,
+    dailyGoals = { units: 100, packings: 20, errors: 0, xtr: 100 },
+    sessionDuration = 0,
   } = props;
 
+  const { user } = useAppContext();
+  const [copied, setCopied] = useState(false);
+
   const safeLeaderboard = Array.isArray(leaderboard) ? leaderboard : [];
-  const sessionSec = Math.max(0, Math.floor((Date.now() - (sessionStart || Date.now())) / 1000));
-  const top = useMemo(() => safeLeaderboard.slice(0, 5), [safeLeaderboard]);
+  const top = useMemo(() => safeLeaderboard.slice(0, 3), [safeLeaderboard]);
+
+  const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / dailyGoals.units) * 100), [offloadUnits, dailyGoals.units]);
+  const packingsProgress = useMemo(() => Math.min(100, (packings / dailyGoals.packings) * 100), [packings, dailyGoals.packings]);
+  const errorFree = errorCount === 0 && sessionDuration > 3600; // бонус за zero errors в длинной сессии
+
+  const totalXtr = useMemo(() => {
+    let earned = 0;
+    if (unitsProgress >= 100) earned += 50;
+    if (packingsProgress >= 100) earned += 50;
+    if (errorFree) earned += dailyGoals.xtr;
+    return earned;
+  }, [unitsProgress, packingsProgress, errorFree, dailyGoals.xtr]);
+
+  const shareScore = () => {
+    const text = `🏆 Мой счёт в Warehouse Quest: ${score} очков! Уровень ${level}, серия ${streak}. Заработано ${totalXtr} XTR. Присоединяйся!`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      toast.success("Счёт скопирован!", { description: "Поделись в чате для XTR-бонуса" });
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <div className="p-3 bg-muted rounded-lg text-[13px]">
@@ -88,9 +138,13 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <section className="p-3 rounded-lg bg-background/50 border border-border flex flex-col">
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-2">
+                <motion.div
+                  animate={{ rotate: efficiency > 50 ? 360 : 0 }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-2"
+                >
                   <Zap className="w-5 h-5 text-white" />
-                </div>
+                </motion.div>
                 <div className="min-w-0">
                   <div className="text-[11px] text-muted-foreground truncate">Эффективность</div>
                   <div className="text-lg font-bold truncate">{Number.isFinite(score) ? score.toLocaleString() : 0}</div>
@@ -108,6 +162,12 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
                   <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Package className="w-4 h-4" /> Упаковок</div>
                   <div className="font-medium mt-1">{packings}</div>
                 </div>
+              </div>
+
+              {/* Новое: Efficiency & Avg Time */}
+              <div className="mt-2 pt-2 border-t border-border/50">
+                <div className="text-[11px] text-muted-foreground flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Эффект.: {efficiency} ед/ч</div>
+                <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4" /> Ср. время: {avgTimePerItem}s/ед</div>
               </div>
             </section>
 
@@ -129,10 +189,37 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
             </section>
           </div>
 
+          {/* Новое: Daily Goals Progress */}
+          <div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Target className="w-4 h-4 text-green-600" />
+                Ежедневные цели
+              </h4>
+              <Badge variant={totalXtr > 0 ? "default" : "secondary"} className="text-xs">
+                {totalXtr} XTR
+              </Badge>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals.units}</div>
+                <Progress value={unitsProgress} className="h-2" />
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground mb-1">Упаковок: {packings}/{dailyGoals.packings}</div>
+                <Progress value={packingsProgress} className="h-2" />
+              </div>
+              {errorFree && (
+                <div className="text-[11px] text-green-600 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
+              )}
+            </div>
+          </div>
+
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
               <div className="text-[11px] text-muted-foreground">Время сессии</div>
-              <div className="font-mono font-semibold mt-1">{formatDuration(sessionSec)}</div>
+              <div className="font-mono font-semibold mt-1">{formatDuration(sessionDuration)}</div>
             </div>
 
             <div className="p-2 rounded-lg bg-background/40 border border-border text-[12px] flex flex-col">
@@ -149,33 +236,75 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
           <div className="mt-3">
             <div className="text-[11px] text-muted-foreground">Достижения</div>
             <div className="mt-1 flex flex-wrap gap-2">
-              {(!achievements || achievements.length === 0) ? <div className="text-[12px] text-muted-foreground">—</div> : achievements.map((a, i) => (
-                <div key={i} className="text-[12px] px-2 py-1 bg-foreground/6 rounded-full truncate">{a}</div>
-              ))}
+              <AnimatePresence>
+                {(!achievements || achievements.length === 0) ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[12px] text-muted-foreground">
+                    —
+                  </motion.div>
+                ) : (
+                  achievements.map((a, i) => (
+                    <AchievementBadge key={i} name={a} xtr={parseInt(a.match(/\+(\d+) XTR/)?.[1] || "0")} />
+                  ))
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </main>
 
         <aside className="w-full lg:w-72 flex-shrink-0">
           <div className="p-3 rounded-lg bg-background/50 border border-border">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 text-sm font-semibold"><Award className="w-4 h-4 text-amber-400" /> Рейтинг</div>
-              <div className="text-xs text-muted-foreground">Топ {top.length}</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={shareScore}
+                className="h-6 text-xs"
+                disabled={copied}
+              >
+                <Share2 className="w-3 h-3 mr-1" />
+                {copied ? "Скопировано!" : "Поделиться"}
+              </Button>
             </div>
 
             <ol className="mt-3 space-y-2 text-[13px]">
-              {top.length > 0 ? top.map((entry, idx) => (
-                <li key={idx} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={cn("w-6 h-6 flex items-center justify-center rounded-md text-sm font-semibold", idx === 0 ? "bg-amber-300" : idx === 1 ? "bg-slate-300" : idx === 2 ? "bg-amber-100" : "bg-muted")}>{idx + 1}</div>
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{entry.name}</div>
-                      <div className="text-[11px] text-muted-foreground truncate">{entry.date}</div>
+              <AnimatePresence>
+                {top.length > 0 ? top.map((entry, idx) => (
+                  <motion.li
+                    key={idx}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn("w-6 h-6 flex items-center justify-center rounded-full text-sm font-semibold", 
+                        idx === 0 ? "bg-amber-300 text-amber-800" : 
+                        idx === 1 ? "bg-slate-300 text-slate-800" : 
+                        idx === 2 ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground"
+                      )}>
+                        {idx + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{entry.name}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{entry.date}</div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="font-semibold">{entry.score}</div>
-                </li>
-              )) : <li className="text-[12px] text-muted-foreground">Пусто</li>}
+                    <div className="flex items-center gap-1 font-semibold">
+                      {entry.score}
+                      {entry.xtr > 0 && <Star className="w-3 h-3 text-yellow-400 fill-current" />}
+                    </div>
+                  </motion.li>
+                )) : (
+                  <motion.li
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-[12px] text-muted-foreground"
+                  >
+                    Пусто — будь первым!
+                  </motion.li>
+                )}
+              </AnimatePresence>
             </ol>
           </div>
 
@@ -192,7 +321,7 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-[12px]">Зарплата</div>
-                <div className="font-medium">{Number.isFinite(salary) ? salary.toLocaleString() : 0} руб</div>
+                <div className="font-medium">{Number.isFinite(salary) ? salary.toLocaleString() : 0} руб + {totalXtr} XTR</div>
               </div>
             </div>
           </div>
