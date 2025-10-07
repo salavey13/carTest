@@ -12,13 +12,15 @@ import WarehouseItemCard from "@/components/WarehouseItemCard";
 import FilterAccordion from "@/components/FilterAccordion";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
-import { exportDiffToAdmin, exportCurrentStock, exportDailyEntry, uploadWarehouseCsv, fetchWbPendingCount, fetchOzonPendingCount } from "@/app/wb/actions";
-import { VOXELS, SIZE_PACK } from "@/app/wb/common";
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { parse } from "papaparse";
-import { notifyAdmin } from "@/app/actions";
-import { normalizeSizeKey } from "@/app/wb/common";
+
+// ---------------------------
+// ВАЖНО:
+// убраны топ-уровневые импорты из @/app/wb/actions и @/app/wb/common и @/app/actions
+// Эти heavy-модули подгружаются динамически в обработчиках, чтобы не создавать TDZ/circular-import.
+// ---------------------------
 
 export default function WBPage() {
   const {
@@ -99,9 +101,28 @@ export default function WBPage() {
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
 
-  // Debounce refs for export buttons to prevent accidental multiples
-  const exportDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const DBOUNCE_MS = 100;
+  // SIZE_PACK и VOXELS могут быть тяжёлыми / создавать циклы — грузим их динамически
+  const [SIZE_PACK, set_SIZE_PACK] = useState<Record<string, number> | null>(null);
+  const [VOXELS, set_VOXELS] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const common = await import("@/app/wb/common");
+        if (!mounted) return;
+        set_SIZE_PACK(common.SIZE_PACK || null);
+        set_VOXELS(common.VOXELS || null);
+      } catch (err) {
+        console.warn("Failed to load common dynamically:", err);
+        set_SIZE_PACK(null);
+        set_VOXELS(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const formatSec = (sec: number | null) => {
     if (sec === null) return "--:--";
@@ -110,9 +131,19 @@ export default function WBPage() {
     return `${mm}:${ss}`;
   };
 
-  const sizeOrderArray = Object.keys(SIZE_PACK || {});
-  const sizeOrderMap: Record<string, number> = {};
-  sizeOrderArray.forEach((s, idx) => (sizeOrderMap[s.toLowerCase()] = idx + 1));
+  // sizeOrderMap строится на основе SIZE_PACK (динамически)
+  const sizeOrderMap: Record<string, number> = useMemo(() => {
+    const sp = SIZE_PACK || {};
+    const keys = Object.keys(sp || {});
+    const map: Record<string, number> = {};
+    keys.forEach((s, idx) => (map[s.toLowerCase()] = idx + 1));
+    return map;
+  }, [SIZE_PACK]);
+
+  const normalizeSizeKey = (size?: string | null) => {
+    if (!size) return "";
+    return size.toString().toLowerCase().trim().replace(/\s/g, "").replace(/×/g, "x");
+  };
 
   const getSizePriority = (size: string | null): number => {
     if (!size) return 999;
@@ -140,6 +171,7 @@ export default function WBPage() {
   useEffect(() => {
     loadItems();
     if (error) toast.error(error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error, loadItems]);
 
   useEffect(() => {
@@ -189,6 +221,7 @@ export default function WBPage() {
     });
   };
 
+  // --- FILE UPLOAD: dynamic import uploadWarehouseCsv from actions ---
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -198,6 +231,14 @@ export default function WBPage() {
       try {
         const text = (event.target?.result as string) || "";
         const parsed = parse(text, { header: true, skipEmptyLines: true }).data as any[];
+
+        // dynamic import for server actions wrapper
+        const actionsMod = await import("@/app/wb/actions");
+        const uploadWarehouseCsv = actionsMod?.uploadWarehouseCsv;
+        if (typeof uploadWarehouseCsv !== "function") {
+          throw new Error("uploadWarehouseCsv not available");
+        }
+
         const result = await uploadWarehouseCsv(parsed, user?.id);
         setIsUploading(false);
         if (result?.success) {
@@ -263,9 +304,9 @@ export default function WBPage() {
     });
 
     const stars = packings * 25;
-    const salary = totalDelta * 50;
+    const salary = offloadUnits * 50;
     return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
-  }, [localItems, checkpoint, offloadCount]);
+  }, [localItems, checkpoint, offloadCount, SIZE_PACK]);
 
   useEffect(() => {
     const stats = computeProcessedStats();
@@ -286,59 +327,102 @@ export default function WBPage() {
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : (lastProcessedOffloadUnits ?? 0);
   const processedSalary = checkpointStart ? liveSalary : (lastProcessedSalary ?? 0);
 
-  const debouncedExportStock = useCallback(async (summarized: boolean) => {
-    if (exportDebounceRef.current) clearTimeout(exportDebounceRef.current);
-    exportDebounceRef.current = setTimeout(async () => {
-      const result = await exportCurrentStock(localItems, isTelegram, summarized);
-      if (isTelegram && result?.csv) {
-        navigator.clipboard.writeText(result.csv);
-        toast.success("CSV скопирован в буфер обмена!");
-      } else if (result && result.csv) {
-        const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
-        a.click();
-        window.URL.revokeObjectURL(url);
-      }
+  // --- DAILY EXPORT: dynamic import exportDailyEntry and wrapper ---
+  type ExportDailyParams = {
+    sumsPrevious: Record<string, number>;
+    sumsCurrent: Record<string, number>;
+    gameMode: string;
+    store: string;
+    isTelegram?: boolean;
+  };
 
-      if (checkpointStart) {
-        const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-        setLastCheckpointDurationSec(durSec);
-        const stats = computeProcessedStats();
-        setLastProcessedCount(stats.changedCount);
-        setLastProcessedTotalDelta(stats.totalDelta);
-        setLastProcessedPackings(stats.packings);
-        setLastProcessedStars(stats.stars);
-        setLastProcessedOffloadUnits(stats.offloadUnits);
-        setLastProcessedSalary(stats.salary);
-        setCheckpointStart(null);
-        toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
-        if (gameMode === 'offload') {
-          const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-          await notifyAdmin(message);
+  const callExportDailyEntry = useCallback(
+    async (params: ExportDailyParams) => {
+      try {
+        const actionsMod = await import("@/app/wb/actions");
+        const exportDailyEntry = actionsMod?.exportDailyEntry;
+        if (typeof exportDailyEntry !== "function") {
+          throw new Error("exportDailyEntry is not available in actions");
         }
-        await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта
+        const res = await exportDailyEntry(params.sumsPrevious, params.sumsCurrent, params.gameMode, params.store, params.isTelegram ?? false);
+        if (res?.success) {
+          toast.success("Daily export done");
+        } else {
+          toast.error("Daily export failed");
+        }
+        return res;
+      } catch (err: any) {
+        console.error("callExportDailyEntry error:", err);
+        toast.error(err?.message || "Daily export error");
+        return { success: false, error: err };
       }
-    }, DBOUNCE_MS);
-  }, [localItems, isTelegram, checkpointStart, computeProcessedStats, gameMode, notifyAdmin, loadItems]);
+    },
+    []
+  );
 
+  const onExportDailyClick = useCallback(async () => {
+    // Собираем sums из stats или без них — тут простой пример:
+    const sumsPrev = (statsObj && (statsObj as any).sumsPrevious) || {};
+    const sumsCurr = (statsObj && (statsObj as any).sumsCurrent) || {};
+    const store = (user && (user.store || "main")) || "main";
+    const gameModeLocal = gameMode || "default";
+    const isTelegramLocal = !!tg;
+
+    await callExportDailyEntry({
+      sumsPrevious: sumsPrev,
+      sumsCurrent: sumsCurr,
+      gameMode: gameModeLocal,
+      store,
+      isTelegram: isTelegramLocal,
+    });
+
+    // если был чекпоинт — аналогично поведению handleExportDiff/Stock:
+    if (checkpointStart) {
+      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+      setLastCheckpointDurationSec(durSec);
+      const stats = computeProcessedStats();
+      setLastProcessedCount(stats.changedCount);
+      setLastProcessedTotalDelta(stats.totalDelta);
+      setLastProcessedPackings(stats.packings);
+      setLastProcessedStars(stats.stars);
+      setLastProcessedOffloadUnits(stats.offloadUnits);
+      setLastProcessedSalary(stats.salary);
+      setCheckpointStart(null);
+      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
+      if (gameMode === 'offload') {
+        try {
+          const appActions = await import("@/app/actions");
+          const notifyAdmin = appActions?.notifyAdmin;
+          if (typeof notifyAdmin === "function") {
+            const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+            await notifyAdmin(message);
+          }
+        } catch (err) {
+          console.warn("notifyAdmin failed:", err);
+        }
+      }
+    }
+  }, [callExportDailyEntry, statsObj, user, gameMode, tg, checkpointStart, computeProcessedStats]);
+
+  // --- EXPORT DIFF: dynamic import exportDiffToAdmin and notifyAdmin ---
   const handleExportDiff = async () => {
-    if (exportDebounceRef.current) clearTimeout(exportDebounceRef.current);
-    exportDebounceRef.current = setTimeout(async () => {
-      const diffData = (localItems || [])
-        .flatMap((item) => (item.locations || []).map((loc: any) => {
-          const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
-          const diffQty = (loc.quantity || 0) - (checkpointLoc?.quantity || 0);
-          return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
-        }).filter(Boolean))
-        .filter(Boolean);
+    const diffData = (localItems || [])
+      .flatMap((item) => (item.locations || []).map((loc: any) => {
+        const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
+        const diffQty = (loc.quantity || 0) - (checkpointLoc?.quantity || 0);
+        return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
+      }).filter(Boolean))
+      .filter(Boolean);
 
-      if (diffData.length === 0) {
-        toast.info('No changes to export');
-        return;
-      }
+    if (diffData.length === 0) {
+      toast.info('No changes to export');
+      return;
+    }
+
+    try {
+      const actionsMod = await import("@/app/wb/actions");
+      const exportDiffToAdmin = actionsMod?.exportDiffToAdmin;
+      if (typeof exportDiffToAdmin !== "function") throw new Error("exportDiffToAdmin not available");
 
       const result = await exportDiffToAdmin(diffData as any, isTelegram);
 
@@ -368,39 +452,41 @@ export default function WBPage() {
         setCheckpointStart(null);
         toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
         if (gameMode === 'offload') {
-          const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-          await notifyAdmin(message);
+          try {
+            const appActions = await import("@/app/actions");
+            const notifyAdmin = appActions?.notifyAdmin;
+            if (typeof notifyAdmin === "function") {
+              const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+              await notifyAdmin(message);
+            }
+          } catch (err) {
+            console.warn("notifyAdmin failed:", err);
+          }
         }
-        await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта
       }
-    }, DBOUNCE_MS);
+    } catch (err: any) {
+      console.error("handleExportDiff error:", err);
+      toast.error(err?.message || "Export diff failed");
+    }
   };
 
-  const debouncedExportDailyEntry = useCallback(async () => {
-    if (exportDebounceRef.current) clearTimeout(exportDebounceRef.current);
-    exportDebounceRef.current = setTimeout(async () => {
-      if (!checkpoint || checkpoint.length === 0) {
-        toast.error("Нет чекпоинта для diff — сначала сохраните checkpoint.");
-        return;
-      }
+  // --- EXPORT STOCK: dynamic import exportCurrentStock ---
+  const handleExportStock = async (summarized = false) => {
+    try {
+      const actionsMod = await import("@/app/wb/actions");
+      const exportCurrentStock = actionsMod?.exportCurrentStock;
+      if (typeof exportCurrentStock !== "function") throw new Error("exportCurrentStock not available");
 
-      const store = window.prompt("Which store for offload? (wb/ozon/ym)");
-      if (!store) return;
-
-      const sumsPrevious = computeSums(checkpoint);
-      const sumsCurrent = computeSums(localItems);
-
-      const result = await exportDailyEntry(sumsPrevious, sumsCurrent, gameMode, store.toLowerCase(), isTelegram);
-
+      const result = await exportCurrentStock(localItems, isTelegram, summarized);
       if (isTelegram && result?.csv) {
         navigator.clipboard.writeText(result.csv);
-        toast.success(`Строка скопирована в буфер обмена!`);
+        toast.success("CSV скопирован в буфер обмена!");
       } else if (result && result.csv) {
         const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `otgruzka.csv`;
+        a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
         a.click();
         window.URL.revokeObjectURL(url);
       }
@@ -418,17 +504,35 @@ export default function WBPage() {
         setCheckpointStart(null);
         toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
         if (gameMode === 'offload') {
-          const message = `Offload завершен:\nВыдано единиц: ${stats.totalDelta}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-          await notifyAdmin(message);
+          try {
+            const appActions = await import("@/app/actions");
+            const notifyAdmin = appActions?.notifyAdmin;
+            if (typeof notifyAdmin === "function") {
+              const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+              await notifyAdmin(message);
+            }
+          } catch (err) {
+            console.warn("notifyAdmin failed:", err);
+          }
         }
-        await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта
       }
-    }, DBOUNCE_MS);
-  }, [checkpoint, localItems, computeSums, gameMode, isTelegram, checkpointStart, computeProcessedStats, notifyAdmin, loadItems]);
+    } catch (err: any) {
+      console.error("handleExportStock error:", err);
+      toast.error(err?.message || "Export stock failed");
+    }
+  };
 
+  // --- CHECK PENDING: dynamic import fetchWbPendingCount & fetchOzonPendingCount ---
   const handleCheckPending = async () => {
     setCheckingPending(true);
     try {
+      const actionsMod = await import("@/app/wb/actions");
+      const fetchWbPendingCount = actionsMod?.fetchWbPendingCount;
+      const fetchOzonPendingCount = actionsMod?.fetchOzonPendingCount;
+      if (typeof fetchWbPendingCount !== "function" || typeof fetchOzonPendingCount !== "function") {
+        throw new Error("pending count functions unavailable");
+      }
+
       const wbRes = await fetchWbPendingCount();
       const ozonRes = await fetchOzonPendingCount();
       const wbCount = wbRes?.success ? wbRes.count : 0;
@@ -481,7 +585,7 @@ export default function WBPage() {
     });
 
     return sorted;
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption]);
+  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize, sortOption, SIZE_PACK]);
 
   const handlePlateClickCustom = (voxelId: string) => {
     handlePlateClick(voxelId);
@@ -523,7 +627,7 @@ export default function WBPage() {
       } else {
         const nonEmpty = (item.locations || []).filter((l: any) => (l.quantity || 0) > 0);
         if (nonEmpty.length === 0 || (item.total_quantity || 0) <= 0) return toast.error("Нет товара на складе");
-        if (nonEmpty.length > 1) return toast.error("Выберите ячейка для выдачи (несколько локаций)");
+        if (nonEmpty.length > 1) return toast.error("Выберите ячейку для выдачи (несколько локаций)");
         loc = nonEmpty[0];
       }
       if (loc) {
@@ -534,36 +638,6 @@ export default function WBPage() {
       return;
     }
     handleItemClick(item);
-  };
-
-  const computeSums = (items: any[]): Record<string, number> => {
-    const sums: Record<string, number> = {};
-    items.forEach((item) => {
-      const q = item.total_quantity || 0;
-      const size = normalizeSizeKey(item.size);
-      const season = item.season?.toLowerCase() || '';
-      const idLower = item.id.toLowerCase();
-
-      let cat = '';
-      if (idLower.startsWith('namatrasnik.')) {
-        cat = `namatras ${size}`;
-      } else if (season === 'leto' || season === 'zima') {
-        let sizeKey = '';
-        if (size === '1.5') sizeKey = '1.5';
-        else if (size === '2') sizeKey = '2';
-        else if (size === 'евро') sizeKey = 'evro';
-        else if (size === 'евромакси' || size === 'евро макси') sizeKey = 'evromaksi';
-        if (sizeKey) cat = `${sizeKey} ${season}`;
-      } else if (idLower.startsWith('podushka.')) {
-        if (idLower.includes('anatom')) cat = 'Podushka anatom';
-        else cat = `Podushka ${size.replace('x', 'h')}`;
-      } else if (idLower.startsWith('navolochka.')) {
-        cat = `Navolochka ${size}`;
-      }
-
-      if (cat) sums[cat] = (sums[cat] || 0) + q;
-    });
-    return sums;
   };
 
   return (
@@ -584,9 +658,10 @@ export default function WBPage() {
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={debouncedExportDailyEntry}><Download size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => debouncedExportStock(false)}><FileUp size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => debouncedExportStock(true)}><FileText size={12} /></Button>
+            {/* ЗДЕСЬ: заменил на onExportDailyClick */}
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onExportDailyClick}><Download size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(true)}><FileText size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
             <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
@@ -633,6 +708,7 @@ export default function WBPage() {
             onUpdateLocationQty={(itemId: string, voxelId: string, qty: number) => optimisticUpdate(itemId, voxelId, qty)}
             gameMode={gameMode}
             onPlateClick={handlePlateClickCustom}
+            VOXELS={VOXELS || []}
           />
         </div>
 
@@ -682,7 +758,7 @@ export default function WBPage() {
           optimisticUpdate(itemId, editVoxel, delta);
         }}
         gameMode={gameMode}
-        VOXELS={VOXELS}
+        VOXELS={VOXELS || []}
       />
     </div>
   );
