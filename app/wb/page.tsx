@@ -327,7 +327,7 @@ export default function WBPage() {
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : (lastProcessedOffloadUnits ?? 0);
   const processedSalary = checkpointStart ? liveSalary : (lastProcessedSalary ?? 0);
 
-  // --- DAILY EXPORT: dynamic import exportDailyEntry + client-side clipboard copy ---
+  // --- DAILY EXPORT: dynamic import exportDailyEntry + robust client copy (clipboard API + execCommand fallback + download fallback) ---
   type ExportDailyParams = {
     sumsPrevious: Record<string, number>;
     sumsCurrent: Record<string, number>;
@@ -360,6 +360,26 @@ export default function WBPage() {
     []
   );
 
+  const copyTextToClipboardFallback = (text: string): boolean => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      // Prevent scrolling to bottom
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) {
+      console.warn("execCommand fallback failed:", e);
+      return false;
+    }
+  };
+
   const onExportDailyClick = useCallback(async () => {
     // Build sums like before (or adapt to your real sums)
     const sumsPrev = (statsObj && (statsObj as any).sumsPrevious) || {};
@@ -380,7 +400,8 @@ export default function WBPage() {
     // If server returned CSV — attempt to copy to clipboard (client-side)
     if (result?.csv) {
       const csvText = result.csv as string;
-      // Try clipboard API first
+
+      // 1) Try navigator.clipboard.writeText
       let copied = false;
       try {
         if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
@@ -389,23 +410,37 @@ export default function WBPage() {
           copied = true;
         }
       } catch (clipErr) {
-        console.warn("Clipboard write failed:", clipErr);
-        // not fatal — we'll fallback to download
+        console.warn("navigator.clipboard.writeText failed:", clipErr);
       }
 
+      // 2) Fallback: textarea + execCommand (synchronous)
       if (!copied) {
         try {
-          // Fallback: create blob and trigger download
+          const ok = copyTextToClipboardFallback(csvText);
+          if (ok) {
+            toast.success("CSV скопирован в буфер обмена (fallback)");
+            copied = true;
+          } else {
+            console.warn("copyTextToClipboardFallback returned false");
+          }
+        } catch (e) {
+          console.warn("copyTextToClipboardFallback threw", e);
+        }
+      }
+
+      // 3) Final fallback: download
+      if (!copied) {
+        try {
           const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `otgruzka_${new Date().toISOString().slice(0,10)}.csv`;
+          a.download = `otgruzka_${new Date().toISOString().slice(0, 10)}.csv`;
           document.body.appendChild(a);
           a.click();
           a.remove();
           URL.revokeObjectURL(url);
-          toast.success("Копирование в буфер не удалось — CSV скачан как fallback");
+          toast.success("Не удалось скопировать — CSV скачан как fallback");
         } catch (dlErr) {
           console.error("Fallback download failed:", dlErr);
           toast.error("Не удалось скопировать или скачать CSV. Проверьте права доступа.");
@@ -472,8 +507,8 @@ export default function WBPage() {
       const result = await exportDiffToAdmin(diffData as any, isTelegram);
 
       if (isTelegram && result?.csv) {
-        navigator.clipboard.writeText(result.csv);
-        toast.success("CSV скопирован в буфер обмена!");
+        try { await navigator.clipboard.writeText(result.csv); toast.success("CSV скопирован в буфер обмена!"); }
+        catch { /* ignore */ }
       } else if (result && result.csv) {
         const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
@@ -524,8 +559,22 @@ export default function WBPage() {
 
       const result = await exportCurrentStock(localItems, isTelegram, summarized);
       if (isTelegram && result?.csv) {
-        navigator.clipboard.writeText(result.csv);
-        toast.success("CSV скопирован в буфер обмена!");
+        try { await navigator.clipboard.writeText(result.csv); toast.success("CSV скопирован в буфер обмена!"); }
+        catch {
+          // fallback same as daily: try execCommand, then download
+          const ok = copyTextToClipboardFallback(result.csv || "");
+          if (ok) toast.success("CSV скопирован в буфер обмена (fallback)");
+          else {
+            const blob = new Blob([result.csv || ""], { type: "text/csv;charset=utf-8" });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
+            a.click();
+            window.URL.revokeObjectURL(url);
+            toast.success("CSV скачан (fallback)");
+          }
+        }
       } else if (result && result.csv) {
         const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
         const url = window.URL.createObjectURL(blob);
