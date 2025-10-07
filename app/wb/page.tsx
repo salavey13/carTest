@@ -166,6 +166,47 @@ export default function WBPage() {
     return 3;
   };
 
+  const categorizeItem = useCallback((item: any): string => {
+    const modelLower = (item.model || '').toLowerCase().trim();
+    if (!modelLower) return 'other';
+
+    // Namatras по размеру
+    if (modelLower.includes('наматрасник') || modelLower.includes('namatras')) {
+      const sizeMatch = modelLower.match(/(90|120|140|160|180|200)/);
+      if (sizeMatch) return `namatras ${sizeMatch[1]}`;
+    }
+
+    // Leto/zima по размеру
+    const sizePatterns = ['1\\.5', '2', 'евро', 'евромакси', 'евро макси'];
+    const seasonPatterns = { leto: ['лето', 'leto'], zima: ['зима', 'zima'] };
+
+    for (const [seasonKey, patterns] of Object.entries(seasonPatterns)) {
+      if (patterns.some(p => modelLower.includes(p))) {
+        for (const sizePat of sizePatterns) {
+          if (modelLower.match(new RegExp(sizePat))) {
+            const size = sizePat.replace(/\\./g, '.').replace('евро макси', 'evromaksi leto');
+            return `${size} ${seasonKey}`;
+          }
+        }
+      }
+    }
+
+    // Podushka
+    if (modelLower.includes('подушка') || modelLower.includes('podushka')) {
+      if (modelLower.includes('50x70') || modelLower.includes('50h70')) return 'Podushka 50h70';
+      if (modelLower.includes('70x70') || modelLower.includes('70h70')) return 'Podushka 70h70';
+      if (modelLower.includes('анатом')) return 'Podushka anatom';
+    }
+
+    // Navolochka
+    if (modelLower.includes('наволочка') || modelLower.includes('navolochka')) {
+      if (modelLower.includes('50x70') || modelLower.includes('50h70')) return 'Navolochka 50x70';
+      if (modelLower.includes('70x70') || modelLower.includes('70h70')) return 'Navolochka 70h70';
+    }
+
+    return 'other';
+  }, []);
+
   useEffect(() => setLocalItems(hookItems || []), [hookItems]);
 
   useEffect(() => {
@@ -284,11 +325,25 @@ export default function WBPage() {
   };
 
   const computeProcessedStats = useCallback(() => {
-    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0 };
+    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0, sumsPrevious: {}, sumsCurrent: {} };
     let changedCount = 0;
     let totalDelta = 0;
     let packings = 0;
     let offloadUnits = offloadCount || 0;
+
+    // Новое: sums по категориям
+    let sumsPrevious: Record<string, number> = {};
+    let sumsCurrent: Record<string, number> = {};
+
+    (checkpoint || []).forEach((cp) => {
+      const cat = categorizeItem(cp);
+      sumsPrevious[cat] = (sumsPrevious[cat] || 0) + (cp.total_quantity || 0);
+    });
+
+    (localItems || []).forEach((it) => {
+      const cat = categorizeItem(it);
+      sumsCurrent[cat] = (sumsCurrent[cat] || 0) + (it.total_quantity || 0);
+    });
 
     (localItems || []).forEach((it) => {
       const cp = checkpoint.find((c) => c.id === it.id);
@@ -305,8 +360,8 @@ export default function WBPage() {
 
     const stars = packings * 25;
     const salary = offloadUnits * 50;
-    return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
-  }, [localItems, checkpoint, offloadCount, SIZE_PACK]);
+    return { changedCount, totalDelta, packings, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
+  }, [localItems, checkpoint, offloadCount, SIZE_PACK, categorizeItem]);
 
   useEffect(() => {
     const stats = computeProcessedStats();
