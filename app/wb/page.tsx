@@ -215,7 +215,7 @@ export default function WBPage() {
   };
 
   const handleCheckpoint = () => {
-    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l: any) => ({ ...l })) }));
+    setCheckpoint(localItems.map((i) => ({ ...i, locations: (i.locations || []).map((l: any) => ({ ...l })) })));
     setCheckpointStart(Date.now());
     setLastCheckpointDurationSec(null);
     setLastProcessedCount(null);
