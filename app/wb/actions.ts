@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -44,7 +43,7 @@ function decodeJwtPayloadSafe(token: string): any | null {
   }
 }
 
-// Возвращает список кампаний (parsed) и сырый ответ для диагностики
+// Возвращает список кампаний (parsed) и сырой ответ для диагностики
 export async function getYmCampaigns(): Promise<{ success: boolean; campaigns?: any[]; raw?: any; error?: string; status?: number }> {
   const YM_API_TOKEN = (process.env.YM_API_TOKEN || "").toString().trim();
   if (!YM_API_TOKEN) return { success: false, error: "YM_API_TOKEN missing" };
@@ -527,7 +526,7 @@ export async function exportDailyEntry(
 
     let storeLabel = '';
     let extraLabel = 'Привоз';
-    let dateStr = `,${dd},${mm},${yyyy},0`;
+    let dateStr = `,${dd},${mm},${yyyy},`;
     if (store === 'ozon') {
       storeLabel = 'озон';
       extraLabel = 'Возвраты';
@@ -540,7 +539,7 @@ export async function exportDailyEntry(
       return { success: false, error: 'Invalid store' };
     }
 
-    let csv = "\uFEFF" + `отгрузка ${store} ${dd}.${mm}.${yy},${otgruzka.join(',')},,,${storeLabel},${total},${extraLabel},${extraVal}${dateStr}\n`;
+    let csv = "\uFEFF" + `отгрузка ${store} ${dd}.${mm}.${yy},${otgruzka.join(',')},${storeLabel},${total},${extraLabel},${extraVal}${dateStr}\n`;
 
     console.info("exportDailyEntry successful", { store, total, extraVal });
 
