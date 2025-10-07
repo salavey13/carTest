@@ -263,7 +263,7 @@ export default function WBPage() {
     });
 
     const stars = packings * 25;
-    const salary = offloadUnits * 50;
+    const salary = totalDelta * 50;
     return { changedCount, totalDelta, packings, stars, offloadUnits, salary };
   }, [localItems, checkpoint, offloadCount]);
 
@@ -394,13 +394,13 @@ export default function WBPage() {
 
       if (isTelegram && result?.csv) {
         navigator.clipboard.writeText(result.csv);
-        toast.success(`Строка для ${store} скопирована в буфер обмена!`);
+        toast.success(`Строка скопирована в буфер обмена!`);
       } else if (result && result.csv) {
         const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `otgruzka_${store}.csv`;
+        a.download = `otgruzka.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
       }
@@ -418,7 +418,7 @@ export default function WBPage() {
         setCheckpointStart(null);
         toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
         if (gameMode === 'offload') {
-          const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+          const message = `Offload завершен:\nВыдано единиц: ${stats.totalDelta}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
           await notifyAdmin(message);
         }
         await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта

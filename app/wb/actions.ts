@@ -497,7 +497,6 @@ export async function exportDailyEntry(
     const dd = date.getDate().toString().padStart(2, '0');
     const mm = (date.getMonth() + 1).toString().padStart(2, '0');
     const yy = date.getFullYear().toString().slice(-2);
-    const yyyy = date.getFullYear();
 
     const categories = [
       'namatras 90', 'namatras 120', 'namatras 140', 'namatras 160', 'namatras 180', 'namatras 200',
@@ -508,46 +507,26 @@ export async function exportDailyEntry(
     ];
 
     let otgruzka = categories.map(() => 0);
-    let extraVal = 0;
     let total = 0;
 
     categories.forEach((cat, idx) => {
       const prev = sumsPrevious[cat] || 0;
       const curr = sumsCurrent[cat] || 0;
       const delta = prev - curr;
-
-      if (delta > 0) {
-        otgruzka[idx] = delta;
-        total += delta;
-      } else if (delta < 0) {
-        extraVal += Math.abs(delta);
-      }
+      otgruzka[idx] = Math.abs(delta); // Абсолют для упрощения, привоз/отгрузка в тотале
+      total += Math.abs(delta);
     });
 
-    let storeLabel = '';
-    let extraLabel = 'Привоз';
-    let dateStr = `,${dd},${mm},${yyyy},`;
-    if (store === 'ozon') {
-      storeLabel = 'озон';
-      extraLabel = 'Возвраты';
-      dateStr = ',,';
-    } else if (store === 'wb') {
-      storeLabel = 'вб';
-    } else if (store === 'ym') {
-      storeLabel = 'ym';
-    } else {
-      return { success: false, error: 'Invalid store' };
-    }
+    const salary = total * 50;
+    let csv = "\uFEFF" + `отгрузка ${dd}.${mm}.${yy},${otgruzka.join(',')},всего: ${total},оплата: ${salary}\n`;
 
-    let csv = "\uFEFF" + `отгрузка ${store} ${dd}.${mm}.${yy},${otgruzka.join(',')},${storeLabel},${total},${extraLabel},${extraVal}${dateStr}\n`;
-
-    console.info("exportDailyEntry successful", { store, total, extraVal });
+    console.info("exportDailyEntry successful", { total, salary });
 
     if (isTelegram) {
       return { success: true, csv };
     } else {
-      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", `Отгрузка для ${store} в CSV.`, [], {
-        attachment: { type: "document", content: csv, filename: `otgruzka_${store}.csv` },
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", `Отгрузка в CSV.`, [], {
+        attachment: { type: "document", content: csv, filename: `otgruzka.csv` },
       });
       return { success: true, csv };
     }
@@ -1255,7 +1234,7 @@ export async function fetchOzonPendingCount(): Promise<{ success: boolean; count
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': 'application/json' },
+      headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': "application/json" },
       body: JSON.stringify(body),
     });
 
