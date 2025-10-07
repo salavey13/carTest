@@ -1,4 +1,3 @@
-// /app/wb/page.tsx
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
@@ -99,6 +98,10 @@ export default function WBPage() {
 
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
+
+  // Debounce refs for export buttons to prevent accidental multiples
+  const exportDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const DBOUNCE_MS = 100;
 
   const formatSec = (sec: number | null) => {
     if (sec === null) return "--:--";
@@ -283,163 +286,145 @@ export default function WBPage() {
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : (lastProcessedOffloadUnits ?? 0);
   const processedSalary = checkpointStart ? liveSalary : (lastProcessedSalary ?? 0);
 
+  const debouncedExportStock = useCallback(async (summarized: boolean) => {
+    if (exportDebounceRef.current) clearTimeout(exportDebounceRef.current);
+    exportDebounceRef.current = setTimeout(async () => {
+      const result = await exportCurrentStock(localItems, isTelegram, summarized);
+      if (isTelegram && result?.csv) {
+        navigator.clipboard.writeText(result.csv);
+        toast.success("CSV скопирован в буфер обмена!");
+      } else if (result && result.csv) {
+        const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      if (checkpointStart) {
+        const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+        setLastCheckpointDurationSec(durSec);
+        const stats = computeProcessedStats();
+        setLastProcessedCount(stats.changedCount);
+        setLastProcessedTotalDelta(stats.totalDelta);
+        setLastProcessedPackings(stats.packings);
+        setLastProcessedStars(stats.stars);
+        setLastProcessedOffloadUnits(stats.offloadUnits);
+        setLastProcessedSalary(stats.salary);
+        setCheckpointStart(null);
+        toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
+        if (gameMode === 'offload') {
+          const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+          await notifyAdmin(message);
+        }
+        await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта
+      }
+    }, DBOUNCE_MS);
+  }, [localItems, isTelegram, checkpointStart, computeProcessedStats, gameMode, notifyAdmin, loadItems]);
+
   const handleExportDiff = async () => {
-    const diffData = (localItems || [])
-      .flatMap((item) => (item.locations || []).map((loc: any) => {
-        const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
-        const diffQty = (loc.quantity || 0) - (checkpointLoc?.quantity || 0);
-        return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
-      }).filter(Boolean))
-      .filter(Boolean);
+    if (exportDebounceRef.current) clearTimeout(exportDebounceRef.current);
+    exportDebounceRef.current = setTimeout(async () => {
+      const diffData = (localItems || [])
+        .flatMap((item) => (item.locations || []).map((loc: any) => {
+          const checkpointLoc = checkpoint.find((ci) => ci.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
+          const diffQty = (loc.quantity || 0) - (checkpointLoc?.quantity || 0);
+          return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
+        }).filter(Boolean))
+        .filter(Boolean);
 
-    if (diffData.length === 0) {
-      toast.info('No changes to export');
-      return;
-    }
-
-    const result = await exportDiffToAdmin(diffData as any, isTelegram);
-
-    if (isTelegram && result?.csv) {
-      navigator.clipboard.writeText(result.csv);
-      toast.success("CSV скопирован в буфер обмена!");
-    } else if (result && result.csv) {
-      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "diff_export.csv";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    if (checkpointStart) {
-      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-      setLastCheckpointDurationSec(durSec);
-      const stats = computeProcessedStats();
-      setLastProcessedCount(stats.changedCount);
-      setLastProcessedTotalDelta(stats.totalDelta);
-      setLastProcessedPackings(stats.packings);
-      setLastProcessedStars(stats.stars);
-      setLastProcessedOffloadUnits(stats.offloadUnits);
-      setLastProcessedSalary(stats.salary);
-      setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
-      if (gameMode === 'offload') {
-        const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-        await notifyAdmin(message);
-      }
-    }
-  };
-
-  const handleExportStock = async (summarized = false) => {
-    const result = await exportCurrentStock(localItems, isTelegram, summarized);
-    if (isTelegram && result?.csv) {
-      navigator.clipboard.writeText(result.csv);
-      toast.success("CSV скопирован в буфер обмена!");
-    } else if (result && result.csv) {
-      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = summarized ? "warehouse_stock_summarized.csv" : "warehouse_stock.csv";
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
-
-    if (checkpointStart) {
-      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-      setLastCheckpointDurationSec(durSec);
-      const stats = computeProcessedStats();
-      setLastProcessedCount(stats.changedCount);
-      setLastProcessedTotalDelta(stats.totalDelta);
-      setLastProcessedPackings(stats.packings);
-      setLastProcessedStars(stats.stars);
-      setLastProcessedOffloadUnits(stats.offloadUnits);
-      setLastProcessedSalary(stats.salary);
-      setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
-      if (gameMode === 'offload') {
-        const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-        await notifyAdmin(message);
-      }
-    }
-  };
-
-  const computeSums = (items: any[]): Record<string, number> => {
-    const sums: Record<string, number> = {};
-    items.forEach((item) => {
-      const q = item.total_quantity || 0;
-      const size = normalizeSizeKey(item.size);
-      const season = item.season?.toLowerCase() || '';
-      const idLower = item.id.toLowerCase();
-
-      let cat = '';
-      if (idLower.startsWith('namatrasnik.')) {
-        cat = `namatras ${size}`;
-      } else if (season === 'leto' || season === 'zima') {
-        let sizeKey = '';
-        if (size === '1.5') sizeKey = '1.5';
-        else if (size === '2') sizeKey = '2';
-        else if (size === 'евро') sizeKey = 'evro';
-        else if (size === 'евромакси' || size === 'евро макси') sizeKey = 'evromaksi';
-        if (sizeKey) cat = `${sizeKey} ${season}`;
-      } else if (idLower.startsWith('podushka.')) {
-        if (idLower.includes('anatom')) cat = 'Podushka anatom';
-        else cat = `Podushka ${size.replace('x', 'h')}`;
-      } else if (idLower.startsWith('navolochka.')) {
-        cat = `Navolochka ${size}`;
+      if (diffData.length === 0) {
+        toast.info('No changes to export');
+        return;
       }
 
-      if (cat) sums[cat] = (sums[cat] || 0) + q;
-    });
-    return sums;
-  };
+      const result = await exportDiffToAdmin(diffData as any, isTelegram);
 
-  const handleExportDailyEntry = async () => {
-    if (!checkpoint || checkpoint.length === 0) {
-      toast.error("Нет чекпоинта для diff — сначала сохраните checkpoint.");
-      return;
-    }
-
-    const store = window.prompt("Which store for offload? (wb/ozon/ym)");
-    if (!store) return;
-
-    const sumsPrevious = computeSums(checkpoint);
-    const sumsCurrent = computeSums(localItems);
-
-    const result = await exportDailyEntry(sumsPrevious, sumsCurrent, gameMode, store.toLowerCase(), isTelegram);
-
-    if (isTelegram && result?.csv) {
-      navigator.clipboard.writeText(result.csv);
-      toast.success(`Строка для ${store} скопирована в буфер обмена!`);
-    } else if (result && result.csv) {
-      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `otgruzka_${store}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    }
-
-    if (checkpointStart) {
-      const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
-      setLastCheckpointDurationSec(durSec);
-      const stats = computeProcessedStats();
-      setLastProcessedCount(stats.changedCount);
-      setLastProcessedTotalDelta(stats.totalDelta);
-      setLastProcessedPackings(stats.packings);
-      setLastProcessedStars(stats.stars);
-      setLastProcessedOffloadUnits(stats.offloadUnits);
-      setLastProcessedSalary(stats.salary);
-      setCheckpointStart(null);
-      toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
-      if (gameMode === 'offload') {
-        const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
-        await notifyAdmin(message);
+      if (isTelegram && result?.csv) {
+        navigator.clipboard.writeText(result.csv);
+        toast.success("CSV скопирован в буфер обмена!");
+      } else if (result && result.csv) {
+        const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "diff_export.csv";
+        a.click();
+        URL.revokeObjectURL(url);
       }
-    }
+
+      if (checkpointStart) {
+        const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+        setLastCheckpointDurationSec(durSec);
+        const stats = computeProcessedStats();
+        setLastProcessedCount(stats.changedCount);
+        setLastProcessedTotalDelta(stats.totalDelta);
+        setLastProcessedPackings(stats.packings);
+        setLastProcessedStars(stats.stars);
+        setLastProcessedOffloadUnits(stats.offloadUnits);
+        setLastProcessedSalary(stats.salary);
+        setCheckpointStart(null);
+        toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
+        if (gameMode === 'offload') {
+          const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+          await notifyAdmin(message);
+        }
+        await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта
+      }
+    }, DBOUNCE_MS);
   };
+
+  const debouncedExportDailyEntry = useCallback(async () => {
+    if (exportDebounceRef.current) clearTimeout(exportDebounceRef.current);
+    exportDebounceRef.current = setTimeout(async () => {
+      if (!checkpoint || checkpoint.length === 0) {
+        toast.error("Нет чекпоинта для diff — сначала сохраните checkpoint.");
+        return;
+      }
+
+      const store = window.prompt("Which store for offload? (wb/ozon/ym)");
+      if (!store) return;
+
+      const sumsPrevious = computeSums(checkpoint);
+      const sumsCurrent = computeSums(localItems);
+
+      const result = await exportDailyEntry(sumsPrevious, sumsCurrent, gameMode, store.toLowerCase(), isTelegram);
+
+      if (isTelegram && result?.csv) {
+        navigator.clipboard.writeText(result.csv);
+        toast.success(`Строка для ${store} скопирована в буфер обмена!`);
+      } else if (result && result.csv) {
+        const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `otgruzka_${store}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+
+      if (checkpointStart) {
+        const durSec = Math.floor((Date.now() - checkpointStart) / 1000);
+        setLastCheckpointDurationSec(durSec);
+        const stats = computeProcessedStats();
+        setLastProcessedCount(stats.changedCount);
+        setLastProcessedTotalDelta(stats.totalDelta);
+        setLastProcessedPackings(stats.packings);
+        setLastProcessedStars(stats.stars);
+        setLastProcessedOffloadUnits(stats.offloadUnits);
+        setLastProcessedSalary(stats.salary);
+        setCheckpointStart(null);
+        toast.success(`Экспорт сделан. Время: ${formatSec(durSec)}, изменённых позиций: ${stats.changedCount}`);
+        if (gameMode === 'offload') {
+          const message = `Offload завершен:\nВыдано единиц: ${stats.offloadUnits}\nЗарплата: ${stats.salary} руб\nВремя: ${formatSec(durSec)}\nИзменено позиций: ${stats.changedCount}`;
+          await notifyAdmin(message);
+        }
+        await loadItems(); // Синхронизация стока с сервером после завершения чекпоинта
+      }
+    }, DBOUNCE_MS);
+  }, [checkpoint, localItems, computeSums, gameMode, isTelegram, checkpointStart, computeProcessedStats, notifyAdmin, loadItems]);
 
   const handleCheckPending = async () => {
     setCheckingPending(true);
@@ -551,6 +536,36 @@ export default function WBPage() {
     handleItemClick(item);
   };
 
+  const computeSums = (items: any[]): Record<string, number> => {
+    const sums: Record<string, number> = {};
+    items.forEach((item) => {
+      const q = item.total_quantity || 0;
+      const size = normalizeSizeKey(item.size);
+      const season = item.season?.toLowerCase() || '';
+      const idLower = item.id.toLowerCase();
+
+      let cat = '';
+      if (idLower.startsWith('namatrasnik.')) {
+        cat = `namatras ${size}`;
+      } else if (season === 'leto' || season === 'zima') {
+        let sizeKey = '';
+        if (size === '1.5') sizeKey = '1.5';
+        else if (size === '2') sizeKey = '2';
+        else if (size === 'евро') sizeKey = 'evro';
+        else if (size === 'евромакси' || size === 'евро макси') sizeKey = 'evromaksi';
+        if (sizeKey) cat = `${sizeKey} ${season}`;
+      } else if (idLower.startsWith('podushka.')) {
+        if (idLower.includes('anatom')) cat = 'Podushka anatom';
+        else cat = `Podushka ${size.replace('x', 'h')}`;
+      } else if (idLower.startsWith('navolochka.')) {
+        cat = `Navolochka ${size}`;
+      }
+
+      if (cat) sums[cat] = (sums[cat] || 0) + q;
+    });
+    return sums;
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="p-2 flex flex-col gap-2">
@@ -569,9 +584,9 @@ export default function WBPage() {
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckpoint}><Save size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleReset}><RotateCcw size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportDailyEntry}><Download size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleExportStock(false)}><FileUp size={12} /></Button>
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleExportStock(true)}><FileText size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={debouncedExportDailyEntry}><Download size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => debouncedExportStock(false)}><FileUp size={12} /></Button>
+            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => debouncedExportStock(true)}><FileText size={12} /></Button>
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => fileInputRef.current?.click()} disabled={isUploading}><Upload size={12} /></Button>
             <input ref={fileInputRef as any} type="file" onChange={handleFileChange} className="hidden" accept=".csv,.CSV,.txt,text/csv,text/plain" />
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCheckPending} disabled={checkingPending}>{checkingPending ? <PackageSearch className="animate-spin" size={12} /> : <PackageSearch size={12} />}</Button>
