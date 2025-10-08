@@ -95,12 +95,11 @@ export default function WBPage() {
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
 
   const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
-  const [lastProcessedPackings, setLastProcessedPackings] = useState<number | null>(null);
   const [lastProcessedStars, setLastProcessedStars] = useState<number | null>(null);
   const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
   const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
 
-  const [statsObj, setStatsObj] = useState<any>({ changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0 });
+  const [statsObj, setStatsObj] = useState<any>({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
 
   const [checkingPending, setCheckingPending] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
@@ -320,7 +319,6 @@ export default function WBPage() {
     setLastCheckpointDurationSec(null);
     setLastProcessedCount(null);
     setLastProcessedTotalDelta(null);
-    setLastProcessedPackings(null);
     setLastProcessedStars(null);
     setLastProcessedOffloadUnits(null);
     setLastProcessedSalary(null);
@@ -343,10 +341,9 @@ export default function WBPage() {
   };
 
   const computeProcessedStats = useCallback(() => {
-    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, packings: 0, stars: 0, offloadUnits: 0, salary: 0, sumsPrevious: {}, sumsCurrent: {} };
+    if (!checkpoint || checkpoint.length === 0) return { changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0, sumsPrevious: {}, sumsCurrent: {} };
     let changedCount = 0;
     let totalDelta = 0;
-    let packings = 0;
     let offloadUnits = offloadCount || 0;
 
     // Новое: sums по категориям
@@ -370,23 +367,19 @@ export default function WBPage() {
       const absDelta = Math.abs(rawDelta);
       if (absDelta > 0) changedCount += 1;
       totalDelta += absDelta;
-
-      const sizeKey = normalizeSizeKey(it.size);
-      const piecesPerPack = (SIZE_PACK && SIZE_PACK[sizeKey]) ? SIZE_PACK[sizeKey] : 1;
-      packings += Math.floor(absDelta / piecesPerPack);
     });
 
-    const stars = packings * 25;
+    const stars = 0;
     const salary = offloadUnits * 50;
-    return { changedCount, totalDelta, packings, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
-  }, [localItems, checkpoint, offloadCount, SIZE_PACK]);
+    return { changedCount, totalDelta, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
+  }, [localItems, checkpoint, offloadCount]);
 
   useEffect(() => {
     const stats = computeProcessedStats();
     setStatsObj(stats);
   }, [localItems, checkpoint, offloadCount, onloadCount, editCount, computeProcessedStats]);
 
-  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, packings: livePackings, stars: liveStars, offloadUnits: liveOffloadUnits, salary: liveSalary } = statsObj;
+  const { changedCount: liveChangedCount, totalDelta: liveTotalDelta, stars: liveStars, offloadUnits: liveOffloadUnits, salary: liveSalary } = statsObj;
 
   const elapsedSec = checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null;
 
@@ -395,7 +388,6 @@ export default function WBPage() {
 
   const processedChangedCount = checkpointStart ? liveChangedCount : (lastProcessedCount ?? 0);
   const processedTotalDelta = checkpointStart ? liveTotalDelta : (lastProcessedTotalDelta ?? 0);
-  const processedPackings = checkpointStart ? livePackings : (lastProcessedPackings ?? 0);
   const processedStars = checkpointStart ? liveStars : (lastProcessedStars ?? 0);
   const processedOffloadUnits = checkpointStart ? liveOffloadUnits : (lastProcessedOffloadUnits ?? 0);
   const processedSalary = checkpointStart ? liveSalary : (lastProcessedSalary ?? 0);
@@ -535,7 +527,6 @@ export default function WBPage() {
       const stats = computeProcessedStats();
       setLastProcessedCount(stats.changedCount);
       setLastProcessedTotalDelta(stats.totalDelta);
-      setLastProcessedPackings(stats.packings);
       setLastProcessedStars(stats.stars);
       setLastProcessedOffloadUnits(stats.offloadUnits);
       setLastProcessedSalary(stats.salary);
@@ -598,7 +589,6 @@ export default function WBPage() {
         const stats = computeProcessedStats();
         setLastProcessedCount(stats.changedCount);
         setLastProcessedTotalDelta(stats.totalDelta);
-        setLastProcessedPackings(stats.packings);
         setLastProcessedStars(stats.stars);
         setLastProcessedOffloadUnits(stats.offloadUnits);
         setLastProcessedSalary(stats.salary);
@@ -664,7 +654,6 @@ const handleExportStock = async (summarized = false) => {
       const stats = computeProcessedStats();
       setLastProcessedCount(stats.changedCount);
       setLastProcessedTotalDelta(stats.totalDelta);
-      setLastProcessedPackings(stats.packings);
       setLastProcessedStars(stats.stars);
       setLastProcessedOffloadUnits(stats.offloadUnits);
       setLastProcessedSalary(stats.salary);
@@ -891,7 +880,6 @@ return (
           checkpointSub={checkpointDisplaySub}
           changedCount={processedChangedCount}
           totalDelta={processedTotalDelta}
-          packings={processedPackings}
           stars={processedStars}
           offloadUnits={processedOffloadUnits}
           salary={processedSalary}

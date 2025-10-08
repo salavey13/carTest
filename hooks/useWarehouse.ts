@@ -59,7 +59,6 @@ export function useWarehouse() {
   // Новое: ежедневные цели для прогресса
   const dailyGoals = useMemo(() => ({
     units: 100, // ед. offload для 100% прогресса
-    packings: 20,
     errors: 0, // 0 ошибок для бонуса
     xtr: 100, // Stars за цели
   }), []);
@@ -156,7 +155,6 @@ export function useWarehouse() {
       if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
       
       // Новое: warehouse-specific
-      if (packings >= 50 && !newAch.includes("Packer Pro")) newAch.push("Packer Pro (+50 XTR)");
       if (sessionDuration > 3600 && errorCount === 0 && !newAch.includes("Error-Free Shift")) newAch.push("Error-Free Shift (+25 XTR)");
       if (dailyStreak >= 7 && !newAch.includes("Daily Hustle")) newAch.push("Daily Hustle (+100 XTR)");
       if (efficiency >= 50 && !newAch.includes("Efficiency Expert")) newAch.push("Efficiency Expert (+75 XTR)");
@@ -168,7 +166,7 @@ export function useWarehouse() {
       
       return newAch.slice(-8); // max 8 visible
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, packings, dailyStreak, efficiency, offloadCount, sessionDuration]);
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration]);
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
@@ -340,14 +338,14 @@ export function useWarehouse() {
     }
   }, [gameMode, selectedVoxel, handleUpdateLocationQty]);
 
-  const filteredItems = useMemo(() => items.filter((item) => {
+  const filteredItems = (items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
     const matchesSeason = !filterSeason || item.season === filterSeason;
     const matchesPattern = !filterPattern || item.pattern === filterPattern;
     const matchesColor = !filterColor || item.color === filterColor;
     const matchesSize = !filterSize || item.size === filterSize;
     return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]);
+  }));
 
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
 
