@@ -1,3 +1,4 @@
+// /components/WarehouseStats.tsx
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
@@ -67,7 +68,7 @@ const AchievementBadge: React.FC<{ name: string; xtr?: number }> = ({ name, xtr 
 
 export default function WarehouseStats(props: WarehouseStatsProps) {
   const {
-    itemsCount,
+itemsCount,
     uniqueIds,
     score,
     level,
@@ -89,7 +90,7 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
     leaderboard,
     efficiency = 0,
     avgTimePerItem = 0,
-    dailyGoals = { units: 100, packings: 20, errors: 0, xtr: 100 },
+    dailyGoals = { units: 100, packings: 20, errors: 0, xtr: 100 },  // Fix here: Ensure explicit 'packings: 20' (add colon and value if missing)
     sessionDuration = 0,
   } = props;
 
