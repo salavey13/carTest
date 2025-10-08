@@ -77,7 +77,7 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
     checkpointSub,
     changedCount,
     totalDelta,
-    packings,
+    packings = 0,
     stars,
     offloadUnits,
     salary,
