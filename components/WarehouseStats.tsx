@@ -1,4 +1,3 @@
-// /components/WarehouseStats.tsx
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
@@ -29,7 +28,7 @@ interface WarehouseStatsProps {
   checkpointSub: string;
   changedCount: number;
   totalDelta: number;
-  packings: number;
+  packings?: number; // Fix: Make optional to avoid runtime issues if not passed
   stars: number;
   offloadUnits: number;
   salary: number;
@@ -41,7 +40,7 @@ interface WarehouseStatsProps {
   leaderboard?: LeaderboardEntry[];
   efficiency?: number; // Новое
   avgTimePerItem?: number; // Новое
-  dailyGoals?: { units: number; packings: number; errors: number; xtr: number }; // Новое
+  dailyGoals?: { units: number; packings: number; errors: number; xtr: number }; // Новое, optional
   sessionDuration?: number; // Новое
 }
 
@@ -68,7 +67,7 @@ const AchievementBadge: React.FC<{ name: string; xtr?: number }> = ({ name, xtr 
 
 export default function WarehouseStats(props: WarehouseStatsProps) {
   const {
-itemsCount,
+    itemsCount,
     uniqueIds,
     score,
     level,
@@ -78,7 +77,7 @@ itemsCount,
     checkpointSub,
     changedCount,
     totalDelta,
-    packings = 0,
+    packings = 0, // Fix: Ensure default if prop missing
     stars,
     offloadUnits,
     salary,
@@ -90,7 +89,7 @@ itemsCount,
     leaderboard,
     efficiency = 0,
     avgTimePerItem = 0,
-    dailyGoals = { units: 100, packings: 20, errors: 0, xtr: 100 },  // Fix here: Ensure explicit 'packings: 20' (add colon and value if missing)
+    dailyGoals = { units: 100, packings: 20, errors: 0, xtr: 100 }, // Fix: Explicit keys/values, no shorthand
     sessionDuration = 0,
   } = props;
 
@@ -100,17 +99,17 @@ itemsCount,
   const safeLeaderboard = Array.isArray(leaderboard) ? leaderboard : [];
   const top = useMemo(() => safeLeaderboard.slice(0, 3), [safeLeaderboard]);
 
-  const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / dailyGoals.units) * 100), [offloadUnits, dailyGoals.units]);
-  const packingsProgress = useMemo(() => Math.min(100, (packings / dailyGoals.packings) * 100), [packings, dailyGoals.packings]);
+  const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / (dailyGoals?.units ?? 100)) * 100), [offloadUnits, dailyGoals]); // Fix: Optional chaining
+  const packingsProgress = useMemo(() => Math.min(100, (packings / (dailyGoals?.packings ?? 20)) * 100), [packings, dailyGoals]); // Fix: Optional chaining
   const errorFree = errorCount === 0 && sessionDuration > 3600; // бонус за zero errors в длинной сессии
 
   const totalXtr = useMemo(() => {
     let earned = 0;
     if (unitsProgress >= 100) earned += 50;
     if (packingsProgress >= 100) earned += 50;
-    if (errorFree) earned += dailyGoals.xtr;
+    if (errorFree) earned += dailyGoals?.xtr ?? 100; // Fix: Optional chaining
     return earned;
-  }, [unitsProgress, packingsProgress, errorFree, dailyGoals.xtr]);
+  }, [unitsProgress, packingsProgress, errorFree, dailyGoals]);
 
   const shareScore = () => {
     const text = `🏆 Мой счёт в Warehouse Quest: ${score} очков! Уровень ${level}, серия ${streak}. Заработано ${totalXtr} XTR. Присоединяйся!`;
@@ -161,7 +160,7 @@ itemsCount,
 
                 <div className="flex flex-col">
                   <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Package className="w-4 h-4" /> Упаковок</div>
-                  <div className="font-medium mt-1">{packings}</div>
+                  <div className="font-medium mt-1">{packings ?? 0}</div> {/* Fix: Fallback */}
                 </div>
               </div>
 
@@ -204,15 +203,15 @@ itemsCount,
 
             <div className="space-y-3">
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals.units}</div>
+                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals?.units ?? 100}</div>
                 <Progress value={unitsProgress} className="h-2" />
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">Упаковок: {packings}/{dailyGoals.packings}</div>
+                <div className="text-[11px] text-muted-foreground mb-1">Упаковок: {packings ?? 0}/{dailyGoals?.packings ?? 20}</div>
                 <Progress value={packingsProgress} className="h-2" />
               </div>
               {errorFree && (
-                <div className="text-[11px] text-green-600 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
+                <div className="text-[11px] text-green-600 font-medium">✅ Без ошибок (бонус +{dailyGoals?.xtr ?? 100} XTR!)</div>
               )}
             </div>
           </div>
