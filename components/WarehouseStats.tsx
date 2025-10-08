@@ -28,7 +28,6 @@ interface WarehouseStatsProps {
   checkpointSub: string;
   changedCount: number;
   totalDelta: number;
-  packings?: number; // Fix: Make optional to avoid runtime issues if not passed
   stars: number;
   offloadUnits: number;
   salary: number;
@@ -40,7 +39,7 @@ interface WarehouseStatsProps {
   leaderboard?: LeaderboardEntry[];
   efficiency?: number; // Новое
   avgTimePerItem?: number; // Новое
-  dailyGoals?: { units: number; packings: number; errors: number; xtr: number }; // Новое, optional
+  dailyGoals?: { units: number; errors: number; xtr: number }; // Новое
   sessionDuration?: number; // Новое
 }
 
@@ -77,7 +76,6 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
     checkpointSub,
     changedCount,
     totalDelta,
-    packings = 0, // Fix: Ensure default if prop missing
     stars,
     offloadUnits,
     salary,
@@ -89,7 +87,7 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
     leaderboard,
     efficiency = 0,
     avgTimePerItem = 0,
-    dailyGoals = { units: 100, packings: 20, errors: 0, xtr: 100 }, // Fix: Explicit keys/values, no shorthand
+    dailyGoals = { units: 100, errors: 0, xtr: 100 },
     sessionDuration = 0,
   } = props;
 
@@ -99,17 +97,15 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
   const safeLeaderboard = Array.isArray(leaderboard) ? leaderboard : [];
   const top = useMemo(() => safeLeaderboard.slice(0, 3), [safeLeaderboard]);
 
-  const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / (dailyGoals?.units ?? 100)) * 100), [offloadUnits, dailyGoals]); // Fix: Optional chaining
-  const packingsProgress = useMemo(() => Math.min(100, (packings / (dailyGoals?.packings ?? 20)) * 100), [packings, dailyGoals]); // Fix: Optional chaining
+  const unitsProgress = useMemo(() => Math.min(100, (offloadUnits / dailyGoals.units) * 100), [offloadUnits, dailyGoals.units]);
   const errorFree = errorCount === 0 && sessionDuration > 3600; // бонус за zero errors в длинной сессии
 
   const totalXtr = useMemo(() => {
     let earned = 0;
     if (unitsProgress >= 100) earned += 50;
-    if (packingsProgress >= 100) earned += 50;
-    if (errorFree) earned += dailyGoals?.xtr ?? 100; // Fix: Optional chaining
+    if (errorFree) earned += dailyGoals.xtr;
     return earned;
-  }, [unitsProgress, packingsProgress, errorFree, dailyGoals]);
+  }, [unitsProgress, errorFree, dailyGoals.xtr]);
 
   const shareScore = () => {
     const text = `🏆 Мой счёт в Warehouse Quest: ${score} очков! Уровень ${level}, серия ${streak}. Заработано ${totalXtr} XTR. Присоединяйся!`;
@@ -160,7 +156,7 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
 
                 <div className="flex flex-col">
                   <div className="text-[11px] text-muted-foreground flex items-center gap-2"><Package className="w-4 h-4" /> Упаковок</div>
-                  <div className="font-medium mt-1">{packings ?? 0}</div> {/* Fix: Fallback */}
+                  <div className="font-medium mt-1">0</div>
                 </div>
               </div>
 
@@ -203,15 +199,11 @@ export default function WarehouseStats(props: WarehouseStatsProps) {
 
             <div className="space-y-3">
               <div>
-                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals?.units ?? 100}</div>
+                <div className="text-[11px] text-muted-foreground mb-1">Выдано ед.: {offloadUnits}/{dailyGoals.units}</div>
                 <Progress value={unitsProgress} className="h-2" />
               </div>
-              <div>
-                <div className="text-[11px] text-muted-foreground mb-1">Упаковок: {packings ?? 0}/{dailyGoals?.packings ?? 20}</div>
-                <Progress value={packingsProgress} className="h-2" />
-              </div>
               {errorFree && (
-                <div className="text-[11px] text-green-600 font-medium">✅ Без ошибок (бонус +{dailyGoals?.xtr ?? 100} XTR!)</div>
+                <div className="text-[11px] text-green-600 font-medium">✅ Без ошибок (бонус +{dailyGoals.xtr} XTR!)</div>
               )}
             </div>
           </div>
