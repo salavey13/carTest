@@ -447,13 +447,13 @@ export async function updateItemLocationQty(
    ========================= */
 
 export async function exportDiffToAdmin(diffData: any[], isTelegram = false): Promise<{ success: boolean; csv?: string }> {
-  let csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Изменение: d.diffQty, Ячейка: d.voxel })), { header: true, delimiter: ",", quotes: true });
+  let csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Изменение: d.diffQty, Ячейка: d.voxel })), { header: true, delimiter: "\t", quotes: true });
 
   if (isTelegram) {
     return { success: true, csv: csvData };
   } else {
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
-      attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в TSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_diff.tsv" },
     });
     return { success: true, csv: csvData };
   }
@@ -463,7 +463,7 @@ export async function exportCurrentStock(items: any[], isTelegram = false, summa
   let csvData;
   if (summarized) {
     const stockData = items.map((item) => ({ Артикул: item.id, Количество: item.total_quantity }));
-    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: ",", quotes: true });
+    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: "\t", quotes: true });
   } else {
     const stockData = items.map((item) => ({
       Артикул: item.id,
@@ -471,14 +471,14 @@ export async function exportCurrentStock(items: any[], isTelegram = false, summa
       "Общее Количество": item.total_quantity,
       Локации: item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
     }));
-    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: ",", quotes: true });
+    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: "\t", quotes: true });
   }
 
   if (isTelegram) {
     return { success: true, csv: csvData };
   } else {
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в CSV.", [], {
-      attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в TSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_stock.tsv" },
     });
     return { success: true, csv: csvData };
   }
@@ -517,15 +517,15 @@ export async function exportDailyEntry(
     });
 
     const salary = total * 50;
-    let csv = "\uFEFF" + `отгрузка ${dd}.${mm}.${yy},${otgruzka.join(',')},всего: ${total},оплата: ${salary}\n`;
+    let csv = "\uFEFF" + `отгрузка ${dd}.${mm}.${yy}\t${otgruzka.join('\t')}\tвсего: ${total}\tоплата: ${salary}\n`;
 
     console.info("exportDailyEntry successful", { total, salary });
 
     if (isTelegram) {
       return { success: true, csv };
     } else {
-      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", `Отгрузка в CSV.`, [], {
-        attachment: { type: "document", content: csv, filename: `otgruzka.csv` },
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", `Отгрузка в TSV.`, [], {
+        attachment: { type: "document", content: csv, filename: `otgruzka.tsv` },
       });
       return { success: true, csv };
     }
