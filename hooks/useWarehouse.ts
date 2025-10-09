@@ -42,7 +42,7 @@ export function useWarehouse() {
   const [sessionStart, setSessionStart] = useState(Date.now());
   const [bossMode, setBossMode] = useState(false);
   const [bossTimer, setBossTimer] = useState(0);
-  const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string }[]>([]);
+  const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string; xtr: number }[]>([]);
   const { dbUser } = useAppContext();
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [onloadCount, setOnloadCount] = useState(0);
@@ -55,6 +55,24 @@ export function useWarehouse() {
   const [filterColor, setFilterColor] = useState<string | null>(null);
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
+
+  // Новое: ежедневные цели для прогресса
+  const dailyGoals = useMemo(() => ({
+    units: 100, // ед. offload для 100% прогресса
+    errors: 0, // 0 ошибок для бонуса
+    xtr: 100, // Stars за цели
+  }), []);
+
+  const sessionDuration = useMemo(() => Math.max(0, Math.floor((Date.now() - sessionStart) / 1000)), [sessionStart]);
+  const efficiency = useMemo(() => {
+    if (sessionDuration === 0) return 0;
+    return Math.round((offloadCount / (sessionDuration / 3600)) * 10) / 10; // ед./час
+  }, [offloadCount, sessionDuration]);
+
+  const avgTimePerItem = useMemo(() => {
+    if (offloadCount === 0 || sessionDuration === 0) return 0;
+    return Math.round((sessionDuration / offloadCount) * 100) / 100; // сек/ед.
+  }, [offloadCount, sessionDuration]);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -135,9 +153,20 @@ export function useWarehouse() {
       if (workflowItems.length > 0 && (Date.now() - sessionStart) / 1000 < 3600 && !newAch.includes("Speed Demon")) newAch.push("Speed Demon");
       if (workflowItems.length > 20 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
       if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
-      return newAch;
+      
+      // Новое: warehouse-specific
+      if (sessionDuration > 3600 && errorCount === 0 && !newAch.includes("Error-Free Shift")) newAch.push("Error-Free Shift (+25 XTR)");
+      if (dailyStreak >= 7 && !newAch.includes("Daily Hustle")) newAch.push("Daily Hustle (+100 XTR)");
+      if (efficiency >= 50 && !newAch.includes("Efficiency Expert")) newAch.push("Efficiency Expert (+75 XTR)");
+      if (offloadCount >= 200 && !newAch.includes("Warehouse Warrior")) newAch.push("Warehouse Warrior (+200 XTR)");
+      
+      // XTR mock: log for future API
+      const xtrEarned = newAch.filter(a => a.includes("XTR")).length * 50; // пример
+      if (xtrEarned > 0) toast.success(`Заработано ${xtrEarned} XTR!`, { icon: "⭐" });
+      
+      return newAch.slice(-8); // max 8 visible
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode]);
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration]);
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
@@ -261,7 +290,7 @@ export function useWarehouse() {
     setBossMode(false);
     const finalScore = score - errorCount * 50;
     setLevel(Math.floor(finalScore / 500) + 1);
-    const newLeaderboard = [...leaderboard, { name: dbUser?.username || "Anon", score: finalScore, date: new Date().toLocaleDateString() }]
+    const newLeaderboard = [...leaderboard, { name: dbUser?.username || "Anon", score: finalScore, date: new Date().toLocaleDateString(), xtr: 0 }]
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
     setLeaderboard(newLeaderboard);
@@ -309,14 +338,14 @@ export function useWarehouse() {
     }
   }, [gameMode, selectedVoxel, handleUpdateLocationQty]);
 
-  const filteredItems = useMemo(() => items.filter((item) => {
+  const filteredItems = (items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
     const matchesSeason = !filterSeason || item.season === filterSeason;
     const matchesPattern = !filterPattern || item.pattern === filterPattern;
     const matchesColor = !filterColor || item.color === filterColor;
     const matchesSize = !filterSize || item.size === filterSize;
     return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]);
+  }));
 
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
 
@@ -397,5 +426,9 @@ export function useWarehouse() {
     setOnloadCount,
     setOffloadCount,
     setEditCount,
+    efficiency, // Новое
+    avgTimePerItem, // Новое
+    dailyGoals, // Новое
+    sessionDuration, // Новое
   };
 }
