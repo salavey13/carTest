@@ -1,183 +1,311 @@
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
-import { logger } from "@/lib/logger";
+import { sendTelegramMessage } from "@/app/actions"; // server action
+import { v4 as uuidv4 } from "uuid";
 
 /**
- * Server actions for crew-specific WB page (slug-based).
- * DEBUG_ITEM_TYPE default "bike" (env override).
+ * DEBUG_ITEM_TYPE used for test/demo environment (set DEBUG_ITEM_TYPE=bike)
+ * If DEBUG_ITEM_TYPE is empty, we don't filter by type (show all vehicles).
  */
 const DEBUG_ITEM_TYPE = (process.env.DEBUG_ITEM_TYPE || "bike").toString();
+const DEBUG_LIMIT = 500;
 
-type FetchResult = {
-  success: boolean;
-  data?: any[];
-  crew?: { id: string; name: string; slug: string; owner_id?: string; logo_url?: string };
-  error?: string | null;
-  debug?: {
-    queriedType?: string;
-    foundCount?: number;
-    totalForCrew?: number;
-    sampleAllTypes?: Array<{ id: string; type?: string }>;
-    crewId?: string;
-  };
-};
-
-function logInfo(...args: any[]) {
-  try { logger?.info?.(...args); } catch(e){ /* noop */ }
-  // also console to ensure visibility in simple setups
-  // eslint-disable-next-line no-console
-  console.log("[fetchCrewItemsBySlug]", ...args);
-}
-function logError(...args: any[]) {
-  try { logger?.error?.(...args); } catch(e){ /* noop */ }
-  // eslint-disable-next-line no-console
-  console.error("[fetchCrewItemsBySlug]", ...args);
+function safeParseSpecs(specs: any) {
+  if (!specs) return {};
+  if (typeof specs === "object") return specs;
+  try {
+    return JSON.parse(specs);
+  } catch {
+    return {};
+  }
 }
 
 /**
- * Fetch items for crew identified by slug.
- * If userChatId provided — perform membership check.
- * itemType overrides DEBUG_ITEM_TYPE when provided.
+ * fetchCrewBySlug - lightweight crew metadata
+ */
+export async function fetchCrewBySlug(slug: string): Promise<{ success: boolean; crew?: any; error?: string }> {
+  try {
+    if (!slug) return { success: false, error: "slug required" };
+    console.log("[fetchCrewBySlug] slug:", slug);
+
+    const { data, error } = await supabaseAdmin
+      .from("crews")
+      .select("id, name, slug, description, logo_url, owner_id, hq_location")
+      .eq("slug", slug)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[fetchCrewBySlug] db error:", error);
+      return { success: false, error: error.message || "DB error" };
+    }
+    if (!data) {
+      console.log("[fetchCrewBySlug] crew not found:", slug);
+      return { success: false, error: "Crew not found" };
+    }
+    return { success: true, crew: data };
+  } catch (e: any) {
+    console.error("[fetchCrewBySlug] unexpected:", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/**
+ * fetchCrewItemsBySlug - fetch bikes (or DEBUG_ITEM_TYPE) for crew slug.
+ * - userChatId optional -> returns membership info (role) for the user.
+ * - itemType optional -> override DEBUG_ITEM_TYPE
+ *
+ * Response stable object shape: { success, data, crew, memberRole, debug, error }
  */
 export async function fetchCrewItemsBySlug(
   slug: string,
   userChatId?: string,
   itemType?: string
-): Promise<FetchResult> {
+): Promise<{
+  success: boolean;
+  data?: any[];
+  crew?: any;
+  memberRole?: string | null;
+  debug?: any;
+  error?: string;
+}> {
   try {
-    if (!slug) {
-      logError("Called without slug");
-      return { success: false, error: "slug is required" };
-    }
+    if (!slug) return { success: false, error: "slug is required" };
 
-    logInfo("Starting fetchCrewItemsBySlug", { slug, userChatId, envType: DEBUG_ITEM_TYPE });
+    console.log("[fetchCrewItemsBySlug] start", { slug, userChatId, itemType });
 
-    // 1) Resolve crew by slug
-    const { data: crewRow, error: crewErr } = await supabaseAdmin
+    const crewRes = await supabaseAdmin
       .from("crews")
       .select("id, name, slug, owner_id, logo_url")
       .eq("slug", slug)
       .limit(1)
       .maybeSingle();
 
-    if (crewErr) {
-      logError("Crew lookup error:", crewErr);
-      return { success: false, error: "Failed to lookup crew", debug: { crewId: undefined } };
+    if (crewRes.error) {
+      console.error("[fetchCrewItemsBySlug] crew lookup error:", crewRes.error);
+      return { success: false, error: "Failed to lookup crew", debug: { crewLookupError: crewRes.error } };
     }
-    if (!crewRow) {
-      logError(`Crew with slug '${slug}' not found`);
-      return { success: false, error: `Crew with slug '${slug}' not found`, debug: { crewId: undefined } };
+    if (!crewRes.data) {
+      return { success: false, error: `Crew '${slug}' not found` };
     }
+    const crew = crewRes.data as any;
 
-    const crew = crewRow as any;
-    logInfo("Crew resolved", { crewId: crew.id, crewName: crew.name });
-
-    // 2) If userChatId provided, verify membership
+    // membership / role lookup (if userChatId provided)
+    let memberRole: string | null = null;
     if (userChatId) {
-      try {
-        const { data: member, error: memberErr } = await supabaseAdmin
-          .from("crew_members")
-          .select("id, membership_status")
-          .eq("crew_id", crew.id)
-          .eq("user_id", userChatId)
-          .limit(1)
-          .maybeSingle();
-
-        if (memberErr) {
-          logError("Membership check DB error:", memberErr);
-          return { success: false, error: "Membership check failed (db)", debug: { crewId: crew.id } };
-        }
-        if (!member) {
-          logInfo("User is not a member of crew", { userChatId, crewId: crew.id });
-          return { success: false, error: "User is not a member of this crew", debug: { crewId: crew.id } };
-        }
-        logInfo("Membership validated", { userChatId, membership_status: (member as any).membership_status });
-      } catch (mErr:any) {
-        logError("Membership check unexpected error:", mErr);
-        return { success: false, error: "Membership check failed", debug: { crewId: crew.id } };
-      }
-    } else {
-      logInfo("No userChatId provided — skipping membership check");
-    }
-
-    // 3) Query items by crew_id and type (debug override)
-    const typeToUse = itemType || DEBUG_ITEM_TYPE;
-    logInfo("Querying cars", { crewId: crew.id, type: typeToUse });
-
-    const { data, error } = await supabaseAdmin
-      .from("cars")
-      .select("*")
-      .eq("crew_id", crew.id)
-      .eq("type", typeToUse)
-      .order("make", { ascending: true });
-
-    if (error) {
-      logError("Supabase query error for cars:", error);
-      return { success: false, error: error.message || "Failed to fetch items", debug: { crewId: crew.id, queriedType: typeToUse } };
-    }
-
-    const foundCount = (data || []).length;
-    logInfo("Query returned", { foundCount, crewId: crew.id, queriedType: typeToUse });
-
-    // 4) If zero results, fetch a quick fallback: count of all cars for this crew + sample of types
-    let debug: FetchResult["debug"] = { crewId: crew.id, queriedType: typeToUse, foundCount };
-    if (foundCount === 0) {
-      try {
-        const { data: allForCrew, error: allErr } = await supabaseAdmin
-          .from("cars")
-          .select("id, type")
-          .eq("crew_id", crew.id)
-          .limit(50); // small sample
-
-        if (allErr) {
-          logError("Fallback allForCrew error:", allErr);
-          debug.totalForCrew = 0;
-          debug.sampleAllTypes = [];
-        } else {
-          debug.totalForCrew = (allForCrew || []).length;
-          debug.sampleAllTypes = (allForCrew || []).slice(0, 10).map((r:any) => ({ id: r.id, type: r.type }));
-        }
-        logInfo("Fallback info", debug);
-      } catch (fbErr:any) {
-        logError("Fallback unexpected error:", fbErr);
-        debug.totalForCrew = 0;
-        debug.sampleAllTypes = [];
+      const mem = await supabaseAdmin
+        .from("crew_members")
+        .select("role, membership_status")
+        .eq("crew_id", crew.id)
+        .eq("user_id", userChatId)
+        .limit(1)
+        .maybeSingle();
+      if (mem.error) {
+        console.error("[fetchCrewItemsBySlug] member lookup failed:", mem.error);
+        // NOT fatal for public view - return with warning
+      } else if (mem.data) {
+        memberRole = mem.data.role || null;
       }
     }
 
-    // 5) Normalize a bit (unwrap specs for easy client display)
-    const normalized = (data || []).map((r: any) => {
-      let specs = {};
-      try { specs = r.specs || {}; } catch (e) { specs = {}; }
-      return { ...r, specs };
-    });
+    // Choose type filter: explicit itemType -> DEBUG_ITEM_TYPE -> no filter if empty string
+    const typeToUse = itemType ?? (DEBUG_ITEM_TYPE || "");
+    console.log("[fetchCrewItemsBySlug] using type filter:", typeToUse || "(none)");
 
-    return { success: true, data: normalized, crew: { id: crew.id, name: crew.name, slug: crew.slug, owner_id: crew.owner_id, logo_url: crew.logo_url }, debug };
-  } catch (err: any) {
-    logError("Unexpected error in fetchCrewItemsBySlug:", err);
-    return { success: false, error: err?.message || "unknown error", debug: { crewId: undefined } };
+    let query = supabaseAdmin.from("cars").select("*").eq("crew_id", crew.id).order("make", { ascending: true });
+
+    if (typeToUse && typeToUse.length > 0) {
+      query = query.eq("type", typeToUse);
+    }
+
+    const carsRes = await query.limit(DEBUG_LIMIT);
+    if (carsRes.error) {
+      console.error("[fetchCrewItemsBySlug] cars query error:", carsRes.error);
+      return { success: false, error: "Failed to fetch items", debug: { carsError: carsRes.error } };
+    }
+
+    const rows = (carsRes.data || []).map((r: any) => ({ ...r, specs: safeParseSpecs(r.specs) }));
+    console.log("[fetchCrewItemsBySlug] returning", { crew: crew.id, count: rows.length, memberRole });
+
+    return { success: true, data: rows, crew: { id: crew.id, name: crew.name, slug: crew.slug, owner_id: crew.owner_id, logo_url: crew.logo_url }, memberRole, debug: { count: rows.length } };
+  } catch (e: any) {
+    console.error("[fetchCrewItemsBySlug] unexpected error:", e);
+    return { success: false, error: e?.message || "unknown error" };
   }
 }
 
 /**
- * Lightweight helper to fetch crew metadata by slug.
+ * fetchCrewAllCarsBySlug - debug helper: fetch all cars for crew without type filter.
  */
-export async function fetchCrewBySlug(slug: string): Promise<{ success: boolean; crew?: any; error?: string }> {
+export async function fetchCrewAllCarsBySlug(slug: string): Promise<{ success: boolean; data?: any[]; crew?: any; error?: string; debug?: any }> {
   try {
     if (!slug) return { success: false, error: "slug required" };
-    const { data, error } = await supabaseAdmin.from("crews").select("id, name, slug, description, logo_url, owner_id, hq_location").eq("slug", slug).limit(1).maybeSingle();
-    if (error) {
-      logError("fetchCrewBySlug DB error:", error);
-      return { success: false, error: error.message };
+    console.log("[fetchCrewAllCarsBySlug] slug:", slug);
+
+    const crewRes = await supabaseAdmin.from("crews").select("id, name, slug, owner_id, logo_url").eq("slug", slug).limit(1).maybeSingle();
+    if (crewRes.error) {
+      console.error("[fetchCrewAllCarsBySlug] crew lookup error:", crewRes.error);
+      return { success: false, error: "Crew lookup failed", debug: { crewLookupError: crewRes.error } };
     }
-    if (!data) {
-      logInfo("fetchCrewBySlug: crew not found", { slug });
-      return { success: false, error: "Crew not found" };
+    if (!crewRes.data) { return { success: false, error: "Crew not found" }; }
+    const crew = crewRes.data as any;
+
+    const carsRes = await supabaseAdmin.from("cars").select("*").eq("crew_id", crew.id).order("make", { ascending: true }).limit(DEBUG_LIMIT);
+    if (carsRes.error) { console.error("[fetchCrewAllCarsBySlug] cars error:", carsRes.error); return { success: false, error: "Failed to fetch cars", debug: { carsError: carsRes.error } }; }
+    const data = (carsRes.data || []).map((r:any) => ({ ...r, specs: safeParseSpecs(r.specs) }));
+    console.log("[fetchCrewAllCarsBySlug] returning count:", data.length);
+    return { success: true, data, crew: { id: crew.id, name: crew.name, slug: crew.slug, owner_id: crew.owner_id, logo_url: crew.logo_url }, debug: { total: data.length } };
+  } catch (e:any) {
+    console.error("[fetchCrewAllCarsBySlug] unexpected:", e);
+    return { success: false, error: e?.message || "unknown", debug: null };
+  }
+}
+
+/**
+ * updateItemQuantityForCrew
+ * - slug: crew slug (resolve crew id)
+ * - itemId: cars.id
+ * - delta: positive -> onload (increase), negative -> offload (decrease)
+ * - userId: id performing the action (string). We check membership/role.
+ *
+ * Authorization rules:
+ * - Public: only read.
+ * - To modify quantities, user must be member of crew and role in ('owner','xadmin','manager') — adjust roles as you like.
+ *
+ * Side effects:
+ * - Update cars.quantity (string/integer fields are handled)
+ * - Insert a row into warehouse_shifts (if table exists) for auditing.
+ */
+export async function updateItemQuantityForCrew(
+  slug: string,
+  itemId: string,
+  delta: number,
+  userId?: string
+): Promise<{ success: boolean; item?: any; error?: string; debug?: any }> {
+  try {
+    if (!slug || !itemId || typeof delta !== "number") return { success: false, error: "Missing parameters" };
+    console.log("[updateItemQuantityForCrew] called", { slug, itemId, delta, userId });
+
+    // resolve crew
+    const crewRes = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", slug).limit(1).maybeSingle();
+    if (crewRes.error) {
+      console.error("[updateItemQuantityForCrew] crew lookup error:", crewRes.error);
+      return { success: false, error: "Crew lookup failed" };
     }
-    return { success: true, crew: data };
-  } catch (e: any) {
-    logError("fetchCrewBySlug unexpected error:", e);
+    if (!crewRes.data) return { success: false, error: "Crew not found" };
+    const crewId = (crewRes.data as any).id;
+
+    // authorization: check membership role
+    let userRole: string | null = null;
+    if (userId) {
+      const mem = await supabaseAdmin.from("crew_members").select("role, membership_status").eq("crew_id", crewId).eq("user_id", userId).limit(1).maybeSingle();
+      if (mem.error) {
+        console.warn("[updateItemQuantityForCrew] member lookup error:", mem.error);
+      } else if (mem.data) {
+        userRole = mem.data.role || null;
+      }
+    }
+
+    // allow if owner of crew (owner_id) OR member role in these elevated roles
+    const allowedRoles = ["owner", "xadmin", "manager", "admin"];
+    const isOwnerByCrew = crewRes.data.owner_id && userId && crewRes.data.owner_id === userId;
+    const canModify = isOwnerByCrew || (userRole && allowedRoles.includes(userRole));
+
+    if (!canModify) {
+      console.warn("[updateItemQuantityForCrew] unauthorized modification attempt", { userId, userRole, crewOwner: crewRes.data.owner_id });
+      return { success: false, error: "Not authorized to modify this crew's items (must be crew owner or admin)" };
+    }
+
+    // fetch item and current quantity
+    const itemRes = await supabaseAdmin.from("cars").select("*").eq("id", itemId).eq("crew_id", crewId).limit(1).maybeSingle();
+    if (itemRes.error) { console.error("[updateItemQuantityForCrew] item lookup error:", itemRes.error); return { success: false, error: "Item lookup failed" }; }
+    if (!itemRes.data) { return { success: false, error: "Item not found for this crew" }; }
+
+    const item = itemRes.data as any;
+    // cars.quantity could be string — normalize to int
+    const oldQty = Number(item.quantity || 0);
+    const newQty = Math.max(0, oldQty + delta);
+
+    const { data: updateData, error: updateErr } = await supabaseAdmin
+      .from("cars")
+      .update({ quantity: newQty.toString(), updated_at: new Date().toISOString() })
+      .eq("id", itemId)
+      .select()
+      .maybeSingle();
+
+    if (updateErr) {
+      console.error("[updateItemQuantityForCrew] update error:", updateErr);
+      return { success: false, error: "Failed to update item quantity" };
+    }
+
+    // try to insert audit shift into warehouse_shifts (if table exists)
+    try {
+      const shift = {
+        id: uuidv4(),
+        crew_id: crewId,
+        item_id: itemId,
+        user_id: userId ?? null,
+        delta,
+        previous_quantity: oldQty,
+        new_quantity: newQty,
+        created_at: new Date().toISOString(),
+        metadata: { source: "bikehouse_ui" }
+      };
+      // best-effort insert
+      const { error: shiftErr } = await supabaseAdmin.from("warehouse_shifts").insert(shift);
+      if (shiftErr) {
+        console.warn("[updateItemQuantityForCrew] failed to insert shift (non-fatal):", shiftErr);
+      } else {
+        console.log("[updateItemQuantityForCrew] shift inserted", shift.id);
+      }
+    } catch (e) {
+      console.warn("[updateItemQuantityForCrew] shift insert unexpected:", e);
+    }
+
+    // return updated item (normalize specs)
+    const normalized = { ...(updateData || item), specs: safeParseSpecs((updateData || item).specs) };
+    console.log("[updateItemQuantityForCrew] success", { itemId, oldQty, newQty });
+
+    return { success: true, item: normalized, debug: { oldQty, newQty, userRole } };
+  } catch (e:any) {
+    console.error("[updateItemQuantityForCrew] unexpected:", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/**
+ * notifyOwnerAboutStorageRequest - convenience server action that sends a message to crew owner.
+ * - caller can request to notify owner about a specific item/voxel/slot for conversation.
+ */
+export async function notifyOwnerAboutStorageRequest(
+  slug: string,
+  message: string,
+  requesterId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!slug || !message) return { success: false, error: "Missing params" };
+    const crewRes = await supabaseAdmin.from("crews").select("id, name, owner_id").eq("slug", slug).limit(1).maybeSingle();
+    if (crewRes.error) { console.error("[notifyOwner] crew lookup failed:", crewRes.error); return { success: false, error: "Crew lookup failed" }; }
+    if (!crewRes.data) return { success: false, error: "Crew not found" };
+    const ownerId = crewRes.data.owner_id;
+    if (!ownerId) return { success: false, error: "Owner not configured for this crew" };
+
+    const finalMessage = `Bikehouse request for crew '${crewRes.data.name}'\nFrom: ${requesterId || "anonymous"}\n\n${message}`;
+    // best-effort: use sendTelegramMessage from /app/actions
+    try {
+      const res = await sendTelegramMessage(finalMessage, [], undefined, ownerId);
+      if (!res.success) {
+        console.error("[notifyOwner] sendTelegramMessage returned error:", res.error);
+        return { success: false, error: res.error || "Failed to send telegram" };
+      }
+      return { success: true };
+    } catch (e:any) {
+      console.error("[notifyOwner] unexpected send error:", e);
+      return { success: false, error: e?.message || "notify failed" };
+    }
+  } catch (e:any) {
+    console.error("[notifyOwner] unexpected:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
