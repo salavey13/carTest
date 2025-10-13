@@ -4,8 +4,16 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { sendTelegramMessage } from "@/app/actions";
 import { v4 as uuidv4 } from "uuid";
 
+/**
+ * Debug mode ON by default. Disable by setting NEXT_PUBLIC_DEBUG=0 at build/runtime.
+ */
+const DEBUG = (process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0";
 const DEBUG_ITEM_TYPE = (process.env.DEBUG_ITEM_TYPE || "bike").toString();
 const DEBUG_LIMIT = 500;
+
+function log(...args: any[]) { if (DEBUG) console.log("[wb/actions]", ...args); }
+function warn(...args: any[]) { if (DEBUG) console.warn("[wb/actions]", ...args); }
+function err(...args: any[]) { if (DEBUG) console.error("[wb/actions]", ...args); }
 
 function safeParseSpecs(specs: any) {
   if (!specs) return {};
@@ -22,10 +30,6 @@ async function resolveCrewBySlug(slug: string) {
 
 /* -----------------------
    SHIFT helpers
-   - getActiveShiftForMember(memberId, crewId)
-   - startShiftForMember(memberId, crewId, shiftType)
-   - endShiftForMember(shiftId)
-   - saveCheckpointForShift(memberId, crewId, checkpointData)
    ----------------------- */
 
 export async function getActiveShiftForMember(memberId: string, crewId: string) {
@@ -42,7 +46,7 @@ export async function getActiveShiftForMember(memberId: string, crewId: string) 
     if (error) throw error;
     return { success: true, shift: data || null };
   } catch (e: any) {
-    console.error("[getActiveShiftForMember] error:", e);
+    err("[getActiveShiftForMember] error:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
@@ -51,7 +55,7 @@ export async function startShiftForMember(memberId: string, crewId: string, shif
   try {
     if (!memberId || !crewId) return { success: false, error: "memberId and crewId required" };
 
-    // ensure no active shift exists (optional)
+    // ensure no active shift exists
     const active = await supabaseAdmin
       .from("crew_member_shifts")
       .select("id")
@@ -61,7 +65,7 @@ export async function startShiftForMember(memberId: string, crewId: string, shif
       .limit(1)
       .maybeSingle();
 
-    if (active.error) { console.error("[startShiftForMember] active lookup error:", active.error); }
+    if (active.error) { warn("[startShiftForMember] active lookup error:", active.error); }
     if (active.data) {
       return { success: false, error: "Active shift already exists", shift: active.data };
     }
@@ -75,14 +79,15 @@ export async function startShiftForMember(memberId: string, crewId: string, shif
     }).select().single();
 
     if (error) throw error;
+    log("[startShiftForMember] started shift:", data.id);
     return { success: true, shift: data };
   } catch (e:any) {
-    console.error("[startShiftForMember] error:", e);
+    err("[startShiftForMember] error:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
 
-export async function endShiftForMember(shiftId: string, memberId?: string) {
+export async function endShiftForMember(shiftId: string) {
   try {
     if (!shiftId) return { success: false, error: "shiftId required" };
     const { data, error } = await supabaseAdmin
@@ -92,24 +97,80 @@ export async function endShiftForMember(shiftId: string, memberId?: string) {
       .select()
       .maybeSingle();
     if (error) throw error;
+    log("[endShiftForMember] ended shift:", shiftId);
     return { success: true, shift: data };
   } catch (e:any) {
-    console.error("[endShiftForMember] error:", e);
+    err("[endShiftForMember] error:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
 
 /**
- * saveCheckpointForShift
- * - memberId + crewId are used to resolve the active shift (clock_out_time IS NULL).
- * - checkpointData: any JSON-friendly object (we save into checkpoint JSONB).
+ * saveCheckpointForShift(slug, memberId, checkpointData)
+ * - requires an active shift. Saves checkpoint JSONB into the active shift row under { saved_at, data }.
  */
 export async function saveCheckpointForShift(slug: string, memberId: string, checkpointData: any) {
   try {
     if (!slug || !memberId) return { success: false, error: "slug and memberId required" };
     const crew = await resolveCrewBySlug(slug);
-    if (!crew) return { success: false, error: "Crew not found" };
     const crewId = crew.id;
+    log("[saveCheckpointForShift] slug, member:", slug, memberId);
+
+    const { data: shiftRow, error: shiftErr } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("*")
+      .eq("member_id", memberId)
+      .eq("crew_id", crewId)
+      .is("clock_out_time", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (shiftErr) { err("[saveCheckpointForShift] shift lookup error:", shiftErr); return { success: false, error: "Shift lookup failed" }; }
+    if (!shiftRow) return { success: false, error: "No active shift found for this member" };
+
+    const existing = shiftRow.checkpoint || {};
+    const merged = { ...existing, saved_at: new Date().toISOString(), data: checkpointData };
+
+    const { data, error } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .update({ checkpoint: merged })
+      .eq("id", shiftRow.id)
+      .select()
+      .maybeSingle();
+
+    if (error) { err("[saveCheckpointForShift] update error:", error); return { success: false, error: "Failed to save checkpoint" }; }
+
+    log("[saveCheckpointForShift] saved checkpoint for shift:", shiftRow.id);
+    return { success: true, shift: data };
+  } catch (e:any) {
+    err("[saveCheckpointForShift] unexpected:", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/**
+ * resetCheckpointForShift(slug, memberId)
+ * - requires active shift and checkpoint present.
+ * - will apply the checkpoint snapshot quantities to the cars table (server-side restore).
+ * - This is destructive and requires membership/role check.
+ */
+export async function resetCheckpointForShift(slug: string, memberId: string) {
+  try {
+    if (!slug || !memberId) return { success: false, error: "slug and memberId required" };
+    log("[resetCheckpointForShift] called for", slug, memberId);
+
+    const crew = await resolveCrewBySlug(slug);
+    const crewId = crew.id;
+
+    // role check: only crew adminish allowed to restore
+    const memRes = await supabaseAdmin.from("crew_members").select("role").eq("crew_id", crewId).eq("user_id", memberId).limit(1).maybeSingle();
+    const role = memRes.error ? null : memRes.data?.role || null;
+    const allowedRoles = ["owner", "xadmin", "manager", "admin"];
+    const isOwnerByCrew = crew.owner_id && crew.owner_id === memberId;
+    if (!(isOwnerByCrew || (role && allowedRoles.includes(role)))) {
+      warn("[resetCheckpointForShift] unauthorized attempt:", { role, memberId, crewOwner: crew.owner_id });
+      return { success: false, error: "Not authorized to reset checkpoint" };
+    }
 
     // find active shift
     const { data: shiftRow, error: shiftErr } = await supabaseAdmin
@@ -121,49 +182,56 @@ export async function saveCheckpointForShift(slug: string, memberId: string, che
       .limit(1)
       .maybeSingle();
 
-    if (shiftErr) {
-      console.error("[saveCheckpointForShift] shift lookup error:", shiftErr);
-      return { success: false, error: "Shift lookup failed" };
+    if (shiftErr) { err("[resetCheckpointForShift] shift lookup error:", shiftErr); return { success: false, error: "Shift lookup failed" }; }
+    if (!shiftRow) return { success: false, error: "No active shift found" };
+    if (!shiftRow.checkpoint || !shiftRow.checkpoint.data) return { success: false, error: "No checkpoint saved in active shift" };
+
+    const snapshot = shiftRow.checkpoint.data as Array<{ id: string; quantity: number; locations?: any[] }>;
+    if (!Array.isArray(snapshot)) return { success: false, error: "Checkpoint format invalid" };
+
+    // Apply snapshot to DB — be careful: we will set quantity to snapshot.quantity for items that exist
+    // We'll run sequentially; could be converted to a batch transaction if DB supports it.
+    const failures: Array<{ id: string; error: string }> = [];
+    let applied = 0;
+
+    for (const row of snapshot) {
+      if (!row?.id) continue;
+      const desiredQty = Number(row.quantity || 0);
+      try {
+        const { error: updateErr } = await supabaseAdmin
+          .from("cars")
+          .update({ quantity: desiredQty.toString(), updated_at: new Date().toISOString() })
+          .eq("id", row.id)
+          .eq("crew_id", crewId);
+
+        if (updateErr) {
+          failures.push({ id: row.id, error: updateErr.message || "update failed" });
+          warn("[resetCheckpointForShift] update failed for", row.id, updateErr);
+        } else {
+          applied++;
+        }
+      } catch (e:any) {
+        failures.push({ id: row.id, error: e?.message || "unknown" });
+        warn("[resetCheckpointForShift] unexpected error for", row.id, e);
+      }
     }
-    if (!shiftRow) {
-      return { success: false, error: "No active shift found for this member" };
-    }
 
-    // merge existing checkpoint if any
-    const existing = shiftRow.checkpoint || {};
-    const merged = { ...existing, saved_at: new Date().toISOString(), data: checkpointData };
-
-    const { data, error } = await supabaseAdmin
-      .from("crew_member_shifts")
-      .update({ checkpoint: merged })
-      .eq("id", shiftRow.id)
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      console.error("[saveCheckpointForShift] update error:", error);
-      return { success: false, error: "Failed to save checkpoint" };
-    }
-
-    console.log("[saveCheckpointForShift] saved checkpoint for shift:", shiftRow.id);
-    return { success: true, shift: data };
+    log(`[resetCheckpointForShift] applied ${applied}/${snapshot.length} updates; failures: ${failures.length}`);
+    return { success: failures.length === 0, applied, attempted: snapshot.length, failures: failures.length ? failures : undefined };
   } catch (e:any) {
-    console.error("[saveCheckpointForShift] unexpected:", e);
+    err("[resetCheckpointForShift] unexpected:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
 
 /* -----------------------
-   Existing item fetch functions (kept as before)
-   - fetchCrewBySlug
-   - fetchCrewItemsBySlug
-   - fetchCrewAllCarsBySlug
+   Fetch helpers
    ----------------------- */
 
 export async function fetchCrewBySlug(slug: string): Promise<{ success: boolean; crew?: any; error?: string }> {
   try {
     if (!slug) return { success: false, error: "slug required" };
-    console.log("[fetchCrewBySlug] slug:", slug);
+    log("[fetchCrewBySlug] slug:", slug);
 
     const { data, error } = await supabaseAdmin
       .from("crews")
@@ -172,17 +240,11 @@ export async function fetchCrewBySlug(slug: string): Promise<{ success: boolean;
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      console.error("[fetchCrewBySlug] db error:", error);
-      return { success: false, error: error.message || "DB error" };
-    }
-    if (!data) {
-      console.log("[fetchCrewBySlug] crew not found:", slug);
-      return { success: false, error: "Crew not found" };
-    }
+    if (error) { err("[fetchCrewBySlug] db error:", error); return { success: false, error: error.message || "DB error" }; }
+    if (!data) { log("[fetchCrewBySlug] crew not found:", slug); return { success: false, error: "Crew not found" }; }
     return { success: true, crew: data };
-  } catch (e: any) {
-    console.error("[fetchCrewBySlug] unexpected:", e);
+  } catch (e:any) {
+    err("[fetchCrewBySlug] unexpected:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
@@ -202,7 +264,7 @@ export async function fetchCrewItemsBySlug(
   try {
     if (!slug) return { success: false, error: "slug is required" };
 
-    console.log("[fetchCrewItemsBySlug] start", { slug, userChatId, itemType });
+    log("[fetchCrewItemsBySlug] start", { slug, userChatId, itemType });
 
     const crewRes = await supabaseAdmin
       .from("crews")
@@ -211,16 +273,11 @@ export async function fetchCrewItemsBySlug(
       .limit(1)
       .maybeSingle();
 
-    if (crewRes.error) {
-      console.error("[fetchCrewItemsBySlug] crew lookup error:", crewRes.error);
-      return { success: false, error: "Failed to lookup crew", debug: { crewLookupError: crewRes.error } };
-    }
-    if (!crewRes.data) {
-      return { success: false, error: `Crew '${slug}' not found` };
-    }
+    if (crewRes.error) { err("[fetchCrewItemsBySlug] crew lookup error:", crewRes.error); return { success: false, error: "Failed to lookup crew", debug: { crewLookupError: crewRes.error } }; }
+    if (!crewRes.data) { return { success: false, error: `Crew '${slug}' not found` }; }
     const crew = crewRes.data as any;
 
-    // membership / role lookup (if userChatId provided)
+    // membership / role lookup
     let memberRole: string | null = null;
     if (userChatId) {
       const mem = await supabaseAdmin
@@ -230,34 +287,25 @@ export async function fetchCrewItemsBySlug(
         .eq("user_id", userChatId)
         .limit(1)
         .maybeSingle();
-      if (mem.error) {
-        console.error("[fetchCrewItemsBySlug] member lookup failed:", mem.error);
-      } else if (mem.data) {
-        memberRole = mem.data.role || null;
-      }
+      if (mem.error) { warn("[fetchCrewItemsBySlug] member lookup failed:", mem.error); }
+      else if (mem.data) memberRole = mem.data.role || null;
     }
 
     const typeToUse = itemType ?? (DEBUG_ITEM_TYPE || "");
-    console.log("[fetchCrewItemsBySlug] using type filter:", typeToUse || "(none)");
+    log("[fetchCrewItemsBySlug] using type filter:", typeToUse || "(none)");
 
     let query = supabaseAdmin.from("cars").select("*").eq("crew_id", crew.id).order("make", { ascending: true });
-
-    if (typeToUse && typeToUse.length > 0) {
-      query = query.eq("type", typeToUse);
-    }
+    if (typeToUse && typeToUse.length > 0) query = query.eq("type", typeToUse);
 
     const carsRes = await query.limit(DEBUG_LIMIT);
-    if (carsRes.error) {
-      console.error("[fetchCrewItemsBySlug] cars query error:", carsRes.error);
-      return { success: false, error: "Failed to fetch items", debug: { carsError: carsRes.error } };
-    }
+    if (carsRes.error) { err("[fetchCrewItemsBySlug] cars query error:", carsRes.error); return { success: false, error: "Failed to fetch items", debug: { carsError: carsRes.error } }; }
 
     const rows = (carsRes.data || []).map((r: any) => ({ ...r, specs: safeParseSpecs(r.specs) }));
-    console.log("[fetchCrewItemsBySlug] returning", { crew: crew.id, count: rows.length, memberRole });
+    log("[fetchCrewItemsBySlug] returning", { crew: crew.id, count: rows.length, memberRole });
 
     return { success: true, data: rows, crew: { id: crew.id, name: crew.name, slug: crew.slug, owner_id: crew.owner_id, logo_url: crew.logo_url }, memberRole, debug: { count: rows.length } };
   } catch (e: any) {
-    console.error("[fetchCrewItemsBySlug] unexpected error:", e);
+    err("[fetchCrewItemsBySlug] unexpected error:", e);
     return { success: false, error: e?.message || "unknown error" };
   }
 }
@@ -265,29 +313,28 @@ export async function fetchCrewItemsBySlug(
 export async function fetchCrewAllCarsBySlug(slug: string): Promise<{ success: boolean; data?: any[]; crew?: any; error?: string; debug?: any }> {
   try {
     if (!slug) return { success: false, error: "slug required" };
-    console.log("[fetchCrewAllCarsBySlug] slug:", slug);
+    log("[fetchCrewAllCarsBySlug] slug:", slug);
 
     const crewRes = await supabaseAdmin.from("crews").select("id, name, slug, owner_id, logo_url").eq("slug", slug).limit(1).maybeSingle();
-    if (crewRes.error) {
-      console.error("[fetchCrewAllCarsBySlug] crew lookup error:", crewRes.error);
-      return { success: false, error: "Crew lookup failed", debug: { crewLookupError: crewRes.error } };
-    }
+    if (crewRes.error) { err("[fetchCrewAllCarsBySlug] crew lookup error:", crewRes.error); return { success: false, error: "Crew lookup failed", debug: { crewLookupError: crewRes.error } }; }
     if (!crewRes.data) { return { success: false, error: "Crew not found" }; }
     const crew = crewRes.data as any;
 
     const carsRes = await supabaseAdmin.from("cars").select("*").eq("crew_id", crew.id).order("make", { ascending: true }).limit(DEBUG_LIMIT);
-    if (carsRes.error) { console.error("[fetchCrewAllCarsBySlug] cars error:", carsRes.error); return { success: false, error: "Failed to fetch cars", debug: { carsError: carsRes.error } }; }
+    if (carsRes.error) { err("[fetchCrewAllCarsBySlug] cars error:", carsRes.error); return { success: false, error: "Failed to fetch cars", debug: { carsError: carsRes.error } }; }
     const data = (carsRes.data || []).map((r:any) => ({ ...r, specs: safeParseSpecs(r.specs) }));
-    console.log("[fetchCrewAllCarsBySlug] returning count:", data.length);
+    log("[fetchCrewAllCarsBySlug] returning count:", data.length);
     return { success: true, data, crew: { id: crew.id, name: crew.name, slug: crew.slug, owner_id: crew.owner_id, logo_url: crew.logo_url }, debug: { total: data.length } };
   } catch (e:any) {
-    console.error("[fetchCrewAllCarsBySlug] unexpected:", e);
+    err("[fetchCrewAllCarsBySlug] unexpected:", e);
     return { success: false, error: e?.message || "unknown", debug: null };
   }
 }
 
 /* -----------------------
-   updateItemQuantityForCrew: when an item is changed, append an action entry to the active shift.actions JSONB
+   updateItemQuantityForCrew
+   - updates cars.quantity
+   - appends action to active shift.actions (best-effort)
    ----------------------- */
 
 export async function updateItemQuantityForCrew(
@@ -298,35 +345,31 @@ export async function updateItemQuantityForCrew(
 ): Promise<{ success: boolean; item?: any; error?: string; debug?: any }> {
   try {
     if (!slug || !itemId || typeof delta !== "number") return { success: false, error: "Missing parameters" };
-    console.log("[updateItemQuantityForCrew] called", { slug, itemId, delta, userId });
+    log("[updateItemQuantityForCrew] called", { slug, itemId, delta, userId });
 
-    // resolve crew
     const crewRes = await supabaseAdmin.from("crews").select("id, owner_id").eq("slug", slug).limit(1).maybeSingle();
-    if (crewRes.error) {
-      console.error("[updateItemQuantityForCrew] crew lookup error:", crewRes.error);
-      return { success: false, error: "Crew lookup failed" };
-    }
+    if (crewRes.error) { err("[updateItemQuantityForCrew] crew lookup error:", crewRes.error); return { success: false, error: "Crew lookup failed" }; }
     if (!crewRes.data) return { success: false, error: "Crew not found" };
     const crewId = (crewRes.data as any).id;
 
-    // check user role
+    // role check
     let userRole: string | null = null;
     if (userId) {
       const mem = await supabaseAdmin.from("crew_members").select("role, membership_status").eq("crew_id", crewId).eq("user_id", userId).limit(1).maybeSingle();
-      if (mem.error) console.warn("[updateItemQuantityForCrew] member lookup error:", mem.error);
+      if (mem.error) warn("[updateItemQuantityForCrew] member lookup error:", mem.error);
       else if (mem.data) userRole = mem.data.role || null;
     }
     const allowedRoles = ["owner", "xadmin", "manager", "admin"];
     const isOwnerByCrew = crewRes.data.owner_id && userId && crewRes.data.owner_id === userId;
     const canModify = isOwnerByCrew || (userRole && allowedRoles.includes(userRole));
     if (!canModify) {
-      console.warn("[updateItemQuantityForCrew] unauthorized modification attempt", { userId, userRole, crewOwner: crewRes.data.owner_id });
+      warn("[updateItemQuantityForCrew] unauthorized modification attempt", { userId, userRole, crewOwner: crewRes.data.owner_id });
       return { success: false, error: "Not authorized to modify this crew's items" };
     }
 
     // find item
     const itemRes = await supabaseAdmin.from("cars").select("*").eq("id", itemId).eq("crew_id", crewId).limit(1).maybeSingle();
-    if (itemRes.error) { console.error("[updateItemQuantityForCrew] item lookup error:", itemRes.error); return { success: false, error: "Item lookup failed" }; }
+    if (itemRes.error) { err("[updateItemQuantityForCrew] item lookup error:", itemRes.error); return { success: false, error: "Item lookup failed" }; }
     if (!itemRes.data) { return { success: false, error: "Item not found for this crew" }; }
     const item = itemRes.data as any;
     const oldQty = Number(item.quantity || 0);
@@ -339,12 +382,9 @@ export async function updateItemQuantityForCrew(
       .select()
       .maybeSingle();
 
-    if (updateErr) {
-      console.error("[updateItemQuantityForCrew] update error:", updateErr);
-      return { success: false, error: "Failed to update item quantity" };
-    }
+    if (updateErr) { err("[updateItemQuantityForCrew] update error:", updateErr); return { success: false, error: "Failed to update item quantity" }; }
 
-    // --- append action entry into active shift.actions JSONB (best-effort) ---
+    // append action to active shift if exists (best-effort)
     try {
       const shiftRes = await supabaseAdmin
         .from("crew_member_shifts")
@@ -368,7 +408,7 @@ export async function updateItemQuantityForCrew(
           source: "bikehouse_ui"
         };
 
-        const existingActions = Array.isArray(shiftRow.actions) ? shiftRow.actions : (shiftRow.actions ? JSON.parse(shiftRow.actions) : []);
+        const existingActions = Array.isArray(shiftRow.actions) ? shiftRow.actions : (shiftRow.actions ? shiftRow.actions : []);
         const newActions = [...existingActions, actionEntry];
 
         const { error: appendErr } = await supabaseAdmin
@@ -376,22 +416,19 @@ export async function updateItemQuantityForCrew(
           .update({ actions: newActions })
           .eq("id", shiftRow.id);
 
-        if (appendErr) {
-          console.warn("[updateItemQuantityForCrew] failed to append action to shift (non-fatal):", appendErr);
-        } else {
-          console.log("[updateItemQuantityForCrew] appended action to shift:", shiftRow.id);
-        }
+        if (appendErr) warn("[updateItemQuantityForCrew] failed to append action to shift (non-fatal):", appendErr);
+        else log("[updateItemQuantityForCrew] appended action to shift:", shiftRow.id);
       }
     } catch (e) {
-      console.warn("[updateItemQuantityForCrew] shift append unexpected:", e);
+      warn("[updateItemQuantityForCrew] shift append unexpected:", e);
     }
 
     const normalized = { ...(updateData || item), specs: safeParseSpecs((updateData || item).specs) };
-    console.log("[updateItemQuantityForCrew] success", { itemId, oldQty, newQty });
+    log("[updateItemQuantityForCrew] success", { itemId, oldQty, newQty });
 
     return { success: true, item: normalized, debug: { oldQty, newQty, userRole } };
   } catch (e:any) {
-    console.error("[updateItemQuantityForCrew] unexpected:", e);
+    err("[updateItemQuantityForCrew] unexpected:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
@@ -405,7 +442,7 @@ export async function notifyOwnerAboutStorageRequest(
   try {
     if (!slug || !message) return { success: false, error: "Missing params" };
     const crewRes = await supabaseAdmin.from("crews").select("id, name, owner_id").eq("slug", slug).limit(1).maybeSingle();
-    if (crewRes.error) { console.error("[notifyOwner] crew lookup failed:", crewRes.error); return { success: false, error: "Crew lookup failed" }; }
+    if (crewRes.error) { err("[notifyOwner] crew lookup failed:", crewRes.error); return { success: false, error: "Crew lookup failed" }; }
     if (!crewRes.data) return { success: false, error: "Crew not found" };
     const ownerId = crewRes.data.owner_id;
     if (!ownerId) return { success: false, error: "Owner not configured for this crew" };
@@ -413,17 +450,15 @@ export async function notifyOwnerAboutStorageRequest(
     const finalMessage = `Bikehouse request for crew '${crewRes.data.name}'\nFrom: ${requesterId || "anonymous"}\n\n${message}`;
     try {
       const res = await sendTelegramMessage(finalMessage, [], undefined, ownerId);
-      if (!res.success) {
-        console.error("[notifyOwner] sendTelegramMessage returned error:", res.error);
-        return { success: false, error: res.error || "Failed to send telegram" };
-      }
+      if (!res.success) { err("[notifyOwner] sendTelegramMessage returned error:", res.error); return { success: false, error: res.error || "Failed to send telegram" }; }
+      log("[notifyOwner] notified owner:", ownerId);
       return { success: true };
     } catch (e:any) {
-      console.error("[notifyOwner] unexpected send error:", e);
+      err("[notifyOwner] unexpected send error:", e);
       return { success: false, error: e?.message || "notify failed" };
     }
   } catch (e:any) {
-    console.error("[notifyOwner] unexpected:", e);
+    err("[notifyOwner] unexpected:", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }

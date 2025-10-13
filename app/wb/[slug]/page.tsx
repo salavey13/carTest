@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -8,10 +8,10 @@ import WarehouseViz from "@/components/WarehouseViz";
 import WarehouseStats from "@/components/WarehouseStats";
 import FilterAccordion from "@/components/FilterAccordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Image from "next/image";
-import { Save, RotateCcw, Download, Upload, FileText } from "lucide-react";
+import { Save, RotateCcw, Download, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function BikehousePage() {
   const params = useParams() as { slug?: string };
@@ -20,18 +20,14 @@ export default function BikehousePage() {
 
   const [crew, setCrew] = useState<any | null>(null);
   const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [localItems, setLocalItems] = useState<any[]>([]);
   const [memberRole, setMemberRole] = useState<string | null>(null);
   const [gameMode, setGameMode] = useState<null | "onload" | "offload" | "none">(null);
-  const [localItems, setLocalItems] = useState<any[]>([]);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
   const [checkpoint, setCheckpoint] = useState<any[] | null>(null);
   const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const isTelegram = !!tg;
-  const isAdminish = memberRole && ["owner", "xadmin", "manager", "admin"].includes(memberRole);
-
-  // filters (small)
   const [search, setSearch] = useState("");
   const [filterSeason, setFilterSeason] = useState<string | null>(null);
   const [filterPattern, setFilterPattern] = useState<string | null>(null);
@@ -39,53 +35,81 @@ export default function BikehousePage() {
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<'size_season_color'|'color_size'|'season_size_color' | null>('size_season_color');
 
-// after you set crew and items on initial load — fetch active shift
-useEffect(() => {
-  if (!slug || !dbUser) return;
-  let mounted = true;
-  (async () => {
-    try {
-      const mod = await import("@/app/wb/[slug]/actions");
-      const getActiveShiftForMember = mod?.getActiveShiftForMember;
-      if (typeof getActiveShiftForMember !== "function") return;
-      const crewId = crew?.id;
-      if (!crewId) return;
-      const res = await getActiveShiftForMember(dbUser.user_id, crewId);
-      if (!mounted) return;
-      if (res?.success && res.shift) {
-        // if shift contains checkpoint -> restore it
-        if (res.shift.checkpoint && Object.keys(res.shift.checkpoint || {}).length > 0) {
-          const cp = res.shift.checkpoint.data ?? null;
-          if (cp && Array.isArray(cp)) {
-            // cp expected to be the array of items snapshot
-            setLocalItems(cp);
-            toast.success("Checkpoint restored from active shift");
-            setCheckpoint(cp);
+  const isTelegram = !!tg;
+  const isAdminish = memberRole && ["owner", "xadmin", "manager", "admin"].includes(memberRole);
+
+  // initial load: crew metadata + items
+  useEffect(() => {
+    if (!slug) return;
+    let mounted = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const mod = await import("@/app/wb/[slug]/actions");
+        const crewRes = await mod.fetchCrewBySlug(slug);
+        if (crewRes.success && mounted) setCrew(crewRes.crew);
+        // fetch items; allow non-members to view
+        const itemsRes = await mod.fetchCrewItemsBySlug(slug, dbUser?.user_id);
+        if (itemsRes.success && mounted) {
+          setItems(itemsRes.data || []);
+          setLocalItems(itemsRes.data || []);
+          setMemberRole(itemsRes.memberRole || null);
+        } else {
+          if (mounted) {
+            setItems([]);
+            setLocalItems([]);
+            toast.error(itemsRes.error || "Не удалось загрузить позиции");
           }
         }
-        // store shift in state if needed
-        // setActiveShift(res.shift);
+      } catch (e:any) {
+        console.error("Initial load failed:", e);
+        toast.error("Ошибка загрузки страницы");
+      } finally {
+        if (mounted) setLoading(false);
       }
-    } catch (e:any) {
-      console.warn("Failed to fetch active shift:", e);
-    }
-  })();
-  return () => { mounted = false; };
-}, [slug, dbUser, crew]);
+    })();
+    return () => { mounted = false; };
+  }, [slug, dbUser?.user_id]);
 
-  // keep a local copy for optimistic updates
+  // if member has active shift with checkpoint — restore it on load
+  useEffect(() => {
+    if (!slug || !dbUser?.user_id || !crew?.id) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("@/app/wb/[slug]/actions");
+        const getActiveShiftForMember = mod?.getActiveShiftForMember;
+        if (typeof getActiveShiftForMember !== "function") return;
+        const res = await getActiveShiftForMember(dbUser.user_id, crew.id);
+        if (!mounted) return;
+        if (res?.success && res.shift) {
+          if (res.shift.checkpoint && Object.keys(res.shift.checkpoint || {}).length > 0) {
+            const cp = res.shift.checkpoint.data ?? null;
+            if (cp && Array.isArray(cp)) {
+              setLocalItems(cp);
+              setCheckpoint(cp);
+              toast.success("Checkpoint restored from active shift");
+            }
+          }
+        }
+      } catch (e:any) {
+        console.warn("Failed to fetch active shift:", e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [slug, dbUser?.user_id, crew?.id]);
+
+  // keep local mirror for optimistic updates
   useEffect(() => setLocalItems(items || []), [items]);
 
-  // helpers: optimistic update (client) and server sync
+  // optimistic update (UI) + server sync
   const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
-    // update localItems
     setLocalItems(prev => prev.map(i => {
       if (i.id !== itemId) return i;
       const qty = Number(i.quantity || 0) + delta;
       return { ...i, quantity: Math.max(0, qty) };
     }));
 
-    // server update
     (async () => {
       try {
         const mod = await import("@/app/wb/[slug]/actions");
@@ -95,11 +119,9 @@ useEffect(() => {
         if (!res.success) {
           toast.error(res.error || "Server rejected change");
           // reload items on failure
-          const reload = await import("@/app/wb/[slug]/actions");
-          const fres = await reload.fetchCrewItemsBySlug(slug!, dbUser?.user_id);
+          const fres = await mod.fetchCrewItemsBySlug(slug!, dbUser?.user_id);
           if (fres && fres.success) setLocalItems(fres.data || []);
         } else {
-          // merge server item
           const returned = res.item;
           setLocalItems(prev => prev.map(it => it.id === returned.id ? returned : it));
         }
@@ -121,73 +143,77 @@ useEffect(() => {
     }
     if (gameMode === "offload") {
       if (!isAdminish) return toast.error("Только админы экипажа могут выдавать байки");
-      // simple offload: reduce quantity by 1 if >0
       if ((Number(item.quantity || 0)) <= 0) return toast.error("Нет байка в наличии");
-      // if multiple locations exist, we skip voxel detail for now
       optimisticUpdate(item.id, selectedVoxel || "A1", -1);
       toast.success(`Выдача: -1`);
       return;
     }
-
-    // default: open card (toast stub)
     toast(`Open: ${item.make || ""} ${item.model || ""}`);
   };
 
-  // checkpoint + reset
-const handleCheckpoint = async () => {
-  if (!slug) return toast.error("slug missing");
-  if (!dbUser?.user_id) return toast.error("login required to save checkpoint");
+  // Save checkpoint — requires active shift (server enforces it)
+  const handleCheckpoint = async () => {
+    if (!slug) return toast.error("slug missing");
+    if (!dbUser?.user_id) return toast.error("login required to save checkpoint");
 
-  try {
-    // checkpoint snapshot: array of items with minimal fields (ids + locations + total_quantity)
-    const snapshot = localItems.map(i => ({
-      id: i.id,
-      quantity: i.quantity ?? i.total_quantity ?? 0,
-      locations: i.locations ?? []
-    }));
+    try {
+      const snapshot = localItems.map(i => ({
+        id: i.id,
+        quantity: Number(i.quantity ?? i.total_quantity ?? 0),
+        locations: i.locations ?? []
+      }));
 
-    const mod = await import("@/app/wb/[slug]/actions");
-    const saveCheckpointForShift = mod?.saveCheckpointForShift;
-    if (typeof saveCheckpointForShift !== "function") {
-      return toast.error("Server-side checkpoint save not available");
+      const mod = await import("@/app/wb/[slug]/actions");
+      const saveFn = mod?.saveCheckpointForShift;
+      if (typeof saveFn !== "function") return toast.error("Server-side checkpoint save not available");
+
+      const res = await saveFn(slug!, dbUser.user_id, snapshot);
+      if (!res.success) return toast.error(res.error || "Failed to save checkpoint on server");
+
+      setCheckpoint(snapshot);
+      setCheckpointStart(Date.now());
+      toast.success("Checkpoint saved to active shift (server)");
+    } catch (e:any) {
+      console.error("handleCheckpoint error:", e);
+      toast.error(e?.message || "Failed to save checkpoint");
     }
-
-    const res = await saveCheckpointForShift(slug!, dbUser.user_id, snapshot);
-    if (!res.success) {
-      return toast.error(res.error || "Failed to save checkpoint on server");
-    }
-
-    // locally mirror checkpoint and set checkpoint start
-    setCheckpoint(snapshot);
-    setCheckpointStart(Date.now());
-    toast.success("Checkpoint saved to active shift (server)");
-  } catch (e:any) {
-    console.error("handleCheckpoint error:", e);
-    toast.error(e?.message || "Failed to save checkpoint");
-  }
-};
-
-
-  const handleReset = () => {
-    if (!checkpoint) return toast.error("Нет чекпоинта");
-    setLocalItems(checkpoint.map(i => ({ ...i })));
-    setCheckpoint(null);
-    setCheckpointStart(null);
-    toast.success("Reset to checkpoint");
   };
 
-  // call export - reuse existing wb actions exportDailyEntry if available
+  // Reset checkpoint (server-side restore of car quantities)
+  const handleReset = async () => {
+    if (!slug) return toast.error("slug missing");
+    if (!dbUser?.user_id) return toast.error("login required to reset checkpoint");
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const resetFn = mod?.resetCheckpointForShift;
+      if (typeof resetFn !== "function") return toast.error("Reset not available");
+      const res = await resetFn(slug!, dbUser.user_id);
+      if (!res.success) {
+        return toast.error(res.error || "Failed to reset checkpoint");
+      }
+      // reload items after reset
+      const fres = await mod.fetchCrewItemsBySlug(slug!, dbUser?.user_id);
+      if (fres.success) {
+        setItems(fres.data || []);
+        setLocalItems(fres.data || []);
+      }
+      setCheckpoint(null);
+      setCheckpointStart(null);
+      toast.success(`Checkpoint restored on server. Applied: ${res.applied || 0}/${res.attempted || 0}`);
+    } catch (e:any) {
+      console.error("handleReset error:", e);
+      toast.error(e?.message || "Reset failed");
+    }
+  };
+
   const handleExportDaily = async () => {
     try {
-      const mod = await import("@/app/wb/actions");
+      const mod = await import("@/app/wb/[slug]/actions");
       const exportDailyEntry = mod?.exportDailyEntry;
-      if (typeof exportDailyEntry !== "function") {
-        return toast.error("Экспорт временно недоступен");
-      }
-      // prepare sums (simple: by make)
+      if (typeof exportDailyEntry !== "function") return toast.error("Экспорт временно недоступен");
+
       const sumsPrev: Record<string, number> = {};
       const sumsCurr: Record<string, number> = {};
-      // we don't have previous snapshot here (use checkpoint)
       (checkpoint || []).forEach((c: any) => sumsPrev[c.make || "other"] = (sumsPrev[c.make || "other"] || 0) + Number(c.quantity || 0));
       (localItems || []).forEach((c: any) => sumsCurr[c.make || "other"] = (sumsCurr[c.make || "other"] || 0) + Number(c.quantity || 0));
       const res = await exportDailyEntry(sumsPrev, sumsCurr, gameMode || "default", crew?.slug || "bikehouse", isTelegram);
@@ -196,7 +222,6 @@ const handleCheckpoint = async () => {
           await navigator.clipboard.writeText(res.csv);
           toast.success("TSV скопирован в буфер обмена");
         } catch {
-          // fallback download
           const blob = new Blob([res.csv], { type: "text/tab-separated-values;charset=utf-8" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -217,26 +242,12 @@ const handleCheckpoint = async () => {
     }
   };
 
-  // filter/sort from FilterAccordion
-  const filteredItems = useMemo(() => {
-    const q = (search || "").toLowerCase();
-    return (localItems || []).filter(it => {
-      const matchesSearch = ((it.make || "") + " " + (it.model || "") + " " + (it.description || "")).toLowerCase().includes(q);
-      const matchesSeason = !filterSeason || it.season === filterSeason;
-      const matchesPattern = !filterPattern || it.pattern === filterPattern;
-      const matchesColor = !filterColor || it.color === filterColor;
-      const matchesSize = !filterSize || it.size === filterSize;
-      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-    }).sort((a,b) => 0); // keep order simple
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize]);
-
-  // contact owner action (opens server-side notification)
   const contactOwner = async () => {
     try {
       const mod = await import("@/app/wb/[slug]/actions");
       const notify = mod?.notifyOwnerAboutStorageRequest;
       if (typeof notify !== "function") return toast.error("Notify action not available");
-      const message = `Запрос на хранение/обсуждение ячейки.\nSlug: ${slug}\nПросьба: обсудите условия хранения.`;
+      const message = `Запрос на обсуждение условий хранения для экипажа: ${slug}\nПожалуйста, свяжитесь с отправившим.`;
       const res = await notify(slug!, message, dbUser?.user_id);
       if (!res.success) return toast.error(res.error || "Не удалось отправить уведомление владельцу");
       toast.success("Владелец уведомлён в Telegram (если настроен)");
@@ -246,18 +257,14 @@ const handleCheckpoint = async () => {
     }
   };
 
-  if (!slug) return <div className="p-6">No crew slug</div>;
-
   const debugFetchAll = async () => {
     try {
       const mod = await import("@/app/wb/[slug]/actions");
-      if (typeof mod.fetchCrewAllCarsBySlug !== "function") {
-        toast.error("Debug not available");
-        return;
-      }
-      const res = await mod.fetchCrewAllCarsBySlug(slug);
+      if (typeof mod.fetchCrewAllCarsBySlug !== "function") return toast.error("Debug not available");
+      const res = await mod.fetchCrewAllCarsBySlug(slug!);
       console.log("[debugFetchAll]", res);
       if (res.success) {
+        setItems(res.data || []);
         setLocalItems(res.data || []);
         toast.success(`Debug fetched ${res.data?.length || 0} cars`);
       } else {
@@ -268,6 +275,20 @@ const handleCheckpoint = async () => {
       toast.error("Debug failed");
     }
   };
+
+  const filteredItems = useMemo(() => {
+    const q = (search || "").toLowerCase();
+    return (localItems || []).filter(it => {
+      const matchesSearch = ((it.make || "") + " " + (it.model || "") + " " + (it.description || "")).toLowerCase().includes(q);
+      const matchesSeason = !filterSeason || it.season === filterSeason;
+      const matchesPattern = !filterPattern || it.pattern === filterPattern;
+      const matchesColor = !filterColor || it.color === filterColor;
+      const matchesSize = !filterSize || it.size === filterSize;
+      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
+    });
+  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize]);
+
+  if (!slug) return <div className="p-6">No crew slug</div>;
 
   return (
     <div className="min-h-screen p-4 bg-gradient-to-b from-slate-50 to-white text-slate-900">
@@ -285,11 +306,10 @@ const handleCheckpoint = async () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* compact toolbar: checkpoint, reset, export, import */}
           <button className="p-2 rounded border" title="Checkpoint" onClick={handleCheckpoint}><Save size={14} /></button>
           <button className="p-2 rounded border" title="Reset to checkpoint" onClick={handleReset}><RotateCcw size={14} /></button>
           <button className="p-2 rounded border" title="Export daily" onClick={handleExportDaily}><Download size={14} /></button>
-          <button className="p-2 rounded border" title="Export stock (summary)" onClick={() => { toast.info("Stock export (todo)"); }}><FileText size={14} /></button>
+          <button className="p-2 rounded border" title="Export stock (summary)" onClick={() => toast.info("Stock export (todo)") }><FileText size={14} /></button>
         </div>
       </header>
 
@@ -308,7 +328,7 @@ const handleCheckpoint = async () => {
 
           <div className="flex-1" />
 
-          {process.env.NEXT_PUBLIC_DEBUG === "1" && (
+          {process.env.NEXT_PUBLIC_DEBUG !== "0" && (
             <button className="text-xs text-muted-foreground" onClick={debugFetchAll}>debug: fetch all</button>
           )}
         </div>
@@ -370,11 +390,11 @@ const handleCheckpoint = async () => {
           <h3 className="text-base font-semibold mb-2">Инструкция для использования (весело)</h3>
           <div className="bg-slate-50 p-3 rounded text-sm text-muted-foreground">
             <ol className="list-decimal list-inside space-y-1">
-              <li>Выберите режим сверху: Прием — чтобы добавить байки в ячейки; Выдача — чтобы снять.</li>
-              <li>Нажмите на клетку склада (ячейку) в плане, чтобы выбрать место хранения. Затем нажмите на карточку байка справа, чтобы положить/забрать единицу.</li>
-              <li>Нужна обсуждение условий хранения? Нажмите <button className="underline" onClick={contactOwner}>Contact Owner</button> — мы отправим владельцу короткое сообщение в Telegram.</li>
+              <li>Выберите режим сверху: Прием — чтобы добавить байки; Выдача — чтобы снять.</li>
+              <li>Нажмите на клетку склада в плане, чтобы выбрать место хранения. Затем нажмите карточку байка справа — чтобы положить/забрать единицу.</li>
+              <li>Нужна помощь? <button className="underline" onClick={contactOwner}>Contact Owner</button> — мы отправим владельцу короткое сообщение в Telegram.</li>
             </ol>
-            <p className="mt-2 italic text-xs">Совет: при тестировании включите DEBUG режим (NEXT_PUBLIC_DEBUG=1) и используйте debug: fetch all, если не видите ожидаемые позиции.</p>
+            <p className="mt-2 italic text-xs">Совет: при тестировании включите DEBUG режим (NEXT_PUBLIC_DEBUG ≠ 0) и используйте debug: fetch all, если не видите позиции.</p>
           </div>
         </section>
       </main>
