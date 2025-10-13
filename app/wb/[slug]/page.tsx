@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import WarehouseViz from "@/components/WarehouseViz";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -17,12 +16,14 @@ export default function CrewWBPage() {
   const [items, setItems] = useState<any[]>([]);
   const [crew, setCrew] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [debug, setDebug] = useState<any | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     let mounted = true;
     (async () => {
       setLoading(true);
+      setDebug(null);
       try {
         const mod = await import("@/app/wb/[slug]/actions");
         const fetchCrewItemsBySlug = mod?.fetchCrewItemsBySlug;
@@ -38,12 +39,18 @@ export default function CrewWBPage() {
 
         const userChatId = dbUser?.user_id ?? undefined;
         const itemsRes = await fetchCrewItemsBySlug(slug, userChatId); // uses DEBUG_ITEM_TYPE='bike' by default
+        // debug: log server response
+        // eslint-disable-next-line no-console
+        console.log("[Client] fetchCrewItemsBySlug result:", itemsRes);
+
         if (!mounted) return;
         if (!itemsRes.success) {
           toast.error(`Не удалось загрузить items: ${itemsRes.error || "unknown"}`);
           setItems([]);
+          setDebug(itemsRes.debug || null);
         } else {
           setItems(itemsRes.data || []);
+          setDebug(itemsRes.debug || null);
         }
       } catch (err: any) {
         console.error("CrewWBPage load error:", err);
@@ -56,47 +63,48 @@ export default function CrewWBPage() {
     return () => { mounted = false; };
   }, [slug, dbUser]);
 
-  if (!slug) return <div className="p-8">No crew slug provided</div>;
+  if (!slug) return <div className="p-4 text-sm">No crew slug provided</div>;
 
-  const debugType = process.env.DEBUG_ITEM_TYPE || "bike";
+  const debugType = process.env.NEXT_PUBLIC_DEBUG_ITEM_TYPE || process.env.DEBUG_ITEM_TYPE || "bike";
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-b from-slate-50 to-white text-slate-900">
-      <header className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          {crew?.logo_url ? (
-            <div className="w-16 h-16 rounded-md overflow-hidden shadow">
-              <Image src={crew.logo_url} alt={crew?.name || slug} width={64} height={64} className="object-cover" />
-            </div>
-          ) : (
-            <div className="w-16 h-16 rounded-md bg-slate-200 flex items-center justify-center text-xl font-bold">BH</div>
-          )}
-          <div>
-            <h1 className="text-2xl font-bold">Bikehouse — {crew?.name || slug}</h1>
-            <p className="text-sm text-muted-foreground">Тип: <strong>{debugType}</strong> · Показаны позиции экипажа</p>
+    <div className="min-h-screen px-4 py-3 bg-gradient-to-b from-white to-slate-50 text-slate-900">
+      <header className="flex items-center gap-3 mb-4">
+        {crew?.logo_url ? (
+          <div className="w-12 h-12 rounded-md overflow-hidden shadow-sm flex-shrink-0">
+            <Image src={crew.logo_url} alt={crew?.name || slug} width={48} height={48} className="object-cover" />
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button onClick={() => { setItems([]); toast.success("Локальная перезагрузка (имитация)"); }}>Clear view</Button>
-          <Button variant="outline" onClick={() => toast.info("Заглушка: открой основную страницу")}>Open main</Button>
+        ) : (
+          <div className="w-12 h-12 rounded-md bg-slate-200 flex items-center justify-center text-base font-bold flex-shrink-0">BH</div>
+        )}
+        <div>
+          <h1 className="text-lg font-semibold leading-tight">Bikehouse — {crew?.name || slug}</h1>
+          <p className="text-xs text-muted-foreground">Тип: <strong>{debugType}</strong></p>
         </div>
       </header>
 
       <main>
-        <section className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Витрина байков ({items.length})</h2>
+        <section className="mb-4">
+          <h2 className="text-sm font-medium mb-2">Витрина байков <span className="text-xs text-muted-foreground">({items.length})</span></h2>
+
           {loading ? (
-            <p>Загрузка байков…</p>
+            <p className="text-sm">Загрузка…</p>
           ) : items.length === 0 ? (
-            <p className="text-muted-foreground">Нет байков в этом экипаже (тип: {debugType}).</p>
+            <div className="text-xs text-muted-foreground">
+              <p>Нет байков в этом экипаже (тип: {debugType}).</p>
+              {debug ? (
+                <details className="mt-2 text-xs bg-slate-50 border border-slate-100 p-2 rounded">
+                  <summary className="cursor-pointer">Диагностика (нажми)</summary>
+                  <pre className="text-[11px] mt-2 whitespace-pre-wrap">{JSON.stringify(debug, null, 2)}</pre>
+                </details>
+              ) : null}
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3">
               {items.map((it) => (
-                <div key={it.id} className="bg-card p-3 rounded-lg shadow-sm">
-                  <WarehouseItemCard item={it} onClick={() => toast(`Открыл карточку ${it.make} ${it.model}`)} />
-                  {/* Bike-specific quick info */}
-                  <div className="mt-2 text-sm text-muted-foreground">
+                <div key={it.id} className="bg-card p-2 rounded-md shadow-sm">
+                  <WarehouseItemCard item={it} onClick={() => toast(`Открыл ${it.make} ${it.model}`)} />
+                  <div className="mt-1 text-xs text-muted-foreground">
                     {it.specs?.engine_cc && <div>Двигатель: {it.specs.engine_cc} cc</div>}
                     {it.specs?.horsepower && <div>Л.с.: {it.specs.horsepower}</div>}
                     {it.daily_price && <div>Цена: {it.daily_price} ₽</div>}
@@ -107,9 +115,9 @@ export default function CrewWBPage() {
           )}
         </section>
 
-        <section className="mt-8">
-          <h3 className="text-lg font-semibold mb-2">План склада</h3>
-          <div className="bg-white p-4 rounded shadow">
+        <section className="mt-6">
+          <h3 className="text-sm font-medium mb-2">План склада</h3>
+          <div className="bg-white p-2 rounded shadow-sm">
             <WarehouseViz items={items} VOXELS={[]} onSelectVoxel={() => {}} onUpdateLocationQty={() => {}} gameMode={null} onPlateClick={() => {}} />
           </div>
         </section>
