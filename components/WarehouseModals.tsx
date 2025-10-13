@@ -22,7 +22,7 @@ interface WarehouseModalsProps {
   setEditContents: React.Dispatch<React.SetStateAction<any[]>>;
   saveEditQty: (itemId: string, newQty: number) => Promise<void>;
   gameMode: "offload" | "onload" | null;
-  VOXELS: any[];
+  VOXELS?: any[]; // optional override, but we still guard imported VOXELS
 }
 
 export default function WarehouseModals({
@@ -39,14 +39,16 @@ export default function WarehouseModals({
   setEditContents,
   saveEditQty,
   gameMode,
-  VOXELS,
+  VOXELS: propVoxels,
 }: WarehouseModalsProps) {
   const [localEditContents, setLocalEditContents] = useState(editContents || []);
 
-  // CORRECT SYNC: useEffect, not useState hack
   useEffect(() => {
     setLocalEditContents(editContents || []);
   }, [editContents]);
+
+  // prefer prop VOXELS if provided, otherwise fallback to imported VOXELS; guard with Array.isArray
+  const safeVoxels = Array.isArray(propVoxels) ? propVoxels : (Array.isArray(VOXELS) ? VOXELS : []);
 
   const handleSaveAll = async () => {
     if (!localEditContents || localEditContents.length === 0) {
@@ -64,7 +66,7 @@ export default function WarehouseModals({
   return (
     <>
       {/* Workflow Dialog */}
-      {workflowItems.length > 0 && (
+      {Array.isArray(workflowItems) && workflowItems.length > 0 && (
         <Dialog open={true}>
           <DialogContent className="p-4 max-w-md">
             <DialogHeader>
@@ -78,7 +80,7 @@ export default function WarehouseModals({
                     <SelectValue placeholder="Ячейка" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VOXELS.map((v) => (
+                    {safeVoxels.map((v) => (
                       <SelectItem key={v.id} value={v.id} className="text-[10px]">
                         {v.id}
                       </SelectItem>
@@ -100,7 +102,7 @@ export default function WarehouseModals({
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <Dialog open={!!editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="p-4 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-sm">Редактировать {editVoxel}</DialogTitle>
