@@ -39,45 +39,39 @@ export default function BikehousePage() {
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<'size_season_color'|'color_size'|'season_size_color' | null>('size_season_color');
 
-  useEffect(() => {
-    if (!slug) return;
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const mod = await import("@/app/wb/[slug]/actions");
-        const fetchCrewBySlug = mod?.fetchCrewBySlug;
-        const fetchCrewItemsBySlug = mod?.fetchCrewItemsBySlug;
-        if (typeof fetchCrewBySlug !== "function" || typeof fetchCrewItemsBySlug !== "function") {
-          throw new Error("Server actions unavailable");
+// after you set crew and items on initial load — fetch active shift
+useEffect(() => {
+  if (!slug || !dbUser) return;
+  let mounted = true;
+  (async () => {
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const getActiveShiftForMember = mod?.getActiveShiftForMember;
+      if (typeof getActiveShiftForMember !== "function") return;
+      const crewId = crew?.id;
+      if (!crewId) return;
+      const res = await getActiveShiftForMember(dbUser.user_id, crewId);
+      if (!mounted) return;
+      if (res?.success && res.shift) {
+        // if shift contains checkpoint -> restore it
+        if (res.shift.checkpoint && Object.keys(res.shift.checkpoint || {}).length > 0) {
+          const cp = res.shift.checkpoint.data ?? null;
+          if (cp && Array.isArray(cp)) {
+            // cp expected to be the array of items snapshot
+            setLocalItems(cp);
+            toast.success("Checkpoint restored from active shift");
+            setCheckpoint(cp);
+          }
         }
-
-        const crewRes = await fetchCrewBySlug(slug);
-        if (!crewRes.success) throw new Error(crewRes.error || "Crew not found");
-        if (!mounted) return;
-        setCrew(crewRes.crew);
-
-        const userId = dbUser?.user_id ?? undefined;
-        const itemsRes = await fetchCrewItemsBySlug(slug, userId); // uses DEBUG_ITEM_TYPE if set server-side
-        if (!mounted) return;
-        if (!itemsRes || !itemsRes.success) {
-          toast.error(`Не удалось загрузить байки: ${itemsRes?.error || "unknown"}`);
-          setItems([]);
-          setMemberRole(itemsRes?.memberRole ?? null);
-          return;
-        }
-        setItems(itemsRes.data || []);
-        setMemberRole(itemsRes.memberRole ?? null);
-      } catch (e: any) {
-        console.error("Bikehouse load error:", e);
-        toast.error(e?.message || "Ошибка загрузки Bikehouse");
-        setItems([]);
-      } finally {
-        if (mounted) setLoading(false);
+        // store shift in state if needed
+        // setActiveShift(res.shift);
       }
-    })();
-    return () => { mounted = false; };
-  }, [slug, dbUser]);
+    } catch (e:any) {
+      console.warn("Failed to fetch active shift:", e);
+    }
+  })();
+  return () => { mounted = false; };
+}, [slug, dbUser, crew]);
 
   // keep a local copy for optimistic updates
   useEffect(() => setLocalItems(items || []), [items]);
@@ -140,11 +134,40 @@ export default function BikehousePage() {
   };
 
   // checkpoint + reset
-  const handleCheckpoint = () => {
-    setCheckpoint(localItems.map(i => ({ ...i })));
+const handleCheckpoint = async () => {
+  if (!slug) return toast.error("slug missing");
+  if (!dbUser?.user_id) return toast.error("login required to save checkpoint");
+
+  try {
+    // checkpoint snapshot: array of items with minimal fields (ids + locations + total_quantity)
+    const snapshot = localItems.map(i => ({
+      id: i.id,
+      quantity: i.quantity ?? i.total_quantity ?? 0,
+      locations: i.locations ?? []
+    }));
+
+    const mod = await import("@/app/wb/[slug]/actions");
+    const saveCheckpointForShift = mod?.saveCheckpointForShift;
+    if (typeof saveCheckpointForShift !== "function") {
+      return toast.error("Server-side checkpoint save not available");
+    }
+
+    const res = await saveCheckpointForShift(slug!, dbUser.user_id, snapshot);
+    if (!res.success) {
+      return toast.error(res.error || "Failed to save checkpoint on server");
+    }
+
+    // locally mirror checkpoint and set checkpoint start
+    setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
-    toast.success("Checkpoint saved (local)");
-  };
+    toast.success("Checkpoint saved to active shift (server)");
+  } catch (e:any) {
+    console.error("handleCheckpoint error:", e);
+    toast.error(e?.message || "Failed to save checkpoint");
+  }
+};
+
+
   const handleReset = () => {
     if (!checkpoint) return toast.error("Нет чекпоинта");
     setLocalItems(checkpoint.map(i => ({ ...i })));

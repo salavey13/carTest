@@ -1,29 +1,165 @@
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
-import { sendTelegramMessage } from "@/app/actions"; // server action
+import { sendTelegramMessage } from "@/app/actions";
 import { v4 as uuidv4 } from "uuid";
 
-/**
- * DEBUG_ITEM_TYPE used for test/demo environment (set DEBUG_ITEM_TYPE=bike)
- * If DEBUG_ITEM_TYPE is empty, we don't filter by type (show all vehicles).
- */
 const DEBUG_ITEM_TYPE = (process.env.DEBUG_ITEM_TYPE || "bike").toString();
 const DEBUG_LIMIT = 500;
 
 function safeParseSpecs(specs: any) {
   if (!specs) return {};
   if (typeof specs === "object") return specs;
+  try { return JSON.parse(specs); } catch { return {}; }
+}
+
+async function resolveCrewBySlug(slug: string) {
+  const crewRes = await supabaseAdmin.from("crews").select("id, name, slug, owner_id, logo_url").eq("slug", slug).limit(1).maybeSingle();
+  if (crewRes.error) throw crewRes.error;
+  if (!crewRes.data) throw new Error("Crew not found");
+  return crewRes.data as any;
+}
+
+/* -----------------------
+   SHIFT helpers
+   - getActiveShiftForMember(memberId, crewId)
+   - startShiftForMember(memberId, crewId, shiftType)
+   - endShiftForMember(shiftId)
+   - saveCheckpointForShift(memberId, crewId, checkpointData)
+   ----------------------- */
+
+export async function getActiveShiftForMember(memberId: string, crewId: string) {
   try {
-    return JSON.parse(specs);
-  } catch {
-    return {};
+    if (!memberId || !crewId) return { success: false, error: "memberId and crewId required" };
+    const { data, error } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("*")
+      .eq("member_id", memberId)
+      .eq("crew_id", crewId)
+      .is("clock_out_time", null)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return { success: true, shift: data || null };
+  } catch (e: any) {
+    console.error("[getActiveShiftForMember] error:", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+export async function startShiftForMember(memberId: string, crewId: string, shiftType: string = "online") {
+  try {
+    if (!memberId || !crewId) return { success: false, error: "memberId and crewId required" };
+
+    // ensure no active shift exists (optional)
+    const active = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("id")
+      .eq("member_id", memberId)
+      .eq("crew_id", crewId)
+      .is("clock_out_time", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (active.error) { console.error("[startShiftForMember] active lookup error:", active.error); }
+    if (active.data) {
+      return { success: false, error: "Active shift already exists", shift: active.data };
+    }
+
+    const { data, error } = await supabaseAdmin.from("crew_member_shifts").insert({
+      member_id: memberId,
+      crew_id: crewId,
+      shift_type: shiftType,
+      checkpoint: {} as any,
+      actions: [] as any[],
+    }).select().single();
+
+    if (error) throw error;
+    return { success: true, shift: data };
+  } catch (e:any) {
+    console.error("[startShiftForMember] error:", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+export async function endShiftForMember(shiftId: string, memberId?: string) {
+  try {
+    if (!shiftId) return { success: false, error: "shiftId required" };
+    const { data, error } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .update({ clock_out_time: new Date().toISOString() })
+      .eq("id", shiftId)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    return { success: true, shift: data };
+  } catch (e:any) {
+    console.error("[endShiftForMember] error:", e);
+    return { success: false, error: e?.message || "unknown" };
   }
 }
 
 /**
- * fetchCrewBySlug - lightweight crew metadata
+ * saveCheckpointForShift
+ * - memberId + crewId are used to resolve the active shift (clock_out_time IS NULL).
+ * - checkpointData: any JSON-friendly object (we save into checkpoint JSONB).
  */
+export async function saveCheckpointForShift(slug: string, memberId: string, checkpointData: any) {
+  try {
+    if (!slug || !memberId) return { success: false, error: "slug and memberId required" };
+    const crew = await resolveCrewBySlug(slug);
+    if (!crew) return { success: false, error: "Crew not found" };
+    const crewId = crew.id;
+
+    // find active shift
+    const { data: shiftRow, error: shiftErr } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("*")
+      .eq("member_id", memberId)
+      .eq("crew_id", crewId)
+      .is("clock_out_time", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (shiftErr) {
+      console.error("[saveCheckpointForShift] shift lookup error:", shiftErr);
+      return { success: false, error: "Shift lookup failed" };
+    }
+    if (!shiftRow) {
+      return { success: false, error: "No active shift found for this member" };
+    }
+
+    // merge existing checkpoint if any
+    const existing = shiftRow.checkpoint || {};
+    const merged = { ...existing, saved_at: new Date().toISOString(), data: checkpointData };
+
+    const { data, error } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .update({ checkpoint: merged })
+      .eq("id", shiftRow.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error("[saveCheckpointForShift] update error:", error);
+      return { success: false, error: "Failed to save checkpoint" };
+    }
+
+    console.log("[saveCheckpointForShift] saved checkpoint for shift:", shiftRow.id);
+    return { success: true, shift: data };
+  } catch (e:any) {
+    console.error("[saveCheckpointForShift] unexpected:", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/* -----------------------
+   Existing item fetch functions (kept as before)
+   - fetchCrewBySlug
+   - fetchCrewItemsBySlug
+   - fetchCrewAllCarsBySlug
+   ----------------------- */
+
 export async function fetchCrewBySlug(slug: string): Promise<{ success: boolean; crew?: any; error?: string }> {
   try {
     if (!slug) return { success: false, error: "slug required" };
@@ -51,13 +187,6 @@ export async function fetchCrewBySlug(slug: string): Promise<{ success: boolean;
   }
 }
 
-/**
- * fetchCrewItemsBySlug - fetch bikes (or DEBUG_ITEM_TYPE) for crew slug.
- * - userChatId optional -> returns membership info (role) for the user.
- * - itemType optional -> override DEBUG_ITEM_TYPE
- *
- * Response stable object shape: { success, data, crew, memberRole, debug, error }
- */
 export async function fetchCrewItemsBySlug(
   slug: string,
   userChatId?: string,
@@ -103,13 +232,11 @@ export async function fetchCrewItemsBySlug(
         .maybeSingle();
       if (mem.error) {
         console.error("[fetchCrewItemsBySlug] member lookup failed:", mem.error);
-        // NOT fatal for public view - return with warning
       } else if (mem.data) {
         memberRole = mem.data.role || null;
       }
     }
 
-    // Choose type filter: explicit itemType -> DEBUG_ITEM_TYPE -> no filter if empty string
     const typeToUse = itemType ?? (DEBUG_ITEM_TYPE || "");
     console.log("[fetchCrewItemsBySlug] using type filter:", typeToUse || "(none)");
 
@@ -135,9 +262,6 @@ export async function fetchCrewItemsBySlug(
   }
 }
 
-/**
- * fetchCrewAllCarsBySlug - debug helper: fetch all cars for crew without type filter.
- */
 export async function fetchCrewAllCarsBySlug(slug: string): Promise<{ success: boolean; data?: any[]; crew?: any; error?: string; debug?: any }> {
   try {
     if (!slug) return { success: false, error: "slug required" };
@@ -162,21 +286,10 @@ export async function fetchCrewAllCarsBySlug(slug: string): Promise<{ success: b
   }
 }
 
-/**
- * updateItemQuantityForCrew
- * - slug: crew slug (resolve crew id)
- * - itemId: cars.id
- * - delta: positive -> onload (increase), negative -> offload (decrease)
- * - userId: id performing the action (string). We check membership/role.
- *
- * Authorization rules:
- * - Public: only read.
- * - To modify quantities, user must be member of crew and role in ('owner','xadmin','manager') — adjust roles as you like.
- *
- * Side effects:
- * - Update cars.quantity (string/integer fields are handled)
- * - Insert a row into warehouse_shifts (if table exists) for auditing.
- */
+/* -----------------------
+   updateItemQuantityForCrew: when an item is changed, append an action entry to the active shift.actions JSONB
+   ----------------------- */
+
 export async function updateItemQuantityForCrew(
   slug: string,
   itemId: string,
@@ -196,34 +309,26 @@ export async function updateItemQuantityForCrew(
     if (!crewRes.data) return { success: false, error: "Crew not found" };
     const crewId = (crewRes.data as any).id;
 
-    // authorization: check membership role
+    // check user role
     let userRole: string | null = null;
     if (userId) {
       const mem = await supabaseAdmin.from("crew_members").select("role, membership_status").eq("crew_id", crewId).eq("user_id", userId).limit(1).maybeSingle();
-      if (mem.error) {
-        console.warn("[updateItemQuantityForCrew] member lookup error:", mem.error);
-      } else if (mem.data) {
-        userRole = mem.data.role || null;
-      }
+      if (mem.error) console.warn("[updateItemQuantityForCrew] member lookup error:", mem.error);
+      else if (mem.data) userRole = mem.data.role || null;
     }
-
-    // allow if owner of crew (owner_id) OR member role in these elevated roles
     const allowedRoles = ["owner", "xadmin", "manager", "admin"];
     const isOwnerByCrew = crewRes.data.owner_id && userId && crewRes.data.owner_id === userId;
     const canModify = isOwnerByCrew || (userRole && allowedRoles.includes(userRole));
-
     if (!canModify) {
       console.warn("[updateItemQuantityForCrew] unauthorized modification attempt", { userId, userRole, crewOwner: crewRes.data.owner_id });
-      return { success: false, error: "Not authorized to modify this crew's items (must be crew owner or admin)" };
+      return { success: false, error: "Not authorized to modify this crew's items" };
     }
 
-    // fetch item and current quantity
+    // find item
     const itemRes = await supabaseAdmin.from("cars").select("*").eq("id", itemId).eq("crew_id", crewId).limit(1).maybeSingle();
     if (itemRes.error) { console.error("[updateItemQuantityForCrew] item lookup error:", itemRes.error); return { success: false, error: "Item lookup failed" }; }
     if (!itemRes.data) { return { success: false, error: "Item not found for this crew" }; }
-
     const item = itemRes.data as any;
-    // cars.quantity could be string — normalize to int
     const oldQty = Number(item.quantity || 0);
     const newQty = Math.max(0, oldQty + delta);
 
@@ -239,31 +344,48 @@ export async function updateItemQuantityForCrew(
       return { success: false, error: "Failed to update item quantity" };
     }
 
-    // try to insert audit shift into warehouse_shifts (if table exists)
+    // --- append action entry into active shift.actions JSONB (best-effort) ---
     try {
-      const shift = {
-        id: uuidv4(),
-        crew_id: crewId,
-        item_id: itemId,
-        user_id: userId ?? null,
-        delta,
-        previous_quantity: oldQty,
-        new_quantity: newQty,
-        created_at: new Date().toISOString(),
-        metadata: { source: "bikehouse_ui" }
-      };
-      // best-effort insert
-      const { error: shiftErr } = await supabaseAdmin.from("warehouse_shifts").insert(shift);
-      if (shiftErr) {
-        console.warn("[updateItemQuantityForCrew] failed to insert shift (non-fatal):", shiftErr);
-      } else {
-        console.log("[updateItemQuantityForCrew] shift inserted", shift.id);
+      const shiftRes = await supabaseAdmin
+        .from("crew_member_shifts")
+        .select("*")
+        .eq("member_id", userId ?? "")
+        .eq("crew_id", crewId)
+        .is("clock_out_time", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (!shiftRes.error && shiftRes.data) {
+        const shiftRow = shiftRes.data as any;
+        const actionEntry = {
+          id: uuidv4(),
+          ts: new Date().toISOString(),
+          item_id: itemId,
+          delta,
+          previous_quantity: oldQty,
+          new_quantity: newQty,
+          actor: userId ?? null,
+          source: "bikehouse_ui"
+        };
+
+        const existingActions = Array.isArray(shiftRow.actions) ? shiftRow.actions : (shiftRow.actions ? JSON.parse(shiftRow.actions) : []);
+        const newActions = [...existingActions, actionEntry];
+
+        const { error: appendErr } = await supabaseAdmin
+          .from("crew_member_shifts")
+          .update({ actions: newActions })
+          .eq("id", shiftRow.id);
+
+        if (appendErr) {
+          console.warn("[updateItemQuantityForCrew] failed to append action to shift (non-fatal):", appendErr);
+        } else {
+          console.log("[updateItemQuantityForCrew] appended action to shift:", shiftRow.id);
+        }
       }
     } catch (e) {
-      console.warn("[updateItemQuantityForCrew] shift insert unexpected:", e);
+      console.warn("[updateItemQuantityForCrew] shift append unexpected:", e);
     }
 
-    // return updated item (normalize specs)
     const normalized = { ...(updateData || item), specs: safeParseSpecs((updateData || item).specs) };
     console.log("[updateItemQuantityForCrew] success", { itemId, oldQty, newQty });
 
@@ -274,10 +396,7 @@ export async function updateItemQuantityForCrew(
   }
 }
 
-/**
- * notifyOwnerAboutStorageRequest - convenience server action that sends a message to crew owner.
- * - caller can request to notify owner about a specific item/voxel/slot for conversation.
- */
+/* notify owner */
 export async function notifyOwnerAboutStorageRequest(
   slug: string,
   message: string,
@@ -292,7 +411,6 @@ export async function notifyOwnerAboutStorageRequest(
     if (!ownerId) return { success: false, error: "Owner not configured for this crew" };
 
     const finalMessage = `Bikehouse request for crew '${crewRes.data.name}'\nFrom: ${requesterId || "anonymous"}\n\n${message}`;
-    // best-effort: use sendTelegramMessage from /app/actions
     try {
       const res = await sendTelegramMessage(finalMessage, [], undefined, ownerId);
       if (!res.success) {
