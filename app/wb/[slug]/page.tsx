@@ -5,12 +5,10 @@ import { useParams } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import WarehouseViz from "@/components/WarehouseViz";
-import WarehouseStats from "@/components/WarehouseStats";
-import FilterAccordion from "@/components/FilterAccordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import Image from "next/image";
-import { Save, RotateCcw, Download, FileText } from "lucide-react";
+import { Save, RotateCcw, Download, FileText, Play, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function BikehousePage() {
@@ -28,12 +26,7 @@ export default function BikehousePage() {
   const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [filterSeason, setFilterSeason] = useState<string | null>(null);
-  const [filterPattern, setFilterPattern] = useState<string | null>(null);
-  const [filterColor, setFilterColor] = useState<string | null>(null);
-  const [filterSize, setFilterSize] = useState<string | null>(null);
-  const [sortOption, setSortOption] = useState<'size_season_color'|'color_size'|'season_size_color' | null>('size_season_color');
+  const [activeShift, setActiveShift] = useState<any | null>(null);
 
   const isTelegram = !!tg;
   const isAdminish = memberRole && ["owner", "xadmin", "manager", "admin"].includes(memberRole);
@@ -61,6 +54,29 @@ export default function BikehousePage() {
             toast.error(itemsRes.error || "Не удалось загрузить позиции");
           }
         }
+
+        // also fetch active shift for current user (if logged in)
+        if (dbUser?.user_id && crewRes.success && mounted) {
+          try {
+            const activeRes = await mod.getActiveShiftForMember(dbUser.user_id, crewRes.crew.id);
+            if (activeRes?.success && activeRes.shift) {
+              setActiveShift(activeRes.shift);
+              // if active shift has checkpoint, restore it into localItems
+              if (activeRes.shift.checkpoint && Object.keys(activeRes.shift.checkpoint || {}).length > 0) {
+                const cp = activeRes.shift.checkpoint.data ?? null;
+                if (cp && Array.isArray(cp)) {
+                  setLocalItems(cp);
+                  setCheckpoint(cp);
+                  toast.success("Checkpoint restored from active shift");
+                }
+              }
+            } else {
+              setActiveShift(null);
+            }
+          } catch (e) {
+            console.warn("Failed to fetch active shift on init", e);
+          }
+        }
       } catch (e:any) {
         console.error("Initial load failed:", e);
         toast.error("Ошибка загрузки страницы");
@@ -70,34 +86,6 @@ export default function BikehousePage() {
     })();
     return () => { mounted = false; };
   }, [slug, dbUser?.user_id]);
-
-  // if member has active shift with checkpoint — restore it on load
-  useEffect(() => {
-    if (!slug || !dbUser?.user_id || !crew?.id) return;
-    let mounted = true;
-    (async () => {
-      try {
-        const mod = await import("@/app/wb/[slug]/actions");
-        const getActiveShiftForMember = mod?.getActiveShiftForMember;
-        if (typeof getActiveShiftForMember !== "function") return;
-        const res = await getActiveShiftForMember(dbUser.user_id, crew.id);
-        if (!mounted) return;
-        if (res?.success && res.shift) {
-          if (res.shift.checkpoint && Object.keys(res.shift.checkpoint || {}).length > 0) {
-            const cp = res.shift.checkpoint.data ?? null;
-            if (cp && Array.isArray(cp)) {
-              setLocalItems(cp);
-              setCheckpoint(cp);
-              toast.success("Checkpoint restored from active shift");
-            }
-          }
-        }
-      } catch (e:any) {
-        console.warn("Failed to fetch active shift:", e);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [slug, dbUser?.user_id, crew?.id]);
 
   // keep local mirror for optimistic updates
   useEffect(() => setLocalItems(items || []), [items]);
@@ -149,6 +137,38 @@ export default function BikehousePage() {
       return;
     }
     toast(`Open: ${item.make || ""} ${item.model || ""}`);
+  };
+
+  // Shift actions
+  const handleStartShift = async () => {
+    if (!slug || !dbUser?.user_id) return toast.error("Login required");
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const crewRes = await mod.fetchCrewBySlug(slug);
+      if (!crewRes.success) return toast.error("Crew lookup failed");
+      const crewId = crewRes.crew.id;
+      const res = await mod.startShiftForMember(dbUser.user_id, crewId, "online");
+      if (!res.success) return toast.error(res.error || "Failed to start shift");
+      setActiveShift(res.shift);
+      toast.success("Shift started");
+    } catch (e:any) {
+      console.error("handleStartShift error:", e);
+      toast.error("Failed to start shift");
+    }
+  };
+
+  const handleEndShift = async () => {
+    if (!activeShift?.id) return toast.error("No active shift");
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const res = await mod.endShiftForMember(activeShift.id);
+      if (!res.success) return toast.error(res.error || "Failed to end shift");
+      setActiveShift(null);
+      toast.success("Shift ended");
+    } catch (e:any) {
+      console.error("handleEndShift error:", e);
+      toast.error("Failed to end shift");
+    }
   };
 
   // Save checkpoint — requires active shift (server enforces it)
@@ -206,35 +226,50 @@ export default function BikehousePage() {
     }
   };
 
+  // Export daily -> use exportDailyFromShifts
   const handleExportDaily = async () => {
     try {
       const mod = await import("@/app/wb/[slug]/actions");
-      const exportDailyEntry = mod?.exportDailyEntry;
-      if (typeof exportDailyEntry !== "function") return toast.error("Экспорт временно недоступен");
+      const exporter = mod?.exportDailyFromShifts;
+      if (typeof exporter !== "function") return toast.error("Экспорт временно недоступен");
 
-      const sumsPrev: Record<string, number> = {};
-      const sumsCurr: Record<string, number> = {};
-      (checkpoint || []).forEach((c: any) => sumsPrev[c.make || "other"] = (sumsPrev[c.make || "other"] || 0) + Number(c.quantity || 0));
-      (localItems || []).forEach((c: any) => sumsCurr[c.make || "other"] = (sumsCurr[c.make || "other"] || 0) + Number(c.quantity || 0));
-      const res = await exportDailyEntry(sumsPrev, sumsCurr, gameMode || "default", crew?.slug || "bikehouse", isTelegram);
-      if (res?.csv) {
-        try {
-          await navigator.clipboard.writeText(res.csv);
-          toast.success("TSV скопирован в буфер обмена");
-        } catch {
-          const blob = new Blob([res.csv], { type: "text/tab-separated-values;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "bikehouse_export.tsv";
-          a.click();
-          URL.revokeObjectURL(url);
-          toast.success("TSV скачан (fallback)");
+      const res = await exporter(slug!, { sinceDays: 7 });
+      if (!res.success) return toast.error(res.error || "Export failed");
+
+      const summary = res.summary_tsv || "";
+      const detailed = res.detailed_tsv || "";
+
+      // try clipboard
+      let copied = false;
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(summary);
+          toast.success("Суммарный TSV скопирован в буфер обмена");
+          copied = true;
         }
-      } else if (res.success) {
-        toast.success("Экспорт завершён");
-      } else {
-        toast.error(res.error || "Export failed");
+      } catch (e) {
+        // fallback
+      }
+
+      if (!copied) {
+        const blob = new Blob([summary], { type: "text/tab-separated-values;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `shifts_summary_${slug}_${new Date().toISOString().slice(0,10)}.tsv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Summary TSV downloaded");
+      }
+
+      if (detailed) {
+        const blob2 = new Blob([detailed], { type: "text/tab-separated-values;charset=utf-8" });
+        const url2 = URL.createObjectURL(blob2);
+        const a2 = document.createElement("a");
+        a2.href = url2;
+        a2.download = `shifts_detailed_${slug}_${new Date().toISOString().slice(0,10)}.tsv`;
+        a2.click();
+        URL.revokeObjectURL(url2);
       }
     } catch (e:any) {
       console.error("handleExportDaily error:", e);
@@ -276,17 +311,7 @@ export default function BikehousePage() {
     }
   };
 
-  const filteredItems = useMemo(() => {
-    const q = (search || "").toLowerCase();
-    return (localItems || []).filter(it => {
-      const matchesSearch = ((it.make || "") + " " + (it.model || "") + " " + (it.description || "")).toLowerCase().includes(q);
-      const matchesSeason = !filterSeason || it.season === filterSeason;
-      const matchesPattern = !filterPattern || it.pattern === filterPattern;
-      const matchesColor = !filterColor || it.color === filterColor;
-      const matchesSize = !filterSize || it.size === filterSize;
-      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-    });
-  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize]);
+  const displayedItems = useMemo(() => localItems || [], [localItems]);
 
   if (!slug) return <div className="p-6">No crew slug</div>;
 
@@ -294,11 +319,7 @@ export default function BikehousePage() {
     <div className="min-h-screen p-4 bg-gradient-to-b from-slate-50 to-white text-slate-900">
       <header className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
-          {crew?.logo_url ? (
-            <div className="w-12 h-12 rounded-md overflow-hidden shadow"><Image src={crew.logo_url} alt={crew?.name || slug} width={48} height={48} className="object-cover" /></div>
-          ) : (
-            <div className="w-12 h-12 rounded-md bg-slate-200 flex items-center justify-center font-bold">BH</div>
-          )}
+          {/* avatar removed — show name only */}
           <div className="leading-tight">
             <h1 className="text-lg font-bold">Bikehouse — {crew?.name || slug}</h1>
             <p className="text-xs text-muted-foreground">Склад зимнего хранения · Просмотр: публичный · Управление: {isAdminish ? "включено" : "только чтение"}</p>
@@ -306,10 +327,25 @@ export default function BikehousePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Shift control */}
+          {dbUser?.user_id ? (
+            activeShift ? (
+              <button className="p-2 rounded border flex items-center gap-2 text-sm" title="End shift" onClick={handleEndShift}>
+                <StopCircle size={14} /> End shift
+              </button>
+            ) : (
+              <button className="p-2 rounded border flex items-center gap-2 text-sm" title="Start shift" onClick={handleStartShift}>
+                <Play size={14} /> Start shift
+              </button>
+            )
+          ) : (
+            <button className="p-2 rounded border text-sm" onClick={() => toast.info("Please sign in to manage shifts")}>Sign in</button>
+          )}
+
           <button className="p-2 rounded border" title="Checkpoint" onClick={handleCheckpoint}><Save size={14} /></button>
           <button className="p-2 rounded border" title="Reset to checkpoint" onClick={handleReset}><RotateCcw size={14} /></button>
-          <button className="p-2 rounded border" title="Export daily" onClick={handleExportDaily}><Download size={14} /></button>
-          <button className="p-2 rounded border" title="Export stock (summary)" onClick={() => toast.info("Stock export (todo)") }><FileText size={14} /></button>
+          <button className="p-2 rounded border" title="Export daily (from shifts)" onClick={handleExportDaily}><Download size={14} /></button>
+          <button className="p-2 rounded border" title="Export stock (summary)" onClick={handleExportDaily}><FileText size={14} /></button>
         </div>
       </header>
 
@@ -334,30 +370,13 @@ export default function BikehousePage() {
         </div>
       </div>
 
-      <FilterAccordion
-        filterSeason={filterSeason}
-        setFilterSeason={setFilterSeason}
-        filterPattern={filterPattern}
-        setFilterPattern={setFilterPattern}
-        filterColor={filterColor}
-        setFilterColor={setFilterColor}
-        filterSize={filterSize}
-        setFilterSize={setFilterSize}
-        items={localItems}
-        onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
-        includeSearch={true}
-        search={search}
-        setSearch={setSearch}
-        sortOption={sortOption}
-        setSortOption={setSortOption}
-      />
-
       <main className="mt-4">
         <section className="mb-6">
-          <h2 className="text-base font-semibold mb-2">Витрина байков ({filteredItems.length})</h2>
-          {loading ? <p>Загрузка…</p> : filteredItems.length === 0 ? <p className="text-muted-foreground">Нет байков (тип: demo)</p> : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {filteredItems.map(it => (
+          <h2 className="text-base font-semibold mb-2">Витрина байков ({displayedItems.length})</h2>
+          {loading ? <p>Загрузка…</p> : displayedItems.length === 0 ? <p className="text-muted-foreground">Нет байков (тип: demo)</p> : (
+            // 5 columns on mobile/base, scale down to 3/4 on larger screens
+            <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-3 gap-3">
+              {displayedItems.map(it => (
                 <div key={it.id} className="bg-white p-3 rounded-lg shadow-sm">
                   <WarehouseItemCard item={it} onClick={() => handleItemClick(it)} />
                   <div className="mt-2 text-sm text-muted-foreground">
@@ -398,34 +417,6 @@ export default function BikehousePage() {
           </div>
         </section>
       </main>
-
-      <div className="mt-6">
-        <WarehouseStats
-          itemsCount={localItems.length}
-          uniqueIds={new Set((localItems||[]).map(i => i.id)).size}
-          score={0}
-          level={0}
-          streak={0}
-          dailyStreak={0}
-          checkpointMain={checkpointStart ? `${Math.floor((Date.now()-checkpointStart)/1000)}s` : "--"}
-          checkpointSub={checkpoint ? "есть чекпоинт" : "нет чекпоинта"}
-          changedCount={0}
-          totalDelta={0}
-          stars={0}
-          offloadUnits={0}
-          salary={0}
-          achievements={[]}
-          sessionStart={null}
-          errorCount={0}
-          bossMode={false}
-          bossTimer={0}
-          leaderboard={[]}
-          efficiency={0}
-          avgTimePerItem={0}
-          dailyGoals={[]}
-          sessionDuration={0}
-        />
-      </div>
     </div>
   );
 }
