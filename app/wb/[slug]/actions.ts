@@ -1,3 +1,4 @@
+// /app/wb/[slug]/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -337,6 +338,7 @@ export async function fetchCrewAllCarsBySlug(slug: string): Promise<{ success: b
    - appends action to active shift.actions (best-effort)
    ----------------------- */
 
+
 export async function updateItemQuantityForCrew(
   slug: string,
   itemId: string,
@@ -375,12 +377,39 @@ export async function updateItemQuantityForCrew(
     const oldQty = Number(item.quantity || 0);
     const newQty = Math.max(0, oldQty + delta);
 
-    const { data: updateData, error: updateErr } = await supabaseAdmin
-      .from("cars")
-      .update({ quantity: newQty.toString(), updated_at: new Date().toISOString() })
-      .eq("id", itemId)
-      .select()
-      .maybeSingle();
+    // Try update including updated_at (preferred)
+    let updateData: any = null;
+    let updateErr: any = null;
+
+    try {
+      const res = await supabaseAdmin
+        .from("cars")
+        .update({ quantity: newQty.toString(), updated_at: new Date().toISOString() })
+        .eq("id", itemId)
+        .select()
+        .maybeSingle();
+      updateData = res.data;
+      updateErr = res.error;
+    } catch (e) {
+      updateErr = e;
+    }
+
+    // If PostgREST complains about missing 'updated_at' column (PGRST204), retry without it
+    if (updateErr && updateErr.code === "PGRST204" && String(updateErr.message || "").includes("updated_at")) {
+      warn("[updateItemQuantityForCrew] retrying update without updated_at (column missing in schema)");
+      try {
+        const res2 = await supabaseAdmin
+          .from("cars")
+          .update({ quantity: newQty.toString() })
+          .eq("id", itemId)
+          .select()
+          .maybeSingle();
+        updateData = res2.data;
+        updateErr = res2.error;
+      } catch (e2) {
+        updateErr = e2;
+      }
+    }
 
     if (updateErr) { err("[updateItemQuantityForCrew] update error:", updateErr); return { success: false, error: "Failed to update item quantity" }; }
 
