@@ -1,4 +1,3 @@
-// /app/wb/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -7,7 +6,7 @@ import type { WarehouseItem } from "@/app/wb/common";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { getWbProductCardsList } from "@/app/wb/content-actions";
 import Papa from "papaparse";
-import dns from "dns/promises";
+import { normalizeSizeKey } from "@/app/wb/common";
 
 /**
  * Utilities
@@ -161,7 +160,6 @@ export async function syncYmStocks(campaignId?: string): Promise<{ success: bool
   }
 }
 
-
 export async function checkYmToken(token?: string | null, campaignId?: string | null) {
   // Read from env when not provided
   const YM_API_TOKEN = (token || process.env.YM_API_TOKEN || "").toString().trim();
@@ -215,8 +213,6 @@ export async function checkYmToken(token?: string | null, campaignId?: string | 
 
   return { listStatus, listText, campStatus, campText, message: "ok" };
 }
-
-
 
 // WB token diagnostics: decode JWT + ping marketplace + warehouses
 async function validateWbToken(WB_TOKEN: string): Promise<{ ok: boolean; warehouseId?: string; isTest?: boolean; reason?: string; payload?: any; warehouses?: any[]; requestId?: string; timestamp?: string }> {
@@ -451,13 +447,13 @@ export async function updateItemLocationQty(
    ========================= */
 
 export async function exportDiffToAdmin(diffData: any[], isTelegram = false): Promise<{ success: boolean; csv?: string }> {
-  let csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Изменение: d.diffQty, Ячейка: d.voxel })), { header: true, delimiter: ",", quotes: true });
+  let csvData = "\uFEFF" + Papa.unparse(diffData.map((d) => ({ Артикул: d.id, Изменение: d.diffQty, Ячейка: d.voxel })), { header: true, delimiter: "\t", quotes: true });
 
   if (isTelegram) {
     return { success: true, csv: csvData };
   } else {
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в CSV.", [], {
-      attachment: { type: "document", content: csvData, filename: "warehouse_diff.csv" },
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Изменения склада в TSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_diff.tsv" },
     });
     return { success: true, csv: csvData };
   }
@@ -467,7 +463,7 @@ export async function exportCurrentStock(items: any[], isTelegram = false, summa
   let csvData;
   if (summarized) {
     const stockData = items.map((item) => ({ Артикул: item.id, Количество: item.total_quantity }));
-    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: ",", quotes: true });
+    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: "\t", quotes: true });
   } else {
     const stockData = items.map((item) => ({
       Артикул: item.id,
@@ -475,16 +471,67 @@ export async function exportCurrentStock(items: any[], isTelegram = false, summa
       "Общее Количество": item.total_quantity,
       Локации: item.locations.map((l: any) => `${l.voxel}:${l.quantity}`).join(", "),
     }));
-    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: ",", quotes: true });
+    csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: "\t", quotes: true });
   }
 
   if (isTelegram) {
     return { success: true, csv: csvData };
   } else {
-    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в CSV.", [], {
-      attachment: { type: "document", content: csvData, filename: "warehouse_stock.csv" },
+    await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", "Текущее состояние склада в TSV.", [], {
+      attachment: { type: "document", content: csvData, filename: "warehouse_stock.tsv" },
     });
     return { success: true, csv: csvData };
+  }
+}
+
+export async function exportDailyEntry(
+  sumsPrevious: Record<string, number>,
+  sumsCurrent: Record<string, number>,
+  gameMode: string | null,
+  store: string,
+  isTelegram = false
+): Promise<{ success: boolean; csv?: string; error?: string }> {
+  try {
+    const date = new Date();
+    const dd = date.getDate().toString().padStart(2, '0');
+    const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+    const yy = date.getFullYear().toString().slice(-2);
+
+    const categories = [
+      'namatras 90', 'namatras 120', 'namatras 140', 'namatras 160', 'namatras 180', 'namatras 200',
+      '1.5 leto', '2 leto', 'evro leto', 'evromaksi leto',
+      '1.5 zima', '2 zima', 'evro zima', 'evromaksi zima',
+      'Podushka 50h70', 'Podushka 70h70', 'Podushka anatom',
+      'Navolochka 50x70', 'Navolochka 70h70'
+    ];
+
+    let otgruzka = categories.map(() => 0);
+    let total = 0;
+
+    categories.forEach((cat, idx) => {
+      const prev = sumsPrevious[cat] || 0;
+      const curr = sumsCurrent[cat] || 0;
+      const delta = prev - curr;
+      otgruzka[idx] = Math.abs(delta); // Абсолют для упрощения, привоз/отгрузка в тотале
+      total += Math.abs(delta);
+    });
+
+    const salary = total * 50;
+    let csv = "\uFEFF" + `отгрузка ${dd}.${mm}.${yy}\t${otgruzka.join('\t')}\tвсего: ${total}\tоплата: ${salary}\n`;
+
+    console.info("exportDailyEntry successful", { total, salary });
+
+    if (isTelegram) {
+      return { success: true, csv };
+    } else {
+      await sendComplexMessage(process.env.ADMIN_CHAT_ID || "413553377", `Отгрузка в TSV.`, [], {
+        attachment: { type: "document", content: csv, filename: `otgruzka.tsv` },
+      });
+      return { success: true, csv };
+    }
+  } catch (err: any) {
+    console.error("exportDailyEntry error:", err);
+    return { success: false, error: err?.message || "Unknown error" };
   }
 }
 
@@ -579,6 +626,7 @@ export async function syncWbStocks(): Promise<{ success: boolean; error?: string
     });
 
     try {
+      const dns = await import("dns/promises");
       const lookup = await dns.lookup("marketplace-api.wildberries.ru");
       console.info("syncWbStocks DNS lookup result", lookup);
     } catch (dnsErr: any) {
@@ -764,6 +812,7 @@ export async function fetchWbStocks(): Promise<{ success: boolean; data?: { sku:
     console.info("fetchWbStocks -> About to POST", { url, skusCount: skus.length, sampleSkus: skus.slice(0, 20) });
 
     try {
+      const dns = await import("dns/promises");
       const lookup = await dns.lookup("marketplace-api.wildberries.ru");
       console.info("fetchWbStocks DNS lookup result", lookup);
     } catch (dnsErr: any) {
@@ -1186,7 +1235,7 @@ export async function fetchOzonPendingCount(): Promise<{ success: boolean; count
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': 'application/json' },
+      headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': "application/json" },
       body: JSON.stringify(body),
     });
 
@@ -1202,8 +1251,6 @@ export async function fetchOzonPendingCount(): Promise<{ success: boolean; count
     return { success: false, count: 0, error: err.message };
   }
 }
-
-
 
 export async function setYmSku(): Promise<{ success: boolean; updated?: number; error?: string }> {
   try {
