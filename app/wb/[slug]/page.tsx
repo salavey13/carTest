@@ -1,0 +1,526 @@
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { useAppContext } from "@/contexts/AppContext";
+import WarehouseItemCard from "@/components/WarehouseItemCard";
+import WarehouseViz from "@/components/WarehouseViz";
+import WarehouseStats from "@/components/WarehouseStats";
+import FilterAccordion from "@/components/FilterAccordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import Image from "next/image";
+import { Save, RotateCcw, Download, FileText, Play, StopCircle } from "lucide-react";
+
+export default function BikehousePage() {
+  const params = useParams() as { slug?: string };
+  const slug = params?.slug ?? null;
+  const { dbUser, tg } = useAppContext();
+
+  const [crew, setCrew] = useState<any | null>(null);
+  const [items, setItems] = useState<any[]>([]);
+  const [localItems, setLocalItems] = useState<any[]>([]);
+  const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [gameMode, setGameMode] = useState<null | "onload" | "offload" | "none">(null);
+  const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
+  const [checkpoint, setCheckpoint] = useState<any[] | null>(null);
+  const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const [activeShift, setActiveShift] = useState<any | null>(null);
+  const [shiftsList, setShiftsList] = useState<any[]>([]);
+
+  const [search, setSearch] = useState("");
+  const [filterSeason, setFilterSeason] = useState<string | null>(null);
+  const [filterPattern, setFilterPattern] = useState<string | null>(null);
+  const [filterColor, setFilterColor] = useState<string | null>(null);
+  const [filterSize, setFilterSize] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<'size_season_color'|'color_size'|'season_size_color' | null>('size_season_color');
+
+  const isTelegram = !!tg;
+  const isAdminish = memberRole && ["owner", "xadmin", "manager", "admin"].includes(memberRole);
+
+  // initial load: crew metadata + items + shifts
+  useEffect(() => {
+    if (!slug) return;
+    let mounted = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const mod = await import("@/app/wb/[slug]/actions");
+        const crewRes = await mod.fetchCrewBySlug(slug);
+        if (crewRes.success && mounted) setCrew(crewRes.crew);
+
+        const itemsRes = await mod.fetchCrewItemsBySlug(slug, dbUser?.user_id);
+        if (itemsRes.success && mounted) {
+          setItems(itemsRes.data || []);
+          setLocalItems(itemsRes.data || []);
+          setMemberRole(itemsRes.memberRole || null);
+        } else {
+          if (mounted) {
+            setItems([]);
+            setLocalItems([]);
+            toast.error(itemsRes.error || "Не удалось загрузить позиции");
+          }
+        }
+
+        // fetch shifts list and active shift
+        const shiftsRes = await mod.getShiftsForCrew(slug, 200);
+        if (shiftsRes.success && mounted) {
+          setShiftsList(shiftsRes.data || []);
+          const active = (shiftsRes.data || []).find((s:any) => s.clock_out_time === null);
+          if (active) setActiveShift(active);
+        }
+      } catch (e:any) {
+        console.error("Initial load failed:", e);
+        toast.error("Ошибка загрузки страницы");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [slug, dbUser?.user_id]);
+
+  // restore checkpoint from active shift if present
+  useEffect(() => {
+    if (!slug || !dbUser?.user_id || !crew?.id) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const mod = await import("@/app/wb/[slug]/actions");
+        const getActiveShiftForMember = mod?.getActiveShiftForMember;
+        if (typeof getActiveShiftForMember !== "function") return;
+        const res = await getActiveShiftForMember(dbUser.user_id, crew.id);
+        if (!mounted) return;
+        if (res?.success && res.shift) {
+          setActiveShift(res.shift);
+          if (res.shift.checkpoint && Object.keys(res.shift.checkpoint || {}).length > 0) {
+            const cp = res.shift.checkpoint.data ?? null;
+            if (cp && Array.isArray(cp)) {
+              setLocalItems(cp);
+              setCheckpoint(cp);
+              toast.success("Checkpoint restored from active shift");
+            }
+          }
+        }
+      } catch (e:any) {
+        console.warn("Failed to fetch active shift:", e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [slug, dbUser?.user_id, crew?.id]);
+
+  useEffect(() => setLocalItems(items || []), [items]);
+
+  // optimistic update + server sync
+  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
+    setLocalItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const qty = Number(i.quantity || 0) + delta;
+      return { ...i, quantity: Math.max(0, qty) };
+    }));
+
+    (async () => {
+      try {
+        const mod = await import("@/app/wb/[slug]/actions");
+        const updateFn = mod?.updateItemQuantityForCrew;
+        if (typeof updateFn !== "function") throw new Error("Server update unavailable");
+        const res = await updateFn(slug!, itemId, delta, dbUser?.user_id);
+        if (!res.success) {
+          toast.error(res.error || "Server rejected change");
+          const fres = await mod.fetchCrewItemsBySlug(slug!, dbUser?.user_id);
+          if (fres && fres.success) setLocalItems(fres.data || []);
+        } else {
+          const returned = res.item;
+          setLocalItems(prev => prev.map(it => it.id === returned.id ? returned : it));
+        }
+      } catch (e:any) {
+        console.error("optimistic server sync error:", e);
+        toast.error(e?.message || "Sync failed");
+      }
+    })();
+  };
+
+  const handleItemClick = async (item: any) => {
+    if (!item) return;
+    if (gameMode === "onload") {
+      if (!isAdminish) return toast.error("Только админы экипажа могут принимать байки");
+      const targetVoxel = selectedVoxel || "A1";
+      optimisticUpdate(item.id, targetVoxel, +1);
+      toast.success(`Принятие: +1 в ${targetVoxel}`);
+      return;
+    }
+    if (gameMode === "offload") {
+      if (!isAdminish) return toast.error("Только админы экипажа могут выдавать байки");
+      if ((Number(item.quantity || 0)) <= 0) return toast.error("Нет байка в наличии");
+      optimisticUpdate(item.id, selectedVoxel || "A1", -1);
+      toast.success(`Выдача: -1`);
+      return;
+    }
+    toast(`Open: ${item.make || ""} ${item.model || ""}`);
+  };
+
+  // start/end shift handlers
+  const handleStartShift = async () => {
+    if (!slug || !dbUser?.user_id) return toast.error("Login required");
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const crewRes = await mod.fetchCrewBySlug(slug);
+      if (!crewRes.success) return toast.error("Crew lookup failed");
+      const crewId = crewRes.crew.id;
+      const res = await mod.startShiftForMember(dbUser.user_id, crewId, "online");
+      if (!res.success) return toast.error(res.error || "Failed to start shift");
+      setActiveShift(res.shift);
+      // refresh shifts list
+      const shifts = await mod.getShiftsForCrew(slug, 200);
+      if (shifts.success) setShiftsList(shifts.data || []);
+      toast.success("Shift started");
+    } catch (e:any) {
+      console.error("handleStartShift error:", e);
+      toast.error("Failed to start shift");
+    }
+  };
+
+  const handleEndShift = async () => {
+    if (!activeShift?.id) return toast.error("No active shift");
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const res = await mod.endShiftForMember(activeShift.id);
+      if (!res.success) return toast.error(res.error || "Failed to end shift");
+      setActiveShift(null);
+      const shifts = await mod.getShiftsForCrew(slug, 200);
+      if (shifts.success) setShiftsList(shifts.data || []);
+      toast.success("Shift ended");
+    } catch (e:any) {
+      console.error("handleEndShift error:", e);
+      toast.error("Failed to end shift");
+    }
+  };
+
+  // Save checkpoint (requires active shift; server enforces)
+  const handleCheckpoint = async () => {
+    if (!slug) return toast.error("slug missing");
+    if (!dbUser?.user_id) return toast.error("login required to save checkpoint");
+    try {
+      const snapshot = localItems.map(i => ({
+        id: i.id,
+        quantity: Number(i.quantity ?? i.total_quantity ?? 0),
+        locations: i.locations ?? []
+      }));
+
+      const mod = await import("@/app/wb/[slug]/actions");
+      const saveFn = mod?.saveCheckpointForShift;
+      if (typeof saveFn !== "function") return toast.error("Server-side checkpoint save not available");
+
+      const res = await saveFn(slug!, dbUser.user_id, snapshot);
+      if (!res.success) return toast.error(res.error || "Failed to save checkpoint on server");
+
+      setCheckpoint(snapshot);
+      setCheckpointStart(Date.now());
+      toast.success("Checkpoint saved to active shift (server)");
+    } catch (e:any) {
+      console.error("handleCheckpoint error:", e);
+      toast.error(e?.message || "Failed to save checkpoint");
+    }
+  };
+
+  // Reset checkpoint (server-side restore)
+  const handleReset = async () => {
+    if (!slug) return toast.error("slug missing");
+    if (!dbUser?.user_id) return toast.error("login required to reset checkpoint");
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const resetFn = mod?.resetCheckpointForShift;
+      if (typeof resetFn !== "function") return toast.error("Reset not available");
+      const res = await resetFn(slug!, dbUser.user_id);
+      if (!res.success) return toast.error(res.error || "Failed to reset checkpoint");
+      const fres = await mod.fetchCrewItemsBySlug(slug!, dbUser?.user_id);
+      if (fres.success) {
+        setItems(fres.data || []);
+        setLocalItems(fres.data || []);
+      }
+      setCheckpoint(null);
+      setCheckpointStart(null);
+      toast.success(`Checkpoint restored. Applied: ${res.applied || 0}/${res.attempted || 0}`);
+    } catch (e:any) {
+      console.error("handleReset error:", e);
+      toast.error(e?.message || "Reset failed");
+    }
+  };
+
+  // Daily export from shifts
+  const handleExportDaily = async () => {
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const res = await mod.exportDailyFromShifts(slug!, { sinceDays: 7 });
+      if (!res.success) return toast.error(res.error || "Export failed");
+      // prefer summary TSV for clipboard, include detailed in download if needed
+      const summary = res.summary_tsv || "";
+      const detailed = res.detailed_tsv || "";
+
+      // try clipboard first
+      let copied = false;
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(summary);
+          toast.success("Суммарный TSV скопирован в буфер обмена");
+          copied = true;
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      if (!copied) {
+        // download as fallback (pack both as separate files)
+        const blob = new Blob([summary], { type: "text/tab-separated-values;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `shifts_summary_${slug}_${new Date().toISOString().slice(0,10)}.tsv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Summary TSV downloaded");
+      }
+
+      // also make detailed available (download)
+      if (detailed) {
+        const blob2 = new Blob([detailed], { type: "text/tab-separated-values;charset=utf-8" });
+        const url2 = URL.createObjectURL(blob2);
+        const a2 = document.createElement("a");
+        a2.href = url2;
+        a2.download = `shifts_detailed_${slug}_${new Date().toISOString().slice(0,10)}.tsv`;
+        a2.click();
+        URL.revokeObjectURL(url2);
+      }
+    } catch (e:any) {
+      console.error("handleExportDaily error:", e);
+      toast.error("Export failed");
+    }
+  };
+
+  // contact owner
+  const contactOwner = async () => {
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      const notify = mod?.notifyOwnerAboutStorageRequest;
+      if (typeof notify !== "function") return toast.error("Notify action not available");
+      const message = `Запрос на обсуждение условий хранения для экипажа: ${slug}\nПожалуйста, свяжитесь с отправившим.`;
+      const res = await notify(slug!, message, dbUser?.user_id);
+      if (!res.success) return toast.error(res.error || "Не удалось отправить уведомление владельцу");
+      toast.success("Владелец уведомлён в Telegram (если настроен)");
+    } catch (e:any) {
+      console.error("contactOwner error:", e);
+      toast.error("Failed to notify owner");
+    }
+  };
+
+  const debugFetchAll = async () => {
+    try {
+      const mod = await import("@/app/wb/[slug]/actions");
+      if (typeof mod.fetchCrewAllCarsBySlug !== "function") return toast.error("Debug not available");
+      const res = await mod.fetchCrewAllCarsBySlug(slug!);
+      console.log("[debugFetchAll]", res);
+      if (res.success) {
+        setItems(res.data || []);
+        setLocalItems(res.data || []);
+        toast.success(`Debug fetched ${res.data?.length || 0} cars`);
+      } else {
+        toast.error(res.error || "Debug failed");
+      }
+    } catch (e:any) {
+      console.error("debugFetchAll failed:", e);
+      toast.error("Debug failed");
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    const q = (search || "").toLowerCase();
+    return (localItems || []).filter(it => {
+      const matchesSearch = ((it.make || "") + " " + (it.model || "") + " " + (it.description || "")).toLowerCase().includes(q);
+      const matchesSeason = !filterSeason || it.season === filterSeason;
+      const matchesPattern = !filterPattern || it.pattern === filterPattern;
+      const matchesColor = !filterColor || it.color === filterColor;
+      const matchesSize = !filterSize || it.size === filterSize;
+      return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
+    });
+  }, [localItems, search, filterSeason, filterPattern, filterColor, filterSize]);
+
+  if (!slug) return <div className="p-6">No crew slug</div>;
+
+  return (
+    <div className="min-h-screen p-4 bg-gradient-to-b from-slate-50 to-white text-slate-900">
+      <header className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          {crew?.logo_url ? (
+            <div className="w-12 h-12 rounded-md overflow-hidden shadow"><Image src={crew.logo_url} alt={crew?.name || slug} width={48} height={48} className="object-cover" /></div>
+          ) : (
+            <div className="w-12 h-12 rounded-md bg-slate-200 flex items-center justify-center font-bold">BH</div>
+          )}
+          <div className="leading-tight">
+            <h1 className="text-lg font-bold">Bikehouse — {crew?.name || slug}</h1>
+            <p className="text-xs text-muted-foreground">Склад зимнего хранения · Просмотр: публичный · Управление: {isAdminish ? "включено" : "только чтение"}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Shift control */}
+          {dbUser?.user_id ? (
+            activeShift ? (
+              <button className="p-2 rounded border flex items-center gap-2 text-sm" title="End shift" onClick={handleEndShift}>
+                <StopCircle size={14} /> End shift
+              </button>
+            ) : (
+              <button className="p-2 rounded border flex items-center gap-2 text-sm" title="Start shift" onClick={handleStartShift}>
+                <Play size={14} /> Start shift
+              </button>
+            )
+          ) : (
+            <button className="p-2 rounded border text-sm" onClick={() => toast.info("Please sign in to manage shifts")}>Sign in</button>
+          )}
+
+          {/* compact toolbar */}
+          <button className="p-2 rounded border" title="Checkpoint" onClick={handleCheckpoint}><Save size={14} /></button>
+          <button className="p-2 rounded border" title="Reset to checkpoint" onClick={handleReset}><RotateCcw size={14} /></button>
+          <button className="p-2 rounded border" title="Export daily (from shifts)" onClick={handleExportDaily}><Download size={14} /></button>
+          <button className="p-2 rounded border" title="Export stock (summary)" onClick={() => toast.info("Stock export (todo)") }><FileText size={14} /></button>
+        </div>
+      </header>
+
+      <div className="mb-3">
+        <div className="flex items-center gap-2">
+          <Select value={gameMode === null ? "none" : (gameMode === "none" ? "none" : gameMode)} onValueChange={(v: any) => setGameMode(v === "none" ? null : v)}>
+            <SelectTrigger className="w-28 text-[12px]">
+              <SelectValue placeholder="Режим" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Без режима</SelectItem>
+              <SelectItem value="onload">Прием</SelectItem>
+              <SelectItem value="offload">Выдача</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex-1" />
+
+          {process.env.NEXT_PUBLIC_DEBUG !== "0" && (
+            <button className="text-xs text-muted-foreground" onClick={debugFetchAll}>debug: fetch all</button>
+          )}
+        </div>
+      </div>
+
+      <FilterAccordion
+        filterSeason={filterSeason}
+        setFilterSeason={setFilterSeason}
+        filterPattern={filterPattern}
+        setFilterPattern={setFilterPattern}
+        filterColor={filterColor}
+        setFilterColor={setFilterColor}
+        filterSize={filterSize}
+        setFilterSize={setFilterSize}
+        items={localItems}
+        onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
+        includeSearch={true}
+        search={search}
+        setSearch={setSearch}
+        sortOption={sortOption}
+        setSortOption={setSortOption}
+      />
+
+      <main className="mt-4">
+        <section className="mb-6">
+          <h2 className="text-base font-semibold mb-2">Витрина байков ({filteredItems.length})</h2>
+          {loading ? <p>Загрузка…</p> : filteredItems.length === 0 ? <p className="text-muted-foreground">Нет байков (тип: demo)</p> : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {filteredItems.map(it => (
+                <div key={it.id} className="bg-white p-3 rounded-lg shadow-sm">
+                  <WarehouseItemCard item={it} onClick={() => handleItemClick(it)} />
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    <div>Кол-во: <strong>{it.quantity ?? it.total_quantity ?? 0}</strong></div>
+                    {it.specs?.engine_cc && <div>Двигатель: {it.specs.engine_cc} cc</div>}
+                    {it.daily_price && <div>Цена: {it.daily_price} ₽/дн</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mb-6">
+          <h3 className="text-base font-semibold mb-2">План хранения</h3>
+          <div className="bg-white p-3 rounded shadow">
+            <WarehouseViz
+              items={localItems}
+              selectedVoxel={selectedVoxel}
+              onSelectVoxel={setSelectedVoxel}
+              onUpdateLocationQty={(itemId: string, voxelId: string, qty: number) => optimisticUpdate(itemId, voxelId, qty)}
+              gameMode={gameMode === "none" ? null : (gameMode as any)}
+              onPlateClick={(v:any) => { setSelectedVoxel(v); toast.info(`Ячейка ${v} выбрана`); }}
+              VOXELS={[]}
+            />
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h3 className="text-base font-semibold mb-2">Инструкция для использования (весело)</h3>
+          <div className="bg-slate-50 p-3 rounded text-sm text-muted-foreground">
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Выберите режим сверху: Прием — чтобы добавить байки; Выдача — чтобы снять.</li>
+              <li>Нажмите на клетку склада в плане, чтобы выбрать место хранения. Затем нажмите карточку байка справа — чтобы положить/забрать единицу.</li>
+              <li>Нужна помощь? <button className="underline" onClick={contactOwner}>Contact Owner</button> — мы отправим владельцу короткое сообщение в Telegram.</li>
+            </ol>
+            <p className="mt-2 italic text-xs">Совет: при тестировании включите DEBUG режим (NEXT_PUBLIC_DEBUG ≠ 0) и используйте debug: fetch all, если не видите позиции.</p>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h3 className="text-base font-semibold mb-2">Список смен (последние)</h3>
+          <div className="bg-white p-3 rounded shadow text-sm">
+            {shiftsList.length === 0 ? <div className="text-muted-foreground">Смены не найдены</div> : (
+              <div className="space-y-2">
+                {shiftsList.map(s => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <div>
+                      <div><strong>{s.member_id}</strong> · {s.shift_type} · {s.clock_in_time ? new Date(s.clock_in_time).toLocaleString() : "?"}</div>
+                      <div className="text-xs text-muted-foreground">{s.clock_out_time ? `ended ${new Date(s.clock_out_time).toLocaleString()}` : "active"}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground text-right">
+                      <div>{s.duration_minutes ?? "--"} min</div>
+                      <div>{s.checkpoint?.saved_at ? new Date(s.checkpoint.saved_at).toLocaleString() : ""}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      <div className="mt-6">
+        <WarehouseStats
+          itemsCount={localItems.length}
+          uniqueIds={new Set((localItems||[]).map(i => i.id)).size}
+          score={0}
+          level={0}
+          streak={0}
+          dailyStreak={0}
+          checkpointMain={checkpointStart ? `${Math.floor((Date.now()-checkpointStart)/1000)}s` : "--"}
+          checkpointSub={checkpoint ? "есть чекпоинт" : "нет чекпоинта"}
+          changedCount={0}
+          totalDelta={0}
+          stars={0}
+          offloadUnits={0}
+          salary={0}
+          achievements={[]}
+          sessionStart={null}
+          errorCount={0}
+          bossMode={false}
+          bossTimer={0}
+          leaderboard={[]}
+          efficiency={0}
+          avgTimePerItem={0}
+          dailyGoals={[]}
+          sessionDuration={0}
+        />
+      </div>
+    </div>
+  );
+}
