@@ -6,16 +6,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileUp, Download, Save, RotateCcw, Upload, PackageSearch } from "lucide-react";
+import { FileUp, Download, Save, RotateCcw, Upload } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
-import Link from "next/link";
 import { parse } from "papaparse";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import WarehouseViz from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
 
-// Dynamic imports to avoid circular dependencies
+/**
+ * Slugged warehouse page.
+ * Improvements:
+ * - Compact icon-only top buttons (prevent overflow)
+ * - Disabled checkpoint/reset when no active shift
+ * - Safe clipboard fallback on stock export
+ * - Fetch active shift for current member
+ * - Use wrappers from ./actions (keeps compatibility)
+ */
+
 let SIZE_PACK: Record<string, number> | null = null;
 let VOXELS: any[] | null = null;
 
@@ -27,7 +35,7 @@ export default function CrewWarehousePage() {
   const [isUploading, setIsUploading] = useState(false);
   const isTelegram = !!tg;
 
-  // Core states
+  // Core
   const [crew, setCrew] = useState<any | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [localItems, setLocalItems] = useState<any[]>([]);
@@ -36,15 +44,17 @@ export default function CrewWarehousePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Game mode states
+  // Active shift info (if user has an open shift)
+  const [activeShift, setActiveShift] = useState<any | null>(null);
+
+  // Game and search
   const [gameMode, setGameMode] = useState<"offload" | "onload" | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  // Checkpoint states
+  // Checkpoint + stats
   const [checkpoint, setCheckpoint] = useState<any[]>([]);
   const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
-  const [tick, setTick] = useState(0);
   const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
   const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
@@ -52,7 +62,6 @@ export default function CrewWarehousePage() {
   const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
   const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
 
-  // Stats and game metrics
   const [statsObj, setStatsObj] = useState({
     changedCount: 0,
     totalDelta: 0,
@@ -78,7 +87,7 @@ export default function CrewWarehousePage() {
   const [editCount, setEditCount] = useState(0);
   const [sessionStart, setSessionStart] = useState(Date.now());
 
-  // Dynamic import of common data
+  // load constants
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -92,12 +101,10 @@ export default function CrewWarehousePage() {
         console.warn("Failed to load common:", err);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
-  // Load crew items
+  // Load crew items AND active shift
   useEffect(() => {
     if (!slug) {
       setError("No slug provided");
@@ -105,6 +112,7 @@ export default function CrewWarehousePage() {
       return;
     }
     loadCrewItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const loadCrewItems = async () => {
@@ -116,19 +124,21 @@ export default function CrewWarehousePage() {
       if (res.success) {
         setCrew(res.crew);
         setItems(res.data || []);
-        setLocalItems(res.data || []);
         setMemberRole(res.memberRole);
         setIsOwner(res.isOwner || false);
+
         const mappedItems = (res.data || []).map((i: any) => {
           const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
             voxel: l.voxel_id,
             quantity: l.quantity,
-            min_qty: l.voxel_id?.startsWith("B") ? 3 : undefined,
+            min_qty: l.voxel_id?.startsWith?.("B") ? 3 : undefined,
           })).sort((a: any, b: any) => (a.voxel || "").localeCompare(b.voxel || ""));
           const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
           return {
             id: i.id,
-            name: `${i.make} ${i.model}`,
+            make: i.make,
+            model: i.model,
+            name: `${i.make || ""} ${i.model || ""}`.trim(),
             description: i.description || "",
             image: i.image_url,
             locations,
@@ -137,10 +147,27 @@ export default function CrewWarehousePage() {
             pattern: i.specs?.pattern || null,
             color: i.specs?.color || "gray",
             size: i.specs?.size || "",
+            specs: i.specs || {},
           };
         });
+
         setLocalItems(mappedItems);
-        setCheckpoint(mappedItems.map((it) => ({ ...it, locations: it.locations.map((l: any) => ({ ...l })) })));
+        setCheckpoint(mappedItems.map((it) => ({ id: it.id, locations: it.locations.map((l: any) => ({ ...l })) })));
+
+        // fetch active shift for this member (if logged)
+        if (dbUser?.user_id) {
+          try {
+            const s = await mod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
+            if (s?.success) {
+              setActiveShift(s.shift || null);
+            } else {
+              setActiveShift(null);
+            }
+          } catch (e) {
+            console.warn("Failed to fetch active shift:", e);
+            setActiveShift(null);
+          }
+        }
       } else {
         setError(res.error || "Failed to load warehouse");
         toast.error(res.error || "Ошибка загрузки");
@@ -153,9 +180,8 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // Optimistic update + server sync
+  // optimistic update + server sync
   const optimisticUpdate = async (itemId: string, voxelId: string, delta: number) => {
-    // Optimistic UI update
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
@@ -172,28 +198,26 @@ export default function CrewWarehousePage() {
       })
     );
 
-    // Update stats
+    // stats
     const absDelta = Math.abs(delta);
-    if (gameMode === "onload" && delta > 0) {
-      setOnloadCount((prev) => prev + absDelta);
-    } else if (gameMode === "offload" && delta < 0) {
-      setOffloadCount((prev) => prev + absDelta);
-    } else {
-      setEditCount((prev) => prev + absDelta);
-    }
-    const points = gameMode === "onload" ? 10 : 5;
-    setScore((prev) => prev + points);
-    setStreak((prev) => prev + 1);
+    if (gameMode === "onload" && delta > 0) setOnloadCount((p) => p + absDelta);
+    else if (gameMode === "offload" && delta < 0) setOffloadCount((p) => p + absDelta);
+    else setEditCount((p) => p + absDelta);
 
-    // Server sync
+    const points = gameMode === "onload" ? 10 : 5;
+    setScore((p) => p + points);
+    setStreak((p) => p + 1);
+
+    // server
     try {
       const mod = await import("./actions");
       const res = await mod.updateCrewItemLocationQty(slug!, itemId, voxelId, delta, dbUser?.user_id);
       if (!res.success) {
         toast.error(res.error || "Server update failed");
-        setErrorCount((prev) => prev + 1);
+        setErrorCount((p) => p + 1);
         setStreak(0);
-        loadCrewItems(); // Revert on failure
+        // revert by reloading authoritative state
+        await loadCrewItems();
       } else {
         setStatsObj((prev) => ({
           ...prev,
@@ -206,13 +230,13 @@ export default function CrewWarehousePage() {
       }
     } catch (e: any) {
       toast.error(e.message || "Update failed");
-      setErrorCount((prev) => prev + 1);
+      setErrorCount((p) => p + 1);
       setStreak(0);
-      loadCrewItems();
+      await loadCrewItems();
     }
   };
 
-  // File upload (admin only)
+  // File upload
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
       toast.error("Admin access required");
@@ -230,7 +254,7 @@ export default function CrewWarehousePage() {
         const result = await mod.uploadCrewWarehouseCsv(parsed, slug!, dbUser?.user_id);
         if (result.success) {
           toast.success(result.message || "CSV uploaded successfully");
-          loadCrewItems();
+          await loadCrewItems();
         } else {
           toast.error(result.error || "Upload failed");
         }
@@ -241,11 +265,44 @@ export default function CrewWarehousePage() {
       }
     };
     reader.readAsText(file);
+    // clear input so same file can be selected again later
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Checkpoint logic
+  // Helper: safe clipboard with fallback
+  const safeCopyToClipboard = async (text: string) => {
+    if (!text) return false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      // fallthrough to execCommand fallback
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Checkpoint
   const handleCheckpoint = async () => {
-    const snapshot = localItems.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) }));
+    if (!activeShift) {
+      toast.error("Start shift first to save checkpoint");
+      return;
+    }
+
+    const snapshot = localItems.map((i) => ({ id: i.id, locations: i.locations.map((l: any) => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
     setOnloadCount(0);
@@ -257,17 +314,23 @@ export default function CrewWarehousePage() {
     setLastProcessedStars(null);
     setLastProcessedOffloadUnits(null);
     setLastProcessedSalary(null);
-    toast.success("Checkpoint saved");
+    toast.success("Checkpoint saved locally");
 
-    // Save to shift if active
+    // Save to server shift
     if (dbUser?.user_id) {
       try {
         const mod = await import("./actions");
         const res = await mod.saveCrewCheckpoint(slug!, dbUser.user_id, snapshot);
         if (!res.success) {
           console.warn("Shift checkpoint save failed:", res.error);
+          toast.error("Failed to save checkpoint on server");
+        } else {
+          toast.success("Checkpoint saved to shift");
+          // refresh activeShift info
+          const s = await mod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
+          setActiveShift(s.shift || null);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn("Shift checkpoint save failed:", e);
       }
     }
@@ -278,6 +341,8 @@ export default function CrewWarehousePage() {
       toast.error("No checkpoint available");
       return;
     }
+
+    // local reset
     setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) })));
     setOnloadCount(0);
     setOffloadCount(0);
@@ -288,23 +353,32 @@ export default function CrewWarehousePage() {
     setLastProcessedStars(null);
     setLastProcessedOffloadUnits(null);
     setLastProcessedSalary(null);
-    toast.success("Reset to checkpoint");
+    toast.success("Reset to checkpoint (local)");
 
-    // Server reset if shift active
+    // server reset (requires active shift)
     if (dbUser?.user_id) {
+      if (!activeShift) {
+        toast.error("Start shift first to apply server reset");
+        return;
+      }
       try {
         const mod = await import("./actions");
         const res = await mod.resetCrewCheckpoint(slug!, dbUser.user_id);
         if (!res.success) {
-          console.warn("Server reset failed:", res.error);
+          console.warn("Server reset failed:", res.error || res);
+          toast.error("Server reset had failures; check logs");
+        } else {
+          toast.success(`Server reset applied (${res.applied} items)`);
+          await loadCrewItems();
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn("Server reset error:", e);
+        toast.error("Server reset error");
       }
     }
   };
 
-  // Export functions
+  // Exports - with clipboard attempt
   const handleExportDiff = async () => {
     if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
       toast.error("Admin access required");
@@ -312,7 +386,7 @@ export default function CrewWarehousePage() {
     }
     const diffData = localItems.flatMap((item) =>
       (item.locations || []).map((loc: any) => {
-        const cpLoc = checkpoint.find((cp) => cp.id === item.id)?.locations.find((cl) => cl.voxel === loc.voxel);
+        const cpLoc = checkpoint.find((cp) => cp.id === item.id)?.locations.find((cl: any) => cl.voxel === loc.voxel);
         const diffQty = (loc.quantity || 0) - (cpLoc?.quantity || 0);
         return diffQty !== 0 ? { id: item.id, diffQty, voxel: loc.voxel } : null;
       }).filter(Boolean)
@@ -326,14 +400,20 @@ export default function CrewWarehousePage() {
       const mod = await import("./actions");
       const result = await mod.exportCrewDiffToOwner(slug!, diffData as any, dbUser?.user_id);
       if (result.success && result.csv) {
-        const blob = new Blob([result.csv], { type: "text/tab-separated-values" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `diff_${slug}.tsv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Difference exported successfully");
+        // try copy to clipboard first
+        const copied = await safeCopyToClipboard(result.csv);
+        if (copied) {
+          toast.success("Diff copied to clipboard");
+        } else {
+          const blob = new Blob([result.csv], { type: "text/tab-separated-values" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `diff_${slug}.tsv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success("Difference exported (downloaded)");
+        }
       } else {
         toast.error(result.error || "Export failed");
       }
@@ -351,14 +431,20 @@ export default function CrewWarehousePage() {
       const mod = await import("./actions");
       const result = await mod.exportCrewCurrentStock(slug!, localItems, summarized, dbUser?.user_id);
       if (result.success && result.csv) {
-        const blob = new Blob([result.csv], { type: "text/tab-separated-values" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Stock exported successfully");
+        // prefer clipboard for quick daily export (and fallback to download)
+        const copied = await safeCopyToClipboard(result.csv);
+        if (copied) {
+          toast.success("Stock copied to clipboard");
+        } else {
+          const blob = new Blob([result.csv], { type: "text/tab-separated-values" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success("Stock exported successfully");
+        }
       } else {
         toast.error(result.error || "Export failed");
       }
@@ -413,19 +499,54 @@ export default function CrewWarehousePage() {
       <header className="p-4 bg-white dark:bg-gray-800 shadow">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">{crew?.name} Warehouse</h1>
-          <div className="flex gap-2">
-            <Button onClick={handleCheckpoint} size="sm" variant="outline">
-              <Save className="w-4 h-4 mr-2" /> Save Checkpoint
+          <div className="flex gap-2 items-center overflow-x-auto">
+            {/* Compact icon buttons to avoid overflow; titles provide accessibility */}
+            <Button
+              onClick={handleCheckpoint}
+              size="sm"
+              variant="outline"
+              className="w-9 h-9 p-2"
+              title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"}
+              aria-label="Save checkpoint"
+              disabled={!activeShift}
+            >
+              <Save className="w-4 h-4" />
             </Button>
-            <Button onClick={handleReset} size="sm" variant="outline">
-              <RotateCcw className="w-4 h-4 mr-2" /> Reset to Checkpoint
+
+            <Button
+              onClick={handleReset}
+              size="sm"
+              variant="outline"
+              className="w-9 h-9 p-2"
+              title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"}
+              aria-label="Reset checkpoint"
+              disabled={!activeShift}
+            >
+              <RotateCcw className="w-4 h-4" />
             </Button>
-            <Button onClick={handleExportDiff} size="sm" variant="outline">
-              <Download className="w-4 h-4 mr-2" /> Export Diff
+
+            <Button
+              onClick={handleExportDiff}
+              size="sm"
+              variant="outline"
+              className="w-9 h-9 p-2"
+              title="Export diff"
+              aria-label="Export diff"
+            >
+              <Download className="w-4 h-4" />
             </Button>
-            <Button onClick={() => handleExportStock(false)} size="sm" variant="outline">
-              <FileUp className="w-4 h-4 mr-2" /> Export Stock
+
+            <Button
+              onClick={() => handleExportStock(false)}
+              size="sm"
+              variant="outline"
+              className="w-9 h-9 p-2"
+              title="Export stock"
+              aria-label="Export stock"
+            >
+              <FileUp className="w-4 h-4" />
             </Button>
+
             <input
               ref={fileInputRef}
               type="file"
@@ -438,11 +559,15 @@ export default function CrewWarehousePage() {
               disabled={isUploading}
               size="sm"
               variant="outline"
+              className="w-9 h-9 p-2"
+              title="Upload CSV"
+              aria-label="Upload CSV"
             >
-              <Upload className="w-4 h-4 mr-2" /> {isUploading ? "Uploading..." : "Upload CSV"}
+              <Upload className="w-4 h-4" />
             </Button>
           </div>
         </div>
+
         <div className="mt-4">
           <Input
             placeholder="Search items..."
@@ -452,6 +577,7 @@ export default function CrewWarehousePage() {
           />
         </div>
       </header>
+
       <main className="flex-1 overflow-y-auto p-4">
         <Card className="mb-4">
           <CardHeader>
@@ -473,12 +599,14 @@ export default function CrewWarehousePage() {
             )}
           </CardContent>
         </Card>
+
         <WarehouseViz
           items={localItems}
           selectedVoxel={selectedVoxel}
           onVoxelSelect={setSelectedVoxel}
           gameMode={gameMode}
         />
+
         <WarehouseStats
           stats={statsObj}
           score={score}
@@ -497,6 +625,7 @@ export default function CrewWarehousePage() {
           lastProcessedSalary={lastProcessedSalary}
         />
       </main>
+
       <WarehouseModals
         editDialogOpen={editDialogOpen}
         setEditDialogOpen={setEditDialogOpen}
