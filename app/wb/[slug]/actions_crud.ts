@@ -3,6 +3,13 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { unstable_noStore as noStore } from "next/cache";
 
+/**
+ * Lightweight CRUD operations for slugged warehouse items.
+ *
+ * Important: this file avoids writing `created_at` / `updated_at` to the `cars`
+ * table because some deployments do not have those columns (schema variance).
+ */
+
 function safeParseSpecs(specs: any) {
   if (!specs) return {};
   if (typeof specs === "object") return specs;
@@ -80,6 +87,8 @@ export async function getCrewWarehouseItems(slug: string) {
 /**
  * updateCrewItemLocationQty
  * update single location qty inside specs.warehouse_locations (voxel_id)
+ *
+ * Note: does NOT write updated_at / created_at fields to `cars` to avoid schema errors.
  */
 export async function updateCrewItemLocationQty(
   slug: string,
@@ -126,9 +135,10 @@ export async function updateCrewItemLocationQty(
 
     const totalQuantity = specs.warehouse_locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
 
+    // update only specs (no timestamps)
     const { error: updateError } = await supabaseAdmin
       .from("cars")
-      .update({ specs, updated_at: new Date().toISOString() })
+      .update({ specs })
       .eq("id", itemId)
       .eq("crew_id", crewId);
 

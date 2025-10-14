@@ -5,6 +5,12 @@ import Papa from "papaparse";
 import { v4 as uuidv4 } from "uuid";
 import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 
+/**
+ * CSV helpers for slugged warehouses.
+ * Important: don't attempt to write created_at/updated_at for `cars` table
+ * because the table may not contain those columns in every deployment.
+ */
+
 function log(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.log("[wb/actions_csv]", ...args); }
 function err(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.error("[wb/actions_csv]", ...args); }
 
@@ -71,9 +77,10 @@ export async function uploadCrewWarehouseCsv(parsedRows: any[], slug: string, us
             .limit(1)
             .maybeSingle();
           if (exists) {
+            // update only allowed fields (no timestamps)
             const { error } = await supabaseAdmin
               .from("cars")
-              .update({ make, model, specs, updated_at: new Date().toISOString() })
+              .update({ make, model, specs })
               .eq("id", id)
               .eq("crew_id", crewId);
             if (error) failures.push({ id, error: error.message });
@@ -90,8 +97,6 @@ export async function uploadCrewWarehouseCsv(parsedRows: any[], slug: string, us
           make,
           model,
           specs,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         });
         if (error) failures.push({ id: newId, error: error.message });
         else applied++;
