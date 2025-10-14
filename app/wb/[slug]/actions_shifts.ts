@@ -2,6 +2,23 @@
 
 import { supabaseAdmin } from "@/hooks/supabase";
 
+/**
+ * actions_shifts.ts
+ * Server-side helpers for shift operations (slugged).
+ *
+ * Exposes:
+ * - getCrewMemberStatus(slug, memberId)
+ * - setCrewMemberLiveStatus(slug, memberId, newStatus, opts?)
+ * - getActiveShiftForCrewMember(slug, memberId)
+ * - startWarehouseShift(slug, memberId, shiftType?)
+ * - endWarehouseShift(slug, shiftId)
+ * - saveCrewCheckpoint(slug, memberId, checkpointData)
+ * - resetCrewCheckpoint(slug, memberId)
+ *
+ * These mirror the logic used by the Telegram bot shift command and make it easy
+ * for client components to operate on shifts / member status.
+ */
+
 function log(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.log("[wb/actions_shifts]", ...args); }
 function err(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.error("[wb/actions_shifts]", ...args); }
 
@@ -22,6 +39,66 @@ function safeParseSpecs(specs: any) {
   if (typeof specs === "object") return specs;
   try { return JSON.parse(specs); } catch { return {}; }
 }
+
+/* -------------------------
+   Member status helpers
+   ------------------------- */
+
+/**
+ * Return live_status and crew_members row for the given user in crew
+ */
+export async function getCrewMemberStatus(slug: string, memberId: string) {
+  try {
+    const crew = await resolveCrewBySlug(slug);
+    const { data, error } = await supabaseAdmin
+      .from("crew_members")
+      .select("*")
+      .eq("crew_id", crew.id)
+      .eq("user_id", memberId)
+      .eq("membership_status", "active")
+      .maybeSingle();
+
+    if (error) throw error;
+    return { success: true, member: data || null, live_status: data?.live_status || null };
+  } catch (e: any) {
+    err("getCrewMemberStatus error", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/**
+ * Set live_status for a crew member.
+ * Optionally set last_location or other small fields.
+ */
+export async function setCrewMemberLiveStatus(
+  slug: string,
+  memberId: string,
+  newStatus: string,
+  opts: { last_location?: string | null } = {}
+) {
+  try {
+    const crew = await resolveCrewBySlug(slug);
+    const payload: any = { live_status: newStatus, updated_at: new Date().toISOString() };
+    if (opts.last_location !== undefined) payload.last_location = opts.last_location;
+
+    const { error } = await supabaseAdmin
+      .from("crew_members")
+      .update(payload)
+      .eq("crew_id", crew.id)
+      .eq("user_id", memberId)
+      .eq("membership_status", "active");
+
+    if (error) throw error;
+    return { success: true };
+  } catch (e: any) {
+    err("setCrewMemberLiveStatus error", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/* -------------------------
+   Shift CRUD & checkpoint helpers
+   ------------------------- */
 
 export async function getActiveShiftForCrewMember(slug: string, memberId: string) {
   try {
@@ -45,6 +122,7 @@ export async function getActiveShiftForCrewMember(slug: string, memberId: string
 export async function startWarehouseShift(slug: string, memberId: string, shiftType: string = "warehouse") {
   try {
     const crew = await resolveCrewBySlug(slug);
+    // ensure no active shift
     const active = await supabaseAdmin
       .from("crew_member_shifts")
       .select("id")
@@ -61,8 +139,11 @@ export async function startWarehouseShift(slug: string, memberId: string, shiftT
       shift_type: shiftType,
       checkpoint: {},
       actions: [],
+      clock_in_time: new Date().toISOString(),
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }).select().single();
+
     if (error) throw error;
     return { success: true, shift: data };
   } catch (e: any) {
@@ -115,6 +196,7 @@ export async function saveCrewCheckpoint(slug: string, memberId: string, checkpo
   }
 }
 
+/* Reset writes specs.warehouse_locations for each item from checkpoint */
 export async function resetCrewCheckpoint(slug: string, memberId: string) {
   try {
     const crew = await resolveCrewBySlug(slug);

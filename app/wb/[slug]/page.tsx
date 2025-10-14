@@ -13,17 +13,12 @@ import WarehouseItemCard from "@/components/WarehouseItemCard";
 import WarehouseViz from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
+import ShiftControls from "@/components/ShiftControls";
 
-/**
- * Slugged warehouse page — imports specific action files:
- * - actions_crud.ts
- * - actions_csv.ts
- * - actions_shifts.ts
- * - actions_notify.ts
- *
- * NOTE: we intentionally DO NOT import /app/wb/common.ts here (to avoid coupling).
- * derive helpers done inline where needed (simple heuristics).
- */
+/* Page specifics retained:
+   - uses dynamic imports of actions_crud / actions_csv / actions_shifts where needed.
+   - header has compact icon buttons
+*/
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
@@ -59,7 +54,7 @@ export default function CrewWarehousePage() {
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
 
-  // local derive helpers (don't use global common)
+  // derive helpers (kept local to page)
   const deriveSizePack = (items: any[]) => {
     const counts: Record<string, number> = {};
     for (const it of items || []) {
@@ -154,6 +149,7 @@ export default function CrewWarehousePage() {
     }
   };
 
+  // optimisticUpdate (same as before) - calling actions_crud.updateCrewItemLocationQty
   const optimisticUpdate = async (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
@@ -361,54 +357,29 @@ export default function CrewWarehousePage() {
             <h1 className="text-lg font-medium">{crew?.name || "Crew"} <span className="text-xs text-gray-500">Warehouse</span></h1>
           </div>
 
-          <div className="flex gap-1 items-center overflow-x-auto">
-            <Button
-              onClick={handleCheckpoint}
-              size="sm"
-              variant="outline"
-              className="w-7 h-7 p-1"
-              title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"}
-              aria-label="Save checkpoint"
-              disabled={!activeShift}
-            >
-              <Save className="w-4 h-4" />
-            </Button>
+          <div className="flex gap-2 items-center">
+            {/* ShiftControls component */}
+            <ShiftControls slug={slug!} />
 
-            <Button
-              onClick={handleReset}
-              size="sm"
-              variant="outline"
-              className="w-7 h-7 p-1"
-              title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"}
-              aria-label="Reset checkpoint"
-              disabled={!activeShift}
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
+            {/* Action icons */}
+            <div className="flex gap-1 items-center overflow-x-auto ml-2">
+              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift}>
+                <Save className="w-4 h-4" />
+              </Button>
 
-            <Button
-              onClick={() => handleExportStock(false)}
-              size="sm"
-              variant="outline"
-              className="w-7 h-7 p-1"
-              title="Export stock"
-              aria-label="Export stock"
-            >
-              <FileUp className="w-4 h-4" />
-            </Button>
+              <Button onClick={handleReset} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift}>
+                <RotateCcw className="w-4 h-4" />
+              </Button>
 
-            <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              size="sm"
-              variant="outline"
-              className="w-7 h-7 p-1"
-              title="Upload CSV"
-              aria-label="Upload CSV"
-            >
-              <Upload className="w-4 h-4" />
-            </Button>
+              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-7 h-7 p-1" title="Export stock">
+                <FileUp className="w-4 h-4" />
+              </Button>
+
+              <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
+              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} size="sm" variant="outline" className="w-7 h-7 p-1" title="Upload CSV">
+                <Upload className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
