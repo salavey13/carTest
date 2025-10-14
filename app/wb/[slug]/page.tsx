@@ -15,10 +15,12 @@ import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
 import ShiftControls from "@/components/ShiftControls";
 
-/* Page specifics retained:
-   - uses dynamic imports of actions_crud / actions_csv / actions_shifts where needed.
-   - header has compact icon buttons
-*/
+/**
+ * Slugged warehouse page.
+ * - Header is responsive: stacks on small screens (prevents offscreen buttons).
+ * - Adds a compact game mode switcher (onload/offload/off).
+ * - Action icons are small and wrap on narrow screens.
+ */
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
@@ -100,7 +102,6 @@ export default function CrewWarehousePage() {
       if (res.success) {
         setCrew(res.crew);
         setIsOwner(!!res.crew?.owner_id && dbUser?.user_id === res.crew.owner_id);
-        // map server items to client shape:
         const mapped = (res.data || []).map((i: any) => {
           const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
             voxel: l.voxel_id,
@@ -149,7 +150,7 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // optimisticUpdate (same as before) - calling actions_crud.updateCrewItemLocationQty
+  // optimisticUpdate (same as before)
   const optimisticUpdate = async (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
@@ -351,38 +352,65 @@ export default function CrewWarehousePage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="p-3 bg-white dark:bg-gray-800 shadow">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center">
-            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded mr-2 object-cover" />}
-            <h1 className="text-lg font-medium">{crew?.name || "Crew"} <span className="text-xs text-gray-500">Warehouse</span></h1>
+        {/* Use column layout on small screens to avoid offscreen buttons */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+          <div className="flex items-center gap-3">
+            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded mr-0 object-cover" />}
+            <div>
+              <h1 className="text-lg font-medium leading-tight">{crew?.name || "Crew"}</h1>
+              <div className="text-xs text-gray-500">Warehouse</div>
+            </div>
           </div>
 
-          <div className="flex gap-2 items-center">
-            {/* ShiftControls component */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Shift controls */}
             <ShiftControls slug={slug!} />
 
-            {/* Action icons */}
-            <div className="flex gap-1 items-center overflow-x-auto ml-2">
-              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift}>
+            {/* Mode switcher — compact */}
+            <div className="flex items-center gap-1 ml-1">
+              <Button
+                size="sm"
+                variant={gameMode === "onload" ? "default" : "outline"}
+                onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")}
+                className="px-2 py-1 text-xs"
+                title="Onload (add items)"
+              >
+                +Load
+              </Button>
+              <Button
+                size="sm"
+                variant={gameMode === "offload" ? "default" : "outline"}
+                onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")}
+                className="px-2 py-1 text-xs"
+                title="Offload (remove items)"
+              >
+                −Unload
+              </Button>
+            </div>
+
+            {/* Action icons — small and allowed to wrap */}
+            <div className="flex gap-1 items-center ml-1 flex-wrap">
+              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift}>
                 <Save className="w-4 h-4" />
               </Button>
 
-              <Button onClick={handleReset} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift}>
+              <Button onClick={handleReset} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift}>
                 <RotateCcw className="w-4 h-4" />
               </Button>
 
-              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-7 h-7 p-1" title="Export stock">
+              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock">
                 <FileUp className="w-4 h-4" />
               </Button>
 
               <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} size="sm" variant="outline" className="w-7 h-7 p-1" title="Upload CSV">
+              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} size="sm" variant="outline" className="w-8 h-8 p-1" title="Upload CSV">
                 <Upload className="w-4 h-4" />
               </Button>
             </div>
           </div>
         </div>
 
+        {/* Search field under header row — keeps header compact and search prominent */}
         <div className="mt-3">
           <Input placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
         </div>
