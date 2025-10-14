@@ -8,18 +8,11 @@ import { useAppContext } from "@/contexts/AppContext";
 
 /**
  * ShiftControls
- * - prop: slug (crew slug)
- * - uses useAppContext().dbUser.user_id for member id
+ * Client-side small control that mimics bot keyboard.
  *
- * Behavior:
- * - fetches member live_status and active shift
- * - offers actions that mimic bot keyboard:
- *    - Start Shift (clock_in)
- *    - Toggle Ride (On Bike / In Box)
- *    - End Shift (clock_out)
+ * Uses dynamic imports to call server helpers in /app/wb/[slug]/actions_shifts.ts
  *
- * Notes:
- * - server functions are imported from /app/wb/[slug]/actions_shifts.ts
+ * Note: Notifications are sent server-side (ADMIN_CHAT_ID and crew owner) when status changes.
  */
 
 export default function ShiftControls({ slug }: { slug: string }) {
@@ -54,7 +47,6 @@ export default function ShiftControls({ slug }: { slug: string }) {
 
   useEffect(() => {
     loadStatus();
-    // poll lightly while mounted so UI reflects changes quickly
     const iv = setInterval(() => loadStatus(), 30_000);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,21 +57,15 @@ export default function ShiftControls({ slug }: { slug: string }) {
     setLoading(true);
     try {
       const mod = await import(`@/app/wb/[slug]/actions_shifts`);
-      // 1) ensure DB shift row
       const startRes = await mod.startWarehouseShift(slug, userId);
       if (!startRes?.success) {
         toast.error(startRes?.error || "Не удалось начать смену (shift row)");
-        // still try to set live_status in crew_members for safety
       } else {
         toast.success("Смена начата (shift saved)");
       }
-      // 2) set member live_status to 'online'
       const setRes = await mod.setCrewMemberLiveStatus(slug, userId, "online");
-      if (!setRes?.success) {
-        toast.error(setRes?.error || "Не удалось установить статус участника");
-      } else {
-        toast.success("Статус: Онлайн");
-      }
+      if (!setRes?.success) toast.error(setRes?.error || "Не удалось установить статус участника");
+      else toast.success("Статус: Онлайн");
       await loadStatus();
     } catch (e: any) {
       console.error("startShift error", e);
@@ -117,27 +103,18 @@ export default function ShiftControls({ slug }: { slug: string }) {
     setLoading(true);
     try {
       const mod = await import(`@/app/wb/[slug]/actions_shifts`);
-      // 1) fetch active shift
       const s = await mod.getActiveShiftForCrewMember(slug, userId);
       const shift = s?.shift || null;
       if (shift && shift.id) {
         const endRes = await mod.endWarehouseShift(slug, shift.id);
-        if (!endRes?.success) {
-          toast.error(endRes?.error || "Не удалось завершить смену (shift end)");
-        } else {
-          toast.success("Смена завершена (shift closed)");
-        }
+        if (!endRes?.success) toast.error(endRes?.error || "Не удалось завершить смену (shift end)");
+        else toast.success("Смена завершена (shift closed)");
       } else {
-        // still proceed to set member offline
         toast.info("Активной смены не найдено, переключаем статус участника в offline");
       }
-      // 2) set live_status offline
       const setRes = await mod.setCrewMemberLiveStatus(slug, userId, "offline", { last_location: null });
-      if (!setRes?.success) {
-        toast.error(setRes?.error || "Не удалось установить offline");
-      } else {
-        toast.success("Статус: Оффлайн");
-      }
+      if (!setRes?.success) toast.error(setRes?.error || "Не удалось установить offline");
+      else toast.success("Статус: Оффлайн");
       await loadStatus();
     } catch (e: any) {
       console.error("endShift error", e);
@@ -149,7 +126,7 @@ export default function ShiftControls({ slug }: { slug: string }) {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="text-xs text-gray-600 dark:text-gray-300 mr-2">
+      <div className="text-xs text-gray-600 dark:text-gray-300 mr-2 whitespace-nowrap">
         Статус: <span className="font-medium">{liveStatus || "—"}</span>
       </div>
 

@@ -1,22 +1,24 @@
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
+import { notifyCrewOwner } from "@/app/wb/[slug]/actions_notify";
 
 /**
  * actions_shifts.ts
  * Server-side helpers for shift operations (slugged).
  *
- * Exposes:
- * - getCrewMemberStatus(slug, memberId)
- * - setCrewMemberLiveStatus(slug, memberId, newStatus, opts?)
- * - getActiveShiftForCrewMember(slug, memberId)
- * - startWarehouseShift(slug, memberId, shiftType?)
- * - endWarehouseShift(slug, shiftId)
- * - saveCrewCheckpoint(slug, memberId, checkpointData)
- * - resetCrewCheckpoint(slug, memberId)
+ * - Does NOT write `updated_at` into crew_members (some schemas don't have it).
+ * - Sends admin notifications on live status changes.
  *
- * These mirror the logic used by the Telegram bot shift command and make it easy
- * for client components to operate on shifts / member status.
+ * Exported functions:
+ * - getCrewMemberStatus
+ * - setCrewMemberLiveStatus
+ * - getActiveShiftForCrewMember
+ * - startWarehouseShift
+ * - endWarehouseShift
+ * - saveCrewCheckpoint
+ * - resetCrewCheckpoint
  */
 
 function log(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.log("[wb/actions_shifts]", ...args); }
@@ -68,7 +70,8 @@ export async function getCrewMemberStatus(slug: string, memberId: string) {
 
 /**
  * Set live_status for a crew member.
- * Optionally set last_location or other small fields.
+ * Does NOT try to write `updated_at` to crew_members to avoid "schema cache" errors.
+ * Sends a notification to the ADMIN_CHAT_ID (if configured) and to crew owner (if configured).
  */
 export async function setCrewMemberLiveStatus(
   slug: string,
@@ -78,7 +81,9 @@ export async function setCrewMemberLiveStatus(
 ) {
   try {
     const crew = await resolveCrewBySlug(slug);
-    const payload: any = { live_status: newStatus, updated_at: new Date().toISOString() };
+
+    // Build payload WITHOUT updated_at to avoid schema mismatch on crew_members
+    const payload: any = { live_status: newStatus };
     if (opts.last_location !== undefined) payload.last_location = opts.last_location;
 
     const { error } = await supabaseAdmin
@@ -89,6 +94,27 @@ export async function setCrewMemberLiveStatus(
       .eq("membership_status", "active");
 
     if (error) throw error;
+
+    // Notify ADMIN (global) and crew owner (if present)
+    const adminChat = process.env.ADMIN_CHAT_ID;
+    const safeMessage = `Shift status changed: user=${memberId} crew=${slug} -> ${newStatus}`;
+    try {
+      if (adminChat) {
+        await sendComplexMessage(adminChat, safeMessage);
+      }
+    } catch (notifyErr) {
+      // non-fatal
+      log("Failed to notify admin:", notifyErr);
+    }
+
+    try {
+      // also try notifying crew owner via notifyCrewOwner (which uses crew.owner_id)
+      await notifyCrewOwner(slug, `Member ${memberId} changed status to ${newStatus}`, memberId);
+    } catch (ownerNotifyError) {
+      // If owner isn't configured, that's fine; we only try
+      log("Failed to notify crew owner:", ownerNotifyError);
+    }
+
     return { success: true };
   } catch (e: any) {
     err("setCrewMemberLiveStatus error", e);
@@ -141,7 +167,6 @@ export async function startWarehouseShift(slug: string, memberId: string, shiftT
       actions: [],
       clock_in_time: new Date().toISOString(),
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     }).select().single();
 
     if (error) throw error;
@@ -156,7 +181,7 @@ export async function endWarehouseShift(slug: string, shiftId: string) {
   try {
     const { data, error } = await supabaseAdmin
       .from("crew_member_shifts")
-      .update({ clock_out_time: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ clock_out_time: new Date().toISOString() })
       .eq("id", shiftId)
       .select()
       .maybeSingle();
@@ -185,7 +210,7 @@ export async function saveCrewCheckpoint(slug: string, memberId: string, checkpo
 
     const { error } = await supabaseAdmin
       .from("crew_member_shifts")
-      .update({ checkpoint: merged, updated_at: new Date().toISOString() })
+      .update({ checkpoint: merged })
       .eq("id", shift.id);
 
     if (error) throw error;
@@ -232,7 +257,7 @@ export async function resetCrewCheckpoint(slug: string, memberId: string) {
         specs.warehouse_locations = normalizedLocations;
         const { error } = await supabaseAdmin
           .from("cars")
-          .update({ specs, updated_at: new Date().toISOString() })
+          .update({ specs })
           .eq("id", row.id)
           .eq("crew_id", crew.id);
 
