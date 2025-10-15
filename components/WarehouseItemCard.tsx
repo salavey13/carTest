@@ -32,7 +32,7 @@ export default function WarehouseItemCard({ item, onClick = () => {} }: Warehous
       whileTap={{ scale: 0.95 }}
     >
       {item?.image && (
-        <Image src={item.image} alt={item.name || ""} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
+        <Image src={item.image} alt={""} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
       )}
       <div className={cn("absolute inset-0 opacity-60 transition-opacity duration-300", COLOR_MAP[item?.color || ""], tintClass)} />
       <div className="relative z-10 flex flex-col h-full p-1 justify-between">
