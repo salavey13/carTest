@@ -234,7 +234,7 @@ export async function resetCrewCheckpoint(slug: string, memberId: string) {
 }
 
 /* -------------------------
-   New: Export daily entry for shift
+   Export daily entry for shift (onloads + offloads)
    ------------------------- */
 
 /**
@@ -244,8 +244,8 @@ export async function resetCrewCheckpoint(slug: string, memberId: string) {
  *
  * Behavior:
  * - collect shifts for today (clock_in_time >= startOfDay UTC) and active shift (clock_out_time IS NULL)
- * - collect actions; treat events with type 'offload' OR delta < 0 as offloads
- * - aggregate by itemId + voxel_id, summing qty
+ * - collect actions: onload/offload (type field OR delta sign)
+ * - aggregate by itemId + voxel_id + type, summing qty
  * - format TSV and either send to admin or return csv
  */
 export async function exportDailyEntryForShift(slug: string, opts: { isTelegram?: boolean } = {}) {
@@ -266,7 +266,7 @@ export async function exportDailyEntryForShift(slug: string, opts: { isTelegram?
 
     if (sErr) throw sErr;
 
-    // 2) fetch active shift (if exists) to include offloads from ongoing shift
+    // 2) fetch active shift (if exists) to include actions from ongoing shift
     const { data: activeShift } = await supabaseAdmin
       .from("crew_member_shifts")
       .select("*")
@@ -280,55 +280,62 @@ export async function exportDailyEntryForShift(slug: string, opts: { isTelegram?
     (activeShift || []).forEach((s: any) => shiftsMap.set(String(s.id), s));
     const shifts = Array.from(shiftsMap.values());
 
-    // 3) collect offloads
-    const offloadRows: Array<{ itemId: string; voxel: string | null; qty: number; user: string | null; ts: string | null }> = [];
+    // 3) collect all onload/offload actions
+    const rows: Array<{ itemId: string; voxel: string | null; qty: number; user: string | null; ts: string | null; type: string }> = [];
 
     for (const sh of shifts) {
       const actions = Array.isArray(sh.actions) ? sh.actions : [];
+      // sort by timestamp if present to keep order
+      actions.sort((a: any, b: any) => {
+        const ta = a.ts ? new Date(a.ts).getTime() : 0;
+        const tb = b.ts ? new Date(b.ts).getTime() : 0;
+        return ta - tb;
+      });
       for (const a of actions) {
         // unify possible shapes: { type, itemId, voxel_id, voxel, qty, amount, delta, ts, user_id }
-        const type = a.type || null;
-        const delta = typeof a.delta === "number" ? a.delta : (typeof a.qty === "number" ? a.qty : (typeof a.amount === "number" ? a.amount : null));
+        const deltaRaw = typeof a.delta === "number" ? a.delta : (typeof a.qty === "number" ? a.qty : (typeof a.amount === "number" ? a.amount : null));
+        const delta = deltaRaw === null ? null : Number(deltaRaw);
+        if (delta === null || isNaN(delta)) continue;
+
+        const t = a.type || (delta < 0 ? "offload" : "onload");
         const qty = Math.abs(delta || 0);
-        const isOffload = type === "offload" || (typeof delta === "number" && delta < 0);
-
-        if (!isOffload) continue;
-
         const itemId = a.itemId || a.item_id || a.id || a.sku || null;
         if (!itemId) continue;
-
         const voxel = a.voxel || a.voxel_id || (a.location && (a.location.voxel || a.location.voxel_id)) || null;
-        offloadRows.push({
+
+        rows.push({
           itemId: String(itemId),
           voxel: voxel ? String(voxel) : null,
           qty,
           user: a.user_id || a.user || sh.member_id || null,
           ts: a.ts || a.ts_iso || sh.clock_in_time || null,
+          type: t,
         });
       }
     }
 
-    if (offloadRows.length === 0) {
-      return { success: true, csv: "", message: "No offloads for today" };
+    if (rows.length === 0) {
+      return { success: true, csv: "", message: "No onload/offload actions for today" };
     }
 
-    // 4) aggregate by itemId + voxel
-    const aggMap = new Map<string, { itemId: string; voxel: string | null; qty: number; users: Set<string>; times: number }>();
-    for (const r of offloadRows) {
-      const key = `${r.itemId}::${r.voxel || ""}`;
-      const cur = aggMap.get(key) || { itemId: r.itemId, voxel: r.voxel, qty: 0, users: new Set<string>(), times: 0 };
+    // 4) aggregate by itemId + voxel + type
+    const aggMap = new Map<string, { itemId: string; voxel: string | null; type: string; qty: number; users: Set<string>; ops: number }>();
+    for (const r of rows) {
+      const key = `${r.itemId}::${r.voxel || ""}::${r.type}`;
+      const cur = aggMap.get(key) || { itemId: r.itemId, voxel: r.voxel, type: r.type, qty: 0, users: new Set<string>(), ops: 0 };
       cur.qty += r.qty;
       if (r.user) cur.users.add(r.user);
-      cur.times += 1;
+      cur.ops += 1;
       aggMap.set(key, cur);
     }
 
     const aggregated = Array.from(aggMap.values()).map((v) => ({
       Артикул: v.itemId,
+      Тип: v.type,
       Ячейка: v.voxel || "",
       Количество: v.qty,
       Участников: Array.from(v.users).join(","),
-      Операций: v.times,
+      Операций: v.ops,
     }));
 
     const csv = "\uFEFF" + Papa.unparse(aggregated, { header: true, delimiter: "\t", quotes: true });
@@ -341,9 +348,9 @@ export async function exportDailyEntryForShift(slug: string, opts: { isTelegram?
       }
       const res = await sendComplexMessage(
         adminChat,
-        `Daily offload for crew ${crew.name} (${crew.slug}) — ${new Date().toISOString()}`,
+        `Daily onload/offload for crew ${crew.name} (${crew.slug}) — ${new Date().toISOString()}`,
         [],
-        { attachment: { type: "document", content: csv, filename: `daily_offload_${crew.slug}.tsv` } }
+        { attachment: { type: "document", content: csv, filename: `daily_onoff_${crew.slug}.tsv` } }
       );
       if (!res.success) throw new Error(res.error || "Failed to send to admin");
       return { success: true, csv };
@@ -352,6 +359,100 @@ export async function exportDailyEntryForShift(slug: string, opts: { isTelegram?
     return { success: true, csv };
   } catch (e: any) {
     err("exportDailyEntryForShift error", e);
+    return { success: false, error: e?.message || "unknown" };
+  }
+}
+
+/* -------------------------
+   Send delivery car request
+   ------------------------- */
+
+/**
+ * sendDeliveryCarRequest(slug, opts)
+ * - aggregates today's offload qty (all providers combined) and sends a short message to TAXI_REQUEST_CHAT_ID
+ * - opts: { forceType?: 'taxi'|'pickup'|'auto' }  // 'auto' means choose by threshold
+ * Threshold: default 10 items => pickup
+ */
+export async function sendDeliveryCarRequest(slug: string, opts: { forceType?: "taxi" | "pickup" | "auto" } = {}) {
+  try {
+    const crew = await resolveCrewBySlug(slug);
+    // gather today's shifts + active
+    const now = new Date();
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const startOfDay_iso = startOfDay.toISOString();
+
+    const { data: shiftsToday } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("*")
+      .eq("crew_id", crew.id)
+      .gte("clock_in_time", startOfDay_iso)
+      .limit(1000);
+
+    const { data: activeShift } = await supabaseAdmin
+      .from("crew_member_shifts")
+      .select("*")
+      .eq("crew_id", crew.id)
+      .is("clock_out_time", null)
+      .limit(1000);
+
+    const shiftsMap = new Map<string, any>();
+    (shiftsToday || []).forEach((s: any) => shiftsMap.set(String(s.id), s));
+    (activeShift || []).forEach((s: any) => shiftsMap.set(String(s.id), s));
+    const shifts = Array.from(shiftsMap.values());
+
+    let totalOffloadQty = 0;
+    // for message: top items by qty
+    const itemMap = new Map<string, number>();
+
+    for (const sh of shifts) {
+      const actions = Array.isArray(sh.actions) ? sh.actions : [];
+      for (const a of actions) {
+        const deltaRaw = typeof a.delta === "number" ? a.delta : (typeof a.qty === "number" ? a.qty : (typeof a.amount === "number" ? a.amount : null));
+        const delta = deltaRaw === null ? null : Number(deltaRaw);
+        if (delta === null || isNaN(delta)) continue;
+        const isOffload = (a.type === "offload") || (delta < 0);
+        if (!isOffload) continue;
+        const qty = Math.abs(delta || 0);
+        const itemId = a.itemId || a.item_id || a.id || a.sku || "unknown";
+        totalOffloadQty += qty;
+        itemMap.set(String(itemId), (itemMap.get(String(itemId)) || 0) + qty);
+      }
+    }
+
+    // choose car type
+    const threshold = 10;
+    let carType: "taxi" | "pickup" | "auto" = "auto";
+    if (opts.forceType === "taxi" || opts.forceType === "pickup") carType = opts.forceType;
+    else carType = totalOffloadQty >= threshold ? "pickup" : "taxi";
+
+    const chatId = process.env.TAXI_REQUEST_CHAT_ID || process.env.ADMIN_CHAT_ID;
+    if (!chatId) throw new Error("TAXI_REQUEST_CHAT_ID not configured");
+
+    // prepare message
+    const topItems = Array.from(itemMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const topList = topItems.map(([id, q]) => `${id}: ${q}`).join("\n") || "—";
+
+    const msg = `🚚 Запрос на подачу машины для склада ${crew.name} (${crew.slug})
+Всего offload (сегодня): ${totalOffloadQty}
+Рекомендуемый тип: ${carType === "auto" ? (totalOffloadQty >= threshold ? "pickup" : "taxi") : carType}
+Top items:
+${topList}
+
+Примечание: Ozon/YM handled manually.`;
+
+    const res = await sendComplexMessage(chatId as string, msg);
+    if (!res.success) throw new Error(res.error || "Failed to send taxi request");
+
+    // also notify admin channel if different
+    if (process.env.ADMIN_CHAT_ID && process.env.ADMIN_CHAT_ID !== chatId) {
+      try {
+        await sendComplexMessage(process.env.ADMIN_CHAT_ID, `[TAXI_REQUEST] ${crew.slug} -> ${carType} qty=${totalOffloadQty}`);
+      } catch (_) {}
+    }
+
+    return { success: true, totalOffloadQty, carType };
+  } catch (e: any) {
+    err("sendDeliveryCarRequest error", e);
     return { success: false, error: e?.message || "unknown" };
   }
 }
