@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileUp, Save, RotateCcw, Upload, Mail } from "lucide-react";
+import { FileUp, Save, RotateCcw, Upload } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { parse } from "papaparse";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -17,10 +17,14 @@ import ShiftControls from "@/components/ShiftControls";
 import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 
 /**
- * Slugged warehouse page.
- * Key changes:
- *  - loadCrewItems reconstructs UI from shift.checkpoint + shift.actions (UI-only).
- *  - Sync buttons component included.
+ * Slugged warehouse page (updated).
+ *
+ * Fixes:
+ * - fetch and set memberRole so admin buttons enable correctly
+ * - reconstruct local items from shift.checkpoint + shift.actions (if present)
+ * - pass proper props to WarehouseStats
+ * - pass computed VOXELS to WarehouseViz (fix select only A1)
+ * - move sync buttons to bottom
  */
 
 export default function CrewWarehousePage() {
@@ -43,7 +47,6 @@ export default function CrewWarehousePage() {
   const [search, setSearch] = useState("");
 
   const [checkpoint, setCheckpoint] = useState<any[]>([]);
-  // legacy stats object kept for compatibility
   const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
@@ -58,10 +61,7 @@ export default function CrewWarehousePage() {
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
 
-  // car request override
-  const [carOverride, setCarOverride] = useState<"auto" | "taxi" | "pickup">("auto");
-
-  // derive helpers (kept local to page)
+  // derive helpers
   const deriveSizePack = (items: any[]) => {
     const counts: Record<string, number> = {};
     for (const it of items || []) {
@@ -79,7 +79,7 @@ export default function CrewWarehousePage() {
       const locs = it.specs?.warehouse_locations || it.locations || [];
       for (const l of locs) {
         const v = l.voxel_id || l.voxel || (typeof l === "string" ? l : undefined);
-        if (v) set.add(v.toString());
+        if (v) set.add(String(v));
       }
     }
     return Array.from(set).sort();
@@ -98,229 +98,137 @@ export default function CrewWarehousePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  /**
-   * loadCrewItems
-   * - reads cars (DB)
-   * - reads active shift (if any)
-   * - if there is checkpoint.data -> reconstruct UI from checkpoint then apply actions (in-memory only)
-   * - DOES NOT write reconstructed state back to Supabase (no updates here).
-   */
   const loadCrewItems = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [crudMod, shiftsMod] = await Promise.all([import("./actions_crud"), import("./actions_shifts")]);
-      const res = await crudMod.getCrewWarehouseItems(slug!);
-      if (!res.success) {
-        setError(res.error || "Failed to load warehouse");
-        toast.error(res.error || "Ошибка загрузки");
-        setLoading(false);
-        return;
-      }
+      const mod = await import("./actions_crud");
+      const res = await mod.getCrewWarehouseItems(slug!);
+      if (!res.success) throw new Error(res.error || "Failed to load crew items");
 
-      const crewMeta = res.crew;
-      setCrew(crewMeta);
-      setIsOwner(!!crewMeta?.owner_id && dbUser?.user_id === crewMeta.owner_id);
+      // set crew and owner flag
+      setCrew(res.crew || null);
+      setIsOwner(!!res.crew?.owner_id && dbUser?.user_id === res.crew.owner_id);
 
-      // fetch active shift for this user (if auth present)
-      let active: any = null;
+      // map items to UI shape
+      const mapped = (res.data || []).map((i: any) => {
+        const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
+          voxel: l.voxel_id,
+          quantity: l.quantity,
+          min_qty: l.voxel_id?.startsWith?.("B") ? 3 : undefined,
+        })).sort((a: any, b: any) => (a.voxel || "").localeCompare(b.voxel || ""));
+        const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+        return {
+          id: i.id,
+          make: i.make,
+          model: i.model,
+          name: `${i.make || ""} ${i.model || ""}`.trim(),
+          description: i.description || "",
+          image: i.image_url,
+          locations,
+          total_quantity: total,
+          season: i.specs?.season || null,
+          pattern: i.specs?.pattern || null,
+          color: i.specs?.color || "gray",
+          size: i.specs?.size || "",
+          specs: i.specs || {},
+        };
+      });
+      setLocalItems(mapped);
+
+      // checkpoint default = current mapped snapshot
+      setCheckpoint(mapped.map((it) => ({ id: it.id, locations: it.locations.map((l: any) => ({ ...l })) })));
+
+      // fetch member status + active shift in parallel
       if (dbUser?.user_id) {
         try {
-          const s = await shiftsMod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
-          active = s?.shift || null;
-          setActiveShift(active);
-        } catch (e) {
-          active = null;
-          setActiveShift(null);
-        }
-      }
-
-      // Build DB items map
-      const dbItems: any[] = (res.data || []).map((i: any) => ({
-        ...i,
-        specs: i.specs || {},
-        locations: i.specs?.warehouse_locations || [],
-      }));
-      const dbMap = new Map<string, any>();
-      dbItems.forEach((i) => dbMap.set(String(i.id), i));
-
-      // If checkpoint exists in active shift -> reconstruct UI from it and apply actions locally
-      let itemsForUI: any[] = [];
-      if (active?.checkpoint?.data && Array.isArray(active.checkpoint.data) && active.checkpoint.data.length > 0) {
-        // snapshot is authoritative base for UI (but not saved to DB here)
-        const snapshot = active.checkpoint.data as any[];
-        const itemMap = new Map<string, any>();
-
-        // initialize itemMap from snapshot (merge in DB meta where available)
-        for (const row of snapshot) {
-          const id = String(row.id);
-          const meta = dbMap.get(id) || null;
-          const locations = Array.isArray(row.locations)
-            ? row.locations.map((l: any) => ({ voxel: l.voxel || l.voxel_id || l.id, quantity: Number(l.quantity || 0) }))
-            : [];
-          const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-          const item = {
-            id,
-            make: meta?.make || "",
-            model: meta?.model || "",
-            name: meta ? `${meta.make || ""} ${meta.model || ""}`.trim() : id,
-            description: meta?.description || "",
-            image: meta?.image_url || null,
-            locations,
-            total_quantity: total,
-            specs: meta?.specs || {},
-            db_meta: meta || null,
-          };
-          itemMap.set(id, item);
-        }
-
-        // include DB items not present in checkpoint (so UI shows them too)
-        for (const dbi of dbItems) {
-          if (!itemMap.has(String(dbi.id))) {
-            const locs = (dbi.specs?.warehouse_locations || []).map((l: any) => ({ voxel: l.voxel_id, quantity: l.quantity }));
-            const total = locs.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-            itemMap.set(String(dbi.id), {
-              id: dbi.id,
-              make: dbi.make,
-              model: dbi.model,
-              name: `${dbi.make || ""} ${dbi.model || ""}`.trim(),
-              description: dbi.description || "",
-              image: dbi.image_url || null,
-              locations: locs,
-              total_quantity: total,
-              specs: dbi.specs || {},
-              db_meta: dbi,
-            });
+          const sMod = await import("./actions_shifts");
+          const statusRes = await sMod.getCrewMemberStatus(slug!, dbUser.user_id);
+          if (statusRes.success) {
+            setMemberRole(statusRes.member?.role || null);
+            // live_status maybe used by UI elsewhere
+          } else {
+            setMemberRole(null);
           }
-        }
-
-        // If there are actions referencing missing items -> create placeholders (UI-only)
-        const allActions = Array.isArray(active.actions) ? [...active.actions] : [];
-        for (const a of allActions) {
-          const itemId = a.itemId || a.item_id || a.id || a.sku;
-          if (!itemId) continue;
-          if (!itemMap.has(String(itemId))) {
-            const meta = dbMap.get(String(itemId)) || null;
-            const locs = meta ? (meta.specs?.warehouse_locations || []) : [];
-            const lnorm = Array.isArray(locs) ? locs.map((l: any) => ({ voxel: l.voxel_id || l.voxel, quantity: Number(l.quantity || 0) })) : [];
-            const total = lnorm.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-            itemMap.set(String(itemId), {
-              id: itemId,
-              make: meta?.make || "",
-              model: meta?.model || "",
-              name: meta ? `${meta.make || ""} ${meta.model || ""}`.trim() : String(itemId),
-              description: meta?.description || "",
-              image: meta?.image_url || null,
-              locations: lnorm,
-              total_quantity: total,
-              specs: meta?.specs || {},
-              db_meta: meta || null,
-            });
-          }
-        }
-
-        // Apply actions (chronological) to itemMap LOCALLY (no DB writes)
-        allActions.sort((a: any, b: any) => {
-          const ta = a.ts ? new Date(a.ts).getTime() : 0;
-          const tb = b.ts ? new Date(b.ts).getTime() : 0;
-          return ta - tb;
-        });
-
-        // stats counters accumulated from actions (UI-only)
-        let onloadCtr = 0;
-        let offloadCtr = 0;
-        let editCtr = 0;
-        let points = 0;
-        let streakLocal = 0;
-
-        for (const a of allActions) {
-          const itemId = a.itemId || a.item_id || a.id || a.sku;
-          if (!itemId) continue;
-          const key = String(itemId);
-          const item = itemMap.get(key);
-          if (!item) continue;
-
-          const deltaRaw = typeof a.delta === "number" ? a.delta : (typeof a.qty === "number" ? a.qty : (typeof a.amount === "number" ? a.amount : null));
-          const delta = deltaRaw === null ? null : Number(deltaRaw);
-          if (delta === null || isNaN(delta)) continue;
-          const voxel = a.voxel || a.voxel_id || (a.location && (a.location.voxel || a.location.voxel_id)) || (item.locations[0] && item.locations[0].voxel) || null;
-
-          // mutate local locations array
-          const locs = Array.isArray(item.locations) ? [...item.locations] : [];
-          const idx = locs.findIndex((l: any) => String(l.voxel) === String(voxel));
-          if (idx === -1) {
-            if (delta > 0) {
-              locs.push({ voxel: voxel || "A1", quantity: Math.max(0, delta) });
-            } else {
-              // negative delta on missing location -> skip (can't reduce below snapshot)
+          const s = await sMod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
+          const shift = s?.shift || null;
+          setActiveShift(shift);
+          // if there's a checkpoint in shift — restore local state from checkpoint + apply actions
+          if (shift?.checkpoint?.data) {
+            // start from checkpoint snapshot
+            const baseSnapshot = Array.isArray(shift.checkpoint.data) ? shift.checkpoint.data : [];
+            const idMap = new Map<string, any>();
+            // create map of items from snapshot
+            for (const r of baseSnapshot) {
+              idMap.set(r.id, {
+                id: r.id,
+                locations: Array.isArray(r.locations) ? r.locations.map((l: any) => ({
+                  voxel: l.voxel || l.voxel_id || l.id,
+                  quantity: Number(l.quantity || 0)
+                })) : []
+              });
             }
-          } else {
-            locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
+            // apply actions in chronological order
+            const actions = Array.isArray(shift.actions) ? shift.actions.slice().sort((a: any,b: any)=> (a.ts||0)-(b.ts||0)) : [];
+            // initialize counters
+            let onl = 0, offl = 0, edits = 0, changed = 0, delta = 0;
+            for (const a of actions) {
+              if (!a || !a.type) continue;
+              const entry = idMap.get(a.itemId) || { id: a.itemId, locations: [] };
+              // ensure voxel present
+              const voxel = a.voxel || a.voxel_id || a.v || "A1";
+              const qty = Number(a.qty || a.amount || 0);
+              // mutate entry.locations array
+              const loc = entry.locations.find((ll: any) => ll.voxel === voxel);
+              if (a.type === "offload") {
+                if (loc) loc.quantity = Math.max(0, (loc.quantity||0) - qty);
+                else {
+                  // nothing to remove, skip (still count)
+                }
+                offl += qty;
+                changed++;
+                delta -= qty;
+              } else if (a.type === "onload") {
+                if (loc) loc.quantity = (loc.quantity||0) + qty;
+                else entry.locations.push({ voxel, quantity: qty });
+                onl += qty;
+                changed++;
+                delta += qty;
+              } else if (a.type === "edit") {
+                // edit gives absolute new quantity in a.qty maybe; handle defensively
+                const newQ = Number(a.newQty ?? a.qty ?? 0);
+                if (loc) {
+                  const diff = newQ - (loc.quantity || 0);
+                  loc.quantity = Math.max(0, newQ);
+                  if (diff !== 0) { edits += Math.abs(diff); changed++; delta += diff; }
+                } else {
+                  entry.locations.push({ voxel, quantity: newQ });
+                  edits += newQ; changed++; delta += newQ;
+                }
+              }
+              idMap.set(entry.id, entry);
+            }
+            // convert map back to items used by UI
+            const restored = mapped.map((mi) => {
+              const snap = idMap.get(mi.id);
+              if (!snap) return mi;
+              const locs = (snap.locations || []).map((l: any) => ({ voxel: l.voxel, quantity: l.quantity }));
+              const total = locs.reduce((acc:any, l:any) => acc + (l.quantity||0), 0);
+              return { ...mi, locations: locs, total_quantity: total };
+            });
+            setLocalItems(restored);
+            setCheckpoint(restored.map((it) => ({ id: it.id, locations: it.locations.map((l:any)=>({...l})) })));
+            // set counters from shift replay
+            setOnloadCount(onl);
+            setOffloadCount(offl);
+            setEditCount(edits);
+            setStatsObj((prev)=>({ ...prev, changedCount: changed, totalDelta: delta, offloadUnits: offl }));
           }
-          const filtered = locs.filter((l: any) => (l.quantity || 0) > 0);
-          const newTotal = filtered.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-          item.locations = filtered;
-          item.total_quantity = newTotal;
-          itemMap.set(key, item);
-
-          // counters (UI-only)
-          if (a.type === "onload" || delta > 0) {
-            onloadCtr += Math.abs(delta);
-            points += 10 * Math.abs(delta);
-          } else if (a.type === "offload" || delta < 0) {
-            offloadCtr += Math.abs(delta);
-            points += 5 * Math.abs(delta);
-          } else {
-            editCtr += Math.abs(delta);
-            points += 2 * Math.abs(delta);
-          }
-          streakLocal += 1;
+        } catch (e: any) {
+          console.warn("Shift/member status fetch failed", e);
         }
-
-        itemsForUI = Array.from(itemMap.values());
-        // update UI state and stats (no DB writes)
-        setLocalItems(itemsForUI);
-        setCheckpoint(active.checkpoint?.data || []);
-        setOnloadCount(onloadCtr);
-        setOffloadCount(offloadCtr);
-        setEditCount(editCtr);
-        setScore((p) => p + points);
-        setStreak(streakLocal);
-        // we keep statsObj for any legacy UI pieces
-        setStatsObj((prev) => ({ ...prev, changedCount: allActions.length, totalDelta: onloadCtr + offloadCtr, offloadUnits: offloadCtr }));
-      } else {
-        // fallback: use DB specs directly when there is no checkpoint
-        const mapped = dbItems.map((i: any) => {
-          const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
-            voxel: l.voxel_id,
-            quantity: l.quantity,
-            min_qty: l.voxel_id?.startsWith?.("B") ? 3 : undefined,
-          })).sort((a: any, b: any) => (a.voxel || "").localeCompare(b.voxel || ""));
-          const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-          return {
-            id: i.id,
-            make: i.make,
-            model: i.model,
-            name: `${i.make || ""} ${i.model || ""}`.trim(),
-            description: i.description || "",
-            image: i.image_url,
-            locations,
-            total_quantity: total,
-            season: i.specs?.season || null,
-            pattern: i.specs?.pattern || null,
-            color: i.specs?.color || "gray",
-            size: i.specs?.size || "",
-            specs: i.specs || {},
-            db_meta: i,
-          };
-        });
-        itemsForUI = mapped;
-        setLocalItems(itemsForUI);
-        setCheckpoint([]);
-        setOnloadCount(0);
-        setOffloadCount(0);
-        setEditCount(0);
       }
+
     } catch (e: any) {
       setError(e.message || "Load failed");
       toast.error("Ошибка загрузки");
@@ -329,7 +237,7 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // optimisticUpdate (same as before)
+  // optimistic update kept as before, but uses actions_crud update
   const optimisticUpdate = async (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
@@ -339,7 +247,7 @@ export default function CrewWarehousePage() {
         if (idx !== -1) locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
         else if (delta > 0) locs.push({ voxel: voxelId, quantity: delta });
         const filtered = locs.filter((l) => (l.quantity || 0) > 0);
-        const newTotal = filtered.reduce((acc, l) => acc + (l.quantity || 0), 0);
+        const newTotal = filtered.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
         return { ...i, locations: filtered, total_quantity: newTotal };
       })
     );
@@ -348,6 +256,7 @@ export default function CrewWarehousePage() {
     if (gameMode === "onload" && delta > 0) setOnloadCount((p) => p + absDelta);
     else if (gameMode === "offload" && delta < 0) setOffloadCount((p) => p + absDelta);
     else setEditCount((p) => p + absDelta);
+
     const points = gameMode === "onload" ? 10 : 5;
     setScore((p) => p + points);
     setStreak((p) => p + 1);
@@ -366,6 +275,7 @@ export default function CrewWarehousePage() {
           changedCount: prev.changedCount + 1,
           totalDelta: prev.totalDelta + absDelta,
           stars: prev.stars + (gameMode === "onload" ? 2 : 1),
+          offloadUnits: prev.offloadUnits + (gameMode === "offload" && delta < 0 ? Math.abs(delta) : 0),
         }));
       }
     } catch (e: any) {
@@ -376,6 +286,7 @@ export default function CrewWarehousePage() {
     }
   };
 
+  // CSV upload
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
       toast.error("Admin access required");
@@ -425,9 +336,7 @@ export default function CrewWarehousePage() {
       const ok = document.execCommand("copy");
       document.body.removeChild(ta);
       return ok;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   };
 
   const handleCheckpoint = async () => {
@@ -470,10 +379,7 @@ export default function CrewWarehousePage() {
     toast.success("Reset to checkpoint (local)");
 
     if (dbUser?.user_id) {
-      if (!activeShift) {
-        toast.error("Start shift first to apply server reset");
-        return;
-      }
+      if (!activeShift) { toast.error("Start shift first to apply server reset"); return; }
       try {
         const mod = await import("./actions_shifts");
         const res = await mod.resetCrewCheckpoint(slug!, dbUser.user_id);
@@ -490,7 +396,7 @@ export default function CrewWarehousePage() {
   };
 
   const handleExportStock = async (summarized = false) => {
-    if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
+    if (!isOwner && !["owner","admin"].includes(memberRole||"")) {
       toast.error("Admin access required");
       return;
     }
@@ -518,58 +424,30 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // export daily on/off (uses actions from shifts, includes both onload & offload)
+  // helper for export daily for shift (finalized)
   const handleExportDaily = async () => {
-    if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
-      toast.error("Admin access required");
-      return;
-    }
+    if (!dbUser?.user_id) return toast.error("User required");
     try {
       const mod = await import("./actions_shifts");
       const res = await mod.exportDailyEntryForShift(slug!, { isTelegram: false });
-      if (!res.success) {
-        toast.error(res.error || "Export daily failed");
-        return;
-      }
-      if (!res.csv || res.csv === "") {
-        toast.info("Нет onload/offload операций за сегодня");
-        return;
-      }
-      const copied = await safeCopyToClipboard(res.csv);
-      if (copied) {
-        toast.success("Daily on/off TSV скопирован в буфер");
+      if (res?.success && res.csv) {
+        const copied = await safeCopyToClipboard(res.csv);
+        if (copied) toast.success("Daily TSV copied to clipboard");
+        else {
+          const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `daily_offload_${slug}.tsv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success("Daily TSV downloaded");
+        }
       } else {
-        const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `daily_onoff_${slug}.tsv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Daily on/off exported");
+        toast.error(res?.error || "Export failed");
       }
-    } catch (e: any) {
-      console.error("handleExportDaily error", e);
-      toast.error(e?.message || "Export daily error");
-    }
-  };
-
-  const handleSendCarRequest = async () => {
-    if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
-      toast.error("Admin access required");
-      return;
-    }
-    try {
-      const mod = await import("./actions_shifts");
-      const res = await mod.sendDeliveryCarRequest(slug!, { forceType: carOverride === "auto" ? undefined : carOverride });
-      if (!res.success) {
-        toast.error(res.error || "Car request failed");
-        return;
-      }
-      toast.success(`Car request sent — qty=${res.totalOffloadQty}, type=${res.carType}`);
-    } catch (e: any) {
-      console.error("handleSendCarRequest error", e);
-      toast.error(e?.message || "Car request error");
+    } catch (e:any) {
+      toast.error(e?.message || "Export error");
     }
   };
 
@@ -580,27 +458,56 @@ export default function CrewWarehousePage() {
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [localItems, search]);
 
+  // send car request (client trigger)
+  const handleSendCar = async () => {
+    if (!isOwner && !["owner","admin"].includes(memberRole||"")) {
+      return toast.error("Only owner/admin can request car");
+    }
+    try {
+      const mod = await import("./actions_shifts");
+      // server function should calculate and notify; fallback to notifyAdmin if not present
+      if (typeof mod.sendDeliveryCarRequest === "function") {
+        const r = await mod.sendDeliveryCarRequest(slug!, { requester: dbUser?.user_id });
+        if (r?.success) toast.success("Car request sent");
+        else toast.error(r?.error || "Failed to send car request");
+      } else {
+        // fallback: notify admin
+        const nmod = await import("./actions_notify");
+        const msg = `Car request: crew=${slug} by ${dbUser?.user_id || "unknown"} — please check on portal.`;
+        const rn = await nmod.notifyAdmin(msg);
+        if (rn?.success) toast.success("Admin notified (fallback)");
+        else toast.error("Failed to notify admin");
+      }
+    } catch (e:any) {
+      console.error("send car error", e);
+      toast.error(e?.message || "Send car failed");
+    }
+  };
+
   if (loading) return <div className="p-4">Loading crew warehouse...</div>;
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+
+  // prepare props for WarehouseStats
+  const itemsCount = localItems.reduce((s, it) => s + (it.total_quantity || 0), 0);
+  const uniqueIds = localItems.length;
+  const checkpointMain = activeShift?.checkpoint?.saved_at ? new Date(activeShift.checkpoint.saved_at).toLocaleString() : "--:--";
+  const checkpointSub = activeShift?.checkpoint?.saved_at ? `saved ${new Date(activeShift.checkpoint.saved_at).toLocaleTimeString()}` : "--:--";
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="p-3 bg-white dark:bg-gray-800 shadow">
-        {/* Header layout */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div className="flex items-center gap-3">
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded mr-0 object-cover" />}
             <div>
               <h1 className="text-lg font-medium leading-tight">{crew?.name || "Crew"}</h1>
-              <div className="text-xs text-gray-500">Warehouse</div>
+              <div className="text-xs text-gray-500">Warehouse · Статус: {activeShift ? (activeShift.shift_type||"warehouse") : "offline"}</div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Shift controls */}
             <ShiftControls slug={slug!} />
 
-            {/* Mode switcher */}
             <div className="flex items-center gap-1 ml-1">
               <Button
                 size="sm"
@@ -622,7 +529,6 @@ export default function CrewWarehousePage() {
               </Button>
             </div>
 
-            {/* Action icons */}
             <div className="flex gap-1 items-center ml-1 flex-wrap">
               <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift}>
                 <Save className="w-4 h-4" />
@@ -636,51 +542,28 @@ export default function CrewWarehousePage() {
                 <FileUp className="w-4 h-4" />
               </Button>
 
-              <Button onClick={handleExportDaily} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export today's onload/offload">
-                <Mail className="w-4 h-4" />
-              </Button>
-
-              <select
-                value={carOverride}
-                onChange={(e) => setCarOverride(e.target.value as any)}
-                className="text-xs p-1 rounded border border-gray-200 dark:border-gray-700 ml-1"
-                title="Car type override"
-              >
-                <option value="auto">Auto (auto-select)</option>
-                <option value="taxi">Taxi (small)</option>
-                <option value="pickup">Pickup (big)</option>
-              </select>
-
-              <Button onClick={handleSendCarRequest} size="sm" variant="outline" className="px-2 py-1 ml-1" title="Send delivery car request">
-                Send car
-              </Button>
-
               <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
               <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} size="sm" variant="outline" className="w-8 h-8 p-1" title="Upload CSV">
                 <Upload className="w-4 h-4" />
+              </Button>
+
+              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 ml-2 text-xs">
+                Send car
+              </Button>
+
+              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 ml-1 text-xs">
+                Export daily
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="mt-3">
           <Input placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
-          {/* Sync buttons component live in header right (compact) */}
-          <div className="hidden md:block w-80">
-            <WarehouseSyncButtons />
-          </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
-        <div className="mb-4">
-          {/* Small sync for mobile under header */}
-          <div className="block md:hidden">
-            <WarehouseSyncButtons />
-          </div>
-        </div>
-
         <Card className="mb-4">
           <CardHeader>
             <CardTitle>Inventory</CardTitle>
@@ -702,7 +585,7 @@ export default function CrewWarehousePage() {
                     }
                     optimisticUpdate(item.id, voxel, delta);
                   }}
-                  disabled={!gameMode || (!isOwner && !["owner", "admin"].includes(memberRole || ""))}
+                  disabled={!gameMode || (!isOwner && !["owner","admin"].includes(memberRole || ""))}
                 />
               ))}
             </div>
@@ -710,51 +593,58 @@ export default function CrewWarehousePage() {
           </CardContent>
         </Card>
 
-        <WarehouseViz items={localItems} selectedVoxel={selectedVoxel} onVoxelSelect={setSelectedVoxel} gameMode={gameMode} />
+        <WarehouseViz items={localItems} selectedVoxel={selectedVoxel} onSelectVoxel={setSelectedVoxel} onPlateClick={(v)=>setSelectedVoxel(v)} gameMode={gameMode} VOXELS={VOXELS} />
 
-        <WarehouseStats
-          // both styles supported: pass compact stats object + explicit fields for compatibility
-          stats={statsObj}
-          score={score}
-          level={level}
-          streak={streak}
-          changedCount={statsObj.changedCount}
-          totalDelta={statsObj.totalDelta}
-          stars={statsObj.stars}
-          offloadUnits={statsObj.offloadUnits}
-          salary={statsObj.salary}
-          sessionDuration={Math.floor((Date.now() - sessionStart) / 1000)}
-          errorCount={errorCount}
-        />
+        <div className="mt-4">
+          <WarehouseStats
+            itemsCount={itemsCount}
+            uniqueIds={uniqueIds}
+            score={score}
+            level={level}
+            streak={streak}
+            dailyStreak={0}
+            checkpointMain={checkpointMain}
+            checkpointSub={checkpointSub}
+            changedCount={statsObj.changedCount}
+            totalDelta={statsObj.totalDelta}
+            stars={statsObj.stars}
+            offloadUnits={statsObj.offloadUnits || offloadCount}
+            salary={statsObj.salary}
+            achievements={[]}
+            sessionStart={sessionStart}
+            errorCount={errorCount}
+            bossMode={false}
+            bossTimer={0}
+            leaderboard={[]}
+            efficiency={0}
+            avgTimePerItem={0}
+            dailyGoals={{ units: 100, errors: 0, xtr: 100 }}
+            sessionDuration={Math.floor((Date.now() - sessionStart) / 1000)}
+          />
+        </div>
+
+        {/* Sync buttons moved to bottom as requested */}
+        <div className="mt-6">
+          <WarehouseSyncButtons />
+        </div>
       </main>
 
       <WarehouseModals
+        workflowItems={[]}
+        currentWorkflowIndex={0}
+        selectedWorkflowVoxel={selectedVoxel}
+        setSelectedWorkflowVoxel={setSelectedVoxel}
+        handleWorkflowNext={async () => {}}
+        handleSkipItem={() => {}}
         editDialogOpen={editDialogOpen}
         setEditDialogOpen={setEditDialogOpen}
         editVoxel={editVoxel}
-        setEditVoxel={setEditVoxel}
         editContents={editContents}
         setEditContents={setEditContents}
-        onSave={async (voxelId: string, contents: Array<{ item: any; quantity: number }>) => {
-          for (const { item, quantity } of contents) {
-            const currentQty = item.locations.find((l: any) => l.voxel === voxelId)?.quantity || 0;
-            const delta = quantity - currentQty;
-            if (delta !== 0) await optimisticUpdate(item.id, voxelId, delta);
-          }
-        }}
-        workflowItems={[]} // not used in minimal flow here
-        currentWorkflowIndex={0}
-        selectedWorkflowVoxel={null}
-        setSelectedWorkflowVoxel={() => {}}
-        handleWorkflowNext={() => {}}
-        handleSkipItem={() => {}}
         saveEditQty={async (itemId: string, newQty: number) => {
-          // perform delta against current in-memory item
-          const item = localItems.find((it) => it.id === itemId);
-          if (!item) return;
-          const currentQty = item.locations[0]?.quantity || 0;
+          const currentQty = localItems.find((it) => it.id === itemId)?.locations.find((l:any)=>l.voxel===editVoxel)?.quantity || 0;
           const delta = newQty - currentQty;
-          if (delta !== 0) await optimisticUpdate(itemId, item.locations[0]?.voxel || "A1", delta);
+          if (delta !== 0) await optimisticUpdate(itemId, editVoxel || "A1", delta);
         }}
         gameMode={gameMode}
         VOXELS={VOXELS}
