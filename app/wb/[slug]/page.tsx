@@ -14,10 +14,15 @@ import WarehouseViz from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
 import ShiftControls from "@/components/ShiftControls";
+import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 
 /**
  * Slugged warehouse page.
+ * Key changes:
+ *  - loadCrewItems reconstructs UI from shift.checkpoint + shift.actions (UI-only).
+ *  - Sync buttons component included.
  */
+
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
@@ -38,6 +43,7 @@ export default function CrewWarehousePage() {
   const [search, setSearch] = useState("");
 
   const [checkpoint, setCheckpoint] = useState<any[]>([]);
+  // legacy stats object kept for compatibility
   const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
@@ -52,7 +58,7 @@ export default function CrewWarehousePage() {
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
 
-  // car request override: 'auto' lets server decide by threshold, or 'taxi'/'pickup'
+  // car request override
   const [carOverride, setCarOverride] = useState<"auto" | "taxi" | "pickup">("auto");
 
   // derive helpers (kept local to page)
@@ -93,10 +99,11 @@ export default function CrewWarehousePage() {
   }, [slug]);
 
   /**
-   * loadCrewItems:
-   * - load DB items (metadata)
-   * - load active shift (if any) and use checkpoint + actions to reconstruct localItems
-   * - if no checkpoint, use DB specs as before
+   * loadCrewItems
+   * - reads cars (DB)
+   * - reads active shift (if any)
+   * - if there is checkpoint.data -> reconstruct UI from checkpoint then apply actions (in-memory only)
+   * - DOES NOT write reconstructed state back to Supabase (no updates here).
    */
   const loadCrewItems = async () => {
     setLoading(true);
@@ -128,21 +135,29 @@ export default function CrewWarehousePage() {
         }
       }
 
-      // Build items map by id from DB metadata
-      const dbItems: any[] = (res.data || []).map((i: any) => ({ ...i, specs: i.specs || {}, locations: i.specs?.warehouse_locations || [] }));
+      // Build DB items map
+      const dbItems: any[] = (res.data || []).map((i: any) => ({
+        ...i,
+        specs: i.specs || {},
+        locations: i.specs?.warehouse_locations || [],
+      }));
       const dbMap = new Map<string, any>();
       dbItems.forEach((i) => dbMap.set(String(i.id), i));
 
+      // If checkpoint exists in active shift -> reconstruct UI from it and apply actions locally
       let itemsForUI: any[] = [];
-      // If there is checkpoint data — reconstruct base snapshot from checkpoint + DB metadata
       if (active?.checkpoint?.data && Array.isArray(active.checkpoint.data) && active.checkpoint.data.length > 0) {
+        // snapshot is authoritative base for UI (but not saved to DB here)
         const snapshot = active.checkpoint.data as any[];
-        // Map snapshot rows into full items (merge DB metadata)
         const itemMap = new Map<string, any>();
+
+        // initialize itemMap from snapshot (merge in DB meta where available)
         for (const row of snapshot) {
           const id = String(row.id);
           const meta = dbMap.get(id) || null;
-          const locations = Array.isArray(row.locations) ? row.locations.map((l: any) => ({ voxel: l.voxel || l.voxel_id || l.voxel_id, quantity: Number(l.quantity || 0) })) : [];
+          const locations = Array.isArray(row.locations)
+            ? row.locations.map((l: any) => ({ voxel: l.voxel || l.voxel_id || l.id, quantity: Number(l.quantity || 0) }))
+            : [];
           const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
           const item = {
             id,
@@ -154,21 +169,20 @@ export default function CrewWarehousePage() {
             locations,
             total_quantity: total,
             specs: meta?.specs || {},
-            // keep original DB-supplied specs as well
             db_meta: meta || null,
           };
           itemMap.set(id, item);
         }
 
-        // Include DB items that were not in checkpoint (so we can show them too)
+        // include DB items not present in checkpoint (so UI shows them too)
         for (const dbi of dbItems) {
           if (!itemMap.has(String(dbi.id))) {
             const locs = (dbi.specs?.warehouse_locations || []).map((l: any) => ({ voxel: l.voxel_id, quantity: l.quantity }));
             const total = locs.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
             itemMap.set(String(dbi.id), {
               id: dbi.id,
-              make: dbi.make || "",
-              model: dbi.model || "",
+              make: dbi.make,
+              model: dbi.model,
               name: `${dbi.make || ""} ${dbi.model || ""}`.trim(),
               description: dbi.description || "",
               image: dbi.image_url || null,
@@ -180,41 +194,39 @@ export default function CrewWarehousePage() {
           }
         }
 
-        // If some actions reference items not in DB or snapshot, create placeholders
-        if (Array.isArray(active.actions)) {
-          for (const a of active.actions) {
-            const itemId = a.itemId || a.item_id || a.id || a.sku;
-            if (!itemId) continue;
-            if (!itemMap.has(String(itemId))) {
-              const meta = dbMap.get(String(itemId)) || null;
-              const locs = meta ? (meta.specs?.warehouse_locations || []) : [];
-              const lnorm = Array.isArray(locs) ? locs.map((l: any) => ({ voxel: l.voxel_id || l.voxel, quantity: Number(l.quantity || 0) })) : [];
-              const total = lnorm.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-              itemMap.set(String(itemId), {
-                id: itemId,
-                make: meta?.make || "",
-                model: meta?.model || "",
-                name: meta ? `${meta.make || ""} ${meta.model || ""}`.trim() : String(itemId),
-                description: meta?.description || "",
-                image: meta?.image_url || null,
-                locations: lnorm,
-                total_quantity: total,
-                specs: meta?.specs || {},
-                db_meta: meta || null,
-              });
-            }
+        // If there are actions referencing missing items -> create placeholders (UI-only)
+        const allActions = Array.isArray(active.actions) ? [...active.actions] : [];
+        for (const a of allActions) {
+          const itemId = a.itemId || a.item_id || a.id || a.sku;
+          if (!itemId) continue;
+          if (!itemMap.has(String(itemId))) {
+            const meta = dbMap.get(String(itemId)) || null;
+            const locs = meta ? (meta.specs?.warehouse_locations || []) : [];
+            const lnorm = Array.isArray(locs) ? locs.map((l: any) => ({ voxel: l.voxel_id || l.voxel, quantity: Number(l.quantity || 0) })) : [];
+            const total = lnorm.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+            itemMap.set(String(itemId), {
+              id: itemId,
+              make: meta?.make || "",
+              model: meta?.model || "",
+              name: meta ? `${meta.make || ""} ${meta.model || ""}`.trim() : String(itemId),
+              description: meta?.description || "",
+              image: meta?.image_url || null,
+              locations: lnorm,
+              total_quantity: total,
+              specs: meta?.specs || {},
+              db_meta: meta || null,
+            });
           }
         }
 
-        // apply actions over snapshot (in chronological order)
-        const allActions = Array.isArray(active.actions) ? [...active.actions] : [];
+        // Apply actions (chronological) to itemMap LOCALLY (no DB writes)
         allActions.sort((a: any, b: any) => {
           const ta = a.ts ? new Date(a.ts).getTime() : 0;
           const tb = b.ts ? new Date(b.ts).getTime() : 0;
           return ta - tb;
         });
 
-        // counters
+        // stats counters accumulated from actions (UI-only)
         let onloadCtr = 0;
         let offloadCtr = 0;
         let editCtr = 0;
@@ -233,22 +245,17 @@ export default function CrewWarehousePage() {
           if (delta === null || isNaN(delta)) continue;
           const voxel = a.voxel || a.voxel_id || (a.location && (a.location.voxel || a.location.voxel_id)) || (item.locations[0] && item.locations[0].voxel) || null;
 
-          // find location index
+          // mutate local locations array
           const locs = Array.isArray(item.locations) ? [...item.locations] : [];
           const idx = locs.findIndex((l: any) => String(l.voxel) === String(voxel));
           if (idx === -1) {
-            // create new location if positive delta
             if (delta > 0) {
               locs.push({ voxel: voxel || "A1", quantity: Math.max(0, delta) });
             } else {
-              // negative delta on non-existing location: skip
+              // negative delta on missing location -> skip (can't reduce below snapshot)
             }
           } else {
             locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
-            if (locs[idx].quantity === 0) {
-              // remove zeroed location
-              // we'll filter later
-            }
           }
           const filtered = locs.filter((l: any) => (l.quantity || 0) > 0);
           const newTotal = filtered.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
@@ -256,7 +263,7 @@ export default function CrewWarehousePage() {
           item.total_quantity = newTotal;
           itemMap.set(key, item);
 
-          // counters
+          // counters (UI-only)
           if (a.type === "onload" || delta > 0) {
             onloadCtr += Math.abs(delta);
             points += 10 * Math.abs(delta);
@@ -270,17 +277,19 @@ export default function CrewWarehousePage() {
           streakLocal += 1;
         }
 
-        // set final items array
         itemsForUI = Array.from(itemMap.values());
+        // update UI state and stats (no DB writes)
+        setLocalItems(itemsForUI);
+        setCheckpoint(active.checkpoint?.data || []);
         setOnloadCount(onloadCtr);
         setOffloadCount(offloadCtr);
         setEditCount(editCtr);
         setScore((p) => p + points);
         setStreak(streakLocal);
-        // keep checkpoint in state
-        setCheckpoint(active.checkpoint?.data || []);
+        // we keep statsObj for any legacy UI pieces
+        setStatsObj((prev) => ({ ...prev, changedCount: allActions.length, totalDelta: onloadCtr + offloadCtr, offloadUnits: offloadCtr }));
       } else {
-        // fallback: use DB current specs directly (no checkpoint)
+        // fallback: use DB specs directly when there is no checkpoint
         const mapped = dbItems.map((i: any) => {
           const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
             voxel: l.voxel_id,
@@ -306,13 +315,12 @@ export default function CrewWarehousePage() {
           };
         });
         itemsForUI = mapped;
+        setLocalItems(itemsForUI);
         setCheckpoint([]);
         setOnloadCount(0);
         setOffloadCount(0);
         setEditCount(0);
       }
-
-      setLocalItems(itemsForUI);
     } catch (e: any) {
       setError(e.message || "Load failed");
       toast.error("Ошибка загрузки");
@@ -510,7 +518,7 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // new: export daily (onloads + offloads)
+  // export daily on/off (uses actions from shifts, includes both onload & offload)
   const handleExportDaily = async () => {
     if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
       toast.error("Admin access required");
@@ -527,7 +535,6 @@ export default function CrewWarehousePage() {
         toast.info("Нет onload/offload операций за сегодня");
         return;
       }
-      // copy to clipboard or download
       const copied = await safeCopyToClipboard(res.csv);
       if (copied) {
         toast.success("Daily on/off TSV скопирован в буфер");
@@ -547,7 +554,6 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // new: send car request
   const handleSendCarRequest = async () => {
     if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
       toast.error("Admin access required");
@@ -580,7 +586,7 @@ export default function CrewWarehousePage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="p-3 bg-white dark:bg-gray-800 shadow">
-        {/* Use column layout on small screens to avoid offscreen buttons */}
+        {/* Header layout */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div className="flex items-center gap-3">
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded mr-0 object-cover" />}
@@ -594,7 +600,7 @@ export default function CrewWarehousePage() {
             {/* Shift controls */}
             <ShiftControls slug={slug!} />
 
-            {/* Mode switcher — compact */}
+            {/* Mode switcher */}
             <div className="flex items-center gap-1 ml-1">
               <Button
                 size="sm"
@@ -616,7 +622,7 @@ export default function CrewWarehousePage() {
               </Button>
             </div>
 
-            {/* Action icons — small and allowed to wrap */}
+            {/* Action icons */}
             <div className="flex gap-1 items-center ml-1 flex-wrap">
               <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift}>
                 <Save className="w-4 h-4" />
@@ -630,12 +636,10 @@ export default function CrewWarehousePage() {
                 <FileUp className="w-4 h-4" />
               </Button>
 
-              {/* NEW: export daily on/off */}
               <Button onClick={handleExportDaily} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export today's onload/offload">
                 <Mail className="w-4 h-4" />
               </Button>
 
-              {/* Car request UI: selector + button */}
               <select
                 value={carOverride}
                 onChange={(e) => setCarOverride(e.target.value as any)}
@@ -659,13 +663,24 @@ export default function CrewWarehousePage() {
           </div>
         </div>
 
-        {/* Search field under header row — keeps header compact and search prominent */}
-        <div className="mt-3">
+        {/* Search */}
+        <div className="mt-3 flex items-center justify-between gap-3">
           <Input placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
+          {/* Sync buttons component live in header right (compact) */}
+          <div className="hidden md:block w-80">
+            <WarehouseSyncButtons />
+          </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4">
+        <div className="mb-4">
+          {/* Small sync for mobile under header */}
+          <div className="block md:hidden">
+            <WarehouseSyncButtons />
+          </div>
+        </div>
+
         <Card className="mb-4">
           <CardHeader>
             <CardTitle>Inventory</CardTitle>
@@ -698,15 +713,18 @@ export default function CrewWarehousePage() {
         <WarehouseViz items={localItems} selectedVoxel={selectedVoxel} onVoxelSelect={setSelectedVoxel} gameMode={gameMode} />
 
         <WarehouseStats
+          // both styles supported: pass compact stats object + explicit fields for compatibility
           stats={statsObj}
           score={score}
           level={level}
           streak={streak}
-          errorCount={errorCount}
-          onloadCount={onloadCount}
-          offloadCount={offloadCount}
-          editCount={editCount}
+          changedCount={statsObj.changedCount}
+          totalDelta={statsObj.totalDelta}
+          stars={statsObj.stars}
+          offloadUnits={statsObj.offloadUnits}
+          salary={statsObj.salary}
           sessionDuration={Math.floor((Date.now() - sessionStart) / 1000)}
+          errorCount={errorCount}
         />
       </main>
 
@@ -724,6 +742,22 @@ export default function CrewWarehousePage() {
             if (delta !== 0) await optimisticUpdate(item.id, voxelId, delta);
           }
         }}
+        workflowItems={[]} // not used in minimal flow here
+        currentWorkflowIndex={0}
+        selectedWorkflowVoxel={null}
+        setSelectedWorkflowVoxel={() => {}}
+        handleWorkflowNext={() => {}}
+        handleSkipItem={() => {}}
+        saveEditQty={async (itemId: string, newQty: number) => {
+          // perform delta against current in-memory item
+          const item = localItems.find((it) => it.id === itemId);
+          if (!item) return;
+          const currentQty = item.locations[0]?.quantity || 0;
+          const delta = newQty - currentQty;
+          if (delta !== 0) await optimisticUpdate(itemId, item.locations[0]?.voxel || "A1", delta);
+        }}
+        gameMode={gameMode}
+        VOXELS={VOXELS}
       />
     </div>
   );
