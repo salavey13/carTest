@@ -52,6 +52,9 @@ export default function CrewWarehousePage() {
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
 
+  // car request override: 'auto' lets server decide by threshold, or 'taxi'/'pickup'
+  const [carOverride, setCarOverride] = useState<"auto" | "taxi" | "pickup">("auto");
+
   // derive helpers (kept local to page)
   const deriveSizePack = (items: any[]) => {
     const counts: Record<string, number> = {};
@@ -89,16 +92,196 @@ export default function CrewWarehousePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
+  /**
+   * loadCrewItems:
+   * - load DB items (metadata)
+   * - load active shift (if any) and use checkpoint + actions to reconstruct localItems
+   * - if no checkpoint, use DB specs as before
+   */
   const loadCrewItems = async () => {
     setLoading(true);
     setError(null);
     try {
-      const mod = await import("./actions_crud");
-      const res = await mod.getCrewWarehouseItems(slug!);
-      if (res.success) {
-        setCrew(res.crew);
-        setIsOwner(!!res.crew?.owner_id && dbUser?.user_id === res.crew.owner_id);
-        const mapped = (res.data || []).map((i: any) => {
+      const [crudMod, shiftsMod] = await Promise.all([import("./actions_crud"), import("./actions_shifts")]);
+      const res = await crudMod.getCrewWarehouseItems(slug!);
+      if (!res.success) {
+        setError(res.error || "Failed to load warehouse");
+        toast.error(res.error || "Ошибка загрузки");
+        setLoading(false);
+        return;
+      }
+
+      const crewMeta = res.crew;
+      setCrew(crewMeta);
+      setIsOwner(!!crewMeta?.owner_id && dbUser?.user_id === crewMeta.owner_id);
+
+      // fetch active shift for this user (if auth present)
+      let active: any = null;
+      if (dbUser?.user_id) {
+        try {
+          const s = await shiftsMod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
+          active = s?.shift || null;
+          setActiveShift(active);
+        } catch (e) {
+          active = null;
+          setActiveShift(null);
+        }
+      }
+
+      // Build items map by id from DB metadata
+      const dbItems: any[] = (res.data || []).map((i: any) => ({ ...i, specs: i.specs || {}, locations: i.specs?.warehouse_locations || [] }));
+      const dbMap = new Map<string, any>();
+      dbItems.forEach((i) => dbMap.set(String(i.id), i));
+
+      let itemsForUI: any[] = [];
+      // If there is checkpoint data — reconstruct base snapshot from checkpoint + DB metadata
+      if (active?.checkpoint?.data && Array.isArray(active.checkpoint.data) && active.checkpoint.data.length > 0) {
+        const snapshot = active.checkpoint.data as any[];
+        // Map snapshot rows into full items (merge DB metadata)
+        const itemMap = new Map<string, any>();
+        for (const row of snapshot) {
+          const id = String(row.id);
+          const meta = dbMap.get(id) || null;
+          const locations = Array.isArray(row.locations) ? row.locations.map((l: any) => ({ voxel: l.voxel || l.voxel_id || l.voxel_id, quantity: Number(l.quantity || 0) })) : [];
+          const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+          const item = {
+            id,
+            make: meta?.make || "",
+            model: meta?.model || "",
+            name: meta ? `${meta.make || ""} ${meta.model || ""}`.trim() : id,
+            description: meta?.description || "",
+            image: meta?.image_url || null,
+            locations,
+            total_quantity: total,
+            specs: meta?.specs || {},
+            // keep original DB-supplied specs as well
+            db_meta: meta || null,
+          };
+          itemMap.set(id, item);
+        }
+
+        // Include DB items that were not in checkpoint (so we can show them too)
+        for (const dbi of dbItems) {
+          if (!itemMap.has(String(dbi.id))) {
+            const locs = (dbi.specs?.warehouse_locations || []).map((l: any) => ({ voxel: l.voxel_id, quantity: l.quantity }));
+            const total = locs.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+            itemMap.set(String(dbi.id), {
+              id: dbi.id,
+              make: dbi.make || "",
+              model: dbi.model || "",
+              name: `${dbi.make || ""} ${dbi.model || ""}`.trim(),
+              description: dbi.description || "",
+              image: dbi.image_url || null,
+              locations: locs,
+              total_quantity: total,
+              specs: dbi.specs || {},
+              db_meta: dbi,
+            });
+          }
+        }
+
+        // If some actions reference items not in DB or snapshot, create placeholders
+        if (Array.isArray(active.actions)) {
+          for (const a of active.actions) {
+            const itemId = a.itemId || a.item_id || a.id || a.sku;
+            if (!itemId) continue;
+            if (!itemMap.has(String(itemId))) {
+              const meta = dbMap.get(String(itemId)) || null;
+              const locs = meta ? (meta.specs?.warehouse_locations || []) : [];
+              const lnorm = Array.isArray(locs) ? locs.map((l: any) => ({ voxel: l.voxel_id || l.voxel, quantity: Number(l.quantity || 0) })) : [];
+              const total = lnorm.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+              itemMap.set(String(itemId), {
+                id: itemId,
+                make: meta?.make || "",
+                model: meta?.model || "",
+                name: meta ? `${meta.make || ""} ${meta.model || ""}`.trim() : String(itemId),
+                description: meta?.description || "",
+                image: meta?.image_url || null,
+                locations: lnorm,
+                total_quantity: total,
+                specs: meta?.specs || {},
+                db_meta: meta || null,
+              });
+            }
+          }
+        }
+
+        // apply actions over snapshot (in chronological order)
+        const allActions = Array.isArray(active.actions) ? [...active.actions] : [];
+        allActions.sort((a: any, b: any) => {
+          const ta = a.ts ? new Date(a.ts).getTime() : 0;
+          const tb = b.ts ? new Date(b.ts).getTime() : 0;
+          return ta - tb;
+        });
+
+        // counters
+        let onloadCtr = 0;
+        let offloadCtr = 0;
+        let editCtr = 0;
+        let points = 0;
+        let streakLocal = 0;
+
+        for (const a of allActions) {
+          const itemId = a.itemId || a.item_id || a.id || a.sku;
+          if (!itemId) continue;
+          const key = String(itemId);
+          const item = itemMap.get(key);
+          if (!item) continue;
+
+          const deltaRaw = typeof a.delta === "number" ? a.delta : (typeof a.qty === "number" ? a.qty : (typeof a.amount === "number" ? a.amount : null));
+          const delta = deltaRaw === null ? null : Number(deltaRaw);
+          if (delta === null || isNaN(delta)) continue;
+          const voxel = a.voxel || a.voxel_id || (a.location && (a.location.voxel || a.location.voxel_id)) || (item.locations[0] && item.locations[0].voxel) || null;
+
+          // find location index
+          const locs = Array.isArray(item.locations) ? [...item.locations] : [];
+          const idx = locs.findIndex((l: any) => String(l.voxel) === String(voxel));
+          if (idx === -1) {
+            // create new location if positive delta
+            if (delta > 0) {
+              locs.push({ voxel: voxel || "A1", quantity: Math.max(0, delta) });
+            } else {
+              // negative delta on non-existing location: skip
+            }
+          } else {
+            locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
+            if (locs[idx].quantity === 0) {
+              // remove zeroed location
+              // we'll filter later
+            }
+          }
+          const filtered = locs.filter((l: any) => (l.quantity || 0) > 0);
+          const newTotal = filtered.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+          item.locations = filtered;
+          item.total_quantity = newTotal;
+          itemMap.set(key, item);
+
+          // counters
+          if (a.type === "onload" || delta > 0) {
+            onloadCtr += Math.abs(delta);
+            points += 10 * Math.abs(delta);
+          } else if (a.type === "offload" || delta < 0) {
+            offloadCtr += Math.abs(delta);
+            points += 5 * Math.abs(delta);
+          } else {
+            editCtr += Math.abs(delta);
+            points += 2 * Math.abs(delta);
+          }
+          streakLocal += 1;
+        }
+
+        // set final items array
+        itemsForUI = Array.from(itemMap.values());
+        setOnloadCount(onloadCtr);
+        setOffloadCount(offloadCtr);
+        setEditCount(editCtr);
+        setScore((p) => p + points);
+        setStreak(streakLocal);
+        // keep checkpoint in state
+        setCheckpoint(active.checkpoint?.data || []);
+      } else {
+        // fallback: use DB current specs directly (no checkpoint)
+        const mapped = dbItems.map((i: any) => {
           const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
             voxel: l.voxel_id,
             quantity: l.quantity,
@@ -119,25 +302,17 @@ export default function CrewWarehousePage() {
             color: i.specs?.color || "gray",
             size: i.specs?.size || "",
             specs: i.specs || {},
+            db_meta: i,
           };
         });
-        setLocalItems(mapped);
-        setCheckpoint(mapped.map((it) => ({ id: it.id, locations: it.locations.map((l: any) => ({ ...l })) })));
-
-        // fetch active shift
-        if (dbUser?.user_id) {
-          try {
-            const sMod = await import("./actions_shifts");
-            const s = await sMod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
-            setActiveShift(s?.shift || null);
-          } catch (e) {
-            setActiveShift(null);
-          }
-        }
-      } else {
-        setError(res.error || "Failed to load warehouse");
-        toast.error(res.error || "Ошибка загрузки");
+        itemsForUI = mapped;
+        setCheckpoint([]);
+        setOnloadCount(0);
+        setOffloadCount(0);
+        setEditCount(0);
       }
+
+      setLocalItems(itemsForUI);
     } catch (e: any) {
       setError(e.message || "Load failed");
       toast.error("Ошибка загрузки");
@@ -335,7 +510,7 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // new: export daily (offloads)
+  // new: export daily (onloads + offloads)
   const handleExportDaily = async () => {
     if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
       toast.error("Admin access required");
@@ -349,26 +524,46 @@ export default function CrewWarehousePage() {
         return;
       }
       if (!res.csv || res.csv === "") {
-        toast.info("Нет offload-операций за сегодня");
+        toast.info("Нет onload/offload операций за сегодня");
         return;
       }
       // copy to clipboard or download
       const copied = await safeCopyToClipboard(res.csv);
       if (copied) {
-        toast.success("Daily offload TSV copied to clipboard");
+        toast.success("Daily on/off TSV скопирован в буфер");
       } else {
         const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `daily_offload_${slug}.tsv`;
+        a.download = `daily_onoff_${slug}.tsv`;
         a.click();
         URL.revokeObjectURL(url);
-        toast.success("Daily offload exported");
+        toast.success("Daily on/off exported");
       }
     } catch (e: any) {
       console.error("handleExportDaily error", e);
       toast.error(e?.message || "Export daily error");
+    }
+  };
+
+  // new: send car request
+  const handleSendCarRequest = async () => {
+    if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
+      toast.error("Admin access required");
+      return;
+    }
+    try {
+      const mod = await import("./actions_shifts");
+      const res = await mod.sendDeliveryCarRequest(slug!, { forceType: carOverride === "auto" ? undefined : carOverride });
+      if (!res.success) {
+        toast.error(res.error || "Car request failed");
+        return;
+      }
+      toast.success(`Car request sent — qty=${res.totalOffloadQty}, type=${res.carType}`);
+    } catch (e: any) {
+      console.error("handleSendCarRequest error", e);
+      toast.error(e?.message || "Car request error");
     }
   };
 
@@ -435,9 +630,25 @@ export default function CrewWarehousePage() {
                 <FileUp className="w-4 h-4" />
               </Button>
 
-              {/* NEW: export daily offloads */}
-              <Button onClick={handleExportDaily} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export today's offloads">
+              {/* NEW: export daily on/off */}
+              <Button onClick={handleExportDaily} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export today's onload/offload">
                 <Mail className="w-4 h-4" />
+              </Button>
+
+              {/* Car request UI: selector + button */}
+              <select
+                value={carOverride}
+                onChange={(e) => setCarOverride(e.target.value as any)}
+                className="text-xs p-1 rounded border border-gray-200 dark:border-gray-700 ml-1"
+                title="Car type override"
+              >
+                <option value="auto">Auto (auto-select)</option>
+                <option value="taxi">Taxi (small)</option>
+                <option value="pickup">Pickup (big)</option>
+              </select>
+
+              <Button onClick={handleSendCarRequest} size="sm" variant="outline" className="px-2 py-1 ml-1" title="Send delivery car request">
+                Send car
               </Button>
 
               <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
