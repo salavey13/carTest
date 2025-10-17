@@ -19,12 +19,9 @@ import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
 /**
  * Slugged warehouse page (updated).
  *
- * Fixes:
- * - fetch and set memberRole so admin buttons enable correctly
- * - reconstruct local items from shift.checkpoint + shift.actions (if present)
- * - pass proper props to WarehouseStats
- * - pass computed VOXELS to WarehouseViz (fix select only A1)
- * - move sync buttons to bottom
+ * - single shift status line
+ * - checkpoint/reset require activeShift && canManage (owner/member/admin)
+ * - smaller icons, improved mobile layout
  */
 
 export default function CrewWarehousePage() {
@@ -41,6 +38,7 @@ export default function CrewWarehousePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
   const [gameMode, setGameMode] = useState<"offload" | "onload" | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
@@ -146,19 +144,18 @@ export default function CrewWarehousePage() {
           const statusRes = await sMod.getCrewMemberStatus(slug!, dbUser.user_id);
           if (statusRes.success) {
             setMemberRole(statusRes.member?.role || null);
-            // live_status maybe used by UI elsewhere
+            setLiveStatus(statusRes.live_status || null);
           } else {
             setMemberRole(null);
+            setLiveStatus(null);
           }
           const s = await sMod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
           const shift = s?.shift || null;
           setActiveShift(shift);
           // if there's a checkpoint in shift — restore local state from checkpoint + apply actions
           if (shift?.checkpoint?.data) {
-            // start from checkpoint snapshot
             const baseSnapshot = Array.isArray(shift.checkpoint.data) ? shift.checkpoint.data : [];
             const idMap = new Map<string, any>();
-            // create map of items from snapshot
             for (const r of baseSnapshot) {
               idMap.set(r.id, {
                 id: r.id,
@@ -168,23 +165,16 @@ export default function CrewWarehousePage() {
                 })) : []
               });
             }
-            // apply actions in chronological order
             const actions = Array.isArray(shift.actions) ? shift.actions.slice().sort((a: any,b: any)=> (a.ts||0)-(b.ts||0)) : [];
-            // initialize counters
             let onl = 0, offl = 0, edits = 0, changed = 0, delta = 0;
             for (const a of actions) {
               if (!a || !a.type) continue;
               const entry = idMap.get(a.itemId) || { id: a.itemId, locations: [] };
-              // ensure voxel present
               const voxel = a.voxel || a.voxel_id || a.v || "A1";
               const qty = Number(a.qty || a.amount || 0);
-              // mutate entry.locations array
               const loc = entry.locations.find((ll: any) => ll.voxel === voxel);
               if (a.type === "offload") {
                 if (loc) loc.quantity = Math.max(0, (loc.quantity||0) - qty);
-                else {
-                  // nothing to remove, skip (still count)
-                }
                 offl += qty;
                 changed++;
                 delta -= qty;
@@ -195,7 +185,6 @@ export default function CrewWarehousePage() {
                 changed++;
                 delta += qty;
               } else if (a.type === "edit") {
-                // edit gives absolute new quantity in a.qty maybe; handle defensively
                 const newQ = Number(a.newQty ?? a.qty ?? 0);
                 if (loc) {
                   const diff = newQ - (loc.quantity || 0);
@@ -208,7 +197,6 @@ export default function CrewWarehousePage() {
               }
               idMap.set(entry.id, entry);
             }
-            // convert map back to items used by UI
             const restored = mapped.map((mi) => {
               const snap = idMap.get(mi.id);
               if (!snap) return mi;
@@ -218,7 +206,6 @@ export default function CrewWarehousePage() {
             });
             setLocalItems(restored);
             setCheckpoint(restored.map((it) => ({ id: it.id, locations: it.locations.map((l:any)=>({...l})) })));
-            // set counters from shift replay
             setOnloadCount(onl);
             setOffloadCount(offl);
             setEditCount(edits);
@@ -236,6 +223,13 @@ export default function CrewWarehousePage() {
       setLoading(false);
     }
   };
+
+  // quick derived: can this user manage (owner | active member | global admin)
+  const canManage = useMemo(() => {
+    const globalAdmin = !!(dbUser && ((dbUser.status === "admin") || dbUser.is_admin));
+    const memberOk = !!memberRole; // any active member (we set memberRole only for active ones)
+    return !!(isOwner || memberOk || globalAdmin);
+  }, [dbUser, memberRole, isOwner]);
 
   // optimistic update kept as before, but uses actions_crud update
   const optimisticUpdate = async (itemId: string, voxelId: string, delta: number) => {
@@ -288,8 +282,8 @@ export default function CrewWarehousePage() {
 
   // CSV upload
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
-      toast.error("Admin access required");
+    if (!canManage) {
+      toast.error("Admin / member access required");
       return;
     }
     const file = e.target.files?.[0];
@@ -344,6 +338,10 @@ export default function CrewWarehousePage() {
       toast.error("Start shift first to save checkpoint");
       return;
     }
+    if (!canManage) {
+      toast.error("Permission required to save checkpoint");
+      return;
+    }
     const snapshot = localItems.map((i) => ({ id: i.id, locations: i.locations.map((l: any) => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setOnloadCount(0);
@@ -372,6 +370,10 @@ export default function CrewWarehousePage() {
       toast.error("No checkpoint available");
       return;
     }
+    if (!canManage) {
+      toast.error("Permission required to reset checkpoint");
+      return;
+    }
     setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) })));
     setOnloadCount(0);
     setOffloadCount(0);
@@ -396,7 +398,7 @@ export default function CrewWarehousePage() {
   };
 
   const handleExportStock = async (summarized = false) => {
-    if (!isOwner && !["owner","admin"].includes(memberRole||"")) {
+    if (!canManage) {
       toast.error("Admin access required");
       return;
     }
@@ -424,7 +426,6 @@ export default function CrewWarehousePage() {
     }
   };
 
-  // helper for export daily for shift (finalized)
   const handleExportDaily = async () => {
     if (!dbUser?.user_id) return toast.error("User required");
     try {
@@ -458,20 +459,15 @@ export default function CrewWarehousePage() {
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [localItems, search]);
 
-  // send car request (client trigger)
   const handleSendCar = async () => {
-    if (!isOwner && !["owner","admin"].includes(memberRole||"")) {
-      return toast.error("Only owner/admin can request car");
-    }
+    if (!canManage) return toast.error("Only owner/member/admin can request car");
     try {
       const mod = await import("./actions_shifts");
-      // server function should calculate and notify; fallback to notifyAdmin if not present
       if (typeof mod.sendDeliveryCarRequest === "function") {
         const r = await mod.sendDeliveryCarRequest(slug!, { requester: dbUser?.user_id });
         if (r?.success) toast.success("Car request sent");
         else toast.error(r?.error || "Failed to send car request");
       } else {
-        // fallback: notify admin
         const nmod = await import("./actions_notify");
         const msg = `Car request: crew=${slug} by ${dbUser?.user_id || "unknown"} — please check on portal.`;
         const rn = await nmod.notifyAdmin(msg);
@@ -498,23 +494,26 @@ export default function CrewWarehousePage() {
       <header className="p-3 bg-white dark:bg-gray-800 shadow">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div className="flex items-center gap-3">
-            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded mr-0 object-cover" />}
+            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded object-cover" />}
             <div>
               <h1 className="text-lg font-medium leading-tight">{crew?.name || "Crew"}</h1>
-              <div className="text-xs text-gray-500">Warehouse · Статус: {activeShift ? (activeShift.shift_type||"warehouse") : "offline"}</div>
+              <div className="text-xs text-gray-500">
+                Shift: {activeShift ? (activeShift.shift_type || "warehouse") : "none"} · Status: {liveStatus || (activeShift ? "active" : "offline")}
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <ShiftControls slug={slug!} />
 
-            <div className="flex items-center gap-1 ml-1">
+            <div className="flex items-center gap-1">
               <Button
                 size="sm"
                 variant={gameMode === "onload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")}
                 className="px-2 py-1 text-xs"
                 title="Onload (add items)"
+                disabled={!canManage}
               >
                 +Load
               </Button>
@@ -524,30 +523,31 @@ export default function CrewWarehousePage() {
                 onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")}
                 className="px-2 py-1 text-xs"
                 title="Offload (remove items)"
+                disabled={!canManage}
               >
                 −Unload
               </Button>
             </div>
 
-            <div className="flex gap-1 items-center ml-1 flex-wrap">
-              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift}>
-                <Save className="w-4 h-4" />
+            <div className="flex gap-1 items-center ml-0 flex-wrap">
+              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift || !canManage}>
+                <Save className="w-3 h-3" />
               </Button>
 
-              <Button onClick={handleReset} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift}>
-                <RotateCcw className="w-4 h-4" />
+              <Button onClick={handleReset} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift || !canManage}>
+                <RotateCcw className="w-3 h-3" />
               </Button>
 
-              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock">
-                <FileUp className="w-4 h-4" />
+              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock" disabled={!canManage}>
+                <FileUp className="w-3 h-3" />
               </Button>
 
               <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} size="sm" variant="outline" className="w-8 h-8 p-1" title="Upload CSV">
-                <Upload className="w-4 h-4" />
+              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading || !canManage} size="sm" variant="outline" className="w-8 h-8 p-1" title="Upload CSV">
+                <Upload className="w-3 h-3" />
               </Button>
 
-              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 ml-2 text-xs">
+              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 ml-2 text-xs" disabled={!canManage}>
                 Send car
               </Button>
 
@@ -576,6 +576,7 @@ export default function CrewWarehousePage() {
                   item={item}
                   onClick={() => {
                     if (!gameMode) return toast.info(item.description || "No description available");
+                    if (!canManage) return toast.error("Permission required to modify stock");
                     const delta = gameMode === "onload" ? 1 : -1;
                     let voxel = selectedVoxel || item.locations[0]?.voxel || "A1";
                     if (gameMode === "offload" && !selectedVoxel) {
@@ -585,7 +586,6 @@ export default function CrewWarehousePage() {
                     }
                     optimisticUpdate(item.id, voxel, delta);
                   }}
-                  disabled={!gameMode || (!isOwner && !["owner","admin"].includes(memberRole || ""))}
                 />
               ))}
             </div>

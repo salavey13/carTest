@@ -40,6 +40,27 @@ async function verifyCrewMember(crewId: string, userId: string | undefined) {
   return { isMember, role, isOwner };
 }
 
+// small helper: check public.users for admin flag/status
+async function isGlobalAdmin(userId?: string) {
+  if (!userId) return false;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .select("status, is_admin")
+      .eq("id", userId)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.warn("[isGlobalAdmin] query error", error);
+      return false;
+    }
+    return (data?.status === "admin") || !!data?.is_admin;
+  } catch (e) {
+    console.warn("[isGlobalAdmin] unexpected", e);
+    return false;
+  }
+}
+
 /** 
  * getCrewWarehouseItems
  * returns raw server items (specs parsed) and crew meta
@@ -98,10 +119,10 @@ export async function updateCrewItemLocationQty(
 
     const { isMember, role, isOwner, error } = await verifyCrewMember(crewId, userId);
     if (error) throw new Error(error);
-    if (!isMember && !isOwner) throw new Error("Not a member of this crew");
 
-    const allowedRoles = ["owner", "xadmin", "manager", "admin"];
-    if (!isOwner && !(role && allowedRoles.includes(role))) throw new Error("Insufficient permissions");
+    // allow owner OR active member OR global admin
+    const callerIsAdmin = await isGlobalAdmin(userId);
+    if (!isOwner && !isMember && !callerIsAdmin) throw new Error("Not a member of this crew");
 
     const { data: existingItem, error: selErr } = await supabaseAdmin
       .from("cars")
