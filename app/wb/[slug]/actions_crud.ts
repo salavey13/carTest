@@ -46,7 +46,7 @@ async function isGlobalAdmin(userId?: string) {
   try {
     const { data, error } = await supabaseAdmin
       .from("users")
-      .select("status, is_admin")
+      .select("status")
       .eq("id", userId)
       .limit(1)
       .maybeSingle();
@@ -54,7 +54,7 @@ async function isGlobalAdmin(userId?: string) {
       console.warn("[isGlobalAdmin] query error", error);
       return false;
     }
-    return (data?.status === "admin") || !!data?.is_admin;
+    return (data?.status === "admin");
   } catch (e) {
     console.warn("[isGlobalAdmin] unexpected", e);
     return false;
