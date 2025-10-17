@@ -3,11 +3,15 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { WarehouseVizProps } from "@/app/wb/common";
-import { VOXELS } from "@/app/wb/common";
+import { VOXELS as GLOBAL_VOXELS } from "@/app/wb/common";
 import { COLOR_MAP } from "@/app/wb/common";
 
 /**
  * Ultra-ultra-compact WarehouseViz (defensive)
+ *
+ * Changes:
+ * - Accepts optional prop VOXELS (if passed, uses it; otherwise falls back to global VOXELS)
+ * - Defensive guards for item.locations shape
  */
 
 const baseBgForColor = (color?: string) => {
@@ -37,19 +41,19 @@ const extractModelMake = (item: any) => {
   return { model: String(possibleModel), make: String(possibleMake) };
 };
 
-export function WarehouseViz(props: WarehouseVizProps) {
-  // safe guards
-  const { items, selectedVoxel, onSelectVoxel, onPlateClick } = props;
+export function WarehouseViz(props: WarehouseVizProps & { VOXELS?: any[] }) {
+  const { items, selectedVoxel, onSelectVoxel, onPlateClick, VOXELS: propVoxels } = props;
   const safeItems = Array.isArray(items) ? items : [];
-  const safeVoxels = Array.isArray(VOXELS) ? VOXELS : [];
+  const safeVoxels = Array.isArray(propVoxels) ? propVoxels : (Array.isArray(GLOBAL_VOXELS) ? GLOBAL_VOXELS : []);
 
   return (
     <div className="grid grid-cols-4 gap-0 p-0">
       {safeVoxels.map((voxel) => {
+        const vid = (voxel?.id ?? voxel) as string;
         const content = safeItems.flatMap((i) => {
-          const locs = Array.isArray(i?.locations) ? i.locations : [];
+          const locs = Array.isArray(i?.locations) ? i.locations : (Array.isArray(i?.specs?.warehouse_locations) ? i.specs.warehouse_locations.map((l:any)=>({voxel: l.voxel_id||l.voxel, quantity: l.quantity})) : []);
           return locs
-            .filter((l: any) => (Number(l?.quantity || 0) > 0) && (l?.voxel === voxel?.id))
+            .filter((l: any) => (Number(l?.quantity || 0) > 0) && (String(l?.voxel) === String(vid)))
             .map((l: any) => ({ item: i, quantity: Number(l.quantity || 0) }));
         });
 
@@ -59,23 +63,23 @@ export function WarehouseViz(props: WarehouseVizProps) {
 
         return (
           <motion.div
-            key={voxel?.id ?? Math.random()}
+            key={vid ?? Math.random()}
             role="button"
-            aria-label={`Ячейка ${voxel?.id ?? "?"}`}
+            aria-label={`Ячейка ${vid ?? "?"}`}
             onClick={() => {
-              if (typeof onSelectVoxel === "function") onSelectVoxel(voxel?.id);
-              if (typeof onPlateClick === "function") onPlateClick(voxel?.id);
+              if (typeof onSelectVoxel === "function") onSelectVoxel(vid);
+              if (typeof onPlateClick === "function") onPlateClick(vid);
             }}
             whileTap={{ scale: 0.985 }}
             className={cn(
               "rounded-none border border-gray-300 select-none cursor-pointer flex flex-col",
-              selectedVoxel === voxel?.id ? "border-blue-400/80 bg-blue-50" : "",
+              selectedVoxel === vid ? "border-blue-400/80 bg-blue-50" : "",
               bgClass,
               "min-h-[44px] max-h-[180px] overflow-hidden"
             )}
           >
             <div className="flex items-center justify-between px-1 py-[3px]">
-              <div className="text-[9px] md:text-[11px] font-semibold leading-none">{voxel?.id ?? "?"}</div>
+              <div className="text-[9px] md:text-[11px] font-semibold leading-none">{vid ?? "?"}</div>
               {!isEmpty && (
                 <div className="text-[9px] md:text-[11px] opacity-80 leading-none">{content.reduce((s, c) => s + (c.quantity || 0), 0)}</div>
               )}
