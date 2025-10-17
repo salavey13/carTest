@@ -3,19 +3,11 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { unstable_noStore as noStore } from "next/cache";
 
-/**
- * Lightweight CRUD operations for slugged warehouse items.
- *
- * Important: this file avoids writing `created_at` / `updated_at` to the `cars`
- * table because some deployments do not have those columns (schema variance).
- */
-
 function safeParseSpecs(specs: any) {
   if (!specs) return {};
   if (typeof specs === "object") return specs;
   try { return JSON.parse(specs); } catch { return {}; }
 }
-
 function log(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.log("[wb/actions_crud]", ...args); }
 function err(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.error("[wb/actions_crud]", ...args); }
 
@@ -48,7 +40,7 @@ async function verifyCrewMember(crewId: string, userId: string | undefined) {
   return { isMember, role, isOwner };
 }
 
-/**
+/** 
  * getCrewWarehouseItems
  * returns raw server items (specs parsed) and crew meta
  */
@@ -88,7 +80,7 @@ export async function getCrewWarehouseItems(slug: string) {
  * updateCrewItemLocationQty
  * update single location qty inside specs.warehouse_locations (voxel_id)
  *
- * Note: does NOT write updated_at / created_at fields to `cars` to avoid schema errors.
+ * Also logs event into active shift.actions if userId is provided and active shift exists.
  */
 export async function updateCrewItemLocationQty(
   slug: string,
@@ -145,6 +137,44 @@ export async function updateCrewItemLocationQty(
     if (updateError) throw updateError;
 
     log(`[updateCrewItemLocationQty] ok ${itemId} ${voxelId} ${delta} total=${totalQuantity}`);
+
+    // --- Log action to active shift.actions if possible ---
+    try {
+      if (userId) {
+        const { data: activeShift } = await supabaseAdmin
+          .from("crew_member_shifts")
+          .select("*")
+          .eq("member_id", userId)
+          .eq("crew_id", crewId)
+          .is("clock_out_time", null)
+          .limit(1)
+          .maybeSingle();
+
+        if (activeShift && activeShift.id) {
+          const actions = Array.isArray(activeShift.actions) ? activeShift.actions : [];
+          const evt: any = {
+            type: delta < 0 ? "offload" : "onload",
+            itemId,
+            voxel_id: voxelId,
+            qty: Math.abs(delta),
+            delta,
+            user_id: userId,
+            ts: new Date().toISOString(),
+          };
+          actions.push(evt);
+
+          // write back
+          const { error: updShiftErr } = await supabaseAdmin
+            .from("crew_member_shifts")
+            .update({ actions })
+            .eq("id", activeShift.id);
+          if (updShiftErr) log("Failed to append action to shift:", updShiftErr);
+        }
+      }
+    } catch (logErr) {
+      log("Error while logging action into shift:", logErr);
+    }
+
     return { success: true, item: { id: itemId, specs, total_quantity: totalQuantity } };
   } catch (e: any) {
     err("updateCrewItemLocationQty error", e);

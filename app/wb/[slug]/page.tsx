@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileUp, Save, RotateCcw, Upload } from "lucide-react";
+import { FileUp, Save, RotateCcw, Upload, Mail } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 import { parse } from "papaparse";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -17,11 +17,7 @@ import ShiftControls from "@/components/ShiftControls";
 
 /**
  * Slugged warehouse page.
- * - Header is responsive: stacks on small screens (prevents offscreen buttons).
- * - Adds a compact game mode switcher (onload/offload/off).
- * - Action icons are small and wrap on narrow screens.
  */
-
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
@@ -339,6 +335,43 @@ export default function CrewWarehousePage() {
     }
   };
 
+  // new: export daily (offloads)
+  const handleExportDaily = async () => {
+    if (!isOwner && !["owner", "admin"].includes(memberRole || "")) {
+      toast.error("Admin access required");
+      return;
+    }
+    try {
+      const mod = await import("./actions_shifts");
+      const res = await mod.exportDailyEntryForShift(slug!, { isTelegram: false });
+      if (!res.success) {
+        toast.error(res.error || "Export daily failed");
+        return;
+      }
+      if (!res.csv || res.csv === "") {
+        toast.info("Нет offload-операций за сегодня");
+        return;
+      }
+      // copy to clipboard or download
+      const copied = await safeCopyToClipboard(res.csv);
+      if (copied) {
+        toast.success("Daily offload TSV copied to clipboard");
+      } else {
+        const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `daily_offload_${slug}.tsv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Daily offload exported");
+      }
+    } catch (e: any) {
+      console.error("handleExportDaily error", e);
+      toast.error(e?.message || "Export daily error");
+    }
+  };
+
   const filteredItems = useMemo(() => {
     return localItems.filter((item) =>
       item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -400,6 +433,11 @@ export default function CrewWarehousePage() {
 
               <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock">
                 <FileUp className="w-4 h-4" />
+              </Button>
+
+              {/* NEW: export daily offloads */}
+              <Button onClick={handleExportDaily} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export today's offloads">
+                <Mail className="w-4 h-4" />
               </Button>
 
               <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
