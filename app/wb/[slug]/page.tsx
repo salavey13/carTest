@@ -178,7 +178,7 @@ export default function CrewWarehousePage() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!checkpoint.length) return toast.error("No checkpoint");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setOnloadCount(0);
