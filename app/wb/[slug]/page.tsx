@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Save, RotateCcw, Download, FileUp, PackageSearch } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
@@ -19,7 +18,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { notifyCrewOwner } from "./actions_notify";
 import { exportCrewCurrentStock, exportDailyEntryForShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
-import { getCrewMemberStatus, setCrewMemberLiveStatus, startWarehouseShift, endWarehouseShift } from "./actions_shifts";
+import { getCrewMemberStatus, startWarehouseShift, endWarehouseShift } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 
 export default function CrewWarehousePage() {
@@ -164,7 +163,7 @@ export default function CrewWarehousePage() {
     });
   };
 
-  const handleCheckpoint = () => {
+  const handleCheckpoint = async () => {
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setOnloadCount(0);
@@ -322,18 +321,11 @@ export default function CrewWarehousePage() {
   const handleSendCar = async () => {
     if (!canManage) return toast.error("Only owner/member/admin can request car");
     try {
-      const mod = await import("./actions_shifts");
-      if (typeof mod.sendDeliveryCarRequest === "function") {
-        const r = await mod.sendDeliveryCarRequest(slug, { requester: dbUser?.user_id });
-        if (r?.success) toast.success("Car request sent");
-        else toast.error(r?.error || "Failed to send car request");
-      } else {
-        const msg = `Car request: crew=${slug} by ${dbUser?.user_id || "unknown"} — please check on portal.`;
-        await notifyCrewOwner(slug, msg, dbUser?.user_id);
-        toast.success("Owner notified (fallback)");
-      }
-    } catch (e: any) {
-      toast.error(e?.message || "Send car failed");
+      const msg = `Car request: crew=${slug} by ${dbUser?.user_id || "unknown"} — please check on portal.`;
+      await notifyCrewOwner(slug, msg, dbUser?.user_id);
+      toast.success("Car request sent to owner");
+    } catch (err) {
+      toast.error("Send car failed");
     }
   };
 
@@ -505,7 +497,7 @@ export default function CrewWarehousePage() {
             <CardTitle>Inventory</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-4 gap-1">
               {hookFilteredItems.map((item) => (
                 <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
               ))}
