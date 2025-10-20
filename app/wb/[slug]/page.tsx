@@ -6,343 +6,166 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileUp, Save, RotateCcw, Upload } from "lucide-react";
-import { useAppContext } from "@/contexts/AppContext";
-import { parse } from "papaparse";
+import { Save, RotateCcw, Download, FileUp, PackageSearch } from "lucide-react";
+import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import WarehouseViz from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
 import ShiftControls from "@/components/ShiftControls";
-import { WarehouseSyncButtons } from "@/components/WarehouseSyncButtons";
-
-/**
- * Slugged warehouse page (updated).
- *
- * - single shift status line
- * - checkpoint/reset require activeShift && canManage (owner/member/admin)
- * - smaller icons, improved mobile layout
- */
+import CrewWarehouseSyncButtons from "@/components/CrewWarehouseSyncButtons";
+import FilterAccordion from "@/components/FilterAccordion";
+import { useAppContext } from "@/contexts/AppContext";
+import { notifyCrewOwner } from "./actions_notify";
+import { exportCrewCurrentStock, exportDailyEntryForShift } from "./actions_csv";
+import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
+import { getCrewMemberStatus, setCrewMemberLiveStatus, startWarehouseShift, endWarehouseShift } from "./actions_shifts";
+import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
   const { dbUser } = useAppContext();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
 
+  const warehouse = useCrewWarehouse(slug || "");
+  const {
+    items: hookItems,
+    loading,
+    error,
+    checkpoint,
+    setCheckpoint,
+    workflowItems,
+    currentWorkflowIndex,
+    selectedWorkflowVoxel,
+    setSelectedWorkflowVoxel,
+    gameMode,
+    setGameMode,
+    score,
+    level,
+    streak,
+    dailyStreak,
+    achievements,
+    errorCount,
+    sessionStart,
+    bossMode,
+    bossTimer,
+    leaderboard,
+    loadItems,
+    handleUpdateLocationQty,
+    handleWorkflowNext,
+    handleSkipItem,
+    handlePlateClick,
+    handleItemClick,
+    search,
+    setSearch,
+    filterSeason,
+    setFilterSeason,
+    filterPattern,
+    setFilterPattern,
+    filterColor,
+    setFilterColor,
+    filterSize,
+    setFilterSize,
+    selectedVoxel,
+    setSelectedVoxel,
+    filteredItems: hookFilteredItems,
+    sortOption,
+    setSortOption,
+    onloadCount,
+    offloadCount,
+    editCount,
+    setOnloadCount,
+    setOffloadCount,
+    setEditCount,
+    efficiency,
+    avgTimePerItem,
+    dailyGoals,
+    sessionDuration,
+  } = warehouse;
+
+  const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
-  const [localItems, setLocalItems] = useState<any[]>([]);
   const [memberRole, setMemberRole] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
-  const [gameMode, setGameMode] = useState<"offload" | "onload" | null>(null);
-  const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-
-  const [checkpoint, setCheckpoint] = useState<any[]>([]);
   const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
-  const [score, setScore] = useState(0);
-  const [level, setLevel] = useState(1);
-  const [streak, setStreak] = useState(0);
-  const [errorCount, setErrorCount] = useState(0);
-  const [onloadCount, setOnloadCount] = useState(0);
-  const [offloadCount, setOffloadCount] = useState(0);
-  const [editCount, setEditCount] = useState(0);
-  const [sessionStart, setSessionStart] = useState(Date.now());
-
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editVoxel, setEditVoxel] = useState<string | null>(null);
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
+  const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
+  const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
+  const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
+  const [lastProcessedStars, setLastProcessedStars] = useState<number | null>(null);
+  const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
+  const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
+  const [checkingPending, setCheckingPending] = useState(false);
+  const [targetOffload, setTargetOffload] = useState(0);
 
-  // derive helpers
-  const deriveSizePack = (items: any[]) => {
-    const counts: Record<string, number> = {};
-    for (const it of items || []) {
-      const size = (it.specs?.size || it.size || "").toString().trim() || "unknown";
-      counts[size] = (counts[size] || 0) + 1;
-    }
-    const unique = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    const map: Record<string, number> = {};
-    unique.forEach((s, i) => (map[s] = Math.max(1, Math.min(10, i + 1))));
-    return map;
-  };
-  const deriveVoxels = (items: any[]) => {
-    const set = new Set<string>();
-    for (const it of items || []) {
-      const locs = it.specs?.warehouse_locations || it.locations || [];
-      for (const l of locs) {
-        const v = l.voxel_id || l.voxel || (typeof l === "string" ? l : undefined);
-        if (v) set.add(String(v));
-      }
-    }
-    return Array.from(set).sort();
-  };
+  const uniqueSeasons = useMemo(() => [...new Set(localItems.map(i => i.season).filter(Boolean))].sort(), [localItems]);
+  const uniquePatterns = useMemo(() => [...new Set(localItems.map(i => i.pattern).filter(Boolean))].sort(), [localItems]);
+  const uniqueColors = useMemo(() => [...new Set(localItems.map(i => i.color).filter(Boolean))].sort(), [localItems]);
+  const uniqueSizes = useMemo(() => [...new Set(localItems.map(i => i.size).filter(Boolean))].sort((a,b) => getSizePriority(a) - getSizePriority(b)), [localItems]);
 
-  const SIZE_PACK = useMemo(() => deriveSizePack(localItems), [localItems]);
-  const VOXELS = useMemo(() => deriveVoxels(localItems), [localItems]);
+  useEffect(() => setLocalItems(hookItems || []), [hookItems]);
 
   useEffect(() => {
-    if (!slug) {
-      setError("No slug provided");
-      setLoading(false);
-      return;
-    }
-    loadCrewItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+    const iv = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(iv);
+  }, []);
 
-  const loadCrewItems = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const mod = await import("./actions_crud");
-      const res = await mod.getCrewWarehouseItems(slug!);
-      if (!res.success) throw new Error(res.error || "Failed to load crew items");
-
-      // set crew and owner flag
-      setCrew(res.crew || null);
-      setIsOwner(!!res.crew?.owner_id && dbUser?.user_id === res.crew.owner_id);
-
-      // map items to UI shape
-      const mapped = (res.data || []).map((i: any) => {
-        const locations = (i.specs?.warehouse_locations || []).map((l: any) => ({
-          voxel: l.voxel_id,
-          quantity: l.quantity,
-          min_qty: l.voxel_id?.startsWith?.("B") ? 3 : undefined,
-        })).sort((a: any, b: any) => (a.voxel || "").localeCompare(b.voxel || ""));
-        const total = locations.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
-        return {
-          id: i.id,
-          make: i.make,
-          model: i.model,
-          name: `${i.make || ""} ${i.model || ""}`.trim(),
-          description: i.description || "",
-          image: i.image_url,
-          locations,
-          total_quantity: total,
-          season: i.specs?.season || null,
-          pattern: i.specs?.pattern || null,
-          color: i.specs?.color || "gray",
-          size: i.specs?.size || "",
-          specs: i.specs || {},
-        };
-      });
-      setLocalItems(mapped);
-
-      // checkpoint default = current mapped snapshot
-      setCheckpoint(mapped.map((it) => ({ id: it.id, locations: it.locations.map((l: any) => ({ ...l })) })));
-
-      // fetch member status + active shift in parallel
-      if (dbUser?.user_id) {
-        try {
-          const sMod = await import("./actions_shifts");
-          const statusRes = await sMod.getCrewMemberStatus(slug!, dbUser.user_id);
-          if (statusRes.success) {
-            setMemberRole(statusRes.member?.role || null);
-            setLiveStatus(statusRes.live_status || null);
-          } else {
-            setMemberRole(null);
-            setLiveStatus(null);
-          }
-          const s = await sMod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
-          const shift = s?.shift || null;
-          setActiveShift(shift);
-          // if there's a checkpoint in shift — restore local state from checkpoint + apply actions
-          if (shift?.checkpoint?.data) {
-            const baseSnapshot = Array.isArray(shift.checkpoint.data) ? shift.checkpoint.data : [];
-            const idMap = new Map<string, any>();
-            for (const r of baseSnapshot) {
-              idMap.set(r.id, {
-                id: r.id,
-                locations: Array.isArray(r.locations) ? r.locations.map((l: any) => ({
-                  voxel: l.voxel || l.voxel_id || l.id,
-                  quantity: Number(l.quantity || 0)
-                })) : []
-              });
-            }
-            const actions = Array.isArray(shift.actions) ? shift.actions.slice().sort((a: any,b: any)=> (a.ts||0)-(b.ts||0)) : [];
-            let onl = 0, offl = 0, edits = 0, changed = 0, delta = 0;
-            for (const a of actions) {
-              if (!a || !a.type) continue;
-              const entry = idMap.get(a.itemId) || { id: a.itemId, locations: [] };
-              const voxel = a.voxel || a.voxel_id || a.v || "A1";
-              const qty = Number(a.qty || a.amount || 0);
-              const loc = entry.locations.find((ll: any) => ll.voxel === voxel);
-              if (a.type === "offload") {
-                if (loc) loc.quantity = Math.max(0, (loc.quantity||0) - qty);
-                offl += qty;
-                changed++;
-                delta -= qty;
-              } else if (a.type === "onload") {
-                if (loc) loc.quantity = (loc.quantity||0) + qty;
-                else entry.locations.push({ voxel, quantity: qty });
-                onl += qty;
-                changed++;
-                delta += qty;
-              } else if (a.type === "edit") {
-                const newQ = Number(a.newQty ?? a.qty ?? 0);
-                if (loc) {
-                  const diff = newQ - (loc.quantity || 0);
-                  loc.quantity = Math.max(0, newQ);
-                  if (diff !== 0) { edits += Math.abs(diff); changed++; delta += diff; }
-                } else {
-                  entry.locations.push({ voxel, quantity: newQ });
-                  edits += newQ; changed++; delta += newQ;
-                }
-              }
-              idMap.set(entry.id, entry);
-            }
-            const restored = mapped.map((mi) => {
-              const snap = idMap.get(mi.id);
-              if (!snap) return mi;
-              const locs = (snap.locations || []).map((l: any) => ({ voxel: l.voxel, quantity: l.quantity }));
-              const total = locs.reduce((acc:any, l:any) => acc + (l.quantity||0), 0);
-              return { ...mi, locations: locs, total_quantity: total };
-            });
-            setLocalItems(restored);
-            setCheckpoint(restored.map((it) => ({ id: it.id, locations: it.locations.map((l:any)=>({...l})) })));
-            setOnloadCount(onl);
-            setOffloadCount(offl);
-            setEditCount(edits);
-            setStatsObj((prev)=>({ ...prev, changedCount: changed, totalDelta: delta, offloadUnits: offl }));
-          }
-        } catch (e: any) {
-          console.warn("Shift/member status fetch failed", e);
-        }
-      }
-
-    } catch (e: any) {
-      setError(e.message || "Load failed");
-      toast.error("Ошибка загрузки");
-    } finally {
-      setLoading(false);
-    }
+  const loadStatus = async () => {
+    if (!slug || !dbUser?.user_id) return;
+    const statusRes = await getCrewMemberStatus(slug, dbUser.user_id);
+    if (statusRes.success) setLiveStatus(statusRes.live_status || null);
+    const shiftRes = await getActiveShiftForCrewMember(slug, dbUser.user_id);
+    setActiveShift(shiftRes.shift || null);
   };
 
-  // quick derived: can this user manage (owner | active member | global admin)
+  useEffect(() => {
+    loadStatus();
+    const poll = setInterval(loadStatus, 30000);
+    return () => clearInterval(poll);
+  }, [slug, dbUser?.user_id]);
+
   const canManage = useMemo(() => {
-    const globalAdmin = !!(dbUser && ((dbUser.status === "admin") || dbUser.is_admin));
-    const memberOk = !!memberRole; // any active member (we set memberRole only for active ones)
+    const globalAdmin = !!dbUser && (dbUser.status === "admin" || dbUser.is_admin);
+    const memberOk = !!memberRole;
     return !!(isOwner || memberOk || globalAdmin);
   }, [dbUser, memberRole, isOwner]);
 
-  // optimistic update kept as before, but uses actions_crud update
-  const optimisticUpdate = async (itemId: string, voxelId: string, delta: number) => {
+  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
         const locs = (i.locations || []).map((l: any) => ({ ...l }));
         const idx = locs.findIndex((l: any) => l.voxel === voxelId);
-        if (idx !== -1) locs[idx].quantity = Math.max(0, (locs[idx].quantity || 0) + delta);
-        else if (delta > 0) locs.push({ voxel: voxelId, quantity: delta });
-        const filtered = locs.filter((l) => (l.quantity || 0) > 0);
-        const newTotal = filtered.reduce((acc: number, l: any) => acc + (l.quantity || 0), 0);
+        if (idx !== -1) {
+          locs[idx].quantity = Math.max(0, locs[idx].quantity + delta);
+        } else if (delta > 0) {
+          locs.push({ voxel: voxelId, quantity: delta });
+        }
+        const filtered = locs.filter(l => l.quantity > 0);
+        const newTotal = filtered.reduce((acc, l) => acc + l.quantity, 0);
         return { ...i, locations: filtered, total_quantity: newTotal };
       })
     );
 
     const absDelta = Math.abs(delta);
-    if (gameMode === "onload" && delta > 0) setOnloadCount((p) => p + absDelta);
-    else if (gameMode === "offload" && delta < 0) setOffloadCount((p) => p + absDelta);
-    else setEditCount((p) => p + absDelta);
+    if (gameMode === "onload" && delta > 0) setOnloadCount(p => p + absDelta);
+    else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
+    else setEditCount(p => p + absDelta);
 
-    const points = gameMode === "onload" ? 10 : 5;
-    setScore((p) => p + points);
-    setStreak((p) => p + 1);
-
-    try {
-      const mod = await import("./actions_crud");
-      const res = await mod.updateCrewItemLocationQty(slug!, itemId, voxelId, delta, dbUser?.user_id);
-      if (!res.success) {
-        toast.error(res.error || "Server update failed");
-        setErrorCount((p) => p + 1);
-        setStreak(0);
-        await loadCrewItems();
-      } else {
-        setStatsObj((prev) => ({
-          ...prev,
-          changedCount: prev.changedCount + 1,
-          totalDelta: prev.totalDelta + absDelta,
-          stars: prev.stars + (gameMode === "onload" ? 2 : 1),
-          offloadUnits: prev.offloadUnits + (gameMode === "offload" && delta < 0 ? Math.abs(delta) : 0),
-        }));
-      }
-    } catch (e: any) {
-      toast.error(e.message || "Update failed");
-      setErrorCount((p) => p + 1);
-      setStreak(0);
-      await loadCrewItems();
-    }
+    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => {
+      loadItems();
+      toast.error("Server update failed - reloaded");
+    });
   };
 
-  // CSV upload
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canManage) {
-      toast.error("Admin / member access required");
-      return;
-    }
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target?.result as string | "";
-        const parsed = parse(text, { header: true, skipEmptyLines: true }).data as any[];
-        const mod = await import("./actions_csv");
-        const result = await mod.uploadCrewWarehouseCsv(parsed, slug!, dbUser?.user_id);
-        if (result.success) {
-          toast.success(result.message || "CSV uploaded successfully");
-          await loadCrewItems();
-        } else {
-          toast.error(result.error || "Upload failed");
-        }
-      } catch (err: any) {
-        toast.error(err.message || "Failed to parse CSV");
-      } finally {
-        setIsUploading(false);
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const safeCopyToClipboard = async (text: string) => {
-    if (!text) return false;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    } catch {}
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    } catch { return false; }
-  };
-
-  const handleCheckpoint = async () => {
-    if (!activeShift) {
-      toast.error("Start shift first to save checkpoint");
-      return;
-    }
-    if (!canManage) {
-      toast.error("Permission required to save checkpoint");
-      return;
-    }
-    const snapshot = localItems.map((i) => ({ id: i.id, locations: i.locations.map((l: any) => ({ voxel: l.voxel, quantity: l.quantity })) }));
+  const handleCheckpoint = () => {
+    const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setOnloadCount(0);
     setOffloadCount(0);
@@ -350,144 +173,236 @@ export default function CrewWarehousePage() {
     toast.success("Checkpoint saved locally");
 
     if (dbUser?.user_id) {
-      try {
-        const mod = await import("./actions_shifts");
-        const res = await mod.saveCrewCheckpoint(slug!, dbUser.user_id, snapshot);
-        if (!res.success) toast.error("Failed to save checkpoint on server");
-        else {
-          toast.success("Checkpoint saved to shift");
-          const s = await mod.getActiveShiftForCrewMember(slug!, dbUser.user_id);
-          setActiveShift(s.shift || null);
-        }
-      } catch (e) {
-        console.warn("Shift checkpoint save failed", e);
-      }
+      const res = await saveCrewCheckpoint(slug, dbUser.user_id, snapshot);
+      if (res.success) toast.success("Checkpoint saved to server");
+      else toast.error("Server checkpoint save failed");
     }
   };
 
-  const handleReset = async () => {
-    if (!checkpoint?.length) {
-      toast.error("No checkpoint available");
-      return;
-    }
-    if (!canManage) {
-      toast.error("Permission required to reset checkpoint");
-      return;
-    }
-    setLocalItems(checkpoint.map((i) => ({ ...i, locations: i.locations.map((l: any) => ({ ...l })) })));
+  const handleReset = () => {
+    if (!checkpoint.length) return toast.error("No checkpoint");
+    setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
     toast.success("Reset to checkpoint (local)");
 
     if (dbUser?.user_id) {
-      if (!activeShift) { toast.error("Start shift first to apply server reset"); return; }
-      try {
-        const mod = await import("./actions_shifts");
-        const res = await mod.resetCrewCheckpoint(slug!, dbUser.user_id);
-        if (!res.success) toast.error("Server reset had failures; check logs");
-        else {
-          toast.success(`Server reset applied (${res.applied} items)`);
-          await loadCrewItems();
-        }
-      } catch (e) {
-        console.warn("Server reset error", e);
-        toast.error("Server reset error");
+      const res = await resetCrewCheckpoint(slug, dbUser.user_id);
+      if (res.success) {
+        toast.success(`Server reset applied (${res.applied} items)`);
+        loadItems();
+      } else {
+        toast.error("Server reset failed");
       }
     }
   };
 
-  const handleExportStock = async (summarized = false) => {
-    if (!canManage) {
-      toast.error("Admin access required");
-      return;
+  const categorizeItem = (item: any): string => {
+    const fullLower = (item.id || item.model || '').toLowerCase().trim();
+    if (!fullLower) return 'other';
+
+    if (fullLower.includes('наматрасник') || fullLower.includes('namatras')) {
+      const sizeMatch = fullLower.match(/(90|120|140|160|180|200)/);
+      if (sizeMatch) return `namatras ${sizeMatch[0]}`;
     }
-    try {
-      const mod = await import("./actions_csv");
-      const result = await mod.exportCrewCurrentStock(slug!, localItems, summarized);
-      if (result.success && result.csv) {
-        const copied = await safeCopyToClipboard(result.csv);
-        if (copied) toast.success("Stock copied to clipboard");
-        else {
-          const blob = new Blob([result.csv], { type: "text/tab-separated-values" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
-          a.click();
-          URL.revokeObjectURL(url);
-          toast.success("Stock exported successfully");
-        }
-      } else {
-        toast.error(result.error || "Export failed");
+
+    const sizeChecks = [
+      { key: 'евро макси', val: 'evromaksi' },
+      { key: 'evro maksi', val: 'evromaksi' },
+      { key: 'evromaksi', val: 'evromaksi' },
+      { key: 'евро', val: 'evro' },
+      { key: 'evro', val: 'evro' },
+      { key: 'euro', val: 'evro' },
+      { key: '2', val: '2' },
+      { key: '1.5', val: '1.5' }
+    ];
+    let detectedSize = null;
+    for (const { key, val } of sizeChecks) {
+      if (fullLower.includes(key)) {
+        detectedSize = val;
+        break;
       }
-    } catch (e: any) {
-      toast.error(e.message || "Export error");
     }
+
+    const seasonMap = { 'лето': 'leto', 'зима': 'zima', 'leto': 'leto', 'zima': 'zima' };
+    let detectedSeason = null;
+    for (const [key, val] of Object.entries(seasonMap)) {
+      if (fullLower.includes(key)) {
+        detectedSeason = val;
+        break;
+      }
+    }
+
+    if (detectedSize && detectedSeason) {
+      return `${detectedSize} ${detectedSeason}`;
+    }
+
+    if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
+      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Podushka 50h70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Podushka 70h70';
+      if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
+    }
+
+    if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
+      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70h70';
+    }
+
+    return 'other';
   };
+
+  const computeProcessedStats = useCallback(() => {
+    if (!checkpoint.length) return { changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0, sumsPrevious: {}, sumsCurrent: {} };
+    let changedCount = 0;
+    let totalDelta = 0;
+    let offloadUnits = offloadCount || 0;
+
+    let sumsPrevious: Record<string, number> = {};
+    let sumsCurrent: Record<string, number> = {};
+
+    checkpoint.forEach(cp => {
+      const cat = categorizeItem(cp);
+      sumsPrevious[cat] = (sumsPrevious[cat] || 0) + (cp.total_quantity || 0);
+    });
+
+    localItems.forEach(it => {
+      const cat = categorizeItem(it);
+      sumsCurrent[cat] = (sumsCurrent[cat] || 0) + (it.total_quantity || 0);
+    });
+
+    localItems.forEach(it => {
+      const cp = checkpoint.find(c => c.id === it.id);
+      if (!cp) return;
+      const rawDelta = it.total_quantity - cp.total_quantity;
+      const absDelta = Math.abs(rawDelta);
+      if (absDelta > 0) changedCount += 1;
+      totalDelta += absDelta;
+    });
+
+    const stars = 0;
+    const salary = offloadUnits * 50;
+    return { changedCount, totalDelta, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
+  }, [localItems, checkpoint, offloadCount]);
+
+  useEffect(() => {
+    const stats = computeProcessedStats();
+    setStatsObj(stats);
+  }, [computeProcessedStats]);
 
   const handleExportDaily = async () => {
-    if (!dbUser?.user_id) return toast.error("User required");
-    try {
-      const mod = await import("./actions_shifts");
-      const res = await mod.exportDailyEntryForShift(slug!, { isTelegram: false });
-      if (res?.success && res.csv) {
-        const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Daily TSV copied to clipboard");
-        else {
-          const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `daily_offload_${slug}.tsv`;
-          a.click();
-          URL.revokeObjectURL(url);
-          toast.success("Daily TSV downloaded");
-        }
-      } else {
-        toast.error(res?.error || "Export failed");
+    const freshStats = computeProcessedStats();
+    const sumsPrev = freshStats.sumsPrevious || {};
+    const sumsCurr = freshStats.sumsCurrent || {};
+    const store = dbUser?.store || "main";
+    const gameModeLocal = gameMode || "default";
+
+    const res = await exportDailyEntryForShift(slug, { isTelegram: false });
+
+    if (res?.success && res.csv) {
+      const copied = await safeCopyToClipboard(res.csv);
+      if (copied) toast.success("Daily TSV copied");
+      else {
+        const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `daily_offload_${slug}.tsv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Daily TSV downloaded");
       }
-    } catch (e:any) {
-      toast.error(e?.message || "Export error");
+
+      await notifyCrewOwner(slug, `Daily export by @${dbUser?.username || "user"}\n${res.csv}`, dbUser?.user_id);
+    } else {
+      toast.error(res?.error || "Export failed");
     }
   };
-
-  const filteredItems = useMemo(() => {
-    return localItems.filter((item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.description.toLowerCase().includes(search.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [localItems, search]);
 
   const handleSendCar = async () => {
     if (!canManage) return toast.error("Only owner/member/admin can request car");
     try {
       const mod = await import("./actions_shifts");
       if (typeof mod.sendDeliveryCarRequest === "function") {
-        const r = await mod.sendDeliveryCarRequest(slug!, { requester: dbUser?.user_id });
+        const r = await mod.sendDeliveryCarRequest(slug, { requester: dbUser?.user_id });
         if (r?.success) toast.success("Car request sent");
         else toast.error(r?.error || "Failed to send car request");
       } else {
-        const nmod = await import("./actions_notify");
         const msg = `Car request: crew=${slug} by ${dbUser?.user_id || "unknown"} — please check on portal.`;
-        const rn = await nmod.notifyAdmin(msg);
-        if (rn?.success) toast.success("Admin notified (fallback)");
-        else toast.error("Failed to notify admin");
+        await notifyCrewOwner(slug, msg, dbUser?.user_id);
+        toast.success("Owner notified (fallback)");
       }
-    } catch (e:any) {
-      console.error("send car error", e);
+    } catch (e: any) {
       toast.error(e?.message || "Send car failed");
     }
   };
 
+  const handleCheckPending = async () => {
+    setCheckingPending(true);
+    try {
+      const wbRes = await fetchCrewWbPendingCount(slug);
+      const ozonRes = await fetchCrewOzonPendingCount(slug);
+      const wbCount = wbRes.success ? wbRes.count : 0;
+      const ozonCount = ozonRes.success ? ozonRes.count : 0;
+      const total = wbCount + ozonCount;
+      setTargetOffload(total);
+      toast.success(`Pending offloads: WB ${wbCount}, Ozon ${ozonCount}. Target: ${total}`);
+    } catch (err: any) {
+      toast.error("Pending check failed: " + (err?.message || 'Unknown'));
+    } finally {
+      setCheckingPending(false);
+    }
+  };
+
+  const handleExportStock = async (summarized = false) => {
+    const res = await exportCrewCurrentStock(slug, localItems, summarized);
+    if (res.success && res.csv) {
+      const copied = await safeCopyToClipboard(res.csv);
+      if (copied) toast.success("Stock copied to clipboard");
+      else {
+        const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Stock exported successfully");
+      }
+    } else {
+      toast.error(res.error || "Export failed");
+    }
+  };
+
+  const safeCopyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const formatSec = (sec: number | null) => {
+    if (sec === null) return "--:--";
+    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
+    const ss = (sec % 60).toString().padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
+  const checkpointDisplayMain = checkpointStart ? formatSec(Math.floor((Date.now() - checkpointStart) / 1000)) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--");
+  const checkpointDisplaySub = checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался");
+
+  const processedChangedCount = checkpointStart ? statsObj.changedCount : (lastProcessedCount ?? 0);
+  const processedTotalDelta = checkpointStart ? statsObj.totalDelta : (lastProcessedTotalDelta ?? 0);
+  const processedStars = checkpointStart ? statsObj.stars : (lastProcessedStars ?? 0);
+  const processedOffloadUnits = checkpointStart ? statsObj.offloadUnits : (lastProcessedOffloadUnits ?? 0);
+  const processedSalary = checkpointStart ? statsObj.salary : (lastProcessedSalary ?? 0);
+
+  const filteredItems = hookFilteredItems;
+
   if (loading) return <div className="p-4">Loading crew warehouse...</div>;
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
-
-  // prepare props for WarehouseStats
-  const itemsCount = localItems.reduce((s, it) => s + (it.total_quantity || 0), 0);
-  const uniqueIds = localItems.length;
-  const checkpointMain = activeShift?.checkpoint?.saved_at ? new Date(activeShift.checkpoint.saved_at).toLocaleString() : "--:--";
-  const checkpointSub = activeShift?.checkpoint?.saved_at ? `saved ${new Date(activeShift.checkpoint.saved_at).toLocaleTimeString()}` : "--:--";
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
@@ -538,28 +453,49 @@ export default function CrewWarehousePage() {
                 <RotateCcw className="w-3 h-3" />
               </Button>
 
-              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock" disabled={!canManage}>
-                <FileUp className="w-3 h-3" />
+              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 ml-1 text-xs">
+                Export daily
               </Button>
 
-              <input ref={fileInputRef} type="file" accept=".csv,.tsv" onChange={handleFileChange} className="hidden" />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading || !canManage} size="sm" variant="outline" className="w-8 h-8 p-1" title="Upload CSV">
-                <Upload className="w-3 h-3" />
+              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock" disabled={!canManage}>
+                <FileUp className="w-3 h-3" />
               </Button>
 
               <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 ml-2 text-xs" disabled={!canManage}>
                 Send car
               </Button>
 
-              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 ml-1 text-xs">
-                Export daily
+              <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8 text-xs" disabled={checkingPending}>
+                {checkingPending ? "Checking..." : "Check pending"}
               </Button>
             </div>
           </div>
         </div>
 
         <div className="mt-3">
-          <Input placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
+          <FilterAccordion
+            filterSeason={filterSeason}
+            setFilterSeason={setFilterSeason}
+            filterPattern={filterPattern}
+            setFilterPattern={setFilterPattern}
+            filterColor={filterColor}
+            setFilterColor={setFilterColor}
+            filterSize={filterSize}
+            setFilterSize={setFilterSize}
+            items={localItems}
+            onResetFilters={() => {
+              setFilterSeason(null);
+              setFilterPattern(null);
+              setFilterColor(null);
+              setFilterSize(null);
+              setSearch("");
+            }}
+            includeSearch
+            search={search}
+            setSearch={setSearch}
+            sortOption={sortOption as any}
+            setSortOption={setSortOption as any}
+          />
         </div>
       </header>
 
@@ -570,84 +506,73 @@ export default function CrewWarehousePage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {filteredItems.map((item) => (
-                <WarehouseItemCard
-                  key={item.id}
-                  item={item}
-                  onClick={() => {
-                    if (!gameMode) return toast.info(item.description || "No description available");
-                    if (!canManage) return toast.error("Permission required to modify stock");
-                    const delta = gameMode === "onload" ? 1 : -1;
-                    let voxel = selectedVoxel || item.locations[0]?.voxel || "A1";
-                    if (gameMode === "offload" && !selectedVoxel) {
-                      const hasStock = item.locations.some((l: any) => (l.quantity || 0) > 0);
-                      if (!hasStock) return toast.error("No stock available");
-                      voxel = item.locations.find((l: any) => (l.quantity || 0) > 0)?.voxel || "A1";
-                    }
-                    optimisticUpdate(item.id, voxel, delta);
-                  }}
-                />
+              {hookFilteredItems.map((item) => (
+                <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
               ))}
             </div>
-            {filteredItems.length === 0 && <div className="text-center py-8 text-gray-500">No items found</div>}
+            {hookFilteredItems.length === 0 && <div className="text-center py-8 text-gray-500">No items found</div>}
           </CardContent>
         </Card>
 
-        <WarehouseViz items={localItems} selectedVoxel={selectedVoxel} onSelectVoxel={setSelectedVoxel} onPlateClick={(v)=>setSelectedVoxel(v)} gameMode={gameMode} VOXELS={VOXELS} />
+        <WarehouseViz
+          items={localItems}
+          selectedVoxel={selectedVoxel}
+          onSelectVoxel={setSelectedVoxel}
+          onPlateClick={handlePlateClick}
+          gameMode={gameMode}
+        />
 
         <div className="mt-4">
           <WarehouseStats
-            itemsCount={itemsCount}
-            uniqueIds={uniqueIds}
+            itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
+            uniqueIds={localItems.length}
             score={score}
             level={level}
             streak={streak}
-            dailyStreak={0}
-            checkpointMain={checkpointMain}
-            checkpointSub={checkpointSub}
-            changedCount={statsObj.changedCount}
-            totalDelta={statsObj.totalDelta}
-            stars={statsObj.stars}
-            offloadUnits={statsObj.offloadUnits || offloadCount}
-            salary={statsObj.salary}
-            achievements={[]}
+            dailyStreak={dailyStreak}
+            checkpointMain={checkpointDisplayMain}
+            checkpointSub={checkpointDisplaySub}
+            changedCount={processedChangedCount}
+            totalDelta={processedTotalDelta}
+            stars={processedStars}
+            offloadUnits={processedOffloadUnits}
+            salary={processedSalary}
+            achievements={achievements}
             sessionStart={sessionStart}
             errorCount={errorCount}
-            bossMode={false}
-            bossTimer={0}
-            leaderboard={[]}
-            efficiency={0}
-            avgTimePerItem={0}
-            dailyGoals={{ units: 100, errors: 0, xtr: 100 }}
-            sessionDuration={Math.floor((Date.now() - sessionStart) / 1000)}
+            bossMode={bossMode}
+            bossTimer={bossTimer}
+            leaderboard={leaderboard}
+            efficiency={efficiency}
+            avgTimePerItem={avgTimePerItem}
+            dailyGoals={dailyGoals}
+            sessionDuration={sessionDuration}
           />
         </div>
 
-        {/* Sync buttons moved to bottom as requested */}
         <div className="mt-6">
-          <WarehouseSyncButtons />
+          <CrewWarehouseSyncButtons slug={slug!} />
         </div>
       </main>
 
       <WarehouseModals
-        workflowItems={[]}
-        currentWorkflowIndex={0}
-        selectedWorkflowVoxel={selectedVoxel}
-        setSelectedWorkflowVoxel={setSelectedVoxel}
-        handleWorkflowNext={async () => {}}
-        handleSkipItem={() => {}}
+        workflowItems={workflowItems}
+        currentWorkflowIndex={currentWorkflowIndex}
+        selectedWorkflowVoxel={selectedWorkflowVoxel}
+        setSelectedWorkflowVoxel={setSelectedWorkflowVoxel}
+        handleWorkflowNext={handleWorkflowNext}
+        handleSkipItem={handleSkipItem}
         editDialogOpen={editDialogOpen}
         setEditDialogOpen={setEditDialogOpen}
         editVoxel={editVoxel}
         editContents={editContents}
         setEditContents={setEditContents}
         saveEditQty={async (itemId: string, newQty: number) => {
-          const currentQty = localItems.find((it) => it.id === itemId)?.locations.find((l:any)=>l.voxel===editVoxel)?.quantity || 0;
+          const currentQty = editContents.find(c => c.item.id === itemId)?.quantity || 0;
           const delta = newQty - currentQty;
-          if (delta !== 0) await optimisticUpdate(itemId, editVoxel || "A1", delta);
+          if (delta !== 0) optimisticUpdate(itemId, editVoxel || "A1", delta);
         }}
         gameMode={gameMode}
-        VOXELS={VOXELS}
       />
     </div>
   );
