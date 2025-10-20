@@ -21,8 +21,7 @@ function getCrewEnvVar(slug: string, baseName: string) {
   const key = `${baseName}_${suffix}`;
   const value = process.env[key];
   if (!value) {
-    console.warn(`Env var ${key} not found for crew ${slug}. Falling back to global ${baseName}`);
-    return process.env[baseName] || null;
+    throw new Error(`Env var ${key} not found for crew ${slug}. Set it in Vercel env variables.`);
   }
   return value;
 }
@@ -53,10 +52,14 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 1000): 
 }
 
 export async function syncCrewWbStocks(slug: string) {
-  const WB_TOKEN = getCrewEnvVar(slug, "WB_API_TOKEN");
-  let WB_WAREHOUSE_ID = getCrewEnvVar(slug, "WB_WAREHOUSE_ID");
-
-  if (!WB_TOKEN) return { success: false, error: "WB credentials missing for this crew" };
+  let WB_TOKEN;
+  let WB_WAREHOUSE_ID;
+  try {
+    WB_TOKEN = getCrewEnvVar(slug, "WB_API_TOKEN");
+    WB_WAREHOUSE_ID = getCrewEnvVar(slug, "WB_WAREHOUSE_ID");
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 
   const items = await getCrewItems(slug);
   if (items.length === 0) return { success: false, error: "No items for this crew" };
@@ -73,14 +76,6 @@ export async function syncCrewWbStocks(slug: string) {
     .filter(Boolean) as { sku: string; amount: number; warehouseId: string }[];
 
   if (stocks.length === 0) return { success: false, error: "No syncable items (check wb_sku setup)" };
-
-  if (!WB_WAREHOUSE_ID) {
-    const whCounts = stocks.reduce((acc, s) => {
-      acc[s.warehouseId] = (acc[s.warehouseId] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    WB_WAREHOUSE_ID = Object.keys(whCounts).sort((a, b) => whCounts[b] - whCounts[a])[0];
-  }
 
   const url = `https://marketplace-api.wildberries.ru/api/v3/stocks/${WB_WAREHOUSE_ID}`;
   console.info("syncCrewWbStocks -> PUT", { url, count: stocks.length, sample: stocks[0] });
@@ -106,11 +101,16 @@ export async function syncCrewWbStocks(slug: string) {
 }
 
 export async function syncCrewOzonStocks(slug: string) {
-  const OZON_CLIENT_ID = getCrewEnvVar(slug, "OZON_CLIENT_ID");
-  const OZON_API_KEY = getCrewEnvVar(slug, "OZON_API_KEY");
-  let OZON_WAREHOUSE_ID = getCrewEnvVar(slug, "OZON_WAREHOUSE_ID");
-
-  if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, error: "Ozon credentials missing for this crew" };
+  let OZON_CLIENT_ID;
+  let OZON_API_KEY;
+  let OZON_WAREHOUSE_ID;
+  try {
+    OZON_CLIENT_ID = getCrewEnvVar(slug, "OZON_CLIENT_ID");
+    OZON_API_KEY = getCrewEnvVar(slug, "OZON_API_KEY");
+    OZON_WAREHOUSE_ID = getCrewEnvVar(slug, "OZON_WAREHOUSE_ID");
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 
   const items = await getCrewItems(slug);
   if (items.length === 0) return { success: false, error: "No items for this crew" };
@@ -152,9 +152,12 @@ export async function syncCrewOzonStocks(slug: string) {
 }
 
 export async function syncCrewYmStocks(slug: string, campaignId?: string) {
-  const YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
-
-  if (!YM_API_TOKEN) return { success: false, error: "YM credentials missing for this crew" };
+  let YM_API_TOKEN;
+  try {
+    YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 
   const items = await getCrewItems(slug);
   if (items.length === 0) return { success: false, error: "No items for this crew" };
@@ -206,8 +209,12 @@ export async function syncCrewYmStocks(slug: string, campaignId?: string) {
 }
 
 export async function getCrewYmCampaigns(slug: string) {
-  const YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
-  if (!YM_API_TOKEN) return { success: false, error: "YM credentials missing" };
+  let YM_API_TOKEN;
+  try {
+    YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 
   try {
     const res = await fetch("https://api.partner.market.yandex.ru/v2/campaigns", {
@@ -224,10 +231,14 @@ export async function getCrewYmCampaigns(slug: string) {
 }
 
 export async function checkCrewYmToken(slug: string, campaignId?: string) {
-  const YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
-  const YM_WAREHOUSE_ID = campaignId || getCrewEnvVar(slug, "YM_WAREHOUSE_ID");
-
-  if (!YM_API_TOKEN) return { error: "missing_token", message: "YM_API_TOKEN not set", listStatus: 0, campStatus: 0, listText: "", campText: "" };
+  let YM_API_TOKEN;
+  let YM_WAREHOUSE_ID;
+  try {
+    YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
+    YM_WAREHOUSE_ID = campaignId || getCrewEnvVar(slug, "YM_WAREHOUSE_ID");
+  } catch (err: any) {
+    return { error: "missing_credential", message: err.message, listStatus: 0, campStatus: 0, listText: "", campText: "" };
+  }
 
   let listStatus = 0;
   let listText = "";
@@ -261,8 +272,12 @@ export async function checkCrewYmToken(slug: string, campaignId?: string) {
 }
 
 export async function fetchCrewWbPendingCount(slug: string) {
-  const WB_TOKEN = getCrewEnvVar(slug, "WB_API_TOKEN");
-  if (!WB_TOKEN) return { success: false, count: 0, error: "WB credentials missing" };
+  let WB_TOKEN;
+  try {
+    WB_TOKEN = getCrewEnvVar(slug, "WB_API_TOKEN");
+  } catch (err: any) {
+    return { success: false, count: 0, error: err.message };
+  }
 
   try {
     const url = 'https://marketplace-api.wildberries.ru/api/v4/fbs/posting/list';
@@ -288,9 +303,14 @@ export async function fetchCrewWbPendingCount(slug: string) {
 }
 
 export async function fetchCrewOzonPendingCount(slug: string) {
-  const OZON_CLIENT_ID = getCrewEnvVar(slug, "OZON_CLIENT_ID");
-  const OZON_API_KEY = getCrewEnvVar(slug, "OZON_API_KEY");
-  if (!OZON_CLIENT_ID || !OZON_API_KEY) return { success: false, count: 0, error: "Ozon credentials missing" };
+  let OZON_CLIENT_ID;
+  let OZON_API_KEY;
+  try {
+    OZON_CLIENT_ID = getCrewEnvVar(slug, "OZON_CLIENT_ID");
+    OZON_API_KEY = getCrewEnvVar(slug, "OZON_API_KEY");
+  } catch (err: any) {
+    return { success: false, count: 0, error: err.message };
+  }
 
   try {
     const url = 'https://api-seller.ozon.ru/v3/posting/fbs/list';
@@ -318,8 +338,12 @@ export async function fetchCrewOzonPendingCount(slug: string) {
 }
 
 export async function setCrewWbBarcodes(slug: string) {
-  const WB_TOKEN = getCrewEnvVar(slug, "WB_API_TOKEN");
-  if (!WB_TOKEN) return { success: false, error: "WB credentials missing" };
+  let WB_TOKEN;
+  try {
+    WB_TOKEN = getCrewEnvVar(slug, "WB_API_TOKEN");
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 
   const itemsRes = await getCrewWarehouseItems(slug);
   if (!itemsRes.success || !itemsRes.data) return { success: false, error: "Failed to get crew items" };
@@ -371,11 +395,18 @@ export async function setCrewYmSku(slug: string) {
   const itemsRes = await getCrewWarehouseItems(slug);
   if (!itemsRes.success || !itemsRes.data) return { success: false, error: "Failed to get crew items" };
 
+  let YM_WAREHOUSE_ID;
+  try {
+    YM_WAREHOUSE_ID = getCrewEnvVar(slug, "YM_WAREHOUSE_ID") || "7252771";
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+
   const updates = itemsRes.data
     .filter(i => !i.specs?.ym_sku)
     .map(i => ({
       id: i.id,
-      specs: { ...i.specs, ym_sku: i.id, ym_warehouse_id: getCrewEnvVar(slug, "YM_WAREHOUSE_ID") || "7252771" },
+      specs: { ...i.specs, ym_sku: i.id, ym_warehouse_id: YM_WAREHOUSE_ID },
     }));
 
   if (updates.length === 0) return { success: true, updated: 0 };
