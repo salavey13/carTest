@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
 
-const getSizePriority = (size: string | null): number => {
+export const getSizePriority = (size: string | null): number => {
   if (!size) return 999;
   const sizeOrder: Record<string, number> = {
     "1.5": 1,
@@ -146,17 +146,15 @@ export function useCrewWarehouse(slug: string) {
       if (workflowItems.length > 20 && bossMode && !newAch.includes("Быстрая катка")) newAch.push("Быстрая катка");
       if (workflowItems.length > 0 && errorCount === 0 && !newAch.includes("Безошибочная приемка")) newAch.push("Безошибочная приемка");
       
-      // Новое: warehouse-specific
       if (sessionDuration > 3600 && errorCount === 0 && !newAch.includes("Error-Free Shift")) newAch.push("Error-Free Shift (+25 XTR)");
       if (dailyStreak >= 7 && !newAch.includes("Daily Hustle")) newAch.push("Daily Hustle (+100 XTR)");
       if (efficiency >= 50 && !newAch.includes("Efficiency Expert")) newAch.push("Efficiency Expert (+75 XTR)");
       if (offloadCount >= 200 && !newAch.includes("Warehouse Warrior")) newAch.push("Warehouse Warrior (+200 XTR)");
       
-      // XTR mock: log for future API
-      const xtrEarned = newAch.filter(a => a.includes("XTR")).length * 50; // пример
+      const xtrEarned = newAch.filter(a => a.includes("XTR")).length * 50;
       if (xtrEarned > 0) toast.success(`Заработано ${xtrEarned} XTR!`, { icon: "⭐" });
       
-      return newAch.slice(-8); // max 8 visible
+      return newAch.slice(-8);
     });
   }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration]);
 
@@ -422,5 +420,6 @@ export function useCrewWarehouse(slug: string) {
     avgTimePerItem,
     dailyGoals,
     sessionDuration,
+    getSizePriority, // Export the function
   };
 }
