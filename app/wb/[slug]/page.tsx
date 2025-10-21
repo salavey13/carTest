@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Save, RotateCcw, Download, FileUp, PackageSearch } from "lucide-react";
-import { useCrewWarehous, getSizePriority } from "./warehouseHooks";
+import { useCrewWarehouse, getSizePriority } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
