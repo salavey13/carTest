@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Save, RotateCcw, Download, FileUp, PackageSearch } from "lucide-react";
-import { useCrewWarehouse, getSizePriority } from "./warehouseHooks";
+import { useCrewWarehouse } from "./warehouseHooks"; // Removed getSizePriority import
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
@@ -18,7 +18,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { notifyCrewOwner } from "./actions_notify";
 import { exportCrewCurrentStock, exportDailyEntryForShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
-import { getCrewMemberStatus } from "./actions_shifts";
+import { getCrewMemberStatus, getActiveShiftForCrewMember } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 
 export default function CrewWarehousePage() {
@@ -80,6 +80,7 @@ export default function CrewWarehousePage() {
     avgTimePerItem,
     dailyGoals,
     sessionDuration,
+    getSizePriority, // Access from warehouse hook
   } = warehouse;
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
@@ -106,7 +107,7 @@ export default function CrewWarehousePage() {
   const uniqueSeasons = useMemo(() => [...new Set(localItems.map(i => i.season).filter(Boolean))].sort(), [localItems]);
   const uniquePatterns = useMemo(() => [...new Set(localItems.map(i => i.pattern).filter(Boolean))].sort(), [localItems]);
   const uniqueColors = useMemo(() => [...new Set(localItems.map(i => i.color).filter(Boolean))].sort(), [localItems]);
-  const uniqueSizes = useMemo(() => [...new Set(localItems.map(i => i.size).filter(Boolean))].sort((a,b) => getSizePriority(a) - getSizePriority(b)), [localItems]);
+  const uniqueSizes = useMemo(() => [...new Set(localItems.map(i => i.size).filter(Boolean))].sort((a, b) => getSizePriority(a) - getSizePriority(b)), [localItems, getSizePriority]);
 
   useEffect(() => setLocalItems(hookItems || []), [hookItems]);
 
@@ -166,6 +167,7 @@ export default function CrewWarehousePage() {
   const handleCheckpoint = async () => {
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
+    setCheckpointStart(Date.now());
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
@@ -181,6 +183,7 @@ export default function CrewWarehousePage() {
   const handleReset = async () => {
     if (!checkpoint.length) return toast.error("No checkpoint");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
+    setCheckpointStart(null);
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
@@ -399,9 +402,9 @@ export default function CrewWarehousePage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
       <header className="p-3 bg-white dark:bg-gray-800 shadow">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
-            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded object-cover" />}
+            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-8 h-8 rounded object-cover" />}
             <div>
               <h1 className="text-lg font-medium leading-tight">{crew?.name || "Crew"}</h1>
               <div className="text-xs text-gray-500">
@@ -418,7 +421,7 @@ export default function CrewWarehousePage() {
                 size="sm"
                 variant={gameMode === "onload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")}
-                className="px-2 py-1 text-xs"
+                className="px-2 py-1 text-xs sm:text-sm"
                 title="Onload (add items)"
                 disabled={!canManage}
               >
@@ -428,7 +431,7 @@ export default function CrewWarehousePage() {
                 size="sm"
                 variant={gameMode === "offload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")}
-                className="px-2 py-1 text-xs"
+                className="px-2 py-1 text-xs sm:text-sm"
                 title="Offload (remove items)"
                 disabled={!canManage}
               >
@@ -436,35 +439,73 @@ export default function CrewWarehousePage() {
               </Button>
             </div>
 
-            <div className="flex gap-1 items-center ml-0 flex-wrap">
-              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift || !canManage}>
-                <Save className="w-3 h-3" />
+            <div className="flex gap-1 items-center flex-wrap">
+              <Button
+                onClick={handleCheckpoint}
+                size="sm"
+                variant="outline"
+                className="w-8 h-8 p-1"
+                title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"}
+                disabled={!activeShift || !canManage}
+              >
+                <Save className="w-4 h-4" />
               </Button>
 
-              <Button onClick={handleReset} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift || !canManage}>
-                <RotateCcw className="w-3 h-3" />
+              <Button
+                onClick={handleReset}
+                size="sm"
+                variant="outline"
+                className="w-8 h-8 p-1"
+                title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"}
+                disabled={!activeShift || !canManage}
+              >
+                <RotateCcw className="w-4 h-4" />
               </Button>
 
-              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 ml-1 text-xs">
+              <Button
+                onClick={handleExportDaily}
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs sm:text-sm"
+              >
                 Export daily
               </Button>
 
-              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock" disabled={!canManage}>
-                <FileUp className="w-3 h-3" />
+              <Button
+                onClick={() => handleExportStock(false)}
+                size="sm"
+                variant="outline"
+                className="w-8 h-8 p-1"
+                title="Export stock"
+                disabled={!canManage}
+              >
+                <FileUp className="w-4 h-4" />
               </Button>
 
-              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 ml-2 text-xs" disabled={!canManage}>
+              <Button
+                onClick={handleSendCar}
+                size="sm"
+                variant="secondary"
+                className="h-8 text-xs sm:text-sm"
+                disabled={!canManage}
+              >
                 Send car
               </Button>
 
-              <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8 text-xs" disabled={checkingPending}>
+              <Button
+                onClick={handleCheckPending}
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs sm:text-sm"
+                disabled={checkingPending}
+              >
                 {checkingPending ? "Checking..." : "Check pending"}
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 max-w-7xl mx-auto">
           <FilterAccordion
             filterSeason={filterSeason}
             setFilterSeason={setFilterSeason}
@@ -491,18 +532,25 @@ export default function CrewWarehousePage() {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4">
+      <main className="flex-1 overflow-y-auto p-4 max-w-7xl mx-auto">
         <Card className="mb-4">
           <CardHeader>
             <CardTitle>Inventory</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
               {hookFilteredItems.map((item) => (
-                <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
+                <WarehouseItemCard
+                  key={item.id}
+                  item={item}
+                  onClick={() => handleItemClick(item)}
+                  className="w-full aspect-square"
+                />
               ))}
             </div>
-            {hookFilteredItems.length === 0 && <div className="text-center py-8 text-gray-500">No items found</div>}
+            {hookFilteredItems.length === 0 && (
+              <div className="text-center py-8 text-gray-500">No items found</div>
+            )}
           </CardContent>
         </Card>
 
@@ -512,6 +560,7 @@ export default function CrewWarehousePage() {
           onSelectVoxel={setSelectedVoxel}
           onPlateClick={handlePlateClick}
           gameMode={gameMode}
+          className="w-full max-w-full"
         />
 
         <div className="mt-4">
