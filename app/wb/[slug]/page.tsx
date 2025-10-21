@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,17 +8,17 @@ import { toast } from "sonner";
 import { Save, RotateCcw, Download, FileUp, PackageSearch } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
-import WarehouseViz from "@/components/WarehouseViz";
+import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
 import WarehouseStats from "@/components/WarehouseStats";
 import ShiftControls from "@/components/ShiftControls";
-import CrewWarehouseSyncButtons from "@/components/CrewWarehouseSyncButtons";
+import { CrewWarehouseSyncButtons } from "@/components/CrewWarehouseSyncButtons";
 import FilterAccordion from "@/components/FilterAccordion";
 import { useAppContext } from "@/contexts/AppContext";
 import { notifyCrewOwner } from "./actions_notify";
 import { exportCrewCurrentStock, exportDailyEntryForShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
-import { getCrewMemberStatus, startWarehouseShift, endWarehouseShift } from "./actions_shifts";
+import { getCrewMemberStatus } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 
 export default function CrewWarehousePage() {
