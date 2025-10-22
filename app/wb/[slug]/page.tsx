@@ -16,7 +16,7 @@ import { CrewWarehouseSyncButtons } from "@/components/CrewWarehouseSyncButtons"
 import FilterAccordion from "@/components/FilterAccordion";
 import { useAppContext } from "@/contexts/AppContext";
 import { notifyCrewOwner } from "./actions_notify";
-import { exportCrewCurrentStock, exportDailyEntryForShift } from "./actions_csv";
+import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv"; // Updated import
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
 import { getCrewMemberStatus, getActiveShiftForCrewMember } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
@@ -278,7 +278,7 @@ export default function CrewWarehousePage() {
 
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
       if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70h70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
     }
 
     return 'other';
@@ -327,17 +327,49 @@ export default function CrewWarehousePage() {
     setLastProcessedSalary(stats.salary);
   }, [computeProcessedStats]);
 
+  // Define handlePlateClickCustom to open edit modal in "none" game mode
+  const handlePlateClickCustom = useCallback((voxelId: string) => {
+    if (gameMode) {
+      // In game mode, use the default handlePlateClick from the hook
+      handlePlateClick(voxelId);
+      return;
+    }
+    // In "none" mode, open the edit modal
+    setEditVoxel(voxelId);
+    const contents = localItems
+      .flatMap((i) => {
+        const locs = Array.isArray(i?.locations) ? i.locations : [];
+        return locs
+          .filter((l: any) => l.voxel === voxelId && l.quantity > 0)
+          .map((l: any) => ({ item: i, quantity: l.quantity, newQuantity: l.quantity }));
+      });
+    setEditContents(contents);
+    setEditDialogOpen(true);
+    toast.info(`Открыта ячейка ${voxelId} для редактирования`);
+  }, [gameMode, handlePlateClick, localItems]);
+
+  // Define handleItemClickCustom to open edit modal in "none" game mode
+  const handleItemClickCustom = useCallback((item: any) => {
+    if (gameMode) {
+      // In game mode, use the default handleItemClick from the hook
+      handleItemClick(item);
+      return;
+    }
+    // In "none" mode, open the edit modal with the item's primary location
+    const voxelId = selectedVoxel || item.locations?.[0]?.voxel || "A1";
+    setEditVoxel(voxelId);
+    const loc = item.locations?.find((l: any) => l.voxel === voxelId);
+    const contents = loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : [];
+    setEditContents(contents);
+    setEditDialogOpen(true);
+    toast.info(`Открыт товар ${item.name} для редактирования в ячейке ${voxelId}`);
+  }, [gameMode, handleItemClick, selectedVoxel]);
+
   const handleExportDaily = async () => {
     if (!activeShift) return toast.error("Для экспорта необходима активная смена");
     setExportingDaily(true);
     try {
-      const freshStats = computeProcessedStats();
-      const sumsPrev = freshStats.sumsPrevious || {};
-      const sumsCurr = freshStats.sumsCurrent || {};
-      const store = dbUser?.store || "main";
-      const gameModeLocal = gameMode || "default";
-
-      const res = await exportDailyEntryForShift(slug, { isTelegram: false });
+      const res = await exportCrewDailyShift(slug, false); // Use exportCrewDailyShift with special notification
 
       if (res?.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
@@ -347,13 +379,14 @@ export default function CrewWarehousePage() {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `daily_offload_${slug}.tsv`;
+          a.download = `daily_shift_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
           toast.success("Ежедневный TSV скачан");
         }
 
-        await notifyCrewOwner(slug, `Ежедневный экспорт от @${dbUser?.username || "user"}\n${res.csv}`, dbUser?.user_id);
+        // Notification already sent by exportCrewDailyShift
+        toast.success("Отчет отправлен владельцу экипажа");
       } else {
         toast.error(res?.error || "Ошибка экспорта");
       }
