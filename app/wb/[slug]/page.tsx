@@ -22,6 +22,7 @@ import { getCrewMemberStatus, getActiveShiftForCrewMember } from "./actions_shif
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabaseAdmin } from "@/hooks/supabase";
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
@@ -453,21 +454,21 @@ export default function CrewWarehousePage() {
           <div className="flex items-center gap-2">
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
             <div>
-              <h1 className="text-base font-medium leading-tight">{crew?.name || "Экипаж"}</h1>
+              <h1 className="text-sm font-medium leading-tight">{crew?.name || "Экипаж"}</h1>
               <div className="text-xs text-gray-500">
                 Смена: {activeShift ? (activeShift.shift_type || "склад") : "нет"} · Статус: {liveStatus || (activeShift ? "активен" : "оффлайн")}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-1 overflow-x-auto md:overflow-visible">
             <ShiftControls slug={slug!} />
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 whitespace-nowrap">
               <Button
                 size="sm"
                 variant={gameMode === "onload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")}
-                className="px-2 py-1 text-xs h-7"
+                className="px-2 py-1 text-xs h-6 min-w-[60px]"
                 title="Загрузка (добавить товары)"
                 disabled={!canManage}
               >
@@ -477,30 +478,54 @@ export default function CrewWarehousePage() {
                 size="sm"
                 variant={gameMode === "offload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")}
-                className="px-2 py-1 text-xs h-7"
+                className="px-2 py-1 text-xs h-6 min-w-[60px]"
                 title="Выгрузка (убрать товары)"
                 disabled={!canManage}
               >
                 −Выгрузка
               </Button>
-            </div>
-
-            <div className="flex gap-1 items-center flex-wrap">
-              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Сохранить чекпоинт" : "Начните смену для чекпоинта"} disabled={!activeShift || !canManage}>
+              <Button
+                onClick={handleCheckpoint}
+                size="sm"
+                variant="outline"
+                className="w-6 h-6 p-1"
+                title={activeShift ? "Сохранить чекпоинт" : "Начните смену для чекпоинта"}
+                disabled={!activeShift || !canManage}
+              >
                 <Save className="w-3 h-3" />
               </Button>
-              <Button onClick={handleReset} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Сброс до чекпоинта" : "Начните смену для сброса"} disabled={!activeShift || !canManage}>
+              <Button
+                onClick={handleReset}
+                size="sm"
+                variant="outline"
+                className="w-6 h-6 p-1"
+                title={activeShift ? "Сброс до чекпоинта" : "Начните смену для сброса"}
+                disabled={!activeShift || !canManage}
+              >
                 <RotateCcw className="w-3 h-3" />
               </Button>
-              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-7 text-xs" disabled={exportingDaily}>
+              <Button
+                onClick={handleExportDaily}
+                size="sm"
+                variant="ghost"
+                className="h-6 text-xs min-w-[70px]"
+                disabled={exportingDaily}
+              >
                 {exportingDaily ? <Loading text="Экспорт..." variant="generic" className="inline w-4 h-4" /> : "Экспорт дня"}
               </Button>
-              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-7 h-7 p-1" title="Экспорт склада" disabled={!canManage}>
+              <Button
+                onClick={() => handleExportStock(false)}
+                size="sm"
+                variant="outline"
+                className="w-6 h-6 p-1"
+                title="Экспорт склада"
+                disabled={!canManage}
+              >
                 <FileUp className="w-3 h-3" />
               </Button>
               <div className="flex items-center gap-1">
                 <Select value={carSize} onValueChange={setCarSize}>
-                  <SelectTrigger className="h-7 text-xs w-24">
+                  <SelectTrigger className="h-6 text-xs w-20">
                     <SelectValue placeholder="Тип машины" />
                   </SelectTrigger>
                   <SelectContent>
@@ -509,12 +534,24 @@ export default function CrewWarehousePage() {
                     <SelectItem value="large">Большая</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-7 text-xs" disabled={sendingCar || !canManage}>
+                <Button
+                  onClick={handleSendCar}
+                  size="sm"
+                  variant="secondary"
+                  className="h-6 text-xs min-w-[60px]"
+                  disabled={sendingCar || !canManage}
+                >
                   {sendingCar ? <Loading text="Отправка..." variant="generic" className="inline w-4 h-4" /> : <><Car className="w-3 h-3 mr-1" /> Машина</>}
                 </Button>
               </div>
-              <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-7 text-xs" disabled={checkingPending}>
-                {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить ожидающие"}
+              <Button
+                onClick={handleCheckPending}
+                size="sm"
+                variant="ghost"
+                className="h-6 text-xs min-w-[70px]"
+                disabled={checkingPending}
+              >
+                {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить"}
               </Button>
             </div>
           </div>
@@ -530,7 +567,7 @@ export default function CrewWarehousePage() {
             <div className="overflow-y-auto max-h-[60vh] simple-scrollbar">
               <div className="grid grid-cols-4 gap-2 sm:gap-3">
                 {hookFilteredItems.map((item) => (
-                  <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
+                  <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClickCustom(item)} />
                 ))}
               </div>
             </div>
@@ -568,7 +605,7 @@ export default function CrewWarehousePage() {
           items={localItems}
           selectedVoxel={selectedVoxel}
           onSelectVoxel={setSelectedVoxel}
-          onPlateClick={handlePlateClick}
+          onPlateClick={handlePlateClickCustom}
           gameMode={gameMode}
         />
 
