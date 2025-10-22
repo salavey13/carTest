@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Save, RotateCcw, Download, FileUp, PackageSearch } from "lucide-react";
-import { useCrewWarehouse } from "./warehouseHooks"; // Removed getSizePriority import
+import { Save, RotateCcw, FileUp, PackageSearch, Car } from "lucide-react";
+import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import { WarehouseViz } from "@/components/WarehouseViz";
 import WarehouseModals from "@/components/WarehouseModals";
@@ -20,6 +20,8 @@ import { exportCrewCurrentStock, exportDailyEntryForShift } from "./actions_csv"
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
 import { getCrewMemberStatus, getActiveShiftForCrewMember } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
+import { Loading } from "@/components/Loading";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
@@ -80,7 +82,7 @@ export default function CrewWarehousePage() {
     avgTimePerItem,
     dailyGoals,
     sessionDuration,
-    getSizePriority, // Access from warehouse hook
+    getSizePriority,
   } = warehouse;
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
@@ -102,7 +104,10 @@ export default function CrewWarehousePage() {
   const [lastProcessedOffloadUnits, setLastProcessedOffloadUnits] = useState<number | null>(null);
   const [lastProcessedSalary, setLastProcessedSalary] = useState<number | null>(null);
   const [checkingPending, setCheckingPending] = useState(false);
+  const [exportingDaily, setExportingDaily] = useState(false);
+  const [sendingCar, setSendingCar] = useState(false);
   const [targetOffload, setTargetOffload] = useState(0);
+  const [carSize, setCarSize] = useState<"small" | "medium" | "large">("medium");
 
   const uniqueSeasons = useMemo(() => [...new Set(localItems.map(i => i.season).filter(Boolean))].sort(), [localItems]);
   const uniquePatterns = useMemo(() => [...new Set(localItems.map(i => i.pattern).filter(Boolean))].sort(), [localItems]);
@@ -116,12 +121,36 @@ export default function CrewWarehousePage() {
     return () => clearInterval(iv);
   }, []);
 
+  // Load crew data to ensure name displays
+  useEffect(() => {
+    const fetchCrew = async () => {
+      if (!slug) return;
+      const { data, error } = await supabaseAdmin
+        .from("crews")
+        .select("id, name, slug, owner_id, logo_url")
+        .eq("slug", slug)
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        toast.error("Ошибка загрузки данных экипажа");
+        return;
+      }
+      setCrew(data || null);
+      setIsOwner(data?.owner_id === dbUser?.user_id);
+    };
+    fetchCrew();
+  }, [slug, dbUser?.user_id]);
+
   const loadStatus = async () => {
     if (!slug || !dbUser?.user_id) return;
-    const statusRes = await getCrewMemberStatus(slug, dbUser.user_id);
-    if (statusRes.success) setLiveStatus(statusRes.live_status || null);
-    const shiftRes = await getActiveShiftForCrewMember(slug, dbUser.user_id);
-    setActiveShift(shiftRes.shift || null);
+    try {
+      const statusRes = await getCrewMemberStatus(slug, dbUser.user_id);
+      if (statusRes.success) setLiveStatus(statusRes.live_status || null);
+      const shiftRes = await getActiveShiftForCrewMember(slug, dbUser.user_id);
+      setActiveShift(shiftRes.shift || null);
+    } catch {
+      toast.error("Ошибка загрузки статуса");
+    }
   };
 
   useEffect(() => {
@@ -160,7 +189,7 @@ export default function CrewWarehousePage() {
 
     handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => {
       loadItems();
-      toast.error("Server update failed - reloaded");
+      toast.error("Ошибка обновления на сервере - перезагружено");
     });
   };
 
@@ -171,31 +200,31 @@ export default function CrewWarehousePage() {
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Checkpoint saved locally");
+    toast.success("Чекпоинт сохранён локально");
 
     if (dbUser?.user_id) {
       const res = await saveCrewCheckpoint(slug, dbUser.user_id, snapshot);
-      if (res.success) toast.success("Checkpoint saved to server");
-      else toast.error("Server checkpoint save failed");
+      if (res.success) toast.success("Чекпоинт сохранён на сервере");
+      else toast.error("Ошибка сохранения чекпоинта на сервере");
     }
   };
 
   const handleReset = async () => {
-    if (!checkpoint.length) return toast.error("No checkpoint");
+    if (!checkpoint.length) return toast.error("Нет чекпоинта");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Reset to checkpoint (local)");
+    toast.success("Сброс до чекпоинта (локально)");
 
     if (dbUser?.user_id) {
       const res = await resetCrewCheckpoint(slug, dbUser.user_id);
       if (res.success) {
-        toast.success(`Server reset applied (${res.applied} items)`);
+        toast.success(`Сброс на сервере применён (${res.applied} позиций)`);
         loadItems();
       } else {
-        toast.error("Server reset failed");
+        toast.error("Ошибка сброса на сервере");
       }
     }
   };
@@ -255,10 +284,11 @@ export default function CrewWarehousePage() {
   };
 
   const computeProcessedStats = useCallback(() => {
-    if (!checkpoint.length) return { changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0, sumsPrevious: {}, sumsCurrent: {} };
+    if (!checkpoint.length) return { changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: offloadCount || 0, salary: (offloadCount || 0) * 50, sumsPrevious: {}, sumsCurrent: {} };
     let changedCount = 0;
     let totalDelta = 0;
     let offloadUnits = offloadCount || 0;
+    let stars = Math.floor(offloadUnits / 10); // Award 1 star per 10 offloaded units
 
     let sumsPrevious: Record<string, number> = {};
     let sumsCurrent: Record<string, number> = {};
@@ -282,7 +312,6 @@ export default function CrewWarehousePage() {
       totalDelta += absDelta;
     });
 
-    const stars = 0;
     const salary = offloadUnits * 50;
     return { changedCount, totalDelta, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
   }, [localItems, checkpoint, offloadCount]);
@@ -290,45 +319,61 @@ export default function CrewWarehousePage() {
   useEffect(() => {
     const stats = computeProcessedStats();
     setStatsObj(stats);
+    setLastProcessedCount(stats.changedCount);
+    setLastProcessedTotalDelta(stats.totalDelta);
+    setLastProcessedStars(stats.stars);
+    setLastProcessedOffloadUnits(stats.offloadUnits);
+    setLastProcessedSalary(stats.salary);
   }, [computeProcessedStats]);
 
   const handleExportDaily = async () => {
-    const freshStats = computeProcessedStats();
-    const sumsPrev = freshStats.sumsPrevious || {};
-    const sumsCurr = freshStats.sumsCurrent || {};
-    const store = dbUser?.store || "main";
-    const gameModeLocal = gameMode || "default";
+    if (!activeShift) return toast.error("Для экспорта необходима активная смена");
+    setExportingDaily(true);
+    try {
+      const freshStats = computeProcessedStats();
+      const sumsPrev = freshStats.sumsPrevious || {};
+      const sumsCurr = freshStats.sumsCurrent || {};
+      const store = dbUser?.store || "main";
+      const gameModeLocal = gameMode || "default";
 
-    const res = await exportDailyEntryForShift(slug, { isTelegram: false });
+      const res = await exportDailyEntryForShift(slug, { isTelegram: false });
 
-    if (res?.success && res.csv) {
-      const copied = await safeCopyToClipboard(res.csv);
-      if (copied) toast.success("Daily TSV copied");
-      else {
-        const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `daily_offload_${slug}.tsv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Daily TSV downloaded");
+      if (res?.success && res.csv) {
+        const copied = await safeCopyToClipboard(res.csv);
+        if (copied) toast.success("Ежедневный TSV скопирован");
+        else {
+          const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `daily_offload_${slug}.tsv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success("Ежедневный TSV скачан");
+        }
+
+        await notifyCrewOwner(slug, `Ежедневный экспорт от @${dbUser?.username || "user"}\n${res.csv}`, dbUser?.user_id);
+      } else {
+        toast.error(res?.error || "Ошибка экспорта");
       }
-
-      await notifyCrewOwner(slug, `Daily export by @${dbUser?.username || "user"}\n${res.csv}`, dbUser?.user_id);
-    } else {
-      toast.error(res?.error || "Export failed");
+    } catch (err) {
+      toast.error("Ошибка экспорта: " + (err?.message || "Неизвестная ошибка"));
+    } finally {
+      setExportingDaily(false);
     }
   };
 
   const handleSendCar = async () => {
-    if (!canManage) return toast.error("Only owner/member/admin can request car");
+    if (!canManage) return toast.error("Только владелец/участник/админ может запросить машину");
+    setSendingCar(true);
     try {
-      const msg = `Car request: crew=${slug} by ${dbUser?.user_id || "unknown"} — please check on portal.`;
+      const msg = `Запрос машины: экипаж=${slug}, тип=${carSize}, от ${dbUser?.user_id || "unknown"} — проверьте на t.me/oneSitePlsBot/sklad`;
       await notifyCrewOwner(slug, msg, dbUser?.user_id);
-      toast.success("Car request sent to owner");
+      toast.success("Запрос машины отправлен владельцу");
     } catch (err) {
-      toast.error("Send car failed");
+      toast.error("Ошибка отправки запроса машины");
+    } finally {
+      setSendingCar(false);
     }
   };
 
@@ -341,31 +386,35 @@ export default function CrewWarehousePage() {
       const ozonCount = ozonRes.success ? ozonRes.count : 0;
       const total = wbCount + ozonCount;
       setTargetOffload(total);
-      toast.success(`Pending offloads: WB ${wbCount}, Ozon ${ozonCount}. Target: ${total}`);
+      toast.success(`Ожидающие выгрузки: WB ${wbCount}, Ozon ${ozonCount}. Итого: ${total}`);
     } catch (err: any) {
-      toast.error("Pending check failed: " + (err?.message || 'Unknown'));
+      toast.error("Ошибка проверки ожидающих: " + (err?.message || 'Неизвестная'));
     } finally {
       setCheckingPending(false);
     }
   };
 
   const handleExportStock = async (summarized = false) => {
-    const res = await exportCrewCurrentStock(slug, localItems, summarized);
-    if (res.success && res.csv) {
-      const copied = await safeCopyToClipboard(res.csv);
-      if (copied) toast.success("Stock copied to clipboard");
-      else {
-        const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Stock exported successfully");
+    try {
+      const res = await exportCrewCurrentStock(slug, localItems, summarized);
+      if (res.success && res.csv) {
+        const copied = await safeCopyToClipboard(res.csv);
+        if (copied) toast.success("Склад скопирован в буфер обмена");
+        else {
+          const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success("Склад успешно экспортирован");
+        }
+      } else {
+        toast.error(res.error || "Ошибка экспорта");
       }
-    } else {
-      toast.error(res.error || "Export failed");
+    } catch (err) {
+      toast.error("Ошибка экспорта склада");
     }
   };
 
@@ -394,80 +443,102 @@ export default function CrewWarehousePage() {
   const processedOffloadUnits = checkpointStart ? statsObj.offloadUnits : (lastProcessedOffloadUnits ?? 0);
   const processedSalary = checkpointStart ? statsObj.salary : (lastProcessedSalary ?? 0);
 
-  const filteredItems = hookFilteredItems;
-
-  if (loading) return <div className="p-4">Loading crew warehouse...</div>;
-  if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+  if (loading) return <Loading text="Загрузка склада..." />;
+  if (error) return <div className="p-2 text-red-500">Ошибка: {error}</div>;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
-      <header className="p-3 bg-white dark:bg-gray-800 shadow">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-          <div className="flex items-center gap-3">
-            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-7 h-7 rounded object-cover" />}
+      <header className="p-2 bg-white dark:bg-gray-800 shadow">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+          <div className="flex items-center gap-2">
+            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
             <div>
-              <h1 className="text-lg font-medium leading-tight">{crew?.name || "Crew"}</h1>
+              <h1 className="text-base font-medium leading-tight">{crew?.name || "Экипаж"}</h1>
               <div className="text-xs text-gray-500">
-                Shift: {activeShift ? (activeShift.shift_type || "warehouse") : "none"} · Status: {liveStatus || (activeShift ? "active" : "offline")}
+                Смена: {activeShift ? (activeShift.shift_type || "склад") : "нет"} · Статус: {liveStatus || (activeShift ? "активен" : "оффлайн")}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 flex-wrap">
             <ShiftControls slug={slug!} />
-
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
                 variant={gameMode === "onload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")}
-                className="px-2 py-1 text-xs"
-                title="Onload (add items)"
+                className="px-2 py-1 text-xs h-7"
+                title="Загрузка (добавить товары)"
                 disabled={!canManage}
               >
-                +Load
+                +Загрузка
               </Button>
               <Button
                 size="sm"
                 variant={gameMode === "offload" ? "default" : "outline"}
                 onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")}
-                className="px-2 py-1 text-xs"
-                title="Offload (remove items)"
+                className="px-2 py-1 text-xs h-7"
+                title="Выгрузка (убрать товары)"
                 disabled={!canManage}
               >
-                −Unload
+                −Выгрузка
               </Button>
             </div>
 
-            <div className="flex gap-1 items-center ml-0 flex-wrap">
-              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Save checkpoint" : "Start shift to enable checkpoint"} disabled={!activeShift || !canManage}>
+            <div className="flex gap-1 items-center flex-wrap">
+              <Button onClick={handleCheckpoint} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Сохранить чекпоинт" : "Начните смену для чекпоинта"} disabled={!activeShift || !canManage}>
                 <Save className="w-3 h-3" />
               </Button>
-
-              <Button onClick={handleReset} size="sm" variant="outline" className="w-8 h-8 p-1" title={activeShift ? "Reset to checkpoint" : "Start shift to enable reset"} disabled={!activeShift || !canManage}>
+              <Button onClick={handleReset} size="sm" variant="outline" className="w-7 h-7 p-1" title={activeShift ? "Сброс до чекпоинта" : "Начните смену для сброса"} disabled={!activeShift || !canManage}>
                 <RotateCcw className="w-3 h-3" />
               </Button>
-
-              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 ml-1 text-xs">
-                Export daily
+              <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-7 text-xs" disabled={exportingDaily}>
+                {exportingDaily ? <Loading text="Экспорт..." variant="generic" className="inline w-4 h-4" /> : "Экспорт дня"}
               </Button>
-
-              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-8 h-8 p-1" title="Export stock" disabled={!canManage}>
+              <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="w-7 h-7 p-1" title="Экспорт склада" disabled={!canManage}>
                 <FileUp className="w-3 h-3" />
               </Button>
-
-              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 ml-2 text-xs" disabled={!canManage}>
-                Send car
-              </Button>
-
-              <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8 text-xs" disabled={checkingPending}>
-                {checkingPending ? "Checking..." : "Check pending"}
+              <div className="flex items-center gap-1">
+                <Select value={carSize} onValueChange={setCarSize}>
+                  <SelectTrigger className="h-7 text-xs w-24">
+                    <SelectValue placeholder="Тип машины" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="small">Маленькая</SelectItem>
+                    <SelectItem value="medium">Средняя</SelectItem>
+                    <SelectItem value="large">Большая</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-7 text-xs" disabled={sendingCar || !canManage}>
+                  {sendingCar ? <Loading text="Отправка..." variant="generic" className="inline w-4 h-4" /> : <><Car className="w-3 h-3 mr-1" /> Машина</>}
+                </Button>
+              </div>
+              <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-7 text-xs" disabled={checkingPending}>
+                {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить ожидающие"}
               </Button>
             </div>
           </div>
         </div>
+      </header>
 
-        <div className="mt-3">
+      <main className="flex-1 overflow-y-auto p-0 sm:p-2">
+        <Card className="mb-2">
+          <CardHeader className="p-2">
+            <CardTitle className="text-base">Склад</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-4">
+            <div className="overflow-y-auto max-h-[60vh] simple-scrollbar">
+              <div className="grid grid-cols-4 gap-2 sm:gap-3">
+                {hookFilteredItems.map((item) => (
+                  <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
+                ))}
+              </div>
+            </div>
+            {hookFilteredItems.length === 0 && <div className="text-center py-6 text-gray-500">Товары не найдены</div>}
+          </CardContent>
+        </Card>
+
+        <div className="mb-2">
           <FilterAccordion
             filterSeason={filterSeason}
             setFilterSeason={setFilterSeason}
@@ -492,24 +563,6 @@ export default function CrewWarehousePage() {
             setSortOption={setSortOption as any}
           />
         </div>
-      </header>
-
-      <main className="flex-1 overflow-y-auto p-0 sm:p-4">
-        <Card className="mb-4">
-          <CardHeader className="p-2 sm:p-6">
-            <CardTitle>Inventory</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 sm:p-6">
-            <div className="overflow-y-auto max-h-[69vh] simple-scrollbar">
-              <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-                {hookFilteredItems.map((item) => (
-                  <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClick(item)} />
-                ))}
-              </div>
-            </div>
-            {hookFilteredItems.length === 0 && <div className="text-center py-8 text-gray-500">No items found</div>}
-          </CardContent>
-        </Card>
 
         <WarehouseViz
           items={localItems}
@@ -519,7 +572,7 @@ export default function CrewWarehousePage() {
           gameMode={gameMode}
         />
 
-        <div className="mt-4">
+        <div className="mt-2">
           <WarehouseStats
             itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
             uniqueIds={localItems.length}
@@ -547,7 +600,7 @@ export default function CrewWarehousePage() {
           />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-4">
           <CrewWarehouseSyncButtons slug={slug!} />
         </div>
       </main>
