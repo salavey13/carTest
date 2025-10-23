@@ -141,14 +141,8 @@ export async function exportCrewDiffToOwner(slug: string, diffData: any[], userI
 
 export async function exportCrewCurrentStock(slug: string, items: any[], summarized = false) {
   try {
-    const stockData = summarized
-      ? items.map((item) => ({ Артикул: item.id, Количество: item.total_quantity }))
-      : items.map((item) => ({
-        Артикул: item.id,
-        Название: `${item.make || ""} ${item.model || ""}`.trim(),
-        "Общее Количество": item.total_quantity,
-        Локации: (item.specs?.warehouse_locations || []).map((l: any) => `${l.voxel_id}:${l.quantity}`).join(", ") || "",
-      }));
+    // Always use summarized format (2 columns)
+    const stockData = items.map((item) => ({ Артикул: item.id, Количество: item.total_quantity }));
 
     const csvData = "\uFEFF" + Papa.unparse(stockData, { header: true, delimiter: "\t", quotes: true });
     return { success: true, csv: csvData };
@@ -180,7 +174,7 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
 
     // Query shifts table for offload operations
     const { data: shiftRecords, error: shiftError } = await supabaseAdmin
-      .from("shifts")
+      .from("crew_member_shifts")
       .select("timestamp, data")
       .eq("crew_id", crewId)
       .eq("operation", "offload")
