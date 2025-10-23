@@ -1,3 +1,4 @@
+// /app/wb/[slug]/actions_csv.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -158,13 +159,13 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
     const crew = await resolveCrewBySlug(slug);
     const crewId = crew.id;
 
-    // Define categories (same as exportDailyEntry in actions.ts)
+    // Define categories
     const categories = [
       'namatras 90', 'namatras 120', 'namatras 140', 'namatras 160', 'namatras 180', 'namatras 200',
       '1.5 leto', '2 leto', 'evro leto', 'evromaksi leto',
       '1.5 zima', '2 zima', 'evro zima', 'evromaksi zima',
-      'Podushka 50h70', 'Podushka 70h70', 'Podushka anatom',
-      'Navolochka 50x70', 'Navolochka 70h70'
+      'Podushka 50x70', 'Podushka 70x70', 'Podushka anatom',
+      'Navolochka 50x70', 'Navolochka 70x70'
     ];
 
     // Get current date for filtering (midnight to midnight)
@@ -172,20 +173,18 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-    // Query shifts table for offload operations
+    // Query shifts table for actions within the day
     const { data: shiftRecords, error: shiftError } = await supabaseAdmin
       .from("crew_member_shifts")
-      .select("timestamp, data")
+      .select("actions, clock_in_time")
       .eq("crew_id", crewId)
-      .eq("operation", "offload")
-      .gte("timestamp", startOfDay.toISOString())
-      .lt("timestamp", endOfDay.toISOString())
-      .order("timestamp");
+      .gte("clock_in_time", startOfDay.toISOString())
+      .lt("clock_in_time", endOfDay.toISOString())
+      .order("clock_in_time");
 
     if (shiftError) throw new Error(`Failed to fetch shifts: ${shiftError.message}`);
     if (!shiftRecords || shiftRecords.length === 0) {
       const emptyCsv = `\uFEFFотгрузка wb ${format(today, 'dd.MM.yy')}\t${categories.map(() => '0').join('\t')}\tвсего: 0\tоплата: 0\n`;
-      // Send special notification even for empty report
       if (!isTelegram && crew.owner_id) {
         await sendComplexMessage(
           crew.owner_id,
@@ -193,6 +192,7 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
           [],
           { attachment: { type: "document", content: emptyCsv, filename: `shift_${slug}_${format(today, 'ddMMyy')}.tsv` } }
         );
+        toast.success("Отчет отправлен владельцу экипажа (нет отгрузок)");
       }
       return { success: true, csv: emptyCsv };
     }
@@ -204,10 +204,12 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
     let ymAssigned = false;
 
     shiftRecords.forEach((record: any) => {
-      const timestamp = new Date(record.timestamp);
-      let marketplace: string;
+      const offloadActions = Array.isArray(record.actions)
+        ? record.actions.filter((action: any) => action.type === "offload" && action.ts)
+        : [];
+      if (offloadActions.length === 0) return;
 
-      // Assign marketplace based on order of appearance
+      let marketplace: string;
       if (!wbAssigned) {
         marketplace = "wb";
         wbAssigned = true;
@@ -218,20 +220,36 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
         marketplace = "ym";
         ymAssigned = true;
       } else {
-        marketplace = "other"; // Fallback for additional offloads
+        marketplace = "other";
       }
 
-      // Extract items from data
-      const items = Array.isArray(record.data)
-        ? record.data.map((entry: any) => ({
-            item_id: entry.item_id,
-            delta: Math.abs(entry.delta || 0),
-            category: entry.category || entry.item_id.split('-')[0] || 'unknown'
-          }))
-        : [];
+      offloadActions.forEach((action: any) => {
+        const timestamp = new Date(action.ts);
+        if (timestamp < startOfDay || timestamp >= endOfDay) return;
 
-      operations.push({ timestamp, marketplace, items });
+        const items = [{
+          item_id: action.itemId,
+          delta: Math.abs(action.delta || 0),
+          category: action.category || categorizeItem({ id: action.itemId }) || 'unknown'
+        }];
+
+        operations.push({ timestamp, marketplace, items });
+      });
     });
+
+    if (operations.length === 0) {
+      const emptyCsv = `\uFEFFотгрузка wb ${format(today, 'dd.MM.yy')}\t${categories.map(() => '0').join('\t')}\tвсего: 0\tоплата: 0\n`;
+      if (!isTelegram && crew.owner_id) {
+        await sendComplexMessage(
+          crew.owner_id,
+          `📊 Дневной отчет по смене для экипажа ${crew.name} (${slug}): Нет отгрузок`,
+          [],
+          { attachment: { type: "document", content: emptyCsv, filename: `shift_${slug}_${format(today, 'ddMMyy')}.tsv` } }
+        );
+        toast.success("Отчет отправлен владельцу экипажа (нет отгрузок)");
+      }
+      return { success: true, csv: emptyCsv };
+    }
 
     // Summarize each operation
     const csvLines: string[] = [];
@@ -261,7 +279,6 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
 
     const csvData = "\uFEFF" + csvLines.join("\n");
 
-    // Send special notification
     if (!isTelegram && crew.owner_id) {
       await sendComplexMessage(
         crew.owner_id,
@@ -269,6 +286,7 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
         [],
         { attachment: { type: "document", content: csvData, filename: `shift_${slug}_${format(today, 'ddMMyy')}.tsv` } }
       );
+      toast.success("Отчет отправлен владельцу экипажа");
     }
 
     return { success: true, csv: csvData };
@@ -276,4 +294,59 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
     err("exportCrewDailyShift error", e);
     return { success: false, error: e?.message || "Export failed" };
   }
+}
+
+// Add categorizeItem to actions_csv.ts for consistency
+function categorizeItem(item: any): string {
+  const fullLower = (item.id || item.model || '').toLowerCase().trim();
+  if (!fullLower) return 'other';
+
+  if (fullLower.includes('наматрасник') || fullLower.includes('namatras')) {
+    const sizeMatch = fullLower.match(/(90|120|140|160|180|200)/);
+    if (sizeMatch) return `namatras ${sizeMatch[0]}`;
+  }
+
+  const sizeChecks = [
+    { key: 'евро макси', val: 'evromaksi' },
+    { key: 'evro maksi', val: 'evromaksi' },
+    { key: 'evromaksi', val: 'evromaksi' },
+    { key: 'евро', val: 'evro' },
+    { key: 'evro', val: 'evro' },
+    { key: 'euro', val: 'evro' },
+    { key: '2', val: '2' },
+    { key: '1.5', val: '1.5' }
+  ];
+  let detectedSize = null;
+  for (const { key, val } of sizeChecks) {
+    if (fullLower.includes(key)) {
+      detectedSize = val;
+      break;
+    }
+  }
+
+  const seasonMap = { 'лето': 'leto', 'зима': 'zima', 'leto': 'leto', 'zima': 'zima' };
+  let detectedSeason = null;
+  for (const [key, val] of Object.entries(seasonMap)) {
+    if (fullLower.includes(key)) {
+      detectedSeason = val;
+      break;
+    }
+  }
+
+  if (detectedSize && detectedSeason) {
+    return `${detectedSize} ${detectedSeason}`;
+  }
+
+  if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
+    if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Podushka 50x70';
+    if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Podushka 70x70';
+    if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
+  }
+
+  if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
+    if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Navolochka 50x70';
+    if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Navolochka 70x70';
+  }
+
+  return 'other';
 }
