@@ -272,14 +272,14 @@ export default function CrewWarehousePage() {
     }
 
     if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Podushka 50h70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Podushka 70h70';
+      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Podushka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Podushka 70x70';
       if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
     }
 
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Navolochka 70x70';
     }
 
     return 'other';
