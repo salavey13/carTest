@@ -16,7 +16,7 @@ import { CrewWarehouseSyncButtons } from "@/components/CrewWarehouseSyncButtons"
 import FilterAccordion from "@/components/FilterAccordion";
 import { useAppContext } from "@/contexts/AppContext";
 import { notifyCrewOwner } from "./actions_notify";
-import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv"; // Updated import
+import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
 import { getCrewMemberStatus, getActiveShiftForCrewMember } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
@@ -278,7 +278,7 @@ export default function CrewWarehousePage() {
 
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
       if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70h70';
     }
 
     return 'other';
@@ -300,7 +300,7 @@ export default function CrewWarehousePage() {
     });
 
     localItems.forEach(it => {
-      const cat = categorizeItem(it);
+      const cat = categorize_item(it);
       sumsCurrent[cat] = (sumsCurrent[cat] || 0) + (it.total_quantity || 0);
     });
 
@@ -326,44 +326,6 @@ export default function CrewWarehousePage() {
     setLastProcessedOffloadUnits(stats.offloadUnits);
     setLastProcessedSalary(stats.salary);
   }, [computeProcessedStats]);
-
-  // Define handlePlateClickCustom to open edit modal in "none" game mode
-  const handlePlateClickCustom = useCallback((voxelId: string) => {
-    if (gameMode) {
-      // In game mode, use the default handlePlateClick from the hook
-      handlePlateClick(voxelId);
-      return;
-    }
-    // In "none" mode, open the edit modal
-    setEditVoxel(voxelId);
-    const contents = localItems
-      .flatMap((i) => {
-        const locs = Array.isArray(i?.locations) ? i.locations : [];
-        return locs
-          .filter((l: any) => l.voxel === voxelId && l.quantity > 0)
-          .map((l: any) => ({ item: i, quantity: l.quantity, newQuantity: l.quantity }));
-      });
-    setEditContents(contents);
-    setEditDialogOpen(true);
-    toast.info(`Открыта ячейка ${voxelId} для редактирования`);
-  }, [gameMode, handlePlateClick, localItems]);
-
-  // Define handleItemClickCustom to open edit modal in "none" game mode
-  const handleItemClickCustom = useCallback((item: any) => {
-    if (gameMode) {
-      // In game mode, use the default handleItemClick from the hook
-      handleItemClick(item);
-      return;
-    }
-    // In "none" mode, open the edit modal with the item's primary location
-    const voxelId = selectedVoxel || item.locations?.[0]?.voxel || "A1";
-    setEditVoxel(voxelId);
-    const loc = item.locations?.find((l: any) => l.voxel === voxelId);
-    const contents = loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : [];
-    setEditContents(contents);
-    setEditDialogOpen(true);
-    toast.info(`Открыт товар ${item.name} для редактирования в ячейке ${voxelId}`);
-  }, [gameMode, handleItemClick, selectedVoxel]);
 
   const handleExportDaily = async () => {
     if (!activeShift) return toast.error("Для экспорта необходима активная смена");
@@ -517,75 +479,6 @@ export default function CrewWarehousePage() {
               >
                 −Выгрузка
               </Button>
-              <Button
-                onClick={handleCheckpoint}
-                size="sm"
-                variant="outline"
-                className="w-6 h-6 p-1"
-                title={activeShift ? "Сохранить чекпоинт" : "Начните смену для чекпоинта"}
-                disabled={!activeShift || !canManage}
-              >
-                <Save className="w-3 h-3" />
-              </Button>
-              <Button
-                onClick={handleReset}
-                size="sm"
-                variant="outline"
-                className="w-6 h-6 p-1"
-                title={activeShift ? "Сброс до чекпоинта" : "Начните смену для сброса"}
-                disabled={!activeShift || !canManage}
-              >
-                <RotateCcw className="w-3 h-3" />
-              </Button>
-              <Button
-                onClick={handleExportDaily}
-                size="sm"
-                variant="ghost"
-                className="h-6 text-xs min-w-[70px]"
-                disabled={exportingDaily}
-              >
-                {exportingDaily ? <Loading text="Экспорт..." variant="generic" className="inline w-4 h-4" /> : "Экспорт дня"}
-              </Button>
-              <Button
-                onClick={() => handleExportStock(false)}
-                size="sm"
-                variant="outline"
-                className="w-6 h-6 p-1"
-                title="Экспорт склада"
-                disabled={!canManage}
-              >
-                <FileUp className="w-3 h-3" />
-              </Button>
-              <div className="flex items-center gap-1">
-                <Select value={carSize} onValueChange={setCarSize}>
-                  <SelectTrigger className="h-6 text-xs w-20">
-                    <SelectValue placeholder="Тип машины" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="small">Маленькая</SelectItem>
-                    <SelectItem value="medium">Средняя</SelectItem>
-                    <SelectItem value="large">Большая</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={handleSendCar}
-                  size="sm"
-                  variant="secondary"
-                  className="h-6 text-xs min-w-[60px]"
-                  disabled={sendingCar || !canManage}
-                >
-                  {sendingCar ? <Loading text="Отправка..." variant="generic" className="inline w-4 h-4" /> : <><Car className="w-3 h-3 mr-1" /> Машина</>}
-                </Button>
-              </div>
-              <Button
-                onClick={handleCheckPending}
-                size="sm"
-                variant="ghost"
-                className="h-6 text-xs min-w-[70px]"
-                disabled={checkingPending}
-              >
-                {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить"}
-              </Button>
             </div>
           </div>
         </div>
@@ -668,6 +561,79 @@ export default function CrewWarehousePage() {
             dailyGoals={dailyGoals}
             sessionDuration={sessionDuration}
           />
+        </div>
+
+        {/* Moved buttons: checkpoint, reset, export daily, export stock, car request, check pending */}
+        <div className="mt-2 p-2 flex flex-wrap gap-2 justify-center">
+          <Button
+            onClick={handleCheckpoint}
+            size="sm"
+            variant="outline"
+            className="h-8"
+            title={activeShift ? "Сохранить чекпоинт" : "Начните смену для чекпоинта"}
+            disabled={!activeShift || !canManage}
+          >
+            <Save className="w-4 h-4 mr-1" /> Чекпоинт
+          </Button>
+          <Button
+            onClick={handleReset}
+            size="sm"
+            variant="outline"
+            className="h-8"
+            title={activeShift ? "Сброс до чекпоинта" : "Начните смену для сброса"}
+            disabled={!activeShift || !canManage}
+          >
+            <RotateCcw className="w-4 h-4 mr-1" /> Сброс
+          </Button>
+          <Button
+            onClick={handleExportDaily}
+            size="sm"
+            variant="ghost"
+            className="h-8"
+            disabled={exportingDaily}
+          >
+            {exportingDaily ? <Loading text="Экспорт..." variant="generic" className="inline w-4 h-4" /> : "Экспорт дня"}
+          </Button>
+          <Button
+            onClick={() => handleExportStock(false)}
+            size="sm"
+            variant="outline"
+            className="h-8"
+            title="Экспорт склада"
+            disabled={!canManage}
+          >
+            <FileUp className="w-4 h-4 mr-1" /> Экспорт склада
+          </Button>
+          <div className="flex items-center gap-1">
+            <Select value={carSize} onValueChange={setCarSize}>
+              <SelectTrigger className="h-8 w-28">
+                <SelectValue placeholder="Тип машины" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small">Маленькая</SelectItem>
+                <SelectItem value="medium">Средняя</SelectItem>
+                <SelectItem value="large">Большая</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleSendCar}
+              size="sm"
+              variant="secondary"
+              className="h-8"
+              disabled={sendingCar || !canManage}
+            >
+              {sendingCar ? <Loading text="Отправка..." variant="generic" className="inline w-4 h-4" /> : <><Car className="w-4 h-4 mr-1" /> Запрос машины</>}
+            </Button>
+          </div>
+          <Button
+            onClick={handleCheckPending}
+            size="sm"
+            variant="ghost"
+            className="h-8"
+            disabled={checkingPending}
+          >
+            {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить ожидающие"}
+          </Button>
         </div>
 
         <div className="mt-4">
