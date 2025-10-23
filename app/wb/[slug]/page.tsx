@@ -1,3 +1,4 @@
+// /app/wb/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -278,7 +279,7 @@ export default function CrewWarehousePage() {
 
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
       if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70h70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
     }
 
     return 'other';
@@ -326,6 +327,44 @@ export default function CrewWarehousePage() {
     setLastProcessedOffloadUnits(stats.offloadUnits);
     setLastProcessedSalary(stats.salary);
   }, [computeProcessedStats]);
+
+  // Define handlePlateClickCustom to open edit modal in "none" game mode
+  const handlePlateClickCustom = useCallback((voxelId: string) => {
+    if (gameMode) {
+      // In game mode, use the default handlePlateClick from the hook
+      handlePlateClick(voxelId);
+      return;
+    }
+    // In "none" mode, open the edit modal
+    setEditVoxel(voxelId);
+    const contents = localItems
+      .flatMap((i) => {
+        const locs = Array.isArray(i?.locations) ? i.locations : [];
+        return locs
+          .filter((l: any) => l.voxel === voxelId && l.quantity > 0)
+          .map((l: any) => ({ item: i, quantity: l.quantity, newQuantity: l.quantity }));
+      });
+    setEditContents(contents);
+    setEditDialogOpen(true);
+    toast.info(`Открыта ячейка ${voxelId} для редактирования`);
+  }, [gameMode, handlePlateClick, localItems]);
+
+  // Define handleItemClickCustom to open edit modal in "none" game mode
+  const handleItemClickCustom = useCallback((item: any) => {
+    if (gameMode) {
+      // In game mode, use the default handleItemClick from the hook
+      handleItemClick(item);
+      return;
+    }
+    // In "none" mode, open the edit modal with the item's primary location
+    const voxelId = selectedVoxel || item.locations?.[0]?.voxel || "A1";
+    setEditVoxel(voxelId);
+    const loc = item.locations?.find((l: any) => l.voxel === voxelId);
+    const contents = loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : [];
+    setEditContents(contents);
+    setEditDialogOpen(true);
+    toast.info(`Открыт товар ${item.name} для редактирования в ячейке ${voxelId}`);
+  }, [gameMode, handleItemClick, selectedVoxel]);
 
   const handleExportDaily = async () => {
     if (!activeShift) return toast.error("Для экспорта необходима активная смена");
@@ -479,6 +518,75 @@ export default function CrewWarehousePage() {
               >
                 −Выгрузка
               </Button>
+					 
+										  
+						 
+								 
+									   
+																																   
+													 
+			   
+											
+					   
+					 
+									 
+						 
+								 
+									   
+																															
+													 
+			   
+												 
+					   
+					 
+										   
+						 
+							   
+													
+										 
+			   
+																																			  
+					   
+					 
+														
+						 
+								 
+									   
+												   
+									 
+			   
+											  
+					   
+													   
+																   
+															  
+																	 
+								  
+								 
+																			 
+																		  
+																		 
+								  
+						 
+					   
+										 
+						   
+									 
+													  
+													 
+				 
+																																										 
+						 
+					
+					 
+											
+						 
+							   
+													
+										  
+			   
+																																			  
+					   
             </div>
           </div>
         </div>
