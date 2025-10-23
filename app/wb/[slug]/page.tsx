@@ -301,7 +301,7 @@ export default function CrewWarehousePage() {
     });
 
     localItems.forEach(it => {
-      const cat = categorize_item(it);
+      const cat = categorizeItem(it);
       sumsCurrent[cat] = (sumsCurrent[cat] || 0) + (it.total_quantity || 0);
     });
 
