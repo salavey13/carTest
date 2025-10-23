@@ -1,4 +1,3 @@
-// /app/wb/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -163,7 +162,7 @@ export default function CrewWarehousePage() {
 
   const canManage = useMemo(() => {
     const globalAdmin = !!dbUser && (dbUser.status === "admin" || dbUser.is_admin);
-    const memberOk = !!memberRole;
+    const memberOk = !!memberRole && memberRole !== "car_monitor"; // Exclude car_monitor
     return !!(isOwner || memberOk || globalAdmin);
   }, [dbUser, memberRole, isOwner]);
 
@@ -196,18 +195,34 @@ export default function CrewWarehousePage() {
   };
 
   const handleCheckpoint = async () => {
+    // Summarize previous checkpoint stats
+    if (checkpoint.length && dbUser?.user_id) {
+      const stats = computeProcessedStats();
+      const { offloadUnits, changedCount, totalDelta, sumsPrevious, sumsCurrent } = stats;
+      const changedCategories = Object.keys(sumsCurrent).filter(
+        (cat) => sumsCurrent[cat] !== (sumsPrevious[cat] || 0)
+      );
+      const message = `Завершён чекпоинт: отгружено ${offloadUnits} ед., изменено ${changedCount} позиций, общее изменение ${totalDelta} ед.\nКатегории: ${changedCategories.join(", ") || "нет"}`;
+      await notifyCrewOwner(slug, message, dbUser.user_id);
+      // Optionally notify car_monitor (uncomment if desired)
+      // await notifyCarMonitors(slug, message);
+      toast.success("Предыдущий чекпоинт отправлен");
+    }
+
+    // Save new checkpoint
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Чекпоинт сохранён локально");
+    setLastCheckpointDurationSec(checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null);
+    toast.success("Чекпоинт сохранён");
 
     if (dbUser?.user_id) {
       const res = await saveCrewCheckpoint(slug, dbUser.user_id, snapshot);
       if (res.success) toast.success("Чекпоинт сохранён на сервере");
-      else toast.error("Ошибка сохранения чекпоинта на сервере");
+      else toast.error("Ошибка сохранения чекпоинта");
     }
   };
 
@@ -218,15 +233,15 @@ export default function CrewWarehousePage() {
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Сброс до чекпоинта (локально)");
+    toast.success("Сброшено до чекпоинта");
 
     if (dbUser?.user_id) {
       const res = await resetCrewCheckpoint(slug, dbUser.user_id);
       if (res.success) {
-        toast.success(`Сброс на сервере применён (${res.applied} позиций)`);
+        toast.success(`Сброшено на сервере (${res.applied} позиций)`);
         loadItems();
       } else {
-        toast.error("Ошибка сброса на сервере");
+        toast.error("Ошибка сброса чекпоинта");
       }
     }
   };
@@ -374,7 +389,7 @@ export default function CrewWarehousePage() {
 
       if (res?.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Ежедневный TSV скопирован");
+        if (copied) toast.success("Отчет скопирован");
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
@@ -383,28 +398,28 @@ export default function CrewWarehousePage() {
           a.download = `daily_shift_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          toast.success("Ежедневный TSV скачан");
+          toast.success("Отчет скачан");
         }
 
         // Notification already sent by exportCrewDailyShift
-        toast.success("Отчет отправлен владельцу экипажа");
+        toast.success("Отчет отправлен владельцу");
       } else {
-        toast.error(res?.error || "Ошибка экспорта");
+        toast.error(res?.error || "Ошибка экспорта отчета");
       }
     } catch (err) {
-      toast.error("Ошибка экспорта: " + (err?.message || "Неизвестная ошибка"));
+      toast.error("Ошибка экспорта отчета");
     } finally {
       setExportingDaily(false);
     }
   };
 
   const handleSendCar = async () => {
-    if (!canManage) return toast.error("Только владелец/участник/админ может запросить машину");
+    if (!canManage) return toast.error("Нет прав для запроса машины");
     setSendingCar(true);
     try {
-      const msg = `Запрос машины: экипаж=${slug}, тип=${carSize}, от ${dbUser?.user_id || "unknown"} — проверьте на t.me/oneSitePlsBot/sklad`;
+      const msg = `Запрос машины: тип=${carSize}`;
       await notifyCrewOwner(slug, msg, dbUser?.user_id);
-      toast.success("Запрос машины отправлен владельцу");
+      toast.success("Запрос машины отправлен");
     } catch (err) {
       toast.error("Ошибка отправки запроса машины");
     } finally {
@@ -423,7 +438,7 @@ export default function CrewWarehousePage() {
       setTargetOffload(total);
       toast.success(`Ожидающие выгрузки: WB ${wbCount}, Ozon ${ozonCount}. Итого: ${total}`);
     } catch (err: any) {
-      toast.error("Ошибка проверки ожидающих: " + (err?.message || 'Неизвестная'));
+      toast.error("Ошибка проверки ожидающих");
     } finally {
       setCheckingPending(false);
     }
@@ -434,7 +449,7 @@ export default function CrewWarehousePage() {
       const res = await exportCrewCurrentStock(slug, localItems, summarized);
       if (res.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Склад скопирован в буфер обмена");
+        if (copied) toast.success("Склад скопирован");
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
@@ -443,10 +458,10 @@ export default function CrewWarehousePage() {
           a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          toast.success("Склад успешно экспортирован");
+          toast.success("Склад экспортирован");
         }
       } else {
-        toast.error(res.error || "Ошибка экспорта");
+        toast.error(res.error || "Ошибка экспорта склада");
       }
     } catch (err) {
       toast.error("Ошибка экспорта склада");
@@ -518,75 +533,6 @@ export default function CrewWarehousePage() {
               >
                 −Выгрузка
               </Button>
-					 
-										  
-						 
-								 
-									   
-																																   
-													 
-			   
-											
-					   
-					 
-									 
-						 
-								 
-									   
-																															
-													 
-			   
-												 
-					   
-					 
-										   
-						 
-							   
-													
-										 
-			   
-																																			  
-					   
-					 
-														
-						 
-								 
-									   
-												   
-									 
-			   
-											  
-					   
-													   
-																   
-															  
-																	 
-								  
-								 
-																			 
-																		  
-																		 
-								  
-						 
-					   
-										 
-						   
-									 
-													  
-													 
-				 
-																																										 
-						 
-					
-					 
-											
-						 
-							   
-													
-										  
-			   
-																																			  
-					   
             </div>
           </div>
         </div>
