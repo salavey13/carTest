@@ -1,3 +1,4 @@
+// /app/wb/[slug]/warehouseHooks.ts
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast as sonnerToast } from "sonner"; // Fallback: Top import to prevent hoisting TDZ
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
@@ -32,10 +33,7 @@ interface ToastProps {
 }
 
 export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
-  // Prod Guard: Require props to avoid fallback TDZ entirely
-  if (process.env.NODE_ENV === 'production' && !toastProps) {
-    throw new Error("ToastProps required for useCrewWarehouse in production—pass from useAppToast");
-  }
+  
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
