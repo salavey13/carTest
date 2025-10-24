@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// убрал прямой импорт sonner/toast
 import { Save, RotateCcw, FileUp, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -22,26 +21,23 @@ import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabaseAdmin } from "@/hooks/supabase";
-
-// Хук для тостов — компонентный уровень, не хук/утилита
 import { useAppToast } from "@/hooks/useAppToast";
 
 /**
- * CrewWarehousePage
- * - Регистрация notifier'а: компонент регистрирует useAppToast() в хуке
- *   через registerNotifier, возвращаемый useCrewWarehouse.
- * - Таким образом hooks остаются без прямых вызовов sonner/toast (нет TDZ/circular).
+ * Полный компонент страницы "Crew Warehouse"
+ * - hook useCrewWarehouse теперь даёт registerNotifier
+ * - компонент регистрирует useAppToast() как notifier
+ * - подписывается на window event 'crew:shift:changed' для мгновенного обновления статуса
+ * - упрощённые тексты лоадеров в кнопках (без вложенных Loading-компонентов)
  */
+
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
 
-  // component-level toast hook
   const toast = useAppToast();
 
-  // Получаем весь API хука. registerNotifier присутствует в возвращаемом объекте.
   const wh = useCrewWarehouse(slug || "");
-  // Деструктурируем поля (включая registerNotifier)
   const {
     items: hookItems,
     loading,
@@ -97,7 +93,7 @@ export default function CrewWarehousePage() {
     sessionDuration,
     getSizePriority,
     registerNotifier,
-  } = wh as any; // as any чтобы не тянуть длинные TS-типовые определения здесь
+  } = wh as any;
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
@@ -137,7 +133,6 @@ export default function CrewWarehousePage() {
   // register notifier: map hook notifications -> component toast
   useEffect(() => {
     if (!registerNotifier || !toast) return;
-    // Обёртка, чтобы не ронять, если toast методы изменятся
     const notifier = (type: string, message: string | any, opts?: any) => {
       try {
         if (type === "success") return toast.success(message as any, opts);
@@ -145,11 +140,9 @@ export default function CrewWarehousePage() {
         if (type === "warning") return toast.warning(message as any, opts);
         if (type === "info") return toast.info(message as any, opts);
         if (type === "custom" && typeof message === "function") return toast.custom(message as any, opts);
-        // fallback
         return toast.message(String(message), opts);
       } catch (e) {
-        // fallback silent
-        // console.error("Notifier mapping failed", e);
+        // swallow
       }
     };
 
@@ -157,13 +150,11 @@ export default function CrewWarehousePage() {
     return () => {
       try {
         registerNotifier(null);
-      } catch (e) {
-        /* ignore */
-      }
+      } catch {}
     };
   }, [registerNotifier, toast]);
 
-  // Load crew data to ensure name displays
+  // Load crew data
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
@@ -183,30 +174,48 @@ export default function CrewWarehousePage() {
     fetchCrew();
   }, [slug, toast]);
 
-  const loadStatus = async () => {
+  // loadStatus used both by this page and ShiftControls event
+  const loadStatus = useCallback(async () => {
     if (!slug) return;
     try {
       const { data: userData } = await supabaseAdmin.auth.getUser();
       const userId = userData?.user?.id;
-      if (!userId) return;
+      if (!userId) {
+        setLiveStatus(null);
+        setActiveShift(null);
+        return;
+      }
 
       const statusRes = await getCrewMemberStatus(slug, userId);
       if (statusRes.success) setLiveStatus(statusRes.live_status || null);
       const shiftRes = await getActiveShiftForCrewMember(slug, userId);
       setActiveShift(shiftRes.shift || null);
-    } catch {
+    } catch (err) {
       toast.error("Ошибка загрузки статуса");
     }
-  };
+  }, [slug, toast]);
 
   useEffect(() => {
     loadStatus();
     const poll = setInterval(loadStatus, 30000);
     return () => clearInterval(poll);
-  }, [slug]);
+  }, [loadStatus]);
+
+  // Listen for shift changes emitted by ShiftControls so page updates immediately
+  useEffect(() => {
+    const onShiftChanged = (e: Event) => {
+      // simply reload status and items to re-evaluate canManage, etc.
+      try {
+        loadStatus();
+        loadItems();
+      } catch {}
+    };
+    window.addEventListener("crew:shift:changed", onShiftChanged);
+    return () => window.removeEventListener("crew:shift:changed", onShiftChanged);
+  }, [loadStatus, loadItems]);
 
   const canManage = useMemo(() => {
-    const globalAdmin = false; // page-level: ты можешь заменить этой логикой из AppContext, если надо
+    const globalAdmin = false;
     const memberOk = !!(isOwner || activeShift);
     return !!(memberOk || globalAdmin);
   }, [isOwner, activeShift]);
@@ -248,7 +257,6 @@ export default function CrewWarehousePage() {
     setEditCount(0);
     toast.success("Чекпоинт сохранён локально");
 
-    // Сохраняем на сервере если есть сессия
     try {
       const user = await supabaseAdmin.auth.getUser();
       const userId = user.data?.user?.id;
@@ -324,13 +332,13 @@ export default function CrewWarehousePage() {
       return `${detectedSize} ${detectedSeason}`;
     }
     if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Podushka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Podushka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Podushka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Podushka 70x70';
       if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
     }
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Navolochka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
     }
     return 'other';
   };
@@ -678,7 +686,7 @@ export default function CrewWarehousePage() {
             className="h-8"
             disabled={exportingDaily}
           >
-            {exportingDaily ? <Loading text="Экспорт..." variant="generic" className="inline w-4 h-4" /> : "Экспорт дня"}
+            {exportingDaily ? "Экспорт..." : "Экспорт дня"}
           </Button>
           <Button
             onClick={() => handleExportStock(false)}
@@ -708,7 +716,7 @@ export default function CrewWarehousePage() {
               className="h-8"
               disabled={sendingCar || !canManage}
             >
-              {sendingCar ? <Loading text="Отправка..." variant="generic" className="inline w-4 h-4" /> : <><Car className="w-4 h-4 mr-1" /> Запрос машины</>}
+              {sendingCar ? "Отправка..." : (<><Car className="w-4 h-4 mr-1" /> Запрос машины</>)}
             </Button>
           </div>
           <Button
@@ -718,7 +726,7 @@ export default function CrewWarehousePage() {
             className="h-8"
             disabled={checkingPending}
           >
-            {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить ожидающие"}
+            {checkingPending ? "Проверка..." : "Проверить ожидающие"}
           </Button>
         </div>
 

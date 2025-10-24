@@ -13,6 +13,8 @@ import { useAppContext } from "@/contexts/AppContext";
  * - start / toggle ride / end shift actions
  *
  * Polls server for status and also updates elapsed timer clientside.
+ *
+ * Emits window event 'crew:shift:changed' after changing shift/status so page can reload state.
  */
 
 export default function ShiftControls({ slug }: { slug: string }) {
@@ -85,6 +87,14 @@ export default function ShiftControls({ slug }: { slug: string }) {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
+  const emitShiftChanged = () => {
+    try {
+      window.dispatchEvent(new CustomEvent("crew:shift:changed", { detail: { slug, userId } }));
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const startShift = async () => {
     if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
     setLoading(true);
@@ -99,9 +109,11 @@ export default function ShiftControls({ slug }: { slug: string }) {
       const setRes = await mod.setCrewMemberLiveStatus(slug, userId, "online");
       if (!setRes?.success) toast.error(setRes?.error || "Не удалось установить статус участника");
       await loadStatus();
+      emitShiftChanged();
     } catch (e: any) {
       console.error("startShift error", e);
       toast.error(e?.message || "Ошибка при старте смены");
+      emitShiftChanged();
     } finally {
       setLoading(false);
     }
@@ -119,9 +131,11 @@ export default function ShiftControls({ slug }: { slug: string }) {
       if (!setRes?.success) toast.error(setRes?.error || "Не удалось переключить статус");
       else toast.success(newStatus === "riding" ? "Статус: На байке" : "Статус: Онлайн (в боксе)");
       await loadStatus();
+      emitShiftChanged();
     } catch (e: any) {
       console.error("toggleRide error", e);
       toast.error(e?.message || "Ошибка переключения статуса");
+      emitShiftChanged();
     } finally {
       setLoading(false);
     }
@@ -144,9 +158,11 @@ export default function ShiftControls({ slug }: { slug: string }) {
       const setRes = await mod.setCrewMemberLiveStatus(slug, userId, "offline", { last_location: null });
       if (!setRes?.success) toast.error(setRes?.error || "Не удалось установить offline");
       await loadStatus();
+      emitShiftChanged();
     } catch (e: any) {
       console.error("endShift error", e);
       toast.error(e?.message || "Ошибка завершения смены");
+      emitShiftChanged();
     } finally {
       setLoading(false);
     }
