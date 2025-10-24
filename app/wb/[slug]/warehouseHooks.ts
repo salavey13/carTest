@@ -31,7 +31,7 @@ type Notifier = (type: "success" | "error" | "info" | "warning" | "custom" | str
  *
  * NOTE: hook does NOT show toasts itself anymore.
  * If you want to display toasts, call registerNotifier(fn) on the returned object,
- * where fn is (type, message, opts) => { /* e.g. useAppToast().success(...) */ }.
+ * where fn is (type, message, opts) => { }.
  */
 export function useCrewWarehouse(slug: string) {
   const [items, setItems] = useState<any[]>([]);
