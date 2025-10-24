@@ -1,8 +1,7 @@
-// /app/wb/[slug]/warehouseHooks.ts
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast as sonnerToast } from "sonner"; // Fallback: Top import to prevent hoisting TDZ
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
 import { logger } from "@/lib/logger";
-import { toast as sonnerToast } from "sonner"; // Added: For fallback when no toastProps
 import { useAppContext } from "@/contexts/AppContext";
 
 export const getSizePriority = (size: string | null): number => {
@@ -33,6 +32,11 @@ interface ToastProps {
 }
 
 export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
+  // Prod Guard: Require props to avoid fallback TDZ entirely
+  if (process.env.NODE_ENV === 'production' && !toastProps) {
+    throw new Error("ToastProps required for useCrewWarehouse in production—pass from useAppToast");
+  }
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +68,25 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
 
-  // Fallback to sonner if no props passed (for isolated testing)
-  const toast = useMemo(() => ({
-    success: toastProps?.success || ((msg: string) => sonnerToast.success(msg)),
-    error: toastProps?.error || ((msg: string) => sonnerToast.error(msg)),
-    info: toastProps?.info || ((msg: string) => sonnerToast.info(msg)),
-    warning: toastProps?.warning || ((msg: string) => sonnerToast.warning(msg)),
-  }), [toastProps]);
+  // Safe Fallback: Runtime guard vs TDZ; always opts for sig match; dev-only
+  const toast = useMemo(() => {
+    const noOp = (_msg: string | React.ReactNode, _opts?: any) => {}; // Sig match
+    if (typeof sonnerToast === 'undefined') {
+      logger.warn("[useCrewWarehouse] Sonner unavailable—using no-op fallback (TDZ guard)");
+      return {
+        success: noOp,
+        error: noOp,
+        info: noOp,
+        warning: noOp,
+      };
+    }
+    return {
+      success: toastProps?.success || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.success(msg, opts)),
+      error: toastProps?.error || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.error(msg, opts)),
+      info: toastProps?.info || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.info(msg, opts)),
+      warning: toastProps?.warning || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.warning(msg, opts)),
+    };
+  }, [toastProps]); // Stable—no inner hoisting risk
 
   const dailyGoals = useMemo(() => ({
     units: 100,
@@ -115,15 +131,15 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       setItems(mappedItems);
       setCheckpoint(mappedItems.map((it) => ({ ...it, locations: it.locations.map((l: any) => ({ ...l })) })));
       if (mappedItems.length === 0) {
-        toast.warning("Нет товаров в складе. Загрузите CSV.");
+        toast.warning("Нет товаров в складе. Загрузите CSV.", { duration: 5000 });
       }
       setLoading(false);
     } else {
       setError(fetchError || "Failed to load items");
-      toast.error(fetchError || "Ошибка загрузки товаров");
+      toast.error(fetchError || "Ошибка загрузки товаров", { duration: 5000 });
       setLoading(false);
     }
-  }, [slug, toast]);
+  }, [slug, toast.warning, toast.error]); // Explicit deps: Pin methods to avoid stale closures
 
   useEffect(() => {
     const resumeSession = localStorage.getItem(`warehouse_session_${slug}`);
@@ -138,7 +154,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
             setOnloadCount(onload || 0);
             setOffloadCount(offload || 0);
             setEditCount(edits || 0);
-            toast.info('Offload возобновлен.');
+            toast.info('Offload возобновлен.', { duration: 5000 });
           } else {
             localStorage.removeItem(`warehouse_session_${slug}`);
           }
@@ -150,7 +166,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
     loadItems();
     const savedLeaderboard = JSON.parse(localStorage.getItem(`warehouse_leaderboard_${slug}`) || "[]");
     setLeaderboard(savedLeaderboard);
-  }, [loadItems, slug]);
+  }, [loadItems, slug, toast.info]); // Explicit dep
 
   const checkAchievements = useCallback(() => {
     setAchievements((prev) => {
@@ -172,7 +188,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       
       return newAch.slice(-8);
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration, toast]);
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration, toast.success]); // Explicit
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
@@ -242,12 +258,12 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
         }));
         return { success, item };
       } else {
-        toast.error(updateError || "Failed to update quantity");
+        toast.error(updateError || "Failed to update quantity", { duration: 5000 });
         if (isGameAction) setErrorCount((prev) => prev + 1);
         return { success: false, error: updateError };
       }
     },
-    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser, toast],
+    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser, toast.error] // Explicit
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -260,22 +276,22 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       setCurrentWorkflowIndex((prev) => prev + 1);
       setSelectedWorkflowVoxel(null);
       if (currentWorkflowIndex + 1 === workflowItems.length) {
-        toast.success("Workflow completed!");
+        toast.success("Workflow completed!", { duration: 5000 });
         setWorkflowItems([]);
         endGameSession();
       }
     }
-  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty, toast]);
+  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty, toast.success]); // Explicit
 
   const handleSkipItem = useCallback(() => {
     setCurrentWorkflowIndex((prev) => prev + 1);
     setErrorCount((prev) => prev + 1);
     if (currentWorkflowIndex + 1 === workflowItems.length) {
-      toast.success("Workflow completed with skips!");
+      toast.success("Workflow completed with skips!", { duration: 5000 });
       setWorkflowItems([]);
       endGameSession();
     }
-  }, [currentWorkflowIndex, workflowItems.length, toast]);
+  }, [currentWorkflowIndex, workflowItems.length, toast.success]); // Explicit
 
   const startBossMode = () => {
     setBossMode(true);
@@ -285,7 +301,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
         if (prev <= 0) {
           clearInterval(bossIntervalRef.current!);
           setBossMode(false);
-          toast.error("Boss time expired!");
+          toast.error("Boss time expired!", { duration: 5000 });
           return 0;
         }
         return prev - 1000;
@@ -314,7 +330,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
 
   const handleItemClick = useCallback((item: any) => {
     if (!gameMode) {
-      toast.info(item.description || "Описание отсутствует");
+      toast.info(item.description || "Описание отсутствует", { duration: 5000 });
       return;
     }
 
@@ -329,11 +345,11 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
         if (loc && loc.quantity > 0) {
           voxel = selectedVoxel;
         } else {
-          return toast.error("Товар отсутствует в выбранной ячейке");
+          return toast.error("Товар отсутствует в выбранной ячейке", { duration: 5000 });
         }
       } else {
         if (item.locations.length === 0 || item.total_quantity <= 0) {
-          return toast.error("Нет локаций или количества для выгрузки");
+          return toast.error("Нет локаций или количества для выгрузки", { duration: 5000 });
         }
         voxel = item.locations[0].voxel;
       }
@@ -342,9 +358,9 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
     if (voxel && (delta > 0 || item.locations.find((l: any) => l.voxel === voxel)?.quantity > 0)) {
       handleUpdateLocationQty(item.id, voxel, delta, true);
     } else if (delta < 0) {
-      toast.error("Нельзя уменьшить ниже 0");
+      toast.error("Нельзя уменьшить ниже 0", { duration: 5000 });
     }
-  }, [gameMode, selectedVoxel, handleUpdateLocationQty, toast]);
+  }, [gameMode, selectedVoxel, handleUpdateLocationQty, toast.info, toast.error]); // Explicit
 
   const filteredItems = (items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
