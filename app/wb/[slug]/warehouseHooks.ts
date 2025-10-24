@@ -1,10 +1,9 @@
-// /app/wb/[slug]/warehouseHooks.ts
 "use client";
+
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { toast as sonnerToast } from "sonner"; // Fallback: Top import to prevent hoisting TDZ
+import { toast as sonnerToast } from "sonner";
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
 import { logger } from "@/lib/logger";
-import { useAppContext } from "@/contexts/AppContext";
 
 export const getSizePriority = (size: string | null): number => {
   if (!size) return 999;
@@ -26,16 +25,27 @@ const getSeasonPriority = (season: string | null): number => {
   return seasonOrder[season as string] || 3;
 };
 
-interface ToastProps {
-  success: (msg: string | React.ReactNode, opts?: any) => void;
-  error: (msg: string | React.ReactNode, opts?: any) => void;
-  info: (msg: string | React.ReactNode, opts?: any) => void;
-  warning: (msg: string | React.ReactNode, opts?: any) => void;
-}
+// Safe toast wrapper with fallback
+const toast = {
+  success: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.success === "function"
+      ? sonnerToast.success(msg, opts)
+      : console.log("TOAST SUCCESS:", msg),
+  error: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.error === "function"
+      ? sonnerToast.error(msg, opts)
+      : console.error("TOAST ERROR:", msg),
+  info: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.info === "function"
+      ? sonnerToast.info(msg, opts)
+      : console.log("TOAST INFO:", msg),
+  warning: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.warning === "function"
+      ? sonnerToast.warning(msg, opts)
+      : console.warn("TOAST WARNING:", msg),
+};
 
-export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
-  
-
+export function useCrewWarehouse(slug: string) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +64,6 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
   const [bossMode, setBossMode] = useState(false);
   const [bossTimer, setBossTimer] = useState(0);
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string; xtr: number }[]>([]);
-  const { dbUser } = useAppContext();
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [onloadCount, setOnloadCount] = useState(0);
   const [offloadCount, setOffloadCount] = useState(0);
@@ -66,26 +75,6 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
   const [filterColor, setFilterColor] = useState<string | null>(null);
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
-
-  // Safe Fallback: Runtime guard vs TDZ; always opts for sig match; dev-only
-  const toast = useMemo(() => {
-    const noOp = (_msg: string | React.ReactNode, _opts?: any) => {}; // Sig match
-    if (typeof sonnerToast === 'undefined') {
-      logger.warn("[useCrewWarehouse] Sonner unavailable—using no-op fallback (TDZ guard)");
-      return {
-        success: noOp,
-        error: noOp,
-        info: noOp,
-        warning: noOp,
-      };
-    }
-    return {
-      success: toastProps?.success || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.success(msg, opts)),
-      error: toastProps?.error || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.error(msg, opts)),
-      info: toastProps?.info || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.info(msg, opts)),
-      warning: toastProps?.warning || ((msg: string | React.ReactNode, opts?: any) => sonnerToast.warning(msg, opts)),
-    };
-  }, [toastProps]); // Stable—no inner hoisting risk
 
   const dailyGoals = useMemo(() => ({
     units: 100,
@@ -138,7 +127,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       toast.error(fetchError || "Ошибка загрузки товаров", { duration: 5000 });
       setLoading(false);
     }
-  }, [slug, toast.warning, toast.error]); // Explicit: Pin methods vs stale closures
+  }, [slug]);
 
   useEffect(() => {
     const resumeSession = localStorage.getItem(`warehouse_session_${slug}`);
@@ -165,7 +154,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
     loadItems();
     const savedLeaderboard = JSON.parse(localStorage.getItem(`warehouse_leaderboard_${slug}`) || "[]");
     setLeaderboard(savedLeaderboard);
-  }, [loadItems, slug, toast.info]); // Explicit dep
+  }, [loadItems, slug]);
 
   const checkAchievements = useCallback(() => {
     setAchievements((prev) => {
@@ -187,12 +176,12 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       
       return newAch.slice(-8);
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration, toast.success]); // Explicit
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration]);
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
       logger.info(`Updating qty for ${itemId} in ${voxelId} by ${delta}`);
-      const { success, error: updateError, item } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta, dbUser?.user_id);
+      const { success, error: updateError, item } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta);
       if (success) {
         setItems((prev) =>
           prev.map((i) => {
@@ -262,7 +251,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
         return { success: false, error: updateError };
       }
     },
-    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser, toast.error] // Explicit
+    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount]
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -280,7 +269,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
         endGameSession();
       }
     }
-  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty, toast.success]); // Explicit
+  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty]);
 
   const handleSkipItem = useCallback(() => {
     setCurrentWorkflowIndex((prev) => prev + 1);
@@ -290,7 +279,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       setWorkflowItems([]);
       endGameSession();
     }
-  }, [currentWorkflowIndex, workflowItems.length, toast.success]); // Explicit
+  }, [currentWorkflowIndex, workflowItems.length]);
 
   const startBossMode = () => {
     setBossMode(true);
@@ -313,7 +302,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
     setBossMode(false);
     const finalScore = score - errorCount * 50;
     setLevel(Math.floor(finalScore / 500) + 1);
-    const newLeaderboard = [...leaderboard, { name: dbUser?.username || "Anon", score: finalScore, date: new Date().toLocaleDateString(), xtr: 0 }]
+    const newLeaderboard = [...leaderboard, { name: "You", score: finalScore, date: new Date().toLocaleDateString(), xtr: 0 }]
       .sort((a, b) => b.score - a.score)
       .slice(0, 10);
     setLeaderboard(newLeaderboard);
@@ -324,7 +313,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
   };
 
   const handlePlateClick = useCallback((voxelId: string) => {
-    // placeholder - UI handles modal logic
+    // placeholder
   }, []);
 
   const handleItemClick = useCallback((item: any) => {
@@ -359,16 +348,16 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
     } else if (delta < 0) {
       toast.error("Нельзя уменьшить ниже 0", { duration: 5000 });
     }
-  }, [gameMode, selectedVoxel, handleUpdateLocationQty, toast.info, toast.error]); // Explicit
+  }, [gameMode, selectedVoxel, handleUpdateLocationQty]);
 
-  const filteredItems = (items.filter((item) => {
+  const filteredItems = useMemo(() => items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
     const matchesSeason = !filterSeason || item.season === filterSeason;
     const matchesPattern = !filterPattern || item.pattern === filterPattern;
     const matchesColor = !filterColor || item.color === filterColor;
     const matchesSize = !filterSize || item.size === filterSize;
     return matchesSearch && matchesSeason && matchesPattern && matchesColor && matchesSize;
-  }));
+  }), [items, search, filterSeason, filterPattern, filterColor, filterSize]);
 
   const [sortOption, setSortOption] = useState<'size_season_color' | 'color_size' | 'season_size_color'>('size_season_color');
 
@@ -453,6 +442,6 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
     avgTimePerItem,
     dailyGoals,
     sessionDuration,
-    getSizePriority, // Export the function
+    getSizePriority,
   };
 }
