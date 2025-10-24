@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast as sonnerToast } from "sonner"; // Fallback only
 import { Save, RotateCcw, FileUp, PackageSearch, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -15,6 +15,7 @@ import ShiftControls from "@/components/ShiftControls";
 import { CrewWarehouseSyncButtons } from "@/components/CrewWarehouseSyncButtons";
 import FilterAccordion from "@/components/FilterAccordion";
 import { useAppContext } from "@/contexts/AppContext";
+import { useAppToast } from "@/hooks/useAppToast";
 import { notifyCrewOwner } from "./actions_notify";
 import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
@@ -28,8 +29,9 @@ export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
   const { dbUser } = useAppContext();
+  const { success: appToast, error: appError, info: appInfo, warning: appWarning, custom: appCustom, dismiss: appDismiss } = useAppToast();
 
-  const warehouse = useCrewWarehouse(slug || "");
+  const warehouse = useCrewWarehouse(slug || "", { toast: { success: appToast, error: appError, info: appInfo, warning: appWarning } });
   const {
     items: hookItems,
     loading,
@@ -133,14 +135,14 @@ export default function CrewWarehousePage() {
         .limit(1)
         .maybeSingle();
       if (error) {
-        toast.error("Ошибка загрузки данных экипажа");
+        appError("Ошибка загрузки данных экипажа", { position: "top-right" });
         return;
       }
       setCrew(data || null);
       setIsOwner(data?.owner_id === dbUser?.user_id);
     };
     fetchCrew();
-  }, [slug, dbUser?.user_id]);
+  }, [slug, dbUser?.user_id, appError]);
 
   const loadStatus = async () => {
     if (!slug || !dbUser?.user_id) return;
@@ -150,7 +152,7 @@ export default function CrewWarehousePage() {
       const shiftRes = await getActiveShiftForCrewMember(slug, dbUser.user_id);
       setActiveShift(shiftRes.shift || null);
     } catch {
-      toast.error("Ошибка загрузки статуса");
+      appError("Ошибка загрузки статуса", { position: "top-right" });
     }
   };
 
@@ -166,7 +168,7 @@ export default function CrewWarehousePage() {
     return !!(isOwner || memberOk || globalAdmin);
   }, [dbUser, memberRole, isOwner]);
 
-  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
+  const optimisticUpdate = useCallback((itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
@@ -188,11 +190,34 @@ export default function CrewWarehousePage() {
     else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
     else setEditCount(p => p + absDelta);
 
-    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => {
+    // Enhanced: Toast on successful server update
+    handleUpdateLocationQty(itemId, voxelId, delta, true).then(({ success, item }) => {
+      if (success && item) {
+        const actionType = delta > 0 ? "Добавлено" : "Отгружено";
+        const newTotal = item.total_quantity;
+        const runningTotal = gameMode === "offload" ? offloadCount + absDelta : onloadCount + absDelta;
+        const itemName = localItems.find(i => i.id === itemId)?.name || "Товар";
+        appToast.success(
+          `${actionType} ${absDelta} ${itemName} в ${voxelId} (остаток: ${newTotal})`,
+          {
+            description: `Сессия: ${runningTotal} ед. ${gameMode === "offload" ? "отгружено" : "добавлено"}`,
+            duration: 4000,
+            position: "bottom-right",
+            action: {
+              label: "Чекпоинт",
+              onClick: () => handleCheckpoint(),
+            },
+          }
+        );
+      } else {
+        loadItems();
+        appError("Сервер не обновил—перезагружено", { position: "top-right" });
+      }
+    }).catch(() => {
       loadItems();
-      toast.error("Ошибка обновления на сервере - перезагружено");
+      appError("Ошибка обновления на сервере - перезагружено", { position: "top-right" });
     });
-  };
+  }, [handleUpdateLocationQty, gameMode, offloadCount, onloadCount, localItems, appToast, appError, handleCheckpoint]);
 
   const handleCheckpoint = async () => {
     // Summarize previous checkpoint stats
@@ -202,11 +227,25 @@ export default function CrewWarehousePage() {
       const changedCategories = Object.keys(sumsCurrent).filter(
         (cat) => sumsCurrent[cat] !== (sumsPrevious[cat] || 0)
       );
-      const message = `Завершён чекпоинт: отгружено ${offloadUnits} ед., изменено ${changedCount} позиций, общее изменение ${totalDelta} ед.\nКатегории: ${changedCategories.join(", ") || "нет"}`;
-      await notifyCrewOwner(slug, message, dbUser.user_id);
-      // Optionally notify car_monitor (uncomment if desired)
-      // await notifyCarMonitors(slug, message);
-      toast.success("Предыдущий чекпоинт отправлен");
+      const semitotalMsg = `Семитотал чекпоинта: ${offloadUnits} ед. отгружено, ${changedCount} изменений, Δ${totalDelta} ед.`;
+      const fullMessage = `${semitotalMsg}\nКатегории: ${changedCategories.join(", ") || "нет"}`;
+      await notifyCrewOwner(slug, fullMessage, dbUser.user_id);
+
+      // Custom semitotal toast
+      appCustom((t) => (
+        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md space-y-2">
+          <h3 className="font-semibold text-blue-800">Чекпоинт Завершён</h3>
+          <p className="text-sm text-blue-700">{semitotalMsg}</p>
+          <div className="text-xs text-gray-600 grid grid-cols-3 gap-2">
+            <span>Изменения: {changedCount}</span>
+            <span>Дельта: {totalDelta}</span>
+            <span>Отгружено: {offloadUnits}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => appDismiss(t)} className="w-full">
+            Продолжить
+          </Button>
+        </div>
+      ), { duration: 8000, position: "bottom-right" });
     }
 
     // Save new checkpoint
@@ -217,32 +256,33 @@ export default function CrewWarehousePage() {
     setOffloadCount(0);
     setEditCount(0);
     setLastCheckpointDurationSec(checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null);
-    toast.success("Чекпоинт сохранён");
+    appInfo("Новый чекпоинт запущен", { position: "bottom-right" });
 
     if (dbUser?.user_id) {
       const res = await saveCrewCheckpoint(slug, dbUser.user_id, snapshot);
-      if (res.success) toast.success("Чекпоинт сохранён на сервере");
-      else toast.error("Ошибка сохранения чекпоинта");
+      if (res.success) appToast("Чекпоинт сохранён на сервере", { position: "bottom-right" });
+      else appError("Ошибка сохранения чекпоинта", { position: "top-right" });
     }
   };
 
   const handleReset = async () => {
-    if (!checkpoint.length) return toast.error("Нет чекпоинта");
+    if (!checkpoint.length) return appError("Нет чекпоинта для сброса", { position: "top-right" });
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Сброшено до чекпоинта");
 
     if (dbUser?.user_id) {
       const res = await resetCrewCheckpoint(slug, dbUser.user_id);
       if (res.success) {
-        toast.success(`Сброшено на сервере (${res.applied} позиций)`);
+        appInfo(`Сброшено: ${res.applied} позиций (отменено ${statsObj.totalDelta} ед.)`, { position: "bottom-right" });
         loadItems();
       } else {
-        toast.error("Ошибка сброса чекпоинта");
+        appError("Ошибка сброса чекпоинта", { position: "top-right" });
       }
+    } else {
+      appInfo("Сброшено локально до чекпоинта", { position: "bottom-right" });
     }
   };
 
@@ -361,8 +401,8 @@ export default function CrewWarehousePage() {
       });
     setEditContents(contents);
     setEditDialogOpen(true);
-    toast.info(`Открыта ячейка ${voxelId} для редактирования`);
-  }, [gameMode, handlePlateClick, localItems]);
+    appInfo(`Ячейка ${voxelId} открыта для правки`, { position: "bottom-right" });
+  }, [gameMode, handlePlateClick, localItems, appInfo]);
 
   // Define handleItemClickCustom to open edit modal in "none" game mode
   const handleItemClickCustom = useCallback((item: any) => {
@@ -378,18 +418,18 @@ export default function CrewWarehousePage() {
     const contents = loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : [];
     setEditContents(contents);
     setEditDialogOpen(true);
-    toast.info(`Открыт товар ${item.name} для редактирования в ячейке ${voxelId}`);
-  }, [gameMode, handleItemClick, selectedVoxel]);
+    appInfo(`Товар ${item.name} открыт для правки в ${voxelId}`, { position: "bottom-right" });
+  }, [gameMode, handleItemClick, selectedVoxel, appInfo]);
 
   const handleExportDaily = async () => {
-    if (!activeShift) return toast.error("Для экспорта необходима активная смена");
+    if (!activeShift) return appError("Запустите смену для экспорта отчёта", { position: "top-right" });
     setExportingDaily(true);
     try {
       const res = await exportCrewDailyShift(slug, false); // Use exportCrewDailyShift with special notification
 
       if (res?.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Отчет скопирован");
+        if (copied) appToast("Отчёт скопирован в буфер", { position: "bottom-right" });
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
@@ -398,30 +438,36 @@ export default function CrewWarehousePage() {
           a.download = `daily_shift_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          toast.success("Отчет скачан");
+          appToast("Отчёт скачан", { position: "bottom-right" });
         }
 
         // Notification already sent by exportCrewDailyShift
-        toast.success("Отчет отправлен владельцу");
+        appInfo("Отчёт отправлен владельцу экипажа", { position: "top-right" });
       } else {
-        toast.error(res?.error || "Ошибка экспорта отчета");
+        appError(res?.error || "Экспорт отчёта провалился", { position: "top-right" });
       }
     } catch (err) {
-      toast.error("Ошибка экспорта отчета");
+      appError("Критическая ошибка экспорта отчёта", { position: "top-right" });
     } finally {
       setExportingDaily(false);
     }
   };
 
   const handleSendCar = async () => {
-    if (!canManage) return toast.error("Нет прав для запроса машины");
+    if (!canManage) return appError("У вас нет прав на запрос машины", { position: "top-right" });
     setSendingCar(true);
     try {
       const msg = `Запрос машины: тип=${carSize}`;
       await notifyCrewOwner(slug, msg, dbUser?.user_id);
-      toast.success("Запрос машины отправлен");
+      appCustom((t) => (
+        <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
+          <Car className="w-5 h-5 text-green-600" />
+          <span>Запрос {carSize} машины ушёл владельцу</span>
+          <Button variant="ghost" size="sm" onClick={() => appDismiss(t)}>OK</Button>
+        </div>
+      ), { duration: 5000, position: "bottom-right" });
     } catch (err) {
-      toast.error("Ошибка отправки запроса машины");
+      appError("Не удалось отправить запрос машины", { position: "top-right" });
     } finally {
       setSendingCar(false);
     }
@@ -436,9 +482,12 @@ export default function CrewWarehousePage() {
       const ozonCount = ozonRes.success ? ozonRes.count : 0;
       const total = wbCount + ozonCount;
       setTargetOffload(total);
-      toast.success(`Ожидающие выгрузки: WB ${wbCount}, Ozon ${ozonCount}. Итого: ${total}`);
+      appWarning(`Горячие заказы: WB ${wbCount} | Ozon ${ozonCount} | Всего ${total}`, {
+        position: "top-center",
+        duration: 6000,
+      });
     } catch (err: any) {
-      toast.error("Ошибка проверки ожидающих");
+      appError("Проверка заказов сломалась", { position: "top-right" });
     } finally {
       setCheckingPending(false);
     }
@@ -449,7 +498,7 @@ export default function CrewWarehousePage() {
       const res = await exportCrewCurrentStock(slug, localItems, summarized);
       if (res.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Склад скопирован");
+        if (copied) appToast("Склад в буфере — готов к вставке", { position: "bottom-right" });
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
@@ -458,13 +507,13 @@ export default function CrewWarehousePage() {
           a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          toast.success("Склад экспортирован");
+          appToast("Склад экспортирован в файл", { position: "bottom-right" });
         }
       } else {
-        toast.error(res.error || "Ошибка экспорта склада");
+        appError(res.error || "Экспорт склада не удался", { position: "top-right" });
       }
     } catch (err) {
-      toast.error("Ошибка экспорта склада");
+      appError("Крах экспорта склада", { position: "top-right" });
     }
   };
 

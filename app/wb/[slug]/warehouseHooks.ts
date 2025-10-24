@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { toast } from "sonner";
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
@@ -24,7 +23,14 @@ const getSeasonPriority = (season: string | null): number => {
   return seasonOrder[season as string] || 3;
 };
 
-export function useCrewWarehouse(slug: string) {
+interface ToastProps {
+  success: (msg: string | React.ReactNode, opts?: any) => void;
+  error: (msg: string | React.ReactNode, opts?: any) => void;
+  info: (msg: string | React.ReactNode, opts?: any) => void;
+  warning: (msg: string | React.ReactNode, opts?: any) => void;
+}
+
+export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +61,14 @@ export function useCrewWarehouse(slug: string) {
   const [filterColor, setFilterColor] = useState<string | null>(null);
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
+
+  // Fallback to sonner if no props passed (for isolated testing)
+  const toast = useMemo(() => ({
+    success: toastProps?.success || ((msg: string) => sonnerToast.success(msg)),
+    error: toastProps?.error || ((msg: string) => sonnerToast.error(msg)),
+    info: toastProps?.info || ((msg: string) => sonnerToast.info(msg)),
+    warning: toastProps?.warning || ((msg: string) => sonnerToast.warning(msg)),
+  }), [toastProps]);
 
   const dailyGoals = useMemo(() => ({
     units: 100,
@@ -107,7 +121,7 @@ export function useCrewWarehouse(slug: string) {
       toast.error(fetchError || "Ошибка загрузки товаров");
       setLoading(false);
     }
-  }, [slug]);
+  }, [slug, toast]);
 
   useEffect(() => {
     const resumeSession = localStorage.getItem(`warehouse_session_${slug}`);
@@ -156,12 +170,12 @@ export function useCrewWarehouse(slug: string) {
       
       return newAch.slice(-8);
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration]);
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration, toast]);
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
       logger.info(`Updating qty for ${itemId} in ${voxelId} by ${delta}`);
-      const { success, error: updateError } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta, dbUser?.user_id);
+      const { success, error: updateError, item } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta, dbUser?.user_id);
       if (success) {
         setItems((prev) =>
           prev.map((i) => {
@@ -224,12 +238,14 @@ export function useCrewWarehouse(slug: string) {
           offload: offloadCount,
           edits: editCount,
         }));
+        return { success, item };
       } else {
         toast.error(updateError || "Failed to update quantity");
         if (isGameAction) setErrorCount((prev) => prev + 1);
+        return { success: false, error: updateError };
       }
     },
-    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser],
+    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser, toast],
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -247,7 +263,7 @@ export function useCrewWarehouse(slug: string) {
         endGameSession();
       }
     }
-  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty]);
+  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty, toast]);
 
   const handleSkipItem = useCallback(() => {
     setCurrentWorkflowIndex((prev) => prev + 1);
@@ -257,7 +273,7 @@ export function useCrewWarehouse(slug: string) {
       setWorkflowItems([]);
       endGameSession();
     }
-  }, [currentWorkflowIndex, workflowItems.length]);
+  }, [currentWorkflowIndex, workflowItems.length, toast]);
 
   const startBossMode = () => {
     setBossMode(true);
@@ -326,7 +342,7 @@ export function useCrewWarehouse(slug: string) {
     } else if (delta < 0) {
       toast.error("Нельзя уменьшить ниже 0");
     }
-  }, [gameMode, selectedVoxel, handleUpdateLocationQty]);
+  }, [gameMode, selectedVoxel, handleUpdateLocationQty, toast]);
 
   const filteredItems = (items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
