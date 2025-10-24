@@ -1,4 +1,5 @@
 // /app/wb/[slug]/warehouseHooks.ts
+"use client";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast as sonnerToast } from "sonner"; // Fallback: Top import to prevent hoisting TDZ
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
