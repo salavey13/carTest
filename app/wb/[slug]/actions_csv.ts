@@ -192,7 +192,6 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
           [],
           { attachment: { type: "document", content: emptyCsv, filename: `shift_${slug}_${format(today, 'ddMMyy')}.tsv` } }
         );
-        toast.success("Отчет отправлен владельцу экипажа (нет отгрузок)");
       }
       return { success: true, csv: emptyCsv };
     }
@@ -246,7 +245,6 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
           [],
           { attachment: { type: "document", content: emptyCsv, filename: `shift_${slug}_${format(today, 'ddMMyy')}.tsv` } }
         );
-        toast.success("Отчет отправлен владельцу экипажа (нет отгрузок)");
       }
       return { success: true, csv: emptyCsv };
     }
@@ -286,7 +284,6 @@ export async function exportCrewDailyShift(slug: string, isTelegram = false): Pr
         [],
         { attachment: { type: "document", content: csvData, filename: `shift_${slug}_${format(today, 'ddMMyy')}.tsv` } }
       );
-      toast.success("Отчет отправлен владельцу экипажа");
     }
 
     return { success: true, csv: csvData };
