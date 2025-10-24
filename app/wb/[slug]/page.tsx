@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast as sonnerToast } from "sonner";
+// REMOVED top-level sonner import and wrapper
 import { Save, RotateCcw, FileUp, PackageSearch, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -23,34 +23,15 @@ import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabaseAdmin } from "@/hooks/supabase";
 
-// Sonner toast wrapper (safe, no TDZ, no AppToast)
-const toast = {
-  success: (msg: string | React.ReactNode, opts?: any) =>
-    typeof sonnerToast?.success === "function"
-      ? sonnerToast.success(msg, opts)
-      : console.log("TOAST SUCCESS:", msg),
-  error: (msg: string | React.ReactNode, opts?: any) =>
-    typeof sonnerToast?.error === "function"
-      ? sonnerToast.error(msg, opts)
-      : console.error("TOAST ERROR:", msg),
-  info: (msg: string | React.ReactNode, opts?: any) =>
-    typeof sonnerToast?.info === "function"
-      ? sonnerToast.info(msg, opts)
-      : console.log("TOAST INFO:", msg),
-  warning: (msg: string | React.ReactNode, opts?: any) =>
-    typeof sonnerToast?.warning === "function"
-      ? sonnerToast.warning(msg, opts)
-      : console.warn("TOAST WARNING:", msg),
-  custom: (content: React.ReactNode, opts?: any) =>
-    typeof sonnerToast === "function"
-      ? sonnerToast(content, opts)
-      : console.log("TOAST CUSTOM:", content),
-  dismiss: (id?: any) => sonnerToast.dismiss(id),
-};
+// <-- NEW: use centralized hook-based toast
+import { useAppToast } from "@/hooks/useAppToast";
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
+
+  // Call the toast hook inside component render (safe)
+  const toast = useAppToast();
 
   const warehouse = useCrewWarehouse(slug || "");
   const {
