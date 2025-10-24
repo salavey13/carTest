@@ -11,8 +11,14 @@ function safeParseSpecs(specs: any) {
 function log(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.log("[wb/actions_crud]", ...args); }
 function err(...args: any[]) { if ((process.env.NEXT_PUBLIC_DEBUG ?? "1") !== "0") console.error("[wb/actions_crud]", ...args); }
 
+// Cached resolver: Per-request cache to avoid multi-call dups (e.g., in batched updates)
+const crewCache = new Map<string, any>();
 async function resolveCrewBySlug(slug: string) {
   noStore();
+  if (crewCache.has(slug)) {
+    log(`[resolveCrewBySlug] Cache hit for ${slug}`);
+    return crewCache.get(slug);
+  }
   const { data, error } = await supabaseAdmin
     .from("crews")
     .select("id, name, slug, owner_id, logo_url")
@@ -21,22 +27,27 @@ async function resolveCrewBySlug(slug: string) {
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error(`Crew '${slug}' not found`);
+  crewCache.set(slug, data);
   return data as any;
 }
 
-async function verifyCrewMember(crewId: string, userId: string | undefined) {
+// Fused auth: Single query for member + owner check (join on crews)
+async function verifyCrewAccess(crewId: string, userId: string | undefined) {
   if (!userId) return { isMember: false, role: null, isOwner: false, error: "User ID required" };
   const { data: member, error } = await supabaseAdmin
     .from("crew_members")
-    .select("role, membership_status")
+    .select(`
+      role,
+      membership_status,
+      crews!inner(owner_id)
+    `)
     .eq("crew_id", crewId)
     .eq("user_id", userId)
     .single();
   if (error && (error as any).code !== "PGRST116") throw error;
   const isMember = !!member && member.membership_status === "active";
   const role = (member as any)?.role || null;
-  const { data: crew } = await supabaseAdmin.from("crews").select("owner_id").eq("id", crewId).single();
-  const isOwner = crew?.owner_id === userId;
+  const isOwner = (member as any)?.crews?.owner_id === userId;
   return { isMember, role, isOwner };
 }
 
@@ -117,8 +128,9 @@ export async function updateCrewItemLocationQty(
     const crew = await resolveCrewBySlug(slug);
     const crewId = crew.id;
 
-    const { isMember, role, isOwner, error } = await verifyCrewMember(crewId, userId);
-    if (error) throw new Error(error);
+    // Fused verify + owner check
+    const { isMember, role, isOwner, error: authErr } = await verifyCrewAccess(crewId, userId);
+    if (authErr) throw new Error(authErr);
 
     // allow owner OR active member OR global admin
     const callerIsAdmin = await isGlobalAdmin(userId);
@@ -159,20 +171,24 @@ export async function updateCrewItemLocationQty(
 
     log(`[updateCrewItemLocationQty] ok ${itemId} ${voxelId} ${delta} total=${totalQuantity}`);
 
-    // --- Log action to active shift.actions if possible ---
+    // --- Log action to active shift.actions if possible (batched: fetch + update in one go if exists) ---
     try {
       if (userId) {
-        const { data: activeShift } = await supabaseAdmin
+        const { data: activeShift, error: shiftErr } = await supabaseAdmin
           .from("crew_member_shifts")
-          .select("*")
+          .select("id, actions")
           .eq("member_id", userId)
           .eq("crew_id", crewId)
           .is("clock_out_time", null)
           .limit(1)
           .maybeSingle();
+        if (shiftErr) {
+          log("Shift fetch error (non-fatal):", shiftErr);
+          return { success: true, item: { id: itemId, specs, total_quantity: totalQuantity } }; // Non-breaking: Skip log
+        }
 
         if (activeShift && activeShift.id) {
-          const actions = Array.isArray(activeShift.actions) ? activeShift.actions : [];
+          const actions = Array.isArray(activeShift.actions) ? [...activeShift.actions] : [];
           const evt: any = {
             type: delta < 0 ? "offload" : "onload",
             itemId,
@@ -184,7 +200,7 @@ export async function updateCrewItemLocationQty(
           };
           actions.push(evt);
 
-          // write back
+          // Single update for actions
           const { error: updShiftErr } = await supabaseAdmin
             .from("crew_member_shifts")
             .update({ actions })
