@@ -4,8 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// REMOVED top-level sonner import and wrapper
-import { Save, RotateCcw, FileUp, PackageSearch, Car } from "lucide-react";
+// убрал прямой импорт sonner/toast
+import { Save, RotateCcw, FileUp, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
 import { WarehouseViz } from "@/components/WarehouseViz";
@@ -23,17 +23,25 @@ import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabaseAdmin } from "@/hooks/supabase";
 
-// <-- NEW: use centralized hook-based toast
+// Хук для тостов — компонентный уровень, не хук/утилита
 import { useAppToast } from "@/hooks/useAppToast";
 
+/**
+ * CrewWarehousePage
+ * - Регистрация notifier'а: компонент регистрирует useAppToast() в хуке
+ *   через registerNotifier, возвращаемый useCrewWarehouse.
+ * - Таким образом hooks остаются без прямых вызовов sonner/toast (нет TDZ/circular).
+ */
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
 
-  // Call the toast hook inside component render (safe)
+  // component-level toast hook
   const toast = useAppToast();
 
-  const warehouse = useCrewWarehouse(slug || "");
+  // Получаем весь API хука. registerNotifier присутствует в возвращаемом объекте.
+  const wh = useCrewWarehouse(slug || "");
+  // Деструктурируем поля (включая registerNotifier)
   const {
     items: hookItems,
     loading,
@@ -88,7 +96,8 @@ export default function CrewWarehousePage() {
     dailyGoals,
     sessionDuration,
     getSizePriority,
-  } = warehouse;
+    registerNotifier,
+  } = wh as any; // as any чтобы не тянуть длинные TS-типовые определения здесь
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
@@ -125,7 +134,36 @@ export default function CrewWarehousePage() {
     return () => clearInterval(iv);
   }, []);
 
-  // Load crew data
+  // register notifier: map hook notifications -> component toast
+  useEffect(() => {
+    if (!registerNotifier || !toast) return;
+    // Обёртка, чтобы не ронять, если toast методы изменятся
+    const notifier = (type: string, message: string | any, opts?: any) => {
+      try {
+        if (type === "success") return toast.success(message as any, opts);
+        if (type === "error") return toast.error(message as any, opts);
+        if (type === "warning") return toast.warning(message as any, opts);
+        if (type === "info") return toast.info(message as any, opts);
+        if (type === "custom" && typeof message === "function") return toast.custom(message as any, opts);
+        // fallback
+        return toast.message(String(message), opts);
+      } catch (e) {
+        // fallback silent
+        // console.error("Notifier mapping failed", e);
+      }
+    };
+
+    registerNotifier(notifier);
+    return () => {
+      try {
+        registerNotifier(null);
+      } catch (e) {
+        /* ignore */
+      }
+    };
+  }, [registerNotifier, toast]);
+
+  // Load crew data to ensure name displays
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
@@ -140,11 +178,10 @@ export default function CrewWarehousePage() {
         return;
       }
       setCrew(data || null);
-      const { data: userData } = await supabaseAdmin.auth.getUser();
-      setIsOwner(data?.owner_id === userData?.user?.id);
+      setIsOwner(data?.owner_id === (await supabaseAdmin.auth.getUser()).data?.user?.id);
     };
     fetchCrew();
-  }, [slug]);
+  }, [slug, toast]);
 
   const loadStatus = async () => {
     if (!slug) return;
@@ -169,10 +206,12 @@ export default function CrewWarehousePage() {
   }, [slug]);
 
   const canManage = useMemo(() => {
-    return isOwner || activeShift;
+    const globalAdmin = false; // page-level: ты можешь заменить этой логикой из AppContext, если надо
+    const memberOk = !!(isOwner || activeShift);
+    return !!(memberOk || globalAdmin);
   }, [isOwner, activeShift]);
 
-  const optimisticUpdate = useCallback((itemId: string, voxelId: string, delta: number) => {
+  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
@@ -194,111 +233,68 @@ export default function CrewWarehousePage() {
     else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
     else setEditCount(p => p + absDelta);
 
-    handleUpdateLocationQty(itemId, voxelId, delta, true).then(({ success, item }) => {
-      if (success && item) {
-        const actionType = delta > 0 ? "Добавлено" : "Отгружено";
-        const newTotal = item.total_quantity;
-        const runningTotal = gameMode === "offload" ? offloadCount + absDelta : onloadCount + absDelta;
-        const itemName = localItems.find(i => i.id === itemId)?.name || "Товар";
-        toast.success(
-          `${actionType} ${absDelta} ${itemName} в ${voxelId} (остаток: ${newTotal})`,
-          {
-            description: `Сессия: ${runningTotal} ед. ${gameMode === "offload" ? "отгружено" : "добавлено"}`,
-            duration: 4000,
-            position: "bottom-right",
-            action: {
-              label: "Чекпоинт",
-              onClick: () => handleCheckpoint(),
-            },
-          }
-        );
-      } else {
-        loadItems();
-        toast.error("Сервер не обновил—перезагружено");
-      }
-    }).catch(() => {
+    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => {
       loadItems();
       toast.error("Ошибка обновления на сервере - перезагружено");
     });
-  }, [handleUpdateLocationQty, gameMode, offloadCount, onloadCount, localItems, handleCheckpoint]);
+  };
 
   const handleCheckpoint = async () => {
-    if (checkpoint.length) {
-      const stats = computeProcessedStats();
-      const { offloadUnits, changedCount, totalDelta, sumsPrevious, sumsCurrent } = stats;
-      const changedCategories = Object.keys(sumsCurrent).filter(
-        (cat) => sumsCurrent[cat] !== (sumsPrevious[cat] || 0)
-      );
-      const semitotalMsg = `Семитотал чекпоинта: ${offloadUnits} ед. отгружено, ${changedCount} изменений, Δ${totalDelta} ед.`;
-      const fullMessage = `${semitotalMsg}\nКатегории: ${changedCategories.join(", ") || "нет"}`;
-      await notifyCrewOwner(slug, fullMessage);
-
-      toast.custom((t) => (
-        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md space-y-2">
-          <h3 className="font-semibold text-blue-800">Чекпоинт Завершён</h3>
-          <p className="text-sm text-blue-700">{semitotalMsg}</p>
-          <div className="text-xs text-gray-600 grid grid-cols-3 gap-2">
-            <span>Изменения: {changedCount}</span>
-            <span>Дельта: {totalDelta}</span>
-            <span>Отгружено: {offloadUnits}</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => toast.dismiss(t)} className="w-full">
-            Продолжить
-          </Button>
-        </div>
-      ), { duration: 8000, position: "bottom-right" });
-    }
-
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    setLastCheckpointDurationSec(checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null);
-    toast.info("Новый чекпоинт запущен");
+    toast.success("Чекпоинт сохранён локально");
 
-    const { data: userData } = await supabaseAdmin.auth.getUser();
-    const userId = userData?.user?.id;
-    if (userId) {
-      const res = await saveCrewCheckpoint(slug, userId, snapshot);
-      if (res.success) toast.success("Чекпоинт сохранён на сервере");
-      else toast.error("Ошибка сохранения чекпоинта");
+    // Сохраняем на сервере если есть сессия
+    try {
+      const user = await supabaseAdmin.auth.getUser();
+      const userId = user.data?.user?.id;
+      if (userId) {
+        const res = await saveCrewCheckpoint(slug, userId, snapshot);
+        if (res.success) toast.success("Чекпоинт сохранён на сервере");
+        else toast.error("Ошибка сохранения чекпоинта на сервере");
+      }
+    } catch (e) {
+      toast.error("Ошибка сохранения чекпоинта");
     }
   };
 
   const handleReset = async () => {
-    if (!checkpoint.length) return toast.error("Нет чекпоинта для сброса");
+    if (!checkpoint.length) return toast.error("Нет чекпоинта");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
+    toast.success("Сброс до чекпоинта (локально)");
 
-    const { data: userData } = await supabaseAdmin.auth.getUser();
-    const userId = userData?.user?.id;
-    if (userId) {
-      const res = await resetCrewCheckpoint(slug, userId);
-      if (res.success) {
-        toast.info(`Сброшено: ${res.applied} позиций (отменено ${statsObj.totalDelta} ед.)`);
-        loadItems();
-      } else {
-        toast.error("Ошибка сброса чекпоинта");
+    try {
+      const user = await supabaseAdmin.auth.getUser();
+      const userId = user.data?.user?.id;
+      if (userId) {
+        const res = await resetCrewCheckpoint(slug, userId);
+        if (res.success) {
+          toast.success(`Сброс на сервере применён (${res.applied} позиций)`);
+          loadItems();
+        } else {
+          toast.error("Ошибка сброса на сервере");
+        }
       }
-    } else {
-      toast.info("Сброшено локально до чекпоинта");
+    } catch (e) {
+      toast.error("Ошибка при сбросе");
     }
   };
 
   const categorizeItem = (item: any): string => {
     const fullLower = (item.id || item.model || '').toLowerCase().trim();
     if (!fullLower) return 'other';
-
     if (fullLower.includes('наматрасник') || fullLower.includes('namatras')) {
       const sizeMatch = fullLower.match(/(90|120|140|160|180|200)/);
       if (sizeMatch) return `namatras ${sizeMatch[0]}`;
     }
-
     const sizeChecks = [
       { key: 'евро макси', val: 'evromaksi' },
       { key: 'evro maksi', val: 'evromaksi' },
@@ -316,7 +312,6 @@ export default function CrewWarehousePage() {
         break;
       }
     }
-
     const seasonMap = { 'лето': 'leto', 'зима': 'zima', 'leto': 'leto', 'zima': 'zima' };
     let detectedSeason = null;
     for (const [key, val] of Object.entries(seasonMap)) {
@@ -325,22 +320,18 @@ export default function CrewWarehousePage() {
         break;
       }
     }
-
     if (detectedSize && detectedSeason) {
       return `${detectedSize} ${detectedSeason}`;
     }
-
     if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70')) return 'Podushka 50x70';
-      if (fullLower.includes('70x70')) return 'Podushka 70x70';
-      if (fullLower.includes('анатом')) return 'Podushka anatom';
+      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Podushka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Podushka 70x70';
+      if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
     }
-
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70')) return 'Navolochka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Navolochka 70x70';
     }
-
     return 'other';
   };
 
@@ -403,7 +394,7 @@ export default function CrewWarehousePage() {
     setEditContents(contents);
     setEditDialogOpen(true);
     toast.info(`Ячейка ${voxelId} открыта для правки`);
-  }, [gameMode, handlePlateClick, localItems]);
+  }, [gameMode, handlePlateClick, localItems, toast]);
 
   const handleItemClickCustom = useCallback((item: any) => {
     if (gameMode) {
@@ -417,7 +408,7 @@ export default function CrewWarehousePage() {
     setEditContents(contents);
     setEditDialogOpen(true);
     toast.info(`Товар ${item.name} открыт для правки в ${voxelId}`);
-  }, [gameMode, handleItemClick, selectedVoxel]);
+  }, [gameMode, handleItemClick, selectedVoxel, toast]);
 
   const handleExportDaily = async () => {
     if (!activeShift) return toast.error("Запустите смену для экспорта отчёта");
