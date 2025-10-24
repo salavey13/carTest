@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast as sonnerToast } from "sonner"; // Fallback only
+import { toast as sonnerToast } from "sonner";
 import { Save, RotateCcw, FileUp, PackageSearch, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -14,8 +14,6 @@ import WarehouseStats from "@/components/WarehouseStats";
 import ShiftControls from "@/components/ShiftControls";
 import { CrewWarehouseSyncButtons } from "@/components/CrewWarehouseSyncButtons";
 import FilterAccordion from "@/components/FilterAccordion";
-import { useAppContext } from "@/contexts/AppContext";
-import { useAppToast } from "@/hooks/useAppToast";
 import { notifyCrewOwner } from "./actions_notify";
 import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
@@ -25,13 +23,36 @@ import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabaseAdmin } from "@/hooks/supabase";
 
+// Sonner toast wrapper (safe, no TDZ, no AppToast)
+const toast = {
+  success: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.success === "function"
+      ? sonnerToast.success(msg, opts)
+      : console.log("TOAST SUCCESS:", msg),
+  error: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.error === "function"
+      ? sonnerToast.error(msg, opts)
+      : console.error("TOAST ERROR:", msg),
+  info: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.info === "function"
+      ? sonnerToast.info(msg, opts)
+      : console.log("TOAST INFO:", msg),
+  warning: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.warning === "function"
+      ? sonnerToast.warning(msg, opts)
+      : console.warn("TOAST WARNING:", msg),
+  custom: (content: React.ReactNode, opts?: any) =>
+    typeof sonnerToast === "function"
+      ? sonnerToast(content, opts)
+      : console.log("TOAST CUSTOM:", content),
+  dismiss: (id?: any) => sonnerToast.dismiss(id),
+};
+
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
-  const { dbUser } = useAppContext();
-  const { success: appToast, error: appError, info: appInfo, warning: appWarning, custom: appCustom, dismiss: appDismiss } = useAppToast();
 
-  const warehouse = useCrewWarehouse(slug || "", { toast: { success: appToast, error: appError, info: appInfo, warning: appWarning } });
+  const warehouse = useCrewWarehouse(slug || "");
   const {
     items: hookItems,
     loading,
@@ -90,7 +111,6 @@ export default function CrewWarehousePage() {
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
-  const [memberRole, setMemberRole] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
@@ -124,7 +144,7 @@ export default function CrewWarehousePage() {
     return () => clearInterval(iv);
   }, []);
 
-  // Load crew data to ensure name displays
+  // Load crew data
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
@@ -135,24 +155,29 @@ export default function CrewWarehousePage() {
         .limit(1)
         .maybeSingle();
       if (error) {
-        appError("Ошибка загрузки данных экипажа", { position: "top-right" });
+        toast.error("Ошибка загрузки данных экипажа");
         return;
       }
       setCrew(data || null);
-      setIsOwner(data?.owner_id === dbUser?.user_id);
+      const { data: userData } = await supabaseAdmin.auth.getUser();
+      setIsOwner(data?.owner_id === userData?.user?.id);
     };
     fetchCrew();
-  }, [slug, dbUser?.user_id, appError]);
+  }, [slug]);
 
   const loadStatus = async () => {
-    if (!slug || !dbUser?.user_id) return;
+    if (!slug) return;
     try {
-      const statusRes = await getCrewMemberStatus(slug, dbUser.user_id);
+      const { data: userData } = await supabaseAdmin.auth.getUser();
+      const userId = userData?.user?.id;
+      if (!userId) return;
+
+      const statusRes = await getCrewMemberStatus(slug, userId);
       if (statusRes.success) setLiveStatus(statusRes.live_status || null);
-      const shiftRes = await getActiveShiftForCrewMember(slug, dbUser.user_id);
+      const shiftRes = await getActiveShiftForCrewMember(slug, userId);
       setActiveShift(shiftRes.shift || null);
     } catch {
-      appError("Ошибка загрузки статуса", { position: "top-right" });
+      toast.error("Ошибка загрузки статуса");
     }
   };
 
@@ -160,13 +185,11 @@ export default function CrewWarehousePage() {
     loadStatus();
     const poll = setInterval(loadStatus, 30000);
     return () => clearInterval(poll);
-  }, [slug, dbUser?.user_id]);
+  }, [slug]);
 
   const canManage = useMemo(() => {
-    const globalAdmin = !!dbUser && (dbUser.status === "admin" || dbUser.is_admin);
-    const memberOk = !!memberRole && memberRole !== "car_monitor"; // Exclude car_monitor
-    return !!(isOwner || memberOk || globalAdmin);
-  }, [dbUser, memberRole, isOwner]);
+    return isOwner || activeShift;
+  }, [isOwner, activeShift]);
 
   const optimisticUpdate = useCallback((itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
@@ -190,14 +213,13 @@ export default function CrewWarehousePage() {
     else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
     else setEditCount(p => p + absDelta);
 
-    // Enhanced: Toast on successful server update
     handleUpdateLocationQty(itemId, voxelId, delta, true).then(({ success, item }) => {
       if (success && item) {
         const actionType = delta > 0 ? "Добавлено" : "Отгружено";
         const newTotal = item.total_quantity;
         const runningTotal = gameMode === "offload" ? offloadCount + absDelta : onloadCount + absDelta;
         const itemName = localItems.find(i => i.id === itemId)?.name || "Товар";
-        appToast.success(
+        toast.success(
           `${actionType} ${absDelta} ${itemName} в ${voxelId} (остаток: ${newTotal})`,
           {
             description: `Сессия: ${runningTotal} ед. ${gameMode === "offload" ? "отгружено" : "добавлено"}`,
@@ -211,17 +233,16 @@ export default function CrewWarehousePage() {
         );
       } else {
         loadItems();
-        appError("Сервер не обновил—перезагружено", { position: "top-right" });
+        toast.error("Сервер не обновил—перезагружено");
       }
     }).catch(() => {
       loadItems();
-      appError("Ошибка обновления на сервере - перезагружено", { position: "top-right" });
+      toast.error("Ошибка обновления на сервере - перезагружено");
     });
-  }, [handleUpdateLocationQty, gameMode, offloadCount, onloadCount, localItems, appToast, appError, handleCheckpoint]);
+  }, [handleUpdateLocationQty, gameMode, offloadCount, onloadCount, localItems, handleCheckpoint]);
 
   const handleCheckpoint = async () => {
-    // Summarize previous checkpoint stats
-    if (checkpoint.length && dbUser?.user_id) {
+    if (checkpoint.length) {
       const stats = computeProcessedStats();
       const { offloadUnits, changedCount, totalDelta, sumsPrevious, sumsCurrent } = stats;
       const changedCategories = Object.keys(sumsCurrent).filter(
@@ -229,10 +250,9 @@ export default function CrewWarehousePage() {
       );
       const semitotalMsg = `Семитотал чекпоинта: ${offloadUnits} ед. отгружено, ${changedCount} изменений, Δ${totalDelta} ед.`;
       const fullMessage = `${semitotalMsg}\nКатегории: ${changedCategories.join(", ") || "нет"}`;
-      await notifyCrewOwner(slug, fullMessage, dbUser.user_id);
+      await notifyCrewOwner(slug, fullMessage);
 
-      // Custom semitotal toast
-      appCustom((t) => (
+      toast.custom((t) => (
         <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md space-y-2">
           <h3 className="font-semibold text-blue-800">Чекпоинт Завершён</h3>
           <p className="text-sm text-blue-700">{semitotalMsg}</p>
@@ -241,14 +261,13 @@ export default function CrewWarehousePage() {
             <span>Дельта: {totalDelta}</span>
             <span>Отгружено: {offloadUnits}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => appDismiss(t)} className="w-full">
+          <Button variant="ghost" size="sm" onClick={() => toast.dismiss(t)} className="w-full">
             Продолжить
           </Button>
         </div>
       ), { duration: 8000, position: "bottom-right" });
     }
 
-    // Save new checkpoint
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
@@ -256,33 +275,37 @@ export default function CrewWarehousePage() {
     setOffloadCount(0);
     setEditCount(0);
     setLastCheckpointDurationSec(checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null);
-    appInfo("Новый чекпоинт запущен", { position: "bottom-right" });
+    toast.info("Новый чекпоинт запущен");
 
-    if (dbUser?.user_id) {
-      const res = await saveCrewCheckpoint(slug, dbUser.user_id, snapshot);
-      if (res.success) appToast("Чекпоинт сохранён на сервере", { position: "bottom-right" });
-      else appError("Ошибка сохранения чекпоинта", { position: "top-right" });
+    const { data: userData } = await supabaseAdmin.auth.getUser();
+    const userId = userData?.user?.id;
+    if (userId) {
+      const res = await saveCrewCheckpoint(slug, userId, snapshot);
+      if (res.success) toast.success("Чекпоинт сохранён на сервере");
+      else toast.error("Ошибка сохранения чекпоинта");
     }
   };
 
   const handleReset = async () => {
-    if (!checkpoint.length) return appError("Нет чекпоинта для сброса", { position: "top-right" });
+    if (!checkpoint.length) return toast.error("Нет чекпоинта для сброса");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
 
-    if (dbUser?.user_id) {
-      const res = await resetCrewCheckpoint(slug, dbUser.user_id);
+    const { data: userData } = await supabaseAdmin.auth.getUser();
+    const userId = userData?.user?.id;
+    if (userId) {
+      const res = await resetCrewCheckpoint(slug, userId);
       if (res.success) {
-        appInfo(`Сброшено: ${res.applied} позиций (отменено ${statsObj.totalDelta} ед.)`, { position: "bottom-right" });
+        toast.info(`Сброшено: ${res.applied} позиций (отменено ${statsObj.totalDelta} ед.)`);
         loadItems();
       } else {
-        appError("Ошибка сброса чекпоинта", { position: "top-right" });
+        toast.error("Ошибка сброса чекпоинта");
       }
     } else {
-      appInfo("Сброшено локально до чекпоинта", { position: "bottom-right" });
+      toast.info("Сброшено локально до чекпоинта");
     }
   };
 
@@ -327,14 +350,14 @@ export default function CrewWarehousePage() {
     }
 
     if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Podushka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Podushka 70x70';
-      if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
+      if (fullLower.includes('50x70')) return 'Podushka 50x70';
+      if (fullLower.includes('70x70')) return 'Podushka 70x70';
+      if (fullLower.includes('анатом')) return 'Podushka anatom';
     }
 
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Navolochka 70x70';
+      if (fullLower.includes('50x70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70')) return 'Navolochka 70x70';
     }
 
     return 'other';
@@ -345,7 +368,7 @@ export default function CrewWarehousePage() {
     let changedCount = 0;
     let totalDelta = 0;
     let offloadUnits = offloadCount || 0;
-    let stars = Math.floor(offloadUnits / 10); // Award 1 star per 10 offloaded units
+    let stars = Math.floor(offloadUnits / 10);
 
     let sumsPrevious: Record<string, number> = {};
     let sumsCurrent: Record<string, number> = {};
@@ -383,14 +406,11 @@ export default function CrewWarehousePage() {
     setLastProcessedSalary(stats.salary);
   }, [computeProcessedStats]);
 
-  // Define handlePlateClickCustom to open edit modal in "none" game mode
   const handlePlateClickCustom = useCallback((voxelId: string) => {
     if (gameMode) {
-      // In game mode, use the default handlePlateClick from the hook
       handlePlateClick(voxelId);
       return;
     }
-    // In "none" mode, open the edit modal
     setEditVoxel(voxelId);
     const contents = localItems
       .flatMap((i) => {
@@ -401,35 +421,32 @@ export default function CrewWarehousePage() {
       });
     setEditContents(contents);
     setEditDialogOpen(true);
-    appInfo(`Ячейка ${voxelId} открыта для правки`, { position: "bottom-right" });
-  }, [gameMode, handlePlateClick, localItems, appInfo]);
+    toast.info(`Ячейка ${voxelId} открыта для правки`);
+  }, [gameMode, handlePlateClick, localItems]);
 
-  // Define handleItemClickCustom to open edit modal in "none" game mode
   const handleItemClickCustom = useCallback((item: any) => {
     if (gameMode) {
-      // In game mode, use the default handleItemClick from the hook
       handleItemClick(item);
       return;
     }
-    // In "none" mode, open the edit modal with the item's primary location
     const voxelId = selectedVoxel || item.locations?.[0]?.voxel || "A1";
     setEditVoxel(voxelId);
     const loc = item.locations?.find((l: any) => l.voxel === voxelId);
     const contents = loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : [];
     setEditContents(contents);
     setEditDialogOpen(true);
-    appInfo(`Товар ${item.name} открыт для правки в ${voxelId}`, { position: "bottom-right" });
-  }, [gameMode, handleItemClick, selectedVoxel, appInfo]);
+    toast.info(`Товар ${item.name} открыт для правки в ${voxelId}`);
+  }, [gameMode, handleItemClick, selectedVoxel]);
 
   const handleExportDaily = async () => {
-    if (!activeShift) return appError("Запустите смену для экспорта отчёта", { position: "top-right" });
+    if (!activeShift) return toast.error("Запустите смену для экспорта отчёта");
     setExportingDaily(true);
     try {
-      const res = await exportCrewDailyShift(slug, false); // Use exportCrewDailyShift with special notification
+      const res = await exportCrewDailyShift(slug, false);
 
       if (res?.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
-        if (copied) appToast("Отчёт скопирован в буфер", { position: "bottom-right" });
+        if (copied) toast.success("Отчёт скопирован в буфер");
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
@@ -438,36 +455,34 @@ export default function CrewWarehousePage() {
           a.download = `daily_shift_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          appToast("Отчёт скачан", { position: "bottom-right" });
+          toast.success("Отчёт скачан");
         }
-
-        // Notification already sent by exportCrewDailyShift
-        appInfo("Отчёт отправлен владельцу экипажа", { position: "top-right" });
+        toast.info("Отчёт отправлен владельцу экипажа");
       } else {
-        appError(res?.error || "Экспорт отчёта провалился", { position: "top-right" });
+        toast.error(res?.error || "Экспорт отчёта провалился");
       }
     } catch (err) {
-      appError("Критическая ошибка экспорта отчёта", { position: "top-right" });
+      toast.error("Критическая ошибка экспорта отчёта");
     } finally {
       setExportingDaily(false);
     }
   };
 
   const handleSendCar = async () => {
-    if (!canManage) return appError("У вас нет прав на запрос машины", { position: "top-right" });
+    if (!canManage) return toast.error("У вас нет прав на запрос машины");
     setSendingCar(true);
     try {
       const msg = `Запрос машины: тип=${carSize}`;
-      await notifyCrewOwner(slug, msg, dbUser?.user_id);
-      appCustom((t) => (
+      await notifyCrewOwner(slug, msg);
+      toast.custom((t) => (
         <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
           <Car className="w-5 h-5 text-green-600" />
           <span>Запрос {carSize} машины ушёл владельцу</span>
-          <Button variant="ghost" size="sm" onClick={() => appDismiss(t)}>OK</Button>
+          <Button variant="ghost" size="sm" onClick={() => toast.dismiss(t)}>OK</Button>
         </div>
       ), { duration: 5000, position: "bottom-right" });
     } catch (err) {
-      appError("Не удалось отправить запрос машины", { position: "top-right" });
+      toast.error("Не удалось отправить запрос машины");
     } finally {
       setSendingCar(false);
     }
@@ -482,12 +497,12 @@ export default function CrewWarehousePage() {
       const ozonCount = ozonRes.success ? ozonRes.count : 0;
       const total = wbCount + ozonCount;
       setTargetOffload(total);
-      appWarning(`Горячие заказы: WB ${wbCount} | Ozon ${ozonCount} | Всего ${total}`, {
+      toast.warning(`Горячие заказы: WB ${wbCount} | Ozon ${ozonCount} | Всего ${total}`, {
         position: "top-center",
         duration: 6000,
       });
     } catch (err: any) {
-      appError("Проверка заказов сломалась", { position: "top-right" });
+      toast.error("Проверка заказов сломалась");
     } finally {
       setCheckingPending(false);
     }
@@ -498,7 +513,7 @@ export default function CrewWarehousePage() {
       const res = await exportCrewCurrentStock(slug, localItems, summarized);
       if (res.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
-        if (copied) appToast("Склад в буфере — готов к вставке", { position: "bottom-right" });
+        if (copied) toast.success("Склад в буфере — готов к вставке");
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
@@ -507,13 +522,13 @@ export default function CrewWarehousePage() {
           a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          appToast("Склад экспортирован в файл", { position: "bottom-right" });
+          toast.success("Склад экспортирован в файл");
         }
       } else {
-        appError(res.error || "Экспорт склада не удался", { position: "top-right" });
+        toast.error(res.error || "Экспорт склада не удался");
       }
     } catch (err) {
-      appError("Крах экспорта склада", { position: "top-right" });
+      toast.error("Крах экспорта склада");
     }
   };
 
@@ -553,9 +568,6 @@ export default function CrewWarehousePage() {
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
             <div>
               <h1 className="text-sm font-medium leading-tight">{crew?.name || "Экипаж"}</h1>
-              <div className="text-xs text-gray-500">
-                Смена: {activeShift ? (activeShift.shift_type || "склад") : "нет"} · Статус: {liveStatus || (activeShift ? "активен" : "оффлайн")}
-              </div>
             </div>
           </div>
 
@@ -666,7 +678,6 @@ export default function CrewWarehousePage() {
           />
         </div>
 
-        {/* Moved buttons: checkpoint, reset, export daily, export stock, car request, check pending */}
         <div className="mt-2 p-2 flex flex-wrap gap-2 justify-center">
           <Button
             onClick={handleCheckpoint}
