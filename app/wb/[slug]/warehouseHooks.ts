@@ -139,7 +139,7 @@ export function useCrewWarehouse(slug: string, toastProps?: ToastProps) {
       toast.error(fetchError || "Ошибка загрузки товаров", { duration: 5000 });
       setLoading(false);
     }
-  }, [slug, toast.warning, toast.error]); // Explicit deps: Pin methods to avoid stale closures
+  }, [slug, toast.warning, toast.error]); // Explicit: Pin methods vs stale closures
 
   useEffect(() => {
     const resumeSession = localStorage.getItem(`warehouse_session_${slug}`);
