@@ -282,3 +282,25 @@ export async function resetCrewCheckpoint(slug: string, memberId: string) {
     return { success: false, error: e?.message || "unknown" };
   }
 }
+
+export async function getLastClosedShiftToday(slug: string, memberId: string) {
+  const crew = await resolveCrewBySlug(slug);
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const end = new Date(start.getTime() + 86400000);
+
+  const { data, error } = await supabaseAdmin
+    .from("crew_member_shifts")
+    .select("*")
+    .eq("crew_id", crew.id)
+    .eq("member_id", memberId)
+    .gte("clock_in_time", start.toISOString())
+    .lt("clock_in_time", end.toISOString())
+    .not("clock_out_time", "is", null)
+    .order("clock_out_time", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
