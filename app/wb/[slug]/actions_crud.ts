@@ -1,3 +1,4 @@
+// /app/wb/[slug]/actions_crud.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
