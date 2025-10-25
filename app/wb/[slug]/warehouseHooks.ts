@@ -1,5 +1,7 @@
+"use client";
+
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-// removed: import { toast } from "sonner";
+import { toast as sonnerToast } from "sonner";
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
@@ -24,16 +26,9 @@ const getSeasonPriority = (season: string | null): number => {
   return seasonOrder[season as string] || 3;
 };
 
-type Notifier = (type: "success" | "error" | "info" | "warning" | "custom" | string, message: string | any, opts?: any) => void;
-
-/**
- * useCrewWarehouse
- *
- * NOTE: hook does NOT show toasts itself anymore.
- * If you want to display toasts, call registerNotifier(fn) on the returned object,
- * where fn is (type, message, opts) => { }.
- */
 export function useCrewWarehouse(slug: string) {
+  const { dbUser } = useAppContext();
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +47,6 @@ export function useCrewWarehouse(slug: string) {
   const [bossMode, setBossMode] = useState(false);
   const [bossTimer, setBossTimer] = useState(0);
   const [leaderboard, setLeaderboard] = useState<{ name: string; score: number; date: string; xtr: number }[]>([]);
-  const { dbUser } = useAppContext();
   const bossIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [onloadCount, setOnloadCount] = useState(0);
   const [offloadCount, setOffloadCount] = useState(0);
@@ -64,29 +58,6 @@ export function useCrewWarehouse(slug: string) {
   const [filterColor, setFilterColor] = useState<string | null>(null);
   const [filterSize, setFilterSize] = useState<string | null>(null);
   const [selectedVoxel, setSelectedVoxel] = useState<string | null>(null);
-
-  // notifierRef: component can register a notifier function (e.g. useAppToast wrapper)
-  const notifierRef = useRef<Notifier | null>(null);
-
-  const setNotifier = useCallback((fn: Notifier | null) => {
-    notifierRef.current = fn;
-  }, []);
-
-  const fireNotify = useCallback((type: Parameters<Notifier>[0], message: Parameters<Notifier>[1], opts?: any) => {
-    if (notifierRef.current) {
-      try {
-        notifierRef.current(type, message, opts);
-        return;
-      } catch (err) {
-        // If notifier throws, log it and fallback to logger
-        logger.error("Notifier threw error:", err, { type, message, opts });
-      }
-    }
-    // fallback logging if no notifier registered
-    if (type === "error") logger.error(String(message));
-    else if (type === "warning") logger.warn(String(message));
-    else logger.info(String(message));
-  }, []);
 
   const dailyGoals = useMemo(() => ({
     units: 100,
@@ -131,15 +102,15 @@ export function useCrewWarehouse(slug: string) {
       setItems(mappedItems);
       setCheckpoint(mappedItems.map((it) => ({ ...it, locations: it.locations.map((l: any) => ({ ...l })) })));
       if (mappedItems.length === 0) {
-        fireNotify("warning", "Нет товаров в складе. Загрузите CSV.");
+        sonnerToast.warning("Нет товаров в складе. Загрузите CSV.");
       }
       setLoading(false);
     } else {
       setError(fetchError || "Failed to load items");
-      fireNotify("error", fetchError || "Ошибка загрузки товаров");
+      sonnerToast.error(fetchError || "Ошибка загрузки товаров");
       setLoading(false);
     }
-  }, [slug, fireNotify]);
+  }, [slug]);
 
   useEffect(() => {
     const resumeSession = localStorage.getItem(`warehouse_session_${slug}`);
@@ -154,20 +125,19 @@ export function useCrewWarehouse(slug: string) {
             setOnloadCount(onload || 0);
             setOffloadCount(offload || 0);
             setEditCount(edits || 0);
-            fireNotify("info", 'Offload возобновлен.');
+            sonnerToast.info('Offload возобновлен.');
           } else {
             localStorage.removeItem(`warehouse_session_${slug}`);
           }
         }
       } catch (e) {
         // ignore parse errors
-        logger.warn("Failed to parse resumeSession", e);
       }
     }
     loadItems();
     const savedLeaderboard = JSON.parse(localStorage.getItem(`warehouse_leaderboard_${slug}`) || "[]");
     setLeaderboard(savedLeaderboard);
-  }, [loadItems, slug, fireNotify]);
+  }, [loadItems, slug]);
 
   const checkAchievements = useCallback(() => {
     setAchievements((prev) => {
@@ -185,16 +155,16 @@ export function useCrewWarehouse(slug: string) {
       if (offloadCount >= 200 && !newAch.includes("Warehouse Warrior")) newAch.push("Warehouse Warrior (+200 XTR)");
       
       const xtrEarned = newAch.filter(a => a.includes("XTR")).length * 50;
-      if (xtrEarned > 0) fireNotify("success", `Заработано ${xtrEarned} XTR!`, { icon: "⭐" });
+      if (xtrEarned > 0) sonnerToast.success(`Заработано ${xtrEarned} XTR!`, { icon: "⭐" });
       
       return newAch.slice(-8);
     });
-  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration, fireNotify]);
+  }, [streak, score, workflowItems.length, errorCount, sessionStart, bossMode, dailyStreak, efficiency, offloadCount, sessionDuration]);
 
   const handleUpdateLocationQty = useCallback(
     async (itemId: string, voxelId: string, delta: number, isGameAction: boolean = false) => {
       logger.info(`Updating qty for ${itemId} in ${voxelId} by ${delta}`);
-      const { success, error: updateError } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta, dbUser?.user_id);
+      const { success, error: updateError, item } = await updateCrewItemLocationQty(slug, itemId, voxelId, delta, dbUser?.user_id);
       if (success) {
         setItems((prev) =>
           prev.map((i) => {
@@ -257,13 +227,14 @@ export function useCrewWarehouse(slug: string) {
           offload: offloadCount,
           edits: editCount,
         }));
+        return { success, item };
       } else {
-        // no toasts here — hand off to notifier / logger
-        fireNotify("error", updateError || "Failed to update quantity");
+        sonnerToast.error(updateError || "Failed to update quantity");
         if (isGameAction) setErrorCount((prev) => prev + 1);
+        return { success: false, error: updateError };
       }
     },
-    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser, fireNotify],
+    [slug, gameMode, level, checkAchievements, checkpoint, onloadCount, offloadCount, editCount, dbUser],
   );
 
   const handleWorkflowNext = useCallback(async () => {
@@ -276,22 +247,22 @@ export function useCrewWarehouse(slug: string) {
       setCurrentWorkflowIndex((prev) => prev + 1);
       setSelectedWorkflowVoxel(null);
       if (currentWorkflowIndex + 1 === workflowItems.length) {
-        fireNotify("success", "Workflow completed!");
+        sonnerToast.success("Workflow completed!");
         setWorkflowItems([]);
         endGameSession();
       }
     }
-  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty, fireNotify]);
+  }, [workflowItems, currentWorkflowIndex, selectedWorkflowVoxel, items, handleUpdateLocationQty]);
 
   const handleSkipItem = useCallback(() => {
     setCurrentWorkflowIndex((prev) => prev + 1);
     setErrorCount((prev) => prev + 1);
     if (currentWorkflowIndex + 1 === workflowItems.length) {
-      fireNotify("success", "Workflow completed with skips!");
+      sonnerToast.success("Workflow completed with skips!");
       setWorkflowItems([]);
       endGameSession();
     }
-  }, [currentWorkflowIndex, workflowItems.length, fireNotify]);
+  }, [currentWorkflowIndex, workflowItems.length]);
 
   const startBossMode = () => {
     setBossMode(true);
@@ -301,7 +272,7 @@ export function useCrewWarehouse(slug: string) {
         if (prev <= 0) {
           clearInterval(bossIntervalRef.current!);
           setBossMode(false);
-          fireNotify("error", "Boss time expired!");
+          sonnerToast.error("Boss time expired!");
           return 0;
         }
         return prev - 1000;
@@ -330,7 +301,7 @@ export function useCrewWarehouse(slug: string) {
 
   const handleItemClick = useCallback((item: any) => {
     if (!gameMode) {
-      fireNotify("info", item.description || "Описание отсутствует");
+      sonnerToast.info(item.description || "Описание отсутствует");
       return;
     }
 
@@ -345,13 +316,11 @@ export function useCrewWarehouse(slug: string) {
         if (loc && loc.quantity > 0) {
           voxel = selectedVoxel;
         } else {
-          fireNotify("error", "Товар отсутствует в выбранной ячейке");
-          return;
+          return sonnerToast.error("Товар отсутствует в выбранной ячейке");
         }
       } else {
         if (item.locations.length === 0 || item.total_quantity <= 0) {
-          fireNotify("error", "Нет локаций или количества для выгрузки");
-          return;
+          return sonnerToast.error("Нет локаций или количества для выгрузки");
         }
         voxel = item.locations[0].voxel;
       }
@@ -360,9 +329,9 @@ export function useCrewWarehouse(slug: string) {
     if (voxel && (delta > 0 || item.locations.find((l: any) => l.voxel === voxel)?.quantity > 0)) {
       handleUpdateLocationQty(item.id, voxel, delta, true);
     } else if (delta < 0) {
-      fireNotify("error", "Нельзя уменьшить ниже 0");
+      sonnerToast.error("Нельзя уменьшить ниже 0");
     }
-  }, [gameMode, selectedVoxel, handleUpdateLocationQty, fireNotify]);
+  }, [gameMode, selectedVoxel, handleUpdateLocationQty]);
 
   const filteredItems = (items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.description.toLowerCase().includes(search.toLowerCase());
@@ -457,7 +426,5 @@ export function useCrewWarehouse(slug: string) {
     dailyGoals,
     sessionDuration,
     getSizePriority, // Export the function
-    // notifier registration API:
-    registerNotifier: setNotifier,
   };
 }
