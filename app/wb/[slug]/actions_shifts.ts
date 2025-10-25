@@ -1,3 +1,4 @@
+// /app/wb/[slug]/actions_shifts.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -281,8 +282,3 @@ export async function resetCrewCheckpoint(slug: string, memberId: string) {
     return { success: false, error: e?.message || "unknown" };
   }
 }
-
-/* -------------------------
-   exportDailyEntryForShift / sendDeliveryCarRequest unchanged...
-   ------------------------- */
-/* (rest of file kept as-is; earlier logic unchanged) */
