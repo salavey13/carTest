@@ -1,4 +1,3 @@
-// /app/wb/[slug]/warehouseHooks.ts
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -371,9 +370,29 @@ export function useCrewWarehouse(slug: string) {
       }
     }
 
-    if (voxel && (delta > 0 || item.locations.find((l: any) => l.voxel === voxel)?.quantity > 0)) {
-      await handleUpdateLocationQty(item.id, voxel, delta, true);
-      fireNotify("success", delta < 0 ? `Выдано из ${voxel}` : `Загружено в ${voxel}`, { duration: 1500 });
+    // --------------------------------------------------------------
+    //  Async version – wait for DB update before showing toast
+    // --------------------------------------------------------------
+    if (
+      voxel &&
+      (delta > 0 ||
+        item.locations.find((l: any) => l.voxel === voxel)?.quantity > 0)
+    ) {
+      (async () => {
+        try {
+          await handleUpdateLocationQty(item.id, voxel, delta, true);
+
+          const qty = Math.abs(delta);
+          const action = delta < 0 ? "Выдано из" : "Загружено в";
+          const msg = `${action} ячейки **${voxel}**: ${qty} шт. **${item.name}**`;
+
+          fireNotify("success", msg, { duration: 2000, icon: "package" });
+        } catch (err) {
+          // handleUpdateLocationQty already fires its own error toast,
+          // but we keep a fallback just in case.
+          fireNotify("error", "Не удалось обновить количество");
+        }
+      })();
     } else if (delta < 0) {
       fireNotify("error", "Нельзя уменьшить ниже 0");
     }
