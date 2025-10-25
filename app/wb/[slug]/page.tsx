@@ -22,13 +22,11 @@ import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppToast } from "@/hooks/useAppToast";
+import { useAppContext } from "@/contexts/AppContext";
 
 /**
- * Полный компонент страницы "Crew Warehouse"
- * - hook useCrewWarehouse теперь даёт registerNotifier
- * - компонент регистрирует useAppToast() как notifier
- * - подписывается на window event 'crew:shift:changed' для мгновенного обновления статуса
- * - упрощённые тексты лоадеров в кнопках (без вложенных Loading-компонентов)
+ * CrewWarehousePage — обновлённая версия.
+ * Использует dbUser из AppContext для определения прав доступа (isOwner/isMember/role).
  */
 
 export default function CrewWarehousePage() {
@@ -36,6 +34,7 @@ export default function CrewWarehousePage() {
   const slug = params?.slug as string | undefined;
 
   const toast = useAppToast();
+  const { dbUser, userCrewInfo } = useAppContext();
 
   const wh = useCrewWarehouse(slug || "");
   const {
@@ -97,7 +96,12 @@ export default function CrewWarehousePage() {
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
+
+  // server-driven membership info
+  const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [membershipStatus, setMembershipStatus] = useState<string | null>(null); // e.g. "active" or null
   const [isOwner, setIsOwner] = useState(false);
+
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
   const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
@@ -130,7 +134,7 @@ export default function CrewWarehousePage() {
     return () => clearInterval(iv);
   }, []);
 
-  // register notifier: map hook notifications -> component toast
+  // register notifier from hook -> component-level toast
   useEffect(() => {
     if (!registerNotifier || !toast) return;
     const notifier = (type: string, message: string | any, opts?: any) => {
@@ -141,7 +145,7 @@ export default function CrewWarehousePage() {
         if (type === "info") return toast.info(message as any, opts);
         if (type === "custom" && typeof message === "function") return toast.custom(message as any, opts);
         return toast.message(String(message), opts);
-      } catch (e) {
+      } catch {
         // swallow
       }
     };
@@ -154,7 +158,7 @@ export default function CrewWarehousePage() {
     };
   }, [registerNotifier, toast]);
 
-  // Load crew data
+  // Load crew metadata (owner, etc.)
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
@@ -169,31 +173,59 @@ export default function CrewWarehousePage() {
         return;
       }
       setCrew(data || null);
-      setIsOwner(data?.owner_id === (await supabaseAdmin.auth.getUser()).data?.user?.id);
+
+      // compute owner using dbUser (prefer AppContext userCrewInfo when available)
+      const appOwnerId = userCrewInfo?.id ? userCrewInfo?.id : undefined;
+      const uid = dbUser?.user_id || dbUser?.id || null;
+      if (data?.owner_id && uid) {
+        setIsOwner(String(data.owner_id) === String(uid));
+      } else if (userCrewInfo?.is_owner) {
+        setIsOwner(true);
+      } else {
+        setIsOwner(false);
+      }
     };
     fetchCrew();
-  }, [slug, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, dbUser, userCrewInfo, toast]);
 
-  // loadStatus used both by this page and ShiftControls event
+  // loadStatus uses dbUser from AppContext (so page reacts to actual logged user)
   const loadStatus = useCallback(async () => {
     if (!slug) return;
     try {
-      const { data: userData } = await supabaseAdmin.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) {
+      const uid = dbUser?.user_id || dbUser?.id || null;
+      if (!uid) {
         setLiveStatus(null);
         setActiveShift(null);
+        setMembershipStatus(null);
+        setMemberRole(null);
         return;
       }
 
-      const statusRes = await getCrewMemberStatus(slug, userId);
-      if (statusRes.success) setLiveStatus(statusRes.live_status || null);
-      const shiftRes = await getActiveShiftForCrewMember(slug, userId);
+      // get crew member record & live status
+      const statusRes = await getCrewMemberStatus(slug, String(uid));
+      if (statusRes?.success) {
+        setLiveStatus(statusRes.live_status || null);
+        const member = statusRes.member || null;
+        setMembershipStatus(member?.membership_status || null);
+        setMemberRole(member?.role || null);
+        // owner check: also ensure consistency
+        if (crew?.owner_id && String(crew.owner_id) === String(uid)) {
+          setIsOwner(true);
+        }
+      } else {
+        setLiveStatus(null);
+        setMembershipStatus(null);
+        setMemberRole(null);
+      }
+
+      // active shift
+      const shiftRes = await getActiveShiftForCrewMember(slug, String(uid));
       setActiveShift(shiftRes.shift || null);
     } catch (err) {
       toast.error("Ошибка загрузки статуса");
     }
-  }, [slug, toast]);
+  }, [slug, dbUser, crew, toast]);
 
   useEffect(() => {
     loadStatus();
@@ -203,8 +235,7 @@ export default function CrewWarehousePage() {
 
   // Listen for shift changes emitted by ShiftControls so page updates immediately
   useEffect(() => {
-    const onShiftChanged = (e: Event) => {
-      // simply reload status and items to re-evaluate canManage, etc.
+    const onShiftChanged = () => {
       try {
         loadStatus();
         loadItems();
@@ -214,11 +245,18 @@ export default function CrewWarehousePage() {
     return () => window.removeEventListener("crew:shift:changed", onShiftChanged);
   }, [loadStatus, loadItems]);
 
+  // Determine canManage:
+  // - owner OR active member (membership_status === 'active') OR global admin
+  // - but if memberRole === 'car_observer' and not owner and not active member -> cannot manage
   const canManage = useMemo(() => {
-    const globalAdmin = false;
-    const memberOk = !!(isOwner || activeShift);
-    return !!(memberOk || globalAdmin);
-  }, [isOwner, activeShift]);
+    const uid = dbUser?.user_id || dbUser?.id || null;
+    const isGlobalAdmin = Boolean(uid && (dbUser?.status === "admin" || dbUser?.role === "admin" || dbUser?.role === "vprAdmin"));
+    const isActiveMember = membershipStatus === "active";
+    const owner = isOwner;
+    // explicit observer lock
+    if (memberRole === "car_observer" && !owner && !isActiveMember && !isGlobalAdmin) return false;
+    return Boolean(owner || isActiveMember || isGlobalAdmin);
+  }, [dbUser, membershipStatus, memberRole, isOwner]);
 
   const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
@@ -249,6 +287,7 @@ export default function CrewWarehousePage() {
   };
 
   const handleCheckpoint = async () => {
+    if (!canManage) return toast.error("Нет прав для сохранения чекпоинта");
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
@@ -258,10 +297,9 @@ export default function CrewWarehousePage() {
     toast.success("Чекпоинт сохранён локально");
 
     try {
-      const user = await supabaseAdmin.auth.getUser();
-      const userId = user.data?.user?.id;
-      if (userId) {
-        const res = await saveCrewCheckpoint(slug, userId, snapshot);
+      const uid = dbUser?.user_id || dbUser?.id || null;
+      if (uid) {
+        const res = await saveCrewCheckpoint(slug, String(uid), snapshot);
         if (res.success) toast.success("Чекпоинт сохранён на сервере");
         else toast.error("Ошибка сохранения чекпоинта на сервере");
       }
@@ -271,6 +309,7 @@ export default function CrewWarehousePage() {
   };
 
   const handleReset = async () => {
+    if (!canManage) return toast.error("Нет прав для сброса чекпоинта");
     if (!checkpoint.length) return toast.error("Нет чекпоинта");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
@@ -280,10 +319,9 @@ export default function CrewWarehousePage() {
     toast.success("Сброс до чекпоинта (локально)");
 
     try {
-      const user = await supabaseAdmin.auth.getUser();
-      const userId = user.data?.user?.id;
-      if (userId) {
-        const res = await resetCrewCheckpoint(slug, userId);
+      const uid = dbUser?.user_id || dbUser?.id || null;
+      if (uid) {
+        const res = await resetCrewCheckpoint(slug, String(uid));
         if (res.success) {
           toast.success(`Сброс на сервере применён (${res.applied} позиций)`);
           loadItems();
