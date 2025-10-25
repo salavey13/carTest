@@ -1,10 +1,9 @@
-// /app/wb/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components1/ui/card";
 import { Save, RotateCcw, FileUp, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -24,11 +23,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from "@/contexts/AppContext";
-
-/**
- * CrewWarehousePage — обновлённая версия.
- * Использует dbUser из AppContext для определения прав доступа (isOwner/isMember/role).
- */
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
@@ -97,12 +91,9 @@ export default function CrewWarehousePage() {
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
-
-  // server-driven membership info
   const [memberRole, setMemberRole] = useState<string | null>(null);
-  const [membershipStatus, setMembershipStatus] = useState<string | null>(null); // e.g. "active" or null
+  const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
-
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
   const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
@@ -111,7 +102,7 @@ export default function CrewWarehousePage() {
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
   const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
-  const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
+  const [lastCheckpointDurationSec斯拉, setLastCheckpointDurationSec] = useState<number | null>(null);
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
   const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
   const [lastProcessedStars, setLastProcessedStars] = useState<number | null>(null);
@@ -120,7 +111,6 @@ export default function CrewWarehousePage() {
   const [checkingPending, setCheckingPending] = useState(false);
   const [exportingDaily, setExportingDaily] = useState(false);
   const [sendingCar, setSendingCar] = useState(false);
-  const [targetOffload, setTargetOffload] = useState(0);
   const [carSize, setCarSize] = useState<"small" | "medium" | "large">("medium");
 
   const uniqueSeasons = useMemo(() => [...new Set(localItems.map(i => i.season).filter(Boolean))].sort(), [localItems]);
@@ -129,37 +119,21 @@ export default function CrewWarehousePage() {
   const uniqueSizes = useMemo(() => [...new Set(localItems.map(i => i.size).filter(Boolean))].sort((a, b) => getSizePriority(a) - getSizePriority(b)), [localItems, getSizePriority]);
 
   useEffect(() => setLocalItems(hookItems || []), [hookItems]);
+  useEffect(() => { const iv = setInterval(() => setTick(t => t + 1), 1000); return () => clearInterval(iv); }, []);
 
-  useEffect(() => {
-    const iv = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(iv);
-  }, []);
-
-  // register notifier from hook -> component-level toast
   useEffect(() => {
     if (!registerNotifier || !toast) return;
     const notifier = (type: string, message: string | any, opts?: any) => {
-      try {
-        if (type === "success") return toast.success(message as any, opts);
-        if (type === "error") return toast.error(message as any, opts);
-        if (type === "warning") return toast.warning(message as any, opts);
-        if (type === "info") return toast.info(message as any, opts);
-        if (type === "custom" && typeof message === "function") return toast.custom(message as any, opts);
-        return toast.message(String(message), opts);
-      } catch {
-        // swallow
-      }
+      if (type === "success") return toast.success(message as any, opts);
+      if (type === "error") return toast.error(message as any, opts);
+      if (type === "warning") return toast.warning(message as any, opts);
+      if (type === "info") return toast.info(message as any, opts);
+      return toast.message(String(message), opts);
     };
-
     registerNotifier(notifier);
-    return () => {
-      try {
-        registerNotifier(null);
-      } catch {}
-    };
+    return () => registerNotifier(null);
   }, [registerNotifier, toast]);
 
-  // Load crew metadata (owner, etc.)
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
@@ -169,293 +143,84 @@ export default function CrewWarehousePage() {
         .eq("slug", slug)
         .limit(1)
         .maybeSingle();
-      if (error) {
-        toast.error("Ошибка загрузки данных экипажа");
-        return;
-      }
+      if (error) { toast.error("Ошибка загрузки экипажа"); return; }
       setCrew(data || null);
-
-      // compute owner using dbUser (prefer AppContext userCrewInfo when available)
-      const appOwnerId = userCrewInfo?.id ? userCrewInfo?.id : undefined;
       const uid = dbUser?.user_id || dbUser?.id || null;
-      if (data?.owner_id && uid) {
-        setIsOwner(String(data.owner_id) === String(uid));
-      } else if (userCrewInfo?.is_owner) {
-        setIsOwner(true);
-      } else {
-        setIsOwner(false);
-      }
+      if (data?.owner_id && uid) setIsOwner(String(data.owner_id) === String(uid));
+      else if (userCrewInfo?.is_owner) setIsOwner(true);
+      else setIsOwner(false);
     };
     fetchCrew();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, dbUser, userCrewInfo, toast]);
 
-  // loadStatus uses dbUser from AppContext (so page reacts to actual logged user)
   const loadStatus = useCallback(async () => {
-    if (!slug) return;
+    if (!slug || !dbUser?.user_id) return;
     try {
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (!uid) {
-        setLiveStatus(null);
-        setActiveShift(null);
-        setMembershipStatus(null);
-        setMemberRole(null);
-        return;
-      }
-
-      // get crew member record & live status
-      const statusRes = await getCrewMemberStatus(slug, String(uid));
+      const uid = String(dbUser.user_id || dbUser.id);
+      const statusRes = await getCrewMemberStatus(slug, uid);
       if (statusRes?.success) {
         setLiveStatus(statusRes.live_status || null);
         const member = statusRes.member || null;
         setMembershipStatus(member?.membership_status || null);
         setMemberRole(member?.role || null);
-        // owner check: also ensure consistency
-        if (crew?.owner_id && String(crew.owner_id) === String(uid)) {
-          setIsOwner(true);
-        }
-      } else {
-        setLiveStatus(null);
-        setMembershipStatus(null);
-        setMemberRole(null);
       }
-
-      // active shift
-      const shiftRes = await getActiveShiftForCrewMember(slug, String(uid));
+      const shiftRes = await getActiveShiftForCrewMember(slug, uid);
       setActiveShift(shiftRes.shift || null);
-    } catch (err) {
-      toast.error("Ошибка загрузки статуса");
-    }
-  }, [slug, dbUser, crew, toast]);
+    } catch { toast.error("Ошибка статуса"); }
+  }, [slug, dbUser, toast]);
 
-  useEffect(() => {
-    loadStatus();
-    const poll = setInterval(loadStatus, 30000);
-    return () => clearInterval(poll);
-  }, [loadStatus]);
+  useEffect(() => { loadStatus(); const poll = setInterval(loadStatus, 30000); return () => clearInterval(poll); }, [loadStatus]);
 
-  // Listen for shift changes emitted by ShiftControls so page updates immediately
-  useEffect(() => {
-    const onShiftChanged = () => {
-      try {
-        loadStatus();
-        loadItems();
-      } catch {}
-    };
-    window.addEventListener("crew:shift:changed", onShiftChanged);
-    return () => window.removeEventListener("crew:shift:changed", onShiftChanged);
-  }, [loadStatus, loadItems]);
-
-  // Determine canManage:
-  // - owner OR active member (membership_status === 'active') OR global admin
-  // - but if memberRole === 'car_observer' and not owner and not active member -> cannot manage
   const canManage = useMemo(() => {
-    const uid = dbUser?.user_id || dbUser?.id || null;
-    const isGlobalAdmin = Boolean(uid && (dbUser?.status === "admin" || dbUser?.role === "admin" || dbUser?.role === "vprAdmin"));
+    const isGlobalAdmin = Boolean(dbUser?.status === "admin" || dbUser?.role === "admin");
     const isActiveMember = membershipStatus === "active";
     const owner = isOwner;
-    // explicit observer lock
     if (memberRole === "car_observer" && !owner && !isActiveMember && !isGlobalAdmin) return false;
     return Boolean(owner || isActiveMember || isGlobalAdmin);
   }, [dbUser, membershipStatus, memberRole, isOwner]);
 
   const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
-    setLocalItems((prev) =>
-      prev.map((i) => {
-        if (i.id !== itemId) return i;
-        const locs = (i.locations || []).map((l: any) => ({ ...l }));
-        const idx = locs.findIndex((l: any) => l.voxel === voxelId);
-        if (idx !== -1) {
-          locs[idx].quantity = Math.max(0, locs[idx].quantity + delta);
-        } else if (delta > 0) {
-          locs.push({ voxel: voxelId, quantity: delta });
-        }
-        const filtered = locs.filter(l => l.quantity > 0);
-        const newTotal = filtered.reduce((acc, l) => acc + l.quantity, 0);
-        return { ...i, locations: filtered, total_quantity: newTotal };
-      })
-    );
-
+    setLocalItems(prev => prev.map(i => {
+      if (i.id !== itemId) return i;
+      const locs = (i.locations || []).map(l => ({ ...l }));
+      const idx = locs.findIndex(l => l.voxel === voxelId);
+      if (idx !== -1) locs[idx].quantity = Math.max(0, locs[idx].quantity + delta);
+      else if (delta > 0) locs.push({ voxel: voxelId, quantity: delta });
+      const filtered = locs.filter(l => l.quantity > 0);
+      const newTotal = filtered.reduce((acc, l) => acc + l.quantity, 0);
+      return { ...i, locations: filtered, total_quantity: newTotal };
+    }));
     const absDelta = Math.abs(delta);
     if (gameMode === "onload" && delta > 0) setOnloadCount(p => p + absDelta);
     else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
     else setEditCount(p => p + absDelta);
-
-    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => {
-      loadItems();
-      toast.error("Ошибка обновления на сервере - перезагружено");
-    });
+    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => { loadItems(); toast.error("Ошибка сервера"); });
   };
 
   const handleCheckpoint = async () => {
-    if (!canManage) return toast.error("Нет прав для сохранения чекпоинта");
+    if (!canManage) return toast.error("Нет прав");
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
-    setOnloadCount(0);
-    setOffloadCount(0);
-    setEditCount(0);
-    toast.success("Чекпоинт сохранён локально");
-
+    setOnloadCount(0); setOffloadCount(0); setEditCount(0);
+    toast.success("Чекпоинт локально");
     try {
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (uid) {
-        const res = await saveCrewCheckpoint(slug, String(uid), snapshot);
-        if (res.success) toast.success("Чекпоинт сохранён на сервере");
-        else toast.error("Ошибка сохранения чекпоинта на сервере");
-      }
-    } catch (e) {
-      toast.error("Ошибка сохранения чекпоинта");
-    }
+      const res = await saveCrewCheckpoint(slug, String(dbUser?.user_id), snapshot);
+      if (res.success) toast.success("Чекпоинт на сервере");
+    } catch { toast.error("Ошибка сервера"); }
   };
 
   const handleReset = async () => {
-    if (!canManage) return toast.error("Нет прав для сброса чекпоинта");
-    if (!checkpoint.length) return toast.error("Нет чекпоинта");
+    if (!canManage || !checkpoint.length) return toast.error("Нет чекпоинта");
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
-    setOnloadCount(0);
-    setOffloadCount(0);
-    setEditCount(0);
-    toast.success("Сброс до чекпоинта (локально)");
-
+    setOnloadCount(0); setOffloadCount(0); setEditCount(0);
+    toast.success("Сброс локально");
     try {
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (uid) {
-        const res = await resetCrewCheckpoint(slug, String(uid));
-        if (res.success) {
-          toast.success(`Сброс на сервере применён (${res.applied} позиций)`);
-          loadItems();
-        } else {
-          toast.error("Ошибка сброса на сервере");
-        }
-      }
-    } catch (e) {
-      toast.error("Ошибка при сбросе");
-    }
+      const res = await resetCrewCheckpoint(slug, String(dbUser?.user_id));
+      if (res.success) { toast.success(`Сброс на сервере (${res.applied})`); loadItems(); }
+    } catch { toast.error("Ошибка сброса"); }
   };
-
-  const categorizeItem = (item: any): string => {
-    const fullLower = (item.id || item.model || '').toLowerCase().trim();
-    if (!fullLower) return 'other';
-    if (fullLower.includes('наматрасник') || fullLower.includes('namatras')) {
-      const sizeMatch = fullLower.match(/(90|120|140|160|180|200)/);
-      if (sizeMatch) return `namatras ${sizeMatch[0]}`;
-    }
-    const sizeChecks = [
-      { key: 'евро макси', val: 'evromaksi' },
-      { key: 'evro maksi', val: 'evromaksi' },
-      { key: 'evromaksi', val: 'evromaksi' },
-      { key: 'евро', val: 'evro' },
-      { key: 'evro', val: 'evro' },
-      { key: 'euro', val: 'evro' },
-      { key: '2', val: '2' },
-      { key: '1.5', val: '1.5' }
-    ];
-    let detectedSize = null;
-    for (const { key, val } of sizeChecks) {
-      if (fullLower.includes(key)) {
-        detectedSize = val;
-        break;
-      }
-    }
-    const seasonMap = { 'лето': 'leto', 'зима': 'zima', 'leto': 'leto', 'zima': 'zima' };
-    let detectedSeason = null;
-    for (const [key, val] of Object.entries(seasonMap)) {
-      if (fullLower.includes(key)) {
-        detectedSeason = val;
-        break;
-      }
-    }
-    if (detectedSize && detectedSeason) {
-      return `${detectedSize} ${detectedSeason}`;
-    }
-    if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50х70')) return 'Podushka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70х70')) return 'Podushka 70x70';
-      if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
-    }
-    if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50х70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70х70')) return 'Navolochka 70x70';
-    }
-    return 'other';
-  };
-
-  const computeProcessedStats = useCallback(() => {
-    if (!checkpoint.length) return { changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: offloadCount || 0, salary: (offloadCount || 0) * 50, sumsPrevious: {}, sumsCurrent: {} };
-    let changedCount = 0;
-    let totalDelta = 0;
-    let offloadUnits = offloadCount || 0;
-    let stars = Math.floor(offloadUnits / 10);
-
-    let sumsPrevious: Record<string, number> = {};
-    let sumsCurrent: Record<string, number> = {};
-
-    checkpoint.forEach(cp => {
-      const cat = categorizeItem(cp);
-      sumsPrevious[cat] = (sumsPrevious[cat] || 0) + (cp.total_quantity || 0);
-    });
-
-    localItems.forEach(it => {
-      const cat = categorizeItem(it);
-      sumsCurrent[cat] = (sumsCurrent[cat] || 0) + (it.total_quantity || 0);
-    });
-
-    localItems.forEach(it => {
-      const cp = checkpoint.find(c => c.id === it.id);
-      if (!cp) return;
-      const rawDelta = it.total_quantity - cp.total_quantity;
-      const absDelta = Math.abs(rawDelta);
-      if (absDelta > 0) changedCount += 1;
-      totalDelta += absDelta;
-    });
-
-    const salary = offloadUnits * 50;
-    return { changedCount, totalDelta, stars, offloadUnits, salary, sumsPrevious, sumsCurrent };
-  }, [localItems, checkpoint, offloadCount]);
-
-  useEffect(() => {
-    const stats = computeProcessedStats();
-    setStatsObj(stats);
-    setLastProcessedCount(stats.changedCount);
-    setLastProcessedTotalDelta(stats.totalDelta);
-    setLastProcessedStars(stats.stars);
-    setLastProcessedOffloadUnits(stats.offloadUnits);
-    setLastProcessedSalary(stats.salary);
-  }, [computeProcessedStats]);
-
-  const handlePlateClickCustom = useCallback((voxelId: string) => {
-    if (gameMode) {
-      handlePlateClick(voxelId);
-      return;
-    }
-    setEditVoxel(voxelId);
-    const contents = localItems
-      .flatMap((i) => {
-        const locs = Array.isArray(i?.locations) ? i.locations : [];
-        return locs
-          .filter((l: any) => l.voxel === voxelId && l.quantity > 0)
-          .map((l: any) => ({ item: i, quantity: l.quantity, newQuantity: l.quantity }));
-      });
-    setEditContents(contents);
-    setEditDialogOpen(true);
-    toast.info(`Ячейка ${voxelId} открыта для правки`);
-  }, [gameMode, handlePlateClick, localItems, toast]);
-
-  const handleItemClickCustom = useCallback((item: any) => {
-    if (gameMode) {
-      handleItemClick(item);
-      return;
-    }
-    const voxelId = selectedVoxel || item.locations?.[0]?.voxel || "A1";
-    setEditVoxel(voxelId);
-    const loc = item.locations?.find((l: any) => l.voxel === voxelId);
-    const contents = loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : [];
-    setEditContents(contents);
-    setEditDialogOpen(true);
-    toast.info(`Товар ${item.name} открыт для правки в ${voxelId}`);
-  }, [gameMode, handleItemClick, selectedVoxel, toast]);
 
   const handleExportDaily = async () => {
     setExportingDaily(true);
@@ -465,234 +230,153 @@ export default function CrewWarehousePage() {
         const last = await getLastClosedShiftToday(slug, dbUser?.user_id);
         if (last) shift = last;
       }
-
-      if (!shift) {
-        toast.error("Нет данных за сегодня");
-        return;
-      }
+      if (!shift) { toast.error("Нет данных за сегодня"); setExportingDaily(false); return; }
 
       const res = await exportCrewDailyShift(slug, false);
       if (res?.success && res.csv) {
-        const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Отчёт скопирован в буфер");
+        const copied = await navigator.clipboard.writeText(res.csv).then(() => true).catch(() => false);
+        if (copied) toast.success("Отчёт в буфере");
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `daily_shift_${slug}.tsv`;
-          a.click();
+          const a = document.createElement("a"); a.href = url; a.download = `daily_${slug}.tsv`; a.click();
           URL.revokeObjectURL(url);
           toast.success("Отчёт скачан");
         }
-        toast.info("Отчёт отправлен владельцу экипажа");
-      } else {
-        toast.error(res?.error || "Экспорт отчёта провалился");
-      }
-    } catch (err) {
-      toast.error("Критическая ошибка экспорта отчёта");
-    } finally {
-      setExportingDaily(false);
-    }
+      } else toast.error(res?.error || "Ошибка экспорта");
+    } catch { toast.error("Критическая ошибка"); } finally { setExportingDaily(false); }
   };
 
   const handleSendCar = async () => {
-    if (!canManage) return toast.error("У вас нет прав на запрос машины");
+    if (!canManage) return toast.error("Нет прав");
     setSendingCar(true);
     try {
-      const msg = `Запрос машины: тип=${carSize}`;
-      await notifyCrewOwner(slug, msg);
-      toast.custom((t) => (
-        <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
-          <Car className="w-5 h-5 text-green-600" />
-          <span>Запрос {carSize} машины ушёл владельцу</span>
-          <Button variant="ghost" size="sm" onClick={() => toast.dismiss(t)}>OK</Button>
-        </div>
-      ), { duration: 5000, position: "bottom-right" });
-    } catch (err) {
-      toast.error("Не удалось отправить запрос машины");
-    } finally {
-      setSendingCar(false);
-    }
+      await notifyCrewOwner(slug, `Запрос машины: ${carSize}`);
+      toast.success("Запрос отправлен");
+    } catch { toast.error("Ошибка отправки"); } finally { setSendingCar(false); }
   };
 
   const handleCheckPending = async () => {
     setCheckingPending(true);
     try {
-      const wbRes = await fetchCrewWbPendingCount(slug);
-      const ozonRes = await fetchCrewOzonPendingCount(slug);
-      const wbCount = wbRes.success ? wbRes.count : 0;
-      const ozonCount = ozonRes.success ? ozonRes.count : 0;
-      const total = wbCount + ozonCount;
-      setTargetOffload(total);
-      toast.warning(`Горячие заказы: WB ${wbCount} | Ozon ${ozonCount} | Всего ${total}`, {
-        position: "top-center",
-        duration: 6000,
-      });
-    } catch (err: any) {
-      toast.error("Проверка заказов сломалась");
-    } finally {
-      setCheckingPending(false);
-    }
+      const [wbRes, ozonRes] = await Promise.all([fetchCrewWbPendingCount(slug), fetchCrewOzonPendingCount(slug)]);
+      const total = (wbRes.success ? wbRes.count : 0) + (ozonRes.success ? ozonRes.count : 0);
+      toast.warning(`Заказы: WB ${wbRes.count || 0} | Ozon ${ozonRes.count || 0} | Всего ${total}`);
+    } catch { toast.error("Ошибка проверки"); } finally { setCheckingPending(false); }
   };
 
   const handleExportStock = async (summarized = false) => {
     try {
       const res = await exportCrewCurrentStock(slug, localItems, summarized);
       if (res.success && res.csv) {
-        const copied = await safeCopyToClipboard(res.csv);
-        if (copied) toast.success("Склад в буфере — готов к вставке");
+        const copied = await navigator.clipboard.writeText(res.csv).then(() => true).catch(() => false);
+        if (copied) toast.success("Склад в буфере");
         else {
           const blob = new Blob([res.csv], { type: "text/tab-separated-values" });
           const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
-          a.click();
+          const a = document.createElement("a"); a.href = url; a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`; a.click();
           URL.revokeObjectURL(url);
-          toast.success("Склад скачан (буфер недоступен)");
+          toast.success("Склад скачан");
         }
-      } else {
-        toast.error(res.error || "Экспорт склада не удался");
       }
-    } catch (err) {
-      toast.error("Крах экспорта склада");
-    }
+    } catch { toast.error("Ошибка экспорта"); }
   };
 
-  const safeCopyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  const handlePlateClickCustom = useCallback((voxelId: string) => {
+    if (gameMode) { handlePlateClick(voxelId); return; }
+    setEditVoxel(voxelId);
+    const contents = localItems.flatMap(i => i.locations.filter(l => l.voxel === voxelId && l.quantity > 0).map(l => ({ item: i, quantity: l.quantity, newQuantity: l.quantity })));
+    setEditContents(contents);
+    setEditDialogOpen(true);
+  }, [gameMode, handlePlateClick, localItems]);
 
-  const formatSec = (sec: number | null) => {
-    if (sec === null) return "--:--";
-    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
-    const ss = (sec % 60).toString().padStart(2, "0");
-    return `${mm}:${ss}`;
-  };
+  const handleItemClickCustom = useCallback((item: any) => {
+    if (gameMode) { handleItemClick(item); return; }
+    const voxelId = selectedVoxel || item.locations[0]?.voxel || "A1";
+    const loc = item.locations.find(l => l.voxel === voxelId);
+    setEditContents(loc ? [{ item, quantity: loc.quantity, newQuantity: loc.quantity }] : []);
+    setEditVoxel(voxelId);
+    setEditDialogOpen(true);
+  }, [gameMode, handleItemClick, selectedVoxel]);
 
-  const checkpointDisplayMain = checkpointStart ? formatSec(Math.floor((Date.now() - checkpointStart) / 1000)) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--");
-  const checkpointDisplaySub = checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался");
-
-  const processedChangedCount = checkpointStart ? statsObj.changedCount : (lastProcessedCount ?? 0);
-  const processedTotalDelta = checkpointStart ? statsObj.totalDelta : (lastProcessedTotalDelta ?? 0);
-  const processedStars = checkpointStart ? statsObj.stars : (lastProcessedStars ?? 0);
-  const processedOffloadUnits = checkpointStart ? statsObj.offloadUnits : (lastProcessedOffloadUnits ?? 0);
-  const processedSalary = checkpointStart ? statsObj.salary : (lastProcessedSalary ?? 0);
-
-  if (loading) return <Loading text="Загрузка склада..." />;
+  if (loading) return <Loading text="Загрузка..." />;
   if (error) return <div className="p-2 text-red-500">Ошибка: {error}</div>;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
-      <header className="p-2 bg-white dark:bg-gray-800 shadow">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+      {/* HEADER */}
+      <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-sm p-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
           <div className="flex items-center gap-2">
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
-            <div>
-              <h1 className="text-sm font-medium leading-tight">{crew?.name || "noname"}</h1>
-            </div>
+            <h1 className="text-sm font-medium truncate max-w-[180px] sm:max-w-none">{crew?.name || "Экипаж"}</h1>
           </div>
-
-          <div className="flex items-center gap-1 overflow-x-auto md:overflow-visible">
+          <div className="flex items-center gap-1 overflow-x-auto">
             <ShiftControls slug={slug!} />
-            <div className="flex items-center gap-1 whitespace-nowrap">
-              <Button
-                size="sm"
-                variant={gameMode === "onload" ? "default" : "outline"}
-                onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")}
-                className="px-2 py-1 text-xs h-6 min-w-[60px]"
-                title="Загрузка (добавить товары)"
-                disabled={!canManage}
-              >
-                +Загрузка
-              </Button>
-              <Button
-                size="sm"
-                variant={gameMode === "offload" ? "default" : "outline"}
-                onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")}
-                className="px-2 py-1 text-xs h-6 min-w-[60px]"
-                title="Выгрузка (убрать товары)"
-                disabled={!canManage}
-              >
-                −Выгрузка
-              </Button>
+            <div className="flex gap-1">
+              <Button size="sm" variant={gameMode === "onload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>+Загрузка</Button>
+              <Button size="sm" variant={gameMode === "offload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>−Выгрузка</Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-0 sm:p-2">
+      <main className="flex-1 overflow-y-auto p-2 pb-20 sm:pb-2">
+        {/* СКЛАД */}
         <Card className="mb-2">
-          <CardHeader className="p-2">
+          <CardHeader className="p-2 pb-1">
             <CardTitle className="text-base">Склад</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 sm:p-4">
-            <div className="overflow-y-auto max-h-[60vh] simple-scrollbar">
-              <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                {hookFilteredItems.map((item) => (
-                  <WarehouseItemCard key={item.id} item={item} onClick={() => handleItemClickCustom(item)} />
-                ))}
-              </div>
+          <CardContent className="p-2 pt-0">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {hookFilteredItems.map((item) => (
+                <div key={item.id} className="min-w-0">
+                  <WarehouseItemCard item={item} onClick={() => handleItemClickCustom(item)} />
+                </div>
+              ))}
             </div>
-            {hookFilteredItems.length === 0 && <div className="text-center py-6 text-gray-500">Товары не найдены</div>}
+            {hookFilteredItems.length === 0 && <p className="text-center py-4 text-gray-500 text-sm">Товары не найдены</p>}
           </CardContent>
         </Card>
 
+        {/* ФИЛЬТРЫ */}
         <div className="mb-2">
           <FilterAccordion
-            filterSeason={filterSeason}
-            setFilterSeason={setFilterSeason}
-            filterPattern={filterPattern}
-            setFilterPattern={setFilterPattern}
-            filterColor={filterColor}
-            setFilterColor={setFilterColor}
-            filterSize={filterSize}
-            setFilterSize={setFilterSize}
+            filterSeason={filterSeason} setFilterSeason={setFilterSeason}
+            filterPattern={filterPattern} setFilterPattern={setFilterPattern}
+            filterColor={filterColor} setFilterColor={setFilterColor}
+            filterSize={filterSize} setFilterSize={setFilterSize}
             items={localItems}
-            onResetFilters={() => {
-              setFilterSeason(null);
-              setFilterPattern(null);
-              setFilterColor(null);
-              setFilterSize(null);
-              setSearch("");
-            }}
-            includeSearch
-            search={search}
-            setSearch={setSearch}
-            sortOption={sortOption as any}
-            setSortOption={setSortOption as any}
+            onResetFilters={() => { setFilterSeason(null); setFilterPattern(null); setFilterColor(null); setFilterSize(null); setSearch(""); }}
+            includeSearch search={search} setSearch={setSearch}
+            sortOption={sortOption as any} setSortOption={setSortOption as any}
           />
         </div>
 
-        <WarehouseViz
-          items={localItems}
-          selectedVoxel={selectedVoxel}
-          onSelectVoxel={setSelectedVoxel}
-          onPlateClick={handlePlateClickCustom}
-          gameMode={gameMode}
-        />
+        {/* ВИЗУАЛИЗАЦИЯ */}
+        <div className="mb-2">
+          <WarehouseViz
+            items={localItems}
+            selectedVoxel={selectedVoxel}
+            onSelectVoxel={setSelectedVoxel}
+            onPlateClick={handlePlateClickCustom}
+            gameMode={gameMode}
+          />
+        </div>
 
-        <div className="mt-2">
+        {/* СТАТИСТИКА */}
+        <div className="mb-2">
           <WarehouseStats
             itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
             uniqueIds={localItems.length}
-            score={score}
-            level={level}
-            streak={streak}
-            dailyStreak={dailyStreak}
-            checkpointMain={checkpointDisplayMain}
-            checkpointSub={checkpointDisplaySub}
-            changedCount={processedChangedCount}
-            totalDelta={processedTotalDelta}
-            stars={processedStars}
-            offloadUnits={processedOffloadUnits}
-            salary={processedSalary}
+            score={score} level={level} streak={streak} dailyStreak={dailyStreak}
+            checkpointMain={checkpointStart ? formatSec(Math.floor((Date.now() - checkpointStart) / 1000)) : (lastCheckpointDurationSec ? formatSec(lastCheckpointDurationSec) : "--:--")}
+            checkpointSub={checkpointStart ? "в процессе" : (lastCheckpointDurationSec ? `последнее: ${formatSec(lastCheckpointDurationSec)}` : "не запускался")}
+            changedCount={checkpointStart ? statsObj.changedCount : (lastProcessedCount ?? 0)}
+            totalDelta={checkpointStart ? statsObj.totalDelta : (lastProcessedTotalDelta ?? 0)}
+            stars={checkpointStart ? statsObj.stars : (lastProcessedStars ?? 0)}
+            offloadUnits={checkpointStart ? statsObj.offloadUnits : (lastProcessedOffloadUnits ?? 0)}
+            salary={checkpointStart ? statsObj.salary : (lastProcessedSalary ?? 0)}
             achievements={achievements}
             sessionStart={sessionStart}
             errorCount={errorCount}
@@ -706,69 +390,35 @@ export default function CrewWarehousePage() {
           />
         </div>
 
+        {/* НИЖНИЕ КНОПКИ — ПОЛНОСТЬЮ АДАПТИВНАЯ СЕТКА */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-2">
-          <Button
-            onClick={handleCheckpoint}
-            size="sm"
-            variant="outline"
-            className="h-8"
-            title={activeShift ? "Сохранить чекпоинт" : "Начните смену для чекпоинта"}
-            disabled={!activeShift || !canManage}
-          >
+          <Button onClick={handleCheckpoint} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
             <Save className="w-4 h-4 mr-1" /> Чекпоинт
           </Button>
-          <Button
-            onClick={handleReset}
-            size="sm"
-            variant="outline"
-            className="h-8"
-            title={activeShift ? "Сброс до чекпоинта" : "Начните смену для сброса"}
-            disabled={!activeShift || !canManage}
-          >
+          <Button onClick={handleReset} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
             <RotateCcw className="w-4 h-4 mr-1" /> Сброс
           </Button>
-          <Button
-            onClick={handleExportDaily}
-            size="sm"
-            variant="ghost"
-            className="h-8"
-            disabled={exportingDaily}
-          >
-            {exportingDaily ? "Экспорт..." : "Экспорт дня"}
+          <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 text-xs" disabled={exportingDaily}>
+            {exportingDaily ? "Экспорт…" : "Экспорт дня"}
           </Button>
-          <Button
-            onClick={() => handleExportStock(false)}
-            size="sm"
-            variant="outline"
-            className="h-8"
-            title="Экспорт склада"
-            disabled={!canManage}
-          >
+          <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="h-8 text-xs" disabled={!canManage}>
             <FileUp className="w-4 h-4 mr-1" /> Экспорт склада
           </Button>
           <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
             <Select value={carSize} onValueChange={setCarSize}>
-              <SelectTrigger className="h-8 w-28">
-                <SelectValue placeholder="Тип машины" />
-              </SelectTrigger>
+              <SelectTrigger className="h-8 w-full text-xs"><SelectValue placeholder="Тип" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="small">Маленькая</SelectItem>
                 <SelectItem value="medium">Средняя</SelectItem>
                 <SelectItem value="large">Большая</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              onClick={handleSendCar}
-              size="sm"
-              variant="secondary"
-              className="h-8"
-              disabled={sendingCar || !canManage}
-            >
-              {sendingCar ? "Отправка..." : (<><Car className="w-4 h-4 mr-1" /> Машина</>)}
+            <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 flex-1" disabled={sendingCar || !canManage}>
+              {sendingCar ? "…" : <Car className="w-4 h-4" />}
             </Button>
           </div>
-          <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8" disabled={checkingPending}>
-            {checkingPending ? "Проверка..." : "Проверить заказы"}
+          <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8 text-xs" disabled={checkingPending}>
+            {checkingPending ? "…" : "Проверить заказы"}
           </Button>
         </div>
 
@@ -789,9 +439,9 @@ export default function CrewWarehousePage() {
         editVoxel={editVoxel}
         editContents={editContents}
         setEditContents={setEditContents}
-        saveEditQty={async (itemId: string, newQty: number) => {
-          const currentQty = editContents.find(c => c.item.id === itemId)?.quantity || 0;
-          const delta = newQty - currentQty;
+        saveEditQty={async (itemId, newQty) => {
+          const current = editContents.find(c => c.item.id === itemId)?.quantity || 0;
+          const delta = newQty - current;
           if (delta !== 0) optimisticUpdate(itemId, editVoxel || "A1", delta);
         }}
         gameMode={gameMode}
@@ -799,3 +449,11 @@ export default function CrewWarehousePage() {
     </div>
   );
 }
+
+// Утилита для времени
+const formatSec = (sec: number | null) => {
+  if (sec === null) return "--:--";
+  const mm = Math.floor(sec / 60).toString().padStart(2, "0");
+  const ss = (sec % 60).toString().padStart(2, "0");
+  return `${mm}:${ss}`;
+};
