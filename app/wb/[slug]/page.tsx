@@ -17,7 +17,7 @@ import FilterAccordion from "@/components/FilterAccordion";
 import { notifyCrewOwner } from "./actions_notify";
 import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
-import { getCrewMemberStatus, getActiveShiftForCrewMember } from "./actions_shifts";
+import { getCrewMemberStatus, getActiveShiftForCrewMember, getLastClosedShiftToday } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -371,13 +371,13 @@ export default function CrewWarehousePage() {
       return `${detectedSize} ${detectedSeason}`;
     }
     if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Podushka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Podushka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50х70')) return 'Podushka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70х70')) return 'Podushka 70x70';
       if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
     }
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50х70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70х70')) return 'Navolochka 70x70';
     }
     return 'other';
   };
@@ -458,11 +458,20 @@ export default function CrewWarehousePage() {
   }, [gameMode, handleItemClick, selectedVoxel, toast]);
 
   const handleExportDaily = async () => {
-    if (!activeShift) return toast.error("Запустите смену для экспорта отчёта");
     setExportingDaily(true);
     try {
-      const res = await exportCrewDailyShift(slug, false);
+      let shift = activeShift;
+      if (!shift) {
+        const last = await getLastClosedShiftToday(slug, dbUser?.user_id);
+        if (last) shift = last;
+      }
 
+      if (!shift) {
+        toast.error("Нет данных за сегодня");
+        return;
+      }
+
+      const res = await exportCrewDailyShift(slug, false);
       if (res?.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
         if (copied) toast.success("Отчёт скопирован в буфер");
@@ -586,7 +595,7 @@ export default function CrewWarehousePage() {
           <div className="flex items-center gap-2">
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
             <div>
-              <h1 className="text-sm font-medium leading-tight">{crew?.name || "Экипаж"}</h1>
+              <h1 className="text-sm font-medium leading-tight">{crew?.name || "noname"}</h1>
             </div>
           </div>
 
@@ -697,7 +706,7 @@ export default function CrewWarehousePage() {
           />
         </div>
 
-        <div className="mt-2 p-2 flex flex-wrap gap-2 justify-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-2">
           <Button
             onClick={handleCheckpoint}
             size="sm"
@@ -737,7 +746,7 @@ export default function CrewWarehousePage() {
           >
             <FileUp className="w-4 h-4 mr-1" /> Экспорт склада
           </Button>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
             <Select value={carSize} onValueChange={setCarSize}>
               <SelectTrigger className="h-8 w-28">
                 <SelectValue placeholder="Тип машины" />
@@ -755,17 +764,11 @@ export default function CrewWarehousePage() {
               className="h-8"
               disabled={sendingCar || !canManage}
             >
-              {sendingCar ? "Отправка..." : (<><Car className="w-4 h-4 mr-1" /> Запрос машины</>)}
+              {sendingCar ? "Отправка..." : (<><Car className="w-4 h-4 mr-1" /> Машина</>)}
             </Button>
           </div>
-          <Button
-            onClick={handleCheckPending}
-            size="sm"
-            variant="ghost"
-            className="h-8"
-            disabled={checkingPending}
-          >
-            {checkingPending ? "Проверка..." : "Проверить ожидающие"}
+          <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8" disabled={checkingPending}>
+            {checkingPending ? "Проверка..." : "Проверить заказы"}
           </Button>
         </div>
 
