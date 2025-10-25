@@ -1,3 +1,4 @@
+// /app/wb/[slug]/actions_notify.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";

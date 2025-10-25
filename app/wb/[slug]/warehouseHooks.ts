@@ -1,6 +1,6 @@
-// /app/wb/[slug]/warehouseHooks.ts
+"use client";
+
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-// removed: import { toast } from "sonner";
 import { getCrewWarehouseItems, updateCrewItemLocationQty } from "./actions_crud";
 import { logger } from "@/lib/logger";
 import { useAppContext } from "@/contexts/AppContext";
@@ -346,20 +346,33 @@ export function useCrewWarehouse(slug: string) {
         if (loc && loc.quantity > 0) {
           voxel = selectedVoxel;
         } else {
-          fireNotify("error", "Товар отсутствует в выбранной ячейке");
-          return;
+          // NEW: auto-offload only if single cell
+          if (item.locations.length === 1) {
+            const available = item.locations[0];
+            if (available.quantity > 0) {
+              voxel = available.voxel;
+              fireNotify("info", `Авто-выгрузка из ${voxel}`);
+            } else {
+              fireNotify("error", "Товар отсутствует на складе");
+              return;
+            }
+          } else {
+            fireNotify("error", "Товар отсутствует в выбранной ячейке");
+            return;
+          }
         }
       } else {
         if (item.locations.length === 0 || item.total_quantity <= 0) {
-          fireNotify("error", "Нет локаций или количества для выгрузки");
+          fireNotify("error", "Нет товара для выгрузки");
           return;
         }
-        voxel = item.locations[0].voxel;
+        voxel = item.locations.find((l: any) => l.quantity > 0)?.voxel;
       }
     }
 
     if (voxel && (delta > 0 || item.locations.find((l: any) => l.voxel === voxel)?.quantity > 0)) {
-      handleUpdateLocationQty(item.id, voxel, delta, true);
+      await handleUpdateLocationQty(item.id, voxel, delta, true);
+      fireNotify("success", delta < 0 ? `Выдано из ${voxel}` : `Загружено в ${voxel}`, { duration: 1500 });
     } else if (delta < 0) {
       fireNotify("error", "Нельзя уменьшить ниже 0");
     }

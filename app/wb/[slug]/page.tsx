@@ -541,7 +541,7 @@ export default function CrewWarehousePage() {
           a.download = summarized ? `stock_summary_${slug}.tsv` : `stock_${slug}.tsv`;
           a.click();
           URL.revokeObjectURL(url);
-          toast.success("Склад экспортирован в файл");
+          toast.success("Склад скачан (буфер недоступен)");
         }
       } else {
         toast.error(res.error || "Экспорт склада не удался");
