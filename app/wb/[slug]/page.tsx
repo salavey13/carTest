@@ -1,4 +1,3 @@
-// /app/wb/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -103,7 +102,7 @@ export default function CrewWarehousePage() {
   const [editContents, setEditContents] = useState<Array<{ item: any; quantity: number; newQuantity: number }>>([]);
   const [checkpointStart, setCheckpointStart] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
-  const [lastCheckpointDurationSec斯拉, setLastCheckpointDurationSec] = useState<number | null>(null);
+  const [lastCheckpointDurationSec, setLastCheckpointDurationSec] = useState<number | null>(null);
   const [lastProcessedCount, setLastProcessedCount] = useState<number | null>(null);
   const [lastProcessedTotalDelta, setLastProcessedTotalDelta] = useState<number | null>(null);
   const [lastProcessedStars, setLastProcessedStars] = useState<number | null>(null);
