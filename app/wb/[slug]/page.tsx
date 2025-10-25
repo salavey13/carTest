@@ -21,22 +21,39 @@ import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
 import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from "@/contexts/AppContext";
 
-/**
- * CrewWarehousePage — обновлённая версия.
- * Использует dbUser из AppContext для определения прав доступа (isOwner/isMember/role).
- */
+// Sonner toast wrapper (safe, no TDZ, no AppToast)
+const toast = {
+  success: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.success === "function"
+      ? sonnerToast.success(msg, opts)
+      : console.log("TOAST SUCCESS:", msg),
+  error: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.error === "function"
+      ? sonnerToast.error(msg, opts)
+      : console.error("TOAST ERROR:", msg),
+  info: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.info === "function"
+      ? sonnerToast.info(msg, opts)
+      : console.log("TOAST INFO:", msg),
+  warning: (msg: string | React.ReactNode, opts?: any) =>
+    typeof sonnerToast?.warning === "function"
+      ? sonnerToast.warning(msg, opts)
+      : console.warn("TOAST WARNING:", msg),
+  custom: (content: React.ReactNode, opts?: any) =>
+    typeof sonnerToast === "function"
+      ? sonnerToast.custom(content, opts)
+      : console.log("TOAST CUSTOM:", content),
+  dismiss: (id?: any) => sonnerToast.dismiss(id),
+};
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
+  const { dbUser } = useAppContext();
 
-  const toast = useAppToast();
-  const { dbUser, userCrewInfo } = useAppContext();
-
-  const wh = useCrewWarehouse(slug || "");
+  const warehouse = useCrewWarehouse(slug || "");
   const {
     items: hookItems,
     loading,
@@ -91,17 +108,12 @@ export default function CrewWarehousePage() {
     dailyGoals,
     sessionDuration,
     getSizePriority,
-    registerNotifier,
-  } = wh as any;
+  } = warehouse;
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
   const [crew, setCrew] = useState<any | null>(null);
-
-  // server-driven membership info
   const [memberRole, setMemberRole] = useState<string | null>(null);
-  const [membershipStatus, setMembershipStatus] = useState<string | null>(null); // e.g. "active" or null
   const [isOwner, setIsOwner] = useState(false);
-
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [activeShift, setActiveShift] = useState<any | null>(null);
   const [statsObj, setStatsObj] = useState({ changedCount: 0, totalDelta: 0, stars: 0, offloadUnits: 0, salary: 0 });
@@ -134,31 +146,7 @@ export default function CrewWarehousePage() {
     return () => clearInterval(iv);
   }, []);
 
-  // register notifier from hook -> component-level toast
-  useEffect(() => {
-    if (!registerNotifier || !toast) return;
-    const notifier = (type: string, message: string | any, opts?: any) => {
-      try {
-        if (type === "success") return toast.success(message as any, opts);
-        if (type === "error") return toast.error(message as any, opts);
-        if (type === "warning") return toast.warning(message as any, opts);
-        if (type === "info") return toast.info(message as any, opts);
-        if (type === "custom" && typeof message === "function") return toast.custom(message as any, opts);
-        return toast.message(String(message), opts);
-      } catch {
-        // swallow
-      }
-    };
-
-    registerNotifier(notifier);
-    return () => {
-      try {
-        registerNotifier(null);
-      } catch {}
-    };
-  }, [registerNotifier, toast]);
-
-  // Load crew metadata (owner, etc.)
+  // Load crew data to ensure name displays
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
@@ -169,96 +157,40 @@ export default function CrewWarehousePage() {
         .limit(1)
         .maybeSingle();
       if (error) {
-        toast.error("Ошибка загрузки данных экипажа");
+        toast.error("Ошибка загрузки данных экипажа", { position: "top-right" });
         return;
       }
       setCrew(data || null);
-
-      // compute owner using dbUser (prefer AppContext userCrewInfo when available)
-      const appOwnerId = userCrewInfo?.id ? userCrewInfo?.id : undefined;
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (data?.owner_id && uid) {
-        setIsOwner(String(data.owner_id) === String(uid));
-      } else if (userCrewInfo?.is_owner) {
-        setIsOwner(true);
-      } else {
-        setIsOwner(false);
-      }
+      setIsOwner(data?.owner_id === dbUser?.user_id);
     };
     fetchCrew();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, dbUser, userCrewInfo, toast]);
+  }, [slug, dbUser?.user_id]);
 
-  // loadStatus uses dbUser from AppContext (so page reacts to actual logged user)
-  const loadStatus = useCallback(async () => {
-    if (!slug) return;
+  const loadStatus = async () => {
+    if (!slug || !dbUser?.user_id) return;
     try {
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (!uid) {
-        setLiveStatus(null);
-        setActiveShift(null);
-        setMembershipStatus(null);
-        setMemberRole(null);
-        return;
-      }
-
-      // get crew member record & live status
-      const statusRes = await getCrewMemberStatus(slug, String(uid));
-      if (statusRes?.success) {
-        setLiveStatus(statusRes.live_status || null);
-        const member = statusRes.member || null;
-        setMembershipStatus(member?.membership_status || null);
-        setMemberRole(member?.role || null);
-        // owner check: also ensure consistency
-        if (crew?.owner_id && String(crew.owner_id) === String(uid)) {
-          setIsOwner(true);
-        }
-      } else {
-        setLiveStatus(null);
-        setMembershipStatus(null);
-        setMemberRole(null);
-      }
-
-      // active shift
-      const shiftRes = await getActiveShiftForCrewMember(slug, String(uid));
+      const statusRes = await getCrewMemberStatus(slug, dbUser.user_id);
+      if (statusRes.success) setLiveStatus(statusRes.live_status || null);
+      const shiftRes = await getActiveShiftForCrewMember(slug, dbUser.user_id);
       setActiveShift(shiftRes.shift || null);
-    } catch (err) {
-      toast.error("Ошибка загрузки статуса");
+    } catch {
+      toast.error("Ошибка загрузки статуса", { position: "top-right" });
     }
-  }, [slug, dbUser, crew, toast]);
+  };
 
   useEffect(() => {
     loadStatus();
     const poll = setInterval(loadStatus, 30000);
     return () => clearInterval(poll);
-  }, [loadStatus]);
+  }, [slug, dbUser?.user_id]);
 
-  // Listen for shift changes emitted by ShiftControls so page updates immediately
-  useEffect(() => {
-    const onShiftChanged = () => {
-      try {
-        loadStatus();
-        loadItems();
-      } catch {}
-    };
-    window.addEventListener("crew:shift:changed", onShiftChanged);
-    return () => window.removeEventListener("crew:shift:changed", onShiftChanged);
-  }, [loadStatus, loadItems]);
-
-  // Determine canManage:
-  // - owner OR active member (membership_status === 'active') OR global admin
-  // - but if memberRole === 'car_observer' and not owner and not active member -> cannot manage
   const canManage = useMemo(() => {
-    const uid = dbUser?.user_id || dbUser?.id || null;
-    const isGlobalAdmin = Boolean(uid && (dbUser?.status === "admin" || dbUser?.role === "admin" || dbUser?.role === "vprAdmin"));
-    const isActiveMember = membershipStatus === "active";
-    const owner = isOwner;
-    // explicit observer lock
-    if (memberRole === "car_observer" && !owner && !isActiveMember && !isGlobalAdmin) return false;
-    return Boolean(owner || isActiveMember || isGlobalAdmin);
-  }, [dbUser, membershipStatus, memberRole, isOwner]);
+    const globalAdmin = !!dbUser && (dbUser.status === "admin" || dbUser.is_admin);
+    const memberOk = !!memberRole && memberRole !== "car_monitor"; // Exclude car_monitor
+    return !!(isOwner || memberOk || globalAdmin);
+  }, [dbUser, memberRole, isOwner]);
 
-  const optimisticUpdate = (itemId: string, voxelId: string, delta: number) => {
+  const optimisticUpdate = useCallback((itemId: string, voxelId: string, delta: number) => {
     setLocalItems((prev) =>
       prev.map((i) => {
         if (i.id !== itemId) return i;
@@ -280,67 +212,111 @@ export default function CrewWarehousePage() {
     else if (gameMode === "offload" && delta < 0) setOffloadCount(p => p + absDelta);
     else setEditCount(p => p + absDelta);
 
-    handleUpdateLocationQty(itemId, voxelId, delta, true).catch(() => {
+    // Enhanced: Toast on successful server update
+    handleUpdateLocationQty(itemId, voxelId, delta, true).then(({ success, item }) => {
+      if (success && item) {
+        const actionType = delta > 0 ? "Добавлено" : "Отгружено";
+        const newTotal = item.total_quantity;
+        const runningTotal = gameMode === "offload" ? offloadCount + absDelta : onloadCount + absDelta;
+        const itemName = localItems.find(i => i.id === itemId)?.name || "Товар";
+        toast.success(
+          `${actionType} ${absDelta} ${itemName} в ${voxelId} (остаток: ${newTotal})`,
+          {
+            description: `Сессия: ${runningTotal} ед. ${gameMode === "offload" ? "отгружено" : "добавлено"}`,
+            duration: 4000,
+            position: "bottom-right",
+            action: {
+              label: "Чекпоинт",
+              onClick: () => handleCheckpoint(),
+            },
+          }
+        );
+      } else {
+        loadItems();
+        toast.error("Сервер не обновил—перезагружено", { position: "top-right" });
+      }
+    }).catch(() => {
       loadItems();
-      toast.error("Ошибка обновления на сервере - перезагружено");
+      toast.error("Ошибка обновления на сервере - перезагружено", { position: "top-right" });
     });
-  };
+  }, [handleUpdateLocationQty, gameMode, offloadCount, onloadCount, localItems, toast, handleCheckpoint]);
 
   const handleCheckpoint = async () => {
-    if (!canManage) return toast.error("Нет прав для сохранения чекпоинта");
+    // Summarize previous checkpoint stats
+    if (checkpoint.length && dbUser?.user_id) {
+      const stats = computeProcessedStats();
+      const { offloadUnits, changedCount, totalDelta, sumsPrevious, sumsCurrent } = stats;
+      const changedCategories = Object.keys(sumsCurrent).filter(
+        (cat) => sumsCurrent[cat] !== (sumsPrevious[cat] || 0)
+      );
+      const semitotalMsg = `Семитотал чекпоинта: ${offloadUnits} ед. отгружено, ${changedCount} изменений, Δ${totalDelta} ед.`;
+      const fullMessage = `${semitotalMsg}\nКатегории: ${changedCategories.join(", ") || "нет"}`;
+      await notifyCrewOwner(slug, fullMessage, dbUser.user_id);
+
+      // Custom semitotal toast
+      toast.custom((t) => (
+        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-md space-y-2">
+          <h3 className="font-semibold text-blue-800">Чекпоинт Завершён</h3>
+          <p className="text-sm text-blue-700">{semitotalMsg}</p>
+          <div className="text-xs text-gray-600 grid grid-cols-3 gap-2">
+            <span>Изменения: {changedCount}</span>
+            <span>Дельта: {totalDelta}</span>
+            <span>Отгружено: {offloadUnits}</span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => toast.dismiss(t)} className="w-full">
+            Продолжить
+          </Button>
+        </div>
+      ), { duration: 8000, position: "bottom-right" });
+    }
+
+    // Save new checkpoint
     const snapshot = localItems.map(i => ({ id: i.id, locations: i.locations.map(l => ({ voxel: l.voxel, quantity: l.quantity })) }));
     setCheckpoint(snapshot);
     setCheckpointStart(Date.now());
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Чекпоинт сохранён локально");
+    setLastCheckpointDurationSec(checkpointStart ? Math.floor((Date.now() - checkpointStart) / 1000) : null);
+    toast.info("Новый чекпоинт запущен", { position: "bottom-right" });
 
-    try {
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (uid) {
-        const res = await saveCrewCheckpoint(slug, String(uid), snapshot);
-        if (res.success) toast.success("Чекпоинт сохранён на сервере");
-        else toast.error("Ошибка сохранения чекпоинта на сервере");
-      }
-    } catch (e) {
-      toast.error("Ошибка сохранения чекпоинта");
+    if (dbUser?.user_id) {
+      const res = await saveCrewCheckpoint(slug, dbUser.user_id, snapshot);
+      if (res.success) toast.success("Чекпоинт сохранён на сервере", { position: "bottom-right" });
+      else toast.error("Ошибка сохранения чекпоинта", { position: "top-right" });
     }
   };
 
   const handleReset = async () => {
-    if (!canManage) return toast.error("Нет прав для сброса чекпоинта");
-    if (!checkpoint.length) return toast.error("Нет чекпоинта");
+    if (!checkpoint.length) return toast.error("Нет чекпоинта для сброса", { position: "top-right" });
     setLocalItems(checkpoint.map(i => ({ ...i, locations: [...i.locations] })));
     setCheckpointStart(null);
     setOnloadCount(0);
     setOffloadCount(0);
     setEditCount(0);
-    toast.success("Сброс до чекпоинта (локально)");
 
-    try {
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (uid) {
-        const res = await resetCrewCheckpoint(slug, String(uid));
-        if (res.success) {
-          toast.success(`Сброс на сервере применён (${res.applied} позиций)`);
-          loadItems();
-        } else {
-          toast.error("Ошибка сброса на сервере");
-        }
+    if (dbUser?.user_id) {
+      const res = await resetCrewCheckpoint(slug, dbUser.user_id);
+      if (res.success) {
+        toast.info(`Сброшено: ${res.applied} позиций (отменено ${statsObj.totalDelta} ед.)`, { position: "bottom-right" });
+        loadItems();
+      } else {
+        toast.error("Ошибка сброса чекпоинта", { position: "top-right" });
       }
-    } catch (e) {
-      toast.error("Ошибка при сбросе");
+    } else {
+      toast.info("Сброшено локально до чекпоинта", { position: "bottom-right" });
     }
   };
 
   const categorizeItem = (item: any): string => {
     const fullLower = (item.id || item.model || '').toLowerCase().trim();
     if (!fullLower) return 'other';
+
     if (fullLower.includes('наматрасник') || fullLower.includes('namatras')) {
       const sizeMatch = fullLower.match(/(90|120|140|160|180|200)/);
       if (sizeMatch) return `namatras ${sizeMatch[0]}`;
     }
+
     const sizeChecks = [
       { key: 'евро макси', val: 'evromaksi' },
       { key: 'evro maksi', val: 'evromaksi' },
@@ -358,6 +334,7 @@ export default function CrewWarehousePage() {
         break;
       }
     }
+
     const seasonMap = { 'лето': 'leto', 'зима': 'zima', 'leto': 'leto', 'zima': 'zima' };
     let detectedSeason = null;
     for (const [key, val] of Object.entries(seasonMap)) {
@@ -366,18 +343,22 @@ export default function CrewWarehousePage() {
         break;
       }
     }
+
     if (detectedSize && detectedSeason) {
       return `${detectedSize} ${detectedSeason}`;
     }
+
     if (fullLower.includes('подушка') || fullLower.includes('podushka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Podushka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Podushka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Podushka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Podushka 70x70';
       if (fullLower.includes('анатом') || fullLower.includes('anatom')) return 'Podushka anatom';
     }
+
     if (fullLower.includes('наволочка') || fullLower.includes('navolochka')) {
-      if (fullLower.includes('50x70') || fullLower.includes('50h70')) return 'Navolochka 50x70';
-      if (fullLower.includes('70x70') || fullLower.includes('70h70')) return 'Navolochka 70x70';
+      if (fullLower.includes('50x70') || fullLower.includes('50x70')) return 'Navolochka 50x70';
+      if (fullLower.includes('70x70') || fullLower.includes('70x70')) return 'Navolochka 70x70';
     }
+
     return 'other';
   };
 
@@ -440,7 +421,7 @@ export default function CrewWarehousePage() {
     setEditContents(contents);
     setEditDialogOpen(true);
     toast.info(`Ячейка ${voxelId} открыта для правки`);
-  }, [gameMode, handlePlateClick, localItems, toast]);
+  }, [gameMode, handlePlateClick, localItems]);
 
   const handleItemClickCustom = useCallback((item: any) => {
     if (gameMode) {
@@ -454,14 +435,13 @@ export default function CrewWarehousePage() {
     setEditContents(contents);
     setEditDialogOpen(true);
     toast.info(`Товар ${item.name} открыт для правки в ${voxelId}`);
-  }, [gameMode, handleItemClick, selectedVoxel, toast]);
+  }, [gameMode, handleItemClick, selectedVoxel]);
 
   const handleExportDaily = async () => {
     if (!activeShift) return toast.error("Запустите смену для экспорта отчёта");
     setExportingDaily(true);
     try {
       const res = await exportCrewDailyShift(slug, false);
-
       if (res?.success && res.csv) {
         const copied = await safeCopyToClipboard(res.csv);
         if (copied) toast.success("Отчёт скопирован в буфер");
@@ -475,6 +455,7 @@ export default function CrewWarehousePage() {
           URL.revokeObjectURL(url);
           toast.success("Отчёт скачан");
         }
+
         toast.info("Отчёт отправлен владельцу экипажа");
       } else {
         toast.error(res?.error || "Экспорт отчёта провалился");
@@ -491,7 +472,7 @@ export default function CrewWarehousePage() {
     setSendingCar(true);
     try {
       const msg = `Запрос машины: тип=${carSize}`;
-      await notifyCrewOwner(slug, msg);
+      await notifyCrewOwner(slug, msg, dbUser?.user_id);
       toast.custom((t) => (
         <div className="flex items-center gap-2 p-3 bg-green-50 rounded-md">
           <Car className="w-5 h-5 text-green-600" />
@@ -586,6 +567,9 @@ export default function CrewWarehousePage() {
             {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
             <div>
               <h1 className="text-sm font-medium leading-tight">{crew?.name || "Экипаж"}</h1>
+              <div className="text-xs text-gray-500">
+                Смена: {activeShift ? (activeShift.shift_type || "склад") : "нет"} · Статус: {liveStatus || (activeShift ? "активен" : "оффлайн")}
+              </div>
             </div>
           </div>
 
@@ -724,7 +708,7 @@ export default function CrewWarehousePage() {
             className="h-8"
             disabled={exportingDaily}
           >
-            {exportingDaily ? "Экспорт..." : "Экспорт дня"}
+            {exportingDaily ? <Loading text="Экспорт..." variant="generic" className="inline w-4 h-4" /> : "Экспорт дня"}
           </Button>
           <Button
             onClick={() => handleExportStock(false)}
@@ -754,7 +738,7 @@ export default function CrewWarehousePage() {
               className="h-8"
               disabled={sendingCar || !canManage}
             >
-              {sendingCar ? "Отправка..." : (<><Car className="w-4 h-4 mr-1" /> Запрос машины</>)}
+              {sendingCar ? <Loading text="Отправка..." variant="generic" className="inline w-4 h-4" /> : <><Car className="w-4 h-4 mr-1" /> Запрос машины</>}
             </Button>
           </div>
           <Button
@@ -764,7 +748,7 @@ export default function CrewWarehousePage() {
             className="h-8"
             disabled={checkingPending}
           >
-            {checkingPending ? "Проверка..." : "Проверить ожидающие"}
+            {checkingPending ? <Loading text="Проверка..." variant="generic" className="inline w-4 h-4" /> : "Проверить ожидающие"}
           </Button>
         </div>
 
