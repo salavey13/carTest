@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, RotateCcw, FileUp, Car } from "lucide-react";
 import { useCrewWarehouse } from "./warehouseHooks";
 import WarehouseItemCard from "@/components/WarehouseItemCard";
@@ -18,9 +17,9 @@ import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
 import { getCrewMemberStatus, getActiveShiftForCrewMember, getLastClosedShiftToday } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
+import { getCrewBySlug } from "./actions_crud"; // ← ALREADY EXISTS
 import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from "@/contexts/AppContext";
 
@@ -134,21 +133,24 @@ export default function CrewWarehousePage() {
     return () => registerNotifier(null);
   }, [registerNotifier, toast]);
 
+  // Fetch crew via existing action
   useEffect(() => {
     const fetchCrew = async () => {
       if (!slug) return;
-      const { data, error } = await supabaseAdmin
-        .from("crews")
-        .select("id, name, slug, owner_id, logo_url")
-        .eq("slug", slug)
-        .limit(1)
-        .maybeSingle();
-      if (error) { toast.error("Ошибка загрузки экипажа"); return; }
-      setCrew(data || null);
+      const res = await getCrewBySlug(slug);
+      if (!res.success) {
+        toast.error("Ошибка загрузки экипажа");
+        return;
+      }
+      setCrew(res.crew);
       const uid = dbUser?.user_id || dbUser?.id || null;
-      if (data?.owner_id && uid) setIsOwner(String(data.owner_id) === String(uid));
-      else if (userCrewInfo?.is_owner) setIsOwner(true);
-      else setIsOwner(false);
+      if (res.crew?.owner_id && uid) {
+        setIsOwner(String(res.crew.owner_id) === String(uid));
+      } else if (userCrewInfo?.is_owner) {
+        setIsOwner(true);
+      } else {
+        setIsOwner(false);
+      }
     };
     fetchCrew();
   }, [slug, dbUser, userCrewInfo, toast]);
@@ -304,43 +306,40 @@ export default function CrewWarehousePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
-      {/* HEADER */}
-      <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 shadow-sm p-2">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-          <div className="flex items-center gap-2">
-            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover" />}
-            <h1 className="text-sm font-medium truncate max-w-[180px] sm:max-w-none">{crew?.name || "Экипаж"}</h1>
+      {/* HEADER — НЕ sticky */}
+      <header className="bg-white dark:bg-gray-800 shadow-sm p-2 border-b">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+            <h1 className="text-sm font-medium truncate">{crew?.name || "Экипаж"}</h1>
           </div>
-          <div className="flex items-center gap-1 overflow-x-auto">
-            <ShiftControls slug={slug!} />
-            <div className="flex gap-1">
-              <Button size="sm" variant={gameMode === "onload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>+Загрузка</Button>
-              <Button size="sm" variant={gameMode === "offload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>−Выгрузка</Button>
-            </div>
+          <div className="flex gap-1 flex-shrink-0">
+            <Button size="sm" variant={gameMode === "onload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>+Загрузка</Button>
+            <Button size="sm" variant={gameMode === "offload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "offload" ? null : "offload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>−Выгрузка</Button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-2 pb-20 sm:pb-2">
-        {/* СКЛАД */}
-        <Card className="mb-2">
-          <CardHeader className="p-2 pb-1">
-            <CardTitle className="text-base">Склад</CardTitle>
-          </CardHeader>
-          <CardContent className="p-2 pt-0">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {hookFilteredItems.map((item) => (
-                <div key={item.id} className="min-w-0">
-                  <WarehouseItemCard item={item} onClick={() => handleItemClickCustom(item)} />
-                </div>
-              ))}
-            </div>
-            {hookFilteredItems.length === 0 && <p className="text-center py-4 text-gray-500 text-sm">Товары не найдены</p>}
-          </CardContent>
-        </Card>
+      {/* SHIFT CONTROLS — ВНЕ хедера */}
+      <div className="p-2 bg-white dark:bg-gray-800 border-b">
+        <ShiftControls slug={slug!} />
+      </div>
+
+      <main className="flex-1 overflow-y-auto">
+        {/* СКЛАД — 6pvh scroll wrapper */}
+        <div className="h-[calc(6*16vw)] overflow-y-auto p-2 bg-white dark:bg-gray-800">
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+            {hookFilteredItems.map((item) => (
+              <div key={item.id} className="min-w-0">
+                <WarehouseItemCard item={item} onClick={() => handleItemClickCustom(item)} />
+              </div>
+            ))}
+          </div>
+          {hookFilteredItems.length === 0 && <p className="text-center py-8 text-gray-500 text-sm">Товары не найдены</p>}
+        </div>
 
         {/* ФИЛЬТРЫ */}
-        <div className="mb-2">
+        <div className="p-2 bg-white dark:bg-gray-800 border-b">
           <FilterAccordion
             filterSeason={filterSeason} setFilterSeason={setFilterSeason}
             filterPattern={filterPattern} setFilterPattern={setFilterPattern}
@@ -354,7 +353,7 @@ export default function CrewWarehousePage() {
         </div>
 
         {/* ВИЗУАЛИЗАЦИЯ */}
-        <div className="mb-2">
+        <div className="p-2 bg-white dark:bg-gray-800 border-b">
           <WarehouseViz
             items={localItems}
             selectedVoxel={selectedVoxel}
@@ -365,7 +364,7 @@ export default function CrewWarehousePage() {
         </div>
 
         {/* СТАТИСТИКА */}
-        <div className="mb-2">
+        <div className="p-2 bg-white dark:bg-gray-800 border-b">
           <WarehouseStats
             itemsCount={localItems.reduce((s, it) => s + (it.total_quantity || 0), 0)}
             uniqueIds={localItems.length}
@@ -390,40 +389,42 @@ export default function CrewWarehousePage() {
           />
         </div>
 
-        {/* НИЖНИЕ КНОПКИ — ПОЛНОСТЬЮ АДАПТИВНАЯ СЕТКА */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-2">
-          <Button onClick={handleCheckpoint} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
-            <Save className="w-4 h-4 mr-1" /> Чекпоинт
-          </Button>
-          <Button onClick={handleReset} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
-            <RotateCcw className="w-4 h-4 mr-1" /> Сброс
-          </Button>
-          <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 text-xs" disabled={exportingDaily}>
-            {exportingDaily ? "Экспорт…" : "Экспорт дня"}
-          </Button>
-          <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="h-8 text-xs" disabled={!canManage}>
-            <FileUp className="w-4 h-4 mr-1" /> Экспорт склада
-          </Button>
-          <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
-            <Select value={carSize} onValueChange={setCarSize}>
-              <SelectTrigger className="h-8 w-full text-xs"><SelectValue placeholder="Тип" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="small">Маленькая</SelectItem>
-                <SelectItem value="medium">Средняя</SelectItem>
-                <SelectItem value="large">Большая</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 flex-1" disabled={sendingCar || !canManage}>
-              {sendingCar ? "…" : <Car className="w-4 h-4" />}
+        {/* НИЖНИЕ КНОПКИ */}
+        <div className="p-2 bg-white dark:bg-gray-800">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <Button onClick={handleCheckpoint} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
+              <Save className="w-4 h-4 mr-1" /> Чекпоинт
+            </Button>
+            <Button onClick={handleReset} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
+              <RotateCcw className="w-4 h-4 mr-1" /> Сброс
+            </Button>
+            <Button onClick={handleExportDaily} size="sm" variant="ghost" className="h-8 text-xs" disabled={exportingDaily}>
+              {exportingDaily ? "Экспорт…" : "Экспорт дня"}
+            </Button>
+            <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="h-8 text-xs" disabled={!canManage}>
+              <FileUp className="w-4 h-4 mr-1" /> Экспорт склада
+            </Button>
+            <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
+              <Select value={carSize} onValueChange={setCarSize}>
+                <SelectTrigger className="h-8 w-20 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">Мал.</SelectItem>
+                  <SelectItem value="medium">Сред.</SelectItem>
+                  <SelectItem value="large">Бол.</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 flex-1" disabled={sendingCar || !canManage}>
+                {sendingCar ? "…" : <Car className="w-4 h-4" />}
+              </Button>
+            </div>
+            <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8 text-xs" disabled={checkingPending}>
+              {checkingPending ? "…" : "Заказы"}
             </Button>
           </div>
-          <Button onClick={handleCheckPending} size="sm" variant="ghost" className="h-8 text-xs" disabled={checkingPending}>
-            {checkingPending ? "…" : "Проверить заказы"}
-          </Button>
-        </div>
 
-        <div className="mt-4">
-          <CrewWarehouseSyncButtons slug={slug!} />
+          <div className="mt-3">
+            <CrewWarehouseSyncButtons slug={slug!} />
+          </div>
         </div>
       </main>
 
@@ -450,10 +451,9 @@ export default function CrewWarehousePage() {
   );
 }
 
-// Утилита для времени
-const formatSec = (sec: number | null) => {
-  if (sec === null) return "--:--";
-  const mm = Math.floor(sec / 60).toString().padStart(2, "0");
-  const ss = (sec % 60).toString().padStart(2, "0");
-  return `${mm}:${ss}`;
-};
+  const formatSec = (sec: number | null) => {
+    if (sec === null) return "--:--";
+    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
+    const ss = (sec % 60).toString().padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
