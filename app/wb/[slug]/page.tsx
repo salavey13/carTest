@@ -17,7 +17,6 @@ import { exportCrewCurrentStock, exportCrewDailyShift } from "./actions_csv";
 import { fetchCrewWbPendingCount, fetchCrewOzonPendingCount } from "./actions_sync";
 import { getCrewMemberStatus, getActiveShiftForCrewMember, getLastClosedShiftToday } from "./actions_shifts";
 import { saveCrewCheckpoint, resetCrewCheckpoint } from "./actions_shifts";
-import { getCrewBySlug } from "./actions_crud"; // ← ALREADY EXISTS
 import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppToast } from "@/hooks/useAppToast";
@@ -89,7 +88,6 @@ export default function CrewWarehousePage() {
   } = wh as any;
 
   const [localItems, setLocalItems] = useState<any[]>(hookItems || []);
-  const [crew, setCrew] = useState<any | null>(null);
   const [memberRole, setMemberRole] = useState<string | null>(null);
   const [membershipStatus, setMembershipStatus] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -133,27 +131,14 @@ export default function CrewWarehousePage() {
     return () => registerNotifier(null);
   }, [registerNotifier, toast]);
 
-  // Fetch crew via existing action
+  // Use userCrewInfo from AppContext — NO getCrewBySlug needed
   useEffect(() => {
-    const fetchCrew = async () => {
-      if (!slug) return;
-      const res = await getCrewBySlug(slug);
-      if (!res.success) {
-        toast.error("Ошибка загрузки экипажа");
-        return;
-      }
-      setCrew(res.crew);
-      const uid = dbUser?.user_id || dbUser?.id || null;
-      if (res.crew?.owner_id && uid) {
-        setIsOwner(String(res.crew.owner_id) === String(uid));
-      } else if (userCrewInfo?.is_owner) {
-        setIsOwner(true);
-      } else {
-        setIsOwner(false);
-      }
-    };
-    fetchCrew();
-  }, [slug, dbUser, userCrewInfo, toast]);
+    if (userCrewInfo?.slug === slug) {
+      setIsOwner(userCrewInfo.is_owner);
+    } else {
+      setIsOwner(false);
+    }
+  }, [userCrewInfo, slug]);
 
   const loadStatus = useCallback(async () => {
     if (!slug || !dbUser?.user_id) return;
@@ -306,12 +291,12 @@ export default function CrewWarehousePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
-      {/* HEADER — НЕ sticky */}
+      {/* HEADER */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-2 border-b">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            {crew?.logo_url && <img src={crew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover flex-shrink-0" />}
-            <h1 className="text-sm font-medium truncate">{crew?.name || "Экипаж"}</h1>
+            {userCrewInfo?.logo_url && <img src={userCrewInfo.logo_url} alt="logo" className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+            <h1 className="text-sm font-medium truncate">{userCrewInfo?.name || "Экипаж"}</h1>
           </div>
           <div className="flex gap-1 flex-shrink-0">
             <Button size="sm" variant={gameMode === "onload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>+Загрузка</Button>
@@ -320,13 +305,13 @@ export default function CrewWarehousePage() {
         </div>
       </header>
 
-      {/* SHIFT CONTROLS — ВНЕ хедера */}
+      {/* SHIFT CONTROLS — 1 LINE */}
       <div className="p-2 bg-white dark:bg-gray-800 border-b">
         <ShiftControls slug={slug!} />
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        {/* СКЛАД — 6pvh scroll wrapper */}
+        {/* СКЛАД — 6pvh */}
         <div className="h-[calc(6*16vw)] overflow-y-auto p-2 bg-white dark:bg-gray-800">
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
             {hookFilteredItems.map((item) => (
@@ -350,7 +335,7 @@ export default function CrewWarehousePage() {
             includeSearch search={search} setSearch={setSearch}
             sortOption={sortOption as any} setSortOption={setSortOption as any}
           />
-        </div>
+        </52</div>
 
         {/* ВИЗУАЛИЗАЦИЯ */}
         <div className="p-2 bg-white dark:bg-gray-800 border-b">
@@ -413,7 +398,7 @@ export default function CrewWarehousePage() {
                   <SelectItem value="large">Бол.</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 flex-1" disabled={sendingCar || !canManage}>
+              <Button onClick={handleSendCar} size="sm" variant="secondary" className="h-8 w-12" disabled={sendingCar || !canManage}>
                 {sendingCar ? "…" : <Car className="w-4 h-4" />}
               </Button>
             </div>
@@ -451,9 +436,9 @@ export default function CrewWarehousePage() {
   );
 }
 
-  const formatSec = (sec: number | null) => {
-    if (sec === null) return "--:--";
-    const mm = Math.floor(sec / 60).toString().padStart(2, "0");
-    const ss = (sec % 60).toString().padStart(2, "0");
-    return `${mm}:${ss}`;
-  };
+const formatSec = (sec: number | null) => {
+  if (sec === null) return "--:--";
+  const mm = Math.floor(sec / 60).toString().padStart(2, "0");
+  const ss = (sec % 60).toString().padStart(2, "0");
+  return `${mm}:${ss}`;
+};
