@@ -6,17 +6,6 @@ import { toast } from "sonner";
 import { Play, Truck, LogOut } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
 
-/**
- * ShiftControls
- * - shows live_status
- * - shows active shift elapsed time (if active)
- * - start / toggle ride / end shift actions
- *
- * Polls server for status and also updates elapsed timer clientside.
- *
- * Emits window event 'crew:shift:changed' after changing shift/status so page can reload state.
- */
-
 export default function ShiftControls({ slug }: { slug: string }) {
   const { dbUser } = useAppContext();
   const userId = dbUser?.user_id;
@@ -27,46 +16,28 @@ export default function ShiftControls({ slug }: { slug: string }) {
   const timerRef = useRef<number | null>(null);
 
   const loadStatus = async () => {
-    if (!slug || !userId) {
-      setLiveStatus(null);
-      setActiveShift(null);
-      setElapsedSec(null);
-      return;
-    }
+    if (!slug || !userId) return;
     try {
       const mod = await import(`@/app/wb/[slug]/actions_shifts`);
       const statusRes = await mod.getCrewMemberStatus(slug, userId);
-      if (statusRes?.success) {
-        setLiveStatus(statusRes.live_status || null);
-      } else {
-        setLiveStatus(null);
-      }
+      if (statusRes?.success) setLiveStatus(statusRes.live_status || null);
       const shiftRes = await mod.getActiveShiftForCrewMember(slug, userId);
       setActiveShift(shiftRes?.shift || null);
-    } catch (e: any) {
+    } catch (e) {
       console.warn("ShiftControls: failed to load status", e);
-      setLiveStatus(null);
-      setActiveShift(null);
-      setElapsedSec(null);
     }
   };
 
   useEffect(() => {
     loadStatus();
-    const poll = setInterval(() => loadStatus(), 30_000);
+    const poll = setInterval(loadStatus, 30_000);
     return () => clearInterval(poll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, userId]);
 
-  // client timer: update elapsedSec every second while activeShift present
   useEffect(() => {
-    if (timerRef.current) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    if (timerRef.current) window.clearInterval(timerRef.current);
     if (activeShift && activeShift.clock_in_time && !activeShift.clock_out_time) {
       const startTs = Date.parse(activeShift.clock_in_time);
-      // set immediately
       setElapsedSec(Math.floor((Date.now() - startTs) / 1000));
       timerRef.current = window.setInterval(() => {
         setElapsedSec(Math.floor((Date.now() - startTs) / 1000));
@@ -74,9 +45,7 @@ export default function ShiftControls({ slug }: { slug: string }) {
     } else {
       setElapsedSec(null);
     }
-    return () => {
-      if (timerRef.current) window.clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) window.clearInterval(timerRef.current); };
   }, [activeShift]);
 
   const formatElapsed = (s: number | null) => {
@@ -88,14 +57,10 @@ export default function ShiftControls({ slug }: { slug: string }) {
   };
 
   const emitShiftChanged = () => {
-    try {
-      window.dispatchEvent(new CustomEvent("crew:shift:changed", { detail: { slug, userId } }));
-    } catch (e) {
-      // ignore
-    }
+    window.dispatchEvent(new CustomEvent("crew:shift:changed", { detail: { slug, userId } }));
   };
 
-  const startShift = async () => {
+    const startShift = async () => {
     if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
     setLoading(true);
     try {
@@ -118,7 +83,6 @@ export default function ShiftControls({ slug }: { slug: string }) {
       setLoading(false);
     }
   };
-
   const toggleRide = async () => {
     if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
     setLoading(true);
@@ -140,7 +104,6 @@ export default function ShiftControls({ slug }: { slug: string }) {
       setLoading(false);
     }
   };
-
   const endShift = async () => {
     if (!slug || !userId) return toast.error("Нет данных пользователя/экипажа");
     setLoading(true);
@@ -169,55 +132,20 @@ export default function ShiftControls({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="flex flex-col md:flex-row items-center gap-2">
-      <div className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
-        Статус: <span className="font-medium">{liveStatus || "—"}</span>
-      </div>
-
-      <div className="text-xs text-gray-500 whitespace-nowrap">
-        {activeShift ? (
-          <>
-            <div>Shift: <span className="font-medium">{activeShift.shift_type || "online"}</span></div>
-            <div>Elapsed: <span className="font-mono">{formatElapsed(elapsedSec)}</span></div>
-            <div className="text-xs text-gray-400">Actions: {(activeShift.actions || []).length || 0}</div>
-          </>
-        ) : (
-          <div className="text-xs text-gray-400">No active shift</div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={startShift}
-          disabled={loading || liveStatus === "online" || liveStatus === "riding" || !userId}
-          title="Начать смену"
-          className="px-2 py-1"
-        >
-          <Play className="w-4 h-4 mr-1" />Start
+    <div className="flex items-center gap-2 text-xs">
+      <span className="whitespace-nowrap">Статус: <strong>{liveStatus || "—"}</strong></span>
+      {activeShift ? (
+        <span className="whitespace-nowrap font-mono">{formatElapsed(elapsedSec)}</span>
+      ) : null}
+      <div className="flex gap-1 ml-auto">
+        <Button size="sm" variant="ghost" onClick={startShift} disabled={loading || liveStatus === "online" || liveStatus === "riding" || !userId} className="px-2 py-1">
+          <Play className="w-4 h-4" />
         </Button>
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={toggleRide}
-          disabled={loading || (!liveStatus) || liveStatus === "offline" || !userId}
-          title={liveStatus === "riding" ? "Вернуться в бокс" : "Отметиться: на байке"}
-          className="px-2 py-1"
-        >
-          <Truck className="w-4 h-4 mr-1" />{liveStatus === "riding" ? "In Box" : "On Bike"}
+        <Button size="sm" variant="outline" onClick={toggleRide} disabled={loading || !liveStatus || liveStatus === "offline" || !userId} className="px-2 py-1">
+          <Truck className="w-4 h-4" />
         </Button>
-
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={endShift}
-          disabled={loading || liveStatus === "offline" || !userId}
-          title="Завершить смену"
-          className="px-2 py-1"
-        >
-          <LogOut className="w-4 h-4 mr-1" />End
+        <Button size="sm" variant="destructive" onClick={endShift} disabled={loading || liveStatus === "offline" || !userId} className="px-2 py-1">
+          <LogOut className="w-4 h-4" />
         </Button>
       </div>
     </div>
