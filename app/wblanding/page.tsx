@@ -134,7 +134,7 @@ export default function WarehouseLandingPage() {
                 <li><strong>Смены:</strong> Старт/завершение смен, статусы (online/offline/riding). Уведомления владельцам о запросах (машина, заказы).</li>
                 <li><strong>Синхронизация:</strong> API с WB/Ozon/YM для стоков. Настройка SKU/баркодов. Экспорт CSV (стоки, смены).</li>
                 <li><strong>Статистика:</strong> Эффективность, время на товар, цели, достижения, лидерборд. Игровые элементы (очки, уровни, босс-режим).</li>
-                <li><strong>Приглашения:</strong> Владельцы создают экипажи (/crews/create). Приглашают через ссылки (start_param как 'crew_{slug}_join_crew'). Заявки на вступление подтверждают владельцы. Участники видят статусы (pending/active).</li>
+                <li><strong>Приглашения:</strong> Владельцы создают экипажи (/crews/create). Приглашают через ссылки (start_param как 'crew_slug_join_crew'). Заявки на вступление подтверждают владельцы. Участники видят статусы (pending/active).</li>
               </ul>
             </div>
             <div>
