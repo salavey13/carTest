@@ -15,7 +15,7 @@ export default function WarehouseLandingPage() {
             alt="Логотип приложения"
             width={169}
             height={169}
-            className="mx-auto mb-6 sm:mb-8 rounded-full shadow-lg w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40"
+            className="mx-auto mb-6 sm:mb-8 rounded-full w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40"
           />
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-4 sm:mb-6 leading-tight">Складской учет для онлайн-магазинов</h1>
           <p className="text-base sm:text-xl md:text-2xl mb-8 sm:mb-10 max-w-xl sm:max-w-3xl mx-auto">Сократите недостачи на 73%, обновляйте остатки одним кликом. Для 2+ магазинов на WB, Ozon, YM с 100+ артикулами.</p>
