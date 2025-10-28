@@ -1,3 +1,4 @@
+// /app/wblanding/page.tsx
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -13,7 +14,7 @@ export default function WarehouseLandingPage() {
             src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
             alt="Логотип приложения"
             width={169}
-            height={120}
+            height={169}
             className="mx-auto mb-6 sm:mb-8 rounded-full shadow-lg w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40"
           />
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-4 sm:mb-6 leading-tight">Складской учет для онлайн-магазинов</h1>
