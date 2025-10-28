@@ -1,3 +1,4 @@
+// /app/wb/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -311,8 +312,8 @@ export default function CrewWarehousePage() {
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        {/* СКЛАД — 6pvh */}
-        <div className="h-[calc(6*16vw)] overflow-y-auto p-2 bg-white dark:bg-gray-800">
+        {/* СКЛАД — 60vh */}
+        <div className="h-[60vh] overflow-y-auto p-2 bg-white dark:bg-gray-800">
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
             {hookFilteredItems.map((item) => (
               <div key={item.id} className="min-w-0">
@@ -335,7 +336,7 @@ export default function CrewWarehousePage() {
             includeSearch search={search} setSearch={setSearch}
             sortOption={sortOption as any} setSortOption={setSortOption as any}
           />
-        </52</div>
+        </div>
 
         {/* ВИЗУАЛИЗАЦИЯ */}
         <div className="p-2 bg-white dark:bg-gray-800 border-b">
