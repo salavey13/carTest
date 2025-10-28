@@ -1,45 +1,71 @@
 import React from 'react';
+import Image from 'next/image';
 
 export default function WarehouseLandingPage() {
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800">
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
       {/* Hero Section */}
-      <section className="bg-blue-600 text-white py-20 px-4">
+      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-24 px-4 md:py-32">
         <div className="max-w-6xl mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold mb-4">Управление складом для онлайн-магазинов</h1>
-          <p className="text-xl md:text-2xl mb-8">Снижайте количество недостач. Ведите учет товаров и смен персонала в 10 раз быстрее. Идеально для владельцев 2+ магазинов на WB, Ozon, YM с ~100 артикулами и 500 ед. товаров.</p>
-          <a href="#features" className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold text-lg hover:bg-gray-100">Узнать больше</a>
+          <Image 
+            src="/logo.png" // Замените на путь к вашему логотипу
+            alt="Логотип приложения"
+            width={120}
+            height={120}
+            className="mx-auto mb-6 rounded-full shadow-lg"
+          />
+          <h1 className="text-4xl md:text-6xl font-bold mb-6">Складской учет для онлайн-магазинов</h1>
+          <p className="text-xl md:text-2xl mb-10 max-w-3xl mx-auto">Сократите недостачи, ускорьте учет товаров и смен персонала в 10 раз. Идеально для владельцев 2+ магазинов на WB, Ozon, YM с ~100 артикулами и до 500 единиц товаров.</p>
+          <a href="#features" className="bg-white text-blue-600 px-8 py-4 rounded-full font-semibold text-lg hover:bg-gray-100 shadow-md transition-all">Узнать больше</a>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-16 px-4">
+      <section id="features" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Ключевые возможности</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Возможности приложения</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Синхронизация с маркетплейсами</h3>
-              <p>Автоматическая синхронизация остатков с WB, Ozon и Яндекс.Маркет. Поддержка API для seamless интеграции.</p>
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow">
+              <svg className="w-12 h-12 mx-auto mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <h3 className="text-xl font-bold mb-4 text-center">Синхронизация с маркетплейсами</h3>
+              <p className="text-center text-gray-600">Автоматическое обновление остатков на WB, Ozon и Яндекс.Маркет в реальном времени.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Управление сменами</h3>
-              <p>Контроль смен персонала, чекпоинты, сбросы и статистика эффективности. Идеально для складского персонала.</p>
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow">
+              <svg className="w-12 h-12 mx-auto mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-xl font-bold mb-4 text-center">Управление сменами</h3>
+              <p className="text-center text-gray-600">Контроль работы персонала, чекпоинты и детальная статистика по сменам.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Мульти-тенантность</h3>
-              <p>Доступ для нескольких владельцев складов как тенантов. Суперадмин управление на базе Supabase freemium.</p>
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow">
+              <svg className="w-12 h-12 mx-auto mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <h3 className="text-xl font-bold mb-4 text-center">Мульти-доступ</h3>
+              <p className="text-center text-gray-600">Управление несколькими складами, ролевой доступ для команды.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Авторизация через Telegram</h3>
-              <p>Безопасная авторизация с использованием Telegram и Supabase RLS для контроля доступа.</p>
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow">
+              <svg className="w-12 h-12 mx-auto mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <h3 className="text-xl font-bold mb-4 text-center">Telegram-интерфейс</h3>
+              <p className="text-center text-gray-600">Удобный доступ через мессенджер, без установки приложений.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Визуализация склада</h3>
-              <p>Интерактивная визуализация ячеек склада, фильтры по сезонам, узорам, цветам и размерам.</p>
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow">
+              <svg className="w-12 h-12 mx-auto mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <h3 className="text-xl font-bold mb-4 text-center">Визуализация</h3>
+              <p className="text-center text-gray-600">Интерактивная карта склада с фильтрами по характеристикам товаров.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Экспорт и отчеты</h3>
-              <p>Экспорт текущих остатков, ежедневных смен в CSV/TSV. Автоматическая генерация отчетов.</p>
+            <div className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow">
+              <svg className="w-12 h-12 mx-auto mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-xl font-bold mb-4 text-center">Отчеты</h3>
+              <p className="text-center text-gray-600">Экспорт остатков и смен в удобных форматах, статистика продаж.</p>
             </div>
           </div>
         </div>
@@ -48,142 +74,202 @@ export default function WarehouseLandingPage() {
       {/* Benefits Section */}
       <section className="bg-gray-100 py-16 px-4">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Преимущества для вашего бизнеса</h2>
-          <div className="space-y-8">
-            {/* Для владельца */}
-            <div>
-              <h3 className="text-2xl font-bold mb-4">Для владельца склада</h3>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Контроль нескольких онлайн-магазинов в одном месте.</li>
-                <li>Снижение потерь за счет точного учета ~100 артикулов и 500 ед. товаров.</li>
-                <li>Автоматизация синхронизации с WB, Ozon, YM.</li>
-                <li>Мониторинг эффективности персонала через смены и чекпоинты.</li>
-                <li>Freemium модель на базе Supabase - масштабируемо и бесплатно для старта.</li>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Почему наше приложение выгодно для вас</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-6 text-center text-blue-800">Для владельца</h3>
+              <ul className="space-y-4 text-gray-600">
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Контроль нескольких магазинов в одном интерфейсе
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Снижение потерь и ошибок в учете
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Автоматическая синхронизация остатков
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Мониторинг работы команды
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Freemium модель - начните бесплатно
+                </li>
               </ul>
             </div>
-            {/* Для персонала */}
-            <div>
-              <h3 className="text-2xl font-bold mb-4">Для складского персонала</h3>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Простой интерфейс через Telegram - без сложных приложений.</li>
-                <li>Быстрые операции: загрузка/выгрузка, редактирование, визуализация.</li>
-                <li>Игровой режим с очками, уровнями и достижениями.</li>
-                <li>Статистика: эффективность, время на товар, ежедневные цели.</li>
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-6 text-center text-blue-800">Для персонала</h3>
+              <ul className="space-y-4 text-gray-600">
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Простой интерфейс в Telegram
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Быстрые операции с товарами
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Игровой режим с наградами
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Личная статистика и цели
+                </li>
               </ul>
             </div>
-            {/* Для бухгалтера/админа */}
-            <div>
-              <h3 className="text-2xl font-bold mb-4">Для администратора</h3>
-              <ul className="list-disc pl-6 space-y-2">
-                <li>Мульти-тенант доступ: управляйте несколькими складами как суперадмин.</li>
-                <li>RLS для безопасности данных.</li>
-                <li>Автоматические уведомления о заказах и машинах.</li>
-                <li>Экспорт в CSV для отчетов и аналитики.</li>
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-6 text-center text-blue-800">Для администратора</h3>
+              <ul className="space-y-4 text-gray-600">
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Управление несколькими складами
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Безопасный доступ для команды
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Уведомления о заказах
+                </li>
+                <li className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Простые отчеты в CSV
+                </li>
               </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 px-4">
+      {/* Why Choose Us vs YClients */}
+      <section id="why-us" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Как это работает</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Авторизация и доступ</h3>
-              <p>Вход через Telegram с Supabase RLS. Экипажи действуют как тенанты для владельцев складов.</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Учет и визуализация</h3>
-              <p>Загрузка/выгрузка товаров, чекпоинты, визуализация ячеек, фильтры по атрибутам.</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Смены и статистика</h3>
-              <p>Управление сменами, статистика эффективности, достижения, лидерборд.</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-bold mb-4">Синхронизации</h3>
-              <p>Синхронизация с WB, Ozon, YM. Экспорт отчетов, уведомления о заказах.</p>
-            </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Почему наше приложение лучше YClients</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-md">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-6 py-4 text-left font-bold text-gray-700">Аспект</th>
+                  <th className="px-6 py-4 text-left font-bold text-gray-700">Наше приложение</th>
+                  <th className="px-6 py-4 text-left font-bold text-gray-700">YClients</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t">
+                  <td className="px-6 py-4 font-medium">Ценообразование</td>
+                  <td className="px-6 py-4">Freemium модель. Платите только половину от сэкономленных на штрафах средств (индивидуальный расчет). Бесплатно для малого бизнеса.</td>
+                  <td className="px-6 py-4">Фиксированные тарифы от 900 руб/мес (за 3 мес предоплаты). Дополнительные модули оплачиваются отдельно. Нет бесплатной версии.</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-6 py-4 font-medium">Функциональность</td>
+                  <td className="px-6 py-4">Фокус на складе: синхронизация с маркетплейсами, управление сменами, визуализация, игровые элементы для персонала, ежедневные отчеты.</td>
+                  <td className="px-6 py-4">Полная CRM для услуг: склад - дополнительный модуль. Больше функций для записи клиентов, но менее специализирован на складском учете для e-com.</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-6 py-4 font-medium">Удобство использования</td>
+                  <td className="px-6 py-4">Мобильный интерфейс через Telegram. Простой и интуитивный, с gamification для мотивации. Нет нужды в обучении.</td>
+                  <td className="px-6 py-4">Веб/приложение с полным CRM. Требует времени на освоение, больше подходит для комплексного бизнеса услуг.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
-      </section>
-
-      {/* Code Explainer Section */}
-      <section className="bg-gray-100 py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Анализ кода приложения</h2>
-          <p className="text-lg mb-8">Приложение построено на Next.js с использованием Supabase для хранения данных и Telegram для авторизации. Оно фокусируется на управлении складом с интеграцией маркетплейсов. Вот ключевые детали и потоки:</p>
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-2xl font-bold mb-2">Архитектура</h3>
-              <ul className="list-disc pl-6 space-y-2">
-                <li><strong>Фронтенд:</strong> React с компонентами UI (shadcn/ui, lucide-react). Использует hooks для состояния (useState, useEffect, custom hooks как useCrewWarehouse).</li>
-                <li><strong>Бэкенд:</strong> Server actions в Next.js для CRUD, синхронизации, уведомлений. Supabase для БД с RLS.</li>
-                <li><strong>Авторизация:</strong> Через Telegram (useTelegram hook), интеграция с Supabase для пользователей/экипажей.</li>
-                <li><strong>Модель данных:</strong> Экипажи (crews) как тенанты, члены (crew_members) с ролями, смены (crew_member_shifts) с чекпоинтами, товары (cars) с specs (locations, sku).</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold mb-2">Ключевые потоки</h3>
-              <ul className="list-disc pl-6 space-y-2">
-                <li><strong>Авторизация:</strong> Telegram auth -> Supabase RLS. Пользователи в экипажах с ролями (owner, member, car_observer).</li>
-                <li><strong>Управление складом:</strong> Визуализация ячеек (WarehouseViz), карточки товаров (WarehouseItemCard). Фильтры/сортировка по атрибутам (сезон, узор, цвет, размер).</li>
-                <li><strong>Операции:</strong> Загрузка/выгрузка в режимах gameMode. Чекпоинты для фиксации состояний, сброс. Оптимистичные обновления с fallback на reload.</li>
-                <li><strong>Смены:</strong> Старт/завершение смен, статусы (online/offline/riding). Уведомления владельцам о запросах (машина, заказы).</li>
-                <li><strong>Синхронизация:</strong> API с WB/Ozon/YM для стоков. Настройка SKU/баркодов. Экспорт CSV (стоки, смены).</li>
-                <li><strong>Статистика:</strong> Эффективность, время на товар, цели, достижения, лидерборд. Игровые элементы (очки, уровни, босс-режим).</li>
-                <li><strong>Приглашения:</strong> Владельцы создают экипажи (/crews/create). Приглашают через ссылки (start_param как 'crew_slug_join_crew'). Заявки на вступление подтверждают владельцы. Участники видят статусы (pending/active).</li>
-              </ul>
-            </div>
-          </div>
+          <p className="mt-8 text-center text-gray-600 max-w-3xl mx-auto">Наше приложение - специализированное решение для складов онлайн-магазинов. Оно проще, дешевле и эффективнее для малого/среднего e-com, где ключ - быстрый учет и снижение ошибок.</p>
         </div>
       </section>
 
       {/* Real Example Section */}
-      <section className="py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Реальный пример использования</h2>
-          <p className="text-lg mb-8">Мы управляли складом по продаже одеял: 4 размера, 2 сезона, 8 цветовых узоров - всего 64 разных артикула, общий объем >500 единиц. Приложение работало стабильно на freemium Supabase.</p>
-          <div className="space-y-4">
-            <h3 className="text-2xl font-bold">Достижения:</h3>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>Время на обновление остатков сократилось с половины дня до 1 клика.</li>
-              <li>Штрафы за ошибки уменьшились с 30+ тыс. руб. до 8 тыс. руб.</li>
-            </ul>
-            <p className="text-lg">Мы предлагаем использование приложения за половину от снижения штрафов - индивидуальный расчет по вашим метрикам!</p>
+      <section className="bg-gray-100 py-16 px-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Реальный кейс: Склад одеял</h2>
+          <p className="text-lg mb-12 max-w-3xl mx-auto">Мы тестировали приложение на складе с одеялами: 4 размера, 2 сезона, 8 узоров - 64 артикула, >500 единиц. Работало стабильно на бесплатном Supabase.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-4 text-blue-800">До приложения</h3>
+              <ul className="space-y-3 text-left text-gray-600">
+                <li>Обновление остатков - полдня работы</li>
+                <li>Штрафы за ошибки - 30+ тыс. руб/мес</li>
+              </ul>
+            </div>
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-4 text-blue-800">После</h3>
+              <ul className="space-y-3 text-left text-gray-600">
+                <li>Обновление - 1 клик</li>
+                <li>Штрафы - 8 тыс. руб/мес (снижение на 73%)</li>
+              </ul>
+            </div>
           </div>
+          <p className="mt-12 text-lg font-semibold text-blue-800">Мы предлагаем использование за 50% от вашей экономии на штрафах - рассчитаем индивидуально!</p>
         </div>
       </section>
 
       {/* Invite Section */}
-      <section className="bg-gray-100 py-16 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Как пригласить людей в экипаж и получить доступ</h2>
-          <ol className="list-decimal pl-6 space-y-4 max-w-2xl mx-auto text-lg">
-            <li>Создайте экипаж в приложении (кнопка "+" на странице /crews).</li>
-            <li>Поделитесь ссылкой для приглашения: t.me/вашбот?start=crew_ваш-slug_join_crew.</li>
-            <li>Пользователь подаст заявку на вступление.</li>
-            <li>Подтвердите заявку в интерфейсе экипажа как владелец.</li>
-            <li>После присоединения назначьте роли (member, car_observer) и предоставьте доступ к складу.</li>
-          </ol>
+      <section className="py-16 px-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Как начать работу и пригласить команду</h2>
+          <div className="max-w-3xl mx-auto text-left space-y-6 text-lg text-gray-600">
+            <ol className="list-decimal pl-6 space-y-4">
+              <li>Откройте приложение в Telegram и авторизуйтесь.</li>
+              <li>Перейдите в раздел "Экипажи" и создайте новый экипаж (кнопка "+").</li>
+              <li>Поделитесь ссылкой приглашения: t.me/[ваш-бот]?start=crew_[ваш-slug]_join_crew</li>
+              <li>Сотрудник перейдет по ссылке и подаст заявку.</li>
+              <li>Подтвердите заявку в карточке экипажа.</li>
+              <li>Назначьте роли и предоставьте доступ к складу.</li>
+            </ol>
+            <p className="text-center font-semibold mt-8">Экипаж - это ваш склад. Приглашайте команду для совместной работы!</p>
+          </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="bg-blue-600 text-white py-16 px-4">
+      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Готовы оптимизировать свой склад?</h2>
-          <p className="text-xl mb-8">Создайте экипаж и начните управлять складом эффективнее уже сегодня!</p>
-          <a href="/crews/create" className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold text-lg hover:bg-gray-100">Создать экипаж</a>
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Оптимизируйте склад уже сегодня</h2>
+          <p className="text-xl mb-10">Создайте экипаж бесплатно и начните экономить на ошибках</p>
+          <a href="/crews/create" className="bg-white text-blue-600 px-10 py-4 rounded-full font-bold text-xl hover:bg-gray-100 shadow-lg transition-all">Создать экипаж</a>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8 px-4">
-        <div className="max-w-6xl mx-auto text-center">
+      <footer className="bg-gray-900 text-gray-300 py-8 px-4">
+        <div className="max-w-6xl mx-auto text-center space-y-4">
           <p>&copy; 2025 Управление складом. Все права защищены.</p>
+          <div className="flex justify-center gap-6 text-sm">
+            <a href="/privacy" className="hover:text-white">Политика конфиденциальности</a>
+            <a href="/terms" className="hover:text-white">Условия использования</a>
+            <a href="/support" className="hover:text-white">Поддержка</a>
+          </div>
         </div>
       </footer>
     </div>
