@@ -110,7 +110,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Code Analysis Section */}
+      {/* Code Explainer Section */}
       <section className="bg-gray-100 py-16 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Анализ кода приложения</h2>
@@ -134,17 +134,40 @@ export default function WarehouseLandingPage() {
                 <li><strong>Смены:</strong> Старт/завершение смен, статусы (online/offline/riding). Уведомления владельцам о запросах (машина, заказы).</li>
                 <li><strong>Синхронизация:</strong> API с WB/Ozon/YM для стоков. Настройка SKU/баркодов. Экспорт CSV (стоки, смены).</li>
                 <li><strong>Статистика:</strong> Эффективность, время на товар, цели, достижения, лидерборд. Игровые элементы (очки, уровни, босс-режим).</li>
-                <li><strong>Приглашения:</strong> Владельцы создают экипажи (/crews/create). Приглашают через ссылки (start_param как 'crew_slug_join_crew'). Заявки на вступление подтверждают владельцы. Участники видят статусы (pending/active).</li>
+                <li><strong>Приглашения:</strong> Владельцы создают экипажи (/crews/create). Приглашают через ссылки (start_param как 'crew_{slug}_join_crew'). Заявки на вступление подтверждают владельцы. Участники видят статусы (pending/active).</li>
               </ul>
             </div>
-            <div>
-              <h3 className="text-2xl font-bold mb-2">Как пригласить людей в экипаж</h3>
-              <p>1. Создайте экипаж в приложении (кнопка + в /crews).</p>
-              <p>2. Поделитесь ссылкой: t.me/вашбот?start=crew_ваш-slug_join_crew.</p>
-              <p>3. Пользователь подает заявку, вы подтверждаете в интерфейсе экипажа.</p>
-              <p>4. После присоединения - назначьте роли и предоставьте доступ к складу.</p>
-            </div>
           </div>
+        </div>
+      </section>
+
+      {/* Real Example Section */}
+      <section className="py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Реальный пример использования</h2>
+          <p className="text-lg mb-8">Мы управляли складом по продаже одеял: 4 размера, 2 сезона, 8 цветовых узоров - всего 64 разных артикула, общий объем >500 единиц. Приложение работало стабильно на freemium Supabase.</p>
+          <div className="space-y-4">
+            <h3 className="text-2xl font-bold">Достижения:</h3>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Время на обновление остатков сократилось с половины дня до 1 клика.</li>
+              <li>Штрафы за ошибки уменьшились с 30+ тыс. руб. до 8 тыс. руб.</li>
+            </ul>
+            <p className="text-lg">Мы предлагаем использование приложения за половину от снижения штрафов - индивидуальный расчет по вашим метрикам!</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Invite Section */}
+      <section className="bg-gray-100 py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Как пригласить людей в экипаж и получить доступ</h2>
+          <ol className="list-decimal pl-6 space-y-4 max-w-2xl mx-auto text-lg">
+            <li>Создайте экипаж в приложении (кнопка "+" на странице /crews).</li>
+            <li>Поделитесь ссылкой для приглашения: t.me/вашбот?start=crew_ваш-slug_join_crew.</li>
+            <li>Пользователь подаст заявку на вступление.</li>
+            <li>Подтвердите заявку в интерфейсе экипажа как владелец.</li>
+            <li>После присоединения назначьте роли (member, car_observer) и предоставьте доступ к складу.</li>
+          </ol>
         </div>
       </section>
 
