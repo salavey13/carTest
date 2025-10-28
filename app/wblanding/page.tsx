@@ -8,7 +8,7 @@ export default function WarehouseLandingPage() {
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-24 px-4 md:py-32">
         <div className="max-w-6xl mx-auto text-center">
           <Image 
-            src="/logo.png" // Замените на путь к вашему логотипу
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
             alt="Логотип приложения"
             width={120}
             height={120}
