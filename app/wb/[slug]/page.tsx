@@ -28,7 +28,7 @@ export default function CrewWarehousePage() {
   const slug = params?.slug as string | undefined;
 
   const toast = useAppToast();
-  const { dbUser } = useAppContext();
+  const { dbUser, userCrewInfo } = useAppContext();
 
   const [currentCrew, setCurrentCrew] = useState(null);
 
