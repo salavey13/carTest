@@ -1,4 +1,3 @@
-// /app/wb/[slug]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
@@ -22,13 +21,28 @@ import { Loading } from "@/components/Loading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppContext } from "@/contexts/AppContext";
+import { getCrewLiveDetails } from "@/app/rentals/actions";
 
 export default function CrewWarehousePage() {
   const params = useParams() as { slug?: string };
   const slug = params?.slug as string | undefined;
 
   const toast = useAppToast();
-  const { dbUser, userCrewInfo } = useAppContext();
+  const { dbUser } = useAppContext();
+
+  const [currentCrew, setCurrentCrew] = useState(null);
+
+  useEffect(() => {
+    async function fetchCrew() {
+      if (slug) {
+        const res = await getCrewLiveDetails(slug);
+        if (res.success && res.data) {
+          setCurrentCrew(res.data);
+        }
+      }
+    }
+    fetchCrew();
+  }, [slug]);
 
   const wh = useCrewWarehouse(slug || "");
   const {
@@ -296,8 +310,8 @@ export default function CrewWarehousePage() {
       <header className="bg-white dark:bg-gray-800 shadow-sm p-2 border-b">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            {userCrewInfo?.logo_url && <img src={userCrewInfo.logo_url} alt="logo" className="w-6 h-6 rounded object-cover flex-shrink-0" />}
-            <h1 className="text-sm font-medium truncate">{userCrewInfo?.name || "Экипаж"}</h1>
+            {currentCrew?.logo_url && <img src={currentCrew.logo_url} alt="logo" className="w-6 h-6 rounded object-cover flex-shrink-0" />}
+            <h1 className="text-sm font-medium truncate">{currentCrew?.name || "Экипаж"}</h1>
           </div>
           <div className="flex gap-1 flex-shrink-0">
             <Button size="sm" variant={gameMode === "onload" ? "default" : "outline"} onClick={() => setGameMode(prev => prev === "onload" ? null : "onload")} className="h-7 min-w-[58px] text-xs" disabled={!canManage}>+Загрузка</Button>
@@ -377,7 +391,7 @@ export default function CrewWarehousePage() {
 
         {/* НИЖНИЕ КНОПКИ */}
         <div className="p-2 bg-white dark:bg-gray-800">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <Button onClick={handleCheckpoint} size="sm" variant="outline" className="h-8 text-xs" disabled={!activeShift || !canManage}>
               <Save className="w-4 h-4 mr-1" /> Чекпоинт
             </Button>
@@ -390,7 +404,7 @@ export default function CrewWarehousePage() {
             <Button onClick={() => handleExportStock(false)} size="sm" variant="outline" className="h-8 text-xs" disabled={!canManage}>
               <FileUp className="w-4 h-4 mr-1" /> Экспорт склада
             </Button>
-            <div className="flex items-center gap-1 col-span-2 sm:col-span-1">
+            <div className="flex items-center gap-1 col-span-1">
               <Select value={carSize} onValueChange={setCarSize}>
                 <SelectTrigger className="h-8 w-20 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
