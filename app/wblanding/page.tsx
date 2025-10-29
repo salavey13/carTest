@@ -13,12 +13,96 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Suspense } from 'react';
+import { getAllPublicCrews } from '@/app/rentals/actions';
 
 const generateSlug = (name: string) =>
   name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
 
+function CrewsListSimplified() {
+  const { userCrewInfo } = useAppContext();
+  const [crews, setCrews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const crewsResult = await getAllPublicCrews();
+        if (crewsResult.success && crewsResult.data) setCrews(crewsResult.data);
+        else setError(crewsResult.error || "Не удалось загрузить список складов.");
+      } catch (e) {
+        setError(e.message || "Неизвестная ошибка на клиенте.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) return <div className="text-center py-10">Загрузка...</div>;
+  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {crews.map((crew) => {
+        const isEditable = userCrewInfo && userCrewInfo.id === crew.id;
+        return (
+          <Link href={`/wb/${crew.slug}`} key={crew.id} className="block group">
+            <div className={cn(
+              "p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow",
+              isEditable ? "bg-blue-50 border-2 border-blue-500" : "bg-white"
+            )}>
+              <div className="flex items-start gap-4 mb-4">
+                <Image 
+                  src={crew.logo_url || '/placeholder.svg'} 
+                  alt={`${crew.name} Logo`} 
+                  width={64} 
+                  height={64} 
+                  className={cn(
+                    "rounded-full border-2 transition-colors",
+                    isEditable ? "border-blue-500" : "border-gray-200 group-hover:border-blue-500"
+                  )}
+                />
+                <div>
+                  <h2 className={cn(
+                    "text-xl font-bold group-hover:text-blue-600",
+                    isEditable ? "text-blue-600" : "text-blue-800"
+                  )}>{crew.name}</h2>
+                  <p className="text-xs text-gray-500">by @{crew.owner_username}</p>
+                </div>
+              </div>
+              <p className="text-gray-600 text-sm mb-4">{crew.description}</p>
+              <div className="grid grid-cols-3 gap-2 border-t pt-4">
+                <div className="text-center">
+                  <span className="block text-lg font-bold">{crew.member_count || 0}</span>
+                  <span className="text-xs text-gray-500">Сотрудников</span>
+                </div>
+                <div className="text-center">
+                  <span className="block text-lg font-bold">{crew.vehicle_count || 0}</span>
+                  <span className="text-xs text-gray-500">Единиц</span>
+                </div>
+                <div className="text-center">
+                  <span className="block text-lg font-bold">N/A</span>
+                  <span className="text-xs text-gray-500">Миссий</span>
+                </div>
+              </div>
+              {isEditable && (
+                <p className="text-center text-blue-600 font-semibold mt-4">
+                  {userCrewInfo.is_owner ? "Ваш склад (владелец)" : "Ваш склад (участник)"}
+                </p>
+              )}
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function WarehouseLandingPage() {
-  const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
+  const { dbUser, isLoading: appContextLoading } = useAppContext();
   const router = useRouter();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -28,13 +112,6 @@ export default function WarehouseLandingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCrew, setCreatedCrew] = useState<{ slug: string; name: string } | null>(null);
 
-  useEffect(() => {
-    if (!appContextLoading && !isAdmin()) {
-      toast.error("Доступ запрещен. Только владельцы могут создавать склады.");
-      router.push("/admin");
-    }
-  }, [appContextLoading, isAdmin, router]);
-  
   useEffect(() => { setSlug(generateSlug(name)); }, [name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -224,7 +301,7 @@ export default function WarehouseLandingPage() {
                   <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Уведомления о заказах
+                  Уведомления о заказах (в разработке)
                 </li>
                 <li className="flex items-start gap-2 sm:gap-3">
                   <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,34 +315,84 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Why Choose Us vs YClients */}
+      {/* Why Choose Us vs Competitors */}
       <section id="why-us" className="py-16 sm:py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Почему наше приложение лучше YClients</h2>
-          <div className="overflow-x-auto -mx-4 px-4">
-            <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-md table-auto">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Сравнение с конкурентами</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-md table-auto text-sm">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="px-4 py-3 sm:px-6 sm:py-4 text-left font-bold text-gray-700 text-sm sm:text-base">Аспект</th>
-                  <th className="px-4 py-3 sm:px-6 sm:py-4 text-left font-bold text-gray-700 text-sm sm:text-base">Наше приложение</th>
-                  <th className="px-4 py-3 sm:px-6 sm:py-4 text-left font-bold text-gray-700 text-sm sm:text-base">YClients</th>
+                  <th className="px-2 py-2 text-left font-bold text-gray-700">Аспект</th>
+                  <th className="px-2 py-2 text-left font-bold text-gray-700">Наше</th>
+                  <th className="px-2 py-2 text-left font-bold text-gray-700">YClients</th>
+                  <th className="px-2 py-2 text-left font-bold text-gray-700">МойСклад</th>
+                  <th className="px-2 py-2 text-left font-bold text-gray-700">TOPSELLER</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-t">
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 font-medium text-sm sm:text-base">Ценообразование</td>
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base">Freemium модель. Платите только половину от сэкономленных на штрафах средств (индивидуальный расчет). Бесплатно для малого бизнеса.</td>
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base">Фиксированные тарифы от 900 руб/мес (за 3 мес предоплаты). Дополнительные модули оплачиваются отдельно. Нет бесплатной версии.</td>
+                  <td className="px-2 py-2 font-medium">Ценообразование</td>
+                  <td className="px-2 py-2">Freemium, % от экономии</td>
+                  <td className="px-2 py-2">От 900 руб/мес</td>
+                  <td className="px-2 py-2">От 1490 руб/мес</td>
+                  <td className="px-2 py-2">От 990 руб/мес</td>
                 </tr>
                 <tr className="border-t">
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 font-medium text-sm sm:text-base">Функциональность</td>
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base">Фокус на складе: синхронизация с маркетплейсами, управление сменами, визуализация, игровые элементы для персонала, ежедневные отчеты.</td>
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base">Полная CRM для услуг: склад - дополнительный модуль. Больше функций для записи клиентов, но менее специализирован на складском учете для e-com.</td>
+                  <td className="px-2 py-2 font-medium">Фокус</td>
+                  <td className="px-2 py-2">Склад для e-com</td>
+                  <td className="px-2 py-2">CRM для услуг</td>
+                  <td className="px-2 py-2">Общий учет</td>
+                  <td className="px-2 py-2">Продажи на MP</td>
                 </tr>
                 <tr className="border-t">
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 font-medium text-sm sm:text-base">Удобство использования</td>
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base">Мобильный интерфейс через Telegram. Простой и интуитивный, с gamification для мотивации. Нет нужды в обучении.</td>
-                  <td className="px-4 py-3 sm:px-6 sm:py-4 text-sm sm:text-base">Веб/приложение с полным CRM. Требует времени на освоение, больше подходит для комплексного бизнеса услуг.</td>
+                  <td className="px-2 py-2 font-medium">Интеграция с MP</td>
+                  <td className="px-2 py-2">WB, Ozon, YM</td>
+                  <td className="px-2 py-2">Ограниченная</td>
+                  <td className="px-2 py-2">WB, Ozon, YM +</td>
+                  <td className="px-2 py-2">WB, Ozon, YM</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-2 py-2 font-medium">Мобильность</td>
+                  <td className="px-2 py-2">Telegram-бот</td>
+                  <td className="px-2 py-2">Веб/моб. app</td>
+                  <td className="px-2 py-2">Веб/моб. app</td>
+                  <td className="px-2 py-2">Облако</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-2 py-2 font-medium">Gamification</td>
+                  <td className="px-2 py-2">Да</td>
+                  <td className="px-2 py-2">Нет</td>
+                  <td className="px-2 py-2">Нет</td>
+                  <td className="px-2 py-2">Нет</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-2 py-2 font-medium">Управление сменами</td>
+                  <td className="px-2 py-2">Да</td>
+                  <td className="px-2 py-2">Для услуг</td>
+                  <td className="px-2 py-2">Базовое</td>
+                  <td className="px-2 py-2">Нет</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-2 py-2 font-medium">Визуализация склада</td>
+                  <td className="px-2 py-2">Карта + фильтры</td>
+                  <td className="px-2 py-2">Базовая</td>
+                  <td className="px-2 py-2">Таблицы</td>
+                  <td className="px-2 py-2">Дашборды</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-2 py-2 font-medium">Отчеты</td>
+                  <td className="px-2 py-2">CSV, статистика</td>
+                  <td className="px-2 py-2">Для услуг</td>
+                  <td className="px-2 py-2">Расширенные</td>
+                  <td className="px-2 py-2">Аналитика MP</td>
+                </tr>
+                <tr className="border-t">
+                  <td className="px-2 py-2 font-medium">Обучение</td>
+                  <td className="px-2 py-2">Минимальное</td>
+                  <td className="px-2 py-2">Требуется</td>
+                  <td className="px-2 py-2">Среднее</td>
+                  <td className="px-2 py-2">Среднее</td>
                 </tr>
               </tbody>
             </table>
@@ -385,6 +512,16 @@ export default function WarehouseLandingPage() {
               </div>
             )}
           </motion.div>
+        </div>
+      </section>
+
+      {/* Existing Crews Section */}
+      <section className="py-16 sm:py-20 px-4 bg-gray-100">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Существующие склады</h2>
+          <Suspense fallback={<div className="text-center py-10">Загрузка...</div>}>
+            <CrewsListSimplified />
+          </Suspense>
         </div>
       </section>
 
