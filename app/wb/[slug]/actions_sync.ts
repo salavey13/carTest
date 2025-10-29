@@ -151,7 +151,7 @@ export async function syncCrewOzonStocks(slug: string) {
   }
 }
 
-export async function syncCrewYmStocks(slug: string, campaignId: string) {
+export async function syncCrewYmStocks(slug: string, campaignId?: string) {
   let YM_API_TOKEN;
   try {
     YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
@@ -173,7 +173,19 @@ export async function syncCrewYmStocks(slug: string, campaignId: string) {
 
   if (skus.length === 0) return { success: false, error: "No syncable items (check ym_sku setup)" };
 
-  const url = `https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}/offers/stocks`;
+  let YM_WAREHOUSE_ID = campaignId || getCrewEnvVar(slug, "YM_WAREHOUSE_ID") || "";
+
+  if (!YM_WAREHOUSE_ID) {
+    const res = await getCrewYmCampaigns(slug);
+    if (res.success) {
+      const available = (res.campaigns || []).find((c: any) => c.apiAvailability === "AVAILABLE");
+      if (available) YM_WAREHOUSE_ID = String(available.id);
+    }
+  }
+
+  if (!YM_WAREHOUSE_ID) return { success: false, error: "No available campaign ID for YM sync" };
+
+  const url = `https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}/offers/stocks`;
   console.info("syncCrewYmStocks -> PUT", { url, count: skus.length, sample: skus[0] });
 
   try {
@@ -189,7 +201,7 @@ export async function syncCrewYmStocks(slug: string, campaignId: string) {
       }
       return res;
     });
-    return { success: true };
+    return { success: true, sent: skus.length, campaignId: YM_WAREHOUSE_ID };
   } catch (err: any) {
     console.error("syncCrewYmStocks error:", err);
     return { success: false, error: err?.message || "Unknown error in syncCrewYmStocks" };
