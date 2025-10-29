@@ -1,9 +1,69 @@
-// /app/wblanding/page.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from "next/navigation";
+import { useAppContext } from "@/contexts/AppContext";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { createCrew } from "@/app/actions";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+const generateSlug = (name: string) =>
+  name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
 
 export default function WarehouseLandingPage() {
+  const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [description, setDescription] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [hqLocation, setHqLocation] = useState("56.3269,44.0059");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdCrew, setCreatedCrew] = useState<{ slug: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!appContextLoading && !isAdmin()) {
+      toast.error("Доступ запрещен. Только владельцы могут создавать склады.");
+      router.push("/admin");
+    }
+  }, [appContextLoading, isAdmin, router]);
+  
+  useEffect(() => { setSlug(generateSlug(name)); }, [name]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dbUser?.user_id) { toast.error("Ошибка: не удалось определить ID пользователя."); return; }
+    if (!slug) { toast.error("Slug не может быть пустым. Введите название склада."); return; }
+    setIsSubmitting(true);
+    toast.info("Создание нового склада...");
+    try {
+      const result = await createCrew({
+        name, slug, description, logo_url: logoUrl, owner_id: dbUser.user_id, hq_location: hqLocation,
+      });
+      if (result.success && result.data) {
+        toast.success(`Склад "${result.data.name}" успешно создан!`);
+        setCreatedCrew({ slug: result.data.slug, name: result.data.name });
+      } else { throw new Error(result.error || "Неизвестная ошибка при создании склада."); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Произошла ошибка.");
+    } finally { setIsSubmitting(false); }
+  };
+
+  const handleInvite = () => {
+    if (!createdCrew) return;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
+    const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    window.open(shareUrl, "_blank");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
       {/* Hero Section */}
@@ -257,14 +317,74 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section with Form */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16 sm:py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 sm:mb-8">Оптимизируйте склад уже сегодня</h2>
           <p className="text-base sm:text-xl mb-8 sm:mb-10">Создайте экипаж бесплатно и начните экономить на ошибках</p>
-          <Link href="/crews/create">
-            <a className="bg-white text-blue-600 px-8 sm:px-10 py-3 sm:py-4 rounded-full font-bold text-base sm:text-xl hover:bg-gray-100 shadow-lg transition-all inline-block">Создать экипаж</a>
-          </Link>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="container mx-auto max-w-2xl bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6"
+          >
+            {!createdCrew ? (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="text-center">
+                  <VibeContentRenderer content="::FaUsers::" className="text-5xl text-white mx-auto mb-4" />
+                  <h1 className="text-4xl font-bold text-white">СОЗДАТЬ СКЛАД</h1>
+                  <p className="text-gray-200 mt-2">Соберите свою команду и управляйте складом эффективно.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="crew-name" className="text-white">НАЗВАНИЕ СКЛАДА</Label>
+                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="crew-slug" className="text-white">SLUG (АДРЕС СКЛАДА)</Label>
+                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-1" />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="crew-desc" className="text-white">ОПИСАНИЕ / ИНСТРУКЦИИ</Label>
+                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-1" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="crew-logo" className="text-white">URL ЛОГОТИПА</Label>
+                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="crew-hq" className="text-white">КООРДИНАТЫ СКЛАДА</Label>
+                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-1" />
+                  </div>
+                </div>
+                
+                <Button type="submit" disabled={isSubmitting} className="w-full text-lg bg-white text-blue-600 hover:bg-gray-100">
+                  {isSubmitting ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Создание..." /> : <VibeContentRenderer content="::FaFlagCheckered:: СФОРМИРОВАТЬ СКЛАД" />}
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-6 text-center">
+                <h3 className="text-2xl font-bold">Склад успешно создан!</h3>
+                <p>Теперь пригласите членов команды.</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={handleInvite} className="p-2 text-white hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600 rounded-md transition-all duration-200 hover:bg-white/10">
+                        <VibeContentRenderer content="::FaUserPlus::" className="h-6 w-6" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Пригласить в Склад</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Link href="/paddock">
+                  <a className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 shadow-lg transition-all inline-block mt-4">Перейти к складу</a>
+                </Link>
+              </div>
+            )}
+          </motion.div>
         </div>
       </section>
 
