@@ -151,7 +151,7 @@ export async function syncCrewOzonStocks(slug: string) {
   }
 }
 
-export async function syncCrewYmStocks(slug: string, campaignId?: string) {
+export async function syncCrewYmStocks(slug: string, campaignId: string) {
   let YM_API_TOKEN;
   try {
     YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
@@ -173,19 +173,7 @@ export async function syncCrewYmStocks(slug: string, campaignId?: string) {
 
   if (skus.length === 0) return { success: false, error: "No syncable items (check ym_sku setup)" };
 
-  let YM_WAREHOUSE_ID = campaignId || getCrewEnvVar(slug, "YM_WAREHOUSE_ID");
-
-  if (!YM_WAREHOUSE_ID) {
-    const res = await getCrewYmCampaigns(slug);
-    if (res.success) {
-      const available = (res.campaigns || []).find((c: any) => c.apiAvailability === "AVAILABLE");
-      if (available) YM_WAREHOUSE_ID = String(available.id);
-    }
-  }
-
-  if (!YM_WAREHOUSE_ID) return { success: false, error: "No available campaign ID for YM sync" };
-
-  const url = `https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}/offers/stocks`;
+  const url = `https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}/offers/stocks`;
   console.info("syncCrewYmStocks -> PUT", { url, count: skus.length, sample: skus[0] });
 
   try {
@@ -201,7 +189,7 @@ export async function syncCrewYmStocks(slug: string, campaignId?: string) {
       }
       return res;
     });
-    return { success: true, sent: skus.length, campaignId: YM_WAREHOUSE_ID };
+    return { success: true };
   } catch (err: any) {
     console.error("syncCrewYmStocks error:", err);
     return { success: false, error: err?.message || "Unknown error in syncCrewYmStocks" };
@@ -232,12 +220,10 @@ export async function getCrewYmCampaigns(slug: string) {
 
 export async function checkCrewYmToken(slug: string, campaignId?: string) {
   let YM_API_TOKEN;
-  let YM_WAREHOUSE_ID;
   try {
     YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
-    YM_WAREHOUSE_ID = campaignId || getCrewEnvVar(slug, "YM_WAREHOUSE_ID");
   } catch (err: any) {
-    return { error: "missing_credential", message: err.message, listStatus: 0, campStatus: 0, listText: "", campText: "" };
+    return { error: "missing_token", message: err.message, listStatus: 0, campStatus: 0, listText: "", campText: "" };
   }
 
   let listStatus = 0;
@@ -252,14 +238,14 @@ export async function checkCrewYmToken(slug: string, campaignId?: string) {
     return { error: "network_error", message: e.message, listStatus: 0, campStatus: 0, listText: "", campText: "" };
   }
 
-  if (!YM_WAREHOUSE_ID) {
+  if (!campaignId) {
     return { listStatus, listText, campStatus: 0, campText: "", message: "no campaignId" };
   }
 
   let campStatus = 0;
   let campText = "";
   try {
-    const res = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}`, {
+    const res = await fetch(`https://api.partner.market.yandex.ru/v2/campaigns/${campaignId}`, {
       headers: { "Api-Key": YM_API_TOKEN },
     });
     campStatus = res.status;
@@ -279,27 +265,33 @@ export async function fetchCrewWbPendingCount(slug: string) {
     return { success: false, count: 0, error: err.message };
   }
 
-  try {
-    const url = 'https://marketplace-api.wildberries.ru/api/v4/fbs/posting/list';
-    const body = {
-      filter: { status: 'awaiting_packaging' },
-      limit: 1,
-    };
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      return { success: false, count: 0, error: `WB: ${res.status} - ${text}` };
+  const statuses = ['awaiting_packaging', 'awaiting_deliver'];
+
+  let total = 0;
+  for (const status of statuses) {
+    try {
+      const url = 'https://marketplace-api.wildberries.ru/api/v4/fbs/posting/list';
+      const body = {
+        filter: { status },
+        limit: 1,
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: WB_TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        return { success: false, count: 0, error: `WB: ${res.status} - ${text}` };
+      }
+      const data = await res.json();
+      total += data?.total || 0;
+    } catch (err: any) {
+      return { success: false, count: 0, error: err.message };
     }
-    const data = await res.json();
-    const total = data?.total || 0;
-    return { success: true, count: total };
-  } catch (err: any) {
-    return { success: false, count: 0, error: err.message };
   }
+
+  return { success: true, count: total };
 }
 
 export async function fetchCrewOzonPendingCount(slug: string) {
@@ -312,29 +304,69 @@ export async function fetchCrewOzonPendingCount(slug: string) {
     return { success: false, count: 0, error: err.message };
   }
 
-  try {
-    const url = 'https://api-seller.ozon.ru/v3/posting/fbs/list';
-    const body = {
-      dir: 'ASC',
-      filter: { status: 'awaiting_packaging' },
-      limit: 1,
-      offset: 0
-    };
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      return { success: false, count: 0, error: `Ozon: ${res.status} - ${text}` };
+  const statuses = ['awaiting_packaging', 'awaiting_deliver'];
+
+  let total = 0;
+  for (const status of statuses) {
+    try {
+      const url = 'https://api-seller.ozon.ru/v3/posting/fbs/list';
+      const body = {
+        dir: 'ASC',
+        filter: { status },
+        limit: 1,
+        offset: 0
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Client-Id': OZON_CLIENT_ID, 'Api-Key': OZON_API_KEY, 'Content-Type': "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        return { success: false, count: 0, error: `Ozon: ${res.status} - ${text}` };
+      }
+      const data = await res.json();
+      total += data?.result?.total || 0;
+    } catch (err: any) {
+      return { success: false, count: 0, error: err.message };
     }
-    const data = await res.json();
-    const total = data?.result?.total || 0;
-    return { success: true, count: total };
+  }
+
+  return { success: true, count: total };
+}
+
+export async function fetchCrewYmPendingCount(slug: string) {
+  let YM_API_TOKEN;
+  let YM_WAREHOUSE_ID;
+  try {
+    YM_API_TOKEN = getCrewEnvVar(slug, "YM_API_TOKEN");
+    YM_WAREHOUSE_ID = getCrewEnvVar(slug, "YM_WAREHOUSE_ID");
   } catch (err: any) {
     return { success: false, count: 0, error: err.message };
   }
+
+  let total = 0;
+  let pageToken = '';
+  do {
+    try {
+      const url = `https://api.partner.market.yandex.ru/v2/campaigns/${YM_WAREHOUSE_ID}/orders?status=PROCESSING&limit=50&page_token=${pageToken}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { "Api-Key": YM_API_TOKEN },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        return { success: false, count: 0, error: `YM: ${res.status} - ${text}` };
+      }
+      const data = await res.json();
+      total += data.orders?.length || 0;
+      pageToken = data.pager?.nextPageToken || '';
+    } catch (err: any) {
+      return { success: false, count: 0, error: err.message };
+    }
+  } while (pageToken);
+
+  return { success: true, count: total };
 }
 
 export async function setCrewWbBarcodes(slug: string) {
@@ -397,7 +429,7 @@ export async function setCrewYmSku(slug: string) {
 
   let YM_WAREHOUSE_ID;
   try {
-    YM_WAREHOUSE_ID = getCrewEnvVar(slug, "YM_WAREHOUSE_ID") || "7252771";
+    YM_WAREHOUSE_ID = getCrewEnvVar(slug, "YM_WAREHOUSE_ID");
   } catch (err: any) {
     return { success: false, error: err.message };
   }
