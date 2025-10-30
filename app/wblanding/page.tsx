@@ -222,7 +222,7 @@ export default function WarehouseLandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
               <Image 
-                src="https://cdn.prod.website-files.com/5e78f62c08f1bb8c2d788576/65bc05feb4b04549469149a9_glamneticcheckoutonmobile_27ud.webp"
+                src="/placeholder.svg"
                 alt="Для владельца бизнеса"
                 width={300}
                 height={200}
@@ -264,7 +264,7 @@ export default function WarehouseLandingPage() {
             </div>
             <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
               <Image 
-                src="https://miro.medium.com/v2/resize:fit:1200/1*mMTvEPi4k2dRbehfe-zyPA.png"
+                src="/placeholder.svg"
                 alt="Для персонала"
                 width={300}
                 height={200}
@@ -300,7 +300,7 @@ export default function WarehouseLandingPage() {
             </div>
             <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
               <Image 
-                src="https://theretailexec.com/wp-content/cache/theretailexec.com/static/static.crozdesk.com/web-app-library-categories-providers-screenshots-008-385-122-pub-skusavvy-screenshot-1750172671.png"
+                src="/placeholder.svg"
                 alt="Для администратора"
                 width={300}
                 height={200}
