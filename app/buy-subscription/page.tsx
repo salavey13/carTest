@@ -1,30 +1,30 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { sendTelegramInvoice } from "@/app/actions";
+import { sendTelegramInvoice, sendServiceInvoice } from "@/app/actions";
 import { createInvoice } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { cn } from "@/lib/utils";
 
 const parseFeatureString = (feature: string): { iconVibeContent: string | null, textContent: string } => {
-    // Regex to match ::FaIconName attributes:: format
-    // Using /s flag to make . match newline characters as well, crucial for multi-line attributes if any.
     const featureMatch = feature.match(/^(::Fa\w+\b(?:.*?)?::)(.*)$/s); 
     if (featureMatch) {
-        const iconVibeSyntax = featureMatch[1]; // Full icon tag e.g. ::FaIcon attributes::
-        const text = featureMatch[2].trim();    // Text content
+        const iconVibeSyntax = featureMatch[1];
+        const text = featureMatch[2].trim();
         return {
             iconVibeContent: iconVibeSyntax,
             textContent: text
         };
     }
-    return { iconVibeContent: null, textContent: feature }; // Fallback if no match
+    return { iconVibeContent: null, textContent: feature };
 };
 
-const UPDATED_SUBSCRIPTION_PLANS = [
+// CyberFitness Plans (Original)
+const CYBERFITNESS_PLANS = [
   {
     id: "cyber_initiate_free_demo",
     name: "КИБЕР-ДЕМО: Попробуй VIBE (0 XTR - БЕСПЛАТНО!)",
@@ -91,7 +91,7 @@ CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
     cta: "АКТИВИРОВАТЬ QBI-МАСТЕРСТВО",
     main_description: "**Это WOW-ТРАНСФОРМАЦИЯ, Агент! Хватит быть зрителем – СТАНЬ АРХИТЕКТОРОМ своей AI-реальности. Мы ВМЕСТЕ с тобой создаем TWA и ботов ЛЮБОЙ сложности, 'доим' существующих клиентов на кастомные фичи, строим твою личную цифровую империю. Я делюсь ВСЕЙ магией CyberVibe, ты – командуешь парадом и гребешь кэш.**",
     features: [
-      "::FaDiagramProject className='text-brand-cyan mr-2 align-middle w-4 h-4 group-hover:text-brand-blue transition-colors duration-300':: **ТЫ – АРХИТЕКТОР, AI – ТВОЙ ЛИЧНЫЙ ЛЕГИОН:** Полный безлимит и все админ-права в SUPERVIBE Studio. Проектируй, генерируй, кастомизируй самые сложные многофайловые приложения и AI-ботов.",
+      "::FaDiagramProject className='text-brand-cyan mr-2 align-middle w-4 h-4 group-hover:text-brand-blue transition-colors duration-300':: **ТЫ – АРХИТЕКТОР, AI – ТВОЙ ЛЕГИОН:** Полный безлимит и все админ-права в SUPERVIBE Studio. Проектируй, генерируй, кастомизируй самые сложные многофайловые приложения и AI-ботов.",
       "::FaDatabase className='text-brand-green mr-2 align-middle w-4 h-4 group-hover:text-neon-lime transition-colors duration-300':: **АЛХИМИЯ SUPABASE (УРОВЕНЬ: ПРОФИ):** От проектирования масштабируемых схем до Realtime-магии, сложных Edge Functions и управления данными из бота – ты освоишь всё.",
       "::FaToolbox className='text-brand-blue mr-2 align-middle w-4 h-4 group-hover:text-brand-cyan transition-colors duration-300':: **АВТОПИЛОТЫ ДЛЯ ТВОЕГО VIBE'А (Продвинутые Supabase Функции):** Автоматизируй всё, что движется (и не движется) – парсинг, отчеты, сложные интеграции, AI-агенты, работающие 24/7.",
       "::FaDove className='text-neon-lime mr-2 align-middle w-4 h-4 group-hover:text-brand-yellow transition-colors duration-300':: **XTR МОНЕТИЗАЦИЯ ИЛИ БЕСПЛАТНО – ТАКОВ VIBE!** Мастер-класс по подключению Telegram Stars. **Никаких е*учих внешних платежек – только чистый XTR-VIBE!**",
@@ -114,35 +114,147 @@ CyberVibe дает тебе **НЕЧЕСТНОЕ ПРЕИМУЩЕСТВО.**
   }
 ];
 
+// Warehouse Management Plans
+const WAREHOUSE_PLANS = [
+  {
+    id: "warehouse_free",
+    name: "Бесплатный старт",
+    price: 0,
+    xtrPrice: "0 XTR",
+    iconString: "::FaRocket className='inline mr-2.5 text-green-500 text-2xl md:text-3xl align-middle'::",
+    color: "from-gray-100 to-gray-200 border-gray-300 hover:border-green-500",
+    cta: "Начать бесплатно",
+    main_description: "**Идеально для тестирования и небольших складов.** Получите полный доступ к основным функциям без ограничения по времени. Начните оптимизировать склад уже сегодня!",
+    features: [
+      "::FaBox className='text-green-500 mr-2 align-middle w-4 h-4':: До 100 артикулов",
+      "::FaWarehouse className='text-green-500 mr-2 align-middle w-4 h-4':: 1 склад и 3 сотрудника",
+      "::FaSync className='text-green-500 mr-2 align-middle w-4 h-4':: Базовая синхронизация с WB",
+      "::FaTelegram className='text-green-500 mr-2 align-middle w-4 h-4':: Telegram-интерфейс",
+      "::FaChartBar className='text-green-500 mr-2 align-middle w-4 h-4':: Отчеты в CSV",
+      "::FaEnvelope className='text-green-500 mr-2 align-middle w-4 h-4':: Поддержка по email"
+    ],
+    who_is_this_for: "Для начинающих и небольших магазинов до 100 артикулов. Идеально чтобы протестировать систему без риска.",
+    hormozi_easter_egg_title: "::FaInfoCircle className='text-green-500':: БЕСПЛАТНО - ЭТО СЕРЬЕЗНО?",
+    hormozi_easter_egg_content: `**Да, абсолютно бесплатно и без скрытых платежей!** Почему мы предлагаем бесплатный тариф? Вы можете протестировать ВСЕ основные функции и убедиться, что система подходит именно вам. Начните сегодня - никакого риска!`
+  },
+  {
+    id: "warehouse_pro",
+    name: "Профессиональный",
+    price: 4900,
+    xtrPrice: "49 XTR",
+    iconString: "::FaCrown className='inline mr-2.5 text-blue-500 text-2xl md:text-3xl align-middle'::",
+    color: "from-blue-50 to-blue-100 border-blue-300 hover:border-blue-500 shadow-blue-glow",
+    cta: "Выбрать профессионал",
+    main_description: "**Для растущего бизнеса с 2-3 магазинами.** Полный набор инструментов для эффективного управления складом и командой. Все необходимое для масштабирования!",
+    features: [
+      "::FaBoxes className='text-blue-500 mr-2 align-middle w-4 h-4':: До 500 артикулов",
+      "::FaWarehouse className='text-blue-500 mr-2 align-middle w-4 h-4':: 3 склада и 10 сотрудников",
+      "::FaSyncAlt className='text-blue-500 mr-2 align-middle w-4 h-4':: Полная синхронизация WB/Ozon/YM",
+      "::FaUsers className='text-blue-500 mr-2 align-middle w-4 h-4':: Управление сменами",
+      "::FaChartLine className='text-blue-500 mr-2 align-middle w-4 h-4':: Расширенные отчеты",
+      "::FaMap className='text-blue-500 mr-2 align-middle w-4 h-4':: Визуализация склада",
+      "::FaHeadset className='text-blue-500 mr-2 align-middle w-4 h-4':: Приоритетная поддержка",
+      "::FaGraduationCap className='text-blue-500 mr-2 align-middle w-4 h-4':: Обучение команды (1 час)"
+    ],
+    who_is_this_for: "Для бизнеса с 2-3 магазинами и 500+ артикулами. Когда нужен полный контроль над складом и командой.",
+    hormozi_easter_egg_title: "::FaBolt className='text-blue-500':: ПОЧЕМУ ИМЕННО ПРОФЕССИОНАЛ?",
+    hormozi_easter_egg_content: `**Потому что время - деньги, а ошибки стоят дорого!** За 4 900₽ в месяц вы получаете экономию 20+ часов в месяц и снижение недостач на 50-70%. Окупаемость в первый же месяц! Попробуйте 14 дней бесплатно!`
+  },
+  {
+    id: "warehouse_enterprise",
+    name: "Предприятие",
+    price: 14900,
+    xtrPrice: "149 XTR",
+    iconString: "::FaGem className='inline mr-2.5 text-purple-500 text-2xl md:text-3xl align-middle animate-pulse-slow'::",
+    color: "from-purple-50 to-purple-100 border-purple-300 hover:border-purple-500 shadow-purple-glow",
+    cta: "Для предприятия",
+    main_description: "**Максимальная автоматизация для крупных сетей.** Индивидуальный подход, кастомные интеграции и гарантированный результат. Все для бесперебойной работы вашего бизнеса!",
+    features: [
+      "::FaInfinity className='text-purple-500 mr-2 align-middle w-4 h-4':: Безлимитные артикулы",
+      "::FaCity className='text-purple-500 mr-2 align-middle w-4 h-4':: Неограниченное количество складов",
+      "::FaPlug className='text-purple-500 mr-2 align-middle w-4 h-4':: Все маркетплейсы + кастомные интеграции",
+      "::FaBrain className='text-purple-500 mr-2 align-middle w-4 h-4':: AI-аналитика и прогнозирование",
+      "::FaUserTie className='text-purple-500 mr-2 align-middle w-4 h-4':: Dedicated менеджер",
+      "::FaTools className='text-purple-500 mr-2 align-middle w-4 h-4':: Индивидуальные доработки",
+      "::FaChalkboardTeacher className='text-purple-500 mr-2 align-middle w-4 h-4':: Обучение команды (5 часов)",
+      "::FaShieldAlt className='text-purple-500 mr-2 align-middle w-4 h-4':: Гарантия снижения недостач на 50%+"
+    ],
+    who_is_this_for: "Для крупных сетей и бизнесов с высокими оборотами. Когда нужны индивидуальные решения и гарантированный результат.",
+    hormozi_easter_egg_title: "::FaChessKing className='text-purple-500':: ДЛЯ ТЕХ, КТО ИГРАЕТ В ДОЛГУЮ",
+    hormozi_easter_egg_content: `**14 900₽ в месяц - это инвестиция в стабильность и рост.** Полная автоматизация складских процессов, индивидуальные решения, гарантированное снижение недостач на 50%+ или возврат денег. Для компаний с оборотом 1M+ в месяц.`
+  }
+];
+
+// Additional Services
+const ADDITIONAL_SERVICES = [
+  {
+    id: "quick_setup",
+    name: "🚀 Быстрая настройка",
+    price: 20000,
+    description: "Полная настройка системы под ваш склад",
+    features: [
+      "Установка и настройка на вашем складе",
+      "Обучение вас работе с системой", 
+      "Интеграция с вашими маркетплейсами",
+      "Настройка визуализации склада",
+      "Гарантия работы 30 дней"
+    ]
+  },
+  {
+    id: "team_training", 
+    name: "👥 Обучение команды",
+    price: 10000,
+    description: "Подключение ваших сотрудников",
+    features: [
+      "Обучение менеджеров и кладовщиков",
+      "Настройка ролевого доступа",
+      "Инструкции для персонала", 
+      "Контроль качества работы",
+      "Чек-листы для сотрудников"
+    ]
+  }
+];
+
 export default function BuySubscriptionPage() {
   const { user, isInTelegramContext, dbUser } = useAppContext();
   const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("cyberfitness");
   const [activeSubscriptionId, setActiveSubscriptionId] = useState<string>("cyber_initiate_free_demo");
 
   useEffect(() => {
-    if (dbUser?.subscription_id && UPDATED_SUBSCRIPTION_PLANS.find(s => s.id === dbUser.subscription_id)) {
-      setActiveSubscriptionId(dbUser.subscription_id as string);
-    } else {
-      setActiveSubscriptionId("cyber_initiate_free_demo");
+    if (dbUser?.subscription_id) {
+      // Check if it's a warehouse or cyberfitness subscription
+      const allPlans = [...CYBERFITNESS_PLANS, ...WAREHOUSE_PLANS];
+      const activePlan = allPlans.find(s => s.id === dbUser.subscription_id);
+      if (activePlan) {
+        setActiveSubscriptionId(dbUser.subscription_id as string);
+        // Set appropriate tab based on subscription type
+        if (dbUser.subscription_id.startsWith('warehouse_')) {
+          setActiveTab("warehouse");
+        } else {
+          setActiveTab("cyberfitness");
+        }
+      }
     }
   }, [dbUser]);
 
-  const handlePurchase = async () => {
+  const handlePurchase = async (subscriptionType: 'cyberfitness' | 'warehouse') => {
     if (!user?.id) {
-      toast.error("Сначала авторизуйтесь в Telegram, Агент!");
+      toast.error("Сначала авторизуйтесь в Telegram!");
       setError("Авторизуйтесь в Telegram");
       return;
     }
-    if (!selectedSubscription || selectedSubscription.id === "cyber_initiate_free_demo") {
-      toast.error("Выберите платный план для реального апгрейда, Агент!");
-      setError("Выберите платный план для апгрейда");
+    if (!selectedSubscription || selectedSubscription.price === 0) {
+      toast.error("Выберите платный план для разблокировки всех функций!");
+      setError("Выберите платный план");
       return;
     }
     if (activeSubscriptionId === selectedSubscription.id) {
-      toast.info(`План "${selectedSubscription.name}" уже ваш, Агент! VIBE ON!`);
+      toast.info(`План "${selectedSubscription.name}" уже активен!`);
       setError(`План "${selectedSubscription.name}" уже активен`);
       return;
     }
@@ -152,29 +264,28 @@ export default function BuySubscriptionPage() {
     setSuccess(false);
 
     if (!isInTelegramContext && process.env.NODE_ENV === 'development') {
-      toast.success(`ДЕМО-РЕЖИМ: Счет для "${selectedSubscription.name}" типа создан! VIBE почти активирован!`);
+      toast.success(`ДЕМО: Счет для "${selectedSubscription.name}" создан!`);
       setLoading(false);
       setSuccess(true);
       setActiveSubscriptionId(selectedSubscription.id); 
-      if (user?.id && typeof window !== 'undefined') {
-        console.log(`[DEV_MODE_PURCHASE] Mock user subscription update to ${selectedSubscription.id}`);
-      }
       return;
     }
 
     try {
       const metadata = {
-        type: "subscription_cyberfitness", 
+        type: subscriptionType === 'cyberfitness' ? "subscription_cyberfitness" : "subscription_warehouse",
         subscription_id: selectedSubscription.id, 
         subscription_name: selectedSubscription.name,
         subscription_price_stars: selectedSubscription.price, 
         userId: user.id.toString(),
         username: user.username || "unknown_tg_user",
       };
-      const payload = `sub_cf_${user.id}_${selectedSubscription.id}_${Date.now()}`;
+      const payload = subscriptionType === 'cyberfitness' 
+        ? `sub_cf_${user.id}_${selectedSubscription.id}_${Date.now()}`
+        : `sub_wh_${user.id}_${selectedSubscription.id}_${Date.now()}`;
 
       const invoiceCreateResult = await createInvoice(
-        "subscription_cyberfitness", 
+        subscriptionType === 'cyberfitness' ? "subscription_cyberfitness" : "subscription_warehouse",
         payload,                    
         user.id.toString(),         
         selectedSubscription.price, 
@@ -183,7 +294,7 @@ export default function BuySubscriptionPage() {
       );
 
       if (!invoiceCreateResult.success || !invoiceCreateResult.data) {
-        throw new Error(invoiceCreateResult.error || "Не удалось создать запись о счете в CyberVibe БД. Попробуйте позже.");
+        throw new Error(invoiceCreateResult.error || "Не удалось создать запись о счете.");
       }
       
       const featuresTextForInvoice = selectedSubscription.features
@@ -191,206 +302,297 @@ export default function BuySubscriptionPage() {
         .slice(0, 2) 
         .join(', ');
       
-      let descriptionForTelegram = `Разблокируй ${selectedSubscription.name} для: ${featuresTextForInvoice}... полный доступ к AI-магии!`;
-      // Clean up VibeRenderer syntax just in case it slipped through parseFeatureString or for other parts of description
+      let descriptionForTelegram = `Разблокируй ${selectedSubscription.name}: ${featuresTextForInvoice}... и многое другое!`;
       descriptionForTelegram = descriptionForTelegram
-        .replace(/::Fa\w+\b(?:.*?)?::/g, '') // Remove ::FaIcon...::
-        .replace(/\s{2,}/g, ' ') // Replace multiple spaces with a single space
+        .replace(/::Fa\w+\b(?:.*?)?::/g, '')
+        .replace(/\s{2,}/g, ' ')
         .trim();
 
       const response = await sendTelegramInvoice(
         user.id.toString(),
-        `Апгрейд CyberVibe OS: ${selectedSubscription.name}`,
+        `${subscriptionType === 'cyberfitness' ? 'CyberVibe OS:' : 'Складская автоматизация:'} ${selectedSubscription.name}`,
         descriptionForTelegram,
         payload, 
         selectedSubscription.price 
       );
 
       if (!response.success) {
-        throw new Error(response.error || "Не удалось отправить счёт в Telegram. Проверьте настройки бота или попробуйте позже.");
+        throw new Error(response.error || "Не удалось отправить счёт в Telegram.");
       }
 
       setSuccess(true);
-      toast.success("Счёт на Апгрейд ОС отправлен в ваш Telegram! После оплаты система обновится автоматически. Готовьтесь к VIBE-трансформации!");
+      toast.success("Счёт отправлен в ваш Telegram! После оплаты система обновится автоматически.");
 
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка при попытке апгрейда.";
-      setError("Ошибка Апгрейда: " + errMsg);
-      toast.error("Ошибка Апгрейда: " + errMsg, { duration: 7000 });
+      const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка.";
+      setError("Ошибка: " + errMsg);
+      toast.error("Ошибка: " + errMsg, { duration: 7000 });
     } finally {
       setLoading(false);
     }
   };
 
-  const activePlan = UPDATED_SUBSCRIPTION_PLANS.find(s => s.id === activeSubscriptionId) || UPDATED_SUBSCRIPTION_PLANS[0];
+  const handleServicePurchase = async (service: any) => {
+    if (!user?.id) {
+      toast.error("Сначала авторизуйтесь в Telegram!");
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const response = await sendServiceInvoice(
+        user.id.toString(),
+        service.id as 'quick_setup' | 'team_training',
+        service.name,
+        service.description,
+        service.price,
+        service.features.join(', ')
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || "Не удалось отправить счёт на услугу");
+      }
+
+      toast.success("Счёт на услугу отправлен в Telegram!");
+      setSelectedService(null);
+      
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка";
+      toast.error("Ошибка: " + errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activePlan = [...CYBERFITNESS_PLANS, ...WAREHOUSE_PLANS].find(s => s.id === activeSubscriptionId) || CYBERFITNESS_PLANS[0];
 
   return (
-    <div className="min-h-screen pt-20 md:pt-24 bg-dark-bg bg-grid-pattern animate-[drift_30s_linear_infinite] pb-10">
+    <div className="min-h-screen pt-20 md:pt-24 bg-gradient-to-br from-blue-50 to-gray-100 pb-10">
       <main className="container mx-auto pt-8 md:pt-10 px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-5xl mx-auto p-4 sm:p-6 md:p-8 bg-dark-card/90 backdrop-blur-lg rounded-2xl shadow-[0_0_40px_theme(colors.brand-purple/50%)] border-2 border-brand-purple/60"
+          className="max-w-6xl mx-auto p-6 sm:p-8 bg-white rounded-2xl shadow-lg border border-gray-200"
         >
-          <h1 className="text-4xl sm:text-5xl font-orbitron font-bold text-brand-purple cyber-text glitch text-center mb-2 sm:mb-3" data-text="UPGRADE COGNITIVE OS">
-            UPGRADE COGNITIVE OS
+          <h1 className="text-3xl sm:text-4xl font-bold text-center mb-4 text-gray-900">
+            Выберите свой план
           </h1>
-          <p className="text-muted-foreground mb-6 md:mb-8 text-base sm:text-lg font-mono text-center max-w-2xl mx-auto">
-            {activeSubscriptionId !== "cyber_initiate_free_demo"
-              ? `Поздравляем, Агент! Твоя текущая ОС: "${activePlan.name}". Все системы в боевой готовности. Новые кибер-горизонты открыты!`
-              : "Расширь свои возможности, Агент! Выбери свой путь к AI-Мастерству в CyberVibe. Время для апгрейда твоего мозга!"}
+          <p className="text-lg text-center text-gray-600 mb-8 max-w-2xl mx-auto">
+            От AI-разработки до автоматизации склада - все в одном месте
           </p>
 
-          {activeSubscriptionId !== "cyber_initiate_free_demo" && (
+          {activeSubscriptionId !== "cyber_initiate_free_demo" && activeSubscriptionId !== "warehouse_free" && (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.5 }}
-              className={`mb-8 md:mb-12 p-5 sm:p-6 rounded-2xl border-2 ${activePlan.color.split(' ').pop()} shadow-xl bg-gradient-to-br ${activePlan.color} text-center`}
+              className={`mb-8 p-6 rounded-2xl border-2 ${activePlan.color.split(' ').pop()} bg-gradient-to-br ${activePlan.color}`}
             >
-                <h3 className="text-2xl sm:text-3xl font-orbitron font-semibold text-light-text mb-2 flex items-center justify-center">
-                  <VibeContentRenderer content={activePlan.iconString} /> <span className="ml-2">{activePlan.name}</span>
-                </h3>
-                <p className="text-lg sm:text-xl font-bold text-white mb-3 font-mono">{activePlan.xtrPrice} / цикл</p>
-                 <p className="text-sm text-gray-100/90 font-sans mb-4 italic px-2 leading-relaxed">
-                    <VibeContentRenderer content={activePlan.main_description} />
-                </p>
-                <ul className="space-y-2 mb-4 text-left max-w-lg mx-auto text-xs sm:text-sm">
-                    {activePlan.features.map((featureString: string, i: number) => {
-                      const { iconVibeContent, textContent } = parseFeatureString(featureString);
-                      return (
-                        <li key={i} className="text-gray-100/95 font-mono flex items-start py-1">
-                          {iconVibeContent && <VibeContentRenderer content={`${iconVibeContent} `} />}
-                          <span>
-                            <VibeContentRenderer content={textContent} />
-                          </span>
-                        </li>
-                      );
-                    })}
-                </ul>
-                <p className="text-xs text-brand-yellow bg-black/30 p-2 rounded-lg mb-4 font-semibold font-mono border border-brand-yellow/30">
-                     <VibeContentRenderer content={`**ДЛЯ КОГО ЭТОТ VIBE:** ${activePlan.who_is_this_for || ''}`} />
-                </p>
-                {activePlan.hormozi_easter_egg_title && (
-                  <details className="group mt-4 text-left">
-                    <summary className="text-sm font-orbitron text-brand-orange cursor-pointer hover:text-brand-yellow transition-colors list-none flex items-center justify-center group-open:mb-2">
-                      <VibeContentRenderer content={activePlan.hormozi_easter_egg_title} />
-                      <VibeContentRenderer content="::FaChevronDown className='ml-2 group-open:rotate-180 transition-transform duration-300'::" />
-                    </summary>
-                    <div className="text-xs text-gray-300/80 font-mono bg-black/40 p-3 rounded-md border border-brand-orange/30 whitespace-pre-line text-left">
-                      <VibeContentRenderer content={activePlan.hormozi_easter_egg_content || ''} />
-                    </div>
-                  </details>
-                )}
-                <p className="text-base sm:text-md text-white font-mono mt-4">Статус ОС: <span className="text-brand-green font-extrabold animate-pulse-slow">ОПТИМАЛЬНЫЙ</span>. VIBE Активирован и Готов к Покорению Матрицы!</p>
+              <h3 className="text-2xl font-bold mb-3 flex items-center justify-center">
+                <VibeContentRenderer content={activePlan.iconString} /> 
+                <span className="ml-2">{activePlan.name}</span>
+              </h3>
+              <p className="text-xl font-bold text-center mb-2">{activePlan.xtrPrice} / месяц</p>
+              <p className="text-sm text-center text-gray-700 mb-4">
+                <VibeContentRenderer content={activePlan.main_description} />
+              </p>
+              <p className="text-center text-green-600 font-semibold">
+                ✅ Активный план
+              </p>
             </motion.div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-            {UPDATED_SUBSCRIPTION_PLANS.map((sub, index) => (
-              <motion.div
-                key={sub.id}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: (activeSubscriptionId === "cyber_initiate_free_demo" ? index : Math.max(0, index -1)) * 0.15, duration: 0.4 }}
-                whileHover={{ scale: activeSubscriptionId === sub.id || (sub.id === "cyber_initiate_free_demo" && activeSubscriptionId === "cyber_initiate_free_demo") ? 1 : 1.03 }}
-                className={`p-4 sm:p-5 rounded-2xl border-2 shadow-lg hover:shadow-2xl flex flex-col justify-between bg-gradient-to-br ${sub.color} ${(sub.id === "cyber_initiate_free_demo" && activeSubscriptionId === "cyber_initiate_free_demo") ? 'opacity-60 cursor-not-allowed ring-2 ring-gray-500' : 'cursor-pointer'} transition-all duration-300 group`}
-              >
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-orbitron font-semibold text-light-text mb-2 flex items-center">
-                    <VibeContentRenderer content={sub.iconString} /> <span className="ml-2">{sub.name}</span>
-                  </h3>
-                  <p className="text-2xl sm:text-3xl font-bold text-white mb-3 font-mono">{sub.xtrPrice}</p>
-                  <p className="text-xs sm:text-sm text-gray-100/90 font-sans mb-3 italic px-1 leading-relaxed min-h-[6em] sm:min-h-[7em]">
-                    <VibeContentRenderer content={sub.main_description} />
-                  </p>
-                  <ul className="space-y-1.5 mb-5 text-[0.6rem] sm:text-xs min-h-[10em] sm:min-h-[12em]">
-                    {sub.features.map((featureString, i) => {
-                      const { iconVibeContent, textContent } = parseFeatureString(featureString);
-                      return (
-                        <li key={i} className="text-gray-100/90 font-mono flex items-start py-0.5">
-                           {iconVibeContent && <VibeContentRenderer content={`${iconVibeContent} `} />}
-                           <span>
-                             <VibeContentRenderer content={textContent} />
-                           </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                   <p className="text-[0.6rem] sm:text-xs text-brand-yellow bg-black/30 p-1.5 sm:p-2 rounded-lg mb-3 font-semibold font-mono border border-brand-yellow/40 min-h-[5em] sm:min-h-[6em]">
-                     <VibeContentRenderer content={`**ДЛЯ КОГО ЭТОТ VIBE:** ${sub.who_is_this_for || ''}`} />
-                   </p>
-                   {sub.hormozi_easter_egg_title && sub.hormozi_easter_egg_content && (
-                     <details className="group mt-3 mb-3 text-left">
-                       <summary className="text-xs font-orbitron text-brand-orange cursor-pointer hover:text-brand-yellow transition-colors list-none flex items-center justify-start group-open:mb-1.5">
-                         <VibeContentRenderer content={sub.hormozi_easter_egg_title} />
-                         <VibeContentRenderer content="::FaChevronDown className='ml-1.5 group-open:rotate-180 transition-transform duration-300 flex-shrink-0 w-3 h-3'::" />
-                       </summary>
-                       <div className="text-[0.65rem] text-gray-300/80 font-mono bg-black/50 p-2 rounded-md border border-brand-orange/40 whitespace-pre-line text-left">
-                         <VibeContentRenderer content={sub.hormozi_easter_egg_content} />
-                       </div>
-                     </details>
-                   )}
-                </div>
-                <Button
-                  onClick={() => sub.id !== "cyber_initiate_free_demo" && setSelectedSubscription(sub)}
-                  disabled={loading || sub.id === activeSubscriptionId || sub.id === "cyber_initiate_free_demo"}
-                  className={`w-full mt-auto py-2 sm:py-2.5 rounded-lg font-orbitron text-sm sm:text-md transition-all duration-200 ease-in-out transform group-hover:scale-105
-                    ${selectedSubscription?.id === sub.id && sub.id !== "cyber_initiate_free_demo" ? "bg-brand-lime text-black ring-4 ring-offset-2 ring-offset-current ring-brand-yellow shadow-2xl shadow-brand-lime/50"
-                    : sub.id === activeSubscriptionId ? "bg-gray-600 text-gray-400 cursor-not-allowed"
-                    : sub.id === "cyber_initiate_free_demo" ? "bg-gray-500 text-gray-300 cursor-not-allowed"
-                    : "bg-dark-bg/80 text-light-text hover:bg-brand-green hover:text-black hover:shadow-brand-green/60 focus:bg-brand-green focus:text-black"}`}
-                >
-                  <VibeContentRenderer content={
-                    sub.id === activeSubscriptionId ? "ЭТО ТЫ, АГЕНТ!"
-                    : selectedSubscription?.id === sub.id ? "::FaCheckToSlot:: ВЫБРАН ДЛЯ АПГРЕЙДА!"
-                    : sub.cta
-                  } />
-                </Button>
-              </motion.div>
-            ))}
-          </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="cyberfitness" className="text-lg py-3">
+                🚀 CyberFitness AI
+              </TabsTrigger>
+              <TabsTrigger value="warehouse" className="text-lg py-3">
+                📦 Управление складом
+              </TabsTrigger>
+            </TabsList>
 
-          {(activeSubscriptionId === "cyber_initiate_free_demo" || (selectedSubscription && selectedSubscription.id !== activeSubscriptionId && selectedSubscription.id !== "cyber_initiate_free_demo") ) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="mt-8 md:mt-10 text-center"
-            >
-              <Button
-                onClick={handlePurchase}
-                disabled={!selectedSubscription || selectedSubscription.id === "cyber_initiate_free_demo" || loading || success}
-                className={`px-10 py-3.5 rounded-xl font-orbitron text-md sm:text-lg transition-all duration-300 ease-in-out transform hover:scale-105
-                  ${loading || success || !selectedSubscription || selectedSubscription.id === "cyber_initiate_free_demo" ? "bg-muted text-muted-foreground cursor-not-allowed animate-pulse-slow"
-                  : "bg-gradient-to-r from-brand-green via-neon-lime to-brand-cyan text-black hover:shadow-[0_0_25px_theme(colors.brand-green)] text-glow"}`}
-              >
-                {loading ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: ОБРАБОТКА ЗАПРОСА..." />
-                : success ? <VibeContentRenderer content="::FaPaperPlane:: СЧЕТ ОТПРАВЛЕН В TELEGRAM!" />
-                : <VibeContentRenderer content="ЗАПУСТИТЬ VIBE-АПГРЕЙД!" />}
-              </Button>
-              {error && (
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-brand-red text-sm font-mono mt-4 animate-pulse-fast"
-                >
-                  {error}
-                </motion.p>
+            {/* CyberFitness Tab */}
+            <TabsContent value="cyberfitness">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {CYBERFITNESS_PLANS.map((sub, index) => (
+                  <PlanCard
+                    key={sub.id}
+                    sub={sub}
+                    index={index}
+                    activeSubscriptionId={activeSubscriptionId}
+                    selectedSubscription={selectedSubscription}
+                    onSelect={() => setSelectedSubscription(sub)}
+                    parseFeatureString={parseFeatureString}
+                  />
+                ))}
+              </div>
+
+              {selectedSubscription && selectedSubscription.id !== activeSubscriptionId && selectedSubscription.price > 0 && (
+                <PurchaseSection
+                  loading={loading}
+                  success={success}
+                  error={error}
+                  selectedSubscription={selectedSubscription}
+                  onPurchase={() => handlePurchase('cyberfitness')}
+                />
               )}
-            </motion.div>
-          )}
-           {success && (activeSubscriptionId === "cyber_initiate_free_demo" || (selectedSubscription && selectedSubscription.id !== activeSubscriptionId) ) && (
-             <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center text-brand-green font-mono mt-6 text-md sm:text-lg"
-             >
-                Отлично, Агент! Мы отправили счет на апгрейд в твой Telegram. После успешной транзакции твоя ОС будет обновлена автоматически. Заряжай полный VIBE!
-             </motion.p>
-           )}
+            </TabsContent>
+
+            {/* Warehouse Tab */}
+            <TabsContent value="warehouse">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                {WAREHOUSE_PLANS.map((sub, index) => (
+                  <PlanCard
+                    key={sub.id}
+                    sub={sub}
+                    index={index}
+                    activeSubscriptionId={activeSubscriptionId}
+                    selectedSubscription={selectedSubscription}
+                    onSelect={() => setSelectedSubscription(sub)}
+                    parseFeatureString={parseFeatureString}
+                  />
+                ))}
+              </div>
+
+              {selectedSubscription && selectedSubscription.id !== activeSubscriptionId && selectedSubscription.price > 0 && (
+                <PurchaseSection
+                  loading={loading}
+                  success={success}
+                  error={error}
+                  selectedSubscription={selectedSubscription}
+                  onPurchase={() => handlePurchase('warehouse')}
+                />
+              )}
+
+              {/* Additional Services for Warehouse */}
+              <div className="mt-12 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                <h3 className="text-2xl font-bold text-center mb-6 text-gray-900">Дополнительные услуги</h3>
+                <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+                  {ADDITIONAL_SERVICES.map((service) => (
+                    <div key={service.id} className="text-center p-6 border border-gray-300 rounded-lg bg-white hover:shadow-md transition-shadow">
+                      <h4 className="text-xl font-bold mb-3">{service.name}</h4>
+                      <p className="text-2xl font-bold mb-2">{service.price.toLocaleString()}₽</p>
+                      <p className="text-sm text-gray-600 mb-4">{service.description}</p>
+                      <ul className="text-sm text-gray-600 mb-4 space-y-1">
+                        {service.features.map((feature, idx) => (
+                          <li key={idx}>• {feature}</li>
+                        ))}
+                      </ul>
+                      <Button 
+                        onClick={() => handleServicePurchase(service)}
+                        disabled={loading}
+                        className="w-full bg-orange-600 hover:bg-orange-700"
+                      >
+                        {loading ? "Обработка..." : "Заказать услугу"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </motion.div>
       </main>
     </div>
   );
 }
+
+// Plan Card Component
+const PlanCard = ({ sub, index, activeSubscriptionId, selectedSubscription, onSelect, parseFeatureString }: any) => (
+  <motion.div
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.15 }}
+    className={`p-6 rounded-xl border-2 ${sub.color} bg-white hover:shadow-lg transition-all duration-300 ${
+      activeSubscriptionId === sub.id ? 'ring-2 ring-blue-500 scale-105' : ''
+    }`}
+  >
+    <div className="text-center mb-4">
+      <VibeContentRenderer content={sub.iconString} />
+      <h3 className="text-xl font-bold mt-2 text-gray-900">{sub.name}</h3>
+      <p className="text-2xl font-bold my-2">{sub.xtrPrice}</p>
+    </div>
+
+    <p className="text-sm text-gray-600 mb-4 text-center">
+      <VibeContentRenderer content={sub.main_description} />
+    </p>
+
+    <ul className="space-y-2 mb-6 max-h-48 overflow-y-auto">
+      {sub.features.map((featureString: string, i: number) => {
+        const { iconVibeContent, textContent } = parseFeatureString(featureString);
+        return (
+          <li key={i} className="text-sm text-gray-700 flex items-start">
+            {iconVibeContent && <VibeContentRenderer content={iconVibeContent} />}
+            <span className="text-xs">
+              <VibeContentRenderer content={textContent} />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+
+    {sub.hormozi_easter_egg_title && (
+      <details className="group mb-4 text-left">
+        <summary className="text-xs font-semibold text-blue-600 cursor-pointer hover:text-blue-800 transition-colors list-none flex items-center justify-start group-open:mb-2">
+          <VibeContentRenderer content={sub.hormozi_easter_egg_title} />
+          <VibeContentRenderer content="::FaChevronDown className='ml-1 group-open:rotate-180 transition-transform duration-300 flex-shrink-0 w-3 h-3'::" />
+        </summary>
+        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded-md border border-gray-200 whitespace-pre-line text-left">
+          <VibeContentRenderer content={sub.hormozi_easter_egg_content} />
+        </div>
+      </details>
+    )}
+
+    <div className="text-center">
+      <Button
+        onClick={onSelect}
+        disabled={sub.id === activeSubscriptionId || sub.price === 0}
+        className={`w-full ${
+          selectedSubscription?.id === sub.id && sub.price > 0 
+            ? "bg-green-600 hover:bg-green-700" 
+            : sub.id === activeSubscriptionId 
+            ? "bg-gray-400 cursor-not-allowed"
+            : sub.price === 0
+            ? "bg-gray-500 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700"
+        } text-white`}
+      >
+        {sub.id === activeSubscriptionId ? "Активный план"
+        : selectedSubscription?.id === sub.id ? "Выбрано для оплаты"
+        : sub.cta}
+      </Button>
+    </div>
+  </motion.div>
+);
+
+// Purchase Section Component
+const PurchaseSection = ({ loading, success, error, selectedSubscription, onPurchase }: any) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="text-center p-6 bg-blue-50 rounded-xl border border-blue-200"
+  >
+    <h3 className="text-xl font-bold mb-4 text-blue-800">
+      Вы выбрали: {selectedSubscription.name}
+    </h3>
+    <Button
+      onClick={onPurchase}
+      disabled={loading}
+      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
+    >
+      {loading ? "Обработка..." : "Перейти к оплате"}
+    </Button>
+    {error && (
+      <p className="text-red-600 mt-3 text-sm">
+        {error}
+      </p>
+    )}
+    {success && (
+      <p className="text-green-600 mt-3 text-sm">
+        Счёт отправлен в Telegram! Проверьте ваши сообщения.
+      </p>
+    )}
+  </motion.div>
+);

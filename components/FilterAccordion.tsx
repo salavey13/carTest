@@ -15,7 +15,7 @@ interface FilterAccordionProps {
   setFilterColor: (value: string | null) => void;
   filterSize: string | null;
   setFilterSize: (value: string | null) => void;
-  items: Item[];
+  items?: Item[] | null;
   onResetFilters: () => void;
   includeSearch?: boolean;
   search?: string;
@@ -41,10 +41,11 @@ export default function FilterAccordion({
   sortOption = 'size_season_color',
   setSortOption,
 }: FilterAccordionProps) {
-  const uniqueSeasons = Array.from(new Set(items.map((i) => i.season).filter(Boolean)));
-  const uniquePatterns = Array.from(new Set(items.map((i) => i.pattern).filter(Boolean)));
-  const uniqueColors = Array.from(new Set(items.map((i) => i.color).filter(Boolean)));
-  const uniqueSizes = Array.from(new Set(items.map((i) => i.size).filter(Boolean)));
+  const safeItems = Array.isArray(items) ? items : [];
+  const uniqueSeasons = Array.from(new Set(safeItems.map((i) => i?.season).filter(Boolean)));
+  const uniquePatterns = Array.from(new Set(safeItems.map((i) => i?.pattern).filter(Boolean)));
+  const uniqueColors = Array.from(new Set(safeItems.map((i) => i?.color).filter(Boolean)));
+  const uniqueSizes = Array.from(new Set(safeItems.map((i) => i?.size).filter(Boolean)));
 
   return (
     <div className="grid grid-cols-2 gap-2">
