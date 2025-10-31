@@ -393,69 +393,78 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Enhanced Pricing Section */}
+      {/* Enhanced Pricing Section - Merged Approach */}
       <section id="pricing" className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900">
-            Выберите свой вариант автоматизации
+            Выберите свой план автоматизации
           </h2>
           <p className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto">
-            От быстрого старта до полного сопровождения
+            От бесплатного старта до полного сопровождения с гарантией результата
           </p>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               {
-                title: "🚀 Быстрый старт",
-                price: "20 000₽",
-                period: "единоразово",
-                description: "Настройка CRM под ваш склад",
-                bestFor: "Для начала автоматизации",
+                title: "🚀 Бесплатный старт",
+                price: "0₽",
+                period: "навсегда",
+                description: "Попробуйте все возможности бесплатно",
+                bestFor: "Для тестирования и небольших складов",
                 features: [
-                  "Установка и настройка на вашем складе",
-                  "Обучение вас работе с системой",
-                  "Интеграция с вашими маркетплейсами",
-                  "Настройка визуализации склада",
-                  "Гарантия работы 30 дней"
+                  "До 100 артикулов",
+                  "1 склад и 3 сотрудника",
+                  "Базовая синхронизация с WB",
+                  "Telegram-интерфейс",
+                  "Отчеты в CSV",
+                  "Поддержка по email"
                 ],
-                cta: "Запустить автоматизацию",
-                popular: false
+                cta: "Начать бесплатно",
+                popular: false,
+                type: "free"
               },
               {
-                title: "👥 Обучение команды",
-                price: "10 000₽",
-                period: "единоразово",
-                description: "Подключение ваших сотрудников",
-                bestFor: "Когда нужна слаженная команда",
-                features: [
-                  "Обучение менеджеров и кладовщиков",
-                  "Настройка ролевого доступа",
-                  "Инструкции для персонала",
-                  "Контроль качества работы",
-                  "Чек-листы для сотрудников"
-                ],
-                cta: "Обучить команду",
-                popular: true
-              },
-              {
-                title: "🛡️ Полное сопровождение",
-                price: "10 000₽",
+                title: "👥 Профессиональный",
+                price: "4 900₽",
                 period: "в месяц",
-                description: "CRM как сервис с поддержкой",
-                bestFor: "Для растущего бизнеса",
+                description: "Для растущего бизнеса",
+                bestFor: "2-3 магазина, 500+ артикулов",
                 features: [
-                  "Всё из пакета 'Быстрый старт'",
-                  "Ежемесячные консультации",
-                  "Обновления и новые функции",
-                  "Мониторинг работы 24/7",
+                  "До 500 артикулов",
+                  "3 склада и 10 сотрудников",
+                  "Полная синхронизация WB/Ozon/YM",
+                  "Управление сменами",
+                  "Расширенные отчеты",
+                  "Визуализация склада",
                   "Приоритетная поддержка",
-                  "Адаптация под изменения API"
+                  "Обучение команды (1 час)"
                 ],
-                cta: "Получить полный контроль",
-                popular: false
+                cta: "Выбрать профессионал",
+                popular: true,
+                type: "pro"
+              },
+              {
+                title: "🏢 Предприятие",
+                price: "14 900₽",
+                period: "в месяц",
+                description: "Максимальная автоматизация",
+                bestFor: "Крупные сети и высокие обороты",
+                features: [
+                  "Безлимитные артикулы",
+                  "Неограниченное количество складов",
+                  "Все маркетплейсы + кастомные интеграции",
+                  "AI-аналитика и прогнозирование",
+                  "Dedicated менеджер",
+                  "Индивидуальные доработки",
+                  "Обучение команды (5 часов)",
+                  "Гарантия снижения недостач на 50%+"
+                ],
+                cta: "Для предприятия",
+                popular: false,
+                type: "enterprise"
               }
             ].map((plan, index) => (
-              <div key={index} className={`bg-white rounded-2xl p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow`}>
+              <div key={index} className={`bg-white rounded-2xl p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                     <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold">
@@ -472,25 +481,77 @@ export default function WarehouseLandingPage() {
                 <p className="text-gray-600 mb-6">{plan.description}</p>
                 
                 <div className="mb-6">
-                  <span className="text-sm text-gray-500">{plan.bestFor}</span>
+                  <span className="text-sm text-gray-500 font-medium">{plan.bestFor}</span>
                 </div>
                 
-                <ul className="space-y-4 mb-8">
+                <ul className="space-y-3 mb-8">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start">
                       <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      <span className="text-gray-600">{feature}</span>
+                      <span className="text-gray-600 text-sm">{feature}</span>
                     </li>
                   ))}
                 </ul>
                 
-                <Button className={`w-full py-3 text-lg font-semibold ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-900'} text-white transition-colors`}>
+                <Button className={`w-full py-3 text-lg font-semibold ${
+                  plan.type === 'free' 
+                    ? 'bg-gray-800 hover:bg-gray-900 text-white' 
+                    : plan.popular 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                } transition-colors duration-300`}>
                   {plan.cta}
                 </Button>
+
+                {plan.type === 'pro' && (
+                  <p className="text-xs text-center text-gray-500 mt-3">
+                    🔥 Первые 14 дней бесплатно
+                  </p>
+                )}
               </div>
             ))}
+          </div>
+
+          {/* Additional Services */}
+          <div className="mt-16 bg-white rounded-2xl p-8 shadow-lg">
+            <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Дополнительные услуги</h3>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="border border-gray-200 rounded-xl p-6">
+                <h4 className="text-xl font-bold mb-4 text-blue-800">🎯 Быстрая настройка</h4>
+                <p className="text-3xl font-bold mb-2">20 000₽</p>
+                <p className="text-gray-600 mb-4">единоразово</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• Полная настройка под ваш склад</li>
+                  <li>• Интеграция со всеми маркетплейсами</li>
+                  <li>• Обучение владельца (2 часа)</li>
+                  <li>• Гарантия 30 дней</li>
+                </ul>
+              </div>
+              <div className="border border-gray-200 rounded-xl p-6">
+                <h4 className="text-xl font-bold mb-4 text-blue-800">👨‍🏫 Обучение команды</h4>
+                <p className="text-3xl font-bold mb-2">10 000₽</p>
+                <p className="text-gray-600 mb-4">единоразово</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• Обучение менеджеров и кладовщиков</li>
+                  <li>• Чек-листы и инструкции</li>
+                  <li>• Ролевой доступ и права</li>
+                  <li>• Контроль качества работы</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Guarantee Section */}
+          <div className="mt-12 text-center">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 inline-block">
+              <h4 className="text-xl font-bold text-blue-800 mb-2">💰 Гарантия результата</h4>
+              <p className="text-gray-700 max-w-2xl mx-auto">
+                Мы настолько уверены в результате, что предлагаем использовать систему за <strong>50% от вашей экономии на штрафах</strong>. 
+                Если недостачи не снизятся на 50% в первый месяц - вернем деньги!
+              </p>
+            </div>
           </div>
         </div>
       </section>
