@@ -897,3 +897,84 @@ export async function saveMapPreset(
         return { success: false, error: errorMessage };
     }
 }
+
+
+export async function sendServiceInvoice(
+  chatId: string, 
+  serviceType: 'quick_setup' | 'team_training',
+  serviceName: string,
+  serviceDescription: string,
+  amount: number,
+  serviceDetails?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return { success: false, error: "Telegram bot token not configured" };
+  }
+
+  const finalAmount = Math.ceil(amount);
+  const MIN_AMOUNT = 1;
+  const MAX_AMOUNT = 10000;
+
+  if (finalAmount < MIN_AMOUNT || finalAmount > MAX_AMOUNT) {
+    const errorMsg = `Calculated amount ${finalAmount} is outside the valid range of ${MIN_AMOUNT}-${MAX_AMOUNT} for XTR currency.`;
+    logger.error(`[sendServiceInvoice] ${errorMsg}`);
+    return { success: false, error: errorMsg };
+  }
+
+  const payload = `service_${serviceType}_${chatId}_${Date.now()}`;
+  const currency = "XTR";
+  const prices = [{ label: serviceName, amount: finalAmount }];
+  
+  const requestBody: Record<string, any> = {
+    chat_id: chatId, 
+    title: serviceName,
+    description: serviceDescription,
+    payload,
+    provider_token: "",
+    currency, 
+    prices, 
+    start_parameter: "pay"
+  };
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendInvoice`, {
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify(requestBody)
+    });
+    
+    const data: TelegramApiResponse = await response.json();
+    if (!data.ok) { 
+      logger.error(`Telegram API error (sendInvoice for service): ${data.description || "Unknown error"}`, { 
+        chatId, 
+        errorCode: data.error_code, 
+        bodySent: requestBody 
+      }); 
+      throw new Error(`Telegram API error: ${data.description || "Failed to send invoice"}`);
+    }
+    
+    // Save service invoice to DB
+    try { 
+      await supabaseAdmin.from("invoices").insert({ 
+        id: payload, 
+        user_id: chatId, 
+        amount: finalAmount,
+        type: "service_" + serviceType, 
+        status: "pending", 
+        metadata: { 
+          service_type: serviceType,
+          service_name: serviceName,
+          service_description: serviceDescription,
+          service_details: serviceDetails
+        }
+      }); 
+    } catch (dbError: any) { 
+      logger.error(`Failed to save service invoice ${payload} to DB: ${dbError.message}`); 
+    }
+    
+    return { success: true };
+  } catch (error) {
+    logger.error("Error in sendServiceInvoice:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to send service invoice" };
+  }
+}
