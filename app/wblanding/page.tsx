@@ -251,10 +251,10 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Tabs for Optional */}
+      {/* Tabs for Optional Sections */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <Tabs defaultValue="none">
+          <Tabs defaultValue="none" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="comparison">Сравнение</TabsTrigger>
               <TabsTrigger value="example">Кейс</TabsTrigger>
