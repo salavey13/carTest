@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Suspense } from 'react';
 import { getAllPublicCrews } from '@/app/rentals/actions';
@@ -145,392 +146,316 @@ export default function WarehouseLandingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16 sm:py-24 px-4 md:py-32 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10 bg-[url('/grid-pattern.png')] bg-repeat"></div>
-        <div className="max-w-6xl mx-auto text-center relative z-10">
-          <Image 
-            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
-            alt="Логотип приложения"
-            width={169}
-            height={169}
-            className="mx-auto mb-6 sm:mb-8 rounded-full w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40"
-          />
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-4 sm:mb-6 leading-tight">Складской учет для онлайн-магазинов</h1>
-          <p className="text-base sm:text-xl md:text-2xl mb-8 sm:mb-10 max-w-xl sm:max-w-3xl mx-auto">Сократите недостачи на 73%, обновляйте остатки одним кликом. Для 2+ магазинов на WB, Ozon, YM с 100+ артикулами.</p>
+      {/* Hero Section with Video Background */}
+      <section className="relative min-h-[60vh] flex items-center justify-center text-white">
+        <video
+          className="absolute inset-0 w-full h-full object-cover brightness-50"
+          autoPlay
+          loop
+          muted
+          playsInline
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4"
+        />
+        <div className="relative z-10 text-center px-4">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white drop-shadow-2xl">Автоматизация склада для MP</h1>
+          <p className="text-xl md:text-2xl mb-8 text-white/90 drop-shadow-lg">Синхронизация, смены, визуализация. Без лишнего.</p>
           <Link href="#features">
-            <a className="bg-white text-blue-600 px-6 py-3 sm:px-8 sm:py-4 rounded-full font-bold text-base sm:text-lg hover:bg-gray-100 shadow-md transition-all inline-block">Узнать больше</a>
+            <a className="bg-white/90 text-blue-600 px-8 py-4 rounded-full font-bold hover:bg-white transition-all shadow-lg">Детали</a>
           </Link>
         </div>
       </section>
 
+      {/* Second Video Section */}
+      <section className="py-8 bg-gray-100">
+        <hr className="border-gray-300 max-w-4xl mx-auto" />
+        <div className="max-w-md mx-auto mt-8">
+          <video
+            className="w-full h-auto rounded-xl shadow-lg md:max-w-md mx-auto"
+            autoPlay
+            loop
+            muted
+            playsInline
+          >
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
       {/* Features Section */}
-      <section id="features" className="py-16 sm:py-20 px-4 bg-white">
+      <section id="features" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Возможности приложения</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 sm:mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Синхронизация с маркетплейсами</h3>
-              <p className="text-center text-gray-600 text-sm sm:text-base">Автоматическое обновление остатков на WB, Ozon и Яндекс.Маркет в реальном времени.</p>
+          <h2 className="text-3xl font-bold text-center mb-16">Что внутри</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-gray-50 p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Синхронизация</h3>
+              <p className="text-gray-600">Авто-обновление остатков на WB, Ozon, YM.</p>
             </div>
-            <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 sm:mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Управление сменами</h3>
-              <p className="text-center text-gray-600 text-sm sm:text-base">Контроль работы персонала, чекпоинты и детальная статистика по сменам.</p>
+            <div className="bg-gray-50 p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Смены</h3>
+              <p className="text-gray-600">Чекпоинты, статистика по сменам.</p>
             </div>
-            <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 sm:mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Мульти-доступ</h3>
-              <p className="text-center text-gray-600 text-sm sm:text-base">Управление несколькими складами, ролевой доступ для команды.</p>
+            <div className="bg-gray-50 p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Доступы</h3>
+              <p className="text-gray-600">Роли, несколько складов.</p>
             </div>
-            <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 sm:mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Telegram-интерфейс</h3>
-              <p className="text-center text-gray-600 text-sm sm:text-base">Удобный доступ через мессенджер, без установки приложений.</p>
+            <div className="bg-gray-50 p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Telegram</h3>
+              <p className="text-gray-600">Всё в чате, без установки.</p>
             </div>
-            <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 sm:mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Визуализация</h3>
-              <p className="text-center text-gray-600 text-sm sm:text-base">Интерактивная карта склада с фильтрами по характеристикам товаров.</p>
+            <div className="bg-gray-50 p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Карта</h3>
+              <p className="text-gray-600">Фильтры по атрибутам товаров.</p>
             </div>
-            <div className="bg-gray-50 p-4 sm:p-6 md:p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-4 sm:mb-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Отчеты</h3>
-              <p className="text-center text-gray-600 text-sm sm:text-base">Экспорт остатков и смен в удобных форматах, статистика продаж.</p>
+            <div className="bg-gray-50 p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Отчеты</h3>
+              <p className="text-gray-600">CSV остатков и смен.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Benefits Section */}
-      <section className="bg-gray-100 py-16 sm:py-20 px-4">
+      {/* For Whom Section */}
+      <section className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Почему наше приложение выгодно</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
-              <Image 
-                src="/placeholder.svg"
-                alt="Для владельца бизнеса"
-                width={300}
-                height={200}
-                className="rounded-lg mb-4 mx-auto"
-              />
-              <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-center text-blue-800">Для владельца</h3>
-              <ul className="space-y-3 sm:space-y-4 text-gray-600 text-sm sm:text-base">
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Контроль нескольких магазинов
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Снижение потерь и ошибок
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Автосинхронизация остатков
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Мониторинг команды
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Freemium - старт бесплатно
-                </li>
+          <h2 className="text-3xl font-bold text-center mb-16">Для кого</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Владельцу</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li>Много магазинов</li>
+                <li>Меньше потерь</li>
+                <li>Авто-синх</li>
+                <li>Мониторинг</li>
+                <li>Бесплатный старт</li>
               </ul>
             </div>
-            <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
-              <Image 
-                src="/placeholder.svg"
-                alt="Для персонала"
-                width={300}
-                height={200}
-                className="rounded-lg mb-4 mx-auto"
-              />
-              <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-center text-blue-800">Для персонала</h3>
-              <ul className="space-y-3 sm:space-y-4 text-gray-600 text-sm sm:text-base">
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Простой интерфейс в Telegram
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Быстрые операции с товарами
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Игровой режим с наградами
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Личная статистика и цели
-                </li>
+            <div className="bg-white p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Персоналу</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li>Telegram UI</li>
+                <li>Быстрые оп</li>
+                <li>Игра + награды</li>
+                <li>Статистика</li>
               </ul>
             </div>
-            <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
-              <Image 
-                src="/placeholder.svg"
-                alt="Для администратора"
-                width={300}
-                height={200}
-                className="rounded-lg mb-4 mx-auto"
-              />
-              <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-center text-blue-800">Для администратора</h3>
-              <ul className="space-y-3 sm:space-y-4 text-gray-600 text-sm sm:text-base">
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Управление несколькими складами
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Безопасный доступ для команды
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Уведомления о заказах (в разработке)
-                </li>
-                <li className="flex items-start gap-2 sm:gap-3">
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Простые отчеты в CSV
-                </li>
+            <div className="bg-white p-8 rounded-xl">
+              <h3 className="text-xl font-bold mb-4">Админу</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li>Много складов</li>
+                <li>Доступы</li>
+                <li>Уведомления</li>
+                <li>CSV</li>
               </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why Choose Us vs Competitors */}
-      <section id="why-us" className="py-16 sm:py-20 px-4 bg-white">
+      {/* Tabs for Optional */}
+      <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Сравнение с конкурентами</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200 rounded-lg shadow-md table-auto text-sm">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-2 py-2 text-left font-bold text-gray-700">Аспект</th>
-                  <th className="px-2 py-2 text-left font-bold text-gray-700">Наше</th>
-                  <th className="px-2 py-2 text-left font-bold text-gray-700">YClients</th>
-                  <th className="px-2 py-2 text-left font-bold text-gray-700">МойСклад</th>
-                  <th className="px-2 py-2 text-left font-bold text-gray-700">TOPSELLER</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Ценообразование</td>
-                  <td className="px-2 py-2">Freemium, % от экономии</td>
-                  <td className="px-2 py-2">От 900 руб/мес</td>
-                  <td className="px-2 py-2">От 1490 руб/мес</td>
-                  <td className="px-2 py-2">От 990 руб/мес</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Фокус</td>
-                  <td className="px-2 py-2">Склад для e-com</td>
-                  <td className="px-2 py-2">CRM для услуг</td>
-                  <td className="px-2 py-2">Общий учет</td>
-                  <td className="px-2 py-2">Продажи на MP</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Интеграция с MP</td>
-                  <td className="px-2 py-2">WB, Ozon, YM</td>
-                  <td className="px-2 py-2">Ограниченная</td>
-                  <td className="px-2 py-2">WB, Ozon, YM +</td>
-                  <td className="px-2 py-2">WB, Ozon, YM</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Мобильность</td>
-                  <td className="px-2 py-2">Telegram-бот</td>
-                  <td className="px-2 py-2">Веб/моб. app</td>
-                  <td className="px-2 py-2">Веб/моб. app</td>
-                  <td className="px-2 py-2">Облако</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Gamification</td>
-                  <td className="px-2 py-2">Да</td>
-                  <td className="px-2 py-2">Нет</td>
-                  <td className="px-2 py-2">Нет</td>
-                  <td className="px-2 py-2">Нет</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Управление сменами</td>
-                  <td className="px-2 py-2">Да</td>
-                  <td className="px-2 py-2">Для услуг</td>
-                  <td className="px-2 py-2">Базовое</td>
-                  <td className="px-2 py-2">Нет</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Визуализация склада</td>
-                  <td className="px-2 py-2">Карта + фильтры</td>
-                  <td className="px-2 py-2">Базовая</td>
-                  <td className="px-2 py-2">Таблицы</td>
-                  <td className="px-2 py-2">Дашборды</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Отчеты</td>
-                  <td className="px-2 py-2">CSV, статистика</td>
-                  <td className="px-2 py-2">Для услуг</td>
-                  <td className="px-2 py-2">Расширенные</td>
-                  <td className="px-2 py-2">Аналитика MP</td>
-                </tr>
-                <tr className="border-t">
-                  <td className="px-2 py-2 font-medium">Обучение</td>
-                  <td className="px-2 py-2">Минимальное</td>
-                  <td className="px-2 py-2">Требуется</td>
-                  <td className="px-2 py-2">Среднее</td>
-                  <td className="px-2 py-2">Среднее</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-8 text-center text-gray-600 max-w-3xl mx-auto text-sm sm:text-base">Наше приложение - специализированное решение для складов онлайн-магазинов. Оно проще, дешевле и эффективнее для малого/среднего e-com, где ключ - быстрый учет и снижение ошибок.</p>
+          <Tabs defaultValue="none">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="comparison">Сравнение</TabsTrigger>
+              <TabsTrigger value="example">Кейс</TabsTrigger>
+            </TabsList>
+            <TabsContent value="comparison">
+              <div className="overflow-x-auto mt-8">
+                <table className="min-w-full bg-white border rounded-lg shadow-md text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Аспект</th>
+                      <th className="p-2">Мы</th>
+                      <th className="p-2">YClients</th>
+                      <th className="p-2">МойСклад</th>
+                      <th className="p-2">TOPSELLER</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="p-2">Цена</td>
+                      <td className="p-2">Freemium + %</td>
+                      <td className="p-2">900+/мес</td>
+                      <td className="p-2">1490+/мес</td>
+                      <td className="p-2">990+/мес</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Фокус</td>
+                      <td className="p-2">e-com склад</td>
+                      <td className="p-2">Услуги CRM</td>
+                      <td className="p-2">Общий учет</td>
+                      <td className="p-2">MP продажи</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Интеграция MP</td>
+                      <td className="p-2">WB/Ozon/YM</td>
+                      <td className="p-2">Ограничено</td>
+                      <td className="p-2">WB/Ozon/YM+</td>
+                      <td className="p-2">WB/Ozon/YM</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Мобильность</td>
+                      <td className="p-2">Telegram</td>
+                      <td className="p-2">Веб/апп</td>
+                      <td className="p-2">Веб/апп</td>
+                      <td className="p-2">Облако</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Gamification</td>
+                      <td className="p-2">Да</td>
+                      <td className="p-2">Нет</td>
+                      <td className="p-2">Нет</td>
+                      <td className="p-2">Нет</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Смены</td>
+                      <td className="p-2">Да</td>
+                      <td className="p-2">Для услуг</td>
+                      <td className="p-2">Базовое</td>
+                      <td className="p-2">Нет</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Визуализация</td>
+                      <td className="p-2">Карта+фильтры</td>
+                      <td className="p-2">Базовая</td>
+                      <td className="p-2">Таблицы</td>
+                      <td className="p-2">Дашборды</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Отчеты</td>
+                      <td className="p-2">CSV, стат</td>
+                      <td className="p-2">Для услуг</td>
+                      <td className="p-2">Расширенные</td>
+                      <td className="p-2">Аналитика MP</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2">Обучение</td>
+                      <td className="p-2">Мин</td>
+                      <td className="p-2">Требуется</td>
+                      <td className="p-2">Среднее</td>
+                      <td className="p-2">Среднее</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+            <TabsContent value="example">
+              <div className="grid md:grid-cols-2 gap-8 mt-8">
+                <div className="bg-gray-50 p-6 rounded-xl">
+                  <h3 className="font-bold mb-4">До</h3>
+                  <ul className="space-y-2 text-gray-600">
+                    <li>Обновление - полдня</li>
+                    <li>Штрафы 30k+</li>
+                  </ul>
+                </div>
+                <div className="bg-gray-50 p-6 rounded-xl">
+                  <h3 className="font-bold mb-4">После</h3>
+                  <ul className="space-y-2 text-gray-600">
+                    <li>Обновление - клик</li>
+                    <li>Штрафы 8k (-73%)</li>
+                  </ul>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </section>
 
-      {/* Real Example Section */}
-      <section className="bg-gray-100 py-16 sm:py-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-12 sm:mb-16 text-gray-900">Реальный кейс: Склад одеял</h2>
-          <p className="text-base sm:text-lg mb-10 sm:mb-12 max-w-xl sm:max-w-3xl mx-auto">Мы тестировали приложение на складе с одеялами: 4 размера, 2 сезона, 8 узоров - 64 артикула, >500 единиц. Работало стабильно на бесплатном Supabase.</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 max-w-xl sm:max-w-4xl mx-auto">
-            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-md">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-blue-800">До приложения</h3>
-              <ul className="space-y-3 sm:space-y-4 text-left text-gray-600 text-sm sm:text-base">
-                <li>Обновление остатков - полдня работы</li>
-                <li>Штрафы за ошибки - 30+ тыс. руб/мес</li>
-              </ul>
+      {/* Pricing */}
+      <section id="pricing" className="py-20 bg-gray-100 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Подписка</h2>
+          <p className="text-center mb-8 text-gray-600">Настройка и менторство бесплатно.</p>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-4">Месяц</h3>
+              <p className="text-3xl font-bold mb-6">10 000₽</p>
+              <Button className="w-full">Выбрать</Button>
             </div>
-            <div className="bg-white p-6 sm:p-8 rounded-xl shadow-md">
-              <h3 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-blue-800">После</h3>
-              <ul className="space-y-3 sm:space-y-4 text-left text-gray-600 text-sm sm:text-base">
-                <li>Обновление - 1 клик</li>
-                <li>Штрафы - 8 тыс. руб/мес (снижение на 73%)</li>
-              </ul>
+            <div className="bg-white p-8 rounded-xl shadow-md ring-2 ring-blue-500">
+              <h3 className="text-xl font-bold mb-4">3 месяца</h3>
+              <p className="text-3xl font-bold mb-2">25 000₽</p>
+              <p className="text-sm text-gray-600 mb-6">~8 333/мес</p>
+              <Button className="w-full bg-blue-600">Выбрать</Button>
+            </div>
+            <div className="bg-white p-8 rounded-xl shadow-md">
+              <h3 className="text-xl font-bold mb-4">6 месяцев</h3>
+              <p className="text-3xl font-bold mb-2">45 000₽</p>
+              <p className="text-sm text-gray-600 mb-6">~7 500/мес</p>
+              <Button className="w-full">Выбрать</Button>
             </div>
           </div>
-          <p className="mt-10 sm:mt-12 text-base sm:text-lg font-semibold text-blue-800 max-w-xl mx-auto">Мы предлагаем использование за 50% от вашей экономии на штрафах - рассчитаем индивидуально!</p>
         </div>
       </section>
 
-      {/* Invite Section */}
-      <section className="py-16 sm:py-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-12 sm:mb-16 text-gray-900">Как начать работу и пригласить команду</h2>
-          <div className="max-w-xl sm:max-w-3xl mx-auto text-left space-y-6 text-base sm:text-lg text-gray-600">
-            <ol className="list-decimal pl-6 space-y-4 sm:space-y-6">
-              <li>Откройте приложение в Telegram и авторизуйтесь.</li>
-              <li>Перейдите в раздел "Экипажи" и создайте новый экипаж (кнопка "+").</li>
-              <li>Поделитесь ссылкой приглашения: t.me/[ваш-бот]?start=crew_[ваш-slug]_join_crew</li>
-              <li>Сотрудник перейдет по ссылке и подаст заявку.</li>
-              <li>Подтвердите заявку в карточке экипажа.</li>
-              <li>Назначьте роли и предоставьте доступ к складу.</li>
+      {/* Invite */}
+      <section className="py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Как запустить</h2>
+          <div className="max-w-2xl mx-auto space-y-4 text-gray-600">
+            <ol className="list-decimal pl-4 space-y-2">
+              <li>Telegram, авторизация.</li>
+              <li>Экипажи → +.</li>
+              <li>Ссылка для команды.</li>
+              <li>Заявка.</li>
+              <li>Подтвердить.</li>
+              <li>Роли.</li>
             </ol>
-            <p className="text-center font-semibold mt-8 sm:mt-12">Экипаж - это ваш склад. Приглашайте команду для совместной работы!</p>
           </div>
         </div>
       </section>
 
-      {/* CTA Section with Form */}
-      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16 sm:py-20 px-4">
+      {/* CTA Form */}
+      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-16 px-4">
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6 sm:mb-8">Оптимизируйте склад уже сегодня</h2>
-          <p className="text-base sm:text-xl mb-8 sm:mb-10">Создайте экипаж бесплатно и начните экономить на ошибках</p>
+          <h2 className="text-3xl font-bold mb-12">Начните</h2>
+          <p className="mb-8">Бесплатно. Без обязательств.</p>
           <motion.div
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="container mx-auto max-w-2xl bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6"
+            className="max-w-2xl mx-auto bg-white/10 p-8 rounded-2xl space-y-6"
           >
             {!createdCrew ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="text-center">
                   <VibeContentRenderer content="::FaUsers::" className="text-5xl text-white mx-auto mb-4" />
-                  <h1 className="text-4xl font-bold text-white">СОЗДАТЬ СКЛАД</h1>
-                  <p className="text-gray-200 mt-2">Соберите свою команду и управляйте складом эффективно.</p>
+                  <h1 className="text-3xl font-bold text-white mb-2">Создать склад</h1>
+                  <p className="text-gray-200">Команда, управление.</p>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="crew-name" className="text-white">НАЗВАНИЕ СКЛАДА</Label>
-                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-1" />
+                    <Label htmlFor="crew-name" className="text-white">Название</Label>
+                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Main Warehouse" required />
                   </div>
                   <div>
-                    <Label htmlFor="crew-slug" className="text-white">SLUG (АДРЕС СКЛАДА)</Label>
-                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-1" />
+                    <Label htmlFor="crew-slug" className="text-white">Slug</Label>
+                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required />
                   </div>
                 </div>
-                
                 <div>
-                  <Label htmlFor="crew-desc" className="text-white">ОПИСАНИЕ / ИНСТРУКЦИИ</Label>
-                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-1" />
+                  <Label htmlFor="crew-desc" className="text-white">Описание</Label>
+                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Правила..." required />
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="crew-logo" className="text-white">URL ЛОГОТИПА</Label>
-                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+                    <Label htmlFor="crew-logo" className="text-white">Лого URL</Label>
+                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." />
                   </div>
                   <div>
-                    <Label htmlFor="crew-hq" className="text-white">КООРДИНАТЫ СКЛАДА</Label>
-                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-1" />
+                    <Label htmlFor="crew-hq" className="text-white">Координаты</Label>
+                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" />
                   </div>
                 </div>
-                
-                <Button type="submit" disabled={isSubmitting} className="w-full text-lg bg-white text-blue-600 hover:bg-gray-100">
-                  {isSubmitting ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Создание..." /> : <VibeContentRenderer content="::FaFlagCheckered:: СФОРМИРОВАТЬ СКЛАД" />}
+                <Button type="submit" disabled={isSubmitting} className="w-full bg-white text-blue-600">
+                  {isSubmitting ? 'Создание...' : 'Создать'}
                 </Button>
               </form>
             ) : (
               <div className="space-y-6 text-center">
-                <h3 className="text-2xl font-bold">Склад успешно создан!</h3>
-                <p>Теперь пригласите членов команды.</p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button onClick={handleInvite} className="p-2 text-white hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600 rounded-md transition-all duration-200 hover:bg-white/10">
-                        <VibeContentRenderer content="::FaUserPlus::" className="h-6 w-6" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Пригласить в Склад</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Link href="/paddock">
-                  <a className="bg-white text-blue-600 px-8 py-3 rounded-full font-bold hover:bg-gray-100 shadow-lg transition-all inline-block mt-4">Перейти к складу</a>
+                <h3 className="text-2xl font-bold">Готово</h3>
+                <p>Пригласите команду.</p>
+                <Button onClick={handleInvite} className="bg-white text-blue-600">Пригласить</Button>
+                <Link href={`/wb/${createdCrew.slug}`}>
+                  <Button variant="ghost" className="text-white">К складу</Button>
                 </Link>
               </div>
             )}
@@ -538,113 +463,11 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Enhanced Pricing Section */}
-      <section id="pricing" className="py-20 px-4 bg-gray-100">
+      {/* Crews */}
+      <section className="py-16 bg-gray-100 px-4">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900">
-            Выберите свой вариант автоматизации
-          </h2>
-          <p className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto">
-            От быстрого старта до полного сопровождения
-          </p>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                title: "🚀 Быстрый старт",
-                price: "20 000₽",
-                period: "единоразово",
-                description: "Настройка CRM под ваш склад",
-                bestFor: "Для начала автоматизации",
-                features: [
-                  "Установка и настройка на вашем складе",
-                  "Обучение вас работе с системой",
-                  "Интеграция с вашими маркетплейсами",
-                  "Настройка визуализации склада",
-                  "Гарантия работы 30 дней"
-                ],
-                cta: "Запустить автоматизацию",
-                popular: false
-              },
-              {
-                title: "👥 Обучение команды",
-                price: "10 000₽",
-                period: "единоразово",
-                description: "Подключение ваших сотрудников",
-                bestFor: "Когда нужна слаженная команда",
-                features: [
-                  "Обучение менеджеров и кладовщиков",
-                  "Настройка ролевого доступа",
-                  "Инструкции для персонала",
-                  "Контроль качества работы",
-                  "Чек-листы для сотрудников"
-                ],
-                cta: "Обучить команду",
-                popular: true
-              },
-              {
-                title: "🛡️ Полное сопровождение",
-                price: "10 000₽",
-                period: "в месяц",
-                description: "CRM как сервис с поддержкой",
-                bestFor: "Для растущего бизнеса",
-                features: [
-                  "Всё из пакета 'Быстрый старт'",
-                  "Ежемесячные консультации",
-                  "Обновления и новые функции",
-                  "Мониторинг работы 24/7",
-                  "Приоритетная поддержка",
-                  "Адаптация под изменения API"
-                ],
-                cta: "Получить полный контроль",
-                popular: false
-              }
-            ].map((plan, index) => (
-              <div key={index} className={`bg-white rounded-2xl p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'}`}>
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-bold">
-                      Самый популярный
-                    </span>
-                  </div>
-                )}
-                
-                <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
-                <div className="mb-4">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-gray-600 ml-2">{plan.period}</span>
-                </div>
-                <p className="text-gray-600 mb-6">{plan.description}</p>
-                
-                <div className="mb-6">
-                  <span className="text-sm text-gray-500">{plan.bestFor}</span>
-                </div>
-                
-                <ul className="space-y-4 mb-8">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start">
-                      <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                
-                <Button className={`w-full py-3 text-lg font-semibold ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-900'} text-white`}>
-                  {plan.cta}
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Existing Crews Section */}
-      <section className="py-16 sm:py-20 px-4 bg-gray-100">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-12 sm:mb-16 text-gray-900">Существующие склады</h2>
-          <Suspense fallback={<div className="text-center py-10">Загрузка...</div>}>
+          <h2 className="text-3xl font-bold text-center mb-12">Склады</h2>
+          <Suspense fallback={<div>Загрузка...</div>}>
             <CrewsListSimplified />
           </Suspense>
         </div>
@@ -652,12 +475,12 @@ export default function WarehouseLandingPage() {
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-300 py-8 px-4">
-        <div className="max-w-6xl mx-auto text-center space-y-4 sm:space-y-6">
-          <p className="text-sm sm:text-base">&copy; 2025 Управление складом. Все права защищены.</p>
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm sm:text-base">
-            <a href="/privacy" className="hover:text-white transition-colors">Политика конфиденциальности</a>
-            <a href="/terms" className="hover:text-white transition-colors">Условия использования</a>
-            <a href="/support" className="hover:text-white transition-colors">Поддержка</a>
+        <div className="max-w-6xl mx-auto text-center space-y-4">
+          <p>&copy; 2025. Все права.</p>
+          <div className="flex justify-center gap-4">
+            <a href="/privacy">Конфиденциальность</a>
+            <a href="/terms">Условия</a>
+            <a href="/support">Поддержка</a>
           </div>
         </div>
       </footer>
