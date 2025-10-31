@@ -538,6 +538,108 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
+      {/* Enhanced Pricing Section */}
+      <section id="pricing" className="py-20 px-4 bg-gray-100">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900">
+            Выберите свой вариант автоматизации
+          </h2>
+          <p className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto">
+            От быстрого старта до полного сопровождения
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {[
+              {
+                title: "🚀 Быстрый старт",
+                price: "20 000₽",
+                period: "единоразово",
+                description: "Настройка CRM под ваш склад",
+                bestFor: "Для начала автоматизации",
+                features: [
+                  "Установка и настройка на вашем складе",
+                  "Обучение вас работе с системой",
+                  "Интеграция с вашими маркетплейсами",
+                  "Настройка визуализации склада",
+                  "Гарантия работы 30 дней"
+                ],
+                cta: "Запустить автоматизацию",
+                popular: false
+              },
+              {
+                title: "👥 Обучение команды",
+                price: "10 000₽",
+                period: "единоразово",
+                description: "Подключение ваших сотрудников",
+                bestFor: "Когда нужна слаженная команда",
+                features: [
+                  "Обучение менеджеров и кладовщиков",
+                  "Настройка ролевого доступа",
+                  "Инструкции для персонала",
+                  "Контроль качества работы",
+                  "Чек-листы для сотрудников"
+                ],
+                cta: "Обучить команду",
+                popular: true
+              },
+              {
+                title: "🛡️ Полное сопровождение",
+                price: "10 000₽",
+                period: "в месяц",
+                description: "CRM как сервис с поддержкой",
+                bestFor: "Для растущего бизнеса",
+                features: [
+                  "Всё из пакета 'Быстрый старт'",
+                  "Ежемесячные консультации",
+                  "Обновления и новые функции",
+                  "Мониторинг работы 24/7",
+                  "Приоритетная поддержка",
+                  "Адаптация под изменения API"
+                ],
+                cta: "Получить полный контроль",
+                popular: false
+              }
+            ].map((plan, index) => (
+              <div key={index} className={`bg-white rounded-2xl p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'}`}>
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-bold">
+                      Самый популярный
+                    </span>
+                  </div>
+                )}
+                
+                <h3 className="text-2xl font-bold mb-2">{plan.title}</h3>
+                <div className="mb-4">
+                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-gray-600 ml-2">{plan.period}</span>
+                </div>
+                <p className="text-gray-600 mb-6">{plan.description}</p>
+                
+                <div className="mb-6">
+                  <span className="text-sm text-gray-500">{plan.bestFor}</span>
+                </div>
+                
+                <ul className="space-y-4 mb-8">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Button className={`w-full py-3 text-lg font-semibold ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 hover:bg-gray-900'} text-white`}>
+                  {plan.cta}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Existing Crews Section */}
       <section className="py-16 sm:py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
