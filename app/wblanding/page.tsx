@@ -214,13 +214,20 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* For Whom Section */}
+      {/* Benefits Section */}
       <section className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-16">Для кого</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white p-8 rounded-xl">
-              <h3 className="text-xl font-bold mb-4">Владельцу</h3>
+              <Image 
+                src="/placeholder.svg"
+                alt="Владелец"
+                width={300}
+                height={200}
+                className="rounded-lg mb-4 mx-auto"
+              />
+              <h3 className="text-xl font-bold mb-4 text-center">Владельцу</h3>
               <ul className="space-y-2 text-gray-600">
                 <li>Много магазинов</li>
                 <li>Меньше потерь</li>
@@ -230,7 +237,14 @@ export default function WarehouseLandingPage() {
               </ul>
             </div>
             <div className="bg-white p-8 rounded-xl">
-              <h3 className="text-xl font-bold mb-4">Персоналу</h3>
+              <Image 
+                src="/placeholder.svg"
+                alt="Персонал"
+                width={300}
+                height={200}
+                className="rounded-lg mb-4 mx-auto"
+              />
+              <h3 className="text-xl font-bold mb-4 text-center">Персоналу</h3>
               <ul className="space-y-2 text-gray-600">
                 <li>Telegram UI</li>
                 <li>Быстрые оп</li>
@@ -239,7 +253,14 @@ export default function WarehouseLandingPage() {
               </ul>
             </div>
             <div className="bg-white p-8 rounded-xl">
-              <h3 className="text-xl font-bold mb-4">Админу</h3>
+              <Image 
+                src="/placeholder.svg"
+                alt="Админ"
+                width={300}
+                height={200}
+                className="rounded-lg mb-4 mx-auto"
+              />
+              <h3 className="text-xl font-bold mb-4 text-center">Админу</h3>
               <ul className="space-y-2 text-gray-600">
                 <li>Много складов</li>
                 <li>Доступы</li>
