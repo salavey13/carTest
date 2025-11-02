@@ -3,13 +3,13 @@
 import React, { useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import PartnerForm from '../components/PartnerForm';
 import { useAppContext } from '@/contexts/AppContext';
+import { addToCart, removeFromCart, checkoutCart } from '../actions';
 import '../styles.css';
 
-const ReferalPage: React.FC = () => {
-  const { dbUser } = useAppContext();
-  const isPartner = dbUser?.metadata?.is_referral_partner || false;
+const CartPage: React.FC = () => {
+  const { dbUser, refreshDbUser, tg } = useAppContext();
+  const cart = dbUser?.metadata?.cart || [];
 
     useEffect(() => {
     // Initialize Slick slider for stories and description
@@ -140,66 +140,50 @@ const ReferalPage: React.FC = () => {
     }
   }, []);
 
+  const handleRemove = async (productId: string) => {
+    if (!dbUser?.user_id) return;
+    await removeFromCart(dbUser.user_id, productId);
+    await refreshDbUser();
+  };
+
+  const handleCheckout = async () => {
+    if (!dbUser?.user_id || !tg?.initDataUnsafe?.user?.id) return;
+    const result = await checkoutCart(dbUser.user_id, tg.initDataUnsafe.user.id.toString());
+    if (result.success) {
+      // Show success message
+    } else {
+      // Show error
+    }
+  };
+
+  const total = cart.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+
   return (
     <div>
       <Header />
       <div className="messages"></div>
       <div className="hero">
-        <span className="title fs__xxl fw__bd gradient" data-anim="lux-up" data-delay="0.1">Реферальная программа - BIO 3.0</span>
-        <span className="subtitle fs__md fw__rg opc opc--75" data-anim="lux-up" data-delay="0.2">Участвуйте в реферальной программе BIO 3.0! Приглашайте друзей и получайте бонусы и скидки на продукцию. Узнайте условия и начните зарабатывать.</span>
+        <span className="title fs__xxl fw__bd gradient" data-anim="lux-up" data-delay="0.1">Корзина - BIO 3.0</span>
+        <span className="subtitle fs__md fw__rg opc opc--75" data-anim="lux-up" data-delay="0.2">Ваша корзина в BIO 3.0. Проверьте список товаров и оформите заказ.</span>
       </div>
-      <div className="grid grid--referral_01" data-stagger="up" data-stagger-delay="0.15">
-        <div className="benefit benefit__center" data-anim="fade" data-delay="0.1">
-          <div className="title fs__lg fw__bd">Как это работает</div>
-          <span className="description">Пригласите друга по реферальной ссылке, он получит скидку, вы - бонус.</span>
-        </div>
-        <div className="benefit benefit__horizontal" data-anim="fade" data-delay="0.2">
-          <div className="title fs__lg fw__bd">Ваша реферальная ссылка</div>
-          <span className="description">https://bio30.ru/referal/yourcode</span>
-        </div>
-        <div className="benefit benefit__horizontal" data-anim="fade" data-delay="0.3">
-          <div className="title fs__lg fw__bd">Статистика</div>
-          <span className="description">Количество приглашенных: 5, Заработано: 500 руб.</span>
-        </div>
+      <div className="cart-items" data-stagger="up" data-stagger-delay="0.15">
+        {cart.map((item: any, index: number) => (
+          <div key={item.productId} className="cart-item row gp gp--md" data-anim="fade" data-delay={0.1 * (index + 1)}>
+            <span className="name fs__md fw__bd">{item.name}</span>
+            <span className="quantity">x{item.quantity}</span>
+            <span className="price">{item.price * item.quantity} руб.</span>
+            <button onClick={() => handleRemove(item.productId)} className="btn btn--danger">Удалить</button>
+          </div>
+        ))}
+        {cart.length === 0 && <span className="empty fs__md fw__rg">Корзина пуста</span>}
       </div>
-      <div className="grid grid--referral_02" data-stagger="up" data-stagger-delay="0.15">
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.1">
-          <div className="title fs__lg fw__bd">Шаг 1: Регистрация</div>
-          <span className="description">Зарегистрируйтесь на сайте.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.2">
-          <div className="title fs__lg fw__bd">Шаг 2: Получите ссылку</div>
-          <span className="description">Получите уникальную реферальную ссылку.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.3">
-          <div className="title fs__lg fw__bd">Шаг 3: Пригласите друзей</div>
-          <span className="description">Поделитесь ссылкой с друзьями.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.4">
-          <div className="title fs__lg fw__bd">Шаг 4: Получите бонусы</div>
-          <span className="description">Получите бонусы за покупки друзей.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.5">
-          <div className="title fs__lg fw__bd">FAQ</div>
-          <span className="description">Часто задаваемые вопросы о программе.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.6">
-          <div className="title fs__lg fw__bd">Контакты поддержки</div>
-          <span className="description">support@bio30.ru</span>
-        </div>
+      <div className="total row ctr gp gp--md">
+        <span className="title fs__lg fw__bd">Итого: {total} руб.</span>
+        <button onClick={handleCheckout} className="btn btn--primary" disabled={cart.length === 0}>Оформить заказ</button>
       </div>
-      {isPartner ? (
-        <div className="dashboard">
-          <span className="title fs__lg fw__bd">Партнерский дашборд</span>
-          <span className="description">Ваша статистика, рефералы и т.д.</span>
-          {/* Add dashboard content */}
-        </div>
-      ) : (
-        <PartnerForm />
-      )}
       <Footer />
     </div>
   );
 };
 
-export default ReferalPage;
+export default CartPage;

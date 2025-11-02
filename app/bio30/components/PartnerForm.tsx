@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { updateUserSettings } from '@/app/actions';
+import { becomeReferralPartner } from '../actions';
 import '../styles.css';
 
 const PartnerForm: React.FC = () => {
@@ -16,12 +16,23 @@ const PartnerForm: React.FC = () => {
     if (!dbUser?.user_id) return;
 
     try {
-      const result = await updateUserSettings(dbUser.user_id, { is_referral_partner: true, partner_email: email });
-      if (result.success) {
-        await refreshDbUser();
-        // Show success message or redirect
+      // Send to /api/send-contact
+      const response = await fetch('/api/send-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, fromTelegram: true, telegramUser: dbUser.user_id }),
+      });
+
+      if (response.ok) {
+        const partnerResult = await becomeReferralPartner(dbUser.user_id, email);
+        if (partnerResult.success) {
+          await refreshDbUser();
+          // Success
+        } else {
+          // Error
+        }
       } else {
-        // Handle error
+        // Error
       }
     } catch (error) {
       // Handle error
