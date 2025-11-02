@@ -4,9 +4,13 @@ import React, { useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import PartnerForm from '../components/PartnerForm';
+import { useAppContext } from '@/contexts/AppContext';
 import '../styles.css';
 
 const ReferalPage: React.FC = () => {
+  const { dbUser } = useAppContext();
+  const isPartner = dbUser?.metadata?.is_referral_partner || false;
+
   useEffect(() => {
     // Initialize Slick slider for stories and description
     if (typeof window !== 'undefined') {
@@ -184,7 +188,15 @@ const ReferalPage: React.FC = () => {
           <span className="description">support@bio30.ru</span>
         </div>
       </div>
-      <PartnerForm />
+      {isPartner ? (
+        <div className="dashboard">
+          <span className="title fs__lg fw__bd">Партнерский дашборд</span>
+          <span className="description">Ваша статистика, рефералы и т.д.</span>
+          {/* Add dashboard content */}
+        </div>
+      ) : (
+        <PartnerForm />
+      )}
       <Footer />
     </div>
   );
