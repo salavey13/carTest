@@ -184,6 +184,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   
   useEffect(() => {
     setShowHeaderAndFooter(!(pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" || pathname?.startsWith("/wb") || 
+pathname?.startsWith("/bio30") ||
 pathname === "/csv-compare" || pathname === "/streamer" || pathname === "/blogger" || pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"));
   }, [pathname]);
 
