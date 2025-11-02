@@ -7,8 +7,7 @@ import '../styles.css';
 
 const CategoriesPage: React.FC = () => {
   useEffect(() => {
-    // Similar useEffect as in main page for animations and messages
-    // Initialize Slick if needed
+    // Similar useEffect as in main page for animations, slick, messages
     if (typeof window !== 'undefined') {
       const $ = require('jquery');
       require('slick-carousel');
@@ -27,7 +26,7 @@ const CategoriesPage: React.FC = () => {
       });
     }
 
-    // initAnimations function here, same as above
+    // initAnimations function here, same as in page.tsx
 
     const msgs = document.querySelector('.messages');
     if (msgs && msgs.querySelectorAll('.alert').length > 0) {
@@ -42,20 +41,28 @@ const CategoriesPage: React.FC = () => {
       <div className="messages"></div>
       <div className="hero">
         <span className="title fs__xxl fw__bd gradient" data-anim="lux-up" data-delay="0.1">Продукты - BIO 3.0</span>
-        <span className="subtitle fs__md fw__rg opc opc--75" data-anim="lux-up" data-delay="0.2">Каталог продуктов BIO 3.0. Широкий выбор БАДов для здоровья и красоты.</span>
+        <span className="subtitle fs__md fw__rg opc opc--75" data-anim="lux-up" data-delay="0.2">Каталог продуктов BIO 3.0. Широкий выбор БАДов для здоровья и красоты. Узнайте больше и выберите подходящие вам биологически активные добавки.</span>
       </div>
       <div className="grid grid--categories" data-stagger="up" data-stagger-delay="0.15">
-        {/* Category cards from categories.txt */}
-        <div className="card card__horizontal">
+        <div className="card card__horizontal" data-anim="fade" data-delay="0.1">
           <div className="aside">
-            <span className="title fs__lg fw__bd">Category Name</span>
-            <span className="description">Category Description</span>
+            <span className="title fs__lg fw__bd">Категория 1</span>
+            <span className="description">Описание категории 1, биопродукты для здоровья.</span>
           </div>
           <div className="bside">
-            <img src="/front/static/uploads/categories/image.webp" alt="Category" className="image__web" />
+            <img src="/front/static/uploads/categories/cat1.webp" alt="Категория 1" className="image__web" />
           </div>
         </div>
-        {/* Repeat for each category */}
+        <div className="card card__horizontal" data-anim="fade" data-delay="0.2">
+          <div className="aside">
+            <span className="title fs__lg fw__bd">Категория 2</span>
+            <span className="description">Описание категории 2, витамины и минералы.</span>
+          </div>
+          <div className="bside">
+            <img src="/front/static/uploads/categories/cat2.webp" alt="Категория 2" className="image__web" />
+          </div>
+        </div>
+        {/* Add more category cards based on categories.txt structure */}
       </div>
       <Footer />
     </div>

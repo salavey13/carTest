@@ -146,15 +146,42 @@ const HomePage: React.FC = () => {
         </div>
       </div>
       <div className="stories">
-        {/* Placeholder for stories slider content */}
+        {/* Add story items, e.g., <div className="story">Story 1</div> */}
       </div>
       <div className="grid grid--benefit" data-stagger="up" data-stagger-delay="0.15">
-        <div className="benefit benefit__default">
+        <div className="benefit benefit__default" data-anim="fade" data-delay="0.1">
           <img src="https://bio30.ru/static/uploads/benefits/mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp" alt="Benefit 1" className="image__mobile" />
           <img src="https://bio30.ru/static/uploads/benefits/6a317041578644d1b283abeaf781bf36.webp" alt="Benefit 2" className="image__web" />
-          {/* Add benefit content */}
+          <div className="title fs__lg fw__bd">Benefit Title 1</div>
+          <span className="description">Description 1</span>
         </div>
-        {/* Add more benefits as per HTML */}
+        <div className="benefit benefit__default" data-anim="fade" data-delay="0.2">
+          <img src="https://bio30.ru/static/uploads/benefits/mobile_image2.webp" alt="Benefit 2" className="image__mobile" />
+          <img src="https://bio30.ru/static/uploads/benefits/image2.webp" alt="Benefit 2" className="image__web" />
+          <div className="title fs__lg fw__bd">Benefit Title 2</div>
+          <span className="description">Description 2</span>
+        </div>
+        {/* Add third benefit if present */}
+      </div>
+      <div className="categories">
+        <span className="title fs__xl fw__bd" data-anim="lux-up" data-delay="0.1">Категории</span>
+        <div className="grid grid--categories" data-stagger="up" data-stagger-delay="0.15">
+          <div className="card card__horizontal">
+            <div className="aside">
+              <span className="title fs__lg fw__bd">Категория 1</span>
+              <span className="description">Описание категории 1</span>
+            </div>
+            <div className="bside">
+              <img src="/front/static/uploads/categories/cat1.webp" alt="Категория 1" className="image__web" />
+            </div>
+          </div>
+          {/* Add more categories */}
+        </div>
+      </div>
+      {/* Add FAQ section if present in main.txt */}
+      <div className="faq">
+        <span className="title fs__xl fw__bd" data-anim="lux-up" data-delay="0.1">Часто задаваемые вопросы</span>
+        {/* Add FAQ items */}
       </div>
       <Footer />
     </div>
