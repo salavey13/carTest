@@ -9,9 +9,15 @@ const CategoriesPage: React.FC = () => {
   return (
     <div>
       <Header />
-      {/* Extract content from categories.txt, e.g., grid--categories */}
       <div className="grid grid--categories">
-        {/* Category cards */}
+        <div className="card card__default">
+          <div className="aside">
+            <div className="title fs__lg fw__bd">Категория 1</div>
+            {/* Add category details */}
+          </div>
+          {/* Bside with image or content */}
+        </div>
+        {/* More categories */}
       </div>
       <Footer />
     </div>

@@ -9,11 +9,13 @@ const DeliveryPage: React.FC = () => {
   return (
     <div>
       <Header />
-      {/* Infer content similar to referal or categories, perhaps grid--delivery from styles */}
       <div className="grid grid--delivery">
-        {/* Delivery info sections */}
         <h1>Доставка</h1>
-        {/* Add placeholders or extract if available */}
+        <div className="benefit benefit__default">
+          <div className="title">Информация о доставке</div>
+          {/* Add delivery details from inferred or provided content */}
+        </div>
+        {/* More sections */}
       </div>
       <Footer />
     </div>

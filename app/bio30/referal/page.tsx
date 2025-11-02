@@ -10,9 +10,12 @@ const ReferalPage: React.FC = () => {
   return (
     <div>
       <Header />
-      {/* Extract content from referal.txt, including grid--referral_01, etc. */}
       <div className="grid grid--referral_01">
-        {/* Referral sections */}
+        <div className="benefit benefit__default">
+          <div className="title">Реферальная программа</div>
+          {/* Add referral info */}
+        </div>
+        {/* More sections from referal.txt */}
       </div>
       <PartnerForm />
       <Footer />
