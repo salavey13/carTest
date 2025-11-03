@@ -4,11 +4,10 @@ import React, { useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles.css';
+import { useBioAnimations } from '../hooks/useBioAnimations';
 
 const DetailsPage: React.FC = () => {
-  useEffect(() => {
-    // Similar useEffect as in other pages for animations, slick, messages
-  }, []);
+  useBioAnimations();
 
   return (
     <div>
