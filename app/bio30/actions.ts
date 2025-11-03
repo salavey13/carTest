@@ -13,6 +13,11 @@ type CartItem = {
   price: number;
 };
 
+type Referral = {
+  referredUserId: string;
+  earned: number;
+};
+
 // Hardcoded products for now (can load from supabase 'cars' later)
 const PRODUCTS = [
   { id: "1", name: "Lion's Mane", price: 1500 },
@@ -117,14 +122,52 @@ export async function checkoutCart(userId: string, chatId: string) {
 }
 
 /**
- * Become referral partner
+ * Become referral partner and initialize referrals
  */
 export async function becomeReferralPartner(userId: string, email: string) {
   try {
-    const result = await updateUserSettings(userId, { is_referral_partner: true, partner_email: email });
+    const result = await updateUserSettings(userId, { is_referral_partner: true, partner_email: email, referrals: [] });
     return { success: result.success, error: result.error };
   } catch (e) {
     logger.error(`[becomeReferralPartner] Error for user ${userId}:`, e);
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Get referral stats from user metadata
+ */
+export async function getReferralStats(userId: string): Promise<{ success: boolean; data?: { referralsCount: number; totalEarned: number }; error?: string }> {
+  try {
+    const user = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
+    if (!user.data) throw new Error("User not found");
+
+    const referrals: Referral[] = user.data.metadata?.referrals || [];
+    const referralsCount = referrals.length;
+    const totalEarned = referrals.reduce((sum, ref) => sum + ref.earned, 0);
+
+    return { success: true, data: { referralsCount, totalEarned } };
+  } catch (e) {
+    logger.error(`[getReferralStats] Error for user ${userId}:`, e);
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+/**
+ * Add referral (when a referred user makes a purchase)
+ */
+export async function addReferral(referrerId: string, referredUserId: string, earned: number) {
+  try {
+    const user = await supabaseAdmin.from("users").select("metadata").eq("user_id", referrerId).single();
+    if (!user.data) throw new Error("Referrer not found");
+
+    const currentReferrals: Referral[] = user.data.metadata?.referrals || [];
+    const updatedReferrals = [...currentReferrals, { referredUserId, earned }];
+
+    const result = await updateUserSettings(referrerId, { referrals: updatedReferrals });
+    return { success: result.success, error: result.error };
+  } catch (e) {
+    logger.error(`[addReferral] Error for referrer ${referrerId}:`, e);
     return { success: false, error: (e as Error).message };
   }
 }
