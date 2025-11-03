@@ -177,8 +177,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
             referrerCode: paramToProcess
           });
           if (result.success) {
-            await refreshDbUser();
-            logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
+            
+   logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
           } else {
             logger.error(`[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`);
           }
