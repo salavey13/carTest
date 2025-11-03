@@ -36,13 +36,12 @@ const CordycepsSinensisPage: React.FC = () => {
         </div>
         <div className="benefit benefit__default" data-anim="fade" data-delay="0.3">
           <div className="title fs__lg fw__bd">Улучшение выносливости</div>
-          <span className="description">Повышает энергию и выносливость.</span>
+          <span className="description">Повышает выносливость и энергию.</span>
         </div>
         <div className="benefit benefit__default" data-anim="fade" data-delay="0.4">
           <div className="title fs__lg fw__bd">Защита от стресса</div>
           <span className="description">Помогает справляться со стрессом.</span>
         </div>
-        {/* Add more benefits from document */}
       </div>
       <button onClick={handleAddToCart} className="btn btn--primary">Добавить в корзину</button>
       <Footer />
