@@ -32,17 +32,16 @@ const SpirulinaChlorellaPage: React.FC = () => {
         </div>
         <div className="benefit benefit__default" data-anim="fade" data-delay="0.2">
           <div className="title fs__lg fw__bd">Укрепление иммунитета</div>
-          <span className="description">Повышает иммунитет.</span>
+          <span className="description">Укрепляет иммунную систему.</span>
         </div>
         <div className="benefit benefit__default" data-anim="fade" data-delay="0.3">
-          <div className="title fs__lg fw__bd">Детоксикация</div>
-          <span className="description">Очищает организм.</span>
+          <div className="title fs__lg fw__bd">Детоксикация организма</div>
+          <span className="description">Очищает организм от токсинов.</span>
         </div>
         <div className="benefit benefit__default" data-anim="fade" data-delay="0.4">
           <div className="title fs__lg fw__bd">Улучшение пищеварения</div>
           <span className="description">Поддерживает здоровое пищеварение.</span>
         </div>
-        {/* Add more benefits */}
       </div>
       <button onClick={handleAddToCart} className="btn btn--primary">Добавить в корзину</button>
       <Footer />
