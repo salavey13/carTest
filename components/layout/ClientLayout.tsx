@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -29,6 +28,7 @@ import { useTelegramBackButton } from '@/hooks/useTelegramBackButton';
 import Image from "next/image";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
+import { setReferrer } from "@/app/bio30/actions"; // Import bio30 setReferrer
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
@@ -120,7 +120,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { startParamPayload, isLoading: isAppLoading, isAuthenticating, clearStartParam } = useAppContext();
+  const { startParamPayload, dbUser, refreshDbUser, isLoading: isAppLoading, isAuthenticating } = useAppContext();
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);
 
@@ -167,6 +167,24 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       } else if (paramToProcess.startsWith('viz_')) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
+      } else if (paramToProcess.startsWith('ref_') && parts.length === 2 && pathname.startsWith('/bio30')) {
+        // Bio30 referral handling
+        const referrerId = parts[1];
+        if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
+          const result = await setReferrer({
+            userId: dbUser.user_id,
+            referrerId,
+            referrerCode: paramToProcess
+          });
+          if (result.success) {
+            await refreshDbUser();
+            logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
+          } else {
+            logger.error(`[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`);
+          }
+        }
+        // No redirect, stay on bio30
+        targetPath = undefined;
       } else {
         targetPath = `/${paramToProcess}`;
       }
@@ -177,7 +195,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         clearStartParam?.(); 
       }
     }
-  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam]);
+  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam, dbUser, refreshDbUser]);
 
   const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals", "/vipbikerental" ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)) || pathname === "/";

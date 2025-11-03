@@ -69,7 +69,7 @@ export async function removeFromCart(userId: string, productId: string) {
     if (!user.data) throw new Error("User not found");
 
     const currentCart: CartItem[] = user.data.metadata?.cart || [];
-    let updatedCart = currentCart.filter(item => item.productId !== productId);
+    const updatedCart = currentCart.filter(item => item.productId !== productId);
 
     const result = await updateUserSettings(userId, { cart: updatedCart });
     return { success: result.success, error: result.error };
@@ -151,20 +151,30 @@ export async function becomeReferralPartner(userId: string, email: string) {
  */
 export async function setReferrer({ userId, referrerId, referrerCode }: SetReferrerParams) {
   try {
-    const user = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
+    const user = await supabaseAdmin.from("users").select("metadata, created_at").eq("user_id", userId).single();
     if (!user.data) throw new Error("User not found");
 
     const metadata = user.data.metadata || {};
-    // Security: Don't overwrite if already set, prevent self-ref, ensure referrer is partner
+    // Security: Don't overwrite if already set
     if (metadata.referrer_id) {
-      throw new Error("Referrer already set");
+      return { success: false, error: "Referrer already set" };
     }
+    // Not self-ref
     if (referrerId === userId) {
-      throw new Error("Cannot refer self");
+      return { success: false, error: "Cannot refer self" };
     }
+    // Referrer exists and is partner
     const referrer = await supabaseAdmin.from("users").select("metadata").eq("user_id", referrerId).single();
     if (!referrer.data || !referrer.data.metadata?.is_referral_partner) {
-      throw new Error("Invalid referrer (not a partner)");
+      return { success: false, error: "Invalid referrer (not a partner)" };
+    }
+    // User creation within 1 day
+    const createdAt = new Date(user.data.created_at);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - createdAt.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays > 1) {
+      return { success: false, error: "Referrer can only be set within 1 day of account creation" };
     }
 
     const result = await updateUserSettings(userId, { referrer_id: referrerId, referrer_code: referrerCode });
@@ -203,7 +213,7 @@ export async function addReferral(referrerId: string, referredUserId: string, ea
     if (!user.data) throw new Error("Referrer not found");
 
     const currentReferrals: Referral[] = user.data.metadata?.referrals || [];
-    let updatedReferrals = [...currentReferrals, { referredUserId, earned }];
+    const updatedReferrals = [...currentReferrals, { referredUserId, earned }];
 
     const result = await updateUserSettings(referrerId, { referrals: updatedReferrals });
     return { success: result.success, error: result.error };
