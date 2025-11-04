@@ -120,7 +120,14 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { startParamPayload, dbUser, refreshDbUser, isLoading: isAppLoading, isAuthenticating } = useAppContext();
+  const { 
+    startParamPayload, 
+    dbUser, 
+    refreshDbUser, 
+    isLoading: isAppLoading, 
+    isAuthenticating, 
+    clearStartParam 
+  } = useAppContext();
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);
 
@@ -130,7 +137,28 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
 
   useEffect(() => {
-     const paramToProcess = startParamPayload || searchParams.get('tgWebAppStartParam');
+    const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
+      if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
+        try {
+          const result = await setReferrer({
+            userId: dbUser.user_id,
+            referrerId,
+            referrerCode: paramToProcess
+          });
+          if (result.success) {
+            logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
+            // Refresh user data to get updated metadata
+            await refreshDbUser();
+          } else {
+            logger.error(`[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`);
+          }
+        } catch (error) {
+          logger.error(`[ClientLayout] Error setting referrer:`, error);
+        }
+      }
+    };
+
+    const paramToProcess = startParamPayload || searchParams.get('tgWebAppStartParam');
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
@@ -168,21 +196,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       } else if (paramToProcess.startsWith('ref_') && parts.length === 2 && pathname.startsWith('/bio30')) {
-        // Bio30 referral handling
+        // Bio30 referral handling - extract and process asynchronously
         const referrerId = parts[1];
-        if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
-          const result = await setReferrer({
-            userId: dbUser.user_id,
-            referrerId,
-            referrerCode: paramToProcess
-          });
-          if (result.success) {
-            
-   logger.info(`[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`);
-          } else {
-            logger.error(`[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`);
-          }
-        }
+        // Process referral without blocking the rest of the logic
+        handleBio30Referral(referrerId, paramToProcess).catch(error => {
+          logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
+        });
         // No redirect, stay on bio30
         targetPath = undefined;
       } else {
@@ -193,9 +212,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         logger.info(`[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting.`);
         router.replace(targetPath);
         clearStartParam?.(); 
+      } else {
+        // Clear start param even if no redirect happens (like in bio30 referral case)
+        clearStartParam?.();
       }
     }
-  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, clearStartParam, dbUser, refreshDbUser]);
+  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, dbUser, refreshDbUser, clearStartParam]);
 
   const pathsToShowBottomNavForStartsWith = [ "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals", "/vipbikerental" ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some(p => pathname?.startsWith(p)) || pathname === "/";
