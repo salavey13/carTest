@@ -1,0 +1,3 @@
+// Update /app/bio30/page.tsx to use the hook
+// Add import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
+// In HomePage: useBio30ThemeFix();

@@ -1,15 +1,14 @@
-// /app/bio30/categories/cordyceps-sinensis/page.tsx
 "use client";
 
 import React from 'react';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
-import { useBioAnimations } from '../../hooks/useBioAnimations';
+import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
 import { addToCart } from '../../actions';
 import { useAppContext } from '@/contexts/AppContext';
 
 const CordycepsSinensisPage: React.FC = () => {
-  useBioAnimations();
+  useBio30ThemeFix();
   const { dbUser, refreshDbUser } = useAppContext();
 
   const handleAddToCart = async () => {
