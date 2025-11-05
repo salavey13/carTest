@@ -116,6 +116,37 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
 "wb": "/wb"
 };
 
+function useBio30ExternalCSS() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!pathname.startsWith("/bio30")) return;
+
+    const BASE = "https://bio30.ru/front/static/css/";
+    const VERSION = "?v=05.07.2025-1";
+    const files = [
+      "grid.css","style__dark.css","cards.css","global.css","icons.css","help.css","fonts.css","hero.css","story.css","glass.css",
+      "header.css","welcome.css","categories.css","cart.css","footer.css","faq.css","cards__cart.css","grid__cards.css","grid__benefit.css",
+      "default.css","grid__delivery.css","grid__referral_01.css","grid__referral_02.css","grid__product.css","grid__product2.css",
+      "grid__categories.css","comment.css","fluids.css"
+    ];
+
+    const links: HTMLLinkElement[] = [];
+    files.forEach(f => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `${BASE}${f}${VERSION}`;
+      link.dataset.source = "bio30-external";
+      document.head.appendChild(link);
+      links.push(link);
+    });
+
+    return () => {
+      links.forEach(l => l.remove());
+    };
+  }, [pathname]);
+}
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -135,6 +166,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
+  
+  useBio30ExternalCSS();
 
   useEffect(() => {
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
