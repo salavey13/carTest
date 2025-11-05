@@ -225,7 +225,92 @@ const HomePage: React.FC = () => {
           </Link>
         </motion.div>
       </section>
-
+      <section className="py-16 px-6">
+        <motion.div
+          ref={advantages.ref}
+          initial="hidden"
+          animate={advantages.controls}
+          variants={advantages.container}
+          className="grid grid--benefit"
+        >
+          {[
+            {
+              title: "Качество, подтвержденное стандартами",
+              desc: "Вы получаете продукт, соответствующий строгим стандартам качества.",
+              img: "https://bio30.ru/static/uploads/benefits/552036943c7f4338b3eed6a3f52cce86.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_93ffddcd82a8440eb272aa165c2a6f95.webp",
+              bg: "#FF0004",
+              text: "#ffffff",
+              class: "benefit benefit__center",
+            },
+            {
+              title: "Доверие в 7+ странах мира",
+              desc: "Наш продукт популярен и пользуется доверием во многих странах.",
+              img: "https://bio30.ru/static/uploads/benefits/fd241b092da14997a9cc7e418c084b60.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_f1b07f689fd04ff882e0f032599e2731.webp",
+              bg: "#000000",
+              text: "#ffffff",
+              class: "benefit benefit__center",
+            },
+            {
+              title: "Поддержка 24/7 для вас",
+              desc: "Наша команда всегда готова ответить на Ваши вопросы.",
+              img: "https://bio30.ru/static/uploads/benefits/873b037261134405857b6ca444c7553a.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_85476bc252d14b1eb3e79633b0a7ee56.webp",
+              bg: "#B2FF00",
+              text: "#000000",
+              class: "benefit benefit__default",
+            },
+            {
+              title: "Решение для всех и каждого",
+              desc: "Продукт подходит для натуральной поддержки Вашего здоровья.",
+              img: "https://bio30.ru/static/uploads/benefits/6a317041578644d1b283abeaf781bf36.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_ee67808825ec4740890288c6ebd4b6fb.webp",
+              bg: "#FFE609",
+              text: "#000000",
+              class: "benefit benefit__default",
+            },
+            {
+              title: "Щедрые выплаты партнерам",
+              desc: "Мы предлагаем Вам выгодные условия партнерской программы.",
+              img: "https://bio30.ru/static/uploads/benefits/4857f03567274775af998c74f7d7dd0b.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_194bc082ad764197a07368ab8db613ac.webp",
+              bg: "#000000",
+              text: "#ffffff",
+              class: "benefit benefit__center",
+            },
+            {
+              title: "Сила только натуральных компонентов",
+              desc: "Вы получаете продукты только из чистых натуральных ингредиентов.",
+              img: "https://bio30.ru/static/uploads/benefits/0fdfd54db54c48a48826920cad697f08.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp",
+              bg: "#ffffff",
+              text: "#000000",
+              class: "benefit benefit__center",
+            },
+          ].map((a, i) => (
+            <motion.div
+              key={i}
+              variants={advantages.child}
+              className={a.class}
+              style={{ backgroundColor: a.bg, color: a.text }}
+            >
+              <div className="aside">
+                <div className="col pd__xl gp gp--md">
+                  <div className="col gp gp--sm">
+                    <h2 className="title fs__md fw__bd">{a.title}</h2>
+                    <h3 className="subtitle fs__md fw__md opc opc--50">{a.desc}</h3>
+                  </div>
+                </div>
+              </div>
+              <div className="bside">
+                <img src={a.img} alt={a.title} className="image__web" />
+                <img src={a.mobileImg} alt={a.title} className="image__mobile" />
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
       <section className="py-16 px-6 bg-muted/30 text-center">
         <motion.h2
           ref={partner.ref}
