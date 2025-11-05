@@ -51,7 +51,7 @@ const HomePage: React.FC = () => {
       price: 2500,
       img: "https://bio30.ru/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/8ccf8585e93949cea7c79b9a9410489f.webp",
-      link: "/product/cordyceps-sinensis",
+      link: "/categories/cordyceps-sinensis",
       bg: "#ffe609",
       text: "#000000",
       class: "card panel-bg-#ffe609 panel-text-#000000 card__default card__default--product",
@@ -62,7 +62,7 @@ const HomePage: React.FC = () => {
       price: 2500,
       img: "https://bio30.ru/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/f21a69b0e62f4dee8b9f231985024282.webp",
-      link: "/product/spirulina-chlorella",
+      link: "/categories/spirulina-chlorella",
       bg: "#a3ea00",
       text: "#000000",
       class: "card panel-bg-#a3ea00 panel-text-#000000 card__horizontal card__horizontal--product",
@@ -73,7 +73,7 @@ const HomePage: React.FC = () => {
       price: 100,
       img: "https://bio30.ru/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/d99d3385cd3f42d6aa1389adb7a719ce.webp",
-      link: "/product/lion-s-mane",
+      link: "/categories/lion-s-mane",
       bg: "#ffffff",
       text: "#000000",
       class: "card panel-bg-#ffffff panel-text-#000000 card__vertical card__vertical--product",
@@ -84,7 +84,7 @@ const HomePage: React.FC = () => {
       price: 1600,
       img: "https://bio30.ru/static/uploads/products/1552689351894f229843f51efdb813fc.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/74faf744a03e4f1c83e24ace9ac7582b.webp",
-      link: "/product/magnesium-pyridoxine",
+      link: "/categories/magnesium-pyridoxine",
       bg: "#02044A",
       text: "#ffffff",
       class: "card panel-bg-#02044A panel-text-#ffffff card__horizontal card__horizontal--product",
@@ -160,7 +160,6 @@ const HomePage: React.FC = () => {
           </div>
         </SlickSlider>
       </section>
-
       <section className="py-16 px-6">
         <motion.div
           ref={advantages.ref}
@@ -247,7 +246,6 @@ const HomePage: React.FC = () => {
           ))}
         </motion.div>
       </section>
-
       <section className="py-16 px-6 bg-muted/30 text-center">
         <motion.h2
           ref={partner.ref}
@@ -261,10 +259,8 @@ const HomePage: React.FC = () => {
         <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
         <PartnerForm />
       </section>
-
       <Footer />
     </div>
   );
 };
-
 export default HomePage;

@@ -76,22 +76,87 @@ const CategoriesPage: React.FC = () => {
 
       <div className="categories__section flex flex-col md:flex-row gap-6 px-6">
         <aside className="aside--categories w-full md:w-1/4">
-          <h3 className="font-bold mb-4">Цена</h3>
-          <div id="price-slider" className="price-slider mb-6"></div>
-          <h3 className="font-bold mb-4">Категория</h3>
-          <div className="space-y-2">
-            <label><input type="checkbox" /> Вегетарианцы</label>
-            <label><input type="checkbox" /> Для женщин</label>
-            <label><input type="checkbox" /> Для мужчин</label>
-            <label><input type="checkbox" /> Комплекс</label>
-            <label><input type="checkbox" /> Есть на складе</label>
-            <label><input type="checkbox" /> Только в наличии</label>
-            <label><input type="checkbox" /> Только со скидкой</label>
+          <div className="sticky">
+            <form id="filter-form" className="container grey col" data-anim="fade" data-delay="0.1">
+              <div className="col pd pd__lg gp gp--lg" data-stagger="fade" data-stagger-delay="0.12">
+                <div className="col gp gp--xs">
+                  <div className="row">
+                    <h4 className="title fs__sm fw__bd opc opc--50 mg mg__lg--btm">
+                      Цена
+                    </h4>
+                  </div>
+                  <div id="price-slider" className="price-slider mb-6"></div>
+                  <div className="row ctr space--between">
+                    <span id="slider_min_value" className="subtitle fs__md fw__md">0</span>
+                    <span id="slider_max_value" className="subtitle fs__md fw__md">5000</span>
+                  </div>
+                </div>
+                <div className="col gp gp--xs">
+                  <div className="row">
+                    <h4 className="title fs__sm fw__bd opc opc--50 mg mg__xs--btm">
+                      Теги
+                    </h4>
+                  </div>
+                  <div className="filter-tags col gp gp--xs">
+                    <div className="row ctr gp gp--xs">
+                      <input className="ui-checkbox" type="checkbox" name="tag" value="bestseller" id="tag_bestseller" />
+                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_bestseller">
+                        Бестселлер
+                      </label>
+                    </div>
+                    <div className="row ctr gp gp--xs">
+                      <input className="ui-checkbox" type="checkbox" name="tag" value="for_women" id="tag_for_women" />
+                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_for_women">
+                        Для женщин
+                      </label>
+                    </div>
+                    <div className="row ctr gp gp--xs">
+                      <input className="ui-checkbox" type="checkbox" name="tag" value="for_men" id="tag_for_men" />
+                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_for_men">
+                        Для мужчин
+                      </label>
+                    </div>
+                    <div className="row ctr gp gp--xs">
+                      <input className="ui-checkbox" type="checkbox" name="tag" value="complex" id="tag_complex" />
+                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_complex">
+                        Комплекс
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div className="col gp gp--xs">
+                  <div className="row">
+                    <h4 className="title fs__sm fw__bd opc opc--50 mg mg__xs--btm">
+                      Наличие
+                    </h4>
+                  </div>
+                  <div className="row ctr gp gp--xs">
+                    <input className="ui-checkbox" type="checkbox" name="in_stock_only" id="in_stock_only" />
+                    <label className="link fs__md fw__md opc opc--50 anmt" for="in_stock_only">
+                      Только в наличии
+                    </label>
+                  </div>
+                </div>
+                <div className="col gp gp--xs">
+                  <div className="row">
+                    <h4 className="title fs__sm fw__bd opc opc--50 mg mg__xs--btm">
+                      Скидки
+                    </h4>
+                  </div>
+                  <div className="row ctr gp gp--xs">
+                    <input className="ui-checkbox" type="checkbox" name="has_discount" id="has_discount" />
+                    <label className="link fs__md fw__md opc opc--50 anmt" for="has_discount">
+                      Только со скидкой
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </form>
           </div>
-          <CategoryFilter />
         </aside>
 
         <section className="bside--categories w-full md:w-3/4">
+          <CategoryFilter />
           <motion.div
             ref={productGrid.ref}
             initial="hidden"
