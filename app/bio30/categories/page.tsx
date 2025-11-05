@@ -12,32 +12,32 @@ import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 import noUiSlider from "nouislider";
 
 const products = [
-  { 
-    id: "lion-s-mane", 
+  {
+    id: "lion-s-mane",
     title: "Lion's Mane",
-    desc: "Гриб Львиная грива. Улучшает когнитивные функции.", 
-    price: 1500, 
+    desc: "Гриб Львиная грива. Улучшает когнитивные функции.",
+    price: 1500,
     img: "https://bio30.ru/front/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp"
   },
-  { 
-    id: "cordyceps-sinensis", 
-    title: "Cordyceps Sinensis", 
-    desc: "Кордицепс китайский. Повышает энергию и выносливость.", 
-    price: 2000, 
+  {
+    id: "cordyceps-sinensis",
+    title: "Cordyceps Sinensis",
+    desc: "Кордицепс китайский. Повышает энергию и выносливость.",
+    price: 2000,
     img: "https://bio30.ru/front/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp"
   },
-  { 
-    id: "spirulina-chlorella", 
-    title: "Spirulina Chlorella", 
-    desc: "Спирулина и хлорелла. Детокс и иммунитет.", 
-    price: 1200, 
+  {
+    id: "spirulina-chlorella",
+    title: "Spirulina Chlorella",
+    desc: "Спирулина и хлорелла. Детокс и иммунитет.",
+    price: 1200,
     img: "https://bio30.ru/front/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp"
   },
-  { 
-    id: "magnesium-pyridoxine", 
-    title: "Magnesium Pyridoxine", 
-    desc: "Магний и витамин B6. Для нервной системы.", 
-    price: 1800, 
+  {
+    id: "magnesium-pyridoxine",
+    title: "Magnesium Pyridoxine",
+    desc: "Магний и витамин B6. Для нервной системы.",
+    price: 1800,
     img: "https://bio30.ru/front/static/uploads/products/1552689351894f229843f51efdb813fc.webp"
   },
 ];
@@ -97,19 +97,25 @@ const CategoriesPage: React.FC = () => {
             initial="hidden"
             animate={productGrid.controls}
             variants={productGrid.container}
-            className="grid md:grid-cols-2 gap-6"
+            className="grid grid--cards"
           >
             {products.map((p, i) => (
               <motion.div
                 key={i}
                 variants={productGrid.child}
-                className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
+                className={p.class || "card card__default bg-card shadow-md rounded-xl overflow-hidden"}
+                style={{ backgroundColor: p.bg, color: p.text }}
               >
                 <Link href={`/bio30/categories/${p.id}`}>
                   <img
                     src={p.img}
                     alt={p.title}
-                    className="w-full h-64 object-cover"
+                    className="w-full h-64 object-cover image__web"
+                  />
+                  <img
+                    src={p.mobileImg || p.img}
+                    alt={p.title}
+                    className="w-full h-64 object-cover image__mobile"
                   />
                   <div className="p-4">
                     <h3 className="text-lg font-semibold">{p.title}</h3>
@@ -119,6 +125,13 @@ const CategoriesPage: React.FC = () => {
                 </Link>
               </motion.div>
             ))}
+            <Link href="/bio30/categories" className="card card__default card__default--show-all card--link" style={{ backgroundColor: '#0D0D0D', border: '1px solid var(--border)' }}>
+              <div className="col pd__xl gp gp--md">
+                <h2 className="title fs__md fw__bd">
+                  Все продукты
+                </h2>
+              </div>
+            </Link>
           </motion.div>
         </section>
       </div>
