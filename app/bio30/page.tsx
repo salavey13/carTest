@@ -6,25 +6,27 @@ import { motion } from "framer-motion";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
+import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 
 const HomePage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
-  const benefit1 = useScrollFadeIn("up", 0.1);
-  const benefit2 = useScrollFadeIn("up", 0.2);
-  const benefit3 = useScrollFadeIn("up", 0.3);
+  const benefits = useStaggerFadeIn(3, 0.2);
+  const categories = useStaggerFadeIn(4, 0.15);
+  const faq = useStaggerFadeIn(5, 0.15);
 
   return (
-    <div>
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Header />
 
+      {/* HERO */}
       <section className="hero text-center py-20">
         <motion.h1
           ref={heroTitle.ref}
           initial="hidden"
           animate={heroTitle.controls}
           variants={heroTitle.variants}
-          className="text-4xl font-bold mb-4 gradient-text"
+          className="text-4xl sm:text-5xl font-bold mb-4 gradient-text"
         >
           BIO 3.0 — Биопродукты будущего
         </motion.h1>
@@ -34,10 +36,10 @@ const HomePage: React.FC = () => {
           initial="hidden"
           animate={heroSubtitle.controls}
           variants={heroSubtitle.variants}
-          className="text-base text-muted-foreground max-w-xl mx-auto mb-6"
+          className="text-base text-muted-foreground max-w-2xl mx-auto mb-6"
         >
-          Передовые технологии и натуральные компоненты для здоровья и
-          долголетия.
+          Передовые биотехнологии и натуральные ингредиенты — синергия
+          инноваций и природы для твоего здоровья.
         </motion.p>
 
         <motion.div
@@ -51,28 +53,132 @@ const HomePage: React.FC = () => {
         </motion.div>
       </section>
 
-      {/* Блок преимуществ */}
-      <section className="grid grid--benefit gap-6 p-6">
-        {[benefit1, benefit2, benefit3].map((anim, i) => (
-          <motion.div
-            key={i}
-            ref={anim.ref}
-            initial="hidden"
-            animate={anim.controls}
-            variants={anim.variants}
-            className="benefit benefit__default p-4 rounded-xl bg-card shadow-lg"
-          >
-            <img
-              src={`https://bio30.ru/static/uploads/benefits/image${i + 1}.webp`}
-              alt={`benefit-${i}`}
-              className="w-full h-48 object-cover rounded-lg mb-4"
-            />
-            <div className="title fs__lg fw__bd">Преимущество {i + 1}</div>
-            <span className="description text-muted-foreground">
-              Натуральные ингредиенты и инновационные технологии.
-            </span>
-          </motion.div>
-        ))}
+      {/* BENEFITS */}
+      <section className="py-16 px-6">
+        <motion.div
+          ref={benefits.ref}
+          initial="hidden"
+          animate={benefits.controls}
+          variants={benefits.container}
+          className="grid md:grid-cols-3 gap-6"
+        >
+          {[
+            {
+              img: "mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp",
+              title: "Натуральные ингредиенты",
+              desc: "Наши продукты создаются из природных компонентов, собранных в экологически чистых регионах.",
+            },
+            {
+              img: "6a317041578644d1b283abeaf781bf36.webp",
+              title: "Инновационные технологии",
+              desc: "Используем современные биотехнологии для максимальной эффективности и биодоступности.",
+            },
+            {
+              img: "image3.webp",
+              title: "Здоровье и благополучие",
+              desc: "Формулы разработаны для поддержки здоровья, энергии и долголетия.",
+            },
+          ].map((b, i) => (
+            <motion.div
+              key={i}
+              variants={benefits.child}
+              className="benefit benefit__default bg-card shadow-md p-6 rounded-xl text-center"
+            >
+              <img
+                src={`https://bio30.ru/static/uploads/benefits/${b.img}`}
+                alt={b.title}
+                className="w-full h-52 object-cover rounded-lg mb-4"
+              />
+              <h3 className="text-lg font-semibold mb-2">{b.title}</h3>
+              <p className="text-sm text-muted-foreground">{b.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* CATEGORIES */}
+      <section className="py-16 bg-muted/30 px-6">
+        <h2 className="text-center text-2xl font-bold mb-8">Категории</h2>
+        <motion.div
+          ref={categories.ref}
+          initial="hidden"
+          animate={categories.controls}
+          variants={categories.container}
+          className="grid md:grid-cols-2 gap-8"
+        >
+          {[
+            {
+              title: "Витамины",
+              desc: "Ежедневная поддержка здоровья и энергии.",
+              img: "vitamins.webp",
+            },
+            {
+              title: "Минералы",
+              desc: "Баланс микроэлементов для устойчивости организма.",
+              img: "minerals.webp",
+            },
+            {
+              title: "Иммунитет",
+              desc: "Укрепление защитных функций организма.",
+              img: "immunity.webp",
+            },
+            {
+              title: "Красота",
+              desc: "Продукты для кожи, волос и внутреннего сияния.",
+              img: "beauty.webp",
+            },
+          ].map((c, i) => (
+            <motion.div
+              key={i}
+              variants={categories.child}
+              className="flex flex-col md:flex-row bg-card shadow-sm rounded-xl overflow-hidden"
+            >
+              <img
+                src={`https://bio30.ru/static/uploads/categories/${c.img}`}
+                alt={c.title}
+                className="w-full md:w-1/2 object-cover"
+              />
+              <div className="p-6 flex flex-col justify-center">
+                <h3 className="text-lg font-semibold mb-2">{c.title}</h3>
+                <p className="text-sm text-muted-foreground">{c.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-16 px-6">
+        <h2 className="text-center text-2xl font-bold mb-8">
+          Часто задаваемые вопросы
+        </h2>
+        <motion.div
+          ref={faq.ref}
+          initial="hidden"
+          animate={faq.controls}
+          variants={faq.container}
+          className="space-y-6 max-w-3xl mx-auto"
+        >
+          {[
+            ["Что такое BIO 3.0?", "Платформа инновационных биопродуктов."],
+            ["Как заказать продукт?", "Добавьте товар в корзину и оформите заказ."],
+            ["Есть ли доставка?", "Да, по всей России с быстрой доставкой."],
+            ["Можно ли вернуть товар?", "Да, согласно политике возврата."],
+            [
+              "Как присоединиться к реферальной программе?",
+              "Зарегистрируйтесь и получите реферальную ссылку.",
+            ],
+          ].map(([q, a], i) => (
+            <motion.div
+              key={i}
+              variants={faq.child}
+              className="p-4 rounded-lg bg-card shadow-sm"
+            >
+              <h4 className="font-semibold mb-1">{q}</h4>
+              <p className="text-sm text-muted-foreground">{a}</p>
+            </motion.div>
+          ))}
+        </motion.div>
       </section>
 
       <Footer />
