@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -9,11 +9,12 @@ import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
+import noUiSlider from "nouislider";
 
 const products = [
   { 
     id: "lion-s-mane", 
-    title: "Lion's Mane", 
+    title: "Lion's Mane",
     desc: "Гриб Львиная грива. Улучшает когнитивные функции.", 
     price: 1500, 
     img: "https://bio30.ru/front/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp"
@@ -47,6 +48,20 @@ const CategoriesPage: React.FC = () => {
   const productGrid = useStaggerFadeIn(products.length, 0.1);
   useBio30ThemeFix();
 
+  useEffect(() => {
+    const slider = document.getElementById('price-slider');
+    if (slider) {
+      noUiSlider.create(slider, {
+        start: [0, 5000],
+        connect: true,
+        range: {
+          'min': 0,
+          'max': 5000
+        }
+      });
+    }
+  }, []);
+
   return (
     <div>
       <Header />
@@ -59,11 +74,10 @@ const CategoriesPage: React.FC = () => {
         </motion.p>
       </section>
 
-      <div className="flex flex-col md:flex-row gap-6 px-6">
-        {/* Sidebar */}
-        <aside className="w-full md:w-1/4">
+      <div className="categories__section flex flex-col md:flex-row gap-6 px-6">
+        <aside className="aside--categories w-full md:w-1/4">
           <h3 className="font-bold mb-4">Цена</h3>
-          <div className="price-slider mb-6">{/* noUiSlider here */}</div>
+          <div id="price-slider" className="price-slider mb-6"></div>
           <h3 className="font-bold mb-4">Категория</h3>
           <div className="space-y-2">
             <label><input type="checkbox" /> Вегетарианцы</label>
@@ -77,8 +91,7 @@ const CategoriesPage: React.FC = () => {
           <CategoryFilter />
         </aside>
 
-        {/* Products */}
-        <section className="w-full md:w-3/4">
+        <section className="bside--categories w-full md:w-3/4">
           <motion.div
             ref={productGrid.ref}
             initial="hidden"
