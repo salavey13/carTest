@@ -1,8 +1,9 @@
+// /app/bio30/categories/spirulina-chlorella/page.tsx
 "use client";
 
 import React from 'react';
-import Header from '../../components/Header';
-import Footer from '../../components/Footer';
+
+
 import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
 import { addToCart } from '../../actions';
 import { useAppContext } from '@/contexts/AppContext';
@@ -19,7 +20,7 @@ const SpirulinaChlorellaPage: React.FC = () => {
 
   return (
     <div>
-      <Header />
+      
       <div className="messages"></div>
       <div className="hero">
         <span className="title fs__xxl fw__bd gradient" data-anim="lux-up" data-delay="0.1">Spirulina Chlorella - BIO 3.0</span>
@@ -43,7 +44,7 @@ const SpirulinaChlorellaPage: React.FC = () => {
         </div>
       </div>
       <button onClick={handleAddToCart} className="btn btn--primary">Добавить в корзину</button>
-      <Footer />
+      
     </div>
   );
 };
