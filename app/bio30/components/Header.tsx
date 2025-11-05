@@ -1,10 +1,10 @@
+// /app/bio30/components/Header.tsx
 "use client";
 
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { ShoppingCart, User } from 'lucide-react';
 import Link from 'next/link';
-import '../styles.css';
 
 const Header: React.FC = () => {
   const { dbUser } = useAppContext();

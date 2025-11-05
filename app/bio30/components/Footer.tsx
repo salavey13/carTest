@@ -1,7 +1,7 @@
+// /app/bio30/components/Footer.tsx
 "use client";
 
 import React from 'react';
-import '../styles.css';
 
 const Footer: React.FC = () => {
   return (

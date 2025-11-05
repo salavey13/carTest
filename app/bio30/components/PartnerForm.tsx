@@ -1,9 +1,9 @@
+// /app/bio30/components/PartnerForm.tsx
 "use client";
 
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { becomeReferralPartner } from '../actions';
-import '../styles.css';
 
 const PartnerForm: React.FC = () => {
   const { dbUser, refreshDbUser } = useAppContext();
