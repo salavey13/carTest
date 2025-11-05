@@ -1,8 +1,9 @@
+// /app/bio30/cart/page.tsx
 "use client";
 
 import React from "react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+
+
 import { motion } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
 import { removeFromCart, checkoutCart } from "../actions";
@@ -32,7 +33,7 @@ const CartPage: React.FC = () => {
 
   return (
     <div>
-      <Header />
+      
       <section className="text-center py-16">
         <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
           Корзина — BIO 3.0
@@ -80,7 +81,7 @@ const CartPage: React.FC = () => {
         </button>
       </div>
 
-      <Footer />
+      
     </div>
   );
 };
