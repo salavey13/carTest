@@ -1,4 +1,3 @@
-// /app/bio30/components/PartnerForm.tsx
 "use client";
 
 import React from 'react';
@@ -41,10 +40,19 @@ const PartnerForm: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} action="/referal/send" method="POST">
-      <div className="row ctr gp gp--xs">
-        <input type="text" name="email" placeholder="Email" className="input" required />
-        <button type="submit" className="btn btn--primary">Отправить</button>
-      </div>
+      <input type="text" placeholder="Введите ваше имя и фамилию" className="input" />
+      <small className="subtitle fs__sm fw__md opc opc--50">Укажите своё настоящее имя и фамилию — для правильного оформления документов.</small>
+      <input type="tel" placeholder="Введите ваш номер телефона" className="input" />
+      <small className="subtitle fs__sm fw__md opc opc--50">Укажите номер, привязанный к Telegram или WhatsApp — для быстрой связи.</small>
+      <input type="email" placeholder="Ваша электронная почта" className="input" />
+      <small className="subtitle fs__sm fw__md opc opc--50">Укажите актуальный email — он будет использоваться для подтверждения и документооборота.</small>
+      <select className="input">
+        <option>Российская Федерация</option>
+      </select>
+      <button type="submit" className="btn btn--wht btn__secondary fill ctr">
+        Отправить заявку
+      </button>
+      <small className="subtitle fs__sm fw__md opc opc--50">Продолжая, вы соглашаетесь с политикой компании в отношении обработки персональных данных и даете согласие на их обработку в соответствии с установленными правилами.</small>
     </form>
   );
 };
