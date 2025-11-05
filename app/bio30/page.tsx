@@ -175,56 +175,95 @@ const HomePage: React.FC = () => {
       </section>
 
       <section>
-        <motion.div
-          ref={productGrid.ref}
-          initial="hidden"
-          animate={productGrid.controls}
-          variants={productGrid.container}
-          className="grid grid--cards"
-        >
-          {products.map((p, i) => (
-            <motion.div
-              key={i}
-              variants={productGrid.child}
-              className={p.class}
-              style={{ backgroundColor: p.bg, color: p.text }}
-            >
-              <Link href={p.link}>
-                <div className="aside">
-                  <div className="col pd__xl gp gp--md">
-                    <div className="col gp gp--sm">
-                      <h2 className="title fs__md fw__bd" style={{ color: p.text }}>
-                        {p.title}
-                      </h2>
-                      <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>
-                        {p.desc}
-                      </h3>
-                    </div>
-                    <div className="row gp gp--lg">
-                      <span className="row gp--xs ctr">
-                        <div className="prices">
-                          <span className="price">{p.price} RUB</span>
-                        </div>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="bside">
-                  <img src={p.img} alt={p.title} className="image__web" />
-                  <img src={p.mobileImg} alt={p.title} className="image__mobile" />
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-          <Link href="/bio30/categories" className="card card__default card__default--show-all card--link" style={{ backgroundColor: '#0D0D0D', border: '1px solid var(--border)' }}>
+  <motion.div
+    ref={productGrid.ref}
+    initial="hidden"
+    animate={productGrid.controls}
+    variants={productGrid.container}
+    className="grid grid--cards"
+    style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1.25rem' }}
+  >
+    {products.map((p, i) => (
+      <motion.div
+        key={i}
+        variants={productGrid.child}
+        /* Добавляем класс benefit, чтобы использовать те же правила, что работают для advantages.
+           Также оставляем оригинальные классы карточки (p.class) для фоновых/текстовых стилей. */
+        className={`benefit ${p.class}`}
+        style={{ backgroundColor: p.bg, color: p.text }}
+      >
+        <Link href={p.link}>
+          {/* aside — текстовая часть */}
+          <div className="aside">
             <div className="col pd__xl gp gp--md">
-              <h2 className="title fs__md fw__bd">
-                Все продукты
-              </h2>
+              <div className="col gp gp--sm">
+                <h2 className="title fs__md fw__bd" style={{ color: p.text }}>
+                  {p.title}
+                </h2>
+                <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>
+                  {p.desc}
+                </h3>
+              </div>
+              <div className="row gp gp--lg">
+                <span className="row gp--xs ctr">
+                  <div className="prices">
+                    <span className="price">{p.price} RUB</span>
+                  </div>
+                </span>
+              </div>
             </div>
-          </Link>
-        </motion.div>
-      </section>
+          </div>
+
+          {/* bside — картинка. даём минимальную высоту и relative, чтобы не схлопнулось */}
+          <div
+            className="bside"
+            style={{
+              position: 'relative',
+              minHeight: 220,           
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={p.img}
+              alt={p.title}
+              className="image__web"
+              loading="lazy"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+            <img
+              src={p.mobileImg}
+              alt={p.title}
+              className="image__mobile"
+              loading="lazy"
+              style={{
+                width: '100%',
+                height: 'auto',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          </div>
+        </Link>
+      </motion.div>
+    ))}
+    <Link
+      href="/bio30/categories"
+      className="card card__default card__default--show-all card--link"
+      style={{ backgroundColor: '#0D0D0D', border: '1px solid var(--border)' }}
+    >
+      <div className="col pd__xl gp gp--md">
+        <h2 className="title fs__md fw__bd">Все продукты</h2>
+      </div>
+    </Link>
+  </motion.div>
+</section>
       <section className="py-16 px-6">
         <motion.div
           ref={advantages.ref}
