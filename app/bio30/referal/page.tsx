@@ -1,69 +1,62 @@
-// /app/bio30/referal/page.tsx
 "use client";
 
-import React, { useEffect } from 'react';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
-import PartnerForm from '../components/PartnerForm';
-import Dashboard from '../components/Dashboard';
-import { useAppContext } from '@/contexts/AppContext';
-import { useBioAnimations } from '../hooks/useBioAnimations';
+import React from "react";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
+import PartnerForm from "../components/PartnerForm";
+import Dashboard from "../components/Dashboard";
+import { useAppContext } from "@/contexts/AppContext";
+import { motion } from "framer-motion";
+import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 
 const ReferalPage: React.FC = () => {
   const { dbUser } = useAppContext();
   const isPartner = dbUser?.metadata?.is_referral_partner || false;
+  const heroTitle = useScrollFadeIn("up", 0.1);
+  const heroSubtitle = useScrollFadeIn("up", 0.2);
 
-  useBioAnimations();
+  const steps = [
+    "Регистрация",
+    "Получите ссылку",
+    "Пригласите друзей",
+    "Получите бонусы",
+    "FAQ",
+    "Контакты поддержки",
+  ];
 
   return (
     <div>
       <Header />
-      <div className="messages"></div>
-      <div className="hero">
-        <span className="title fs__xxl fw__bd gradient" data-anim="lux-up" data-delay="0.1">Реферальная программа - BIO 3.0</span>
-        <span className="subtitle fs__md fw__rg opc opc--75" data-anim="lux-up" data-delay="0.2">Участвуйте в реферальной программе BIO 3.0! Приглашайте друзей и получайте бонусы и скидки на продукцию. Узнайте условия и начните зарабатывать.</span>
+      <section className="text-center py-16">
+        <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
+          Реферальная программа — BIO 3.0
+        </motion.h1>
+        <motion.p ref={heroSubtitle.ref} initial="hidden" animate={heroSubtitle.controls} variants={heroSubtitle.variants} className="text-muted-foreground max-w-xl mx-auto">
+          Приглашайте друзей и получайте бонусы и скидки.
+        </motion.p>
+      </section>
+
+      <section className="grid gap-6 max-w-5xl mx-auto p-6">
+        {steps.map((s, i) => {
+          const anim = useScrollFadeIn("up", i * 0.1);
+          return (
+            <motion.div
+              key={i}
+              ref={anim.ref}
+              initial="hidden"
+              animate={anim.controls}
+              variants={anim.variants}
+              className="p-6 bg-card rounded-xl shadow-md"
+            >
+              <div className="text-lg font-bold mb-1">Шаг {i + 1}: {s}</div>
+              <div className="text-muted-foreground">Описание шага {i + 1}.</div>
+            </motion.div>
+          );
+        })}
+      </section>
+
+      <div className="max-w-4xl mx-auto p-6">{isPartner ? <Dashboard /> : <PartnerForm />}
       </div>
-      <div className="grid grid--referral_01" data-stagger="up" data-stagger-delay="0.15">
-        <div className="benefit benefit__center" data-anim="fade" data-delay="0.1">
-          <div className="title fs__lg fw__bd">Как это работает</div>
-          <span className="description">Пригласите друга по реферальной ссылке, он получит скидку, вы - бонус.</span>
-        </div>
-        <div className="benefit benefit__horizontal" data-anim="fade" data-delay="0.2">
-          <div className="title fs__lg fw__bd">Ваша реферальная ссылка</div>
-          <span className="description">https://bio30.ru/referal/yourcode</span>
-        </div>
-        <div className="benefit benefit__horizontal" data-anim="fade" data-delay="0.3">
-          <div className="title fs__lg fw__bd">Статистика</div>
-          <span className="description">Количество приглашенных: 5, Заработано: 500 руб.</span>
-        </div>
-      </div>
-      <div className="grid grid--referral_02" data-stagger="up" data-stagger-delay="0.15">
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.1">
-          <div className="title fs__lg fw__bd">Шаг 1: Регистрация</div>
-          <span className="description">Зарегистрируйтесь на сайте.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.2">
-          <div className="title fs__lg fw__bd">Шаг 2: Получите ссылку</div>
-          <span className="description">Получите уникальную реферальную ссылку.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.3">
-          <div className="title fs__lg fw__bd">Шаг 3: Пригласите друзей</div>
-          <span className="description">Поделитесь ссылкой с друзьями.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.4">
-          <div className="title fs__lg fw__bd">Шаг 4: Получите бонусы</div>
-          <span className="description">Получите бонусы за покупки друзей.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.5">
-          <div className="title fs__lg fw__bd">FAQ</div>
-          <span className="description">Часто задаваемые вопросы о программе.</span>
-        </div>
-        <div className="benefit benefit__default" data-anim="fade" data-delay="0.6">
-          <div className="title fs__lg fw__bd">Контакты поддержки</div>
-          <span className="description">support@bio30.ru</span>
-        </div>
-      </div>
-      {isPartner ? <Dashboard /> : <PartnerForm />}
       <Footer />
     </div>
   );
