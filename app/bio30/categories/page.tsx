@@ -1,61 +1,59 @@
-// /app/bio30/categories/page.tsx
 "use client";
 
-import React, { useEffect } from 'react';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
-import CategoryFilter from '../components/CategoryFilter';
-import { useBioAnimations } from '../hooks/useBioAnimations';
+import React from "react";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
+import { motion } from "framer-motion";
+import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
+
+const categories = [
+  { title: "Категория 1", desc: "Биопродукты для здоровья", img: "image1.webp" },
+  { title: "Категория 2", desc: "Витамины и минералы", img: "image2.webp" },
+  { title: "Категория 3", desc: "Добавки для иммунитета", img: "image3.webp" },
+  { title: "Категория 4", desc: "Продукты для красоты", img: "image4.webp" },
+];
 
 const CategoriesPage: React.FC = () => {
-  useBioAnimations();
+  const heroTitle = useScrollFadeIn("up", 0.1);
+  const heroSubtitle = useScrollFadeIn("up", 0.2);
 
   return (
     <div>
       <Header />
-      <div className="messages"></div>
-      <div className="hero">
-        <span className="title fs__xxl fw__bd gradient" data-anim="lux-up" data-delay="0.1">Продукты - BIO 3.0</span>
-        <span className="subtitle fs__md fw__rg opc opc--75" data-anim="lux-up" data-delay="0.2">Каталог продуктов BIO 3.0. Широкий выбор БАДов для здоровья и красоты. Узнайте больше и выберите подходящие вам биологически активные добавки.</span>
-    </div>
-      <div className="grid grid--categories" data-stagger="up" data-stagger-delay="0.15">
-        <div className="card card__horizontal" data-anim="fade" data-delay="0.1">
-          <div className="aside">
-            <span className="title fs__lg fw__bd">Категория 1</span>
-            <span className="description">Описание категории 1, биопродукты для здоровья.</span>
-          </div>
-          <div className="bside">
-            <img src="https://bio30.ru/static/uploads/categories/image1.webp" alt="Категория 1" className="image__web" />
-          </div>
-        </div>
-        <div className="card card__horizontal" data-anim="fade" data-delay="0.2">
-          <div className="aside">
-            <span className="title fs__lg fw__bd">Категория 2</span>
-            <span className="description">Описание категории 2, витамины и минералы.</span>
-          </div>
-          <div className="bside">
-            <img src="https://bio30.ru/static/uploads/categories/image2.webp" alt="Категория 2" className="image__web" />
-          </div>
-        </div>
-        <div className="card card__horizontal" data-anim="fade" data-delay="0.3">
-          <div className="aside">
-            <span className="title fs__lg fw__bd">Категория 3</span>
-            <div className="description">Описание категории 3, добавки для иммунитета.</div>
-          </div>
-          <div className="bside">
-            <img src="https://bio30.ru/static/uploads/categories/image3.webp" alt="Категория 3" className="image__web" />
-          </div>
-        </div>
-        <div className="card card__horizontal" data-anim="fade" data-delay="0.4">
-          <div className="aside">
-            <span className="title fs__lg fw__bd">Категория 4</span>
-            <span className="description">Описание категории 4, продукты для красоты.</span>
-          </div>
-          <div className="bside">
-            <img src="https://bio30.ru/static/uploads/categories/image4.webp" alt="Категория 4" className="image__web" />
-          </div>
-        </div>
-      </div>
+      <section className="text-center py-16">
+        <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
+          Продукты — BIO 3.0
+        </motion.h1>
+        <motion.p ref={heroSubtitle.ref} initial="hidden" animate={heroSubtitle.controls} variants={heroSubtitle.variants} className="text-muted-foreground max-w-xl mx-auto">
+          Каталог биодобавок для здоровья и красоты.
+        </motion.p>
+      </section>
+
+      <section className="grid gap-6 p-6 max-w-5xl mx-auto">
+        {categories.map((c, i) => {
+          const anim = useScrollFadeIn("up", i * 0.1);
+          return (
+            <motion.div
+              key={i}
+              ref={anim.ref}
+              initial="hidden"
+              animate={anim.controls}
+              variants={anim.variants}
+              className="flex flex-col md:flex-row items-center bg-card rounded-xl shadow-md overflow-hidden"
+            >
+              <div className="flex-1 p-6">
+                <div className="text-lg font-bold mb-2">{c.title}</div>
+                <div className="text-muted-foreground">{c.desc}</div>
+              </div>
+              <img
+                src={`https://bio30.ru/static/uploads/categories/${c.img}`}
+                alt={c.title}
+                className="w-full md:w-1/3 h-48 object-cover"
+              />
+            </motion.div>
+          );
+        })}
+      </section>
       <Footer />
     </div>
   );
