@@ -1,0 +1,545 @@
+html {
+  font-size: clamp(11px, 1.5vw + 8px, 18px);
+}
+
+
+header {
+  z-index: 9999 !important; 
+}
+/* Переменные */
+:root {
+  /* Цвета */
+  --yellow: #FFE609;
+  --green: #B2FF00;
+  --red: #FF0004;
+  --white: #ffffff;
+  --black: #000000;
+  --purple: #510060;
+  --grey: rgba(255, 255, 255, 0.05);
+
+  /* Шрифты */
+  --primary: 'TT Runs Trial';
+  --secondary: 'TT Interphases Pro Trial';
+
+  /* Жирность */
+  --bold: 700;
+  --medium: 500;
+  --regular: 300;
+
+  /* Границы и переходы */
+  --border: rgba(255, 255, 255, 0.05);
+  --fill: 100%;
+  --center: center;
+  --flex-end: flex-end;
+  --flex-start: flex-start;
+  --animate: all 0.3s ease;
+  --opacity__25: opacity(0.15);
+  --opacity__50: opacity(0.5);
+  --opacity__75: opacity(0.75);
+  --opacity__100: opacity(1);
+  --blur: blur(7.5px);
+}
+* {
+  box-sizing: border-box;
+}
+
+/* Мобильные (до 576px) */
+@media (max-width: 576px) {
+  :root {
+    --zr: 0.25rem; 
+    --xs: 0.5rem;   
+    --sm: 0.75rem; 
+    --md: 0.9rem;   
+    --lg: 1.1rem;  
+    --xl: 1.25rem;    
+    --xxl: 1.5rem; 
+    --hg: 2rem;   
+  }
+  main {
+    width: calc(100% - 1rem);
+    padding-top: 72px; /* Фиксированное значение, чтобы не зависеть от rem */
+    margin: 0 auto;
+  }
+  footer {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    width: calc(100% - 1rem);
+  }
+  header {
+    width: calc(100% - 1rem);
+    position: fixed;
+  }
+}
+
+/* Планшеты (577px–768px) */
+@media (min-width: 577px) and (max-width: 768px) {
+  :root {
+    --zr: 0.25rem; 
+    --xs: 0.5rem;  
+    --sm: 0.75rem; 
+    --md: 1rem;    
+    --lg: 1.5rem;  
+    --xl: 1.7rem;    
+    --xxl: 2.2rem; 
+    --hg: 3rem;   
+  }
+  main {
+    width: 96%;
+    padding-top: var(--lg);
+    margin: 0 auto;
+  }
+  footer {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Маленькие десктопы (769px–992px) */
+@media (min-width: 769px) and (max-width: 992px) {
+  :root {
+    --zr: 0.25rem; 
+    --xs: 0.5rem;  
+    --sm: 0.75rem; 
+    --md: 1rem;    
+    --lg: 1.5rem;  
+    --xl: 1.7rem;    
+    --xxl: 2.2rem; 
+    --hg: 3rem;   
+  }
+  main {
+    width: 98%;
+    padding-top: 112px; /* Примерное значение */
+    margin: 0 auto;
+  }
+  footer {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+  header {
+    width: 100%;
+    z-index: 999;
+    position: fixed;
+  }
+  .web {
+    width: 92%;
+    display: flex;
+    align-items: center;
+    margin: 0 auto;
+  }
+}
+
+/* Средние десктопы (993px–1336px) */
+@media (min-width: 993px) {
+    .card__default--show-all {
+    display: none !important;
+  }
+  :root {
+    --zr: 0.25rem; 
+    --xs: 0.5rem;  
+    --sm: 0.75rem; 
+    --md: 0.9rem;    
+    --lg: 1rem;  
+    --xl: 1.5rem;    
+    --xxl: 2rem; 
+    --hg: 3rem;   
+  }
+  main {
+    width: 92%;
+    padding-top: 128px; /* Оставляем как есть */
+    margin: 0 auto;
+  }
+  footer {
+    width: 92%;
+    margin: 0 auto;
+  }
+  header {
+    width: 100%;
+    z-index: 999;
+    position: fixed;
+  }
+  .web {
+    width: 92%;
+    display: flex;
+    align-items: center;
+    margin: 0 auto;
+  }
+}
+
+/* Большие десктопы (1400px+) */
+@media (min-width: 1600px) {
+
+    .card__default--show-all {
+    display: none !important;
+  }
+  :root {
+    --zr: 0.25rem; 
+    --xs: 0.5rem;  
+    --sm: 0.75rem; 
+    --md: 1rem;    
+    --lg: 1.5rem;  
+    --xl: 1.7rem;    
+    --xxl: 2.2rem; 
+    --hg: 3rem;   
+  }
+  main {
+    width: 80%;
+    padding-top: 128px;
+    margin: 0 auto;
+  }
+  footer {
+    width: 80%;
+    margin: 0 auto;
+  }
+  header {
+    width: 100%;
+    z-index: 999;
+    position: fixed;
+  }
+  .web {
+    width: 80%;
+    display: flex;
+    align-items: center;
+    margin: 0 auto;
+  }
+}
+
+
+/* Размеры шрифтов */
+.fs__xs {
+  font-size: var(--xs);
+  line-height: var(--xs);
+}
+
+.fs__sm {
+  font-size: var(--sm);
+  line-height: var(--md);
+}
+
+.fs__md {
+  font-size: var(--md);
+  line-height: var(--md);
+}
+
+.fs__lg {
+  font-size: var(--lg);
+  line-height: var(--lg);
+}
+
+.fs__xl {
+  font-size: var(--xl);
+  line-height: var(--xl);
+}
+
+.fs__xxl {
+  font-size: var(--xxl);
+  line-height: var(--xxl);
+}
+
+/* Жирность шрифтов */
+.fw__rg {
+  font-weight: var(--regular);
+}
+
+.fw__md {
+  font-weight: var(--medium);
+}
+
+.fw__bd {
+  font-weight: var(--bold);
+}
+
+/* Отступы внутренние */
+.pd__xs {
+  padding: var(--xs);
+}
+
+.pd__sm {
+  padding: var(--sm);
+}
+
+.pd__md {
+  padding: var(--md);
+}
+
+.pd__lg {
+  padding: var(--lg);
+}
+
+.pd__xl {
+  padding: var(--xl);
+}
+
+.pd__hg {
+  padding: var(--hg);
+}
+
+.pd__xxl {
+  padding: var(--xxl);
+}
+
+.pd__xs--rgt {
+  padding-right: var(--xs);
+}
+
+.pd__sm--rgt {
+  padding-right: var(--sm);
+}
+
+.pd__md--rgt {
+  padding-right: var(--md);
+}
+
+.pd__lg--rgt {
+  padding-right: var(--lg);
+}
+
+.pd__xl--rgt {
+  padding-right: var(--xl);
+}
+
+.pd__xxl--rgt {
+  padding-right: var(--xxl);
+}
+
+
+.pd__xs--lft {
+  padding-left: var(--xs);
+}
+
+.pd__sm--lft {
+  padding-left: var(--sm);
+}
+
+.pd__md--lft {
+  padding-left: var(--md);
+}
+
+.pd__lg--lft {
+  padding-left: var(--lg);
+}
+
+.pd__xl--lft {
+  padding-left: var(--xl);
+}
+
+.pd__xxl--lft {
+  padding-left: var(--xxl);
+}
+
+.pd__hg--lft {
+  padding-left: var(--hg);
+}
+
+.pd__xs--top {
+  padding-top: var(--xs);
+}
+
+.pd__sm--top {
+  padding-top: var(--sm);
+}
+
+.pd__md--top {
+  padding-top: var(--md);
+}
+
+.pd__lg--top {
+  padding-top: var(--lg);
+}
+
+.pd__xl--top {
+  padding-top: var(--xl);
+}
+
+.pd__xxl--top {
+  padding-top: var(--xxl);
+}
+
+.pd__hg--top {
+  padding-top: var(--hg);
+}
+
+
+.pd__xs--btm {
+  padding-bottom: var(--xs);
+}
+
+.pd__sm--btm {
+  padding-bottom: var(--sm);
+}
+
+.pd__md--btm {
+  padding-bottom: var(--md);
+}
+
+.pd__lg--btm {
+  padding-bottom: var(--lg);
+}
+
+.pd__xl--btm {
+  padding-bottom: var(--xl);
+}
+
+.pd__xxl--btm {
+  padding-bottom: var(--xxl);
+}
+
+.pd__hg--btm {
+  padding-bottom: var(--hg);
+}
+
+/* Отступы внешние */
+.mg__xs {
+  margin: var(--xs);
+}
+
+.mg__sm {
+  margin: var(--sm);
+}
+
+.mg__md {
+  margin: var(--md);
+}
+
+.mg__lg {
+  margin: var(--lg);
+}
+
+.mg__xl {
+  margin: var(--xl);
+}
+
+.mg__xxl {
+  margin: var(--xxl);
+}
+
+.mg__xs--rgt {
+  margin-right: var(--xs);
+}
+
+.mg__sm--rgt {
+  margin-right: var(--sm);
+}
+
+.mg__md--rgt {
+  margin-right: var(--md);
+}
+
+.mg__lg--rgt {
+  margin-right: var(--lg);
+}
+
+.mg__xl--rgt {
+  margin-right: var(--xl);
+}
+
+.mg__xxl--rgt {
+  margin-right: var(--xxl);
+}
+
+.mg__xs--lft {
+  margin-left: var(--xs);
+}
+
+.mg__sm--lft {
+  margin-left: var(--sm);
+}
+
+.mg__md--lft {
+  margin-left: var(--md);
+}
+
+.mg__lg--lft {
+  margin-left: var(--lg);
+}
+
+.mg__xl--lft {
+  margin-left: var(--xl);
+}
+
+.mg__xxl--lft {
+  margin-left: var(--xxl);
+}
+
+.mg__xs--top {
+  margin-top: var(--xs);
+}
+
+.mg__sm--top {
+  margin-top: var(--sm);
+}
+
+.mg__md--top {
+  margin-top: var(--md);
+}
+
+.mg__lg--top {
+  margin-top: var(--lg);
+}
+
+.mg__xl--top {
+  margin-top: var(--xl);
+}
+
+.mg__xxl--top {
+  margin-top: var(--xxl);
+}
+
+.mg__xs--btm {
+  margin-bottom: var(--xs);
+}
+
+.mg__sm--btm {
+  margin-bottom: var(--sm);
+}
+
+.mg__md--btm {
+  margin-bottom: var(--md);
+}
+
+.mg__lg--btm {
+  margin-bottom: var(--lg);
+}
+
+.mg__xl--btm {
+  margin-bottom: var(--xl);
+}
+
+.mg__xxl--btm {
+  margin-bottom: var(--xxl);
+}
+
+/* Сетка */
+.gp {
+}
+
+.gp--zr {
+  gap: var(--zr);
+}
+
+.gp--xs {
+  gap: var(--xs);
+}
+
+.gp--sm {
+  gap: var(--sm);
+}
+
+.gp--md {
+  gap: var(--md);
+}
+
+.gp--lg {
+  gap: var(--lg);
+}
+
+.gp--xl {
+  gap: var(--xl);
+}
+
+.gp--xxl {
+  gap: var(--xxl);
+}
+
+.gp--hg {
+  gap: var(--hg);
+}

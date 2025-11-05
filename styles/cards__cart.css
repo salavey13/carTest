@@ -1,0 +1,327 @@
+.card__cart {
+    position: relative;
+    transition: transform 0.5s ease-out,
+                box-shadow 0.5s ease-out,
+                border-image 0.5s ease-out;
+    border-radius: var(--md);
+    overflow: hidden;
+    transform-style: preserve-3d;
+
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    z-index: 0;
+    border-image-outset: 1px;
+    border-image: initial;
+    display: flex;
+    align-items: flex-end;
+
+
+}
+
+.card__cart:hover {
+    box-shadow: 0px 20px 100px var(--card-shadow);
+    z-index: 1;
+}
+
+.card__cart::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -500%;
+    width: 500%;
+    height: 50%;
+    background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent);
+    transform: translateX(0) rotate(-45deg);
+    transition: transform 0.7s ease-out;
+    pointer-events: none;
+    opacity: 0.7;
+    z-index: 1;
+}
+
+.card__cart:hover::after {
+    transform: translateX(70%) rotate(-45deg);
+}
+
+/* ----------------- Основные настройки ----------------- */
+
+.card__cart {
+    display: flex;
+    height: auto;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+
+@media (max-width: 576px) {
+
+ /* ----------------- Основные настройки ----------------- */
+
+
+ .card__cart {
+     display: flex;
+     height: auto;
+     flex-direction: column;
+     justify-content: space-between;
+             align-items: center;
+     
+     
+ }
+
+
+ /* -----------------Horizonta (aside)----------------- */
+
+
+ .card__cart .aside {
+     width: 100%;
+     height: 100%;
+ }
+ 
+ .card__cart .bside {
+     width: 100%;
+     height: 100%;
+     display: flex;
+     align-items: flex-end;
+     justify-content: center;
+ }
+ 
+
+ /* ----------------- Изображения (web) ----------------- */
+
+
+ .card__cart .image__web {
+     display: none;
+ }
+
+ /* ----------------- Изображения (mobile) ----------------- */
+
+ .card__cart .image__mobile {
+     width: 100%;
+     height: auto;
+     display: block;
+     object-fit: cover;   
+ }
+
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+    .card__cart {
+        display: flex;
+        height: auto;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        
+    }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__cart .aside {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .card__cart .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__cart .image__web {
+        display: none;
+    }
+
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+    .card__cart .image__mobile {
+        width: 100%;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+}
+
+@media (min-width: 769px) and (max-width: 992px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+    .card__cart {
+        display: flex;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__cart .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__cart .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__cart .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+
+    .card__cart .image__mobile {
+        display: none;  
+    }
+
+}
+
+
+@media (min-width: 993px) and (max-width: 1366px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+
+    .card__cart {
+        display: flex;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+    
+    .card__cart .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__cart .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__cart .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+
+    .card__cart .image__mobile {
+        display: none;  
+    }
+
+
+
+}
+
+
+
+
+
+@media (min-width: 1366px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+    .card__cart {
+        display: flex;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__cart .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__cart .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__cart .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+
+    .card__cart .image__mobile {
+        display: none;  
+    }
+
+
+
+}
