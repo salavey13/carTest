@@ -1,267 +1,51 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 
 const Footer: React.FC = () => {
+  const docBase = "https://bio30.ru/docs";
+
   return (
-    <footer data-anim="fade" data-delay="0.1">
-      {/* верхний блок — контакты и соцсети */}
-      <div className="row ctr pd pd__xxl--top pd__xxl--btm">
-        <div className="row">
-          <a
-            href="mailto:privet@bio30.ru"
-            className="btn btn--blk btn__primary"
-            data-anim="lux-up"
-            data-delay="0.1"
-          >
-            <span>privet@bio30.ru</span>
-          </a>
-        </div>
-
-        <div className="row ctr rgt">
-          <div className="social gp gp--lg mg mg__lg--rgt">
-            <a
-              href="https://t.me/BIO30_chat"
-              className="telegram btn btn--blk btn__primary"
-              data-anim="lux-up"
-              data-delay="0.2"
-              target="_blank"
-              rel="noopener noreferrer"
-            ></a>
-            <a
-              href="https://vk.com/club231438011"
-              className="vk btn btn--blk btn__primary"
-              data-anim="lux-up"
-              data-delay="0.3"
-              target="_blank"
-              rel="noopener noreferrer"
-            ></a>
-            <a
-              href="https://dzen.ru/id/6868db59568f80115b12a631"
-              className="dzen btn btn--blk btn__primary"
-              data-anim="lux-up"
-              data-delay="0.4"
-              target="_blank"
-              rel="noopener noreferrer"
-            ></a>
-          </div>
-
-          <button
-            id="language-btn"
-            className="btn btn--blk btn__primary"
-            aria-haspopup="true"
-            aria-expanded="false"
-            data-anim="lux-up"
-            data-delay="0.5"
-          >
-            <span className="language"></span>
-            <b className="link" data-i18n="Россия">
-              Россия
-            </b>
-          </button>
-        </div>
-      </div>
-
-      {/* блок секций: купить / регион / заработать / документы */}
-      <div className="row">
-        <div className="col gp gp--md">
-          <span
-            className="title fs__md fw__bd mg mg__md--btm"
-            data-anim="lux-up"
-            data-delay="0.1"
-            data-i18n="footer.buy_section"
-          >
-            КУПИТЬ
-          </span>
-        </div>
-
-        <div className="col gp gp--md">
-          <span
-            className="title fs__md fw__bd mg mg__md--btm"
-            data-anim="lux-up"
-            data-delay="0.1"
-            data-i18n="footer.region_section"
-          >
-            РЕГИОН
-          </span>
-
-          <div className="region-block col gp gp--xs">
-            <span
-              className="link s__md fw__rg"
-              data-anim="lux-up"
-              data-delay="0.2"
-              data-i18n="Россия"
-            >
-              Россия
-            </span>
-
-            <div id="languages-ru" className="languages-dropdown row gp gp--xs">
-              <a
-                href="#"
-                className="languages__item link fs__md fw__rg opc opc--50"
-                data-anim="fade"
-                data-delay="0.28"
-                data-lang="ru"
-                data-region="ru"
-                data-i18n="Русский"
-              >
-                <span className="flag ru"></span>Русский
-              </a>
-              <a
-                href="#"
-                className="languages__item link fs__md fw__rg opc opc--50"
-                data-anim="fade"
-                data-delay="0.48"
-                data-lang="en"
-                data-region="ru"
-                data-i18n="English"
-              >
-                <span className="flag en"></span>English
-              </a>
-            </div>
+    <footer className="mt-auto bg-card border-t border-border/50">
+      <div className="max-w-6xl mx-auto px-6 py-12 grid sm:grid-cols-2 md:grid-cols-3 gap-8 text-sm">
+        <div>
+          <h3 className="font-semibold mb-3 text-foreground/80">РЕГИОН</h3>
+          <p className="text-muted-foreground mb-2">Россия</p>
+          <div className="flex gap-3">
+            <span className="cursor-pointer text-muted-foreground hover:text-primary">Русский</span>
+            <span className="cursor-pointer text-muted-foreground hover:text-primary">English</span>
           </div>
         </div>
 
-        <div className="col gp gp--md">
-          <span
-            className="title fs__md fw__bd mg mg__md--btm"
-            data-i18n="footer.earn_section"
-            data-anim="lux-up"
-            data-delay="0.1"
-          >
-            ЗАРАБОТАТЬ
-          </span>
-          <a
-            href="https://bio30.ru/referal"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="footer.general_info"
-            data-anim="lux-up"
-            data-delay="0.1"
-          >
+        <div>
+          <h3 className="font-semibold mb-3 text-foreground/80">ЗАРАБОТАТЬ</h3>
+          <Link href="/bio30/referal" className="block text-muted-foreground hover:text-primary">
             Общая информация
-          </a>
-          <a
-            href="https://bio30.ru/settings"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="footer.my_account"
-            data-anim="lux-up"
-            data-delay="0.1"
-          >
+          </Link>
+          <Link href="/profile" className="block text-muted-foreground hover:text-primary">
             Мой кабинет
-          </a>
+          </Link>
         </div>
 
-        <div className="col gp gp--md">
-          <span
-            className="title fs__md fw__bd mg mg__md--btm"
-            data-i18n="footer.documents_section"
-            data-anim="lux-up"
-            data-delay="0.1"
-          >
-            ДОКУМЕНТЫ
-          </span>
-          <a
-            href="https://bio30.ru/docs/data"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.data"
-            data-anim="lux-up"
-            data-delay="0.2"
-          >
-            Персональные данные
-          </a>
-          <a
-            href="https://bio30.ru/docs/gdpr"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.gdpr"
-            data-anim="lux-up"
-            data-delay="0.3"
-          >
-            GDPR
-          </a>
-          <a
-            href="https://bio30.ru/docs/confidencial"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.confidencial"
-            data-anim="lux-up"
-            data-delay="0.4"
-          >
-            Конфиденциальность
-          </a>
-          <a
-            href="https://bio30.ru/docs/policy"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.policy"
-            data-anim="lux-up"
-            data-delay="0.5"
-          >
-            Политика
-          </a>
-          <a
-            href="https://bio30.ru/docs/info"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.info"
-            data-anim="lux-up"
-            data-delay="0.6"
-          >
-            Информация
-          </a>
-          <a
-            href="https://bio30.ru/docs/payment"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.payment"
-            data-anim="lux-up"
-            data-delay="0.7"
-          >
-            Оплата
-          </a>
-          <a
-            href="https://bio30.ru/docs/returns"
-            className="link fs__md fw__rg opc opc--50 anmt"
-            data-i18n="docs.returns"
-            data-anim="lux-up"
-            data-delay="0.8"
-          >
-            Возвраты
-          </a>
+        <div className="hidden sm:block">
+          <h3 className="font-semibold mb-3 text-foreground/80">ДОКУМЕНТЫ</h3>
+          {["data", "gdpr", "confidencial", "policy", "info", "payment", "returns"].map((doc) => (
+            <a
+              key={doc}
+              href={`${docBase}/${doc}`}
+              className="block text-muted-foreground hover:text-primary"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {doc.toUpperCase()}
+            </a>
+          ))}
         </div>
       </div>
 
-      {/* нижний правовой блок */}
-      <div className="row top pd pd__xxl--top pd__xxl--btm">
-        <div className="aside">
-          <div className="row ctr gp gp--xs">
-            <div className="age"></div>
-            <span
-              className="text fs__sm fw__rg opc opc--50"
-              data-i18n="footer.site_info_adults"
-            >
-              Для лиц старше 18 лет
-            </span>
-          </div>
-        </div>
-
-        <div className="bside">
-          <div className="row ctr rgt gp gp--xs pd pd__lg--rgt">
-            <span className="subtitle fs__sm fw__rg">
-              <a
-                href="https://bio30.ru/docs/data"
-                className="subtitle fs__sm fw__rg"
-                data-i18n="footer.personal_data_processing"
-              >
-                Обработка персональных данных
-              </a>
-            </span>
-            <span className="subtitle fs__sm fw__rg">
-              <a
-                href="https://bio30.ru/docs/confidencial"
-                className="subtitle fs__sm fw__rg"
-                data-i18n="footer.privacy_policy"
-              >
-                Политика конфиденциальности
-              </a>
-            </span>
-          </div>
-        </div>
+      <div className="border-t border-border/30 py-4 text-center text-xs text-muted-foreground">
+        © 2025 BIO 3.0 — все права защищены.
       </div>
     </footer>
   );
