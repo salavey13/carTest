@@ -1,3 +1,4 @@
+// /app/bio30/page.tsx
 "use client";
 
 import React from "react";
@@ -111,7 +112,7 @@ const HomePage: React.FC = () => {
               title: "Cordyceps Sinensis",
               desc: "Адаптоген, помогает справляться со стрессом. Содержит кордицепин и полисахариды для поддержки иммунитета, улучшения выносливости, общего укрепления. Идеален для спортсменов, активных людей и стремящихся к здоровью.",
               price: 2500,
-              img: "https://bio30.ru/front/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp",
+              img: "https://bio30.ru/static/uploads/products/8ccf8585e93949cea7c79b9a9410489f.webp",
               link: "/categories/cordyceps-sinensis",
               color: "bg-yellow-500",
             },
@@ -119,7 +120,7 @@ const HomePage: React.FC = () => {
               title: "Spirulina Chlorella",
               desc: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы. Спирулина — это сине-зеленая водоросль, богатая белками, витаминами и минералами. Хлорелла — это одноклеточная зеленая водоросль, известная своими детоксикационными свойствами и высоким содержанием хлорофилла. Этот продукт помогает укрепить иммунную систему, улучшить пищеварение и поддерживать общее здоровье организма. Рекомендуется для вегетарианцев, спортсменов и всех, кто стремится к здоровому образу жизни.",
               price: 2500,
-              img: "https://bio30.ru/front/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp",
+              img: "https://bio30.ru/static/uploads/products/f21a69b0e62f4dee8b9f231985024282.webp",
               link: "/categories/spirulina-chlorella",
               color: "bg-green-500",
             },
@@ -127,7 +128,7 @@ const HomePage: React.FC = () => {
               title: "Lion's Mane",
               desc: "Lion's Mane, также известный как грива льва или гриб-геркулес, является популярным биологически активным добавкой (БАД), используемой в традиционной китайской медицине. Этот гриб известен своими нейропротекторными свойствами, которые помогают улучшить когнитивные функции, память и концентрацию. Lion's Mane также поддерживает нервную систему и способствует общему укреплению организма. Рекомендуется для людей, стремящихся улучшить свою умственную активность и общее здоровье.",
               price: 100,
-              img: "https://bio30.ru/front/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp",
+              img: "	https://bio30.ru/static/uploads/products/d99d3385cd3f42d6aa1389adb7a719ce.webp",
               link: "/categories/lion-s-mane",
               color: "bg-blue-500",
             },
@@ -135,7 +136,7 @@ const HomePage: React.FC = () => {
               title: "MAGNESIUM PYRIDOXINE",
               desc: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления. Высокобиодоступные формы магния цитрата и пиридоксина обеспечивают глубокое расслабление, качественный сон и защиту от стресса.",
               price: 1600,
-              img: "https://bio30.ru/front/static/uploads/products/1552689351894f229843f51efdb813fc.webp",
+              img: "https://bio30.ru/static/uploads/products/74faf744a03e4f1c83e24ace9ac7582b.webp",
               link: "/categories/magnesium-pyridoxine",
               color: "bg-purple-500",
             },
