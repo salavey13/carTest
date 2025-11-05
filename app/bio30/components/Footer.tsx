@@ -2,10 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-//import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
+import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 const Footer: React.FC = () => {
   const docBase = "https://bio30.ru/docs";
-//  useBio30ThemeFix();
+  useBio30ThemeFix();
 
   return (
     <footer className="mt-auto bg-[hsl(0_0%_10%)] border-t border-border/50">
