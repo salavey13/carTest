@@ -1,0 +1,885 @@
+.card,
+.benefit {
+    position: relative;
+
+    border-radius: var(--md);
+    overflow: hidden;
+
+
+
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    z-index: 0;
+    border-image-outset: 1px;
+    border-image: initial;
+    display: flex;
+
+
+
+}
+
+.card .title {
+    word-break: break-word;
+}
+.benefit .title {
+    word-break: break-word;
+}
+
+
+.benefit .image__web {
+    z-index: 2;
+}
+
+
+
+/* ----------------- Основные настройки ----------------- */
+
+.card__default,
+.benefit__default {
+    display: flex;
+    height: 320px;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.card__horizontal,
+.benefit__horizontal {
+    display: flex;
+    height: 320px;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.card__center,
+.benefit__center {
+    display: flex;
+    height: 320px;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.card__vertical, 
+.benefit__vertical {
+    display: flex;
+    height: auto;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+
+
+@media (max-width: 576px) {
+
+ /* ----------------- Основные настройки ----------------- */
+
+ .card__default,
+ .benefit__default {
+     display: flex;
+     height: auto;
+     flex-direction: column;
+     justify-content: space-between;
+ }
+
+ .card__horizontal,
+ .benefit__horizontal {
+     display: flex;
+     height: auto;
+     flex-direction: column;
+     justify-content: space-between;
+ }
+
+ .card__center,
+ .benefit__center {
+     display: flex;
+     height: auto;
+     flex-direction: column;
+     justify-content: space-between;
+ }
+
+ .card__vertical, 
+ .benefit__vertical {
+     display: flex;
+     height: auto;
+     flex-direction: column;
+     justify-content: space-between;
+ }
+
+ .prices {
+    display: flex;
+    flex-direction: column;
+    gap: var(--xs);
+
+ }
+
+
+ /* -----------------Horizonta (aside)----------------- */
+
+
+ .card__default .aside,
+ .benefit__default .aside {
+     width: 100%;
+     height: 100%;
+ }
+ 
+ .card__default .bside,
+ .benefit__default .bside {
+     width: 100%;
+     height: 100%;
+     display: flex;
+     align-items: flex-end;
+     justify-content: center;
+ }
+ 
+ .card__horizontal .aside,
+ .benefit__horizontal .aside {
+     width: 100%;
+     height: 100%;
+ }
+ 
+ .card__horizontal .bside,
+ .benefit__horizontal .bside {
+     width: 100%;
+     height: 100%;
+     display: flex;
+     align-items: flex-end;
+     justify-content: center;
+ }
+
+
+ /* -----------------Vertical (bside)----------------- */
+ 
+
+ .card__vertical .aside,
+ .benefit__vertical .aside {
+     width: 100%;
+     height: 100%;
+ }
+ 
+ .card__vertical .bside,
+ .benefit__vertical .bside {
+     width: 100%;
+     height: 100%;
+     display: flex;
+     align-items: flex-end;
+     justify-content: center;
+ }
+ 
+ .card__center .aside,
+ .benefit__center .aside {
+     width: 100%;
+     height: 50%;
+ }
+ 
+ .card__center .bside,
+ .benefit__center .bside {
+     width: 100%;
+     height: 50%;
+     display: flex;
+     align-items: flex-end;
+     justify-content: center;
+ }
+
+
+ /* ----------------- Изображения (web) ----------------- */
+
+
+ .card__default .image__web, .benefit__default .image__web {
+     display: none;
+ }
+
+ .card__horizontal .image__web, .benefit__horizontal .image__web {
+     display: none;
+ }
+
+ .card__center .image__web, .benefit__center .image__web {
+     display: none;
+ }
+
+ .card__vertical .image__web, .benefit__vertical .image__web {
+     display: none; 
+ }
+
+ /* ----------------- Изображения (mobile) ----------------- */
+
+ .card__default .image__mobile, .benefit__default .image__mobile {
+     width: 100%;
+     height: auto;
+     display: block;
+     object-fit: cover;   
+ }
+
+ .card__horizontal .image__mobile, .benefit__horizontal .image__mobile {
+     width: 100%;
+     height: auto;
+     display: block;
+     object-fit: cover;   
+ }
+
+ .card__center .image__mobile, .benefit__center .image__mobile {
+     width: 100%;
+     height: auto;
+     display: block;
+     object-fit: cover;   
+ }
+
+ .card__vertical .image__mobile, .benefit__vertical .image__mobile {
+     width: 100%;
+     height: auto;
+     display: block;
+     object-fit: cover;   
+ }
+
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+
+    /* ----------------- Основные настройки ----------------- */
+
+    .card__default,
+    .benefit__default {
+        display: flex;
+        height: auto;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__horizontal,
+    .benefit__horizontal {
+        display: flex;
+        height: auto;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__center,
+    .benefit__center {
+        display: flex;
+        height: auto;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__vertical, 
+    .benefit__vertical {
+        display: flex;
+        height: auto;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__default .aside,
+    .benefit__default .aside {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .card__default .bside,
+    .benefit__default .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__horizontal .aside,
+    .benefit__horizontal .aside {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .card__horizontal .bside,
+    .benefit__horizontal .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* -----------------Vertical (bside)----------------- */
+    
+
+    .card__vertical .aside,
+    .benefit__vertical .aside {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .card__vertical .bside,
+    .benefit__vertical .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__center .aside,
+    .benefit__center .aside {
+        width: 100%;
+        height: 50%;
+    }
+    
+    .card__center .bside,
+    .benefit__center .bside {
+        width: 100%;
+        height: 50%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__default .image__web, .benefit__default .image__web {
+        display: none;
+    }
+
+    .card__horizontal .image__web, .benefit__horizontal .image__web {
+        display: none;
+    }
+
+    .card__center .image__web, .benefit__center .image__web {
+        display: none;
+    }
+
+    .card__vertical .image__web, .benefit__vertical .image__web {
+        display: none; 
+    }
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+    .card__default .image__mobile, .benefit__default .image__mobile {
+        width: 100%;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__horizontal .image__mobile, .benefit__horizontal .image__mobile {
+        width: 100%;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__center .image__mobile, .benefit__center .image__mobile {
+        width: 100%;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__vertical .image__mobile, .benefit__vertical .image__mobile {
+        width: 100%;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+
+}
+
+@media (min-width: 769px) and (max-width: 992px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+    .card__default,
+    .benefit__default {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .card__horizontal,
+    .benefit__horizontal {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .card__center,
+    .benefit__center {
+        display: flex;
+        height: 320px;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__vertical, 
+    .benefit__vertical {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__default .aside,
+    .benefit__default .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__default .bside,
+    .benefit__default .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__horizontal .aside,
+    .benefit__horizontal .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__horizontal .bside,
+    .benefit__horizontal .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* -----------------Vertical (bside)----------------- */
+    
+
+    .card__vertical .aside,
+    .benefit__vertical .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__vertical .bside,
+    .benefit__vertical .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__center .aside,
+    .benefit__center .aside {
+        width: 100%;
+        height: 50%;
+    }
+    
+    .card__center .bside,
+    .benefit__center .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__default .image__web, .benefit__default .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__horizontal .image__web, .benefit__horizontal .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__center .image__web, .benefit__center .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: contain;   
+    }
+
+    .card__vertical .image__web, .benefit__vertical .image__web {
+        width: 320px;
+        height: 100%;
+        display: block;
+        object-fit: cover;   
+    }
+
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+
+    .card__default .image__mobile, .benefit__default .image__mobile {
+        display: none;  
+    }
+
+    .card__horizontal .image__mobile, .benefit__horizontal .image__mobile {
+        display: none;
+    }
+
+    .card__center .image__mobile, .benefit__center .image__mobile {
+        display: none;   
+    }
+
+    .card__vertical .image__mobile, .benefit__vertical .image__mobile {
+        display: none; 
+    }
+
+
+}
+
+
+
+
+
+@media (min-width: 993px) and (max-width: 1366px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+
+    .card__default,
+    .benefit__default {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .card__horizontal,
+    .benefit__horizontal {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .card__center,
+    .benefit__center {
+        display: flex;
+        height: 320px;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__vertical, 
+    .benefit__vertical {
+        display: flex;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__default .aside,
+    .benefit__default .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__default .bside,
+    .benefit__default .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__horizontal .aside,
+    .benefit__horizontal .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__horizontal .bside,
+    .benefit__horizontal .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* -----------------Vertical (bside)----------------- */
+    
+
+    .card__vertical .aside,
+    .benefit__vertical .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__vertical .bside,
+    .benefit__vertical .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__center .aside,
+    .benefit__center .aside {
+        width: 100%;
+        height: 50%;
+    }
+    
+    .card__center .bside,
+    .benefit__center .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__default .image__web, .benefit__default .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__horizontal .image__web, .benefit__horizontal .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__center .image__web, .benefit__center .image__web {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+    }
+
+    .card__vertical .image__web, .benefit__vertical .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+
+    .card__default .image__mobile, .benefit__default .image__mobile {
+        display: none;  
+    }
+
+    .card__horizontal .image__mobile, .benefit__horizontal .image__mobile {
+        display: none;
+    }
+
+    .card__center .image__mobile, .benefit__center .image__mobile {
+        display: none;   
+    }
+
+    .card__vertical .image__mobile, .benefit__vertical .image__mobile {
+        display: none; 
+    }
+
+
+}
+
+
+
+
+
+@media (min-width: 1366px) {
+
+
+    /* ----------------- Основные настройки ----------------- */
+
+    .card__default,
+    .benefit__default {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .card__horizontal,
+    .benefit__horizontal {
+        display: flex;
+        height: 320px;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .card__center,
+    .benefit__center {
+        display: flex;
+        height: 320px;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__vertical, 
+    .benefit__vertical {
+        display: flex;
+        height: auto;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card__horizontal .prices {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+        align-items: center;
+     }
+
+
+    /* -----------------Horizonta (aside)----------------- */
+
+
+    .card__default .aside,
+    .benefit__default .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__default .bside,
+    .benefit__default .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-end;
+    }
+    
+    .card__horizontal .aside,
+    .benefit__horizontal .aside {
+        width: 50%;
+        height: 100%;
+    }
+    
+    .card__horizontal .bside,
+    .benefit__horizontal .bside {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* -----------------Vertical (bside)----------------- */
+    
+
+    .card__vertical .aside,
+    .benefit__vertical .aside {
+        width: 100%;
+        height: 30%;
+    }
+    
+    .card__vertical .bside,
+    .benefit__vertical .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+    
+    .card__center .aside,
+    .benefit__center .aside {
+        width: 100%;
+        height: 50%;
+    }
+    
+    .card__center .bside,
+    .benefit__center .bside {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+    }
+
+
+    /* ----------------- Изображения (web) ----------------- */
+
+
+    .card__default .image__web, .benefit__default .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__horizontal .image__web, .benefit__horizontal .image__web {
+        width: 320px;
+        height: auto;
+        display: block;
+        object-fit: cover;   
+    }
+
+    .card__center .image__web, .benefit__center .image__web {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;   
+    }
+
+    .card__vertical .image__web, .benefit__vertical .image__web {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;   
+    }
+
+
+    /* ----------------- Изображения (mobile) ----------------- */
+
+
+    .card__default .image__mobile, .benefit__default .image__mobile {
+        display: none;  
+    }
+
+    .card__horizontal .image__mobile, .benefit__horizontal .image__mobile {
+        display: none;
+    }
+
+    .card__center .image__mobile, .benefit__center .image__mobile {
+        display: none;   
+    }
+
+    .card__vertical .image__mobile, .benefit__vertical .image__mobile {
+        display: none; 
+    }
+
+
+}

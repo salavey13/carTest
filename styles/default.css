@@ -1,0 +1,77 @@
+@media (max-width: 576px) {
+    .default {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+    }
+
+    .default .aside--default {
+        width: 100%;
+    }
+
+    .default .bside--default {
+        width: 100%;
+    }
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+    .default {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+    }
+
+    .default .aside--default {
+        width: 100%;
+    }
+
+    .default .bside--default {
+        width: 100%;
+    }
+}
+@media (min-width: 769px) and (max-width: 992px) {
+    .default {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+    }
+
+    .default .aside--default {
+        width: 100%;
+    }
+
+    .default .bside--default {
+        width: 100%;
+    }
+}
+@media (min-width: 993px) and (max-width: 1440px) {
+    .default {
+        display: flex;
+        flex-direction: row;
+        gap: var(--hg);
+    }
+
+    .default .aside--default {
+        width: 30%;
+    }
+
+    .default .bside--default {
+        width: 60%;
+    }
+}
+
+@media (min-width: 1400px) {
+    .default {
+        display: flex;
+        flex-direction: row;
+        gap: var(--hg);
+    }
+
+    .default .aside--default {
+        width: 30%;
+    }
+
+    .default .bside--default {
+        width: 60%;
+    }
+}

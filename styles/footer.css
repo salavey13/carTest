@@ -1,0 +1,226 @@
+@media (max-width: 576px) {
+
+    footer {
+        width: 100%;
+    }
+
+    footer .row {
+        display: flex;
+        flex-direction: column;
+    }
+
+    footer .col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    footer a {
+        text-decoration: none;
+        color: var(--white);
+        display: flex;
+        justify-content: center;
+    }
+
+    footer .title {
+        font-family: var(--primary);
+        color: var(--white);
+        margin-top: var(--hg);
+    }
+
+
+    footer .aside {
+        width: 100%;
+    }
+
+
+    footer .fw__rg {
+        font-weight: var(--regular);
+        text-align: center;
+    }
+
+
+    footer .bside {
+        width: 100%;
+        margin-top: var(--hg);
+    }
+
+    footer .gp--md {
+        gap: var(--sm);
+    }
+
+    .age {
+        background-image: url(/front/static/img/icons/age_white.svg);
+        display: block;
+        width: 64px;
+        height: 32px;
+        background-repeat: no-repeat;
+        background-position: center;
+        flex-shrink: 0;
+        margin-bottom: var(--sm);
+        background-size: contain;
+        margin-top: var(--hg);
+    }
+
+    footer .btn {
+        width: 100%;
+        margin-bottom: var(--xs);
+    }
+
+    .social {
+        display: none;
+    }
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+
+    footer {
+        width: 100%;
+    }
+    
+    footer .row {
+        display: flex;
+        flex-direction: column;
+    }
+
+    footer .col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    footer a {
+        text-decoration: none;
+        color: var(--white);
+        display: flex;
+        justify-content: center;
+    }
+
+    footer .title {
+        font-family: var(--primary);
+        color: var(--white);
+        margin-top: var(--hg);
+    }
+
+
+    footer .aside {
+        width: 100%;
+    }
+
+
+    footer .fw__rg {
+        font-weight: var(--regular);
+        text-align: center;
+    }
+
+
+    footer .bside {
+        width: 100%;
+        margin-top: var(--hg);
+    }
+
+    footer .gp--md {
+        gap: var(--sm);
+    }
+
+    .age {
+        background-image: url(/front/static/img/icons/age_white.svg);
+        display: block;
+        width: 64px;
+        height: 32px;
+        background-repeat: no-repeat;
+        background-position: center;
+        flex-shrink: 0;
+        margin-bottom: var(--sm);
+        background-size: contain;
+        margin-top: var(--hg);
+    }
+
+    footer .btn {
+        width: 100%;
+        margin-bottom: var(--xs);
+    }
+
+    .social {
+        display: none;
+    }
+}
+@media (min-width: 769px) and (max-width: 992px) {
+
+    footer {
+        width: 100%;
+    }
+    
+    footer .row {
+        display: flex;
+        flex-direction: column;
+    }
+
+    footer .col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    footer a {
+        text-decoration: none;
+        color: var(--white);
+        display: flex;
+        justify-content: center;
+    }
+
+    footer .title {
+        font-family: var(--primary);
+        color: var(--white);
+        margin-top: var(--hg);
+    }
+
+
+    footer .aside {
+        width: 100%;
+    }
+
+
+    footer .fw__rg {
+        font-weight: var(--regular);
+        text-align: center;
+    }
+
+
+    footer .bside {
+        width: 100%;
+        margin-top: var(--hg);
+    }
+
+    footer .gp--md {
+        gap: var(--sm);
+    }
+
+    .age {
+        background-image: url(/front/static/img/icons/age_white.svg);
+        display: block;
+        width: 64px;
+        height: 32px;
+        background-repeat: no-repeat;
+        background-position: center;
+        flex-shrink: 0;
+        margin-bottom: var(--sm);
+        background-size: contain;
+        margin-top: var(--hg);
+    }
+
+    footer .btn {
+        width: 100%;
+        margin-bottom: var(--xs);
+    }
+
+    .social {
+        display: none;
+    }
+}
+@media (min-width: 993px) and (max-width: 1440px) {
+
+}
+@media (min-width: 1400px) {
+
+}

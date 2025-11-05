@@ -1,0 +1,77 @@
+@media (max-width: 576px) {
+    .fluid {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+    }
+
+    .fluid .aside--fluid {
+        width: 100%;
+    }
+
+    .fluid .bside--fluid {
+        width: 100%;
+    }
+}
+
+@media (min-width: 577px) and (max-width: 768px) {
+    .fluid {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+    }
+
+    .fluid .aside--fluid {
+        width: 100%;
+    }
+
+    .fluid .bside--fluid {
+        width: 100%;
+    }
+}
+@media (min-width: 769px) and (max-width: 992px) {
+    .fluid {
+        display: flex;
+        flex-direction: column;
+        gap: var(--xs);
+    }
+
+    .fluid .aside--fluid {
+        width: 100%;
+    }
+
+    .fluid .bside--fluid {
+        width: 100%;
+    }
+}
+@media (min-width: 993px) and (max-width: 1440px) {
+    .fluid {
+        display: flex;
+        flex-direction: row;
+        gap: var(--hg);
+    }
+
+    .fluid .aside--fluid {
+        width: 50%;
+    }
+
+    .fluid .bside--fluid {
+        width: 50%;
+    }
+}
+
+@media (min-width: 1400px) {
+    .fluid {
+        display: flex;
+        flex-direction: row;
+        gap: var(--hg);
+    }
+
+    .fluid .aside--fluid {
+        width: 50%;
+    }
+
+    .fluid .bside--fluid {
+        width: 50%;
+    }
+}

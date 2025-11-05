@@ -1,0 +1,25 @@
+
+.grid--categories {
+  display: grid;
+  /* Создаем 2 колонки равной ширины */
+  grid-template-columns: repeat(2, 1fr);
+  /* Добавляем отступы между ячейками (опционально) */
+
+}
+
+@media (max-width: 576px) {
+
+    
+
+}
+@media (min-width: 577px) and (max-width: 768px) {
+
+}
+@media (min-width: 769px) and (max-width: 992px) {
+
+}
+@media (min-width: 993px) and (max-width: 1366px) {
+
+}
+@media (min-width: 1400px) {}
+
