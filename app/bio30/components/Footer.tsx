@@ -2,12 +2,13 @@
 
 import React from "react";
 import Link from "next/link";
-
+import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
 const Footer: React.FC = () => {
   const docBase = "https://bio30.ru/docs";
+  useBio30ThemeFix();
 
   return (
-    <footer className="mt-auto bg-card border-t border-border/50">
+    <footer className="mt-auto bg-[hsl(0_0%_10%)] border-t border-border/50">
       <div className="max-w-6xl mx-auto px-6 py-12 grid sm:grid-cols-2 md:grid-cols-3 gap-8 text-sm">
         <div>
           <h3 className="font-semibold mb-3 text-foreground/80">РЕГИОН</h3>

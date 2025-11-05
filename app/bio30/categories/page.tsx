@@ -10,34 +10,33 @@ import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 
 const products = [
   { 
-    id: "lions-mane", 
+    id: "lion-s-mane", 
     title: "Lion's Mane", 
     desc: "Гриб Львиная грива. Улучшает когнитивные функции.", 
     price: 1500, 
-    img: "https://m.media-amazon.com/images/S/aplus-media-library-service-media/3e47bc7b-0f6f-4d80-8d5b-d673ce2bcae1.__CR0,0,600,450_PT0_SX600_V1___.jpg" // From search [image:0]
+    img: "https://bio30.ru/front/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp"
   },
   { 
     id: "cordyceps-sinensis", 
     title: "Cordyceps Sinensis", 
     desc: "Кордицепс китайский. Повышает энергию и выносливость.", 
     price: 2000, 
-    img: "https://manukahoneyofnz.com/cdn/shop/products/MHprop300b_1200x.png?v=1700610630" // [image:1]
+    img: "https://bio30.ru/front/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp"
   },
   { 
     id: "spirulina-chlorella", 
     title: "Spirulina Chlorella", 
     desc: "Спирулина и хлорелла. Детокс и иммунитет.", 
     price: 1200, 
-    img: "https://pub.mdpi-res.com/ijms/ijms-25-11724/article_deploy/html/images/ijms-25-11724-g001-550.jpg?1730384706" // [image:2] placeholder related
+    img: "https://bio30.ru/front/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp"
   },
   { 
     id: "magnesium-pyridoxine", 
     title: "Magnesium Pyridoxine", 
     desc: "Магний и витамин B6. Для нервной системы.", 
     price: 1800, 
-    img: "https://ars.els-cdn.com/content/image/1-s2.0-S0924224421004155-gr1.jpg" // [image:3]
+    img: "https://bio30.ru/front/static/uploads/products/1552689351894f229843f51efdb813fc.webp"
   },
-  // Add more if needed
 ];
 
 const CategoriesPage: React.FC = () => {
@@ -71,7 +70,7 @@ const CategoriesPage: React.FC = () => {
               variants={productGrid.child}
               className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
             >
-              <Link href={`/bio30/product/${p.id}`}>
+              <Link href={`/bio30/categories/${p.id}`}>
                 <img
                   src={p.img}
                   alt={p.title}

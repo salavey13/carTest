@@ -8,12 +8,15 @@ import Footer from "./components/Footer";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 
+import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
+
 const HomePage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
   const benefits = useStaggerFadeIn(2, 0.2);
   const categories = useStaggerFadeIn(4, 0.15);
   const faq = useStaggerFadeIn(5, 0.15);
+  useBio30ThemeFix();
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
@@ -38,7 +41,7 @@ const HomePage: React.FC = () => {
           variants={heroSubtitle.variants}
           className="text-base text-muted-foreground max-w-2xl mx-auto mb-6"
         >
-          МАГАЗИН БИОЛОГИЧЕСКИ АКТИВНЫХ ДОБАВОК
+          Передовые биопродукты и технологии для здоровья и будущего. Откройте новые возможности с нами.
         </motion.p>
 
         <motion.div
@@ -104,7 +107,7 @@ const HomePage: React.FC = () => {
             {
               title: "Витамины",
               desc: "Ежедневная поддержка здоровья и энергии.",
-              img: "vitamins.webp", // Keep placeholder or update if found
+              img: "vitamins.webp", 
             },
             {
               title: "Минералы",
