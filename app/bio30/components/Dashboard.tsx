@@ -1,9 +1,9 @@
+// /app/bio30/components/Dashboard.tsx
 "use client";
 
 import React, { useEffect, useState } from 'react';
 import { getReferralStats } from '../actions';
 import { useAppContext } from '@/contexts/AppContext';
-import '../styles.css';
 
 const Dashboard: React.FC = () => {
   const { dbUser } = useAppContext();

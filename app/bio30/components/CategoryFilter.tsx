@@ -1,7 +1,7 @@
+// /app/bio30/components/CategoryFilter.tsx
 "use client";
 
 import React from 'react';
-import '../styles.css';
 
 const CategoryFilter: React.FC = () => {
   return (
