@@ -39,12 +39,12 @@ const PartnerForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} action="/referal/send" method="POST">
+    <form onSubmit={handleSubmit} action="/referal/send" method="POST" className="col gp gp--lg">
       <input type="text" placeholder="Введите ваше имя и фамилию" className="input" />
       <small className="subtitle fs__sm fw__md opc opc--50">Укажите своё настоящее имя и фамилию — для правильного оформления документов.</small>
       <input type="tel" placeholder="Введите ваш номер телефона" className="input" />
       <small className="subtitle fs__sm fw__md opc opc--50">Укажите номер, привязанный к Telegram или WhatsApp — для быстрой связи.</small>
-      <input type="email" placeholder="Ваша электронная почта" className="input" />
+      <input type="email" placeholder="Ваша электронная почта" className="input" name="email" required />
       <small className="subtitle fs__sm fw__md opc opc--50">Укажите актуальный email — он будет использоваться для подтверждения и документооборота.</small>
       <select className="input">
         <option>Российская Федерация</option>

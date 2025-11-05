@@ -2,9 +2,7 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
-import $ from "jquery";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -12,6 +10,8 @@ import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
 import PartnerForm from "./components/PartnerForm";
+
+const SlickSlider = dynamic(() => import("react-slick"), { ssr: false });
 
 const HomePage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
@@ -21,34 +21,36 @@ const HomePage: React.FC = () => {
   useBio30ThemeFix();
 
   useEffect(() => {
-    const $heroSlider = $('.hero-slider');
-    if ($heroSlider.length) {
-      $heroSlider.slick({
-        infinite: true,
-        slidesToShow: 1,
-        slidesToScroll: 1,
-        autoplay: false,
-        autoplaySpeed: 1000,
-        arrows: false,
-        dots: false,
-      });
-    }
+    if (typeof window !== "undefined") {
+      const $heroSlider = $('.hero-slider');
+      if ($heroSlider.length) {
+        $heroSlider.slick({
+          infinite: true,
+          slidesToShow: 1,
+          slidesToScroll: 1,
+          autoplay: false,
+          autoplaySpeed: 1000,
+          arrows: false,
+          dots: false,
+        });
+      }
 
-    const $stories = $('.stories');
-    if ($stories.length) {
-      $stories.slick({
-        dots: false,
-        arrows: false,
-        infinite: false,
-        speed: 800,
-        slidesToShow: 1,
-        slidesToScroll: 1,
-        responsive: [
-          { breakpoint: 1024, settings: { dots: true } },
-          { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
-          { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } }
-        ]
-      });
+      const $stories = $('.stories');
+      if ($stories.length) {
+        $stories.slick({
+          dots: false,
+          arrows: false,
+          infinite: false,
+          speed: 800,
+          slidesToShow: 1,
+          slidesToScroll: 1,
+          responsive: [
+            { breakpoint: 1024, settings: { dots: true } },
+            { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
+            { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } }
+          ]
+        });
+      }
     }
   }, []);
 
@@ -98,11 +100,9 @@ const HomePage: React.FC = () => {
       class: "card panel-bg-#02044A panel-text-#ffffff card__horizontal card__horizontal--product",
     },
   ];
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Header />
-
       <section className="hero-section">
         <div className="hero-slider">
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#FF0004', border: 'none' }}>
@@ -126,7 +126,6 @@ const HomePage: React.FC = () => {
               <img src="https://bio30.ru/static/uploads/hero/mobile_a78fcf38f4504f929f3f37b069a6e306.webp" alt="Новый уровень заботы о себе" className="image__mobile img--hero" />
             </div>
           </div>
-
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#0f0f0f', border: 'none' }}>
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
@@ -148,7 +147,6 @@ const HomePage: React.FC = () => {
               <img src="https://bio30.ru/static/uploads/hero/mobile_bfd7ec9cc635468cb945c544c663095f.webp" alt="Ваши добавки – в любой точке мира" className="image__mobile img--hero" />
             </div>
           </div>
-
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#B2FF00', border: 'none' }}>
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
@@ -259,7 +257,6 @@ const HomePage: React.FC = () => {
           ))}
         </motion.div>
       </section>
-
       <section className="py-16 px-6 bg-muted/30 text-center">
         <motion.h2
           ref={partner.ref}
@@ -273,10 +270,8 @@ const HomePage: React.FC = () => {
         <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
         <PartnerForm />
       </section>
-
       <Footer />
     </div>
   );
 };
-
 export default HomePage;
