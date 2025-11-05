@@ -1,11 +1,10 @@
+// /app/bio30/page.tsx
 "use client";
 
 import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
@@ -99,7 +98,6 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <Header />
       <section className="hero-section">
         <SlickSlider {...heroSettings}>
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#FF0004', border: 'none' }}>
@@ -241,8 +239,6 @@ const HomePage: React.FC = () => {
         <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
         <PartnerForm />
       </section>
-
-      <Footer />
     </div>
   );
 };
