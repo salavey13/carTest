@@ -5,13 +5,13 @@ import { useAppContext } from "@/contexts/AppContext";
 import { ShoppingCart, User, Menu } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
+//import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 
 const Header: React.FC = () => {
   const { dbUser } = useAppContext();
   const cartCount = dbUser?.metadata?.cart?.length || 0;
   const [menuOpen, setMenuOpen] = useState(false);
-  useBio30ThemeFix();
+//  useBio30ThemeFix();
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
