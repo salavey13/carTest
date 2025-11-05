@@ -1,3 +1,4 @@
+// /app/bio30/referal/page.tsx
 "use client";
 
 import React, { useEffect } from 'react';
@@ -6,7 +7,6 @@ import Footer from '../components/Footer';
 import PartnerForm from '../components/PartnerForm';
 import Dashboard from '../components/Dashboard';
 import { useAppContext } from '@/contexts/AppContext';
-import '../styles.css';
 import { useBioAnimations } from '../hooks/useBioAnimations';
 
 const ReferalPage: React.FC = () => {

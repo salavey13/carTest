@@ -1,3 +1,4 @@
+// /app/bio30/categories/lion-s-mane/page.tsx
 "use client";
 
 import React from 'react';
@@ -6,7 +7,6 @@ import Footer from '../../components/Footer';
 import { useBioAnimations } from '../../hooks/useBioAnimations';
 import { addToCart } from '../../actions';
 import { useAppContext } from '@/contexts/AppContext';
-import '../../styles.css';
 
 const LionSManePage: React.FC = () => {
   useBioAnimations();

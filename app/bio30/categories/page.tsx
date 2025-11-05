@@ -5,7 +5,6 @@ import React, { useEffect } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import CategoryFilter from '../components/CategoryFilter';
-import '../styles.css';
 import { useBioAnimations } from '../hooks/useBioAnimations';
 
 const CategoriesPage: React.FC = () => {
