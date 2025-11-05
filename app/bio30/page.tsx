@@ -8,7 +8,7 @@ import Footer from './components/Footer';
 import { useBioAnimations } from './hooks/useBioAnimations';
 
 const HomePage: React.FC = () => {
-  useBioAnimations();
+  //useBioAnimations();
 
   return (
     <div>
