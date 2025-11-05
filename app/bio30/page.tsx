@@ -38,8 +38,7 @@ const HomePage: React.FC = () => {
           variants={heroSubtitle.variants}
           className="text-base text-muted-foreground max-w-2xl mx-auto mb-6"
         >
-          Передовые биотехнологии и натуральные ингредиенты — синергия
-          инноваций и природы для твоего здоровья.
+          МАГАЗИН БИОЛОГИЧЕСКИ АКТИВНЫХ ДОБАВОК
         </motion.p>
 
         <motion.div
@@ -47,8 +46,8 @@ const HomePage: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.8 }}
         >
-          <Link href="/bio30/details" className="btn btn--primary">
-            Узнать больше
+          <Link href="/bio30/categories" className="btn btn--primary">
+            Каталог продуктов
           </Link>
         </motion.div>
       </section>
@@ -74,7 +73,7 @@ const HomePage: React.FC = () => {
               desc: "Используем современные биотехнологии для максимальной эффективности и биодоступности.",
             },
             {
-              img: "image3.webp",
+              img: "image3.webp", // Placeholder, update if actual image found
               title: "Здоровье и благополучие",
               desc: "Формулы разработаны для поддержки здоровья, энергии и долголетия.",
             },
@@ -96,7 +95,7 @@ const HomePage: React.FC = () => {
         </motion.div>
       </section>
 
-      {/* CATEGORIES */}
+      {/* CATEGORIES TEASER */}
       <section className="py-16 bg-muted/30 px-6">
         <h2 className="text-center text-2xl font-bold mb-8">Категории</h2>
         <motion.div
@@ -110,7 +109,7 @@ const HomePage: React.FC = () => {
             {
               title: "Витамины",
               desc: "Ежедневная поддержка здоровья и энергии.",
-              img: "vitamins.webp",
+              img: "vitamins.webp", // Update with actual if available
             },
             {
               title: "Минералы",
@@ -160,13 +159,13 @@ const HomePage: React.FC = () => {
           className="space-y-6 max-w-3xl mx-auto"
         >
           {[
-            ["Что такое BIO 3.0?", "Платформа инновационных биопродуктов."],
-            ["Как заказать продукт?", "Добавьте товар в корзину и оформите заказ."],
-            ["Есть ли доставка?", "Да, по всей России с быстрой доставкой."],
-            ["Можно ли вернуть товар?", "Да, согласно политике возврата."],
+            ["Что такое BIO 3.0?", "Передовые биопродукты и технологии для здоровья и будущего."],
+            ["Как заказать продукт?", "Добавьте в корзину, проверьте и оформите заказ."],
+            ["Есть ли доставка?", "Да, быстрая доставка по России."],
+            ["Можно ли вернуть товар?", "Да, согласно условиям возврата."],
             [
               "Как присоединиться к реферальной программе?",
-              "Зарегистрируйтесь и получите реферальную ссылку.",
+              "Зарегистрируйтесь и получите реферальную ссылку в кабинете.",
             ],
           ].map(([q, a], i) => (
             <motion.div

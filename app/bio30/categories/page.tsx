@@ -5,17 +5,44 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
+import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 
-const categories = [
-  { title: "Категория 1", desc: "Биопродукты для здоровья", img: "image1.webp" },
-  { title: "Категория 2", desc: "Витамины и минералы", img: "image2.webp" },
-  { title: "Категория 3", desc: "Добавки для иммунитета", img: "image3.webp" },
-  { title: "Категория 4", desc: "Продукты для красоты", img: "image4.webp" },
+const products = [
+  { 
+    id: "lions-mane", 
+    title: "Lion's Mane", 
+    desc: "Гриб Львиная грива. Улучшает когнитивные функции.", 
+    price: 1500, 
+    img: "lions-mane.webp" 
+  },
+  { 
+    id: "cordyceps-sinensis", 
+    title: "Cordyceps Sinensis", 
+    desc: "Кордицепс китайский. Повышает энергию и выносливость.", 
+    price: 2000, 
+    img: "cordyceps.webp" 
+  },
+  { 
+    id: "spirulina-chlorella", 
+    title: "Spirulina Chlorella", 
+    desc: "Спирулина и хлорелла. Детокс и иммунитет.", 
+    price: 1200, 
+    img: "spirulina.webp" 
+  },
+  { 
+    id: "magnesium-pyridoxine", 
+    title: "Magnesium Pyridoxine", 
+    desc: "Магний и витамин B6. Для нервной системы.", 
+    price: 1800, 
+    img: "magnesium.webp" 
+  },
+  // Add more from categories.txt HTML
 ];
 
 const CategoriesPage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
+  const productGrid = useStaggerFadeIn(products.length, 0.1);
 
   return (
     <div>
@@ -25,34 +52,39 @@ const CategoriesPage: React.FC = () => {
           Продукты — BIO 3.0
         </motion.h1>
         <motion.p ref={heroSubtitle.ref} initial="hidden" animate={heroSubtitle.controls} variants={heroSubtitle.variants} className="text-muted-foreground max-w-xl mx-auto">
-          Каталог биодобавок для здоровья и красоты.
+          Каталог БАДов BIO 3.0. Широкий выбор для здоровья и красоты.
         </motion.p>
       </section>
 
-      <section className="grid gap-6 p-6 max-w-5xl mx-auto">
-        {categories.map((c, i) => {
-          const anim = useScrollFadeIn("up", i * 0.1);
-          return (
+      <section className="py-16 px-6">
+        <motion.div
+          ref={productGrid.ref}
+          initial="hidden"
+          animate={productGrid.controls}
+          variants={productGrid.container}
+          className="grid md:grid-cols-3 gap-6"
+        >
+          {products.map((p, i) => (
             <motion.div
               key={i}
-              ref={anim.ref}
-              initial="hidden"
-              animate={anim.controls}
-              variants={anim.variants}
-              className="flex flex-col md:flex-row items-center bg-card rounded-xl shadow-md overflow-hidden"
+              variants={productGrid.child}
+              className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
             >
-              <div className="flex-1 p-6">
-                <div className="text-lg font-bold mb-2">{c.title}</div>
-                <div className="text-muted-foreground">{c.desc}</div>
-              </div>
-              <img
-                src={`https://bio30.ru/static/uploads/categories/${c.img}`}
-                alt={c.title}
-                className="w-full md:w-1/3 h-48 object-cover"
-              />
+              <Link href={`/product/${p.id}`}>
+                <img
+                  src={`https://bio30.ru/static/uploads/products/${p.img}`}
+                  alt={p.title}
+                  className="w-full h-64 object-cover"
+                />
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold">{p.title}</h3>
+                  <p className="text-sm text-muted-foreground">{p.desc}</p>
+                  <p className="text-base font-bold mt-2">{p.price} руб.</p>
+                </div>
+              </Link>
             </motion.div>
-          );
-        })}
+          ))}
+        </motion.div>
       </section>
       <Footer />
     </div>
