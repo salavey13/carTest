@@ -88,6 +88,7 @@
     "react-markdown": "latest",
     "react-resizable-panels": "^2.1.7",
     "react-syntax-highlighter": "^15.6.1",
+    "react-slick": "latest",
     "recharts": "2.15.0",
     "remark-breaks": "latest",
     "remark-gfm": "latest",
