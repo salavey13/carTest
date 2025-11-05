@@ -1,9 +1,10 @@
+// /app/bio30/categories/page.tsx
 "use client";
 
 import React, { useEffect } from "react";
 import Link from "next/link";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+
+
 import CategoryFilter from "../components/CategoryFilter";
 import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
@@ -64,7 +65,7 @@ const CategoriesPage: React.FC = () => {
 
   return (
     <div>
-      <Header />
+      
       <section className="text-center py-16">
         <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
           Продукты — BIO 3.0
@@ -200,7 +201,7 @@ const CategoriesPage: React.FC = () => {
           </motion.div>
         </section>
       </div>
-      <Footer />
+      
     </div>
   );
 };

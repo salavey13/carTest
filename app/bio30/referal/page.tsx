@@ -1,8 +1,9 @@
+// /app/bio30/referal/page.tsx
 "use client";
 
 import React from "react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+
+
 import PartnerForm from "../components/PartnerForm";
 import Dashboard from "../components/Dashboard";
 import { useAppContext } from "@/contexts/AppContext";
@@ -28,7 +29,7 @@ const ReferalPage: React.FC = () => {
 
   return (
     <div>
-      <Header />
+      
       <section className="text-center py-16">
         <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
           Реферальная программа — BIO 3.0
@@ -60,7 +61,7 @@ const ReferalPage: React.FC = () => {
       </section>
 
       <div className="max-w-4xl mx-auto p-6">{isPartner ? <Dashboard /> : <PartnerForm />}</div>
-      <Footer />
+      
     </div>
   );
 };

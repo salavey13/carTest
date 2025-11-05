@@ -1,8 +1,9 @@
+// /app/bio30/delivery/page.tsx
 "use client";
 
 import React from "react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+
+
 import { motion } from "framer-motion";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
@@ -22,7 +23,7 @@ const DeliveryPage: React.FC = () => {
 
   return (
     <div>
-      <Header />
+      
       <section className="text-center py-16">
         <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
           Доставка — BIO 3.0
@@ -52,7 +53,7 @@ const DeliveryPage: React.FC = () => {
           ))}
         </motion.div>
       </section>
-      <Footer />
+      
     </div>
   );
 };

@@ -1,8 +1,9 @@
+// /app/bio30/details/page.tsx
 "use client";
 
 import React from "react";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+
+
 import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 
@@ -20,7 +21,7 @@ const DetailsPage: React.FC = () => {
 
   return (
     <div>
-      <Header />
+      
       <section className="text-center py-16">
         <motion.h1 ref={heroTitle.ref} initial="hidden" animate={heroTitle.controls} variants={heroTitle.variants} className="text-3xl font-bold gradient-text mb-2">
           Детали — BIO 3.0
@@ -48,7 +49,7 @@ const DetailsPage: React.FC = () => {
           );
         })}
       </section>
-      <Footer />
+      
     </div>
   );
 };
