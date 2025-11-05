@@ -11,7 +11,7 @@ import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 const HomePage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
-  const benefits = useStaggerFadeIn(3, 0.2);
+  const benefits = useStaggerFadeIn(2, 0.2);
   const categories = useStaggerFadeIn(4, 0.15);
   const faq = useStaggerFadeIn(5, 0.15);
 
@@ -59,7 +59,7 @@ const HomePage: React.FC = () => {
           initial="hidden"
           animate={benefits.controls}
           variants={benefits.container}
-          className="grid md:grid-cols-3 gap-6"
+          className="grid md:grid-cols-2 gap-6"
         >
           {[
             {
@@ -71,11 +71,6 @@ const HomePage: React.FC = () => {
               img: "6a317041578644d1b283abeaf781bf36.webp",
               title: "Инновационные технологии",
               desc: "Используем современные биотехнологии для максимальной эффективности и биодоступности.",
-            },
-            {
-              img: "image3.webp", // Placeholder, update if actual image found
-              title: "Здоровье и благополучие",
-              desc: "Формулы разработаны для поддержки здоровья, энергии и долголетия.",
             },
           ].map((b, i) => (
             <motion.div
@@ -109,7 +104,7 @@ const HomePage: React.FC = () => {
             {
               title: "Витамины",
               desc: "Ежедневная поддержка здоровья и энергии.",
-              img: "vitamins.webp", // Update with actual if available
+              img: "vitamins.webp", // Keep placeholder or update if found
             },
             {
               title: "Минералы",

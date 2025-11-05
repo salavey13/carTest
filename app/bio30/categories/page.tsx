@@ -13,30 +13,30 @@ const products = [
     title: "Lion's Mane", 
     desc: "Гриб Львиная грива. Улучшает когнитивные функции.", 
     price: 1500, 
-    img: "lions-mane.webp" 
+    img: "https://m.media-amazon.com/images/S/aplus-media-library-service-media/3e47bc7b-0f6f-4d80-8d5b-d673ce2bcae1.__CR0,0,600,450_PT0_SX600_V1___.jpg" // From search [image:0]
   },
   { 
     id: "cordyceps-sinensis", 
     title: "Cordyceps Sinensis", 
     desc: "Кордицепс китайский. Повышает энергию и выносливость.", 
     price: 2000, 
-    img: "cordyceps.webp" 
+    img: "https://manukahoneyofnz.com/cdn/shop/products/MHprop300b_1200x.png?v=1700610630" // [image:1]
   },
   { 
     id: "spirulina-chlorella", 
     title: "Spirulina Chlorella", 
     desc: "Спирулина и хлорелла. Детокс и иммунитет.", 
     price: 1200, 
-    img: "spirulina.webp" 
+    img: "https://pub.mdpi-res.com/ijms/ijms-25-11724/article_deploy/html/images/ijms-25-11724-g001-550.jpg?1730384706" // [image:2] placeholder related
   },
   { 
     id: "magnesium-pyridoxine", 
     title: "Magnesium Pyridoxine", 
     desc: "Магний и витамин B6. Для нервной системы.", 
     price: 1800, 
-    img: "magnesium.webp" 
+    img: "https://ars.els-cdn.com/content/image/1-s2.0-S0924224421004155-gr1.jpg" // [image:3]
   },
-  // Add more from categories.txt HTML
+  // Add more if needed
 ];
 
 const CategoriesPage: React.FC = () => {
@@ -70,9 +70,9 @@ const CategoriesPage: React.FC = () => {
               variants={productGrid.child}
               className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
             >
-              <Link href={`/product/${p.id}`}>
+              <Link href={`/bio30/product/${p.id}`}>
                 <img
-                  src={`https://bio30.ru/static/uploads/products/${p.img}`}
+                  src={p.img}
                   alt={p.title}
                   className="w-full h-64 object-cover"
                 />
