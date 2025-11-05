@@ -1,4 +1,3 @@
-// /app/bio30/page.tsx
 "use client";
 
 import React from "react";
@@ -60,7 +59,7 @@ const HomePage: React.FC = () => {
     },
     {
       title: "Spirulina Chlorella",
-      desc: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы. Спирулина — это сине-зеленая водоросль, богатая белками, витаминами и минералами. Хлорелла — это одноклеточная зеленая водоросль, известная своими детоксикационными свойствами и высоким содержанием хлорофилла. Этот продукт помогает укрепить иммунную систему, улучшить пищеварение и поддерживать общее здоровье организма. Рекомендуется для вегетарианцев, спортсменов и всех, кто стремится к здоровому образу жизни.",
+      desc: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы.",
       price: 2500,
       img: "https://bio30.ru/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/f21a69b0e62f4dee8b9f231985024282.webp",
@@ -72,7 +71,7 @@ const HomePage: React.FC = () => {
     },
     {
       title: "Lion's Mane",
-      desc: "Lion's Mane, также известный как грива льва или гриб-геркулес, является популярным биологически активным добавкой (БАД), используемой в традиционной китайской медицине. Этот гриб известен своими нейропротекторными свойствами, которые помогают улучшить когнитивные функции, память и концентрацию. Lion's Mane также поддерживает нервную систему и способствует общему укреплению организма. Рекомендуется для людей, стремящихся улучшить свою умственную активность и общее здоровье.",
+      desc: "Lion's Mane, также известный как грива льва или гриб-геркулес, улучшает когнитивные функции.",
       price: 100,
       img: "https://bio30.ru/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/d99d3385cd3f42d6aa1389adb7a719ce.webp",
@@ -84,7 +83,7 @@ const HomePage: React.FC = () => {
     },
     {
       title: "MAGNESIUM PYRIDOXINE",
-      desc: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления. Высокобиодоступные формы магния цитрата и пиридоксина обеспечивают глубокое расслабление, качественный сон и защиту от стресса.",
+      desc: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления.",
       price: 1600,
       img: "https://bio30.ru/static/uploads/products/1552689351894f229843f51efdb813fc.webp",
       mobileImg: "https://bio30.ru/static/uploads/products/74faf744a03e4f1c83e24ace9ac7582b.webp",
@@ -175,95 +174,88 @@ const HomePage: React.FC = () => {
       </section>
 
       <section>
-  <motion.div
-    ref={productGrid.ref}
-    initial="hidden"
-    animate={productGrid.controls}
-    variants={productGrid.container}
-    className="grid grid--cards"
-    style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1.25rem' }}
-  >
-    {products.map((p, i) => (
-      <motion.div
-        key={i}
-        variants={productGrid.child}
-        /* Добавляем класс benefit, чтобы использовать те же правила, что работают для advantages.
-           Также оставляем оригинальные классы карточки (p.class) для фоновых/текстовых стилей. */
-        className={`benefit ${p.class}`}
-        style={{ backgroundColor: p.bg, color: p.text }}
-      >
-        <Link href={p.link}>
-          {/* aside — текстовая часть */}
-          <div className="aside">
-            <div className="col pd__xl gp gp--md">
-              <div className="col gp gp--sm">
-                <h2 className="title fs__md fw__bd" style={{ color: p.text }}>
-                  {p.title}
-                </h2>
-                <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>
-                  {p.desc}
-                </h3>
-              </div>
-              <div className="row gp gp--lg">
-                <span className="row gp--xs ctr">
-                  <div className="prices">
-                    <span className="price">{p.price} RUB</span>
+        <motion.div
+          ref={productGrid.ref}
+          initial="hidden"
+          animate={productGrid.controls}
+          variants={productGrid.container}
+          className="grid grid--cards"
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '1.25rem' }}
+        >
+          {products.map((p, i) => (
+            <motion.div
+              key={i}
+              variants={productGrid.child}
+              className={`benefit ${p.class}`}
+              style={{ backgroundColor: p.bg, color: p.text }}
+            >
+              <Link href={p.link}>
+                <div className="aside">
+                  <div className="col pd__xl gp gp--md">
+                    <div className="col gp gp--sm">
+                      <h2 className="title fs__md fw__bd" style={{ color: p.text }}>
+                        {p.title}
+                      </h2>
+                      <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>
+                        {p.desc}
+                      </h3>
+                    </div>
+                    <div className="row gp gp--lg">
+                      <span className="row gp--xs ctr">
+                        <div className="prices">
+                          <span className="price">{p.price} RUB</span>
+                        </div>
+                      </span>
+                    </div>
                   </div>
-                </span>
-              </div>
-            </div>
-          </div>
+                </div>
 
-          {/* bside — картинка. даём минимальную высоту и relative, чтобы не схлопнулось */}
-          <div
-            className="bside"
-            style={{
-              position: 'relative',
-              minHeight: 220,           
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'center',
-            }}
-          >
-            <img
-              src={p.img}
-              alt={p.title}
-              className="image__web"
-              loading="lazy"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
-            <img
-              src={p.mobileImg}
-              alt={p.title}
-              className="image__mobile"
-              loading="lazy"
-              style={{
-                width: '100%',
-                height: 'auto',
-                objectFit: 'cover',
-                display: 'block',
-              }}
-            />
-          </div>
-        </Link>
-      </motion.div>
-    ))}
-    <Link
-      href="/bio30/categories"
-      className="card card__default card__default--show-all card--link"
-      style={{ backgroundColor: '#0D0D0D', border: '1px solid var(--border)' }}
-    >
-      <div className="col pd__xl gp gp--md">
-        <h2 className="title fs__md fw__bd">Все продукты</h2>
-      </div>
-    </Link>
-  </motion.div>
-</section>
+                <div
+                  className="bside"
+                  style={{
+                    position: 'relative',
+                    minHeight: 220,
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <img
+                    src={p.img}
+                    alt={p.title}
+                    className="image__web"
+                    loading="lazy"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                  <img
+                    src={p.mobileImg}
+                    alt={p.title}
+                    className="image__mobile"
+                    loading="lazy"
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                </div>
+              </Link>
+            </motion.div>
+          ))}
+          <Link href="/bio30/categories" className="card card__default card__default--show-all card--link" style={{ backgroundColor: '#0D0D0D', border: '1px solid var(--border)' }}>
+            <div className="col pd__xl gp gp--md">
+              <h2 className="title fs__md fw__bd">Все продукты</h2>
+            </div>
+          </Link>
+        </motion.div>
+      </section>
+
       <section className="py-16 px-6">
         <motion.div
           ref={advantages.ref}
@@ -350,6 +342,7 @@ const HomePage: React.FC = () => {
           ))}
         </motion.div>
       </section>
+
       <section className="py-16 px-6 bg-muted/30 text-center">
         <motion.h2
           ref={partner.ref}
