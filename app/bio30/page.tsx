@@ -7,15 +7,15 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
-
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
 
 const HomePage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
-  const benefits = useStaggerFadeIn(2, 0.2);
-  const categories = useStaggerFadeIn(4, 0.15);
-  const faq = useStaggerFadeIn(5, 0.15);
+  const features = useStaggerFadeIn(3, 0.2);
+  const products = useStaggerFadeIn(4, 0.15);
+  const advantages = useStaggerFadeIn(6, 0.1);
+  const partner = useScrollFadeIn("up", 0.1);
   useBio30ThemeFix();
 
   return (
@@ -31,7 +31,7 @@ const HomePage: React.FC = () => {
           variants={heroTitle.variants}
           className="text-4xl sm:text-5xl font-bold mb-4 gradient-text"
         >
-          BIO 3.0 — Биопродукты будущего
+          Новый уровень заботы о себе
         </motion.h1>
 
         <motion.p
@@ -41,7 +41,7 @@ const HomePage: React.FC = () => {
           variants={heroSubtitle.variants}
           className="text-base text-muted-foreground max-w-2xl mx-auto mb-6"
         >
-          Передовые биопродукты и технологии для здоровья и будущего. Откройте новые возможности с нами.
+          Откройте лучшие добавки для Вашего здоровья на нашем сайте.
         </motion.p>
 
         <motion.div
@@ -50,132 +50,161 @@ const HomePage: React.FC = () => {
           transition={{ delay: 0.4, duration: 0.8 }}
         >
           <Link href="/bio30/categories" className="btn btn--primary">
-            Каталог продуктов
+            Узнать больше
           </Link>
         </motion.div>
       </section>
 
-      {/* BENEFITS */}
+      {/* FEATURES */}
       <section className="py-16 px-6">
         <motion.div
-          ref={benefits.ref}
+          ref={features.ref}
           initial="hidden"
-          animate={benefits.controls}
-          variants={benefits.container}
+          animate={features.controls}
+          variants={features.container}
+          className="grid md:grid-cols-3 gap-6"
+        >
+          {[
+            {
+              title: "Ваши добавки – в любой точке мира",
+              desc: "Быстрая и надежная доставка СДЭК для Вашего удобства.",
+              link: "/delivery",
+            },
+            {
+              title: "Ваш доход растет вместе с нами",
+              desc: "Получайте до 30% с заказов приглашенных (3 уровня). Выгодно и просто!",
+              link: "/referal",
+            },
+            {
+              title: "Мультивселенная продуктов",
+              desc: "Откройте лучшие добавки для Вашего здоровья.",
+              link: "/categories",
+            },
+          ].map((f, i) => (
+            <motion.div
+              key={i}
+              variants={features.child}
+              className="p-6 bg-card rounded-xl shadow-md text-center"
+            >
+              <h3 className="text-lg font-bold mb-2">{f.title}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{f.desc}</p>
+              <Link href={`/bio30${f.link}`} className="btn btn--primary">
+                Узнать больше
+              </Link>
+            </motion.div>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* PRODUCTS */}
+      <section className="py-16 px-6 bg-muted/30">
+        <h2 className="text-center text-2xl font-bold mb-8">Мультивселенная продуктов</h2>
+        <motion.div
+          ref={products.ref}
+          initial="hidden"
+          animate={products.controls}
+          variants={products.container}
           className="grid md:grid-cols-2 gap-6"
         >
           {[
             {
-              img: "mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp",
-              title: "Натуральные ингредиенты",
-              desc: "Наши продукты создаются из природных компонентов, собранных в экологически чистых регионах.",
+              title: "Cordyceps Sinensis",
+              desc: "Адаптоген, помогает справляться со стрессом. Содержит кордицепин и полисахариды для поддержки иммунитета, улучшения выносливости, общего укрепления. Идеален для спортсменов, активных людей и стремящихся к здоровью.",
+              price: 2500,
+              img: "https://bio30.ru/front/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp",
+              link: "/categories/cordyceps-sinensis",
+              color: "bg-yellow-500",
             },
             {
-              img: "6a317041578644d1b283abeaf781bf36.webp",
-              title: "Инновационные технологии",
-              desc: "Используем современные биотехнологии для максимальной эффективности и биодоступности.",
+              title: "Spirulina Chlorella",
+              desc: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы. Спирулина — это сине-зеленая водоросль, богатая белками, витаминами и минералами. Хлорелла — это одноклеточная зеленая водоросль, известная своими детоксикационными свойствами и высоким содержанием хлорофилла. Этот продукт помогает укрепить иммунную систему, улучшить пищеварение и поддерживать общее здоровье организма. Рекомендуется для вегетарианцев, спортсменов и всех, кто стремится к здоровому образу жизни.",
+              price: 2500,
+              img: "https://bio30.ru/front/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp",
+              link: "/categories/spirulina-chlorella",
+              color: "bg-green-500",
             },
-          ].map((b, i) => (
+            {
+              title: "Lion's Mane",
+              desc: "Lion's Mane, также известный как грива льва или гриб-геркулес, является популярным биологически активным добавкой (БАД), используемой в традиционной китайской медицине. Этот гриб известен своими нейропротекторными свойствами, которые помогают улучшить когнитивные функции, память и концентрацию. Lion's Mane также поддерживает нервную систему и способствует общему укреплению организма. Рекомендуется для людей, стремящихся улучшить свою умственную активность и общее здоровье.",
+              price: 100,
+              img: "https://bio30.ru/front/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp",
+              link: "/categories/lion-s-mane",
+              color: "bg-blue-500",
+            },
+            {
+              title: "MAGNESIUM PYRIDOXINE",
+              desc: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления. Высокобиодоступные формы магния цитрата и пиридоксина обеспечивают глубокое расслабление, качественный сон и защиту от стресса.",
+              price: 1600,
+              img: "https://bio30.ru/front/static/uploads/products/1552689351894f229843f51efdb813fc.webp",
+              link: "/categories/magnesium-pyridoxine",
+              color: "bg-purple-500",
+            },
+          ].map((p, i) => (
             <motion.div
               key={i}
-              variants={benefits.child}
-              className="benefit benefit__default bg-card shadow-md p-6 rounded-xl text-center"
+              variants={products.child}
+              className={`p-6 ${p.color} rounded-xl shadow-md`}
             >
-              <img
-                src={`https://bio30.ru/static/uploads/benefits/${b.img}`}
-                alt={b.title}
-                className="w-full h-52 object-cover rounded-lg mb-4"
-              />
-              <h3 className="text-lg font-semibold mb-2">{b.title}</h3>
-              <p className="text-sm text-muted-foreground">{b.desc}</p>
+              <h3 className="text-lg font-bold mb-2 text-white">{p.title}</h3>
+              <p className="text-sm text-white mb-4">{p.desc}</p>
+              <p className="text-base font-bold text-white">{p.price} RUB</p>
+              <img src={p.img} alt={p.title} className="w-full h-48 object-cover mt-4" />
             </motion.div>
           ))}
         </motion.div>
+        <div className="text-center mt-8">
+          <Link href="/bio30/categories" className="btn btn--primary">
+            Все продукты
+          </Link>
+        </div>
       </section>
 
-      {/* CATEGORIES TEASER */}
-      <section className="py-16 bg-muted/30 px-6">
-        <h2 className="text-center text-2xl font-bold mb-8">Категории</h2>
-        <motion.div
-          ref={categories.ref}
-          initial="hidden"
-          animate={categories.controls}
-          variants={categories.container}
-          className="grid md:grid-cols-2 gap-8"
-        >
-          {[
-            {
-              title: "Витамины",
-              desc: "Ежедневная поддержка здоровья и энергии.",
-              img: "vitamins.webp", 
-            },
-            {
-              title: "Минералы",
-              desc: "Баланс микроэлементов для устойчивости организма.",
-              img: "minerals.webp",
-            },
-            {
-              title: "Иммунитет",
-              desc: "Укрепление защитных функций организма.",
-              img: "immunity.webp",
-            },
-            {
-              title: "Красота",
-              desc: "Продукты для кожи, волос и внутреннего сияния.",
-              img: "beauty.webp",
-            },
-          ].map((c, i) => (
-            <motion.div
-              key={i}
-              variants={categories.child}
-              className="flex flex-col md:flex-row bg-card shadow-sm rounded-xl overflow-hidden"
-            >
-              <img
-                src={`https://bio30.ru/static/uploads/categories/${c.img}`}
-                alt={c.title}
-                className="w-full md:w-1/2 object-cover"
-              />
-              <div className="p-6 flex flex-col justify-center">
-                <h3 className="text-lg font-semibold mb-2">{c.title}</h3>
-                <p className="text-sm text-muted-foreground">{c.desc}</p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
-
-      {/* FAQ */}
+      {/* ADVANTAGES */}
       <section className="py-16 px-6">
-        <h2 className="text-center text-2xl font-bold mb-8">
-          Часто задаваемые вопросы
-        </h2>
+        <h2 className="text-center text-2xl font-bold mb-8">Наши Преимущества</h2>
         <motion.div
-          ref={faq.ref}
+          ref={advantages.ref}
           initial="hidden"
-          animate={faq.controls}
-          variants={faq.container}
-          className="space-y-6 max-w-3xl mx-auto"
+          animate={advantages.controls}
+          variants={advantages.container}
+          className="grid md:grid-cols-3 gap-6"
         >
           {[
-            ["Что такое BIO 3.0?", "Передовые биопродукты и технологии для здоровья и будущего."],
-            ["Как заказать продукт?", "Добавьте в корзину, проверьте и оформите заказ."],
-            ["Есть ли доставка?", "Да, быстрая доставка по России."],
-            ["Можно ли вернуть товар?", "Да, согласно условиям возврата."],
-            [
-              "Как присоединиться к реферальной программе?",
-              "Зарегистрируйтесь и получите реферальную ссылку в кабинете.",
-            ],
-          ].map(([q, a], i) => (
+            "Качество, подтвержденное стандартами",
+            "Доверие в 7+ странах мира",
+            "Поддержка 24/7 для вас",
+            "Решение для всех и каждого",
+            "Щедрые выплаты партнерам",
+            "Сила только натуральных компонентов",
+          ].map((adv, i) => (
             <motion.div
               key={i}
-              variants={faq.child}
-              className="p-4 rounded-lg bg-card shadow-sm"
+              variants={advantages.child}
+              className="p-6 bg-card rounded-xl shadow-md text-center"
             >
-              <h4 className="font-semibold mb-1">{q}</h4>
-              <p className="text-sm text-muted-foreground">{a}</p>
+              <h3 className="text-lg font-bold mb-2">{adv}</h3>
+              <p className="text-sm text-muted-foreground">Описание преимущества.</p>
             </motion.div>
           ))}
         </motion.div>
+      </section>
+
+      {/* PARTNER */}
+      <section className="py-16 px-6 bg-muted/30 text-center">
+        <motion.h2
+          ref={partner.ref}
+          initial="hidden"
+          animate={partner.controls}
+          variants={partner.variants}
+          className="text-2xl font-bold mb-4"
+        >
+          Станьте частью большой и дружной семьи
+        </motion.h2>
+        <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
+        <Link href="/bio30/referal" className="btn btn--primary mb-8">
+          Стать партнером
+        </Link>
+        {/* Form would be in referal page */}
       </section>
 
       <Footer />

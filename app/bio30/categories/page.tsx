@@ -4,9 +4,11 @@ import React from "react";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import CategoryFilter from "../components/CategoryFilter";
 import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
+import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 
 const products = [
   { 
@@ -43,6 +45,7 @@ const CategoriesPage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
   const productGrid = useStaggerFadeIn(products.length, 0.1);
+  useBio30ThemeFix();
 
   return (
     <div>
@@ -56,36 +59,56 @@ const CategoriesPage: React.FC = () => {
         </motion.p>
       </section>
 
-      <section className="py-16 px-6">
-        <motion.div
-          ref={productGrid.ref}
-          initial="hidden"
-          animate={productGrid.controls}
-          variants={productGrid.container}
-          className="grid md:grid-cols-3 gap-6"
-        >
-          {products.map((p, i) => (
-            <motion.div
-              key={i}
-              variants={productGrid.child}
-              className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
-            >
-              <Link href={`/bio30/categories/${p.id}`}>
-                <img
-                  src={p.img}
-                  alt={p.title}
-                  className="w-full h-64 object-cover"
-                />
-                <div className="p-4">
-                  <h3 className="text-lg font-semibold">{p.title}</h3>
-                  <p className="text-sm text-muted-foreground">{p.desc}</p>
-                  <p className="text-base font-bold mt-2">{p.price} руб.</p>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+      <div className="flex flex-col md:flex-row gap-6 px-6">
+        {/* Sidebar */}
+        <aside className="w-full md:w-1/4">
+          <h3 className="font-bold mb-4">Цена</h3>
+          <div className="price-slider mb-6">{/* noUiSlider here */}</div>
+          <h3 className="font-bold mb-4">Категория</h3>
+          <div className="space-y-2">
+            <label><input type="checkbox" /> Вегетарианцы</label>
+            <label><input type="checkbox" /> Для женщин</label>
+            <label><input type="checkbox" /> Для мужчин</label>
+            <label><input type="checkbox" /> Комплекс</label>
+            <label><input type="checkbox" /> Есть на складе</label>
+            <label><input type="checkbox" /> Только в наличии</label>
+            <label><input type="checkbox" /> Только со скидкой</label>
+          </div>
+          <CategoryFilter />
+        </aside>
+
+        {/* Products */}
+        <section className="w-full md:w-3/4">
+          <motion.div
+            ref={productGrid.ref}
+            initial="hidden"
+            animate={productGrid.controls}
+            variants={productGrid.container}
+            className="grid md:grid-cols-2 gap-6"
+          >
+            {products.map((p, i) => (
+              <motion.div
+                key={i}
+                variants={productGrid.child}
+                className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
+              >
+                <Link href={`/bio30/categories/${p.id}`}>
+                  <img
+                    src={p.img}
+                    alt={p.title}
+                    className="w-full h-64 object-cover"
+                  />
+                  <div className="p-4">
+                    <h3 className="text-lg font-semibold">{p.title}</h3>
+                    <p className="text-sm text-muted-foreground">{p.desc}</p>
+                    <p className="text-base font-bold mt-2">{p.price} руб.</p>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        </section>
+      </div>
       <Footer />
     </div>
   );
