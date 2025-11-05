@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
+import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 const Footer: React.FC = () => {
   const docBase = "https://bio30.ru/docs";
   useBio30ThemeFix();
