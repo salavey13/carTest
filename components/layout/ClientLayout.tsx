@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react"; 
@@ -116,6 +117,29 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
 "wb": "/wb"
 };
 
+function useBio30ThemeFix() {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!pathname.startsWith("/bio30")) return;
+    const root = document.documentElement;
+    const prevBg = root.style.getPropertyValue("--background");
+    const prevFg = root.style.getPropertyValue("--foreground");
+
+    root.style.setProperty("--background", "hsl(0 0% 6%)");     // тёмный фон
+    root.style.setProperty("--foreground", "hsl(0 0% 100%)");   // белый текст
+    document.body.style.backgroundColor = "hsl(0 0% 6%)";
+    document.body.style.color = "hsl(0 0% 100%)";
+
+    return () => {
+      root.style.setProperty("--background", prevBg);
+      root.style.setProperty("--foreground", prevFg);
+      document.body.style.backgroundColor = "";
+      document.body.style.color = "";
+    };
+  }, [pathname]);
+}
+
+
 function useBio30ExternalCSS() {
   const pathname = usePathname();
 
@@ -168,6 +192,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
   
   useBio30ExternalCSS();
+  useBio30ThemeFix();
 
   useEffect(() => {
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
