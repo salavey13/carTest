@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
@@ -20,39 +20,29 @@ const HomePage: React.FC = () => {
   const partner = useScrollFadeIn("up", 0.1);
   useBio30ThemeFix();
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const $heroSlider = $('.hero-slider');
-      if ($heroSlider.length) {
-        $heroSlider.slick({
-          infinite: true,
-          slidesToShow: 1,
-          slidesToScroll: 1,
-          autoplay: false,
-          autoplaySpeed: 1000,
-          arrows: false,
-          dots: false,
-        });
-      }
+  const heroSettings = {
+    infinite: true,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    autoplay: false,
+    autoplaySpeed: 1000,
+    arrows: false,
+    dots: false,
+  };
 
-      const $stories = $('.stories');
-      if ($stories.length) {
-        $stories.slick({
-          dots: false,
-          arrows: false,
-          infinite: false,
-          speed: 800,
-          slidesToShow: 1,
-          slidesToScroll: 1,
-          responsive: [
-            { breakpoint: 1024, settings: { dots: true } },
-            { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
-            { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } }
-          ]
-        });
-      }
-    }
-  }, []);
+  const storiesSettings = {
+    dots: false,
+    arrows: false,
+    infinite: false,
+    speed: 800,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    responsive: [
+      { breakpoint: 1024, settings: { dots: true } },
+      { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
+      { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } }
+    ]
+  };
 
   const products = [
     {
@@ -104,7 +94,7 @@ const HomePage: React.FC = () => {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <Header />
       <section className="hero-section">
-        <div className="hero-slider">
+        <SlickSlider {...heroSettings}>
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#FF0004', border: 'none' }}>
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
@@ -168,7 +158,7 @@ const HomePage: React.FC = () => {
               <img src="https://bio30.ru/static/uploads/hero/mobile_f447552243cf479790ec8d057ea0425c.webp" alt="Ваш доход растет вместе с нами" className="image__mobile img--hero" />
             </div>
           </div>
-        </div>
+        </SlickSlider>
       </section>
 
       <section className="py-16 px-6">
@@ -257,6 +247,7 @@ const HomePage: React.FC = () => {
           ))}
         </motion.div>
       </section>
+
       <section className="py-16 px-6 bg-muted/30 text-center">
         <motion.h2
           ref={partner.ref}
@@ -270,8 +261,10 @@ const HomePage: React.FC = () => {
         <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
         <PartnerForm />
       </section>
+
       <Footer />
     </div>
   );
 };
+
 export default HomePage;
