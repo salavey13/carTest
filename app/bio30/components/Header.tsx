@@ -5,7 +5,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { ShoppingCart, User, Menu } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
+import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 
 const Header: React.FC = () => {
   const { dbUser } = useAppContext();
