@@ -180,38 +180,42 @@ const HomePage: React.FC = () => {
     initial="hidden"
     animate={productGrid.controls}
     variants={productGrid.container}
-    className="grid grid-cols-2 gap-5 auto-rows-fr"
+    className="grid grid--cards"
+    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}
   >
     {products.map((p, i) => (
       <motion.div
         key={i}
         variants={productGrid.child}
-        className={`benefit ${p.class} flex flex-col`}
+        className={`benefit ${p.class}`}
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        <Link href={p.link} className="flex-1 flex flex-col md:flex-row">
-          <div className="aside p-4 flex flex-col justify-between w-1/2">
-            <div>
-              <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
-              <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
+        <Link href={p.link}>
+          {/* Используем grid вместо flex для ровного 50/50 */}
+          <div className="grid md:grid-cols-2 min-h-[220px]">
+            <div className="aside p-4 flex flex-col justify-between">
+              <div className="col gp gp--sm">
+                <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
+                <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
+              </div>
+              <div className="mt-4">
+                <span className="price">{p.price} RUB</span>
+              </div>
             </div>
-            <div className="mt-4">
-              <span className="price">{p.price} RUB</span>
+            <div className="bside flex items-end justify-center">
+              <img
+                src={p.img}
+                alt={p.title}
+                className="image__web w-full h-full object-cover"
+                loading="lazy"
+              />
+              <img
+                src={p.mobileImg}
+                alt={p.title}
+                className="image__mobile w-full h-auto object-cover"
+                loading="lazy"
+              />
             </div>
-          </div>
-          <div className="bside flex items-end justify-center w-1/2">
-            <img
-              src={p.img}
-              alt={p.title}
-              className="image__web w-full h-full object-cover"
-              loading="lazy"
-            />
-            <img
-              src={p.mobileImg}
-              alt={p.title}
-              className="image__mobile w-full h-auto object-cover"
-              loading="lazy"
-            />
           </div>
         </Link>
       </motion.div>
@@ -227,6 +231,7 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
+
 
 
       <section className="py-16 px-6">
