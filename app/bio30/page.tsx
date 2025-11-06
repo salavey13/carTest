@@ -100,7 +100,7 @@ const HomePage: React.FC = () => {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <section className="hero-section">
         <SlickSlider {...heroSettings}>
-          <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#FF0004', border: 'none' }}>
+          <div className="container gp gp--hg container--hero" style={{ background-color: '#FF0004', border: 'none' }}>
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
                 <div className="col gp gp--xs">
