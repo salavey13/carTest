@@ -192,7 +192,7 @@ const HomePage: React.FC = () => {
       >
         <Link href={p.link}>
           <div className="flex flex-col md:flex-row min-h-[220px]">
-  <div className="aside w-full md:w-1/2 p-4">
+  <div className="aside w-full p-4">
     <div className="col gp gp--sm">
       <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
       <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
@@ -201,7 +201,7 @@ const HomePage: React.FC = () => {
       </div>
     </div>
   </div>
-  <div className="bside w-full md:w-1/2 flex items-end justify-center">
+  <div className="bside  flex items-end justify-center">
     <img
       src={p.img}
       alt={p.title}
