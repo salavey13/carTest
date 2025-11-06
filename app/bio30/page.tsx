@@ -186,11 +186,11 @@ const HomePage: React.FC = () => {
       <motion.div
         key={i}
         variants={productGrid.child}
-        className="benefit flex min-h-[220px] overflow-hidden"
+        className="benefit grid grid-cols-2 min-h-[220px] overflow-hidden"
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        <Link href={p.link} className="flex w-full h-full">
-          <div className="aside p-4 flex flex-col justify-between w-1/2">
+        <Link href={p.link} className="block w-full h-full">
+          <div className="aside p-4 flex flex-col justify-between">
             <div>
               <h2 className="title fs__md fw__bd">{p.title}</h2>
               <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
@@ -199,7 +199,7 @@ const HomePage: React.FC = () => {
               <span className="price">{p.price} RUB</span>
             </div>
           </div>
-          <div className="bside flex items-end justify-center w-1/2">
+          <div className="bside">
             <img
               src={p.img}
               alt={p.title}
@@ -227,6 +227,7 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
+
 
 
 
