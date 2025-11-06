@@ -180,17 +180,17 @@ const HomePage: React.FC = () => {
     initial="hidden"
     animate={productGrid.controls}
     variants={productGrid.container}
-    className="grid gap-5 grid-cols-2"
+    className="grid grid-cols-2 gap-5"
   >
     {products.map((p, i) => (
       <motion.div
         key={i}
         variants={productGrid.child}
-        className={`benefit ${p.class} grid grid-cols-2 min-h-[220px]`}
+        className="benefit grid grid-cols-2 min-h-[220px] overflow-hidden"
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        <Link href={p.link} className="contents">
-          <div className="aside p-4 flex flex-col justify-between">
+        <Link href={p.link} className="block w-full h-full">
+          <div className="aside p-4 flex flex-col justify-between w-full h-full">
             <div>
               <h2 className="title fs__md fw__bd">{p.title}</h2>
               <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
@@ -199,7 +199,7 @@ const HomePage: React.FC = () => {
               <span className="price">{p.price} RUB</span>
             </div>
           </div>
-          <div className="bside flex items-end justify-center">
+          <div className="bside flex items-end justify-center w-full h-full">
             <img
               src={p.img}
               alt={p.title}
@@ -209,7 +209,7 @@ const HomePage: React.FC = () => {
             <img
               src={p.mobileImg}
               alt={p.title}
-              className="image__mobile w-full h-auto object-cover"
+              className="image__mobile w-full h-full object-cover"
               loading="lazy"
             />
           </div>
@@ -227,6 +227,7 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
+
 
 
 
