@@ -1,3 +1,4 @@
+// /app/bio30/components/Header.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -14,7 +15,7 @@ const Header: React.FC = () => {
   useBio30ThemeFix();
 
   return (
-    <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b">
+    <header className="fixed top-0 z-50 bg-background/95 backdrop-blur-md border-b">
       <div className="web row ctr gp gp--xs">
         <div className="row ctr gp gp--xl">
           <Link href="/bio30" className="ctr">
