@@ -55,6 +55,7 @@ const HomePage: React.FC = () => {
       bg: "#ffe609",
       text: "#000000",
       class: "card panel-bg-#ffe609 panel-text-#000000 card__default card__default--product",
+      tags: ["for_men", "for_women", "bestseller"],
     },
     {
       title: "Spirulina Chlorella",
@@ -66,6 +67,7 @@ const HomePage: React.FC = () => {
       bg: "#a3ea00",
       text: "#000000",
       class: "card panel-bg-#a3ea00 panel-text-#000000 card__horizontal card__horizontal--product",
+      tags: ["for_men", "for_women", "bestseller"],
     },
     {
       title: "Lion's Mane",
@@ -77,6 +79,7 @@ const HomePage: React.FC = () => {
       bg: "#ffffff",
       text: "#000000",
       class: "card panel-bg-#ffffff panel-text-#000000 card__vertical card__vertical--product",
+      tags: ["for_men", "for_women", "bestseller"],
     },
     {
       title: "MAGNESIUM PYRIDOXINE",
@@ -88,6 +91,7 @@ const HomePage: React.FC = () => {
       bg: "#02044A",
       text: "#ffffff",
       class: "card panel-bg-#02044A panel-text-#ffffff card__horizontal card__horizontal--product",
+      tags: [],
     },
   ];
 
@@ -99,10 +103,16 @@ const HomePage: React.FC = () => {
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
                 <div className="col gp gp--xs">
-                  <h1 className="title fs__xxl fw__bd" style={{ color: '#ffffff' }}>Новый уровень заботы о себе</h1>
-                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#ffffff' }}>Откройте лучшие добавки для Вашего здоровья на нашем сайте.</h2>
+                  <h1 className="title fs__xxl fw__bd" style={{ color: '#ffffff' }}>
+                    Новый уровень заботы о себе
+                  </h1>
+                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#ffffff' }}>
+                    Откройте лучшие добавки для Вашего здоровья на нашем сайте.
+                  </h2>
                 </div>
-                <Link href="/bio30/categories" className="btn btn--wht btn__secondary">Узнать больше</Link>
+                <Link href="/bio30/categories" className="btn btn--wht btn__secondary">
+                  Узнать больше
+                </Link>
               </div>
             </div>
             <div className="bside">
@@ -114,10 +124,16 @@ const HomePage: React.FC = () => {
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
                 <div className="col gp gp--xs">
-                  <h1 className="title fs__xxl fw__bd" style={{ color: '#ffffff' }}>Ваши добавки – в любой точке мира</h1>
-                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#ffffff' }}>Быстрая и надежная доставка СДЭК для Вашего удобства.</h2>
+                  <h1 className="title fs__xxl fw__bd" style={{ color: '#ffffff' }}>
+                    Ваши добавки – в любой точке мира
+                  </h1>
+                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#ffffff' }}>
+                    Быстрая и надежная доставка СДЭК для Вашего удобства.
+                  </h2>
                 </div>
-                <Link href="/bio30/delivery" className="btn btn--wht btn__secondary">Узнать больше</Link>
+                <Link href="/bio30/delivery" className="btn btn--wht btn__secondary">
+                  Узнать больше
+                </Link>
               </div>
             </div>
             <div className="bside">
@@ -129,10 +145,16 @@ const HomePage: React.FC = () => {
             <div className="aside pd__hg ctr ctr--content">
               <div className="col gp gp--lg">
                 <div className="col gp gp--xs">
-                  <h1 className="title fs__xxl fw__bd" style={{ color: '#000000' }}>Ваш доход растет вместе с нами</h1>
-                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#000000' }}>Получайте до 30% с заказов приглашенных (3 уровня). Выгодно и просто!</h2>
+                  <h1 className="title fs__xxl fw__bd" style={{ color: '#000000' }}>
+                    Ваш доход растет вместе с нами
+                  </h1>
+                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#000000' }}>
+                    Получайте до 30% с заказов приглашенных (3 уровня). Выгодно и просто!
+                  </h2>
                 </div>
-                <Link href="/bio30/referal" className="btn btn--wht btn__secondary">Узнать больше</Link>
+                <Link href="/bio30/referal" className="btn btn--wht btn__secondary">
+                  Узнать больше
+                </Link>
               </div>
             </div>
             <div className="bside">
@@ -145,54 +167,78 @@ const HomePage: React.FC = () => {
 
       <section className="article">
         <div className="row">
-          <h2 className="title fs__lg fw__bd gradient">Мультивселенная продуктов</h2>
+          <h2 className="title fs__lg fw__bd gradient">
+            Мультивселенная продуктов
+          </h2>
         </div>
       </section>
 
       <section>
-        <motion.div
-          ref={productGrid.ref}
-          initial="hidden"
-          animate={productGrid.controls}
-          variants={productGrid.container}
-          className="grid grid--cards"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}
-        >
-          {products.map((p, i) => (
-            <motion.div key={i} variants={productGrid.child} className={`benefit ${p.class}`} style={{ backgroundColor: p.bg, color: p.text }}>
-              <Link href={p.link}>
-                <div className="aside" style={{ width: "50%", padding: "2rem" }}>
-                  <div className="col gp gp--md">
-                    <div className="col gp gp--sm">
-                      <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
-                      <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
-                    </div>
-                    <div className="row gp gp--lg">
-                      <span className="row gp--xs ctr">
-                        <div className="prices">
-                          <span className="price">{p.price} RUB</span>
-                        </div>
-                      </span>
-                    </div>
-                  </div>
+  <motion.div
+    ref={productGrid.ref}
+    initial="hidden"
+    animate={productGrid.controls}
+    variants={productGrid.container}
+    className="grid grid--cards"
+    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}
+  >
+    {products.map((p, i) => (
+      <motion.div
+        key={i}
+        variants={productGrid.child}
+        className={`benefit ${p.class}`}
+        style={{ backgroundColor: p.bg, color: p.text }}
+      >
+        <Link href={p.link}>
+          <div className="flex flex-col md:flex-row min-h-[220px]">
+            <div className="aside md:w-1/2 p-4">
+              <div className="col gp gp--sm">
+                <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
+                <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
+                <div className="mt-4">
+                  <span className="price">{p.price} RUB</span>
                 </div>
-                <div className="bside" style={{ width: "50%", minHeight: 220, position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                  <img src={p.img} alt={p.title} className="image__web" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <img src={p.mobileImg} alt={p.title} className="image__mobile" loading="lazy" style={{ width: "100%", height: "auto", objectFit: "cover", display: "block" }} />
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-          <Link href="/bio30/categories" className="card card__default card__default--show-all card--link" style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}>
-            <div className="col pd__xl gp gp--md">
-              <h2 className="title fs__md fw__bd">Все продукты</h2>
+              </div>
             </div>
-          </Link>
-        </motion.div>
-      </section>
+            <div className="bside md:w-1/2 flex items-end justify-center">
+              <img
+                src={p.img}
+                alt={p.title}
+                className="image__web w-full h-full object-cover"
+                loading="lazy"
+              />
+              <img
+                src={p.mobileImg}
+                alt={p.title}
+                className="image__mobile w-full h-auto object-cover"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+    ))}
+    <Link
+      href="/bio30/categories"
+      className="card card__default card__default--show-all card--link"
+      style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}
+    >
+      <div className="col pd__xl gp gp--md">
+        <h2 className="title fs__md fw__bd">Все продукты</h2>
+      </div>
+    </Link>
+  </motion.div>
+</section>
+
 
       <section className="py-16 px-6">
-        <motion.div ref={advantages.ref} initial="hidden" animate={advantages.controls} variants={advantages.container} className="grid grid--benefit">
+        <motion.div
+          ref={advantages.ref}
+          initial="hidden"
+          animate={advantages.controls}
+          variants={advantages.container}
+          className="grid grid--benefit"
+        >
           {[
             {
               title: "Качество, подтвержденное стандартами",
@@ -249,7 +295,12 @@ const HomePage: React.FC = () => {
               class: "benefit benefit__center",
             },
           ].map((a, i) => (
-            <motion.div key={i} variants={advantages.child} className={a.class} style={{ backgroundColor: a.bg, color: a.text }}>
+            <motion.div
+              key={i}
+              variants={advantages.child}
+              className={a.class}
+              style={{ backgroundColor: a.bg, color: a.text }}
+            >
               <div className="aside">
                 <div className="col pd__xl gp gp--md">
                   <div className="col gp gp--sm">
@@ -268,7 +319,13 @@ const HomePage: React.FC = () => {
       </section>
 
       <section className="py-16 px-6 bg-muted/30 text-center">
-        <motion.h2 ref={partner.ref} initial="hidden" animate={partner.controls} variants={partner.variants} className="text-2xl font-bold mb-4">
+        <motion.h2
+          ref={partner.ref}
+          initial="hidden"
+          animate={partner.controls}
+          variants={partner.variants}
+          className="text-2xl font-bold mb-4"
+        >
           Станьте частью большой и дружной семьи
         </motion.h2>
         <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
