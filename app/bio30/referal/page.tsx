@@ -97,7 +97,7 @@ const ReferalPage: React.FC = () => {
           initial="hidden"
           animate={stepsGrid.controls}
           variants={stepsGrid.container}
-          className="grid md:grid-cols-2 gap-6"
+          className="grid grid-cols-2 gap-6"
         >
           {referralBenefits.map((b, i) => (
             <motion.div
