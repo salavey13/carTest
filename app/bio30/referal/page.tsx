@@ -91,32 +91,41 @@ const ReferalPage: React.FC = () => {
       </section>
 
       {/* Benefits Grid */}
-      <section className="grid gap-6 max-w-5xl mx-auto p-6">
-        <motion.div
-          ref={stepsGrid.ref}
-          initial="hidden"
-          animate={stepsGrid.controls}
-          variants={stepsGrid.container}
-          className="grid grid-cols-2 gap-6"
-        >
-          {referralBenefits.map((b, i) => (
-            <motion.div
-              key={i}
-              variants={stepsGrid.child}
-              className="benefit overflow-hidden bg-black text-white rounded-xl shadow-md p-6 flex flex-col md:flex-row"
-            >
-              <div className="aside md:w-1/2 flex flex-col justify-between">
-                <h2 className="title fs__md fw__bd">{b.title}</h2>
-                <h3 className="subtitle fs__md fw__md opc opc--50">{b.desc}</h3>
-              </div>
-              <div className="bside md:w-1/2 flex justify-center items-end mt-4 md:mt-0">
-                <img className="image__web w-full hidden md:block object-cover" src={b.imgWeb} alt={b.title} />
-                <img className="image__mobile w-full md:hidden h-1/2 object-cover" src={b.imgMobile} alt={b.title} />
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+<section className="max-w-5xl mx-auto p-6">
+  <motion.div
+    ref={stepsGrid.ref}
+    initial="hidden"
+    animate={stepsGrid.controls}
+    variants={stepsGrid.container}
+    className="grid grid-cols-2 gap-6"
+  >
+    {referralBenefits.map((b, i) => (
+      <motion.div
+        key={i}
+        variants={stepsGrid.child}
+        className="benefit overflow-hidden bg-black text-white rounded-xl shadow-md p-6 flex flex-col md:flex-row w-full"
+      >
+        <div className="aside flex flex-col justify-between w-full md:w-1/2 pr-4">
+          <h2 className="title fs__md fw__bd">{b.title}</h2>
+          <h3 className="subtitle fs__md fw__md opc opc--50">{b.desc}</h3>
+        </div>
+        <div className="bside flex justify-center items-end w-full md:w-1/2 mt-4 md:mt-0">
+          <img
+            className="image__web hidden md:block w-full h-auto object-cover"
+            src={b.imgWeb}
+            alt={b.title}
+          />
+          <img
+            className="image__mobile block md:hidden w-full h-auto object-cover"
+            src={b.imgMobile}
+            alt={b.title}
+          />
+        </div>
+      </motion.div>
+    ))}
+  </motion.div>
+</section>
+
 
       {/* Partner Form or Dashboard */}
       <section className="max-w-4xl mx-auto p-6">
