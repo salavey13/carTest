@@ -180,49 +180,45 @@ const HomePage: React.FC = () => {
     initial="hidden"
     animate={productGrid.controls}
     variants={productGrid.container}
-    className="grid grid--cards"
-    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}
+    className="grid gap-5 grid-cols-2"
   >
     {products.map((p, i) => (
       <motion.div
         key={i}
         variants={productGrid.child}
-        className={`benefit ${p.class}`}
+        className={`benefit ${p.class} grid grid-cols-2 min-h-[220px]`}
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        <Link href={p.link}>
-          {/* Используем grid вместо flex для ровного 50/50 */}
-          <div className="grid md:grid-cols-2 min-h-[220px]">
-            <div className="aside p-4 flex flex-col justify-between">
-              <div className="col gp gp--sm">
-                <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
-                <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
-              </div>
-              <div className="mt-4">
-                <span className="price">{p.price} RUB</span>
-              </div>
+        <Link href={p.link} className="contents">
+          <div className="aside p-4 flex flex-col justify-between">
+            <div>
+              <h2 className="title fs__md fw__bd">{p.title}</h2>
+              <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
             </div>
-            <div className="bside flex items-end justify-center">
-              <img
-                src={p.img}
-                alt={p.title}
-                className="image__web w-full h-full object-cover"
-                loading="lazy"
-              />
-              <img
-                src={p.mobileImg}
-                alt={p.title}
-                className="image__mobile w-full h-auto object-cover"
-                loading="lazy"
-              />
+            <div className="mt-4">
+              <span className="price">{p.price} RUB</span>
             </div>
+          </div>
+          <div className="bside flex items-end justify-center">
+            <img
+              src={p.img}
+              alt={p.title}
+              className="image__web w-full h-full object-cover"
+              loading="lazy"
+            />
+            <img
+              src={p.mobileImg}
+              alt={p.title}
+              className="image__mobile w-full h-auto object-cover"
+              loading="lazy"
+            />
           </div>
         </Link>
       </motion.div>
     ))}
     <Link
       href="/bio30/categories"
-      className="card card__default card__default--show-all card--link"
+      className="card card__default card__default--show-all card--link col-span-2"
       style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}
     >
       <div className="col pd__xl gp gp--md">
@@ -231,6 +227,7 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
+
 
 
 
