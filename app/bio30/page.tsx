@@ -186,11 +186,12 @@ const HomePage: React.FC = () => {
       <motion.div
         key={i}
         variants={productGrid.child}
-        className="benefit grid grid-cols-2 min-h-[220px] overflow-hidden"
+        className="benefit min-h-[220px] overflow-hidden flex flex-col md:flex-row"
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        <Link href={p.link} className="block w-full h-full">
-          <div className="aside p-4 flex flex-col justify-between">
+        <Link href={p.link} className="block w-full h-full flex flex-col md:flex-row">
+          {/* Текст слева на ПК, сверху на мобиле */}
+          <div className="aside p-4 flex flex-col justify-between md:w-1/2 order-1">
             <div>
               <h2 className="title fs__md fw__bd">{p.title}</h2>
               <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
@@ -199,7 +200,9 @@ const HomePage: React.FC = () => {
               <span className="price">{p.price} RUB</span>
             </div>
           </div>
-          <div className="bside">
+
+          {/* Картинка справа на ПК, снизу на мобиле */}
+          <div className="bside md:w-1/2 flex justify-center items-end order-2">
             <img
               src={p.img}
               alt={p.title}
@@ -209,13 +212,14 @@ const HomePage: React.FC = () => {
             <img
               src={p.mobileImg}
               alt={p.title}
-              className="image__mobile w-full h-full object-cover"
+              className="image__mobile w-full h-auto object-cover"
               loading="lazy"
             />
           </div>
         </Link>
       </motion.div>
     ))}
+
     <Link
       href="/bio30/categories"
       className="card card__default card__default--show-all card--link col-span-2"
@@ -227,6 +231,7 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
+
 
 
 
