@@ -318,19 +318,7 @@ const HomePage: React.FC = () => {
         </motion.div>
       </section>
 
-      <section className="py-16 px-6 bg-muted/30 text-center">
-        <motion.h2
-          ref={partner.ref}
-          initial="hidden"
-          animate={partner.controls}
-          variants={partner.variants}
-          className="text-2xl font-bold mb-4"
-        >
-          Станьте частью большой и дружной семьи
-        </motion.h2>
-        <p className="text-muted-foreground mb-6">Приглашайте партнёров и зарабатывайте процент с каждой их сделки — больше партнёров, выше доход.</p>
-        <PartnerForm />
-      </section>
+      <PartnerForm />
     </div>
   );
 };
