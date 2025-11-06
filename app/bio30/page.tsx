@@ -201,7 +201,8 @@ const HomePage: React.FC = () => {
             </div>
 
             {/* Картинка */}
-            <div className="bside order-2 md:w-1/2 flex justify-center items-end">
+            <div className="bside order-2 md:w-1/2 flex justify-center md:items-end items-start">
+              {/* На десктопе full-height, на мобиле нижняя половина */}
               <img
                 src={p.img}
                 alt={p.title}
@@ -211,7 +212,7 @@ const HomePage: React.FC = () => {
               <img
                 src={p.mobileImg}
                 alt={p.title}
-                className="image__mobile w-full h-auto object-cover"
+                className="image__mobile w-full h-1/2 object-cover mt-auto"
                 loading="lazy"
               />
             </div>
@@ -232,7 +233,6 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
-
 
 
 
