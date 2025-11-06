@@ -174,7 +174,7 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-<section>
+      <section>
   <motion.div
     ref={productGrid.ref}
     initial="hidden"
@@ -186,40 +186,44 @@ const HomePage: React.FC = () => {
       <motion.div
         key={i}
         variants={productGrid.child}
-        className="benefit overflow-hidden flex flex-row min-h-[220px]"
+        className="benefit overflow-hidden"
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        {/* Текст */}
-        <div className="aside w-1/2 p-4 flex flex-col justify-between">
-          <h2 className="title fs__md fw__bd">{p.title}</h2>
-          <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
-          <div className="mt-4">
-            <span className="price">{p.price} RUB</span>
-          </div>
-        </div>
+        <Link href={p.link} className="block w-full h-full">
+          <div className="flex flex-col md:flex-row min-h-[220px]">
+            {/* Текст */}
+            <div className="aside order-1 md:w-1/2 p-4 flex flex-col justify-between">
+              <h2 className="title fs__md fw__bd">{p.title}</h2>
+              <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
+              <div className="mt-4">
+                <span className="price">{p.price} RUB</span>
+              </div>
+            </div>
 
-        {/* Картинка */}
-        <div className="bside w-1/2 flex justify-center items-end">
-          <img
-            src={p.img}
-            alt={p.title}
-            className="image__web w-full h-full object-cover"
-            loading="lazy"
-          />
-          <img
-            src={p.mobileImg}
-            alt={p.title}
-            className="image__mobile w-full h-full object-cover"
-            loading="lazy"
-          />
-        </div>
+            {/* Картинка */}
+            <div className="bside order-2 md:w-1/2 flex justify-center items-end">
+              <img
+                src={p.img}
+                alt={p.title}
+                className="image__web w-full h-full object-cover"
+                loading="lazy"
+              />
+              <img
+                src={p.mobileImg}
+                alt={p.title}
+                className="image__mobile w-full h-auto object-cover"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        </Link>
       </motion.div>
     ))}
 
     {/* Карточка "Все продукты" */}
     <Link
       href="/bio30/categories"
-      className="card card__default card__default--show-all card--link col-span-2"
+      className="card card__default card__default--show-all card--link col-span-1 md:col-span-2"
       style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}
     >
       <div className="col pd__xl gp gp--md">
@@ -228,6 +232,7 @@ const HomePage: React.FC = () => {
     </Link>
   </motion.div>
 </section>
+
 
 
 
