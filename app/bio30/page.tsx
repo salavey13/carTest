@@ -232,6 +232,7 @@ const HomePage: React.FC = () => {
 
 
 
+
       <section className="py-16 px-6">
         <motion.div
           ref={advantages.ref}
