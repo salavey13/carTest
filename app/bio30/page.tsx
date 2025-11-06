@@ -174,55 +174,54 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-<section>
+      <section>
   <motion.div
     ref={productGrid.ref}
     initial="hidden"
     animate={productGrid.controls}
     variants={productGrid.container}
-    className="grid grid-cols-2 gap-5"
+    className="grid grid--cards"
+    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}
   >
     {products.map((p, i) => (
       <motion.div
         key={i}
         variants={productGrid.child}
-        className="benefit min-h-[220px] overflow-hidden flex flex-col md:flex-row"
+        className={`benefit ${p.class}`}
         style={{ backgroundColor: p.bg, color: p.text }}
       >
-        <Link href={p.link} className="block w-full h-full flex flex-col md:flex-row">
-          {/* Текст слева на ПК, сверху на мобиле */}
-          <div className="aside p-4 flex flex-col justify-between md:w-1/2 order-1">
-            <div>
-              <h2 className="title fs__md fw__bd">{p.title}</h2>
-              <h3 className="subtitle fs__md fw__md opc opc--75">{p.desc}</h3>
-            </div>
-            <div className="mt-4">
-              <span className="price">{p.price} RUB</span>
-            </div>
-          </div>
-
-          {/* Картинка справа на ПК, снизу на мобиле */}
-          <div className="bside md:w-1/2 flex justify-center items-end order-2">
-            <img
-              src={p.img}
-              alt={p.title}
-              className="image__web w-full h-full object-cover"
-              loading="lazy"
-            />
-            <img
-              src={p.mobileImg}
-              alt={p.title}
-              className="image__mobile w-full h-auto object-cover"
-              loading="lazy"
-            />
-          </div>
+        <Link href={p.link}>
+          <div className="flex flex-col md:flex-row min-h-[220px]">
+  <div className="aside w-full md:w-1/2 p-4">
+    <div className="col gp gp--sm">
+      <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
+      <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
+      <div className="mt-4">
+        <span className="price">{p.price} RUB</span>
+      </div>
+    </div>
+  </div>
+  <div className="bside w-full md:w-1/2 flex items-end justify-center">
+    <img
+      src={p.img}
+      alt={p.title}
+      className="image__web w-full h-full object-cover"
+      loading="lazy"
+    />
+    <img
+      src={p.mobileImg}
+      alt={p.title}
+      className="image__mobile w-full h-auto object-cover"
+      loading="lazy"
+    />
+  </div>
+</div>
         </Link>
       </motion.div>
     ))}
-
     <Link
       href="/bio30/categories"
-      className="card card__default card__default--show-all card--link col-span-2"
+      className="card card__default card__default--show-all card--link"
       style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}
     >
       <div className="col pd__xl gp gp--md">
