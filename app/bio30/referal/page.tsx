@@ -90,44 +90,38 @@ const ReferalPage: React.FC = () => {
         </div>
       </section>
 
-     {/* Benefits Grid */}
-<section className="max-w-5xl mx-auto p-6">
+    <section className="max-w-6xl mx-auto p-6">
   <motion.div
     ref={stepsGrid.ref}
     initial="hidden"
     animate={stepsGrid.controls}
     variants={stepsGrid.container}
-    className="grid grid-cols-2 gap-6"
+    className="grid grid-cols-2 gap-6 auto-rows-fr"
   >
     {referralBenefits.map((b, i) => (
       <motion.div
         key={i}
         variants={stepsGrid.child}
-        className="benefit bg-black text-white rounded-xl shadow-md p-6 flex flex-col md:flex-row md:items-center md:justify-between overflow-hidden"
+        className="benefit bg-black text-white rounded-xl shadow-md overflow-hidden flex flex-col justify-between min-h-[260px]"
       >
-        <div className="aside md:w-1/2 flex flex-col justify-between">
+        <div className="aside flex flex-col justify-between flex-1 p-6">
           <h2 className="title fs__md fw__bd">{b.title}</h2>
           <h3 className="subtitle fs__md fw__md opc opc--50">{b.desc}</h3>
         </div>
 
-        <div className="bside md:w-1/2 flex justify-center items-end mt-4 md:mt-0">
-          {/* Desktop image */}
+        <div className="bside flex justify-center items-end flex-1 min-h-[160px]">
           <img
-            className="hidden md:block w-full h-auto object-contain"
-            src={b.imgWeb}
+            className="w-full h-full object-cover block"
+            src={b.imgWeb || b.imgMobile}
             alt={b.title}
-          />
-          {/* Mobile image */}
-          <img
-            className="block md:hidden w-full h-auto object-contain"
-            src={b.imgMobile}
-            alt={b.title}
+            loading="lazy"
           />
         </div>
       </motion.div>
     ))}
   </motion.div>
 </section>
+
 
 
 
