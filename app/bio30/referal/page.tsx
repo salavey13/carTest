@@ -90,7 +90,7 @@ const ReferalPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Benefits Grid */}
+     {/* Benefits Grid */}
 <section className="max-w-5xl mx-auto p-6">
   <motion.div
     ref={stepsGrid.ref}
@@ -101,30 +101,34 @@ const ReferalPage: React.FC = () => {
   >
     {referralBenefits.map((b, i) => (
       <motion.div
-  key={i}
-  variants={stepsGrid.child}
-  className="benefit overflow-hidden bg-black text-white rounded-xl shadow-md p-6 flex flex-col md:flex-row md:gap-4"
->
-  <div className="aside flex-1 flex flex-col justify-between">
-    <h2 className="title fs__md fw__bd">{b.title}</h2>
-    <h3 className="subtitle fs__md fw__md opc opc--50">{b.desc}</h3>
-  </div>
-  <div className="bside flex-1 flex justify-center items-end mt-4 md:mt-0">
-    <img
-      className="image__web hidden md:block max-w-full h-auto object-cover"
-      src={b.imgWeb}
-      alt={b.title}
-    />
-    <img
-      className="image__mobile block md:hidden max-w-full h-auto object-cover"
-      src={b.imgMobile}
-      alt={b.title}
-    />
-  </div>
-</motion.div>
+        key={i}
+        variants={stepsGrid.child}
+        className="benefit bg-black text-white rounded-xl shadow-md p-6 flex flex-col md:flex-row md:items-center md:justify-between overflow-hidden"
+      >
+        <div className="aside md:w-1/2 flex flex-col justify-between">
+          <h2 className="title fs__md fw__bd">{b.title}</h2>
+          <h3 className="subtitle fs__md fw__md opc opc--50">{b.desc}</h3>
+        </div>
+
+        <div className="bside md:w-1/2 flex justify-center items-end mt-4 md:mt-0">
+          {/* Desktop image */}
+          <img
+            className="hidden md:block w-full h-auto object-contain"
+            src={b.imgWeb}
+            alt={b.title}
+          />
+          {/* Mobile image */}
+          <img
+            className="block md:hidden w-full h-auto object-contain"
+            src={b.imgMobile}
+            alt={b.title}
+          />
+        </div>
+      </motion.div>
     ))}
   </motion.div>
 </section>
+
 
 
       {/* Partner Form or Dashboard */}
