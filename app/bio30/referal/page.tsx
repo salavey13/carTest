@@ -1,4 +1,3 @@
-// /app/bio30/referal/page.tsx
 "use client";
 
 import React from "react";
@@ -96,13 +95,13 @@ const ReferalPage: React.FC = () => {
     initial="hidden"
     animate={stepsGrid.controls}
     variants={stepsGrid.container}
-    className="grid grid-cols-2 gap-6 auto-rows-fr"
+    className="grid grid--benefit"
   >
     {referralBenefits.map((b, i) => (
       <motion.div
         key={i}
         variants={stepsGrid.child}
-        className="benefit bg-black text-white rounded-xl shadow-md overflow-hidden flex flex-col justify-between min-h-[260px]"
+        className="benefit benefit__default bg-black text-white rounded-xl shadow-md overflow-hidden flex flex-col justify-between min-h-[260px]"
       >
         <div className="aside flex flex-col justify-between flex-1 p-6">
           <h2 className="title fs__md fw__bd">{b.title}</h2>
@@ -121,9 +120,6 @@ const ReferalPage: React.FC = () => {
     ))}
   </motion.div>
 </section>
-
-
-
 
       {/* Partner Form or Dashboard */}
       <section className="max-w-4xl mx-auto p-6">

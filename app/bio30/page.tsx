@@ -49,8 +49,8 @@ const HomePage: React.FC = () => {
       title: "Cordyceps Sinensis",
       desc: "Адаптоген, помогает справляться со стрессом. Содержит кордицепин и полисахариды для поддержки иммунитета, улучшения выносливости, общего укрепления. Идеален для спортсменов, активных людей и стремящихся к здоровью.",
       price: 2500,
-      img: "https://bio30.ru/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp ",
-      mobileImg: "https://bio30.ru/static/uploads/products/8ccf8585e93949cea7c79b9a9410489f.webp ",
+      img: "https://bio30.ru/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp",
+      mobileImg: "https://bio30.ru/static/uploads/products/8ccf8585e93949cea7c79b9a9410489f.webp",
       link: "/bio30/categories/cordyceps-sinensis",
       bg: "#ffe609",
       text: "#000000",
@@ -60,8 +60,8 @@ const HomePage: React.FC = () => {
       title: "Spirulina Chlorella",
       desc: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы.",
       price: 2500,
-      img: "https://bio30.ru/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp ",
-      mobileImg: "https://bio30.ru/static/uploads/products/f21a69b0e62f4dee8b9f231985024282.webp ",
+      img: "https://bio30.ru/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp",
+      mobileImg: "https://bio30.ru/static/uploads/products/f21a69b0e62f4dee8b9f231985024282.webp",
       link: "/bio30/categories/spirulina-chlorella",
       bg: "#a3ea00",
       text: "#000000",
@@ -71,8 +71,8 @@ const HomePage: React.FC = () => {
       title: "Lion's Mane",
       desc: "Lion's Mane, также известный как грива льва или гриб-геркулес, улучшает когнитивные функции.",
       price: 100,
-      img: "https://bio30.ru/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp ",
-      mobileImg: "https://bio30.ru/static/uploads/products/d99d3385cd3f42d6aa1389adb7a719ce.webp ",
+      img: "https://bio30.ru/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp",
+      mobileImg: "https://bio30.ru/static/uploads/products/d99d3385cd3f42d6aa1389adb7a719ce.webp",
       link: "/bio30/categories/lion-s-mane",
       bg: "#ffffff",
       text: "#000000",
@@ -82,8 +82,8 @@ const HomePage: React.FC = () => {
       title: "MAGNESIUM PYRIDOXINE",
       desc: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления.",
       price: 1600,
-      img: "https://bio30.ru/static/uploads/products/1552689351894f229843f51efdb813fc.webp ",
-      mobileImg: "https://bio30.ru/static/uploads/products/74faf744a03e4f1c83e24ace9ac7582b.webp ",
+      img: "https://bio30.ru/static/uploads/products/1552689351894f229843f51efdb813fc.webp",
+      mobileImg: "https://bio30.ru/static/uploads/products/74faf744a03e4f1c83e24ace9ac7582b.webp",
       link: "/bio30/categories/magnesium-pyridoxine",
       bg: "#02044A",
       text: "#ffffff",
@@ -112,8 +112,8 @@ const HomePage: React.FC = () => {
               </div>
             </div>
             <div className="bside">
-              <img src="https://bio30.ru/static/uploads/hero/d4e3bacf49534b708ce6d8271df758b1.webp " alt="Новый уровень заботы о себе" className="image__web img--hero" />
-              <img src="https://bio30.ru/static/uploads/hero/mobile_a78fcf38f4504f929f3f37b069a6e306.webp " alt="Новый уровень заботы о себе" className="image__mobile img--hero" />
+              <img src="https://bio30.ru/static/uploads/hero/d4e3bacf49534b708ce6d8271df758b1.webp" alt="Новый уровень заботы о себе" className="image__web img--hero" />
+              <img src="https://bio30.ru/static/uploads/hero/mobile_a78fcf38f4504f929f3f37b069a6e306.webp" alt="Новый уровень заботы о себе" className="image__mobile img--hero" />
             </div>
           </div>
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#0f0f0f', border: 'none' }}>
@@ -133,8 +133,8 @@ const HomePage: React.FC = () => {
               </div>
             </div>
             <div className="bside">
-              <img src="https://bio30.ru/static/uploads/hero/5dc7b4c6fa21451ba01717448ce6588e.webp " alt="Ваши добавки – в любой точке мира" className="image__web img--hero" />
-              <img src="https://bio30.ru/static/uploads/hero/mobile_bfd7ec9cc635468cb945c544c663095f.webp " alt="Ваши добавки – в любой точке мира" className="image__mobile img--hero" />
+              <img src="https://bio30.ru/static/uploads/hero/5dc7b4c6fa21451ba01717448ce6588e.webp" alt="Ваши добавки – в любой точке мира" className="image__web img--hero" />
+              <img src="https://bio30.ru/static/uploads/hero/mobile_bfd7ec9cc635468cb945c544c663095f.webp" alt="Ваши добавки – в любой точке мира" className="image__mobile img--hero" />
             </div>
           </div>
           <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#B2FF00', border: 'none' }}>
@@ -154,8 +154,8 @@ const HomePage: React.FC = () => {
               </div>
             </div>
             <div className="bside">
-              <img src="https://bio30.ru/static/uploads/hero/b09c832bbec74900b8cafee174b422bd.webp " alt="Ваш доход растет вместе с нами" className="image__web img--hero" />
-              <img src="https://bio30.ru/static/uploads/hero/mobile_f447552243cf479790ec8d057ea0425c.webp " alt="Ваш доход растет вместе с нами" className="image__mobile img--hero" />
+              <img src="https://bio30.ru/static/uploads/hero/b09c832bbec74900b8cafee174b422bd.webp" alt="Ваш доход растет вместе с нами" className="image__web img--hero" />
+              <img src="https://bio30.ru/static/uploads/hero/mobile_f447552243cf479790ec8d057ea0425c.webp" alt="Ваш доход растет вместе с нами" className="image__mobile img--hero" />
             </div>
           </div>
         </SlickSlider>
@@ -175,10 +175,8 @@ const HomePage: React.FC = () => {
           initial="hidden"
           animate={productGrid.controls}
           variants={productGrid.container}
-          className="grid"
+          className="grid grid--product2"
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
             gap: "1.25rem",
             padding: "0 1.25rem",
           }}
@@ -302,8 +300,8 @@ const HomePage: React.FC = () => {
             {
               title: "Качество, подтвержденное стандартами",
               desc: "Вы получаете продукт, соответствующий строгим стандартам качества.",
-              img: "https://bio30.ru/static/uploads/benefits/552036943c7f4338b3eed6a3f52cce86.webp ",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_93ffddcd82a8440eb272aa165c2a6f95.webp ",
+              img: "https://bio30.ru/static/uploads/benefits/552036943c7f4338b3eed6a3f52cce86.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_93ffddcd82a8440eb272aa165c2a6f95.webp",
               bg: "#FF0004",
               text: "#ffffff",
               class: "benefit benefit__center",
@@ -311,8 +309,8 @@ const HomePage: React.FC = () => {
             {
               title: "Доверие в 7+ странах мира",
               desc: "Наш продукт популярен и пользуется доверием во многих странах.",
-              img: "https://bio30.ru/static/uploads/benefits/fd241b092da14997a9cc7e418c084b60.webp ",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_f1b07f689fd04ff882e0f032599e2731.webp ",
+              img: "https://bio30.ru/static/uploads/benefits/fd241b092da14997a9cc7e418c084b60.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_f1b07f689fd04ff882e0f032599e2731.webp",
               bg: "#000000",
               text: "#ffffff",
               class: "benefit benefit__center",
@@ -320,8 +318,8 @@ const HomePage: React.FC = () => {
             {
               title: "Поддержка 24/7 для вас",
               desc: "Наша команда всегда готова ответить на Ваши вопросы.",
-              img: "https://bio30.ru/static/uploads/benefits/873b037261134405857b6ca444c7553a.webp ",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_85476bc252d14b1eb3e79633b0a7ee56.webp ",
+              img: "https://bio30.ru/static/uploads/benefits/873b037261134405857b6ca444c7553a.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_85476bc252d14b1eb3e79633b0a7ee56.webp",
               bg: "#B2FF00",
               text: "#000000",
               class: "benefit benefit__default",
@@ -329,8 +327,8 @@ const HomePage: React.FC = () => {
             {
               title: "Решение для всех и каждого",
               desc: "Продукт подходит для натуральной поддержки Вашего здоровья.",
-              img: "https://bio30.ru/static/uploads/benefits/6a317041578644d1b283abeaf781bf36.webp ",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_ee67808825ec4740890288c6ebd4b6fb.webp ",
+              img: "https://bio30.ru/static/uploads/benefits/6a317041578644d1b283abeaf781bf36.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_ee67808825ec4740890288c6ebd4b6fb.webp",
               bg: "#FFE609",
               text: "#000000",
               class: "benefit benefit__default",
@@ -338,8 +336,8 @@ const HomePage: React.FC = () => {
             {
               title: "Щедрые выплаты партнерам",
               desc: "Мы предлагаем Вам выгодные условия партнерской программы.",
-              img: "https://bio30.ru/static/uploads/benefits/4857f03567274775af998c74f7d7dd0b.webp ",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_194bc082ad764197a07368ab8db613ac.webp ",
+              img: "https://bio30.ru/static/uploads/benefits/4857f03567274775af998c74f7d7dd0b.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_194bc082ad764197a07368ab8db613ac.webp",
               bg: "#000000",
               text: "#ffffff",
               class: "benefit benefit__center",
@@ -347,8 +345,8 @@ const HomePage: React.FC = () => {
             {
               title: "Сила только натуральных компонентов",
               desc: "Вы получаете продукты только из чистых натуральных ингредиентов.",
-              img: "https://bio30.ru/static/uploads/benefits/0fdfd54db54c48a48826920cad697f08.webp ",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp ",
+              img: "https://bio30.ru/static/uploads/benefits/0fdfd54db54c48a48826920cad697f08.webp",
+              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp",
               bg: "#ffffff",
               text: "#000000",
               class: "benefit benefit__center",
