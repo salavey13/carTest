@@ -1,0 +1,55 @@
+@font-face {
+    font-family: 'TT Interphases Pro Trial';
+    src: url('/front/static/fonts/TT Interphases Pro Trial DemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Interphases Pro Trial';
+    src: url('/front/static/fonts/TT Interphases Pro Trial ExtraBold.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Interphases Pro Trial';
+    src: url('/front/static/fonts/TT Interphases Pro Trial Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Interphases Pro Trial';
+    src: url('/front/static/fonts/TT Interphases Pro Trial Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Runs Trial';
+    src: url('/front/static/fonts/TT Runs Trial DemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Runs Trial';
+    src: url('/front/static/fonts/TT Runs Trial ExtraBold.ttf') format('truetype');
+    font-weight: 800;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Runs Trial';
+    src: url('/front/static/fonts/TT Runs Trial Medium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'TT Runs Trial';
+    src: url('/front/static/fonts/TT Runs Trial Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}

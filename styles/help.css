@@ -1,0 +1,291 @@
+/* Блок поддержки (.help) – фиксирован относительно окна браузера */
+.help {
+  position: fixed !important; /* Принудительное fixed */
+  bottom: 16px;    /* Отступ снизу */
+  right: 16px;     /* Отступ справа */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 1; /* Низкий z-index по умолчанию */
+  width: fit-content;
+}
+
+/* Добавляем z-index только когда панель видима */
+.help.visible {
+  z-index: 9999; /* Поверх всего, только когда открыто */
+  padding: 0;
+}
+
+/* Внутренние элементы панели поддержки */
+.help__dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 24px;
+  max-height: 300px; /* Ограничиваем высоту области сообщений */
+  overflow-y: auto; /* Прокрутка только по вертикали */
+  scrollbar-width: none; /* Убираем ползунок в Firefox */
+  -ms-overflow-style: none; /* Убираем ползунок в IE/Edge */
+  padding: 8px 4px;
+}
+
+/* Стили для сообщений */
+.msg {
+  max-width: 80%;
+  margin: 4px 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: var(--green, #4CAF50);
+  color: var(--black, #000);
+  border-radius: 12px 12px 0 12px;
+    font-family: var(--secondary, Arial, sans-serif)
+}
+
+.msg.bot {
+  align-self: flex-start;
+  background: var(--white, #f1f1f1);
+  color: var(--black, #000);
+  border-radius: 12px 12px 12px 0;
+    font-family: var(--secondary, Arial, sans-serif)
+}
+
+.msg-time {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+/* Убираем ползунок в Chrome, Safari */
+.help__dialog::-webkit-scrollbar {
+  display: none;
+}
+
+.help__panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+  border: 1px solid var(--black-white-w-20, rgba(255,255,255,0.20));
+  border-radius: 24px;
+  margin-bottom: var(--md);
+  backdrop-filter: blur(25px);
+  transform: translateY(200%);
+  transition: transform 0.3s ease;
+  padding: var(--md);
+
+  height: 480px;
+  width: 480px;
+  background: #000000cf;
+}
+
+/* Панель показывается, когда добавлен класс .visible */
+.help__panel.visible {
+  transform: translateY(0);
+}
+
+/* Кнопка-чата (.help__circle) */
+.help__circle {
+  bottom: 0;
+  right: 0;
+  padding: var(--md);
+  border-radius: 88px;
+  border: 1px solid var(--black-white-w-20, rgba(255,255,255,0.20));
+  backdrop-filter: blur(25px);
+  cursor: pointer;
+  box-sizing: content-box;
+  z-index: 9990; /* Оставляем высокий z-index для кнопки */
+  background-color: #010101bd;
+}
+
+.help__circle--open {
+  bottom: 0;
+  right: 0;
+  padding: var(--md);
+  border-radius: 88px;
+  border: 1px solid var(--black-white-w-20, rgba(255,255,255,0.20));
+  backdrop-filter: blur(25px);
+
+  cursor: pointer;
+
+  box-sizing: content-box;
+  z-index: 9990; /* Оставляем высокий z-index для кнопки */
+}
+
+/* Остальные стили */
+.help__message {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.help__message--receiver,
+.help__message--sender {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.help__message--sender {
+  align-items: flex-end;
+  margin-bottom: 24px;
+}
+
+.bubble {
+  display: flex;
+  padding: var(--xs);
+  width: fit-content;
+}
+
+.bubble--sender {
+  display: flex;
+  background-color: var(--green);
+  padding: var(--xs);
+  border-radius: 8px 8px 0 8px;
+}
+
+.bubble--receiver {
+  display: flex;
+  background-color: var(--white);
+  padding: var(--xs);
+  border-radius: 8px 8px 8px 0;
+}
+
+.ai {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  border: 1px solid var(--black-white-w-20, rgba(255, 255, 255, 0.075));
+  border-radius: var(--lg);
+  align-items: center;
+  margin-bottom: var(--lg);
+  position: sticky;
+  top: 0;
+  background: #00000040;
+  padding: 16px;
+}
+
+.ai__photo {
+  background-image: url('/front/static/img/avatar.png');
+  width: 48px;
+  height: 48px;
+  background-position: center;
+  border-radius: 100%;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.ai__desc {
+  display: flex;
+  flex-direction: column;
+}
+
+.title--help {
+  font-size: var(--sm);
+}
+
+.text--help {
+  font-size: var(--md);
+  color: var(--black);
+  font-weight: 600;
+}
+
+.text--time {
+  font-size: var(--sm);
+  color: var(--white);
+  filter: opacity(0.5);
+}
+
+.input--help {
+  width: 100%;
+  margin: 0;
+}
+
+.input__button--help {
+  width: fit-content;
+  margin: 0;
+  margin-left: var(--xs);
+}
+
+.row--help {
+  align-items: center;
+  width: 100%;
+  position: sticky;
+  bottom: 0;
+  background: transparent;
+  padding-top: var(--md);
+  z-index: 1;
+}
+
+.clear-chat-btn {
+  margin-left: var(--xs);
+}
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+  .help__panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 0; /* Убираем скругления для полноэкранности */
+    margin-bottom: 0;
+    backdrop-filter: blur(25px);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+    padding: var(--md);
+    margin-right: 0;
+    width: 100%; /* Полная ширина */
+    height: 100vh; /* Полная высота */
+    background: #000000cf;
+
+  }
+
+  .help__dialog {
+    flex-grow: 1; /* Диалог занимает всё доступное пространство */
+    max-height: none; /* Убираем ограничение высоты */
+  }
+
+  .help {
+    position: fixed !important;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: var(--fill);
+    gap: 12px;
+    padding: var(--lg);
+
+    
+  }
+
+  .help__circle {
+    bottom: 0;
+    right: 0;
+    padding: var(--md);
+    border-radius: 88px;
+    border: 1px solid var(--black-white-w-20, rgba(255, 255, 255, 0.20));
+    backdrop-filter: blur(25px);
+
+    cursor: pointer;
+
+    box-sizing: content-box;
+    z-index: 9990;
+  }
+
+
+  .help__circle--open {
+display: none;
+  }
+}

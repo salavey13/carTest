@@ -1,0 +1,47 @@
+:root {
+  /* Цвета */
+  --yellow: #FFE609;
+  --green: #B2FF00;
+  --red: #FF0004;
+  --white: #ffffff;
+  --black: #000000;
+  --purple: #510060;
+  --grey: rgba(255, 255, 255, 0.05);
+
+  /* Шрифты */
+  --primary: 'TT Runs Trial';
+  --secondary: 'TT Interphases Pro Trial';
+
+  /* Жирность */
+  --bold: 700;
+  --medium: 500;
+  --regular: 300;
+
+  /* Границы и переходы */
+  --border: rgba(255, 255, 255, 0.05);
+  --fill: 100%;
+  --center: center;
+  --flex-end: flex-end;
+  --flex-start: flex-start;
+  --animate: all 0.3s ease;
+  --opacity__25: opacity(0.15);
+  --opacity__50: opacity(0.5);
+  --opacity__75: opacity(0.75);
+  --opacity__100: opacity(1);
+  --blur: blur(7.5px);
+}
+
+@font-face {
+  font-family: 'TT Runs Trial';
+  src: url('/public/fonts/TT Runs Trial Bold.woff2') format('woff2');
+  font-weight: bold;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'TT Interphases Pro Trial';
+  src: url('/public/fonts/TT Interphases Pro Trial Regular.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Add more font faces as needed */

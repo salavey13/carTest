@@ -1,0 +1,117 @@
+.container--faq {
+    display: flex !important;
+}
+
+@media (max-width: 576px) {
+    .container--faq {
+        display: flex !important;
+        flex-direction: column;
+
+    }
+
+    .container--faq .aside {
+        width: 100%;
+    }
+
+    .container--faq .bside {
+        width: 100%;
+    }
+
+    .container .image__mobile {
+        display: block;
+    }
+
+    .container .image__web {
+        display: none;
+    }
+
+
+
+}
+@media (min-width: 577px) and (max-width: 768px) {
+    .container--faq {
+        display: flex !important;
+        flex-direction: column;
+    }
+    .container--faq .aside {
+        width: 100%;
+    }
+    .container--faq .bside {
+        width: 100%;
+    }
+    .container .image__mobile {
+        display: block;
+    }
+    .container .image__web {
+        display: none;
+    }
+
+
+}
+@media (min-width: 769px) and (max-width: 992px) {
+    .container--faq {
+        display: flex !important;
+        flex-direction: column;
+    }
+    .container--faq .aside {
+        width: 100%;
+    }
+    .container--faq .bside {
+        width: 100%;
+    }
+    .container .image__mobile {
+        display: block;
+    }
+    .container .image__web {
+        display: none;
+    }
+
+}
+@media (min-width: 993px) and (max-width: 1440px) {
+    .container--faq {
+        display: flex !important;
+        flex-direction: row;
+    }
+    .container--faq .aside {
+        width: 50%;
+    }
+    .container--faq .bside {
+        width: 50%;
+    }
+    .container .image__mobile {
+        display: none;
+    }
+    .container .image__web {
+        display: block;
+    }
+    .container--faq {
+        display: flex;
+        flex-direction: row;
+    }
+
+
+}
+@media (min-width: 1400px) {
+    .container--faq {
+        display: flex !important;
+        flex-direction: row;
+    }
+    .container--faq .aside {
+        width: 50%;
+    }
+    .container--faq .bside {
+        width: 50%;
+    }
+    .container .image__mobile {
+        display: none;
+    }
+    .container .image__web {
+        display: block;
+    }
+    .container--faq {
+        display: flex;
+        flex-direction: row;
+    }
+
+
+}

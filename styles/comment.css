@@ -1,0 +1,8 @@
+
+.comment {
+    background: linear-gradient(rgb(27 27 27 / 31%) 0%, rgb(29 29 29 / 0%) 100%);
+    border-radius: var(--lg);
+    margin: var(--lg);
+    border-top: 1px solid rgb(255 255 255 / 18%);
+  }
+  

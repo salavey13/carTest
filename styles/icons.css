@@ -1,0 +1,151 @@
+/* Иконки */
+.verif,
+.profile,
+.facebook,
+.telegram,
+.instagram,
+.youtube,
+.chat,
+.close,
+.cancel,
+.open,
+.phone,
+.language,
+.dots,
+.plus,
+.minus,
+.delete,
+.check,
+.bag,
+.verification,
+.settings__icon,
+.referral__icon,
+.cart__icon,
+.dzen,
+.vk,
+.menu-icon {
+  width: 24px;
+  height: 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  flex-shrink: 0;
+  display: block;
+}
+
+.verif {
+  background-image: url('/front/static/img/icons/verif.svg');
+}
+
+.profile {
+  background-image: url('/front/static/img/icons/profile.svg');
+
+}
+
+.dzen {
+  background-image: url('/front/static/img/icons/dzen.svg');
+}
+
+.vk {
+  background-image: url('/front/static/img/icons/vk.svg');
+
+}
+
+
+.settings__icon {
+  background-image: url('/front/static/img/icons/settings.svg');
+}
+
+
+.referral__icon {
+  background-image: url('/front/static/img/icons/referral.svg');
+
+}
+
+
+.cart__icon {
+  background-image: url('/front/static/img/icons/cart.svg');
+
+}
+
+.open {
+  background-image: url('/fronts/static/img/icons/open.svg');
+
+}
+
+.open.cancel {
+  background-image: url('/static/img/icons/cancel.svg');
+}
+
+.cancel {
+  background-image: url('/front/static/img/icons/cancel.svg');
+
+}
+
+.check {
+  background-image: url('/front/static/img/icons/check.svg');
+
+}
+
+.menu-icon {
+  background-image: url('/front/static/img/icons/menu.svg');
+}
+.bag {
+  background-image: url('/front/static/img/icons/bag.svg');
+}
+
+.chat {
+  background-image: url('/front/static/img/icons/help.svg');
+}
+
+.dots {
+  background-image: url('/front/static/img/icons/dots_white.svg');
+}
+
+.close {
+  background-image: url('/front/static/img/icons/delete.svg');
+}
+
+.cancel {
+  background-image: url('/front/static/img/icons/profile.svg');
+}
+
+.phone {
+  background-image: url('/front/static/img/icons/phone.svg');
+}
+
+.language {
+  background-image: url('/front/static/img/icons/language.svg');
+}
+
+
+.facebook {
+  background-image: url('/front/static/img/icons/facebook.svg');
+}
+
+.telegram {
+  background-image: url('/front/static/img/icons/telegram.svg');
+}
+
+.instagram {
+  background-image: url('/front/static/img/icons/instagram.svg');
+}
+
+.delete {
+  background-image: url('/front/static/img/icons/delete.svg');
+}
+
+.youtube {
+  background-image: url('/front/static/img/icons/youtube.svg');
+}
+
+.verification {
+  background-image: url('/front/static/img/icons/verif.svg');
+}
+
+.plus {
+  background-image: url('/front/static/img/icons/plus.svg');
+}
+
+.minus {
+  background-image: url('/front/static/img/icons/minus.svg');
+}
