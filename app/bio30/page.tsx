@@ -1,383 +1,94 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
+import { ProductCard } from "./components/ui/ProductCard";
+import { BenefitCard } from "./components/ui/BenefitCard";
+import { HeroSlider } from "./components/HeroSlider";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
-import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
+import { PRODUCTS, HERO_SLIDES, BENEFITS, STORIES } from "./data";
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
-import PartnerForm from "./components/PartnerForm";
 
-const SlickSlider = dynamic(() => import("react-slick"), { ssr: false });
+const StoriesSlider = dynamic(() => import("./components/StoriesSlider"), { 
+  ssr: false,
+  loading: () => <div className="h-64 bg-muted animate-pulse" />
+});
 
-const HomePage: React.FC = () => {
-  const heroTitle = useScrollFadeIn("up", 0.1);
-  const heroSubtitle = useScrollFadeIn("up", 0.2);
-  const advantages = useStaggerFadeIn(6, 0.1);
-  const partner = useScrollFadeIn("up", 0.1);
-  const productsTitle = useScrollFadeIn("up", 0.1);
-  const productGrid = useStaggerFadeIn(4, 0.1);
+export default function HomePage(): JSX.Element {
   useBio30ThemeFix();
-
-  const heroSettings = {
-    infinite: true,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    autoplay: false,
-    autoplaySpeed: 1000,
-    arrows: false,
-    dots: false,
-  };
-
-  const storiesSettings = {
-    dots: false,
-    arrows: false,
-    infinite: false,
-    speed: 800,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    responsive: [
-      { breakpoint: 1024, settings: { dots: true } },
-      { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
-      { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } }
-    ]
-  };
-
-  const products = [
-    {
-      title: "Cordyceps Sinensis",
-      desc: "Адаптоген, помогает справляться со стрессом. Содержит кордицепин и полисахариды для поддержки иммунитета, улучшения выносливости, общего укрепления. Идеален для спортсменов, активных людей и стремящихся к здоровью.",
-      price: 2500,
-      img: "https://bio30.ru/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp",
-      mobileImg: "https://bio30.ru/static/uploads/products/8ccf8585e93949cea7c79b9a9410489f.webp",
-      link: "/bio30/categories/cordyceps-sinensis",
-      bg: "#ffe609",
-      text: "#000000",
-      tags: ["for_men", "for_women", "bestseller"],
-    },
-    {
-      title: "Spirulina Chlorella",
-      desc: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы.",
-      price: 2500,
-      img: "https://bio30.ru/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp",
-      mobileImg: "https://bio30.ru/static/uploads/products/f21a69b0e62f4dee8b9f231985024282.webp",
-      link: "/bio30/categories/spirulina-chlorella",
-      bg: "#a3ea00",
-      text: "#000000",
-      tags: ["for_men", "for_women", "bestseller"],
-    },
-    {
-      title: "Lion's Mane",
-      desc: "Lion's Mane, также известный как грива льва или гриб-геркулес, улучшает когнитивные функции.",
-      price: 100,
-      img: "https://bio30.ru/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp",
-      mobileImg: "https://bio30.ru/static/uploads/products/d99d3385cd3f42d6aa1389adb7a719ce.webp",
-      link: "/bio30/categories/lion-s-mane",
-      bg: "#ffffff",
-      text: "#000000",
-      tags: ["for_men", "for_women", "bestseller"],
-    },
-    {
-      title: "MAGNESIUM PYRIDOXINE",
-      desc: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления.",
-      price: 1600,
-      img: "https://bio30.ru/static/uploads/products/1552689351894f229843f51efdb813fc.webp",
-      mobileImg: "https://bio30.ru/static/uploads/products/74faf744a03e4f1c83e24ace9ac7582b.webp",
-      link: "/bio30/categories/magnesium-pyridoxine",
-      bg: "#02044A",
-      text: "#ffffff",
-      tags: [],
-    },
-  ];
+  
+  const { ref: titleRef, variants: titleVariants } = useScrollFadeIn("up", { delay: 0.1 });
+  const { ref: gridRef, variants: gridVariants } = useScrollFadeIn("none", { delay: 0.15 });
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <section className="hero-section">
-        <SlickSlider {...heroSettings}>
-          <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#FF0004', border: 'none' }}>
-            <div className="aside pd__hg ctr ctr--content">
-              <div className="col gp gp--lg">
-                <div className="col gp gp--xs">
-                  <h1 className="title fs__xxl fw__bd" style={{ color: '#ffffff' }}>
-                    Новый уровень заботы о себе
-                  </h1>
-                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#ffffff' }}>
-                    Откройте лучшие добавки для Вашего здоровья на нашем сайте.
-                  </h2>
-                </div>
-                <Link href="/bio30/categories" className="btn btn--wht btn__secondary">
-                  Узнать больше
-                </Link>
-              </div>
-            </div>
-            <div className="bside">
-              <img src="https://bio30.ru/static/uploads/hero/d4e3bacf49534b708ce6d8271df758b1.webp" alt="Новый уровень заботы о себе" className="image__web img--hero" />
-              <img src="https://bio30.ru/static/uploads/hero/mobile_a78fcf38f4504f929f3f37b069a6e306.webp" alt="Новый уровень заботы о себе" className="image__mobile img--hero" />
-            </div>
-          </div>
-          <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#0f0f0f', border: 'none' }}>
-            <div className="aside pd__hg ctr ctr--content">
-              <div className="col gp gp--lg">
-                <div className="col gp gp--xs">
-                  <h1 className="title fs__xxl fw__bd" style={{ color: '#ffffff' }}>
-                    Ваши добавки – в любой точке мира
-                  </h1>
-                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#ffffff' }}>
-                    Быстрая и надежная доставка СДЭК для Вашего удобства.
-                  </h2>
-                </div>
-                <Link href="/bio30/delivery" className="btn btn--wht btn__secondary">
-                  Узнать больше
-                </Link>
-              </div>
-            </div>
-            <div className="bside">
-              <img src="https://bio30.ru/static/uploads/hero/5dc7b4c6fa21451ba01717448ce6588e.webp" alt="Ваши добавки – в любой точке мира" className="image__web img--hero" />
-              <img src="https://bio30.ru/static/uploads/hero/mobile_bfd7ec9cc635468cb945c544c663095f.webp" alt="Ваши добавки – в любой точке мира" className="image__mobile img--hero" />
-            </div>
-          </div>
-          <div className="container gp gp--hg container--hero" style={{ backgroundColor: '#B2FF00', border: 'none' }}>
-            <div className="aside pd__hg ctr ctr--content">
-              <div className="col gp gp--lg">
-                <div className="col gp gp--xs">
-                  <h1 className="title fs__xxl fw__bd" style={{ color: '#000000' }}>
-                    Ваш доход растет вместе с нами
-                  </h1>
-                  <h2 className="subtitle fs__lg fw__rg opc opc--75" style={{ color: '#000000' }}>
-                    Получайте до 30% с заказов приглашенных (3 уровня). Выгодно и просто!
-                  </h2>
-                </div>
-                <Link href="/bio30/referal" className="btn btn--wht btn__secondary">
-                  Узнать больше
-                </Link>
-              </div>
-            </div>
-            <div className="bside">
-              <img src="https://bio30.ru/static/uploads/hero/b09c832bbec74900b8cafee174b422bd.webp" alt="Ваш доход растет вместе с нами" className="image__web img--hero" />
-              <img src="https://bio30.ru/static/uploads/hero/mobile_f447552243cf479790ec8d057ea0425c.webp" alt="Ваш доход растет вместе с нами" className="image__mobile img--hero" />
-            </div>
-          </div>
-        </SlickSlider>
-      </section>
-
-      <section className="article">
-        <div className="row">
-          <h2 className="title fs__lg fw__bd gradient">
-            Мультивселенная продуктов
-          </h2>
-        </div>
-      </section>
-
-      <section>
-        <motion.div
-          ref={productGrid.ref}
+    <main className="page-home">
+      <HeroSlider slides={HERO_SLIDES} />
+      
+      <section className="section section--products" aria-labelledby="products-title">
+        <motion.header
+          ref={titleRef}
+          variants={titleVariants}
           initial="hidden"
-          animate={productGrid.controls}
-          variants={productGrid.container}
-          className="grid grid--product2"
-          style={{
-            gap: "1.25rem",
-            padding: "0 1.25rem",
-          }}
+          animate="visible"
+          className="section-header"
         >
-          {products.map((p, i) => (
-            <motion.div
-              key={i}
-              variants={productGrid.child}
-              className="benefit card"
-              style={{
-                backgroundColor: p.bg,
-                color: p.text,
-                borderRadius: "var(--md)",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                minHeight: "280px",
-              }}
-            >
-              <Link href={p.link} style={{ display: "block", height: "100%" }}>
-                <div style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", height: "100%" }}>
-                  {/* ЛЕВАЯ ЧАСТЬ — ТЕКСТ */}
-                  <div
-                    className="aside"
-                    style={{
-                      flex: "0 0 50%",
-                      minWidth: 0,
-                      padding: "1.5rem 1rem 1rem 1.5rem",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-                      <h2 className="title fs__md fw__bd" style={{ color: p.text, marginBottom: "0.5rem", wordWrap: "break-word" }}>
-                        {p.title}
-                      </h2>
-                      <h3 className="subtitle fs__sm fw__md opc opc--75" style={{ color: p.text, flex: 1, fontSize: "0.875rem", wordWrap: "break-word" }}>
-                        {p.desc}
-                      </h3>
-                      <div style={{ marginTop: "auto", paddingTop: "1rem" }}>
-                        <span className="price fs__lg fw__bd">{p.price} RUB</span>
-                      </div>
-                    </div>
-                  </div>
+          <h1 id="products-title" className="title fs__lg fw__bd gradient">
+            Мультивселенная продуктов
+          </h1>
+        </motion.header>
 
-                  {/* ПРАВАЯ ЧАСТЬ — КАРТИНКА */}
-                  <div
-                    className="bside"
-                    style={{
-                      flex: "0 0 50%",
-                      minWidth: 0,
-                      display: "flex",
-                      alignItems: "flex-end",
-                      justifyContent: "center",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <img
-                      src={p.img}
-                      alt={p.title}
-                      className="image__web"
-                      style={{
-                        position: "absolute",
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                      loading="lazy"
-                    />
-                    <img
-                      src={p.mobileImg}
-                      alt={p.title}
-                      className="image__mobile"
-                      style={{
-                        position: "absolute",
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
+        <motion.div
+          ref={gridRef}
+          variants={gridVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid--product2"
+        >
+          {PRODUCTS.map((product, i) => (
+            <ProductCard key={product.title} product={product} index={i} />
           ))}
-
-          <Link
-            href="/bio30/categories"
-            className="card card__default card__default--show-all card--link"
-            style={{
-              backgroundColor: "#0D0D0D",
-              border: "1px solid var(--border)",
-              gridColumn: "1 / -1",
-              minHeight: "120px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "var(--md)",
-            }}
+          
+          <Link 
+            href="/bio30/categories" 
+            className="card card--all"
+            aria-label="Все продукты"
           >
-            <h2 className="title fs__xl fw__bd" style={{ color: "#ffffff" }}>
-              Все продукты
-            </h2>
+            <h2 className="title fs__xl fw__bd">Все продукты</h2>
           </Link>
         </motion.div>
       </section>
 
-      <section className="py-16 px-6">
-        <motion.div
-          ref={advantages.ref}
+      <section className="section section--stories" aria-labelledby="stories-title">
+        <StoriesSlider stories={STORIES} />
+      </section>
+
+      <section className="section section--benefits" aria-labelledby="benefits-title">
+        <motion.header
+          ref={useScrollFadeIn("up", { delay: 0.1 }).ref}
+          variants={useScrollFadeIn("up", { delay: 0.1 }).variants}
           initial="hidden"
-          animate={advantages.controls}
-          variants={advantages.container}
-          className="grid grid--benefit"
+          animate="visible"
+          className="section-header"
         >
-          {[
-            {
-              title: "Качество, подтвержденное стандартами",
-              desc: "Вы получаете продукт, соответствующий строгим стандартам качества.",
-              img: "https://bio30.ru/static/uploads/benefits/552036943c7f4338b3eed6a3f52cce86.webp",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_93ffddcd82a8440eb272aa165c2a6f95.webp",
-              bg: "#FF0004",
-              text: "#ffffff",
-              class: "benefit benefit__center",
-            },
-            {
-              title: "Доверие в 7+ странах мира",
-              desc: "Наш продукт популярен и пользуется доверием во многих странах.",
-              img: "https://bio30.ru/static/uploads/benefits/fd241b092da14997a9cc7e418c084b60.webp",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_f1b07f689fd04ff882e0f032599e2731.webp",
-              bg: "#000000",
-              text: "#ffffff",
-              class: "benefit benefit__center",
-            },
-            {
-              title: "Поддержка 24/7 для вас",
-              desc: "Наша команда всегда готова ответить на Ваши вопросы.",
-              img: "https://bio30.ru/static/uploads/benefits/873b037261134405857b6ca444c7553a.webp",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_85476bc252d14b1eb3e79633b0a7ee56.webp",
-              bg: "#B2FF00",
-              text: "#000000",
-              class: "benefit benefit__default",
-            },
-            {
-              title: "Решение для всех и каждого",
-              desc: "Продукт подходит для натуральной поддержки Вашего здоровья.",
-              img: "https://bio30.ru/static/uploads/benefits/6a317041578644d1b283abeaf781bf36.webp",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_ee67808825ec4740890288c6ebd4b6fb.webp",
-              bg: "#FFE609",
-              text: "#000000",
-              class: "benefit benefit__default",
-            },
-            {
-              title: "Щедрые выплаты партнерам",
-              desc: "Мы предлагаем Вам выгодные условия партнерской программы.",
-              img: "https://bio30.ru/static/uploads/benefits/4857f03567274775af998c74f7d7dd0b.webp",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_194bc082ad764197a07368ab8db613ac.webp",
-              bg: "#000000",
-              text: "#ffffff",
-              class: "benefit benefit__center",
-            },
-            {
-              title: "Сила только натуральных компонентов",
-              desc: "Вы получаете продукты только из чистых натуральных ингредиентов.",
-              img: "https://bio30.ru/static/uploads/benefits/0fdfd54db54c48a48826920cad697f08.webp",
-              mobileImg: "https://bio30.ru/static/uploads/benefits/mobile_74ed8b708e0245aeb2a4211a6b1b104c.webp",
-              bg: "#ffffff",
-              text: "#000000",
-              class: "benefit benefit__center",
-            },
-          ].map((a, i) => (
-            <motion.div
-              key={i}
-              variants={advantages.child}
-              className={a.class}
-              style={{ backgroundColor: a.bg, color: a.text }}
-            >
-              <div className="aside">
-                <div className="col pd__xl gp gp--md">
-                  <div className="col gp gp--sm">
-                    <h2 className="title fs__md fw__bd">{a.title}</h2>
-                    <h3 className="subtitle fs__md fw__md opc opc--50">{a.desc}</h3>
-                  </div>
-                </div>
-              </div>
-              <div className="bside">
-                <img src={a.img} alt={a.title} className="image__web" />
-                <img src={a.mobileImg} alt={a.title} className="image__mobile" />
-              </div>
-            </motion.div>
+          <h2 id="benefits-title" className="title fs__lg fw__bd gradient">
+            Наши Преимущества
+          </h2>
+        </motion.header>
+
+        <motion.div 
+          className="grid grid--benefit"
+          variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+          initial="hidden"
+          animate="visible"
+        >
+          {BENEFITS.map((benefit, i) => (
+            <BenefitCard key={benefit.title} benefit={benefit} index={i} />
           ))}
         </motion.div>
       </section>
 
       <PartnerForm />
-    </div>
+    </main>
   );
-};
-
-export default HomePage;
+}

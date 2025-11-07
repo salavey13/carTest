@@ -1,41 +1,68 @@
 "use client";
 
-import { Variants, useAnimation, useInView } from "framer-motion";
+import { useAnimation, Variants, useInView } from "framer-motion";
 import { useEffect, useRef } from "react";
 
+interface UseScrollFadeInOptions {
+  delay?: number;
+  duration?: number;
+  blurAmount?: number;
+  once?: boolean;
+}
+
+type Direction = "up" | "down" | "left" | "right" | "none";
+
 export const useScrollFadeIn = (
-  direction: "up" | "down" | "left" | "right" | "none" = "up",
-  delay: number = 0
+  direction: Direction = "up",
+  options: UseScrollFadeInOptions = {}
 ) => {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement>(null);
   const controls = useAnimation();
-  const inView = useInView(ref, { once: true, margin: "-50px" });
+  const inView = useInView(ref, { 
+    once: options.once ?? true, 
+    margin: "-50px" 
+  });
+
+  const { delay = 0, duration = 0.8, blurAmount = 4 } = options;
+
+  const motionProps = {
+    [direction]: {
+      up: { y: 40 },
+      down: { y: -40 },
+      left: { x: -40 },
+      right: { x: 40 },
+      none: {}
+    }[direction]
+  };
 
   const variants: Variants = {
     hidden: {
       opacity: 0,
-      y: direction === "up" ? 40 : direction === "down" ? -40 : 0,
-      x: direction === "left" ? -40 : direction === "right" ? 40 : 0,
-      scale: 0.98,
-      filter: "blur(4px)",
+      filter: `blur(${blurAmount}px)`,
+      ...motionProps
     },
     visible: {
       opacity: 1,
-      y: 0,
-      x: 0,
-      scale: 1,
       filter: "blur(0px)",
-      transition: {
-        duration: 0.8,
-        ease: "easeOut",
-        delay,
-      },
-    },
+      x: 0,
+      y: 0,
+      transition: { duration, delay, ease: "easeOut" }
+    }
   };
 
   useEffect(() => {
     if (inView) controls.start("visible");
   }, [inView, controls]);
 
-  return { ref, controls, variants };
+  return { 
+    ref, 
+    controls, 
+    variants,
+    getProps: () => ({ 
+      ref, 
+      variants, 
+      initial: "hidden", 
+      animate: controls 
+    })
+  };
 };
