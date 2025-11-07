@@ -1,4 +1,3 @@
-// /app/bio30/page.tsx
 "use client";
 
 import React from "react";
@@ -55,7 +54,6 @@ const HomePage: React.FC = () => {
       link: "/bio30/categories/cordyceps-sinensis",
       bg: "#ffe609",
       text: "#000000",
-      class: "card panel-bg-#ffe609 panel-text-#000000 card__default card__default--product",
       tags: ["for_men", "for_women", "bestseller"],
     },
     {
@@ -67,7 +65,6 @@ const HomePage: React.FC = () => {
       link: "/bio30/categories/spirulina-chlorella",
       bg: "#a3ea00",
       text: "#000000",
-      class: "card panel-bg-#a3ea00 panel-text-#000000 card__horizontal card__horizontal--product",
       tags: ["for_men", "for_women", "bestseller"],
     },
     {
@@ -79,7 +76,6 @@ const HomePage: React.FC = () => {
       link: "/bio30/categories/lion-s-mane",
       bg: "#ffffff",
       text: "#000000",
-      class: "card panel-bg-#ffffff panel-text-#000000 card__vertical card__vertical--product",
       tags: ["for_men", "for_women", "bestseller"],
     },
     {
@@ -91,7 +87,6 @@ const HomePage: React.FC = () => {
       link: "/bio30/categories/magnesium-pyridoxine",
       bg: "#02044A",
       text: "#ffffff",
-      class: "card panel-bg-#02044A panel-text-#ffffff card__horizontal card__horizontal--product",
       tags: [],
     },
   ];
@@ -174,65 +169,122 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-            <section>
-  <motion.div
-    ref={productGrid.ref}
-    initial="hidden"
-    animate={productGrid.controls}
-    variants={productGrid.container}
-    className="grid grid--cards"
-    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}
-  >
-    {products.map((p, i) => (
-      <motion.div
-        key={i}
-        variants={productGrid.child}
-        className={`benefit ${p.class}`}
-        style={{ backgroundColor: p.bg, color: p.text }}
-      >
-        <Link href={p.link}>
-          <div className="flex flex-col md:flex-row min-h-[220px]">
-  <div className="aside w-full md:w-1/2 p-4">
-    <div className="col gp gp--sm">
-      <h2 className="title fs__md fw__bd" style={{ color: p.text }}>{p.title}</h2>
-      <h3 className="subtitle fs__md fw__md opc opc--75" style={{ color: p.text }}>{p.desc}</h3>
-      <div className="mt-4">
-        <span className="price">{p.price} RUB</span>
-      </div>
-    </div>
-  </div>
-  <div className="bside w-full md:w-1/2 flex items-end justify-center">
-    <img
-      src={p.img}
-      alt={p.title}
-      className="image__web w-full h-full object-cover"
-      loading="lazy"
-    />
-    <img
-      src={p.mobileImg}
-      alt={p.title}
-      className="image__mobile w-full h-auto object-cover"
-      loading="lazy"
-    />
-  </div>
-</div>
-        </Link>
-      </motion.div>
-    ))}
-    <Link
-      href="/bio30/categories"
-      className="card card__default card__default--show-all card--link"
-      style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}
-    >
-      <div className="col pd__xl gp gp--md">
-        <h2 className="title fs__md fw__bd">Все продукты</h2>
-      </div>
-    </Link>
-  </motion.div>
-</section>
+      <section>
+        <motion.div
+          ref={productGrid.ref}
+          initial="hidden"
+          animate={productGrid.controls}
+          variants={productGrid.container}
+          className="grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, 1fr)",
+            gap: "1.25rem",
+            padding: "0 1.25rem",
+          }}
+        >
+          {products.map((p, i) => (
+            <motion.div
+              key={i}
+              variants={productGrid.child}
+              className="benefit card"
+              style={{
+                backgroundColor: p.bg,
+                color: p.text,
+                borderRadius: "var(--md)",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "280px",
+              }}
+            >
+              <Link href={p.link} style={{ display: "block", height: "100%" }}>
+                <div style={{ display: "flex", flexDirection: "row", height: "100%" }}>
+                  {/* ЛЕВАЯ ЧАСТЬ — ТЕКСТ */}
+                  <div
+                    className="aside"
+                    style={{
+                      flex: "0 0 50%",
+                      padding: "1.5rem 1rem 1rem 1.5rem",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                      <h2 className="title fs__md fw__bd" style={{ color: p.text, marginBottom: "0.5rem" }}>
+                        {p.title}
+                      </h2>
+                      <h3 className="subtitle fs__sm fw__md opc opc--75" style={{ color: p.text, flex: 1, fontSize: "0.875rem" }}>
+                        {p.desc}
+                      </h3>
+                      <div style={{ marginTop: "auto", paddingTop: "1rem" }}>
+                        <span className="price fs__lg fw__bd">{p.price} RUB</span>
+                      </div>
+                    </div>
+                  </div>
 
+                  {/* ПРАВАЯ ЧАСТЬ — КАРТИНКА */}
+                  <div
+                    className="bside"
+                    style={{
+                      flex: "0 0 50%",
+                      display: "flex",
+                      alignItems: "flex-end",
+                      justifyContent: "center",
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <img
+                      src={p.img}
+                      alt={p.title}
+                      className="image__web"
+                      style={{
+                        position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      loading="lazy"
+                    />
+                    <img
+                      src={p.mobileImg}
+                      alt={p.title}
+                      className="image__mobile"
+                      style={{
+                        position: "absolute",
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
 
-
+          <Link
+            href="/bio30/categories"
+            className="card card__default card__default--show-all card--link"
+            style={{
+              backgroundColor: "#0D0D0D",
+              border: "1px solid var(--border)",
+              gridColumn: "1 / -1",
+              minHeight: "120px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "var(--md)",
+            }}
+          >
+            <h2 className="title fs__xl fw__bd" style={{ color: "#ffffff" }}>
+              Все продукты
+            </h2>
+          </Link>
+        </motion.div>
+      </section>
 
       <section className="py-16 px-6">
         <motion.div
