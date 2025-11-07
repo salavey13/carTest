@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react";
@@ -23,8 +22,8 @@ import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
 import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useFocusTimeTracker } from "@/hooks/useFocusTimeTracker";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@/vercel/analytics/react";
+import { SpeedInsights } from "@/vercel/speed-insights/next";
 import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
@@ -181,7 +180,7 @@ function useBio30ExternalCSS() {
   useEffect(() => {
     if (!pathname.startsWith("/bio30")) return;
 
-    const BASE = "https://bio30.ru/front/static/css/";
+    const BASE = "https://bio30.ru/front/static/css/ ";
     const VERSION = "?v=05.07.2025-1";
     const files = [
       "grid.css",
@@ -212,13 +211,15 @@ function useBio30ExternalCSS() {
       "grid__categories.css",
       "comment.css",
       "fluids.css",
+      "/styles/components.css",
+      "/styles/biohfixes.css",
     ];
 
     const links: HTMLLinkElement[] = [];
     files.forEach((f) => {
       const link = document.createElement("link");
       link.rel = "stylesheet";
-      link.href = `${BASE}${f}${VERSION}`;
+      link.href = f.startsWith('/') ? f : `${BASE}${f}${VERSION}`;
       link.dataset.source = "bio30-external";
       document.head.appendChild(link);
       links.push(link);
