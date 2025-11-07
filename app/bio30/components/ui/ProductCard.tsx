@@ -1,3 +1,5 @@
+"use client";
+
 import React, { memo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -34,23 +36,45 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
       } as React.CSSProperties}
     >
       <Link href={product.link} className="card-link">
-        <div className="card-content">
-          <div className="card-text">
-            <h2 className="title fs__md fw__bd">{product.title}</h2>
-            <p className="subtitle fs__sm fw__md opc opc--75">{product.description}</p>
-            <div className="card-price">
-              <span className="price fs__lg fw__bd">{product.price} RUB</span>
+        <div className="card-content row">
+          <div className="card-text aside pd__xl">
+            <div className="col gp gp--md">
+              <div className="col gp gp--sm">
+                <h2 className="title fs__md fw__bd" style={{ color: product.theme.text }}>
+                  {product.title}
+                </h2>
+                <p className="subtitle fs__sm fw__md opc opc--75" style={{ color: product.theme.text }}>
+                  {product.description}
+                </p>
+              </div>
+              <div className="prices">
+                <span className="price fs__lg fw__bd">{product.price} RUB</span>
+              </div>
             </div>
           </div>
-          <div className="card-image">
+          <div className="card-image bside">
             <picture>
               <source media="(max-width: 768px)" srcSet={product.image.mobile} />
-              <img src={product.image.web} alt={product.title} loading="lazy" />
+              <img 
+                src={product.image.web} 
+                alt={product.title} 
+                className="image__web"
+                loading="lazy"
+                decoding="async"
+              />
             </picture>
           </div>
+          {product.tags.length > 0 && (
+            <div className="tags">
+              {product.tags.map(tag => (
+                <span key={tag} className="tag">{tag}</span>
+              ))}
+            </div>
+          )}
         </div>
       </Link>
     </motion.article>
   );
 });
+
 ProductCard.displayName = 'ProductCard';
