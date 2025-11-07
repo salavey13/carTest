@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react";
@@ -412,7 +413,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
       <Suspense fallback={null}>
         {/* keep sticky chat for non-bio30 pages to avoid CSS collisions */}
-        {!pathname.startsWith("/bio30") && <StickyChatButton />}
+        <StickyChatButton />{*!pathname.startsWith("/bio30") && <StickyChatButton />*}
       </Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
     </>
