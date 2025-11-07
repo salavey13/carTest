@@ -1,0 +1,53 @@
+/* Стеклянные элементы */
+#glass_01 {
+    position: absolute;
+    height: 400px;
+  
+    left: -180px;
+    right: 0;
+    width: 400px;
+    scale: 0.8;
+    bottom: -134px;
+  }
+  
+  #glass_02 {
+    position: absolute;
+    right: -136px;
+    scale: 0.7;
+    z-index: 2;
+    top: 148px;
+  
+  }
+  
+  #glass_03 {
+    position: absolute;
+    scale: 0.8;
+    z-index: 2;
+    left: 288px;
+    top: 58px;
+  }
+  
+  #glass_04 {
+    position: absolute;
+    scale: 0.7;
+    z-index: 2;
+    left: -268px;
+    top: 387px;
+  }
+  
+  #glass_05 {
+    position: absolute;
+    scale: 0.6;
+    z-index: 2;
+    left: 288px;
+    top: 436px;
+  
+  
+  }
+  
+  #glass_06 {
+    position: absolute;
+    scale: 0.8;
+    z-index: 2;
+    left: 200px;
+  }

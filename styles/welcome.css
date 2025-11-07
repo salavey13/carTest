@@ -1,0 +1,112 @@
+.container--welcome {
+    overflow: hidden;
+    position: relative;
+    background-color: #090043;
+    background-image: 
+      linear-gradient(0deg, rgba(4, 0, 255, 0.05) 0%, rgba(4, 0, 255, 0.05) 100%),
+      radial-gradient(100% 100% at 50% 0%, #0400FF 0%, rgba(4, 0, 255, 0) 45.17%),
+      linear-gradient(180deg, rgba(4, 0, 255, 0.30) 0%, rgba(4, 0, 255, 0.00) 80.17%),
+      url('/front/static/img/noise-white.png');
+    background-size: cover, cover, cover, auto;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+    background-blend-mode: overlay, overlay, overlay, color-burn;
+
+  }
+
+@media (max-width: 576px) {
+
+    .container--welcome .aside {
+        width: 100%;
+    }
+    .container--welcome .bside {
+        width: 100%;
+    }
+    .container--welcome {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #glass_01 {
+        position: absolute;
+        height: 400px;
+        left: -215px;
+        right: 0;
+        width: 400px;
+        scale: 0.4;
+        bottom: -134px;
+    }
+}
+@media (min-width: 577px) and (max-width: 768px) {
+
+    .container--welcome .aside {
+        width: 100%;
+    }
+    .container--welcome .bside {
+        width: 100%;
+    }
+
+    .container--welcome {
+        display: flex;
+        flex-direction: column;
+    }
+    #glass_01 {
+        position: absolute;
+        height: 400px;
+        left: -215px;
+        right: 0;
+        width: 400px;
+        scale: 0.4;
+        bottom: -134px;
+    }
+}
+@media (min-width: 769px) and (max-width: 992px) {
+
+    .container--welcome .aside {
+        width: 100%;
+    }
+    .container--welcome .bside {
+        width: 100%;
+    }
+
+    .container--welcome {
+        display: flex;
+        flex-direction: column;
+    }
+    #glass_01 {
+        position: absolute;
+        height: 400px;
+        left: -215px;
+        right: 0;
+        width: 400px;
+        scale: 0.4;
+        bottom: -134px;
+    }
+}
+@media (min-width: 993px) and (max-width: 1440px) {
+
+    .container--welcome .aside {
+        width: 50%;
+    }
+    .container--welcome .bside {
+        width: 50%;
+    }
+
+    .container--welcome {
+        display: flex;
+        flex-direction: row;
+    }
+}
+@media (min-width: 1400px) {
+
+    .container--welcome .aside {
+        width: 50%;
+    }
+    .container--welcome .bside {
+        width: 50%;
+    }
+
+    .container--welcome {
+        display: flex;
+        flex-direction: row;
+    }
+}
