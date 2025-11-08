@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react";
@@ -251,7 +250,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
 
   // load bio30 CSS when on bio30 paths
-  useBio30ExternalCSS();
+  //useBio30ExternalCSS();
   // apply theme fix (colors) when on bio30
   useBio30ThemeFix();
 
