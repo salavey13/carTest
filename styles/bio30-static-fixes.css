@@ -1,3 +1,4 @@
+/* /styles/bio30-static-fixes.css */
 /* =============================================================================
    BIO30 STATIC FIXES - Версия 2.0 (Read-Safe)
    Все селекторы с .bio30-wrapper для перекрытия read-only стилей
@@ -462,4 +463,140 @@
 /* ФИКС ДЛЯ STORY (удаляем дублирующийся display) */
 .bio30-wrapper .story {
   display: block !important; /* Сбрасываем display: flex !important из story.css */
+}
+
+/* === WELCOME/FORM SECTION STYLES (from welcome.css) === */
+.bio30-wrapper .container--welcome {
+  overflow: hidden;
+  position: relative;
+  background-color: #090043;
+  background-image: 
+    linear-gradient(0deg, rgba(4, 0, 255, 0.05) 0%, rgba(4, 0, 255, 0.05) 100%),
+    radial-gradient(100% 100% at 50% 0%, #0400FF 0%, rgba(4, 0, 255, 0) 45.17%),
+    linear-gradient(180deg, rgba(4, 0, 255, 0.30) 0%, rgba(4, 0, 255, 0.00) 80.17%),
+    url('/front/static/img/noise-white.png');
+  background-size: cover, cover, cover, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-blend-mode: overlay, overlay, overlay, color-burn;
+}
+
+/* === STORIES SECTION STYLES (from story.css) === */
+.bio30-wrapper .section--stories {
+  padding: var(--hg) 0;
+}
+
+.bio30-wrapper .container--stories {
+  display: flex;
+  flex-direction: row;
+  gap: var(--hg);
+  padding: var(--hg);
+}
+
+.bio30-wrapper .container--stories .aside {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.bio30-wrapper .container--stories .bside {
+  width: 50%;
+}
+
+.bio30-wrapper .stories-slider {
+  display: flex;
+  overflow-x: auto;
+  gap: var(--md);
+  padding-bottom: var(--sm);
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)) hsl(var(--muted));
+}
+
+.bio30-wrapper .stories-slider::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bio30-wrapper .stories-slider::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+.bio30-wrapper .stories-slider::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: var(--sm);
+}
+
+.bio30-wrapper .story {
+  position: relative;
+  flex-shrink: 0;
+  width: 320px;
+  aspect-ratio: 1 / 1.8;
+  border-radius: var(--md);
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+}
+
+.bio30-wrapper .story img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.bio30-wrapper .content--story {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--xl);
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.56) 0%, rgba(255, 255, 255, 0) 30%);
+  border-radius: var(--md);
+  z-index: 2;
+  gap: var(--lg);
+}
+
+.bio30-wrapper .content--story .quote__center {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--lg);
+}
+
+.bio30-wrapper .content--story .quote_01 {
+  width: 32px;
+  height: 32px;
+  background: currentColor;
+  mask: url('/front/static/img/icons/quote.svg') center/contain no-repeat;
+  opacity: 0.5;
+}
+
+.bio30-wrapper .content--story .profile {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: hsl(var(--muted));
+  display: block;
+}
+
+/* === RESPONSIVE FOR WELCOME AND STORIES === */
+@media (max-width: 992px) {
+  .bio30-wrapper .container--stories,
+  .bio30-wrapper .container--welcome {
+    flex-direction: column;
+  }
+  
+  .bio30-wrapper .container--stories .aside,
+  .bio30-wrapper .container--stories .bside,
+  .bio30-wrapper .container--welcome .aside,
+  .bio30-wrapper .container--welcome .bside {
+    width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .bio30-wrapper .story {
+    width: 280px;
+  }
 }
