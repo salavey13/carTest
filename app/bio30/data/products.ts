@@ -1,7 +1,8 @@
-import { Product } from '../types';
+import { Product, Story, Benefit } from '../types';
 
 export const PRODUCTS: Product[] = [
   {
+    id: 'cordyceps',
     title: "Cordyceps Sinensis",
     description: "Адаптоген, помогает справляться со стрессом. Содержит кордицепин и полисахариды для поддержки иммунитета, улучшения выносливости, общего укрепления. Идеален для спортсменов, активных людей и стремящихся к здоровью.",
     price: 2500,
@@ -12,9 +13,10 @@ export const PRODUCTS: Product[] = [
     link: "/bio30/categories/cordyceps-sinensis",
     theme: { bg: "#ffe609", text: "#000000" },
     tags: ["for_men", "for_women", "bestseller"],
-    layout: "default"
+    variant: "default"
   },
   {
+    id: 'spirulina',
     title: "Spirulina Chlorella",
     description: "Spirulina Chlorella — это уникальное сочетание двух суперфудов: спирулины и хлореллы. Спирулина — это сине-зеленая водоросль, богатая белками, витаминами и минералами. Хлорелла — это одноклеточная зеленая водоросль, известная своими детоксикационными свойствами и высоким содержанием хлорофилла.",
     price: 2500,
@@ -25,9 +27,10 @@ export const PRODUCTS: Product[] = [
     link: "/bio30/categories/spirulina-chlorella",
     theme: { bg: "#a3ea00", text: "#000000" },
     tags: ["for_men", "for_women", "bestseller"],
-    layout: "horizontal"
+    variant: "horizontal"
   },
   {
+    id: 'lions-mane',
     title: "Lion's Mane",
     description: "Lion's Mane, также известный как грива льва или гриб-геркулес, является популярной биологически активной добавкой, используемой в традиционной китайской медицине. Этот гриб известен своими нейропротекторными свойствами, которые помогают улучшить когнитивные функции, память и концентрацию.",
     price: 2500,
@@ -38,9 +41,10 @@ export const PRODUCTS: Product[] = [
     link: "/bio30/categories/lion-s-mane",
     theme: { bg: "#ffffff", text: "#000000" },
     tags: ["for_men", "for_women"],
-    layout: "vertical"
+    variant: "vertical"
   },
   {
+    id: 'magnesium',
     title: "MAGNESIUM PYRIDOXINE",
     description: "Синергетический комплекс магния и витамина B6 для здоровья нервной системы и полноценного восстановления. Высокобиодоступные формы магния цитрата и пиридоксина обеспечивают глубокое расслабление, качественный сон и защиту от стресса.",
     price: 1600,
@@ -51,16 +55,16 @@ export const PRODUCTS: Product[] = [
     link: "/bio30/categories/magnesium-pyridoxine",
     theme: { bg: "#02044A", text: "#ffffff" },
     tags: [],
-    layout: "horizontal"
+    variant: "horizontal"
   }
 ];
 
-export const STORIES = [
+export const STORIES: Story[] = [
   {
     quote: "Спасибо за качественные продукты и отличный сервис.",
     name: "Алина Чарова",
     platform: "youtube",
-    link: "https://www.youtube.com/shorts/ap5CIoJpWFo?feature=share ",
+    link: "https://www.youtube.com/shorts/ap5CIoJpWFo?feature=share",
     image: "https://bio30.ru/static/uploads/story/65446.webp",
     verified: true
   },
@@ -69,7 +73,7 @@ export const STORIES = [
     name: "Елизавета Марковна",
     followers: "100000 m.",
     platform: "youtube",
-    link: "https://www.youtube.com/shorts/ap5CIoJpWFo?feature=share ",
+    link: "https://www.youtube.com/shorts/ap5CIoJpWFo?feature=share",
     image: "https://bio30.ru/static/uploads/story/pikaso-woman.webp",
     verified: true
   },
@@ -77,14 +81,15 @@ export const STORIES = [
     quote: "Помогает в спорте, помогает в жизни.",
     name: "Евгений Игоревич",
     platform: "instagram",
-    link: "https://www.youtube.com/shorts/ap5CIoJpWFo?feature=share ",
+    link: "https://www.youtube.com/shorts/ap5CIoJpWFo?feature=share",
     image: "https://bio30.ru/static/uploads/story/resource-tti-14.webp",
     verified: true
   }
 ];
 
-export const BENEFITS = [
+export const BENEFITS: Benefit[] = [
   {
+    id: 'quality',
     title: "Качество, подтвержденное стандартами",
     description: "Вы получаете продукт, соответствующий строгим стандартам качества.",
     image: {
@@ -95,6 +100,7 @@ export const BENEFITS = [
     variant: "center"
   },
   {
+    id: 'trust',
     title: "Доверие в 7+ странах мира",
     description: "Наш продукт популярен и пользуется доверием во многих странах.",
     image: {
@@ -105,6 +111,7 @@ export const BENEFITS = [
     variant: "center"
   },
   {
+    id: 'support',
     title: "Поддержка 24/7 для вас",
     description: "Наша команда всегда готова ответить на Ваши вопросы.",
     image: {
@@ -115,6 +122,7 @@ export const BENEFITS = [
     variant: "default"
   },
   {
+    id: 'solution',
     title: "Решение для всех и каждого",
     description: "Продукт подходит для натуральной поддержки Вашего здоровья.",
     image: {
@@ -125,6 +133,7 @@ export const BENEFITS = [
     variant: "default"
   },
   {
+    id: 'partners',
     title: "Щедрые выплаты партнерам",
     description: "Мы предлагаем Вам выгодные условия партнерской программы.",
     image: {
@@ -135,6 +144,7 @@ export const BENEFITS = [
     variant: "center"
   },
   {
+    id: 'natural',
     title: "Сила только натуральных компонентов",
     description: "Вы получаете продукты только из чистых натуральных ингредиентов.",
     image: {
@@ -147,7 +157,7 @@ export const BENEFITS = [
 ];
 
 export const SOCIAL_LINKS = {
-  telegram: "https://t.me/BIO30_chat ",
-  vk: "https://vk.com/club231438011 ",
-  dzen: "https://dzen.ru/id/6868db59568f80115b12a631 "
+  telegram: "https://t.me/BIO30_chat",
+  vk: "https://vk.com/club231438011",
+  dzen: "https://dzen.ru/id/6868db59568f80115b12a631"
 };
