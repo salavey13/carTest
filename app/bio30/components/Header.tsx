@@ -14,7 +14,8 @@ const Header: React.FC = () => {
   useBio30ThemeFix();
 
   return (
-    <header className="bio30-wrapper fixed top-0 right-0 left-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+    <div className="bio30-wrapper">
+<header className="fixed top-0 right-0 left-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
       {/* DESKTOP */}
       <div className="web row ctr gp gp--xs">
         <div className="row ctr gp gp--xl">
@@ -101,6 +102,7 @@ const Header: React.FC = () => {
         )}
       </AnimatePresence>
     </header>
+</div>
   );
 };
 
