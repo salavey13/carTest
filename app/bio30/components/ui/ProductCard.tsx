@@ -28,50 +28,59 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
           transition: { duration: 0.7, ease: "easeOut", delay: i * 0.1 }
         })
       }}
-      className={`card card__${isVertical ? 'vertical' : 'default'} card--product overflow-hidden`} // Добавлен overflow-hidden
+      className="group relative overflow-hidden rounded-xl border border-border hover:shadow-lg transition-shadow min-h-[300px]"
       style={{ 
         backgroundColor: product.theme.bg, 
         color: product.theme.text,
         '--card-shadow': `${product.theme.bg}40`,
-        borderRadius: 'var(--md)' // Явное закругление
       } as React.CSSProperties}
     >
-      <Link href={product.link} className="card-link block h-full">
-        <div className={`card-content ${isVertical ? 'col' : 'row'} h-full`}>
-          <div className="card-text aside pd__xl flex-1">
-            <div className="col gp gp--md h-full">
-              <div className="col gp gp--sm">
-                <h2 className="title fs__md fw__bd" style={{ color: product.theme.text }}>
+      <Link href={product.link} className="block h-full">
+        <div className={`flex h-full ${isVertical ? 'flex-col' : 'flex-col md:flex-row'}`}>
+          {/* Content Area */}
+          <div className={`flex-1 ${isVertical ? '' : 'md:w-1/2'} p-4 md:p-6`}>
+            <div className="flex flex-col gap-3 h-full">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-sm md:text-base font-bold leading-tight" style={{ color: product.theme.text }}>
                   {product.title}
                 </h2>
-                <p className="subtitle fs__sm fw__md opc opc--75" style={{ color: product.theme.text }}>
+                <p className="text-xs md:text-sm opacity-75 line-clamp-3" style={{ color: product.theme.text }}>
                   {product.description}
                 </p>
               </div>
-              <div className="prices mt-auto">
-                <span className="price fs__lg fw__bd">{product.price} RUB</span>
+              <div className="mt-auto">
+                <span className="text-base md:text-lg font-bold">{product.price} RUB</span>
               </div>
             </div>
           </div>
-          <div className="card-image bside flex-shrink-0">
+          
+          {/* Image Area - Bottom Half on Mobile */}
+          <div className={`relative ${isVertical ? 'h-1/2' : 'h-1/2 md:h-auto md:w-1/2'} min-h-[150px]`}>
             <picture>
               <source media="(max-width: 768px)" srcSet={product.image.mobile} />
               <img 
                 src={product.image.web} 
                 alt={product.title} 
-                className="image__web w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
             </picture>
+            
+            {/* Tags - moved to bottom of image */}
+            {product.tags.length > 0 && (
+              <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
+                {product.tags.map(tag => (
+                  <span 
+                    key={tag} 
+                    className="px-2 py-1 rounded-full text-xs bg-white/20 backdrop-blur-sm border border-white/10"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {product.tags.length > 0 && (
-            <div className="tags absolute top-4 left-4 flex gap-2">
-              {product.tags.map(tag => (
-                <span key={tag} className="tag px-3 py-1 rounded-full text-xs bg-white/20">{tag}</span>
-              ))}
-            </div>
-          )}
         </div>
       </Link>
     </motion.article>
