@@ -199,6 +199,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   // Apply theme fix for bio30
   useBio30ThemeFix();
 
+  // Add wrapper class for bio30 theme
+  const isBio30 = pathname.startsWith("/bio30");
+
   useEffect(() => {
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
       if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
@@ -350,7 +353,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   return (
     <>
       {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
-      <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "", !isTransparentPage && "bg-background")}>
+      <main className={cn(
+        "flex-1", 
+        showBottomNav ? "pb-20 sm:pb-0" : "", 
+        !isTransparentPage && "bg-background",
+        isBio30 && "bio30-wrapper" // Add this line
+      )}>
         {children}
       </main>
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
