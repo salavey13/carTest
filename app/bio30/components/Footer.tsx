@@ -1,3 +1,4 @@
+// /app/bio30/components/Footer.tsx
 "use client";
 
 import React from "react";
@@ -18,7 +19,7 @@ const Footer: React.FC = () => {
       variants={container}
       initial="hidden"
       animate={controls}
-      className="footer"
+      className="bio30-wrapper footer"
     >
       <div className="row ctr pd pd__xxl--top pd__xxl--btm">
         <motion.div variants={child} className="row">
