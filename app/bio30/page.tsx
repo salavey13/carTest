@@ -1,3 +1,4 @@
+// /app/bio30/page.tsx
 "use client";
 
 import React from "react";
@@ -40,7 +41,7 @@ export default function HomePage(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="bio30-wrapper min-h-screen bg-background text-foreground flex flex-col">
       {/* Герой-слайдер */}
       <section className="hero-section">
         <SlickSlider {...heroSettings}>
