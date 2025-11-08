@@ -5,9 +5,22 @@ import { motion } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
 import PartnerForm from "../components/PartnerForm";
 import Dashboard from "../components/Dashboard";
+import { BenefitCard } from "../components/ui/BenefitCard";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { REFERRAL_STEPS } from "../data/referral";
+
+// Convert ReferralStep[] to Benefit[] format
+const convertToBenefits = (steps: typeof REFERRAL_STEPS): Benefit[] => {
+  return steps.map(step => ({
+    id: step.title.toLowerCase().replace(/\s+/g, '-'),
+    title: step.title,
+    description: step.description,
+    image: step.image,
+    theme: { bg: "#000000", text: "#ffffff" }, // Default theme for referral
+    variant: "default"
+  }));
+};
 
 const ReferalPage: React.FC = () => {
   const { dbUser } = useAppContext();
@@ -16,6 +29,8 @@ const ReferalPage: React.FC = () => {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
   const stepsGrid = useStaggerFadeIn(REFERRAL_STEPS.length, 0.1);
+
+  const referralBenefits = convertToBenefits(REFERRAL_STEPS);
 
   return (
     <main>
@@ -63,37 +78,17 @@ const ReferalPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Benefits Grid - Pure Tailwind */}
+      {/* Benefits Grid - Reuses BenefitCard Component */}
       <section className="max-w-6xl mx-auto p-6">
         <motion.div
           ref={stepsGrid.ref}
           initial="hidden"
           animate={stepsGrid.controls}
           variants={stepsGrid.container}
-          className="grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {REFERRAL_STEPS.map((step, i) => (
-            <motion.div
-              key={i}
-              variants={stepsGrid.child}
-              className="rounded-xl overflow-hidden shadow-md bg-black text-white"
-            >
-              <div className="p-6">
-                <h2 className="text-lg font-bold mb-2">{step.title}</h2>
-                <p className="text-sm opacity-75">{step.description}</p>
-              </div>
-              <div className="relative h-48 md:h-56">
-                <picture>
-                  <source media="(max-width: 768px)" srcSet={step.image.mobile} />
-                  <img 
-                    src={step.image.web} 
-                    alt={step.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </picture>
-              </div>
-            </motion.div>
+          {referralBenefits.map((benefit, i) => (
+            <BenefitCard key={benefit.id} benefit={benefit} index={i} />
           ))}
         </motion.div>
       </section>

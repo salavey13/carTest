@@ -24,15 +24,24 @@ export interface Benefit {
   id: string;
   title: string;
   description: string;
-  image: { web: string; mobile: string };
-  theme: { bg: string; text: string };
+  image: {
+    web: string;
+    mobile: string;
+  };
+  theme: {
+    bg: string;
+    text: string;
+  };
   variant: 'default' | 'center';
 }
 
 export interface ReferralStep {
   title: string;
   description: string;
-  image: { web: string; mobile: string };
+  image: {
+    web: string;
+    mobile: string;
+  };
 }
 
 export interface HeroSlide {
