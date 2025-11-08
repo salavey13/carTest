@@ -1,4 +1,3 @@
-// /app/bio30/page.tsx
 "use client";
 
 import React from "react";
@@ -8,11 +7,12 @@ import { motion } from "framer-motion";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
-import { ProductCard } from "./components/ui/ProductCard"; // ИСПРАВЛЕН: путь к ui/
-import { BenefitCard } from "./components/ui/BenefitCard"; // ИСПРАВЛЕН: путь к ui/
-import { PRODUCTS, BENEFITS } from "./data/products";
-import { HERO_SLIDES } from "./data/hero";
+import { ProductCard } from "./components/ui/ProductCard";
+import { BenefitCard } from "./components/ui/BenefitCard";
+import StoriesSlider from "./components/StoriesSlider";
 import PartnerForm from "./components/PartnerForm";
+import { PRODUCTS, BENEFITS, STORIES } from "./data/products";
+import { HERO_SLIDES } from "./data/hero";
 
 const SlickSlider = dynamic(() => import("react-slick"), { ssr: false });
 
@@ -23,6 +23,7 @@ export default function HomePage(): JSX.Element {
   const heroSubtitle = useScrollFadeIn("up", 0.2);
   const productsTitle = useScrollFadeIn("up", 0.1);
   const benefitsTitle = useScrollFadeIn("up", 0.1);
+  const storiesTitle = useScrollFadeIn("up", 0.1);
   
   const { ref: productsRef, controls: productsControls, container: productsContainer } = useStaggerFadeIn(PRODUCTS.length, 0.1);
   const { ref: benefitsRef, controls: benefitsControls, container: benefitsContainer } = useStaggerFadeIn(BENEFITS.length, 0.1);
@@ -52,9 +53,9 @@ export default function HomePage(): JSX.Element {
                 style={{ backgroundColor: slide.theme.bg }}
                 aria-hidden="true"
               />
-              <div className="container gp gp--hg grid md:grid-cols-2 items-center h-full relative z-10">
+              <div className="container gp gp--hg grid md:grid-cols-2 items-center h-full relative z-10 px-6">
                 <div className="aside p-8 md:p-16">
-                  <h1 className="title fs__xxl fw__bd mb-4" style={{ color: slide.theme.text }}>
+                  <h1 className="title fs__xxxl fw__bd mb-4" style={{ color: slide.theme.text }}>
                     {slide.title}
                   </h1>
                   <h2 className="subtitle fs__lg fw__rg opc opc--75 mb-8" style={{ color: slide.theme.text }}>
@@ -100,7 +101,7 @@ export default function HomePage(): JSX.Element {
           initial="hidden"
           animate={productsControls}
           variants={productsContainer}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto"
+          className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto"
         >
           {PRODUCTS.map((product, i) => (
             <ProductCard key={product.id} product={product} index={i} />
@@ -140,7 +141,7 @@ export default function HomePage(): JSX.Element {
           initial="hidden"
           animate={benefitsControls}
           variants={benefitsContainer}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto"
+          className="grid grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto"
         >
           {BENEFITS.map((benefit, i) => (
             <BenefitCard key={benefit.id} benefit={benefit} index={i} />
@@ -148,10 +149,11 @@ export default function HomePage(): JSX.Element {
         </motion.div>
       </section>
 
+      {/* Истории успеха */}
+      <StoriesSlider stories={STORIES} />
+
       {/* Партнерская форма */}
-      <section className="section section--partner py-16 px-6" aria-labelledby="partner-title">
-        <PartnerForm />
-      </section>
+      <PartnerForm />
     </div>
   );
 }

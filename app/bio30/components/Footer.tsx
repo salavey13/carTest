@@ -1,4 +1,3 @@
-// /app/bio30/components/Footer.tsx
 "use client";
 
 import React from "react";
@@ -14,7 +13,6 @@ const Footer: React.FC = () => {
   const docBase = "https://bio30.ru/docs";
 
   return (
-    <div className="bio30-wrapper">
     <motion.footer
       ref={ref}
       variants={container}
@@ -22,7 +20,7 @@ const Footer: React.FC = () => {
       animate={controls}
       className="footer"
     >
-      <div className="row ctr pd pd__xxl--top pd__xxl--btm">
+      <div className="row ctr pd pd__xxl--top pd pd__xxl--btm">
         <motion.div variants={child} className="row">
           <a
             href="mailto:privet@bio30.ru"
@@ -38,17 +36,26 @@ const Footer: React.FC = () => {
               variants={child}
               href="https://t.me/BIO30_chat"
               className="telegram btn btn--blk btn__primary"
-            />
+              aria-label="Telegram"
+            >
+              📱
+            </motion.a>
             <motion.a
               variants={child}
               href="https://vk.com/club231438011"
               className="vk btn btn--blk btn__primary"
-            />
+              aria-label="VK"
+            >
+              🎵
+            </motion.a>
             <motion.a
               variants={child}
               href="https://dzen.ru/id/6868db59568f80115b12a631"
               className="dzen btn btn--blk btn__primary"
-            />
+              aria-label="Dzen"
+            >
+              📝
+            </motion.a>
           </div>
           <motion.button
             variants={child}
@@ -73,7 +80,7 @@ const Footer: React.FC = () => {
         <motion.div variants={child} className="col gp gp--md">
           <span className="title fs__md fw__bd mg mg__md--btm">РЕГИОН</span>
           <div className="region-block col gp gp--xs">
-            <span className="link s__md fw__rg">Россия</span>
+            <span className="link fs__md fw__rg">Россия</span>
             <div id="languages-ru" className="languages-dropdown row gp gp--xs">
               <motion.a
                 variants={child}
@@ -140,36 +147,25 @@ const Footer: React.FC = () => {
         </motion.div>
       </div>
 
-      <div className="row top pd pd__xxl--top pd__xxl--btm">
+      <div className="row top pd pd__xxl--top pd pd__xxl--btm">
         <motion.div variants={child} className="aside">
           <div className="row ctr gp gp--xs">
-            <div className="age"></div>
-            <span className="text fs__sm fw__rg opc opc--50"></span>
+            <div className="age">18+</div>
+            <span className="text fs__sm fw__rg opc opc--50">Для лиц старше 18 лет</span>
           </div>
         </motion.div>
         <motion.div variants={child} className="bside">
           <div className="row ctr rgt gp gp--xs pd pd__lg--rgt">
-            <span className="subtitle fs__sm fw__rg">
-              <a
-                href={`${docBase}/data`}
-                className="subtitle fs__sm fw__rg"
-              >
-                Обработка персональных данных
-              </a>
-            </span>
-            <span className="subtitle fs__sm fw__rg">
-              <a
-                href={`${docBase}/confidencial`}
-                className="subtitle fs__sm fw__rg"
-              >
-                Политика конфиденциальности
-              </a>
-            </span>
+            <Link href={`${docBase}/data`} className="subtitle fs__sm fw__rg">
+              Обработка персональных данных
+            </Link>
+            <Link href={`${docBase}/confidencial`} className="subtitle fs__sm fw__rg">
+              Политика конфиденциальности
+            </Link>
           </div>
         </motion.div>
       </div>
     </motion.footer>
-</div>
   );
 };
 
