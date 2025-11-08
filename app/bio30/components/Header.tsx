@@ -5,6 +5,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
+import { cn } from "@/lib/utils";
 
 const Header: React.FC = () => {
   const { dbUser } = useAppContext();
@@ -13,91 +14,140 @@ const Header: React.FC = () => {
   useBio30ThemeFix();
 
   return (
-    <header className="fixed top-0 right-0 left-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
-      {/* DESKTOP */}
-      <div className="web row">
-        <div className="row ctr gp gp--xl">
-          <Link href="/bio30" className="ctr row gp gp--sm">
-            <span className="logo"></span>
-            <span className="title fw__md gradient mg mg__sm--lft slogan opc opc--75 fs__sm">
-              МАГАЗИН БИОЛОГИЧЕСКИ АКТИВНЫХ ДОБАВОК
-            </span>
-          </Link>
-          <div className="row ctr gp gp--lg">
-            <Link href="/bio30/categories" className="link fs__md fw__md opc opc--50 anmt">
-              Продукты
+    <>
+      <header className="fixed top-0 right-0 left-0 z-50 bg-background/95 backdrop-blur-md border-b border-border h-16 md:h-20 px-4 md:px-8">
+        {/* DESKTOP */}
+        <div className="hidden md:flex items-center justify-between h-full">
+          <div className="flex items-center gap-8">
+            <Link href="/bio30" className="flex items-center gap-2">
+              <span className="w-12 h-12 rounded-full bg-gradient-to-br from-[hsl(var(--brand-red-orange))] to-[hsl(var(--brand-gold))] flex items-center justify-center text-white font-bold text-xl">
+                🧬
+              </span>
+              <span className="font-medium text-xs text-muted-foreground whitespace-nowrap">
+                МАГАЗИН БИОЛОГИЧЕСКИ АКТИВНЫХ ДОБАВОК
+              </span>
             </Link>
-            <Link href="/bio30/delivery" className="link fs__md fw__md opc opc--50 anmt">
-              Доставка
-            </Link>
-            <Link href="/bio30/referal" className="link fs__md fw__md opc opc--50 anmt">
-              Реферальная программа
+            <nav className="flex items-center gap-6">
+              <Link href="/bio30/categories" className="text-foreground hover:text-primary transition-colors font-medium">
+                Продукты
+              </Link>
+              <Link href="/bio30/delivery" className="text-foreground hover:text-primary transition-colors font-medium">
+                Доставка
+              </Link>
+              <Link href="/bio30/referral" className="text-foreground hover:text-primary transition-colors font-medium">
+                Реферальная программа
+              </Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Link href="/bio30/cart" className="text-foreground hover:text-primary transition-colors font-medium">
+                Корзина
+              </Link>
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                  {cartCount}
+                </span>
+              )}
+            </div>
+            <Link 
+              href="/profile" 
+              className="inline-flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-md hover:bg-opacity-90 transition-colors font-medium"
+            >
+              <span>👤</span>
+              <span>{dbUser ? dbUser.username || "Профиль" : "Войти"}</span>
             </Link>
           </div>
         </div>
-        <div className="ctr rgt row gp gp--md">
-          <div className="cart-container">
-            <Link href="/bio30/cart" className="link fs__md fw__md opc opc--50 anmt">
+
+        {/* MOBILE */}
+        <div className="flex md:hidden items-center justify-between h-full">
+          <button 
+            className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground text-xl"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+          >
+            ☰
+          </button>
+          <Link href="/bio30" className="w-12 h-12 rounded-full bg-gradient-to-br from-[hsl(var(--brand-red-orange))] to-[hsl(var(--brand-gold))] flex items-center justify-center text-white font-bold text-xl">
+            🧬
+          </Link>
+          <div className="relative">
+            <Link href="/bio30/cart" className="bg-card text-foreground px-3 py-1.5 rounded-md border border-border font-medium">
               Корзина
             </Link>
             {cartCount > 0 && (
-              <span className="count--cart">{cartCount}</span>
+              <span className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                {cartCount}
+              </span>
             )}
           </div>
-          <Link href="/profile" className="btn btn--blk btn__primary">
-            <div className="row ctr gp gp--xs">
-              <span className="profile"></span>
-              <span className="title ft__sm fw__bd pd__xs--rgt">
-                {dbUser ? dbUser.username || "Профиль" : "Войти"}
-              </span>
-            </div>
-          </Link>
         </div>
-      </div>
-
-      {/* MOBILE */}
-      <div className="mobile">
-        <button 
-          className="menu-icon circle grey"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-label="Toggle menu"
-        >
-          ☰
-        </button>
-        <Link href="/bio30" className="logo_mobile"></Link>
-        <div className="cart-container">
-          <Link href="/bio30/cart" className="btn btn--wht btn__secondary ctr">
-            Корзина
-          </Link>
-          {cartCount > 0 && (
-            <span className="count--cart">{cartCount}</span>
-          )}
-        </div>
-      </div>
+      </header>
 
       {/* MOBILE MENU */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className="mobile-menu"
+            className="fixed top-16 left-0 right-0 bottom-0 bg-background z-40 md:hidden overflow-y-auto"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="mobile-menu-content">
-              <nav className="nav--mobile">
-                <ul className="col gp gp--md">
-                  <li><Link href="/bio30/categories" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Продукты</Link></li>
-                  <li><Link href="/bio30/delivery" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Доставка</Link></li>
-                  <li><Link href="/bio30/referal" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Реферальная программа</Link></li>
-                  <li><Link href="/bio30/cart" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Корзина</Link></li>
-                  <li><Link href="/profile" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Профиль</Link></li>
+            <div className="p-6">
+              <nav className="mb-6">
+                <ul className="flex flex-col gap-2">
+                  <li>
+                    <Link 
+                      href="/bio30/categories" 
+                      onClick={() => setMenuOpen(false)} 
+                      className="block p-3 text-foreground hover:bg-muted/50 rounded-md transition-colors font-medium"
+                    >
+                      Продукты
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      href="/bio30/delivery" 
+                      onClick={() => setMenuOpen(false)} 
+                      className="block p-3 text-foreground hover:bg-muted/50 rounded-md transition-colors font-medium"
+                    >
+                      Доставка
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      href="/bio30/referral" 
+                      onClick={() => setMenuOpen(false)} 
+                      className="block p-3 text-foreground hover:bg-muted/50 rounded-md transition-colors font-medium"
+                    >
+                      Реферальная программа
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      href="/bio30/cart" 
+                      onClick={() => setMenuOpen(false)} 
+                      className="block p-3 text-foreground hover:bg-muted/50 rounded-md transition-colors font-medium"
+                    >
+                      Корзина
+                    </Link>
+                  </li>
+                  <li>
+                    <Link 
+                      href="/profile" 
+                      onClick={() => setMenuOpen(false)} 
+                      className="block p-3 text-foreground hover:bg-muted/50 rounded-md transition-colors font-medium"
+                    >
+                      Профиль
+                    </Link>
+                  </li>
                 </ul>
               </nav>
-              <div className="mobile-menu-footer pd pd__xl--top">
-                <a href="tel:88001000000" className="btn btn--blk btn__primary fill mg mg__lg--btm">
-                  <span className="phone mr-2">📞</span>
+              <div className="border-t border-border pt-6">
+                <a href="tel:88001000000" className="inline-flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-md hover:bg-opacity-90 transition-colors font-medium w-full justify-center">
+                  <span>📞</span>
                   <span>8 800 100 00 00</span>
                 </a>
               </div>
@@ -105,7 +155,7 @@ const Header: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </header>
+    </>
   );
 };
 
