@@ -14,12 +14,13 @@ const Footer: React.FC = () => {
   const docBase = "https://bio30.ru/docs";
 
   return (
+    <div className="bio30-wrapper">
     <motion.footer
       ref={ref}
       variants={container}
       initial="hidden"
       animate={controls}
-      className="bio30-wrapper footer"
+      className="footer"
     >
       <div className="row ctr pd pd__xxl--top pd__xxl--btm">
         <motion.div variants={child} className="row">
@@ -168,6 +169,7 @@ const Footer: React.FC = () => {
         </motion.div>
       </div>
     </motion.footer>
+</div>
   );
 };
 
