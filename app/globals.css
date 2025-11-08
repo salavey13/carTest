@@ -13,6 +13,18 @@
 }
 
 :root {
+  /* Add these missing variables */
+  --md: 0.75rem;
+  --sm: 0.5rem;
+  --xs: 0.25rem;
+  --hg: 1.5rem;
+  --zr: 0rem;
+  
+  /* Add color versions */
+  --white: hsl(0, 0%, 100%);
+  --red: hsl(0, 80%, 60%);
+
+
   /* ИЗМЕНЕНИЕ: Улучшенная светлая тема для контрастности */
   /* HEX: #F9F9F9 -> HSL: 0 0% 98% (Почти белый) */
   /* HEX: #1A1A1A -> HSL: 0 0% 10% (Очень темный серый) */
