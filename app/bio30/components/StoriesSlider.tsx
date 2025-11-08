@@ -27,7 +27,7 @@ const StoriesSlider: React.FC<StoriesSliderProps> = ({ stories }) => {
           <div className="stories-slider row gp gp--md" style={{ overflowX: 'auto', paddingBottom: 'var(--sm)' }}>
             {stories.map((story, index) => (
               <motion.div 
-                key={index} 
+                key={story.link}
                 className="story"
                 initial={{ opacity: 0, x: 50 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -39,6 +39,7 @@ const StoriesSlider: React.FC<StoriesSliderProps> = ({ stories }) => {
                   src={story.image}
                   alt={story.name}
                   fill
+                  sizes="(max-width: 768px) 280px, 320px"
                   style={{ objectFit: 'cover', borderRadius: 'var(--md)' }}
                   loading="lazy"
                   decoding="async"
