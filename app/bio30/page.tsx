@@ -11,6 +11,7 @@ import { ProductCard } from "./components/ProductCard";
 import { BenefitCard } from "./components/BenefitCard";
 import { PRODUCTS, BENEFITS } from "./data/products";
 import { HERO_SLIDES } from "./data/hero";
+import PartnerForm from "./components/PartnerForm";
 
 const SlickSlider = dynamic(() => import("react-slick"), { ssr: false });
 
