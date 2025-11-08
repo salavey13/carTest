@@ -89,7 +89,7 @@ const Header: React.FC = () => {
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            className="fixed top-16 left-0 right-0 bottom-0 bg-background z-40 md:hidden overflow-y-auto"
+            className="fixed top-16 left-0 right-0 bottom-0 bg-background/95 backdrop-blur-md z-40 md:hidden overflow-y-auto"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}

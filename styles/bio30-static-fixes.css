@@ -194,7 +194,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: hsl(var(--background));
+  background: hsl(var(--background) / 0.95);
+  backdrop-filter: blur(12px);
   z-index: 9998;
   overflow-y: auto;
 }
@@ -374,7 +375,7 @@
 
 .bio30-wrapper .select-input {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 10l5 5 5-5z' fill='currentColor'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg  ' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 10l5 5 5-5z' fill='currentColor'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   padding-right: 2.5rem;
@@ -469,7 +470,7 @@
   width: 32px;
   height: 32px;
   background: currentColor;
-  mask: url('/front/static/img/icons/quote.svg') center/contain no-repeat;
+  mask: url('https://bio30.ru/front/static/img/icons/quote.svg') center/contain no-repeat;
   opacity: 0.5;
 }
 
