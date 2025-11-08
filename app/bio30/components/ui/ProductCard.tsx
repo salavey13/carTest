@@ -28,17 +28,18 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
           transition: { duration: 0.7, ease: "easeOut", delay: i * 0.1 }
         })
       }}
-      className={`card card__${isVertical ? 'vertical' : 'default'} card--product`}
+      className={`card card__${isVertical ? 'vertical' : 'default'} card--product overflow-hidden`} // Добавлен overflow-hidden
       style={{ 
         backgroundColor: product.theme.bg, 
         color: product.theme.text,
-        '--card-shadow': `${product.theme.bg}40`
+        '--card-shadow': `${product.theme.bg}40`,
+        borderRadius: 'var(--md)' // Явное закругление
       } as React.CSSProperties}
     >
-      <Link href={product.link} className="card-link">
-        <div className="card-content row">
-          <div className="card-text aside pd__xl">
-            <div className="col gp gp--md">
+      <Link href={product.link} className="card-link block h-full">
+        <div className={`card-content ${isVertical ? 'col' : 'row'} h-full`}>
+          <div className="card-text aside pd__xl flex-1">
+            <div className="col gp gp--md h-full">
               <div className="col gp gp--sm">
                 <h2 className="title fs__md fw__bd" style={{ color: product.theme.text }}>
                   {product.title}
@@ -47,27 +48,27 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
                   {product.description}
                 </p>
               </div>
-              <div className="prices">
+              <div className="prices mt-auto">
                 <span className="price fs__lg fw__bd">{product.price} RUB</span>
               </div>
             </div>
           </div>
-          <div className="card-image bside">
+          <div className="card-image bside flex-shrink-0">
             <picture>
               <source media="(max-width: 768px)" srcSet={product.image.mobile} />
               <img 
                 src={product.image.web} 
                 alt={product.title} 
-                className="image__web"
+                className="image__web w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
             </picture>
           </div>
           {product.tags.length > 0 && (
-            <div className="tags">
+            <div className="tags absolute top-4 left-4 flex gap-2">
               {product.tags.map(tag => (
-                <span key={tag} className="tag">{tag}</span>
+                <span key={tag} className="tag px-3 py-1 rounded-full text-xs bg-white/20">{tag}</span>
               ))}
             </div>
           )}
