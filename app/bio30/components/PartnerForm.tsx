@@ -40,7 +40,7 @@ const PartnerForm: React.FC = () => {
   };
 
   return (
-    <div className="container container--welcome pd pd__hg gp gp--hg ctr">
+    <div className="bio30-wrapper container container--welcome pd pd__hg gp gp--hg ctr">
       <div className="aside" data-anim="fade" data-delay="0.1">
         <div className="col gp gp--xs">
           <h2 className="title fs__xxl fw__bd bw0" data-anim="lux-up" data-delay="0.1">
