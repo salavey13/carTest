@@ -7,8 +7,8 @@ import { motion } from "framer-motion";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
-import { ProductCard } from "./components/ProductCard";
-import { BenefitCard } from "./components/BenefitCard";
+import { ProductCard } from "./components/ui/ProductCard"; // ИСПРАВЛЕН: путь к ui/
+import { BenefitCard } from "./components/ui/BenefitCard"; // ИСПРАВЛЕН: путь к ui/
 import { PRODUCTS, BENEFITS } from "./data/products";
 import { HERO_SLIDES } from "./data/hero";
 import PartnerForm from "./components/PartnerForm";
