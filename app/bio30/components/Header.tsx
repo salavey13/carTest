@@ -1,9 +1,7 @@
-// /app/bio30/components/Header.tsx
 "use client";
 
 import React, { useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { ShoppingCart, User, Menu } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
@@ -15,12 +13,13 @@ const Header: React.FC = () => {
   useBio30ThemeFix();
 
   return (
-    <header className="fixed top-0 z-50 bg-background/95 backdrop-blur-md border-b">
+    <header className="fixed top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+      {/* DESKTOP */}
       <div className="web row ctr gp gp--xs">
         <div className="row ctr gp gp--xl">
-          <Link href="/bio30" className="ctr">
+          <Link href="/bio30" className="ctr row gp gp--sm">
             <span className="logo"></span>
-            <span className="title fw__md gradient mg mg__sm--lft slogan opc opc--75">МАГАЗИН БИОЛОГИЧЕСКИ АКТИВНЫХ ДОБАВОК</span>
+            <span className="title fw__md gradient mg mg__sm--lft slogan opc opc--75 fs__sm">МАГАЗИН БИОЛОГИЧЕСКИ АКТИВНЫХ ДОБАВОК</span>
           </Link>
           <div className="row ctr gp gp--lg">
             <Link href="/bio30/categories" className="link fs__md fw__md opc opc--50 anmt">
@@ -34,8 +33,8 @@ const Header: React.FC = () => {
             </Link>
           </div>
         </div>
-        <div className="ctr rgt">
-          <div className="cart-container pd pd__sm--rgt">
+        <div className="ctr rgt row gp gp--md">
+          <div className="cart-container">
             <Link href="/bio30/cart" className="link fs__md fw__md opc opc--50 anmt">
               Корзина
             </Link>
@@ -51,8 +50,14 @@ const Header: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* MOBILE */}
       <div className="mobile">
-        <button className="menu-icon circle grey"></button>
+        <button 
+          className="menu-icon circle grey"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Toggle menu"
+        ></button>
         <Link href="/bio30" className="logo_mobile"></Link>
         <div className="cart-container">
           <Link href="/bio30/cart" className="btn btn--wht btn__secondary ctr">
@@ -63,6 +68,8 @@ const Header: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* MOBILE MENU */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
@@ -73,18 +80,16 @@ const Header: React.FC = () => {
             transition={{ duration: 0.2 }}
           >
             <div className="mobile-menu-content">
-              <div className="col col--header">
-                <nav className="nav--mobile">
-                  <ul>
-                    <li><Link href="/bio30/categories" onClick={() => setMenuOpen(false)}>Продукты</Link></li>
-                    <li><Link href="/bio30/delivery" onClick={() => setMenuOpen(false)}>Доставка</Link></li>
-                    <li><Link href="/bio30/referal" onClick={() => setMenuOpen(false)}>Реферальная программа</Link></li>
-                    <li><Link href="/bio30/cart" onClick={() => setMenuOpen(false)}>Корзина</Link></li>
-                    <li><Link href="/profile" onClick={() => setMenuOpen(false)}>Профиль</Link></li>
-                  </ul>
-                </nav>
-              </div>
-              <div className="mobile-menu-footer">
+              <nav className="nav--mobile">
+                <ul className="col gp gp--md">
+                  <li><Link href="/bio30/categories" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Продукты</Link></li>
+                  <li><Link href="/bio30/delivery" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Доставка</Link></li>
+                  <li><Link href="/bio30/referal" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Реферальная программа</Link></li>
+                  <li><Link href="/bio30/cart" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Корзина</Link></li>
+                  <li><Link href="/profile" onClick={() => setMenuOpen(false)} className="link fs__lg fw__md">Профиль</Link></li>
+                </ul>
+              </nav>
+              <div className="mobile-menu-footer pd pd__xl--top">
                 <a href="tel:88001000000" className="btn btn--blk btn__primary fill mg mg__lg--btm">
                   <span className="phone"></span>
                   <span>8 800 100 00 00</span>
