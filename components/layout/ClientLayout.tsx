@@ -1,3 +1,4 @@
+// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react";
@@ -174,7 +175,60 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
-// REMOVED: useBio30ExternalCSS hook - now using static CSS import
+function useBio30ExternalCSS() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!pathname.startsWith("/bio30")) return;
+
+    const BASE = "https://bio30.ru/front/static/css/";
+    const VERSION = "?v=05.07.2025-1";
+    const files = [
+      "grid.css",
+      "style__dark.css",
+      "cards.css",
+      "global.css",
+      "icons.css",
+      "help.css",
+      "fonts.css",
+      "hero.css",
+      "story.css",
+      "glass.css",
+      "header.css",
+      "welcome.css",
+      "categories.css",
+      "cart.css",
+      "footer.css",
+      "faq.css",
+      "cards__cart.css",
+      "grid__cards.css",
+      "grid__benefit.css",
+      "default.css",
+      "grid__delivery.css",
+      "grid__referral_01.css",
+      "grid__referral_02.css",
+      "grid__product.css",
+      "grid__product2.css",
+      "grid__categories.css",
+      "comment.css",
+      "fluids.css",
+    ];
+
+    const links: HTMLLinkElement[] = [];
+    files.forEach((f) => {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `${BASE}${f}${VERSION}`;
+      link.dataset.source = "bio30-external";
+      document.head.appendChild(link);
+      links.push(link);
+    });
+
+    return () => {
+      links.forEach((l) => l.remove());
+    };
+  }, [pathname]);
+}
 
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -196,11 +250,10 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
 
-  // Apply theme fix for bio30
+  // load bio30 CSS when on bio30 paths
+  useBio30ExternalCSS();
+  // apply theme fix (colors) when on bio30
   useBio30ThemeFix();
-
-  // Add wrapper class for bio30 theme
-  const isBio30 = pathname.startsWith("/bio30");
 
   useEffect(() => {
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
@@ -336,6 +389,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
         pathname?.startsWith("/wb") ||
+        // pathname?.startsWith("/bio30") <-- intentionally removed so bio30 uses its header/footer
         pathname === "/csv-compare" ||
         pathname === "/streamer" ||
         pathname === "/blogger" ||
@@ -353,12 +407,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   return (
     <>
       {showHeaderAndFooter && CurrentHeader && <CurrentHeader />}
-      <main className={cn(
-        "flex-1", 
-        showBottomNav ? "pb-20 sm:pb-0" : "", 
-        !isTransparentPage && "bg-background",
-        isBio30 && "bio30-wrapper" // Add this line
-      )}>
+      <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "", !isTransparentPage && "bg-background")}>
         {children}
       </main>
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
