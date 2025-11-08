@@ -1,88 +1,98 @@
-/* === UTILITY CLASSES === */
-.row { display: flex; }
-.col { display: flex; flex-direction: column; }
-.ctr { align-items: center; justify-content: center; }
-.rgt { justify-content: flex-end; }
-.top { align-items: flex-start; }
-.gp { display: flex; gap: var(--gap); }
-.pd { padding: var(--padding); }
+/* =============================================================================
+   BIO30 STATIC FIXES - Версия 2.0 (Read-Safe)
+   Все селекторы с .bio30-wrapper для перекрытия read-only стилей
+   =========================================================================== */
+
+/* === CSS RESET ДЛЯ BIO30 === */
+.bio30-wrapper * {
+  box-sizing: border-box;
+}
+
+/* === UTILITY CLASSES (ТОЛЬКО ВНУТРИ .bio30-wrapper) === */
+.bio30-wrapper .row { display: flex; }
+.bio30-wrapper .col { display: flex; flex-direction: column; }
+.bio30-wrapper .ctr { align-items: center; justify-content: center; }
+.bio30-wrapper .rgt { justify-content: flex-end; }
+.bio30-wrapper .top { align-items: flex-start; }
+.bio30-wrapper .gp { display: flex; gap: var(--gap); }
+.bio30-wrapper .pd { padding: var(--padding); }
 
 /* Gap utilities */
-.gp--xs { --gap: 0.25rem; }
-.gp--sm { --gap: 0.5rem; }
-.gp--md { --gap: 1rem; }
-.gp--lg { --gap: 1.5rem; }
-.gp--xl { --gap: 2rem; }
-.gp--hg { --gap: 3rem; }
+.bio30-wrapper .gp--xs { --gap: 0.25rem; }
+.bio30-wrapper .gp--sm { --gap: 0.5rem; }
+.bio30-wrapper .gp--md { --gap: 1rem; }
+.bio30-wrapper .gp--lg { --gap: 1.5rem; }
+.bio30-wrapper .gp--xl { --gap: 2rem; }
+.bio30-wrapper .gp--hg { --gap: 3rem; }
 
 /* Padding utilities */
-.pd__xs { --padding: 0.25rem; }
-.pd__sm { --padding: 0.5rem; }
-.pd__md { --padding: 1rem; }
-.pd__lg { --padding: 1.5rem; }
-.pd__xl { --padding: 2rem; }
-.pd__hg { --padding: 3rem; }
-.pd__xxl { --padding: 4rem; }
+.bio30-wrapper .pd__xs { --padding: 0.25rem; }
+.bio30-wrapper .pd__sm { --padding: 0.5rem; }
+.bio30-wrapper .pd__md { --padding: 1rem; }
+.bio30-wrapper .pd__lg { --padding: 1.5rem; }
+.bio30-wrapper .pd__xl { --padding: 2rem; }
+.bio30-wrapper .pd__hg { --padding: 3rem; }
+.bio30-wrapper .pd__xxl { --padding: 4rem; }
 
-.pd__xs--lft { padding-left: 0.25rem; }
-.pd__sm--lft { padding-left: 0.5rem; }
-.pd__md--lft { padding-left: 1rem; }
-.pd__lg--lft { padding-left: 1.5rem; }
+.bio30-wrapper .pd__xs--lft { padding-left: 0.25rem; }
+.bio30-wrapper .pd__sm--lft { padding-left: 0.5rem; }
+.bio30-wrapper .pd__md--lft { padding-left: 1rem; }
+.bio30-wrapper .pd__lg--lft { padding-left: 1.5rem; }
 
-.pd__xs--rgt { padding-right: 0.25rem; }
-.pd__sm--rgt { padding-right: 0.5rem; }
-.pd__md--rgt { padding-right: 1rem; }
-.pd__lg--rgt { padding-right: 1.5rem; }
+.bio30-wrapper .pd__xs--rgt { padding-right: 0.25rem; }
+.bio30-wrapper .pd__sm--rgt { padding-right: 0.5rem; }
+.bio30-wrapper .pd__md--rgt { padding-right: 1rem; }
+.bio30-wrapper .pd__lg--rgt { padding-right: 1.5rem; }
 
-.pd__xs--top { padding-top: 0.25rem; }
-.pd__sm--top { padding-top: 0.5rem; }
-.pd__md--top { padding-top: 1rem; }
-.pd__lg--top { padding-top: 1.5rem; }
-.pd__xxl--top { padding-top: 4rem; }
+.bio30-wrapper .pd__xs--top { padding-top: 0.25rem; }
+.bio30-wrapper .pd__sm--top { padding-top: 0.5rem; }
+.bio30-wrapper .pd__md--top { padding-top: 1rem; }
+.bio30-wrapper .pd__lg--top { padding-top: 1.5rem; }
+.bio30-wrapper .pd__xxl--top { padding-top: 4rem; }
 
-.pd__xs--btm { padding-bottom: 0.25rem; }
-.pd__sm--btm { padding-bottom: 0.5rem; }
-.pd__md--btm { padding-bottom: 1rem; }
-.pd__lg--btm { padding-bottom: 1.5rem; }
-.pd__xxl--btm { padding-bottom: 4rem; }
+.bio30-wrapper .pd__xs--btm { padding-bottom: 0.25rem; }
+.bio30-wrapper .pd__sm--btm { padding-bottom: 0.5rem; }
+.bio30-wrapper .pd__md--btm { padding-bottom: 1rem; }
+.bio30-wrapper .pd__lg--btm { padding-bottom: 1.5rem; }
+.bio30-wrapper .pd__xxl--btm { padding-bottom: 4rem; }
 
 /* Margin utilities */
-.mg__xs--top { margin-top: 0.25rem; }
-.mg__sm--top { margin-top: 0.5rem; }
-.mg__md--top { margin-top: 1rem; }
-.mg__xs--btm { margin-bottom: 0.25rem; }
-.mg__sm--btm { margin-bottom: 0.5rem; }
-.mg__md--btm { margin-bottom: 1rem; }
-.mg__lg--btm { margin-bottom: 1.5rem; }
-.mg__lg--rgt { margin-right: 1.5rem; }
+.bio30-wrapper .mg__xs--top { margin-top: 0.25rem; }
+.bio30-wrapper .mg__sm--top { margin-top: 0.5rem; }
+.bio30-wrapper .mg__md--top { margin-top: 1rem; }
+.bio30-wrapper .mg__xs--btm { margin-bottom: 0.25rem; }
+.bio30-wrapper .mg__sm--btm { margin-bottom: 0.5rem; }
+.bio30-wrapper .mg__md--btm { margin-bottom: 1rem; }
+.bio30-wrapper .mg__lg--btm { margin-bottom: 1.5rem; }
+.bio30-wrapper .mg__lg--rgt { margin-right: 1.5rem; }
 
 /* Font sizes */
-.fs__sm { font-size: 0.875rem; }
-.fs__md { font-size: 1rem; }
-.fs__lg { font-size: 1.125rem; }
-.fs__xl { font-size: 1.25rem; }
-.fs__xxl { font-size: 1.5rem; }
+.bio30-wrapper .fs__sm { font-size: 0.875rem; }
+.bio30-wrapper .fs__md { font-size: 1rem; }
+.bio30-wrapper .fs__lg { font-size: 1.125rem; }
+.bio30-wrapper .fs__xl { font-size: 1.25rem; }
+.bio30-wrapper .fs__xxl { font-size: 1.5rem; }
 
 /* Font weights */
-.fw__rg { font-weight: 400; }
-.fw__md { font-weight: 500; }
-.fw__bd { font-weight: 700; }
+.bio30-wrapper .fw__rg { font-weight: 400; }
+.bio30-wrapper .fw__md { font-weight: 500; }
+.bio30-wrapper .fw__bd { font-weight: 700; }
 
 /* Opacity */
-.opc--50 { opacity: 0.5; }
-.opc--75 { opacity: 0.75; }
+.bio30-wrapper .opc--50 { opacity: 0.5; }
+.bio30-wrapper .opc--75 { opacity: 0.75; }
 
 /* Align */
-.align--center { text-align: center; }
+.bio30-wrapper .align--center { text-align: center; }
 
 /* Fill */
-.fill { width: 100%; }
+.bio30-wrapper .fill { width: 100%; }
 
 /* Border */
-.bw0 { border-width: 0; }
+.bio30-wrapper .bw0 { border-width: 0; }
 
-/* === HEADER STYLES === */
-header {
+/* === HEADER STYLES (ТОЛЬКО ДЛЯ BIO30) === */
+.bio30-wrapper header {
   position: fixed;
   top: 0;
   left: 0;
@@ -90,11 +100,11 @@ header {
   z-index: 9999;
   backdrop-filter: blur(7.5px);
   border-bottom: 1px solid hsl(var(--border));
-  background: hsl(0 0% 6% / 0.95);
+  background: hsl(0 0% 6% / 0.95) !important;
   height: 64px;
 }
 
-.web {
+.bio30-wrapper .web {
   display: none;
   align-items: center;
   justify-content: space-between;
@@ -102,7 +112,7 @@ header {
   padding: 0 1rem;
 }
 
-.mobile {
+.bio30-wrapper .mobile {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -110,23 +120,36 @@ header {
   padding: 0 0.5rem;
 }
 
-.logo, .logo_mobile {
+/* FALLBACK ИКОНКИ (если файлы не найдены) */
+.bio30-wrapper .logo::before,
+.bio30-wrapper .logo_mobile::before {
+  content: "🧬";
+  font-size: 2rem;
+}
+
+.bio30-wrapper .logo,
+.bio30-wrapper .logo_mobile {
   display: block;
   width: 48px;
   height: 48px;
-  background: url('/bio30/logo.svg') center/contain no-repeat;
+  background: linear-gradient(135deg, hsl(var(--brand-red-orange)), hsl(var(--brand-gold)));
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
 }
 
-.slogan {
+.bio30-wrapper .slogan {
   font-size: 0.75rem;
   white-space: nowrap;
 }
 
-.cart-container {
+.bio30-wrapper .cart-container {
   position: relative;
 }
 
-.count--cart {
+.bio30-wrapper .count--cart {
   position: absolute;
   top: -8px;
   right: -8px;
@@ -142,8 +165,27 @@ header {
   color: white;
 }
 
+/* MOBILE MENU BUTTON */
+.bio30-wrapper .menu-icon {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: hsl(var(--muted));
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bio30-wrapper .menu-icon::after {
+  content: "☰";
+  font-size: 1.5rem;
+  color: hsl(var(--foreground));
+}
+
 /* Mobile menu */
-.mobile-menu {
+.bio30-wrapper .mobile-menu {
   position: fixed;
   top: 64px;
   left: 0;
@@ -154,21 +196,21 @@ header {
   overflow-y: auto;
 }
 
-.mobile-menu-content {
+.bio30-wrapper .mobile-menu-content {
   padding: 2rem 1rem;
 }
 
-.nav--mobile ul {
+.bio30-wrapper .nav--mobile ul {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-.nav--mobile li {
+.bio30-wrapper .nav--mobile li {
   margin-bottom: 1rem;
 }
 
-.nav--mobile a {
+.bio30-wrapper .nav--mobile a {
   display: block;
   padding: 0.75rem;
   color: inherit;
@@ -178,18 +220,19 @@ header {
   transition: background-color 0.2s;
 }
 
-.nav--mobile a:hover {
+.bio30-wrapper .nav--mobile a:hover {
   background-color: hsl(var(--muted));
 }
 
-/* === FOOTER STYLES === */
-.footer {
+/* === FOOTER STYLES (ТОЛЬКО ДЛЯ BIO30) === */
+.bio30-wrapper .footer {
   background: hsl(var(--background));
   border-top: 1px solid hsl(var(--border));
   padding: 3rem 0;
+  margin-top: 4rem;
 }
 
-.footer .row {
+.bio30-wrapper .footer .row {
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
@@ -198,44 +241,51 @@ header {
   padding: 0 1rem;
 }
 
-.footer .col {
+.bio30-wrapper .footer .col {
   flex: 1;
   min-width: 200px;
 }
 
-.footer .title {
+.bio30-wrapper .footer .title {
   color: hsl(var(--foreground));
   margin-bottom: 1rem;
 }
 
-.footer a {
+.bio30-wrapper .footer a {
   color: hsl(var(--muted-foreground));
   text-decoration: none;
   transition: color 0.2s;
 }
 
-.footer a:hover {
+.bio30-wrapper .footer a:hover {
   color: hsl(var(--primary));
 }
 
-.age {
-  background: url('/bio30/icons/age.svg') center/contain no-repeat;
+.bio30-wrapper .age {
+  background: linear-gradient(90deg, hsl(var(--brand-red-orange)), hsl(var(--brand-deep-indigo)));
   width: 64px;
   height: 32px;
+  border-radius: var(--sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
-/* === PARTNER FORM STYLES === */
-.partner-form-wrapper {
+/* === PARTNER FORM STYLES (ТОЛЬКО ДЛЯ BIO30) === */
+.bio30-wrapper .partner-form-wrapper {
   max-width: 800px;
   margin: 0 auto;
   padding: 2rem;
 }
 
-.partner-form-wrapper .title {
+.bio30-wrapper .partner-form-wrapper .title {
   margin-bottom: 2rem;
 }
 
-.input {
+.bio30-wrapper .input {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid hsl(var(--border));
@@ -245,11 +295,11 @@ header {
   font-size: 1rem;
 }
 
-.select-container {
+.bio30-wrapper .select-container {
   position: relative;
 }
 
-.select-input {
+.bio30-wrapper .select-input {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 10l5 5 5-5z' fill='currentColor'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -257,7 +307,16 @@ header {
   padding-right: 2.5rem;
 }
 
-/* === GRID SYSTEMS === */
+/* === GRID SYSTEMS (КОНФЛИКТУЮТ С READ-ONLY, ПОЭТОМУ ПЕРЕОПРЕДЕЛЯЕМ) === */
+
+/* Сбрасываем display: flex из cards.css */
+.bio30-wrapper .card,
+.bio30-wrapper .benefit {
+  display: grid !important; /* Перекрываем display: flex */
+  grid-template-columns: 1fr;
+}
+
+/* Наши grid-контейнеры */
 .bio30-wrapper .grid--cards,
 .bio30-wrapper .grid--benefit {
   display: grid;
@@ -267,13 +326,13 @@ header {
   grid-auto-flow: dense;
 }
 
-/* === CARDS === */
+/* Наши карточки */
 .bio30-wrapper .card--product,
 .bio30-wrapper .card--benefit {
   position: relative;
   overflow: hidden;
-  border-radius: var(--md); /* ВАЖНО: явное закругление */
-  border: 1px solid var(--border);
+  border-radius: var(--md);
+  border: 1px solid hsl(var(--border));
   height: 100%;
   min-height: 300px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -312,7 +371,7 @@ header {
     overflow-x: hidden;
   }
   
-  .container {
+  .bio30-wrapper .container {
     width: 100% !important;
     padding-left: 1rem !important;
     padding-right: 1rem !important;
@@ -333,19 +392,19 @@ header {
 
 /* === DESKTOP HEADER === */
 @media (min-width: 769px) {
-  .web {
+  .bio30-wrapper .web {
     display: flex;
   }
-  .mobile {
+  .bio30-wrapper .mobile {
     display: none;
   }
-  header {
+  .bio30-wrapper header {
     height: 88px;
   }
 }
 
 /* === BUTTONS === */
-.btn {
+.bio30-wrapper .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -359,35 +418,48 @@ header {
   cursor: pointer;
 }
 
-.btn--blk {
+.bio30-wrapper .btn--blk {
   background-color: hsl(var(--foreground));
   color: hsl(var(--background));
 }
 
-.btn--wht {
+.bio30-wrapper .btn--wht {
   background-color: hsl(var(--card));
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
 }
 
-.btn:hover {
+.bio30-wrapper .btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 /* === FORM ELEMENTS === */
-.form-group {
+.bio30-wrapper .form-group {
   margin-bottom: 1.5rem;
 }
 
-.form-group small {
+.bio30-wrapper .form-group small {
   display: block;
   color: hsl(var(--muted-foreground));
   font-size: 0.875rem;
   margin-top: 0.5rem;
 }
 
+.bio30-wrapper .select-icon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 /* === ANIMATIONS === */
-.anmt {
+.bio30-wrapper .anmt {
   transition: all 0.2s ease;
+}
+
+/* ФИКС ДЛЯ STORY (удаляем дублирующийся display) */
+.bio30-wrapper .story {
+  display: block !important; /* Сбрасываем display: flex !important из story.css */
 }
