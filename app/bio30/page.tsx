@@ -7,15 +7,12 @@ import { motion } from "framer-motion";
 import { useScrollFadeIn } from "./hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "./hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "./hooks/useBio30ThemeFix";
-import PartnerForm from "./components/PartnerForm";
+import { ProductCard } from "./components/ProductCard";
+import { BenefitCard } from "./components/BenefitCard";
+import { PRODUCTS, BENEFITS } from "./data/products";
 import { HERO_SLIDES } from "./data/hero";
-import { PRODUCTS, BENEFITS, STORIES } from "./data/products";
 
-// Slick-slider импорт
-const SlickSlider = dynamic(() => import("react-slick"), { 
-  ssr: false,
-  loading: () => <div className="h-screen bg-gray-900 animate-pulse" />
-});
+const SlickSlider = dynamic(() => import("react-slick"), { ssr: false });
 
 export default function HomePage(): JSX.Element {
   useBio30ThemeFix();
@@ -23,11 +20,11 @@ export default function HomePage(): JSX.Element {
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
   const productsTitle = useScrollFadeIn("up", 0.1);
-  const productGrid = useStaggerFadeIn(PRODUCTS.length, 0.1);
-  const advantages = useStaggerFadeIn(BENEFITS.length, 0.1);
-  const stories = useStaggerFadeIn(STORIES.length, 0.1);
+  const benefitsTitle = useScrollFadeIn("up", 0.1);
+  
+  const { ref: productsRef, controls: productsControls, container: productsContainer } = useStaggerFadeIn(PRODUCTS.length, 0.1);
+  const { ref: benefitsRef, controls: benefitsControls, container: benefitsContainer } = useStaggerFadeIn(BENEFITS.length, 0.1);
 
-  // Настройки для slick-slider
   const heroSettings = {
     infinite: true,
     slidesToShow: 1,
@@ -41,23 +38,9 @@ export default function HomePage(): JSX.Element {
     cssEase: 'ease-out',
   };
 
-  const storiesSettings = {
-    dots: false,
-    arrows: false,
-    infinite: false,
-    speed: 800,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    responsive: [
-      { breakpoint: 1024, settings: { dots: true } },
-      { breakpoint: 600, settings: { slidesToShow: 2, slidesToScroll: 2 } },
-      { breakpoint: 480, settings: { slidesToShow: 1, slidesToScroll: 1 } }
-    ]
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Герой-слайдер с правильным фоном и изображениями */}
+      {/* Герой-слайдер */}
       <section className="hero-section">
         <SlickSlider {...heroSettings}>
           {HERO_SLIDES.map((slide, index) => (
@@ -96,53 +79,14 @@ export default function HomePage(): JSX.Element {
         </SlickSlider>
       </section>
 
-      {/* Истории успеха */}
-      <section className="section section--stories py-16 px-6" aria-labelledby="stories-title">
-        <motion.header
-          ref={heroTitle.ref}
-          initial="hidden"
-          animate={heroTitle.controls}
-          variants={heroTitle.variants}
-          className="article text-center mb-12"
-        >
-          <h2 id="stories-title" className="title fs__lg fw__bd gradient">
-            Истории успеха
-          </h2>
-        </motion.header>
-
-        <SlickSlider {...storiesSettings}>
-          {STORIES.map((story, index) => (
-            <div key={index} className="story-card p-4">
-              <div className="col gp gp--xl">
-                <img
-                  src={story.image}
-                  alt={story.name}
-                  className="w-full h-64 object-cover rounded-lg mb-4"
-                  loading="lazy"
-                />
-                <div className="content">
-                  <span className="quote fs__md fw__md opc opc--75 mb-2">"{story.quote}"</span>
-                  <div className="row ctr gp gp--xs mt-4">
-                    <span className="title fs__sm fw__bd">{story.name}</span>
-                    {story.followers && (
-                      <span className="subtitle fs__sm fw__md opc opc--50">{story.followers}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </SlickSlider>
-      </section>
-
       {/* Продукты */}
-      <section className="section section--products py-16 px-6" aria-labelledby="products-title">
+      <section className="py-16 px-6" aria-labelledby="products-title">
         <motion.header
           ref={productsTitle.ref}
           initial="hidden"
           animate={productsTitle.controls}
           variants={productsTitle.variants}
-          className="article text-center mb-12"
+          className="text-center mb-12"
         >
           <h2 id="products-title" className="title fs__lg fw__bd gradient">
             Мультивселенная продуктов
@@ -150,75 +94,39 @@ export default function HomePage(): JSX.Element {
         </motion.header>
 
         <motion.div
-          ref={productGrid.ref}
+          ref={productsRef}
           initial="hidden"
-          animate={productGrid.controls}
-          variants={productGrid.container}
-          className="grid grid--cards container mx-auto"
-          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.25rem" }}
+          animate={productsControls}
+          variants={productsContainer}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto"
         >
           {PRODUCTS.map((product, i) => (
-            <motion.div
-              key={product.id}
-              variants={productGrid.child}
-              custom={i}
-              className="card card--product hover:scale-[1.02] transition-transform"
-              style={{ backgroundColor: product.theme.bg, color: product.theme.text }}
-            >
-              <Link href={product.link} className="block">
-                <div className={`flex flex-col ${product.layout === 'horizontal' ? 'md:flex-row' : ''}`}>
-                  {/* Исправлено: Всегда показываем картинку на мобильных */}
-                  <div className="bside w-full md:w-1/2 relative">
-                    <picture>
-                      <source media="(max-width: 768px)" srcSet={product.image.mobile} />
-                      <img
-                        src={product.image.web}
-                        alt={product.title}
-                        className="w-full h-64 md:h-full object-cover"
-                        loading="lazy"
-                      />
-                    </picture>
-                  </div>
-                  <div className="aside w-full md:w-1/2 p-6">
-                    <h3 className="title fs__lg fw__bd mb-2">{product.title}</h3>
-                    <p className="subtitle fs__md fw__rg opc opc--75 mb-4 line-clamp-3">{product.desc}</p>
-                    <span className="price fs__xl fw__bd">{product.price} RUB</span>
-                    {product.tags.length > 0 && (
-                      <div className="tags mt-3 flex gap-2">
-                        {product.tags.map(tag => (
-                          <span key={tag} className="tag text-xs px-2 py-1 rounded bg-white/20">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
+            <ProductCard key={product.id} product={product} index={i} />
           ))}
           
           {/* Карточка "Все продукты" */}
           <Link
             href="/bio30/categories"
-            className="card card__default card--link hover:scale-[1.02] transition-transform"
-            style={{ backgroundColor: "#0D0D0D", border: "1px solid var(--border)" }}
+            className="group relative overflow-hidden rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors min-h-[300px]"
+            style={{ backgroundColor: "#0D0D0D" }}
           >
-            <div className="col pd__xl gp gp--md ctr h-full flex items-center justify-center">
-              <h2 className="title fs__md fw__bd">Все продукты →</h2>
+            <div className="col pd__xl gp gp--md">
+              <h2 className="title fs__md fw__bd group-hover:text-primary transition-colors">
+                Все продукты →
+              </h2>
             </div>
           </Link>
         </motion.div>
       </section>
 
       {/* Преимущества */}
-      <section className="section section--benefits py-16 px-6 bg-muted" aria-labelledby="benefits-title">
+      <section className="py-16 px-6 bg-muted" aria-labelledby="benefits-title">
         <motion.header
-          ref={heroTitle.ref}
+          ref={benefitsTitle.ref}
           initial="hidden"
-          animate={heroTitle.controls}
-          variants={heroTitle.variants}
-          className="article text-center mb-12"
+          animate={benefitsTitle.controls}
+          variants={benefitsTitle.variants}
+          className="text-center mb-12"
         >
           <h2 id="benefits-title" className="title fs__lg fw__bd gradient">
             Наши преимущества
@@ -226,42 +134,19 @@ export default function HomePage(): JSX.Element {
         </motion.header>
 
         <motion.div
-          ref={advantages.ref}
+          ref={benefitsRef}
           initial="hidden"
-          animate={advantages.controls}
-          variants={advantages.container}
-          className="grid grid--benefit container mx-auto"
-          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1.25rem" }}
+          animate={benefitsControls}
+          variants={benefitsContainer}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto"
         >
           {BENEFITS.map((benefit, i) => (
-            <motion.div
-              key={i}
-              variants={advantages.child}
-              custom={i}
-              className="benefit card hover:scale-[1.02] transition-transform"
-              style={{ backgroundColor: benefit.theme.bg, color: benefit.theme.text }}
-            >
-              <div className="col gp gp--md p-6">
-                <h3 className="title fs__md fw__bd mb-2">{benefit.title}</h3>
-                <p className="subtitle fs__sm fw__rg opc opc--75">{benefit.desc}</p>
-              </div>
-              <div className="bside">
-                <picture>
-                  <source media="(max-width: 768px)" srcSet={benefit.image.mobile} />
-                  <img
-                    src={benefit.image.web}
-                    alt={benefit.title}
-                    className="w-full h-32 object-cover mt-4"
-                    loading="lazy"
-                  />
-                </picture>
-              </div>
-            </motion.div>
+            <BenefitCard key={benefit.id} benefit={benefit} index={i} />
           ))}
         </motion.div>
       </section>
 
-      {/* Партнерская форма (без дублирующего заголовка) */}
+      {/* Партнерская форма */}
       <section className="section section--partner py-16 px-6" aria-labelledby="partner-title">
         <PartnerForm />
       </section>

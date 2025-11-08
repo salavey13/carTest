@@ -1,4 +1,5 @@
 export interface Product {
+  id: string;
   title: string;
   description: string;
   price: number;
@@ -6,7 +7,7 @@ export interface Product {
   link: string;
   theme: { bg: string; text: string };
   tags: string[];
-  layout: 'default' | 'horizontal' | 'vertical';
+  variant: 'default' | 'horizontal' | 'vertical';
 }
 
 export interface Story {
@@ -20,6 +21,7 @@ export interface Story {
 }
 
 export interface Benefit {
+  id: string;
   title: string;
   description: string;
   image: { web: string; mobile: string };

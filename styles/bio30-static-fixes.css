@@ -1,0 +1,147 @@
+* Import this file in your main global CSS to fix bio30 cards without dynamic loading
+ * Example: @import './bio30-static-fixes.css';
+ */
+
+/* Override old grid systems with modern responsive grid */
+.bio30-wrapper .grid--cards,
+.bio30-wrapper .grid--benefit {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+  grid-auto-rows: auto !important;
+  gap: 1.25rem !important;
+  grid-auto-flow: dense !important;
+}
+
+.bio30-wrapper .grid--cards > *,
+.bio30-wrapper .grid--benefit > * {
+  grid-column: auto !important;
+  grid-row: auto !important;
+}
+
+/* Card container fixes */
+.bio30-wrapper .card--product,
+.bio30-wrapper .card--benefit {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--md);
+  border: 1px solid var(--border);
+  height: 100% !important;
+  min-height: 300px;
+}
+
+/* Ensure flexbox layout works inside cards */
+.bio30-wrapper .card--product > a,
+.bio30-wrapper .card--benefit > div {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bio30-wrapper .md\:flex-row {
+  flex-direction: row !important;
+}
+
+/* Image container fixes */
+.bio30-wrapper .bside {
+  position: relative;
+  overflow: hidden;
+}
+
+.bio30-wrapper .bside img,
+.bio30-wrapper .bside picture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Mobile image override */
+@media (max-width: 768px) {
+  .bio30-wrapper .md\:hidden {
+    display: block !important;
+  }
+  .bio30-wrapper .md\:block {
+    display: none !important;
+  }
+  
+  .bio30-wrapper .card--product .bside,
+  .bio30-wrapper .card--benefit .bside {
+    height: 200px !important;
+    min-height: 200px;
+  }
+}
+
+/* Desktop image layout */
+@media (min-width: 769px) {
+  .bio30-wrapper .card--product.md\:flex-row .bside,
+  .bio30-wrapper .card--benefit.md\:flex-row .bside {
+    width: 50% !important;
+  }
+  
+  .bio30-wrapper .card--product.md\:flex-row .aside,
+  .bio30-wrapper .card--benefit.md\:flex-row .aside {
+    width: 50% !important;
+  }
+}
+
+/* Vertical card variant */
+.bio30-wrapper .card--product .md\:order-2 {
+  order: 2;
+}
+
+.bio30-wrapper .card--product .md\:h-full {
+  height: 100% !important;
+}
+
+/* Text color inheritance */
+.bio30-wrapper .card--product h3,
+.bio30-wrapper .card--benefit h3,
+.bio30-wrapper .card--product p,
+.bio30-wrapper .card--benefit p {
+  color: inherit !important;
+}
+
+/* Price styling */
+.bio30-wrapper .price {
+  font-size: 1.5rem;
+  font-weight: bold;
+  display: block;
+  margin-top: auto;
+}
+
+/* Tag styling */
+.bio30-wrapper .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.bio30-wrapper .tag {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Hover effects */
+.bio30-wrapper .card--product:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+/* Ensure slick-slider visibility */
+.bio30-wrapper .slick-slider {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.bio30-wrapper .slick-slide > div {
+  height: 100%;
+}
+
+/* Partner form spacing fix */
+.bio30-wrapper .partner-form-wrapper .title {
+  margin-bottom: 0 !important;
+}
