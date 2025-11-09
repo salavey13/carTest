@@ -98,69 +98,100 @@ export function useCodeParsingAndValidation() {
     logger.debug("[Parse Logic] Starting parseFilesFromText");
     const files: FileEntry[] = [];
     const parseErrors: ValidationIssue[] = [];
-    let lastIndex = 0;
-    const descriptionParts: string[] = [];
-    
-    const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)\s*(?:\*\/)?\s*$))?/gm;
-  
-    let match;
+    const lines = text.split('\n');
     let fileCounter = 0;
+    let i = 0;
+    const descriptionParts: string[] = [];
+    let lastContentIndex = 0;
   
-    while ((match = codeBlockRegex.exec(text)) !== null) {
-      fileCounter++;
-      const currentMatchIndex = match.index;
-      if (currentMatchIndex > lastIndex) {
-        descriptionParts.push(text.substring(lastIndex, currentMatchIndex).trim());
-      }
-      lastIndex = codeBlockRegex.lastIndex;
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
   
-      // Determine if path came from outside the code block
-      const pathFromOutside = !!match[1] || !!match[4];
-      let path = (match[1] || match[4] || `unnamed-${fileCounter}`).trim();
-      let content = match[3].trim();
-      let lang = match[2] || '';
-      let extension = getFileExtension(path) || lang || 'txt'; 
-  
-      // --- FIX: Extract path from content if unnamed (path from inside) ---
-      if (path.startsWith('unnamed-')) {
-        const lines = content.split('\n');
-        const potentialPathLine = lines[0]?.trimStart();
-        if (potentialPathLine) {
-          const pathMatch = potentialPathLine.match(pathCommentRegex);
-          if (pathMatch && pathMatch[1]) {
-            path = pathMatch[1].trim();
-            content = lines.slice(1).join('\n').trim();
-            extension = getFileExtension(path) || lang || 'txt';
-            logger.debug(`[Parse Logic] Extracted path "${path}" from comment inside block.`);
+      // Check if this line starts a code block
+      if (trimmed.startsWith('```')) {
+        // Extract language
+        const lang = trimmed.slice(3).trim() || '';
+        
+        // Look backward for a path comment (check previous 5 lines)
+        let path: string | null = null;
+        for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+          const prevLine = lines[j].trimStart();
+          const match = prevLine.match(pathCommentRegex);
+          if (match?.[1]) {
+            path = match[1];
+            break;
           }
         }
-      } 
-      // --- FIX: Strip duplicate if path came from outside ---
-      else if (pathFromOutside) {
-        const lines = content.split('\n');
-        if (lines.length > 0) {
-          const firstLine = lines[0].trimStart();
-          if (pathCommentRegex.test(firstLine)) {
-            logger.debug(`[Parse Logic] Stripping duplicate path comment from ${path}: "${firstLine}"`);
-            content = lines.slice(1).join('\n').trim();
+  
+        // Collect code block content
+        const contentLines: string[] = [];
+        i++; // Move to next line after opening backticks
+        
+        while (i < lines.length && !lines[i].trim().startsWith('```')) {
+          contentLines.push(lines[i]);
+          i++;
+        }
+  
+        // Skip closing backticks
+        if (i < lines.length && lines[i].trim().startsWith('```')) {
+          i++; // Skip the closing line
+        }
+  
+        let content = contentLines.join('\n').trim();
+        let fileId = generateId();
+        let finalPath = path || `unnamed-${++fileCounter}`;
+        let extension = getFileExtension(finalPath) || lang || 'txt';
+  
+        // If no path found above, try first content line
+        if (!path && contentLines.length > 0) {
+          const firstContentLine = contentLines[0].trimStart();
+          const match = firstContentLine.match(pathCommentRegex);
+          if (match?.[1]) {
+            finalPath = match[1];
+            content = contentLines.slice(1).join('\n').trim();
+            extension = getFileExtension(finalPath) || lang || 'txt';
+            logger.debug(`[Parse Logic] Extracted path "${finalPath}" from comment inside block.`);
           }
         }
-      }
+        // If path was found above, strip any duplicate from content
+        else if (path && contentLines.length > 0) {
+          const firstContentLine = contentLines[0].trimStart();
+          if (pathCommentRegex.test(firstContentLine)) {
+            logger.debug(`[Parse Logic] Stripping duplicate path comment from ${finalPath}: "${firstContentLine}"`);
+            content = contentLines.slice(1).join('\n').trim();
+          }
+        }
   
-      // Normalize path: remove leading slashes for consistency, unless it's the root path itself.
-      if (path !== '/' && (path.startsWith('/') || path.startsWith('\\'))) {
-        path = path.substring(1);
-      }
+        // Normalize path
+        if (finalPath !== '/' && (finalPath.startsWith('/') || finalPath.startsWith('\\'))) {
+          finalPath = finalPath.substring(1);
+        }
   
-      if (/^\s*```/m.test(content)) {
-        const fileId = generateId();
-        logger.warn(`[Parse Logic] Nested code block marker (\`\`\`) found at the start of a line within the content of potential file: ${path}. Adding parse error.`);
-        parseErrors.push({ id: generateId(), fileId: fileId, filePath: path || `parse-error-${fileId}`, type: 'parseError', message: `Обнаружен маркер начала/конца блока кода (\`\`\`) внутри другого блока кода. Разбор может быть некорректным.`, details: { lineNumber: -1 }, fixable: false, restorable: false, severity: 'error' });
+        if (/^\s*```/m.test(content)) {
+          logger.warn(`[Parse Logic] Nested code block marker (\`\`\`) found at the start of a line within the content of potential file: ${finalPath}. Adding parse error.`);
+          parseErrors.push({ id: generateId(), fileId: fileId, filePath: finalPath || `parse-error-${fileId}`, type: 'parseError', message: `Обнаружен маркер начала/конца блока кода (\`\`\`) внутри другого блока кода. Разбор может быть некорректным.`, details: { lineNumber: -1 }, fixable: false, restorable: false, severity: 'error' });
+        }
+  
+        // Add description text before this block
+        const blockStartIndex = lines.slice(0, i - contentLines.length - 1).join('\n').length;
+        if (blockStartIndex > lastContentIndex) {
+          descriptionParts.push(text.substring(lastContentIndex, blockStartIndex).trim());
+        }
+        lastContentIndex = lines.slice(0, i).join('\n').length;
+  
+        files.push({ id: fileId, path: finalPath, content, extension });
+        logger.debug(`[Parse Logic] Parsed file ${fileCounter}: Path=${finalPath}, Ext=${extension}, Content Length=${content.length}`);
+      } else {
+        i++;
       }
-      files.push({ id: generateId(), path, content, extension });
-      logger.debug(`[Parse Logic] Parsed file ${fileCounter}: Path=${path}, Ext=${extension}, Content Length=${content.length}`);
     }
-    if (lastIndex < text.length) { descriptionParts.push(text.substring(lastIndex).trim()); }
+  
+    // Add remaining description text
+    if (lastContentIndex < text.length) {
+      descriptionParts.push(text.substring(lastContentIndex).trim());
+    }
+  
     const description = descriptionParts.filter(Boolean).join('\n\n');
     logger.debug(`[Parse Logic] Finished parsing. Files: ${files.length}, Errors: ${parseErrors.length}, Desc Length: ${description.length}`);
     return { files, description, parseErrors };
