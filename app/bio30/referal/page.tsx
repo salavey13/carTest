@@ -1,10 +1,11 @@
+// /app/bio30/referal/page.tsx
 "use client";
 
 import React from "react";
 import { motion } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
 import PartnerForm from "../components/PartnerForm";
-import Dashboard from "../components/Dashboard";
+import ReferralDashboard from "../components/ReferralDashboard";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 
