@@ -102,10 +102,10 @@ export function useCodeParsingAndValidation() {
     const descriptionParts: string[] = [];
     
     const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w\-\[\]]+(?:[/\\][.\w\-\[\]]+)*\.\w+)\s*(?:\*\/)?\s*$))?/gm;
-
+  
     let match;
     let fileCounter = 0;
-
+  
     while ((match = codeBlockRegex.exec(text)) !== null) {
       fileCounter++;
       const currentMatchIndex = match.index;
@@ -113,43 +113,45 @@ export function useCodeParsingAndValidation() {
         descriptionParts.push(text.substring(lastIndex, currentMatchIndex).trim());
       }
       lastIndex = codeBlockRegex.lastIndex;
-
+  
+      // Determine if path came from outside the code block
+      const pathFromOutside = !!match[1] || !!match[4];
       let path = (match[1] || match[4] || `unnamed-${fileCounter}`).trim();
       let content = match[3].trim();
       let lang = match[2] || '';
       let extension = getFileExtension(path) || lang || 'txt'; 
-
-      // --- FIX: Always strip leading path comment from content ---
-      const lines = content.split('\n');
-      if (lines.length > 0) {
-        const firstLine = lines[0].trimStart();
-        if (pathCommentRegex.test(firstLine)) {
-          logger.debug(`[Parse Logic] Stripping leading path comment from ${path}: "${firstLine}"`);
-          content = lines.slice(1).join('\n').trim();
-        }
-      }
-      // --- END FIX ---
-
-      // Keep fallback logic for truly unnamed files, checking the NEW first line
+  
+      // --- FIX: Extract path from content if unnamed (path from inside) ---
       if (path.startsWith('unnamed-')) {
-        const postStripLines = content.split('\n');
-        const potentialPathLine = postStripLines[0]?.trimStart();
+        const lines = content.split('\n');
+        const potentialPathLine = lines[0]?.trimStart();
         if (potentialPathLine) {
           const pathMatch = potentialPathLine.match(pathCommentRegex);
           if (pathMatch && pathMatch[1]) {
             path = pathMatch[1].trim();
-            content = postStripLines.slice(1).join('\n').trim();
+            content = lines.slice(1).join('\n').trim();
             extension = getFileExtension(path) || lang || 'txt';
-            logger.debug(`[Parse Logic] Extracted path "${path}" from comment in unnamed file.`);
+            logger.debug(`[Parse Logic] Extracted path "${path}" from comment inside block.`);
+          }
+        }
+      } 
+      // --- FIX: Strip duplicate if path came from outside ---
+      else if (pathFromOutside) {
+        const lines = content.split('\n');
+        if (lines.length > 0) {
+          const firstLine = lines[0].trimStart();
+          if (pathCommentRegex.test(firstLine)) {
+            logger.debug(`[Parse Logic] Stripping duplicate path comment from ${path}: "${firstLine}"`);
+            content = lines.slice(1).join('\n').trim();
           }
         }
       }
-      
+  
       // Normalize path: remove leading slashes for consistency, unless it's the root path itself.
       if (path !== '/' && (path.startsWith('/') || path.startsWith('\\'))) {
         path = path.substring(1);
       }
-
+  
       if (/^\s*```/m.test(content)) {
         const fileId = generateId();
         logger.warn(`[Parse Logic] Nested code block marker (\`\`\`) found at the start of a line within the content of potential file: ${path}. Adding parse error.`);
@@ -162,8 +164,8 @@ export function useCodeParsingAndValidation() {
     const description = descriptionParts.filter(Boolean).join('\n\n');
     logger.debug(`[Parse Logic] Finished parsing. Files: ${files.length}, Errors: ${parseErrors.length}, Desc Length: ${description.length}`);
     return { files, description, parseErrors };
-  }, []); 
-
+  }, []);
+  
   const validateParsedFiles = useCallback(async (filesToValidate: FileEntry[]): Promise<ValidationIssue[]> => {
     logger.debug("[Validation Logic] Starting validateParsedFiles");
     setValidationStatus('validating');
