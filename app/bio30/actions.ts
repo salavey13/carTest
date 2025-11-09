@@ -163,6 +163,6 @@ export async function clearCart(userId: string) {
 }
 
 // Helper function to map product IDs for addToCart
-export function mapProductIdToCartId(productId: string): string {
+export async function mapProductIdToCartId(productId: string): string {
   return PRODUCT_ID_TO_CART_ID[productId] || productId;
 }
