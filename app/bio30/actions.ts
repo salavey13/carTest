@@ -3,7 +3,7 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
-import { updateUserSettings, sendTelegramInvoice } from "@/app/actions";
+import { updateUserSettings, sendTelegramInvoice  } from "@/app/actions";
 import { processReferralCommissions } from "./ref_actions";
 
 type CartItem = {
@@ -13,13 +13,44 @@ type CartItem = {
   price: number;
 };
 
-// Hardcoded products for now (can load from supabase 'cars' later)
+// Updated product list with your detailed products
 const PRODUCTS = [
-  { id: "1", name: "Lion's Mane", price: 1500 },
-  { id: "2", name: "Cordyceps Sinensis", price: 2000 },
-  { id: "3", name: "Spirulina Chlorella", price: 1200 },
-  { id: "4", name: "Magnesium Pyridoxine", price: 1800 },
+  { 
+    id: "1", 
+    name: "Lion's Mane", 
+    price: 2500,
+    productId: 'lions-mane'
+  },
+  { 
+    id: "2", 
+    name: "Cordyceps Sinensis", 
+    price: 2500,
+    productId: 'cordyceps'
+  },
+  { 
+    id: "3", 
+    name: "Spirulina Chlorella", 
+    price: 2500,
+    productId: 'spirulina'
+  },
+  { 
+    id: "4", 
+    name: "MAGNESIUM PYRIDOXINE", 
+    price: 1600,
+    productId: 'magnesium'
+  }
 ];
+
+const PRODUCT_ID_TO_CART_ID: Record<string, string> = {
+  'lions-mane': '1',
+  'lion-s-mane': '1',
+  'cordyceps': '2',
+  'cordyceps-sinensis': '2',
+  'spirulina': '3',
+  'spirulina-chlorella': '3',
+  'magnesium': '4',
+  'magnesium-pyridoxine': '4'
+};
 
 /**
  * Enhanced checkout with referral processing
@@ -86,9 +117,9 @@ export async function addToCart(userId: string, productId: string, quantity: num
       existing.quantity += quantity;
       updatedCart = [...currentCart];
     } else {
-      const product = PRODUCTS.find(p => p.id === productId);
+      const product = PRODUCTS.find(p => p.productId === productId || p.id === productId);
       if (!product) throw new Error("Product not found");
-      updatedCart = [...currentCart, { productId, quantity, name: product.name, price: product.price }];
+      updatedCart = [...currentCart, { productId: product.id, quantity, name: product.name, price: product.price }];
     }
 
     const result = await updateUserSettings(userId, { cart: updatedCart });
@@ -129,4 +160,9 @@ export async function clearCart(userId: string) {
     logger.error(`[clearCart] Error for user ${userId}:`, e);
     return { success: false, error: (e as Error).message };
   }
+}
+
+// Helper function to map product IDs for addToCart
+export function mapProductIdToCartId(productId: string): string {
+  return PRODUCT_ID_TO_CART_ID[productId] || productId;
 }
