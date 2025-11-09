@@ -151,6 +151,18 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   wb: "/wb",
 };
 
+// BIO30 Product mapping for startapp parameters
+const BIO30_PRODUCT_PATHS: Record<string, string> = {
+  'cordyceps': '/bio30/categories/cordyceps-sinensis',
+  'spirulina': '/bio30/categories/spirulina-chlorella',
+  'lions-mane': '/bio30/categories/lion-s-mane',
+  'lion-s-mane': '/bio30/categories/lion-s-mane',
+  'magnesium': '/bio30/categories/magnesium-pyridoxine',
+  'cordyceps-sinensis': '/bio30/categories/cordyceps-sinensis',
+  'spirulina-chlorella': '/bio30/categories/spirulina-chlorella',
+  'magnesium-pyridoxine': '/bio30/categories/magnesium-pyridoxine'
+};
+
 function useBio30ThemeFix() {
   const pathname = usePathname();
   useEffect(() => {
@@ -179,7 +191,7 @@ function useBio30ExternalCSS() {
   useEffect(() => {
     if (!pathname.startsWith("/bio30")) return;
 
-    const BASE = "https://bio30.ru/front/static/css/";
+    const BASE = "https://bio30.ru/front/static/css/ ";
     const VERSION = "?v=05.07.2025-1";
     const files = [
       "grid.css",
@@ -317,16 +329,47 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       } else if (paramToProcess.startsWith("viz_")) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
+      } else if (prefix === "bio30") {
+        // Handle BIO30 startapp parameters
+        // Format: bio30_<product-id>_ref_<referrer_id> or bio30_ref_<referrer_id> or bio30_<product-id>
+        let productId: string | undefined;
+        let referrerId: string | undefined;
+        
+        // Check for product ID (second part, unless it's "ref")
+        if (parts.length > 1 && parts[1] !== 'ref') {
+          productId = parts[1];
+        }
+        
+        // Check for referral (look for "ref" followed by referrer ID)
+        const refIndex = parts.indexOf('ref');
+        if (refIndex !== -1 && refIndex + 1 < parts.length) {
+          referrerId = parts[refIndex + 1];
+        }
+        
+        // Set up referral if user exists and doesn't have one yet
+        if (referrerId && dbUser?.user_id && !dbUser.metadata?.referrer_id) {
+          handleBio30Referral(referrerId, paramToProcess).catch((error) => {
+            logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
+          });
+        }
+        
+        // Set target path
+        if (productId && BIO30_PRODUCT_PATHS[productId]) {
+          targetPath = BIO30_PRODUCT_PATHS[productId];
+        } else {
+          targetPath = '/bio30';
+        }
       } else if (
         paramToProcess.startsWith("ref_") &&
         parts.length === 2 &&
         pathname.startsWith("/bio30")
       ) {
+        // Legacy referral format: ref_<referrer_id>
         const referrerId = parts[1];
         handleBio30Referral(referrerId, paramToProcess).catch((error) => {
           logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
         });
-        targetPath = undefined;
+        targetPath = undefined; // Stay on current BIO30 page
       } else {
         targetPath = `/${paramToProcess}`;
       }
