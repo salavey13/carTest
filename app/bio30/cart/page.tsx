@@ -3,10 +3,9 @@
 
 import React from "react";
 
-
 import { motion } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
-import { removeFromCart, checkoutCart } from "../actions";
+import { removeFromCart, checkoutCart } from "../ref_actions";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 
