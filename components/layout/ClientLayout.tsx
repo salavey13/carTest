@@ -191,7 +191,7 @@ function useBio30ExternalCSS() {
   useEffect(() => {
     if (!pathname.startsWith("/bio30")) return;
 
-    const BASE = "https://bio30.ru/front/static/css/ ";
+    const BASE = "https://bio30.ru/front/static/css/";
     const VERSION = "?v=05.07.2025-1";
     const files = [
       "grid.css",
