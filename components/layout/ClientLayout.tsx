@@ -16,7 +16,8 @@ import { AppProvider, useAppContext } from "@/contexts/AppContext";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
-import ErrorBoundaryForOverlay from "@/components/DevErrorOverlay";
+import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
+import DevErrorOverlay from "@/components/DevErrorOverlay";
 import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
 import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -477,6 +478,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
               className: "text-sm",
             }}
           />
+          <DevErrorOverlay />
         </TooltipProvider>
         <Analytics />
         <SpeedInsights />
