@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Label } from '@//components/ui/label';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { FaChartLine, FaRocket, FaCheckCircle, FaSparkles, FaTelegram, FaRedo, FaKeyboard, FaClock, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
