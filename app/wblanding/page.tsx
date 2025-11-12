@@ -69,9 +69,9 @@ export default function WarehouseLandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 font-sans">
       {/* Hero Section */}
-      <section className="relative min-h-[70vh] flex items-center justify-center text-white overflow-hidden">
+      <section className="relative min-h-[80vh] flex items-center justify-center text-white overflow-hidden">
         <video className="absolute inset-0 w-full h-full object-cover brightness-50" autoPlay loop muted playsInline
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4 " />
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" />
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-indigo-600/30" />
         <motion.div 
           className="relative z-10 text-center px-4 max-w-6xl mx-auto"
@@ -85,7 +85,7 @@ export default function WarehouseLandingPage() {
             transition={{ delay: 0.2, type: "spring" }}
           >
             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png "
-              alt="Логотип приложения" width={120} height={120}
+              alt="Логотип приложения" width={142} height={69}
               className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 shadow-2xl ring-4 ring-white/10" />
           </motion.div>
           <motion.h1 
