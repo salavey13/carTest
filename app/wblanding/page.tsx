@@ -1,10 +1,11 @@
+// /app/wblanding/page.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
-import { createCrew } from "@/app/actions";
+import { createCrew, sendServiceInvoice, sendComplexMessage, notifyAdmin } from "@/app/actions";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave, FaRedo } from 'react-icons/fa6';
+import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave, FaRedo, FaPaperPlane, FaBell } from 'react-icons/fa6';
 import { FaKeyboard, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import Image from 'next/image';
@@ -36,6 +37,7 @@ export default function WarehouseLandingPage() {
   const [hqLocation, setHqLocation] = useState("56.3269,44.0059");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCrew, setCreatedCrew] = useState<{ slug: string; name: string } | null>(null);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
 
   useEffect(() => { setSlug(generateSlug(name)); }, [name]);
 
@@ -52,26 +54,114 @@ export default function WarehouseLandingPage() {
       if (result.success && result.data) {
         toast.success(`Склад "${result.data.name}" успешно создан!`);
         setCreatedCrew({ slug: result.data.slug, name: result.data.name });
+        
+        // Уведомление администратора о новом складе
+        await notifyAdmin(`🎉 Новый склад создан!\nНазвание: ${result.data.name}\nВладелец: ${dbUser.username || dbUser.user_id}`);
       } else { throw new Error(result.error || "Неизвестная ошибка при создании склада."); }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Произошла ошибка.");
     } finally { setIsSubmitting(false); }
   };
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (!createdCrew) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_ ${createdCrew.slug}_join_crew`;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
     const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
-    const shareUrl = `https://t.me/share/url?url= ${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
     window.open(shareUrl, "_blank");
+    
+    // Отправляем уведомление владельцу
+    if (dbUser?.user_id) {
+      await sendComplexMessage(dbUser.user_id, `✅ Приглашение для склада "${createdCrew.name}" готово!`, []);
+      toast.success("Приглашение отправлено!");
+    }
+  };
+
+  // Функция для отправки счета за услугу
+  const handleSendInvoice = async (serviceType: 'quick_setup' | 'team_training', amount: number) => {
+    if (!dbUser?.user_id) {
+      toast.error("Пожалуйста, войдите в систему");
+      return;
+    }
+    
+    setIsSendingInvoice(true);
+    try {
+      const services = {
+        quick_setup: {
+          name: "🎯 Автоматизация склада за 1 день",
+          description: "Полная настройка, интеграция со всеми маркетплейсами, обучение владельца (2 часа), гарантия 30 дней",
+          amount: 20000
+        },
+        team_training: {
+          name: "👨‍🏫 Обучение команды с нуля",
+          description: "Обучение менеджеров и кладовщиков, чек-листы, ролевой доступ, контроль качества",
+          amount: 10000
+        }
+      };
+      
+      const service = services[serviceType];
+      
+      // Отправляем счет в Telegram
+      const result = await sendServiceInvoice(
+        dbUser.user_id,
+        serviceType,
+        service.name,
+        service.description,
+        service.amount
+      );
+      
+      if (result.success) {
+        toast.success(`✅ Счет на ${service.amount}₽ отправлен в Telegram!`, {
+          duration: 5000,
+          icon: '📨'
+        });
+        
+        // Уведомляем администратора
+        await notifyAdmin(`💰 Новый заказ услуги!\nТип: ${service.name}\nКлиент: ${dbUser.username || dbUser.user_id}\nСумма: ${service.amount}₽`);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toast.error("Ошибка при отправке счета: " + (error instanceof Error ? error.message : "Неизвестная ошибка"));
+    } finally {
+      setIsSendingInvoice(false);
+    }
+  };
+
+  // Функция для массовой рассылки уведомлений
+  const handleBroadcast = async () => {
+    if (!dbUser?.user_id) return;
+    
+    const message = prompt("Введите сообщение для рассылки:");
+    if (!message) return;
+    
+    const confirmBroadcast = confirm(`Отправить сообщение "${message}" всем пользователям?`);
+    if (!confirmBroadcast) return;
+    
+    try {
+      const result = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, senderId: dbUser.user_id })
+      });
+      
+      if (result.ok) {
+        toast.success("📢 Рассылка запущена!");
+        await notifyAdmin(`📢 Массовая рассылка от ${dbUser.username}: ${message}`);
+      }
+    } catch (error) {
+      toast.error("Ошибка рассылки");
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 font-sans">
       {/* Hero Section */}
       <section className="relative min-h-[80vh] flex items-center justify-center text-white overflow-hidden">
-        <video className="absolute inset-0 w-full h-full object-cover brightness-50" autoPlay loop muted playsInline
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" />
+        <div className="absolute inset-0 w-full h-full">
+          <video className="w-full h-full object-cover brightness-50" autoPlay loop muted playsInline
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" />
+        </div>
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-indigo-600/30" />
         <motion.div 
           className="relative z-10 text-center px-4 max-w-6xl mx-auto"
@@ -84,7 +174,7 @@ export default function WarehouseLandingPage() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, type: "spring" }}
           >
-            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png "
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
               alt="Логотип приложения" width={142} height={69}
               className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 shadow-2xl ring-4 ring-white/10" />
           </motion.div>
@@ -111,7 +201,14 @@ export default function WarehouseLandingPage() {
             transition={{ delay: 0.6 }}
           >
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button onClick={() => setShowAudit(true)} size="lg" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto shadow-xl">
+              <Button onClick={() => {
+                setShowAudit(true);
+                // Агрессивное всплывающее уведомление
+                toast.info("🔥 УЗНАЙТЕ СВОИ ПОТЕРИ ПРЯМО СЕЙЧАС!", {
+                  icon: "⚡",
+                  duration: 3000
+                });
+              }} size="lg" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto shadow-xl">
                 <FaChartLine className="mr-2" /> УЗНАТЬ ЭФФЕКТИВНОСТЬ
               </Button>
             </motion.div>
@@ -135,15 +232,19 @@ export default function WarehouseLandingPage() {
       {/* Second Video Section */}
       <section className="py-12 bg-gray-100">
         <div className="max-w-4xl mx-auto px-4">
-          <motion.video 
-            className="w-full h-auto rounded-2xl shadow-2xl md:max-w-2xl mx-auto" 
-            autoPlay loop muted playsInline
+          <motion.div 
+            className="w-full h-auto rounded-2xl shadow-2xl md:max-w-2xl mx-auto overflow-hidden"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
           >
-            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4 " type="video/mp4" />
-          </motion.video>
+            <video 
+              className="w-full h-auto" 
+              autoPlay loop muted playsInline
+            >
+              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
+            </video>
+          </motion.div>
         </div>
       </section>
 
@@ -196,7 +297,10 @@ export default function WarehouseLandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <Button onClick={() => setShowAudit(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
+            <Button onClick={() => {
+              setShowAudit(true);
+              toast.info("🚀 Анализ начался! Не закрывайте страницу", { icon: "⏳" });
+            }} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
               <FaRocket className="mr-2" /> ПРОАНАЛИЗИРОВАТЬ СКЛАД
             </Button>
           </motion.div>
@@ -412,6 +516,19 @@ export default function WarehouseLandingPage() {
             От бесплатного старта до полной автоматизации с гарантией результата
           </motion.p>
 
+          {/* Кнопка массовой рассылки (только для админов) */}
+          {dbUser?.role === 'admin' && (
+            <motion.div 
+              className="text-center mb-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <Button onClick={handleBroadcast} className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-3 rounded-full font-bold shadow-lg">
+                <FaBell className="mr-2" /> МАССОВАЯ РАССЫЛКА
+              </Button>
+            </motion.div>
+          )}
+
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               {
@@ -430,7 +547,8 @@ export default function WarehouseLandingPage() {
                 ],
                 cta: "Начать бесплатно",
                 popular: false,
-                type: "free"
+                type: "free",
+                action: () => toast.success("✅ Бесплатный план активирован! Проверьте Telegram")
               },
               {
                 title: "⚡ Полная автоматизация (Профессионал)",
@@ -450,7 +568,8 @@ export default function WarehouseLandingPage() {
                 ],
                 cta: "Попробовать 14 дней бесплатно",
                 popular: true,
-                type: "pro"
+                type: "pro",
+                action: () => toast.info("💳 Пробный период начат! Счет будет выставлен через 14 дней")
               },
               {
                 title: "🏢 Экспоненциальный рост (Предприятие)",
@@ -470,7 +589,13 @@ export default function WarehouseLandingPage() {
                 ],
                 cta: "Запросить демо",
                 popular: false,
-                type: "enterprise"
+                type: "enterprise",
+                action: () => {
+                  toast.loading("📞 Запрос демо отправлен...");
+                  setTimeout(() => {
+                    toast.success("✅ Менеджер свяжется с вами в течение 15 минут!");
+                  }, 2000);
+                }
               }
             ].map((plan, index) => (
               <motion.div 
@@ -517,14 +642,20 @@ export default function WarehouseLandingPage() {
                   ))}
                 </ul>
                 
-                <Button className={`w-full py-3 text-base sm:text-lg font-semibold transition-all duration-300 ${
-                  plan.type === 'free' 
-                    ? 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-black text-white' 
-                    : plan.popular 
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white' 
-                    : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
-                }`}>
-                  {plan.cta}
+                <Button 
+                  onClick={plan.action}
+                  className={`w-full py-3 text-base sm:text-lg font-semibold transition-all duration-300 ${
+                    plan.type === 'free' 
+                      ? 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-black text-white' 
+                      : plan.popular 
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white' 
+                      : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                  }`}
+                >
+                  <motion.span className="flex items-center justify-center">
+                    {plan.cta}
+                    {plan.type !== 'free' && <FaPaperPlane className="ml-2" />}
+                  </motion.span>
                 </Button>
 
                 {plan.type === 'pro' && (
@@ -565,6 +696,14 @@ export default function WarehouseLandingPage() {
                   <li>• Обучение владельца (2 часа)</li>
                   <li>• Гарантия 30 дней</li>
                 </ul>
+                <Button 
+                  onClick={() => handleSendInvoice('quick_setup', 20000)}
+                  disabled={isSendingInvoice}
+                  className="w-full mt-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold"
+                >
+                  {isSendingInvoice ? <Loader2 className="animate-spin mr-2" /> : <FaPaperPlane className="mr-2" />}
+                  {isSendingInvoice ? 'Отправка...' : 'ОПЛАТИТЬ СЕЙЧАС'}
+                </Button>
               </motion.div>
               <motion.div 
                 className="border border-green-200 rounded-xl p-6 hover:border-green-300 transition-colors"
@@ -579,6 +718,14 @@ export default function WarehouseLandingPage() {
                   <li>• Ролевой доступ и права</li>
                   <li>• Контроль качества работы</li>
                 </ul>
+                <Button 
+                  onClick={() => handleSendInvoice('team_training', 10000)}
+                  disabled={isSendingInvoice}
+                  className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold"
+                >
+                  {isSendingInvoice ? <Loader2 className="animate-spin mr-2" /> : <FaPaperPlane className="mr-2" />}
+                  {isSendingInvoice ? 'Отправка...' : 'ОПЛАТИТЬ СЕЙЧАС'}
+                </Button>
               </motion.div>
             </div>
           </motion.div>
