@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@//components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FaChartLine, FaRocket, FaCheckCircle, FaSparkles, FaTelegram, FaRedo, FaKeyboard } from 'react-icons/fa';
+import { FaChartLine, FaRocket, FaCheckCircle, FaSparkles, FaTelegram, FaRedo, FaKeyboard, FaClock } from 'react-icons/fa';
 import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useWarehouseAudit } from '../hooks/useWarehouseAudit';
@@ -65,7 +65,7 @@ export const WarehouseAuditTool = () => {
           >
             <motion.span className="flex items-center">
               <FaRocket className="mr-3 text-xl" />
-              НАЧАТЬ БЕСПЛАТНЫЙ АУДИТ
+              ПРОЙТИ АУДИТ
               <motion.div
                 className="ml-3"
                 animate={{ rotate: 360 }}
