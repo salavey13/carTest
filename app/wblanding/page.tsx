@@ -16,7 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus } from 'react-icons/fa6';
+import {
+  FaCarBurst, FaChartLine, FaMoneyBillWave, FaRocket, FaUsers, FaSpinner,
+  FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire
+} from 'react-icons/fa6';
 import Image from 'next/image';
 
 const generateSlug = (name: string) =>
@@ -168,10 +171,89 @@ export default function WarehouseLandingPage() {
               <TabsTrigger value="example" className="text-lg py-3">Реальный кейс</TabsTrigger>
             </TabsList>
             <TabsContent value="comparison">
-              {/* Comparison table */}
+              <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
+                <table className="min-w-full bg-white border border-gray-200 rounded-lg text-sm md:text-base">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">Аспект</th>
+                      <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">Наше решение</th>
+                      <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">YClients</th>
+                      <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">МойСклад</th>
+                      <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">TOPSELLER</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["Ценообразование", "Freemium, % от экономии", "От 900 руб/мес", "От 1490 руб/мес", "От 990 руб/мес"],
+                      ["Фокус", "Склад для e-com", "CRM для услуг", "Общий учет", "Продажи на MP"],
+                      ["Интеграция с MP", "WB, Ozon, YM", "Ограниченная", "WB, Ozon, YM +", "WB, Ozon, YM"],
+                      ["Мобильность", "Telegram-бот", "Веб/моб. app", "Веб/моб. app", "Облако"],
+                      ["Gamification", "Да", "Нет", "Нет", "Нет"],
+                      ["Управление сменами", "Да", "Для услуг", "Базовое", "Нет"],
+                      ["Визуализация склада", "Карта + фильтры", "Базовая", "Таблицы", "Дашборды"],
+                      ["Отчеты", "CSV, статистика", "Для услуг", "Расширенные", "Аналитика MP"],
+                      ["Обучение", "Минимальное", "Требуется", "Среднее", "Среднее"]
+                    ].map((row, index) => (
+                      <tr key={index} className="border-t hover:bg-gray-50">
+                        {row.map((cell, cellIndex) => (
+                          <td key={cellIndex} className="px-4 py-4 border-b">
+                            {cellIndex === 0 ? <span className="font-medium">{cell}</span> : cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-8 text-center text-gray-600 max-w-3xl mx-auto text-lg">
+                Наше приложение - специализированное решение для складов онлайн-магазинов. 
+                Оно проще, дешевле и эффективнее для малого/среднего e-com.
+              </p>
             </TabsContent>
             <TabsContent value="example">
-              {/* Case study */}
+              <div className="text-center max-w-4xl mx-auto">
+                <h3 className="text-2xl font-bold mb-8 text-gray-900">Реальный кейс: Склад одеял</h3>
+                <p className="text-lg mb-12 text-gray-600 max-w-2xl mx-auto">
+                  Мы тестировали приложение на складе с одеялами: 4 размера, 2 сезона, 8 узоров - 64 артикула, &gt;500 единиц. 
+                  Работало стабильно на бесплатном Supabase.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
+                  <div className="bg-gray-50 p-8 rounded-xl shadow-md">
+                    <h4 className="text-xl font-bold mb-6 text-blue-800">До приложения</h4>
+                    <ul className="space-y-4 text-left text-gray-600">
+                      <li className="flex items-start gap-3">
+                        <span className="text-red-500 font-bold">•</span>
+                        Обновление остатков - полдня работы
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-red-500 font-bold">•</span>
+                        Штрафы за ошибки - 30+ тыс. руб/мес
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="bg-gray-50 p-8 rounded-xl shadow-md">
+                    <h4 className="text-xl font-bold mb-6 text-blue-800">После</h4>
+                    <ul className="space-y-4 text-left text-gray-600">
+                      <li className="flex items-start gap-3">
+                        <span className="text-green-500 font-bold">•</span>
+                        Обновление - 1 клик
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="text-green-500 font-bold">•</span>
+                        Штрафы - 8 тыс. руб/мес (снижение на 73%)
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="mt-12 bg-blue-50 p-6 rounded-xl max-w-2xl mx-auto">
+                  <p className="text-xl font-semibold text-blue-800 mb-4">
+                    Сколько вы теряете? Проверьте за 60 секунд!
+                  </p>
+                  <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg w-full sm:w-auto">
+                    <FaRocket className="mr-2" /> РАССЧИТАТЬ МОИ ПОТЕРИ
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -187,7 +269,130 @@ export default function WarehouseLandingPage() {
             От бесплатного старта до полной автоматизации с гарантией результата
           </p>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Pricing cards */}
+            {/* Free Plan */}
+            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">🚀 Путь к нулевым потерям (Бесплатно)</h3>
+              <div className="mb-4">
+                <span className="text-3xl sm:text-4xl font-bold text-gray-900">0₽</span>
+                <span className="text-gray-600 ml-2">навсегда</span>
+              </div>
+              <p className="text-gray-600 mb-6">Начните снижать потери прямо сейчас</p>
+              <div className="mb-6"><span className="text-sm text-gray-500 font-medium">Для тестирования и первых 100 артикулов</span></div>
+              <ul className="space-y-3 mb-8">
+                {["До 100 артикулов", "1 склад и 3 сотрудника", "Базовая синхронизация с WB", "Telegram-интерфейс", "Отчеты в CSV", "Поддержка по email"].map((feature, idx) => (
+                  <li key={idx} className="flex items-start">
+                    <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-gray-600 text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button className="w-full py-3 text-base sm:text-lg font-semibold bg-gray-800 hover:bg-gray-900 text-white transition-colors duration-300">
+                Начать бесплатно
+              </Button>
+            </div>
+
+            {/* Pro Plan */}
+            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl ring-2 ring-blue-500 relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+                <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                  <FaFire className="animate-pulse" /> Самый популярный
+                </span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">⚡ Полная автоматизация (Профессионал)</h3>
+              <div className="mb-4">
+                <span className="text-3xl sm:text-4xl font-bold text-gray-900">4 900₽</span>
+                <span className="text-gray-600 ml-2">в месяц</span>
+              </div>
+              <p className="text-gray-600 mb-6">Экономьте 20+ часов и 30+ тыс. руб/мес</p>
+              <div className="mb-6"><span className="text-sm text-gray-500 font-medium">2-3 магазина, 500+ артикулов</span></div>
+              <ul className="space-y-3 mb-8">
+                {["До 500 артикулов", "3 склада и 10 сотрудников", "Полная WB/Ozon/YM синхронизация", "Управление сменами", "Расширенные отчеты", "Визуализация склада", "Приоритетная поддержка", "Обучение команды (1 час)"].map((feature, idx) => (
+                  <li key={idx} className="flex items-start">
+                    <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-gray-600 text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button className="w-full py-3 text-base sm:text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300">
+                Попробовать 14 дней бесплатно
+              </Button>
+              <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-xs text-center text-yellow-800 font-medium">
+                  <FaClock className="inline mr-1" /> Только 3 места по спеццене в ноябре!
+                </p>
+              </div>
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">🏢 Экспоненциальный рост (Предприятие)</h3>
+              <div className="mb-4">
+                <span className="text-3xl sm:text-4xl font-bold text-gray-900">14 900₽</span>
+                <span className="text-gray-600 ml-2">в месяц</span>
+              </div>
+              <p className="text-gray-600 mb-6">Безлимитный рост с персональным сопровождением</p>
+              <div className="mb-6"><span className="text-sm text-gray-500 font-medium">Крупные сети и высокие обороты</span></div>
+              <ul className="space-y-3 mb-8">
+                {["Безлимитные артикулы", "Неограниченное количество складов", "Все маркетплейсы + кастомные интеграции", "AI-аналитика и прогнозирование", "Dedicated менеджер", "Индивидуальные доработки", "Обучение команды (5 часов)", "Гарантия снижения недостач на 50%+"].map((feature, idx) => (
+                  <li key={idx} className="flex items-start">
+                    <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-gray-600 text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button className="w-full py-3 text-base sm:text-lg font-semibold bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
+                Запросить демо
+              </Button>
+            </div>
+          </div>
+
+          {/* Services Section */}
+          <div className="mt-16 bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
+            <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Дополнительные услуги (One-time)</h3>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="border border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
+                <h4 className="text-xl font-bold mb-4 text-blue-800">🎯 Автоматизация склада за 1 день</h4>
+                <p className="text-3xl font-bold mb-2">20 000₽</p>
+                <p className="text-gray-600 mb-4">единоразово</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• Полная настройка под ваш склад</li>
+                  <li>• Интеграция со всеми маркетплейсами</li>
+                  <li>• Обучение владельца (2 часа)</li>
+                  <li>• Гарантия 30 дней</li>
+                </ul>
+              </div>
+              <div className="border border-green-200 rounded-xl p-6 hover:border-green-300 transition-colors">
+                <h4 className="text-xl font-bold mb-4 text-green-800">👨‍🏫 Обучение команды с нуля</h4>
+                <p className="text-3xl font-bold mb-2">10 000₽</p>
+                <p className="text-gray-600 mb-4">единоразово</p>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• Обучение менеджеров и кладовщиков</li>
+                  <li>• Чек-листы и инструкции</li>
+                  <li>• Ролевой доступ и права</li>
+                  <li>• Контроль качества работы</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Guarantee Section */}
+          <div className="mt-12 text-center">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 inline-block">
+              <h4 className="text-xl font-bold text-blue-800 mb-2">💰 Гарантия результата</h4>
+              <p className="text-gray-700 max-w-2xl mx-auto">
+                Мы настолько уверены в результате, что предлагаем использовать систему за <strong>50% от вашей экономии на штрафах</strong>. 
+                Если недостачи не снизятся на 50% в первый месяц - вернем деньги!
+              </p>
+              <Button onClick={() => setShowAudit(true)} className="mt-4 bg-green-600 hover:bg-green-700 text-white">
+                <FaCalendarCheck className="mr-2" /> Проверить мои потери
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -196,7 +401,19 @@ export default function WarehouseLandingPage() {
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Как начать работу и пригласить команду</h2>
-          {/* Instructions */}
+          <div className="max-w-3xl mx-auto text-left space-y-6 text-lg text-gray-600">
+            <ol className="list-decimal pl-6 space-y-6">
+              <li className="pb-2">Откройте приложение в Telegram и авторизуйтесь.</li>
+              <li className="pb-2">Перейдите в раздел "Экипажи" и создайте новый экипаж (кнопка "+").</li>
+              <li className="pb-2">Поделитесь ссылкой приглашения: t.me/[ваш-бот]?start=crew_[ваш-slug]_join_crew</li>
+              <li className="pb-2">Сотрудник перейдет по ссылке и подаст заявку.</li>
+              <li className="pb-2">Подтвердите заявку в карточке экипажа.</li>
+              <li>Назначьте роли и предоставьте доступ к складу.</li>
+            </ol>
+            <p className="text-center font-semibold text-xl mt-12 text-blue-800">
+              Экипаж - это ваш склад. Приглашайте команду для совместной работы!
+            </p>
+          </div>
         </div>
       </section>
 
@@ -204,8 +421,83 @@ export default function WarehouseLandingPage() {
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Оптимизируйте склад уже сегодня</h2>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6 shadow-2xl">
-            {/* Form */}
+          <p className="text-xl mb-10">Создайте экипаж бесплатно и начните экономить на ошибках</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6 shadow-2xl"
+          >
+            {!createdCrew ? (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="text-center">
+                  <FaUsers className="text-5xl text-white mx-auto mb-4" />
+                  <h1 className="text-4xl font-bold text-white mb-2">СОЗДАТЬ СКЛАД</h1>
+                  <p className="text-gray-200">Соберите свою команду и управляйте складом эффективно.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="crew-name" className="text-white text-lg">НАЗВАНИЕ СКЛАДА</Label>
+                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                  </div>
+                  <div>
+                    <Label htmlFor="crew-slug" className="text-white text-lg">SLUG (АДРЕС СКЛАДА)</Label>
+                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="crew-desc" className="text-white text-lg">ОПИСАНИЕ / ИНСТРУКЦИИ</Label>
+                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-2 text-lg min-h-[100px] bg-white/20 text-white placeholder-gray-300" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="crew-logo" className="text-white text-lg">URL ЛОГОТИПА</Label>
+                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                  </div>
+                  <div>
+                    <Label htmlFor="crew-hq" className="text-white text-lg">КООРДИНАТЫ СКЛАДА</Label>
+                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                  </div>
+                </div>
+                
+                <Button type="submit" disabled={isSubmitting} className="w-full text-lg py-6 bg-white text-blue-600 hover:bg-gray-100 font-bold text-xl">
+                  {isSubmitting ? (
+                    <>
+                      <FaSpinner className='animate-spin mr-2' /> Создание...
+                    </>
+                  ) : (
+                    <>
+                      <FaFlagCheckered className="mr-2" /> СФОРМИРОВАТЬ СКЛАД
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-6 text-center">
+                <h3 className="text-3xl font-bold">Склад успешно создан!</h3>
+                <p className="text-xl">Теперь пригласите членов команды.</p>
+                <div className="flex justify-center gap-4">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button onClick={handleInvite} className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-bold">
+                          <FaUserPlus className="mr-2" /> Пригласить команду
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Поделиться ссылкой приглашения</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Link href={`/wb/${createdCrew.slug}`}>
+                    <Button variant="outline" className="text-white border-white hover:bg-white/10 px-8 py-3 text-lg font-bold">
+                      Перейти к складу
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       </section>
@@ -222,6 +514,11 @@ export default function WarehouseLandingPage() {
       <footer className="bg-gray-900 text-gray-300 py-12 px-4">
         <div className="max-w-6xl mx-auto text-center space-y-6">
           <p className="text-lg">&copy; 2025 Управление складом. Все права защищены.</p>
+          <div className="flex flex-wrap justify-center gap-6 text-lg">
+            <a href="/privacy" className="hover:text-white transition-colors duration-200">Политика конфиденциальности</a>
+            <a href="/terms" className="hover:text-white transition-colors duration-200">Условия использования</a>
+            <a href="/support" className="hover:text-white transition-colors duration-200">Поддержка</a>
+          </div>
         </div>
       </footer>
 
