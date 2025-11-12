@@ -16,10 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import {
-  FaCarBurst, FaChartLine, FaMoneyBillWave, FaRocket, FaUsers, FaSpinner,
-  FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire
-} from 'react-icons/fa6';
+import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave } from 'react-icons/fa6';
 import Image from 'next/image';
 
 const generateSlug = (name: string) =>
@@ -103,6 +100,15 @@ export default function WarehouseLandingPage() {
         </section>
       )}
 
+      {/* Second Video Section */}
+      <section className="py-12 bg-gray-100">
+        <div className="max-w-4xl mx-auto px-4">
+          <video className="w-full h-auto rounded-2xl shadow-xl md:max-w-2xl mx-auto" autoPlay loop muted playsInline>
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section id="features" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
@@ -170,6 +176,7 @@ export default function WarehouseLandingPage() {
               <TabsTrigger value="comparison" className="text-lg py-3">Сравнение функций</TabsTrigger>
               <TabsTrigger value="example" className="text-lg py-3">Реальный кейс</TabsTrigger>
             </TabsList>
+            
             <TabsContent value="comparison">
               <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
                 <table className="min-w-full bg-white border border-gray-200 rounded-lg text-sm md:text-base">
@@ -210,6 +217,7 @@ export default function WarehouseLandingPage() {
                 Оно проще, дешевле и эффективнее для малого/среднего e-com.
               </p>
             </TabsContent>
+            
             <TabsContent value="example">
               <div className="text-center max-w-4xl mx-auto">
                 <h3 className="text-2xl font-bold mb-8 text-gray-900">Реальный кейс: Склад одеял</h3>
@@ -268,88 +276,118 @@ export default function WarehouseLandingPage() {
           <p className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto">
             От бесплатного старта до полной автоматизации с гарантией результата
           </p>
+
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free Plan */}
-            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">🚀 Путь к нулевым потерям (Бесплатно)</h3>
-              <div className="mb-4">
-                <span className="text-3xl sm:text-4xl font-bold text-gray-900">0₽</span>
-                <span className="text-gray-600 ml-2">навсегда</span>
-              </div>
-              <p className="text-gray-600 mb-6">Начните снижать потери прямо сейчас</p>
-              <div className="mb-6"><span className="text-sm text-gray-500 font-medium">Для тестирования и первых 100 артикулов</span></div>
-              <ul className="space-y-3 mb-8">
-                {["До 100 артикулов", "1 склад и 3 сотрудника", "Базовая синхронизация с WB", "Telegram-интерфейс", "Отчеты в CSV", "Поддержка по email"].map((feature, idx) => (
-                  <li key={idx} className="flex items-start">
-                    <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-600 text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button className="w-full py-3 text-base sm:text-lg font-semibold bg-gray-800 hover:bg-gray-900 text-white transition-colors duration-300">
-                Начать бесплатно
-              </Button>
-            </div>
+            {[
+              {
+                title: "🚀 Путь к нулевым потерям (Бесплатно)",
+                price: "0₽",
+                period: "навсегда",
+                description: "Начните снижать потери прямо сейчас",
+                bestFor: "Для тестирования и первых 100 артикулов",
+                features: [
+                  "До 100 артикулов",
+                  "1 склад и 3 сотрудника",
+                  "Базовая синхронизация с WB",
+                  "Telegram-интерфейс",
+                  "Отчеты в CSV",
+                  "Поддержка по email"
+                ],
+                cta: "Начать бесплатно",
+                popular: false,
+                type: "free"
+              },
+              {
+                title: "⚡ Полная автоматизация (Профессионал)",
+                price: "4 900₽",
+                period: "в месяц",
+                description: "Экономьте 20+ часов и 30+ тыс. руб/мес",
+                bestFor: "2-3 магазина, 500+ артикулов",
+                features: [
+                  "До 500 артикулов",
+                  "3 склада и 10 сотрудников",
+                  "Полная WB/Ozon/YM синхронизация",
+                  "Управление сменами",
+                  "Расширенные отчеты",
+                  "Визуализация склада",
+                  "Приоритетная поддержка",
+                  "Обучение команды (1 час)"
+                ],
+                cta: "Попробовать 14 дней бесплатно",
+                popular: true,
+                type: "pro"
+              },
+              {
+                title: "🏢 Экспоненциальный рост (Предприятие)",
+                price: "14 900₽",
+                period: "в месяц",
+                description: "Безлимитный рост с персональным сопровождением",
+                bestFor: "Крупные сети и высокие обороты",
+                features: [
+                  "Безлимитные артикулы",
+                  "Неограниченное количество складов",
+                  "Все маркетплейсы + кастомные интеграции",
+                  "AI-аналитика и прогнозирование",
+                  "Dedicated менеджер",
+                  "Индивидуальные доработки",
+                  "Обучение команды (5 часов)",
+                  "Гарантия снижения недостач на 50%+"
+                ],
+                cta: "Запросить демо",
+                popular: false,
+                type: "enterprise"
+              }
+            ].map((plan, index) => (
+              <div key={index} className={`bg-white rounded-2xl p-6 sm:p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+                    <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                      <FaFire className="animate-pulse" /> Самый популярный
+                    </span>
+                  </div>
+                )}
+                
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">{plan.title}</h3>
+                <div className="mb-4">
+                  <span className="text-3xl sm:text-4xl font-bold text-gray-900">{plan.price}</span>
+                  <span className="text-gray-600 ml-2">{plan.period}</span>
+                </div>
+                <p className="text-gray-600 mb-6">{plan.description}</p>
+                
+                <div className="mb-6">
+                  <span className="text-sm text-gray-500 font-medium">{plan.bestFor}</span>
+                </div>
+                
+                <ul className="space-y-3 mb-8">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-gray-600 text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <Button className={`w-full py-3 text-base sm:text-lg font-semibold ${
+                  plan.type === 'free' 
+                    ? 'bg-gray-800 hover:bg-gray-900 text-white' 
+                    : plan.popular 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                } transition-colors duration-300`}>
+                  {plan.cta}
+                </Button>
 
-            {/* Pro Plan */}
-            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl ring-2 ring-blue-500 relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
-                  <FaFire className="animate-pulse" /> Самый популярный
-                </span>
+                {plan.type === 'pro' && (
+                  <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-center text-yellow-800 font-medium">
+                      <FaClock className="inline mr-1" /> Только 3 места по спеццене в ноябре!
+                    </p>
+                  </div>
+                )}
               </div>
-              <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">⚡ Полная автоматизация (Профессионал)</h3>
-              <div className="mb-4">
-                <span className="text-3xl sm:text-4xl font-bold text-gray-900">4 900₽</span>
-                <span className="text-gray-600 ml-2">в месяц</span>
-              </div>
-              <p className="text-gray-600 mb-6">Экономьте 20+ часов и 30+ тыс. руб/мес</p>
-              <div className="mb-6"><span className="text-sm text-gray-500 font-medium">2-3 магазина, 500+ артикулов</span></div>
-              <ul className="space-y-3 mb-8">
-                {["До 500 артикулов", "3 склада и 10 сотрудников", "Полная WB/Ozon/YM синхронизация", "Управление сменами", "Расширенные отчеты", "Визуализация склада", "Приоритетная поддержка", "Обучение команды (1 час)"].map((feature, idx) => (
-                  <li key={idx} className="flex items-start">
-                    <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-600 text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button className="w-full py-3 text-base sm:text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300">
-                Попробовать 14 дней бесплатно
-              </Button>
-              <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-xs text-center text-yellow-800 font-medium">
-                  <FaClock className="inline mr-1" /> Только 3 места по спеццене в ноябре!
-                </p>
-              </div>
-            </div>
-
-            {/* Enterprise Plan */}
-            <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">🏢 Экспоненциальный рост (Предприятие)</h3>
-              <div className="mb-4">
-                <span className="text-3xl sm:text-4xl font-bold text-gray-900">14 900₽</span>
-                <span className="text-gray-600 ml-2">в месяц</span>
-              </div>
-              <p className="text-gray-600 mb-6">Безлимитный рост с персональным сопровождением</p>
-              <div className="mb-6"><span className="text-sm text-gray-500 font-medium">Крупные сети и высокие обороты</span></div>
-              <ul className="space-y-3 mb-8">
-                {["Безлимитные артикулы", "Неограниченное количество складов", "Все маркетплейсы + кастомные интеграции", "AI-аналитика и прогнозирование", "Dedicated менеджер", "Индивидуальные доработки", "Обучение команды (5 часов)", "Гарантия снижения недостач на 50%+"].map((feature, idx) => (
-                  <li key={idx} className="flex items-start">
-                    <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-gray-600 text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button className="w-full py-3 text-base sm:text-lg font-semibold bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
-                Запросить демо
-              </Button>
-            </div>
+            ))}
           </div>
 
           {/* Services Section */}
@@ -422,10 +460,7 @@ export default function WarehouseLandingPage() {
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Оптимизируйте склад уже сегодня</h2>
           <p className="text-xl mb-10">Создайте экипаж бесплатно и начните экономить на ошибках</p>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6 shadow-2xl"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6 shadow-2xl">
             {!createdCrew ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="text-center">
