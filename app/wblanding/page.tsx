@@ -112,7 +112,7 @@ export default function WarehouseLandingPage() {
           >
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button onClick={() => setShowAudit(true)} size="lg" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto shadow-xl">
-                <FaChartLine className="mr-2" /> УЗНАТЬ ЭФФЕКТИВНОСТЬ ЗА 60 СЕК
+                <FaChartLine className="mr-2" /> УЗНАТЬ ЭФФЕКТИВНОСТЬ
               </Button>
             </motion.div>
             <span className="text-white/70">или</span>
