@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { createCrew } from "@/app/actions";
+import { sendComplexMessage } from "@/app/webhook-handlers/actions/sendComplexMessage";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -17,16 +18,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Suspense } from 'react';
 import { getAllPublicCrews } from '@/app/rentals/actions';
-import { FaCarBurst, FaChartLine, FaMoneyBillWave, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire } from 'react-icons/fa6';
+import { FaCarBurst, FaChartLine, FaMoneyBillWave, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaTelegram } from 'react-icons/fa6';
 
 // --- NEW: Warehouse Audit Tool Component (Lead Magnet) ---
 const WarehouseAuditTool = () => {
+  const { dbUser } = useAppContext();
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentAnswer, setCurrentAnswer] = useState("");
-  const [email, setEmail] = useState("");
-  const [showResult, setShowResult] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [losses, setLosses] = useState(0);
+  const [showResult, setShowResult] = useState(false);
 
   const questions = [
     { id: "skus", text: "Сколько артикулов вы держите на складе?", type: "number", placeholder: "100" },
@@ -37,29 +39,85 @@ const WarehouseAuditTool = () => {
 
   const handleNext = () => {
     if (!currentAnswer && currentAnswer !== "0") return;
-    const newAnswers = { ...answers, [questions[step].id]: parseInt(currentAnswer) || currentAnswer };
+    
+    // FIX: Properly parse number and ensure it's stored as number, not string
+    const numValue = parseInt(currentAnswer);
+    const value = isNaN(numValue) ? 0 : numValue; // Default to 0 if invalid
+    
+    const newAnswers = { ...answers, [questions[step].id]: value };
     setAnswers(newAnswers);
     
     if (step < questions.length - 1) {
       setStep(step + 1);
       setCurrentAnswer("");
     } else {
-      const calcLosses = (data) => {
-        const timeCost = data.hours * 1500;
-        const penaltyCost = data.penalties;
-        const missedSales = Math.floor(data.skus * data.stores * 0.05 * 1000);
+      // FIX: Calculate with proper number conversion and fallbacks to prevent NaN
+      const calcLosses = (data: Record<string, number>) => {
+        const skus = Number(data.skus) || 0;
+        const stores = Number(data.stores) || 0;
+        const hours = Number(data.hours) || 0;
+        const penalties = Number(data.penalties) || 0;
+        
+        const timeCost = hours * 1500;
+        const penaltyCost = penalties;
+        const missedSales = Math.floor(skus * stores * 0.05 * 1000);
+        
         return timeCost + penaltyCost + missedSales;
       };
+      
       const totalLosses = calcLosses(newAnswers);
       setLosses(totalLosses);
       setShowResult(true);
     }
   };
 
-  const handleGetReport = () => {
-    if (!email) { toast.error("Введите email для получения отчета"); return; }
-    toast.success("Отчет отправлен! Проверьте почту.");
-    console.log("Lead captured:", { email, answers, losses });
+  const handleGetReport = async () => {
+    if (!dbUser?.user_id) {
+      toast.error("Пожалуйста, войдите в систему, чтобы получить персональный план");
+      return;
+    }
+    
+    setIsSending(true);
+    try {
+      // Calculate breakdown for the message
+      const skus = Number(answers.skus) || 0;
+      const stores = Number(answers.stores) || 0;
+      const hours = Number(answers.hours) || 0;
+      const penalties = Number(answers.penalties) || 0;
+      
+      const timeCost = hours * 1500;
+      const penaltyCost = penalties;
+      const missedSales = Math.floor(skus * stores * 0.05 * 1000);
+      
+      const message = `📊 *Ваш аудит склада готов!*
+
+💸 *Вы теряете:* ~${losses.toLocaleString('ru-RU')}₽/мес
+
+📉 *Развернутый разбор:*
+• Штрафы за ошибки: ${penaltyCost.toLocaleString('ru-RU')}₽
+• Стоимость вашего времени: ${timeCost.toLocaleString('ru-RU')}₽
+• Упущенные продажи из-за неточностей: ${missedSales.toLocaleString('ru-RU')}₽
+
+🎯 *Ваш план снижения потерь:*
+1. Автоматизируйте обновление остатков
+2. Внедрите контроль качества
+3. Оптимизируйте работу персонала
+
+💡 Начните прямо сейчас в приложении!`;
+
+      await sendComplexMessage(dbUser.user_id, message, [], {
+        parseMode: 'Markdown',
+        imageQuery: 'warehouse logistics optimization'
+      });
+      
+      toast.success("✅ План экономии отправлен в Telegram!");
+      console.log("Audit report sent to:", dbUser.user_id);
+    } catch (error) {
+      toast.error("❌ Ошибка отправки отчета");
+      console.error("Failed to send audit report:", error);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (step === 0 && !showResult) return (
@@ -88,16 +146,43 @@ const WarehouseAuditTool = () => {
         <ul className="space-y-2 text-red-700 text-sm sm:text-base">
           <li>• Штрафы за ошибки: {answers.penalties?.toLocaleString('ru-RU')}₽</li>
           <li>• Стоимость вашего времени: {(answers.hours * 1500).toLocaleString('ru-RU')}₽</li>
-          <li>• Упущенные продажи из-за неточностей: ~{Math.floor(answers.skus * answers.stores * 0.05 * 1000).toLocaleString('ru-RU')}₽</li>
+          <li>• Упущенные продажи из-за неточностей: ~{Math.floor((answers.skus || 0) * (answers.stores || 0) * 0.05 * 1000).toLocaleString('ru-RU')}₽</li>
         </ul>
       </div>
+      
+      {/* NEW: Telegram-based report delivery */}
       <div className="mb-6">
-        <Label htmlFor="email" className="text-lg font-bold mb-2 block">Куда отправить план снижения потерь?</Label>
-        <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ваш@email.ru" className="py-3 text-lg" />
+        {dbUser?.user_id ? (
+          <div className="text-center">
+            <p className="text-gray-600 mb-4 text-sm">Персональный план будет отправлен вам в Telegram</p>
+            <Button 
+              onClick={handleGetReport} 
+              disabled={isSending}
+              className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-4"
+            >
+              {isSending ? (
+                <>
+                  <FaSpinner className="animate-spin mr-2" /> Отправка...
+                </>
+              ) : (
+                <>
+                  <FaTelegram className="mr-2" /> ПОЛУЧИТЬ ПЛАН ЭКОНОМИИ
+                </>
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="text-center p-4 bg-blue-50 rounded-xl">
+            <p className="text-gray-700 mb-3">
+              <Link href="/wb" className="text-blue-600 hover:text-blue-800 font-semibold underline">
+                Войдите в приложение
+              </Link>
+              , чтобы получить персональный план в Telegram
+            </p>
+            <p className="text-sm text-gray-500">Это быстро и безопасно через ваш Telegram аккаунт</p>
+          </div>
+        )}
       </div>
-      <Button onClick={handleGetReport} className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-4">
-        <FaMoneyBillWave className="mr-2" /> ПОЛУЧИТЬ ПЛАН ЭКОНОМИИ
-      </Button>
     </motion.div>
   );
 
@@ -298,9 +383,9 @@ export default function WarehouseLandingPage() {
 
   const handleInvite = () => {
     if (!createdCrew) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_ ${createdCrew.slug}_join_crew`;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
     const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
-    const shareUrl = `https://t.me/share/url?url= ${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
     window.open(shareUrl, "_blank");
   };
 
@@ -314,11 +399,11 @@ export default function WarehouseLandingPage() {
           loop
           muted
           playsInline
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4 "
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4"
         />
         <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
           <Image 
-            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png "
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
             alt="Логотип приложения"
             width={120}
             height={120}
@@ -358,7 +443,7 @@ export default function WarehouseLandingPage() {
       <section className="py-12 bg-gray-100">
         <div className="max-w-4xl mx-auto px-4">
           <video className="w-full h-auto rounded-2xl shadow-xl md:max-w-2xl mx-auto" autoPlay loop muted playsInline>
-            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4 " type="video/mp4" />
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
           </video>
         </div>
       </section>
