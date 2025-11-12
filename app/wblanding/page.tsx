@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
-import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 import { createCrew } from "@/app/actions";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -19,12 +18,12 @@ import { cn } from "@/lib/utils";
 import { Suspense } from 'react';
 import { getAllPublicCrews } from '@/app/rentals/actions';
 import { FaCarBurst, FaChartLine, FaMoneyBillWave, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire } from 'react-icons/fa6';
-import { useDebounce } from "@/lib/hooks/useDebounce";
 
 // --- NEW: Warehouse Audit Tool Component (Lead Magnet) ---
 const WarehouseAuditTool = () => {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [currentAnswer, setCurrentAnswer] = useState("");
   const [email, setEmail] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [losses, setLosses] = useState(0);
@@ -36,17 +35,19 @@ const WarehouseAuditTool = () => {
     { id: "stores", text: "На скольких маркетплейсах одновременно продаете?", type: "number", placeholder: "2" },
   ];
 
-  const handleNext = (value) => {
-    if (!value && value !== 0) return;
-    const newAnswers = { ...answers, [questions[step].id]: parseInt(value) || value };
+  const handleNext = () => {
+    if (!currentAnswer && currentAnswer !== "0") return;
+    const newAnswers = { ...answers, [questions[step].id]: parseInt(currentAnswer) || currentAnswer };
     setAnswers(newAnswers);
-    if (step < questions.length - 1) setStep(step + 1);
-    else {
-      // Calculate potential losses
+    
+    if (step < questions.length - 1) {
+      setStep(step + 1);
+      setCurrentAnswer("");
+    } else {
       const calcLosses = (data) => {
-        const timeCost = data.hours * 1500; // 1500 руб/час
+        const timeCost = data.hours * 1500;
         const penaltyCost = data.penalties;
-        const missedSales = Math.floor(data.skus * data.stores * 0.05 * 1000); // 0.05 ошибка, 1000 руб средний чек
+        const missedSales = Math.floor(data.skus * data.stores * 0.05 * 1000);
         return timeCost + penaltyCost + missedSales;
       };
       const totalLosses = calcLosses(newAnswers);
@@ -57,20 +58,18 @@ const WarehouseAuditTool = () => {
 
   const handleGetReport = () => {
     if (!email) { toast.error("Введите email для получения отчета"); return; }
-    // Here you'd send the data to your CRM/API
     toast.success("Отчет отправлен! Проверьте почту.");
-    // Store email for follow-up
     console.log("Lead captured:", { email, answers, losses });
   };
 
   if (step === 0 && !showResult) return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 shadow-xl max-w-2xl mx-auto">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl max-w-2xl mx-auto">
       <div className="text-center mb-6">
-        <h3 className="text-3xl font-bold text-gray-900 mb-3">Рассчитайте ваши потери за 60 секунд</h3>
-        <p className="text-gray-600 text-lg">Узнайте, сколько денег и времени теряет ваш склад сейчас</p>
+        <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Рассчитайте ваши потери за 60 секунд</h3>
+        <p className="text-gray-600 text-base sm:text-lg">Узнайте, сколько денег и времени теряет ваш склад сейчас</p>
       </div>
       <div className="text-center">
-        <Button onClick={() => setStep(1)} size="lg" className="bg-red-500 hover:bg-red-600 text-white text-xl py-6 px-8">
+        <Button onClick={() => setStep(1)} size="lg" className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto">
           <FaRocket className="mr-2" /> НАЧАТЬ БЕСПЛАТНЫЙ АУДИТ
         </Button>
       </div>
@@ -78,15 +77,15 @@ const WarehouseAuditTool = () => {
   );
 
   if (showResult) return (
-    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-8 shadow-xl max-w-2xl mx-auto">
+    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl max-w-2xl mx-auto">
       <div className="text-center mb-6">
-        <FaChartLine className="text-6xl text-red-500 mx-auto mb-4" />
-        <h3 className="text-3xl font-bold text-gray-900 mb-3">Вы теряете: ~{losses.toLocaleString('ru-RU')}₽/мес</h3>
-        <p className="text-gray-600 text-lg mb-4">И тратите {answers.hours} часов на рутину</p>
+        <FaChartLine className="text-5xl sm:text-6xl text-red-500 mx-auto mb-4" />
+        <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Вы теряете: ~{losses.toLocaleString('ru-RU')}₽/мес</h3>
+        <p className="text-gray-600 text-base sm:text-lg mb-4">И тратите {answers.hours} часов на рутину</p>
       </div>
-      <div className="bg-red-50 p-6 rounded-xl mb-6">
-        <h4 className="font-bold text-xl text-red-800 mb-3">Как это возможно?</h4>
-        <ul className="space-y-2 text-red-700">
+      <div className="bg-red-50 p-5 sm:p-6 rounded-xl mb-6">
+        <h4 className="font-bold text-lg sm:text-xl text-red-800 mb-3">Как это возможно?</h4>
+        <ul className="space-y-2 text-red-700 text-sm sm:text-base">
           <li>• Штрафы за ошибки: {answers.penalties?.toLocaleString('ru-RU')}₽</li>
           <li>• Стоимость вашего времени: {(answers.hours * 1500).toLocaleString('ru-RU')}₽</li>
           <li>• Упущенные продажи из-за неточностей: ~{Math.floor(answers.skus * answers.stores * 0.05 * 1000).toLocaleString('ru-RU')}₽</li>
@@ -103,11 +102,11 @@ const WarehouseAuditTool = () => {
   );
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 shadow-xl max-w-2xl mx-auto">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl max-w-2xl mx-auto">
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <span className="text-sm text-gray-500">Шаг {step} из {questions.length}</span>
-          <Button variant="ghost" size="sm" onClick={() => setStep(0)}>Начать заново</Button>
+          <Button variant="ghost" size="sm" onClick={() => { setStep(0); setCurrentAnswer(""); setAnswers({}); }}>Начать заново</Button>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${(step / questions.length) * 100}%` }}></div>
@@ -118,19 +117,64 @@ const WarehouseAuditTool = () => {
         <Input
           type={questions[step].type}
           placeholder={questions[step].placeholder}
-          onKeyPress={(e) => { if (e.key === 'Enter') handleNext(e.target.value); }}
-          className="py-6 text-lg"
+          value={currentAnswer}
+          onChange={(e) => setCurrentAnswer(e.target.value)}
+          onKeyPress={(e) => { if (e.key === 'Enter') handleNext(); }}
+          className="py-5 text-lg"
           autoFocus
         />
       </div>
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">Назад</Button>}
-        <Button onClick={(e) => handleNext(e.target.previousElementSibling?.value)} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-lg py-4">
+        <Button onClick={handleNext} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-lg py-4">
           Далее
           <FaRocket className="ml-2" />
         </Button>
       </div>
     </motion.div>
+  );
+};
+
+// --- NEW: Exit Intent Popup ---
+const ExitIntentPopup = () => {
+  const [show, setShow] = useState(false);
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const handleMouseLeave = (e) => {
+      if (e.clientY <= 0) setShow(true);
+    };
+    document.addEventListener('mouseleave', handleMouseLeave);
+    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+  }, []);
+
+  if (!show) return null;
+
+  const handleSubmit = () => {
+    if (!email) { toast.error("Введите email"); return; }
+    toast.success("Чек-лист отправлен! Проверьте почту.");
+    setShow(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl mx-4">
+        <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900">Уходите? Возьмите чек-лист!</h3>
+        <p className="text-gray-600 mb-6 text-sm sm:text-base">Получите бесплатный чек-лист из 10 пунктов для мгновенного снижения штрафов на маркетплейсах.</p>
+        <Input 
+          placeholder="Ваш email" 
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mb-4"
+        />
+        <div className="flex gap-3">
+          <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={handleSubmit}>
+            Получить чек-лист
+          </Button>
+          <Button variant="outline" onClick={() => setShow(false)}>Нет, спасибо</Button>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 
@@ -219,37 +263,6 @@ function CrewsListSimplified() {
   );
 }
 
-// --- NEW: Exit Intent Popup ---
-const ExitIntentPopup = ({ onClose }) => {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    const handleMouseLeave = (e) => {
-      if (e.clientY <= 0) setShow(true);
-    };
-    document.addEventListener('mouseleave', handleMouseLeave);
-    return () => document.removeEventListener('mouseleave', handleMouseLeave);
-  }, []);
-
-  if (!show) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-8 max-w-lg w-full shadow-2xl">
-        <h3 className="text-2xl font-bold mb-4 text-gray-900">Уходите? Возьмите чек-лист!</h3>
-        <p className="text-gray-600 mb-6">Получите бесплатный чек-лист из 10 пунктов для мгновенного снижения штрафов на маркетплейсах.</p>
-        <Input placeholder="Ваш email" className="mb-4" />
-        <div className="flex gap-3">
-          <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { toast.success("Чек-лист отправлен!"); setShow(false); }}>
-            Получить чек-лист
-          </Button>
-          <Button variant="outline" onClick={() => setShow(false)}>Нет, спасибо</Button>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
 export default function WarehouseLandingPage() {
   const { dbUser, isLoading: appContextLoading } = useAppContext();
   const router = useRouter();
@@ -285,15 +298,15 @@ export default function WarehouseLandingPage() {
 
   const handleInvite = () => {
     if (!createdCrew) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_ ${createdCrew.slug}_join_crew`;
     const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url= ${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
     window.open(shareUrl, "_blank");
   };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
-      {/* Hero Section with NEW Lead Magnet CTA */}
+      {/* Hero Section with Adjusted Font Size */}
       <section className="relative min-h-[70vh] flex items-center justify-center text-white">
         <video
           className="absolute inset-0 w-full h-full object-cover brightness-50"
@@ -301,30 +314,32 @@ export default function WarehouseLandingPage() {
           loop
           muted
           playsInline
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4"
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4 "
         />
         <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
           <Image 
-            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png "
             alt="Логотип приложения"
             width={120}
             height={120}
             className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32"
           />
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-white drop-shadow-2xl leading-tight">
+          {/* Font size reduced: text-3xl md:text-5xl lg:text-6xl (was text-4xl md:text-6xl lg:text-7xl) */}
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-white drop-shadow-2xl leading-tight">
             Складской учет для онлайн-магазинов
           </h1>
           <p className="text-xl md:text-2xl lg:text-3xl mb-8 text-white/90 drop-shadow-lg max-w-4xl mx-auto leading-relaxed">
             Сократите недостачи на 73%, обновляйте остатки одним кликом. Для 2+ магазинов на WB, Ozon, YM с 100+ артикулами.
           </p>
-          {/* NEW CTA: Lead Magnet instead of direct conversion */}
+          {/* CTAs with responsive button sizes */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-full font-bold text-lg text-xl">
+            {/* Button width fixed: px-4 sm:px-6 md:px-8 and w-full sm:w-auto */}
+            <Button onClick={() => setShowAudit(true)} size="lg" className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto">
               <FaChartLine className="mr-2" /> РАССЧИТАТЬ ПОТЕРИ ЗА 60 СЕК
             </Button>
             <span className="text-white/70">или</span>
             <Link href="#features">
-              <Button variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 rounded-full font-bold text-lg">
+              <Button variant="outline" size="lg" className="bg-transparent border-white text-white hover:bg-white hover:text-blue-600 px-4 sm:px-6 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto">
                 Узнать больше
               </Button>
             </Link>
@@ -332,23 +347,23 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* NEW: Lead Magnet Section */}
+      {/* Lead Magnet Section */}
       {showAudit && (
         <section id="audit-tool" className="py-16 px-4 bg-white">
           <WarehouseAuditTool />
         </section>
       )}
 
-      {/* Second Video Section (unchanged) */}
+      {/* Second Video Section */}
       <section className="py-12 bg-gray-100">
         <div className="max-w-4xl mx-auto px-4">
           <video className="w-full h-auto rounded-2xl shadow-xl md:max-w-2xl mx-auto" autoPlay loop muted playsInline>
-            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4 " type="video/mp4" />
           </video>
         </div>
       </section>
 
-      {/* Features Section with CTA */}
+      {/* Features Section */}
       <section id="features" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Возможности приложения</h2>
@@ -370,16 +385,16 @@ export default function WarehouseLandingPage() {
               </div>
             ))}
           </div>
-          {/* NEW: CTA after features */}
+          {/* CTA after features */}
           <div className="text-center mt-16">
-            <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-10 py-4 rounded-full font-bold text-xl">
+            <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg w-full sm:w-auto">
               <FaCarBurst className="mr-2" /> ПОСЧИТАТЬ МОИ ПОТЕРИ
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Benefits Section (unchanged) */}
+      {/* Benefits Section */}
       <section className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Почему наше приложение выгодно</h2>
@@ -407,7 +422,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Comparison Section (unchanged but with better CTAs) */}
+      {/* Comparison Section */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Сравнение с конкурентами</h2>
@@ -493,12 +508,11 @@ export default function WarehouseLandingPage() {
                     </ul>
                   </div>
                 </div>
-                {/* NEW: Stronger CTA with specific benefit */}
                 <div className="mt-12 bg-blue-50 p-6 rounded-xl max-w-2xl mx-auto">
                   <p className="text-xl font-semibold text-blue-800 mb-4">
                     Сколько вы теряете? Проверьте за 60 секунд!
                   </p>
-                  <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg">
+                  <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg w-full sm:w-auto">
                     <FaRocket className="mr-2" /> РАССЧИТАТЬ МОИ ПОТЕРИ
                   </Button>
                 </div>
@@ -508,7 +522,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section with Improved Naming & Urgency */}
+      {/* Pricing Section */}
       <section id="pricing" className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900">
@@ -579,7 +593,7 @@ export default function WarehouseLandingPage() {
                 type: "enterprise"
               }
             ].map((plan, index) => (
-              <div key={index} className={`bg-white rounded-2xl p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
+              <div key={index} className={`bg-white rounded-2xl p-6 sm:p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
                     <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
@@ -588,9 +602,9 @@ export default function WarehouseLandingPage() {
                   </div>
                 )}
                 
-                <h3 className="text-2xl font-bold mb-2 text-gray-900">{plan.title}</h3>
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">{plan.title}</h3>
                 <div className="mb-4">
-                  <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                  <span className="text-3xl sm:text-4xl font-bold text-gray-900">{plan.price}</span>
                   <span className="text-gray-600 ml-2">{plan.period}</span>
                 </div>
                 <p className="text-gray-600 mb-6">{plan.description}</p>
@@ -610,7 +624,7 @@ export default function WarehouseLandingPage() {
                   ))}
                 </ul>
                 
-                <Button className={`w-full py-3 text-lg font-semibold ${
+                <Button className={`w-full py-3 text-base sm:text-lg font-semibold ${
                   plan.type === 'free' 
                     ? 'bg-gray-800 hover:bg-gray-900 text-white' 
                     : plan.popular 
@@ -620,7 +634,6 @@ export default function WarehouseLandingPage() {
                   {plan.cta}
                 </Button>
 
-                {/* NEW: Urgency element */}
                 {plan.type === 'pro' && (
                   <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-xs text-center text-yellow-800 font-medium">
@@ -632,8 +645,8 @@ export default function WarehouseLandingPage() {
             ))}
           </div>
 
-          {/* Services Section (unchanged but with better naming) */}
-          <div className="mt-16 bg-white rounded-2xl p-8 shadow-lg">
+          {/* Services Section */}
+          <div className="mt-16 bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
             <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Дополнительные услуги (One-time)</h3>
             <div className="grid md:grid-cols-2 gap-8">
               <div className="border border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
