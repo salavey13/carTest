@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave, FaRedo, FaUserPlus } from 'react-icons/fa6';
+import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave, FaRedo } from 'react-icons/fa6';
 import { FaKeyboard, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import Image from 'next/image';
