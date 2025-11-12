@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FaChartLine, FaRocket, FaCheckCircle, FaSparkles, FaTelegram, FaRedo, FaKeyboard, FaClock, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
+import { FaChartLine, FaRocket, FaCheckCircle, FaMagic, FaTelegram, FaRedo, FaKeyboard, FaClock, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
 import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useWarehouseAudit } from '../hooks/useWarehouseAudit';
@@ -165,7 +165,7 @@ export const WarehouseAuditTool = () => {
           transition={{ delay: 0.5 }}
         >
           <h4 className="font-bold text-xl text-blue-900 mb-4 flex items-center gap-3">
-            <FaSparkles className="text-blue-600" />
+            <FaMagic className="text-blue-600" />
             Ваша дорожная карта оптимизации:
           </h4>
           <ul className="space-y-3">
