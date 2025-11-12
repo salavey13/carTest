@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { createCrew } from "@/app/actions";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave } from 'react-icons/fa6';
+import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave, FaRedo, FaUserPlus } from 'react-icons/fa6';
+import { FaKeyboard, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
+import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import Image from 'next/image';
+import { FaCheckCircle, FaSparkles } from 'react-icons/fa';
 
 const generateSlug = (name: string) =>
   name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
@@ -57,45 +60,74 @@ export default function WarehouseLandingPage() {
 
   const handleInvite = () => {
     if (!createdCrew) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_ ${createdCrew.slug}_join_crew`;
     const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url= ${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
     window.open(shareUrl, "_blank");
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 font-sans">
       {/* Hero Section */}
-      <section className="relative min-h-[70vh] flex items-center justify-center text-white">
+      <section className="relative min-h-[70vh] flex items-center justify-center text-white overflow-hidden">
         <video className="absolute inset-0 w-full h-full object-cover brightness-50" autoPlay loop muted playsInline
-          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" />
-        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
-          <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
-            alt="Логотип приложения" width={120} height={120}
-            className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32" />
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-white drop-shadow-2xl leading-tight">
+          src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4 " />
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-indigo-600/30" />
+        <motion.div 
+          className="relative z-10 text-center px-4 max-w-6xl mx-auto"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2, type: "spring" }}
+          >
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png "
+              alt="Логотип приложения" width={120} height={120}
+              className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 shadow-2xl ring-4 ring-white/10" />
+          </motion.div>
+          <motion.h1 
+            className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             Складской учет для онлайн-магазинов
-          </h1>
-          <p className="text-xl md:text-2xl lg:text-3xl mb-8 text-white/90 drop-shadow-lg max-w-4xl mx-auto leading-relaxed">
+          </motion.h1>
+          <motion.p 
+            className="text-xl md:text-2xl lg:text-3xl mb-8 text-white/90 max-w-4xl mx-auto leading-relaxed"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
             Сократите недостачи на 73%, обновляйте остатки одним кликом. Для 2+ магазинов на WB, Ozon, YM с 100+ артикулами.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button onClick={() => setShowAudit(true)} size="lg" className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto">
-              <FaChartLine className="mr-2" /> РАССЧИТАТЬ ПОТЕРИ ЗА 60 СЕК
-            </Button>
+          </motion.p>
+          <motion.div 
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button onClick={() => setShowAudit(true)} size="lg" className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto shadow-xl">
+                <FaChartLine className="mr-2" /> УЗНАТЬ ЭФФЕКТИВНОСТЬ ЗА 60 СЕК
+              </Button>
+            </motion.div>
             <span className="text-white/70">или</span>
             <Link href="#features">
-              <Button variant="outline" size="lg" className="bg-transparent border-white text-white hover:bg-white hover:text-blue-600 px-4 sm:px-6 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto">
+              <Button variant="outline" size="lg" className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-blue-600 px-4 sm:px-6 py-3 sm:py-4 rounded-full font-bold text-base sm:text-lg w-full sm:w-auto transition-all">
                 Узнать больше
               </Button>
             </Link>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* Lead Magnet Section */}
       {showAudit && (
-        <section id="audit-tool" className="py-16 px-4 bg-white">
+        <section id="audit-tool" className="py-16 px-4 bg-gradient-to-br from-white to-gray-50">
           <WarehouseAuditTool />
         </section>
       )}
@@ -103,16 +135,29 @@ export default function WarehouseLandingPage() {
       {/* Second Video Section */}
       <section className="py-12 bg-gray-100">
         <div className="max-w-4xl mx-auto px-4">
-          <video className="w-full h-auto rounded-2xl shadow-xl md:max-w-2xl mx-auto" autoPlay loop muted playsInline>
-            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
-          </video>
+          <motion.video 
+            className="w-full h-auto rounded-2xl shadow-2xl md:max-w-2xl mx-auto" 
+            autoPlay loop muted playsInline
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6 }}
+          >
+            <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4 " type="video/mp4" />
+          </motion.video>
         </div>
       </section>
 
       {/* Features Section */}
       <section id="features" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Возможности приложения</h2>
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Возможности приложения
+          </motion.h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               { icon: "M13 10V3L4 14h7v7l9-11h-7z", title: "Синхронизация с маркетплейсами", description: "Автоматическое обновление остатков на WB, Ozon и Яндекс.Маркет в реальном времени." },
@@ -122,46 +167,92 @@ export default function WarehouseLandingPage() {
               { icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z", title: "Визуализация склада", description: "Интерактивная карта склада с фильтрами по характеристикам товаров." },
               { icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z", title: "Отчеты", description: "Экспорт остатков и смен в удобных форматах, статистика продаж." }
             ].map((feature, index) => (
-              <div key={index} className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 group border border-gray-200 hover:border-blue-300">
-                <svg className="w-12 h-12 mx-auto mb-6 text-blue-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <motion.div 
+                key={index} 
+                className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 group border border-gray-200 hover:border-blue-300"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ scale: 1.02 }}
+              >
+                <motion.svg 
+                  className="w-12 h-12 mx-auto mb-6 text-blue-600 group-hover:scale-110 transition-transform" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                  whileHover={{ rotate: 5 }}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={feature.icon} />
-                </svg>
+                </motion.svg>
                 <h3 className="text-xl font-bold mb-4 text-center text-gray-900">{feature.title}</h3>
                 <p className="text-center text-gray-600 leading-relaxed">{feature.description}</p>
-              </div>
+              </motion.div>
             ))}
           </div>
-          <div className="text-center mt-16">
-            <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg w-full sm:w-auto">
-              <FaCarBurst className="mr-2" /> ПОСЧИТАТЬ МОИ ПОТЕРИ
+          <motion.div 
+            className="text-center mt-16"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <Button onClick={() => setShowAudit(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
+              <FaRocket className="mr-2" /> ПРОАНАЛИЗИРОВАТЬ СКЛАД
             </Button>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Benefits Section */}
-      <section className="py-20 px-4 bg-gray-100">
+      <section className="py-20 px-4 bg-gradient-to-br from-gray-100 to-gray-200">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Почему наше приложение выгодно</h2>
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Преимущества для вашего бизнеса
+          </motion.h2>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {[
-              { title: "Для владельца бизнеса", benefits: ["Контроль нескольких магазинов", "Снижение потерь и ошибок", "Автосинхронизация остатков", "Мониторинг команды", "Freemium - старт бесплатно"], color: "text-blue-800" },
+              { title: "Для владельца бизнеса", benefits: ["Полный контроль операций", "Рост эффективности на 70%+", "Автоматизация рутины", "Прозрачность процессов", "Бесплатный старт"], color: "text-blue-800" },
               { title: "Для персонала", benefits: ["Простой интерфейс в Telegram", "Быстрые операции с товарами", "Игровой режим с наградами", "Личная статистика и цели"], color: "text-blue-800" },
               { title: "Для администратора", benefits: ["Управление несколькими складами", "Безопасный доступ для команды", "Уведомления о заказах (в разработке)", "Простые отчеты в CSV"], color: "text-blue-800" }
             ].map((role, index) => (
-              <div key={index} className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+              <motion.div 
+                key={index} 
+                className="bg-white p-8 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200"
+                initial={{ opacity: 0, x: index % 2 === 0 ? -30 : 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.2 }}
+                whileHover={{ y: -5 }}
+              >
                 <h3 className={`text-xl font-bold mb-6 text-center ${role.color}`}>{role.title}</h3>
                 <ul className="space-y-4">
                   {role.benefits.map((benefit, idx) => (
-                    <li key={idx} className="flex items-start gap-3">
-                      <svg className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <motion.li 
+                      key={idx} 
+                      className="flex items-start gap-3"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.2 + idx * 0.1 }}
+                    >
+                      <motion.svg 
+                        className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                        whileHover={{ scale: 1.1 }}
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      </motion.svg>
                       <span className="text-gray-600">{benefit}</span>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -170,20 +261,31 @@ export default function WarehouseLandingPage() {
       {/* Comparison Section */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Сравнение с конкурентами</h2>
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Почему наше решение лучше подходит именно вам
+          </motion.h2>
           <Tabs defaultValue="comparison" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="comparison" className="text-lg py-3">Сравнение функций</TabsTrigger>
+              <TabsTrigger value="comparison" className="text-lg py-3">Сравнение возможностей</TabsTrigger>
               <TabsTrigger value="example" className="text-lg py-3">Реальный кейс</TabsTrigger>
             </TabsList>
             
             <TabsContent value="comparison">
-              <div className="overflow-x-auto bg-white rounded-lg shadow-lg">
+              <motion.div 
+                className="overflow-x-auto bg-white rounded-lg shadow-2xl"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
                 <table className="min-w-full bg-white border border-gray-200 rounded-lg text-sm md:text-base">
-                  <thead className="bg-gray-100">
+                  <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                     <tr>
                       <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">Аспект</th>
-                      <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">Наше решение</th>
+                      <th className="px-4 py-4 text-left font-bold text-blue-700 border-b">Наше решение</th>
                       <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">YClients</th>
                       <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">МойСклад</th>
                       <th className="px-4 py-4 text-left font-bold text-gray-700 border-b">TOPSELLER</th>
@@ -195,39 +297,55 @@ export default function WarehouseLandingPage() {
                       ["Фокус", "Склад для e-com", "CRM для услуг", "Общий учет", "Продажи на MP"],
                       ["Интеграция с MP", "WB, Ozon, YM", "Ограниченная", "WB, Ozon, YM +", "WB, Ozon, YM"],
                       ["Мобильность", "Telegram-бот", "Веб/моб. app", "Веб/моб. app", "Облако"],
-                      ["Gamification", "Да", "Нет", "Нет", "Нет"],
-                      ["Управление сменами", "Да", "Для услуг", "Базовое", "Нет"],
-                      ["Визуализация склада", "Карта + фильтры", "Базовая", "Таблицы", "Дашборды"],
+                      ["Gamification", "✅ Да", "❌ Нет", "❌ Нет", "❌ Нет"],
+                      ["Управление сменами", "✅ Да", "Для услуг", "Базовое", "❌ Нет"],
+                      ["Визуализация склада", "✅ Карта + фильтры", "Базовая", "Таблицы", "Дашборды"],
                       ["Отчеты", "CSV, статистика", "Для услуг", "Расширенные", "Аналитика MP"],
                       ["Обучение", "Минимальное", "Требуется", "Среднее", "Среднее"]
                     ].map((row, index) => (
-                      <tr key={index} className="border-t hover:bg-gray-50">
+                      <motion.tr 
+                        key={index} 
+                        className="border-t hover:bg-blue-50/20"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
                         {row.map((cell, cellIndex) => (
                           <td key={cellIndex} className="px-4 py-4 border-b">
-                            {cellIndex === 0 ? <span className="font-medium">{cell}</span> : cell}
+                            {cellIndex === 1 ? <span className="font-medium text-blue-700">{cell}</span> : cell}
                           </td>
                         ))}
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-              <p className="mt-8 text-center text-gray-600 max-w-3xl mx-auto text-lg">
-                Наше приложение - специализированное решение для складов онлайн-магазинов. 
-                Оно проще, дешевле и эффективнее для малого/среднего e-com.
-              </p>
+              </motion.div>
+              <motion.p 
+                className="mt-8 text-center text-gray-600 max-w-3xl mx-auto text-lg"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+              >
+                Специализация на e-commerce даёт нам преимущество: мы проще, гибче и эффективнее для ваших задач
+              </motion.p>
             </TabsContent>
             
             <TabsContent value="example">
-              <div className="text-center max-w-4xl mx-auto">
+              <motion.div 
+                className="text-center max-w-4xl mx-auto"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
                 <h3 className="text-2xl font-bold mb-8 text-gray-900">Реальный кейс: Склад одеял</h3>
                 <p className="text-lg mb-12 text-gray-600 max-w-2xl mx-auto">
-                  Мы тестировали приложение на складе с одеялами: 4 размера, 2 сезона, 8 узоров - 64 артикула, &gt;500 единиц. 
-                  Работало стабильно на бесплатном Supabase.
+                  64 артикула, 500+ единиц. Работало стабильно на бесплатном Supabase.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
-                  <div className="bg-gray-50 p-8 rounded-xl shadow-md">
-                    <h4 className="text-xl font-bold mb-6 text-blue-800">До приложения</h4>
+                  <motion.div 
+                    className="bg-gradient-to-br from-red-50 to-red-100 p-8 rounded-xl shadow-md border border-red-200"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <h4 className="text-xl font-bold mb-6 text-red-800">До приложения</h4>
                     <ul className="space-y-4 text-left text-gray-600">
                       <li className="flex items-start gap-3">
                         <span className="text-red-500 font-bold">•</span>
@@ -238,9 +356,12 @@ export default function WarehouseLandingPage() {
                         Штрафы за ошибки - 30+ тыс. руб/мес
                       </li>
                     </ul>
-                  </div>
-                  <div className="bg-gray-50 p-8 rounded-xl shadow-md">
-                    <h4 className="text-xl font-bold mb-6 text-blue-800">После</h4>
+                  </motion.div>
+                  <motion.div 
+                    className="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl shadow-md border border-green-200"
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <h4 className="text-xl font-bold mb-6 text-green-800">После внедрения</h4>
                     <ul className="space-y-4 text-left text-gray-600">
                       <li className="flex items-start gap-3">
                         <span className="text-green-500 font-bold">•</span>
@@ -248,34 +369,48 @@ export default function WarehouseLandingPage() {
                       </li>
                       <li className="flex items-start gap-3">
                         <span className="text-green-500 font-bold">•</span>
-                        Штрафы - 8 тыс. руб/мес (снижение на 73%)
+                        Штрафы снижены на 73% → 8 тыс. руб/мес
                       </li>
                     </ul>
-                  </div>
+                  </motion.div>
                 </div>
-                <div className="mt-12 bg-blue-50 p-6 rounded-xl max-w-2xl mx-auto">
+                <motion.div 
+                  className="mt-12 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl max-w-2xl mx-auto border border-blue-200"
+                  whileHover={{ scale: 1.02 }}
+                >
                   <p className="text-xl font-semibold text-blue-800 mb-4">
-                    Сколько вы теряете? Проверьте за 60 секунд!
+                    Готовы к таким результатам?
                   </p>
-                  <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg w-full sm:w-auto">
-                    <FaRocket className="mr-2" /> РАССЧИТАТЬ МОИ ПОТЕРИ
+                  <Button onClick={() => setShowAudit(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
+                    <FaRocket className="mr-2" /> ПОВЫСИТЬ ЭФФЕКТИВНОСТЬ
                   </Button>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             </TabsContent>
           </Tabs>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 bg-gray-100">
+      <section id="pricing" className="py-20 px-4 bg-gradient-to-br from-gray-100 to-gray-200">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
             Выберите план к нулевым потерям
-          </h2>
-          <p className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto">
+          </motion.h2>
+          <motion.p 
+            className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+          >
             От бесплатного старта до полной автоматизации с гарантией результата
-          </p>
+          </motion.p>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
@@ -338,13 +473,26 @@ export default function WarehouseLandingPage() {
                 type: "enterprise"
               }
             ].map((plan, index) => (
-              <div key={index} className={`bg-white rounded-2xl p-6 sm:p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
+              <motion.div 
+                key={index} 
+                className={`bg-white rounded-2xl p-6 sm:p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-2xl' : 'shadow-lg'} hover:shadow-2xl transition-all duration-300`}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.2 }}
+                whileHover={{ y: -10 }}
+              >
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
-                    <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                  <motion.div 
+                    className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10"
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ type: "spring" }}
+                  >
+                    <span className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg">
                       <FaFire className="animate-pulse" /> Самый популярный
                     </span>
-                  </div>
+                  </motion.div>
                 )}
                 
                 <h3 className="text-xl sm:text-2xl font-bold mb-2 text-gray-900">{plan.title}</h3>
@@ -369,32 +517,45 @@ export default function WarehouseLandingPage() {
                   ))}
                 </ul>
                 
-                <Button className={`w-full py-3 text-base sm:text-lg font-semibold ${
+                <Button className={`w-full py-3 text-base sm:text-lg font-semibold transition-all duration-300 ${
                   plan.type === 'free' 
-                    ? 'bg-gray-800 hover:bg-gray-900 text-white' 
+                    ? 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-black text-white' 
                     : plan.popular 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                } transition-colors duration-300`}>
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white' 
+                    : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+                }`}>
                   {plan.cta}
                 </Button>
 
                 {plan.type === 'pro' && (
-                  <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <motion.div 
+                    className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1 }}
+                  >
                     <p className="text-xs text-center text-yellow-800 font-medium">
                       <FaClock className="inline mr-1" /> Только 3 места по спеццене в ноябре!
                     </p>
-                  </div>
+                  </motion.div>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
 
           {/* Services Section */}
-          <div className="mt-16 bg-white rounded-2xl p-6 sm:p-8 shadow-lg">
+          <motion.div 
+            className="mt-16 bg-white rounded-2xl p-6 sm:p-8 shadow-lg"
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
             <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Дополнительные услуги (One-time)</h3>
             <div className="grid md:grid-cols-2 gap-8">
-              <div className="border border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
+              <motion.div 
+                className="border border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors"
+                whileHover={{ scale: 1.02 }}
+              >
                 <h4 className="text-xl font-bold mb-4 text-blue-800">🎯 Автоматизация склада за 1 день</h4>
                 <p className="text-3xl font-bold mb-2">20 000₽</p>
                 <p className="text-gray-600 mb-4">единоразово</p>
@@ -404,8 +565,11 @@ export default function WarehouseLandingPage() {
                   <li>• Обучение владельца (2 часа)</li>
                   <li>• Гарантия 30 дней</li>
                 </ul>
-              </div>
-              <div className="border border-green-200 rounded-xl p-6 hover:border-green-300 transition-colors">
+              </motion.div>
+              <motion.div 
+                className="border border-green-200 rounded-xl p-6 hover:border-green-300 transition-colors"
+                whileHover={{ scale: 1.02 }}
+              >
                 <h4 className="text-xl font-bold mb-4 text-green-800">👨‍🏫 Обучение команды с нуля</h4>
                 <p className="text-3xl font-bold mb-2">10 000₽</p>
                 <p className="text-gray-600 mb-4">единоразово</p>
@@ -415,30 +579,45 @@ export default function WarehouseLandingPage() {
                   <li>• Ролевой доступ и права</li>
                   <li>• Контроль качества работы</li>
                 </ul>
-              </div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Guarantee Section */}
-          <div className="mt-12 text-center">
-            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 inline-block">
+          <motion.div 
+            className="mt-12 text-center"
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+          >
+            <motion.div 
+              className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 inline-block"
+              whileHover={{ scale: 1.02 }}
+            >
               <h4 className="text-xl font-bold text-blue-800 mb-2">💰 Гарантия результата</h4>
               <p className="text-gray-700 max-w-2xl mx-auto">
                 Мы настолько уверены в результате, что предлагаем использовать систему за <strong>50% от вашей экономии на штрафах</strong>. 
                 Если недостачи не снизятся на 50% в первый месяц - вернем деньги!
               </p>
-              <Button onClick={() => setShowAudit(true)} className="mt-4 bg-green-600 hover:bg-green-700 text-white">
-                <FaCalendarCheck className="mr-2" /> Проверить мои потери
+              <Button onClick={() => setShowAudit(true)} className="mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-full font-bold">
+                <FaCalendarCheck className="mr-2" /> Узнать потенциал экономии
               </Button>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
       {/* Invite Section */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Как начать работу и пригласить команду</h2>
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold mb-12 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Как начать работу и пригласить команду
+          </motion.h2>
           <div className="max-w-3xl mx-auto text-left space-y-6 text-lg text-gray-600">
             <ol className="list-decimal pl-6 space-y-6">
               <li className="pb-2">Откройте приложение в Telegram и авторизуйтесь.</li>
@@ -456,15 +635,43 @@ export default function WarehouseLandingPage() {
       </section>
 
       {/* Enhanced CTA Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Оптимизируйте склад уже сегодня</h2>
-          <p className="text-xl mb-10">Создайте экипаж бесплатно и начните экономить на ошибках</p>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6 shadow-2xl">
+      <section className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white py-20 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-white/10 via-transparent to-white/10 animate-pulse" />
+        <div className="max-w-6xl mx-auto text-center relative z-10">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            Оптимизируйте склад уже сегодня
+          </motion.h2>
+          <motion.p 
+            className="text-xl mb-10 max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+          >
+            Создайте экипаж бесплатно и начните экономить время и ресурсы
+          </motion.p>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.4 }}
+            className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md p-8 rounded-2xl space-y-6 shadow-2xl border border-white/20"
+          >
             {!createdCrew ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="text-center">
-                  <FaUsers className="text-5xl text-white mx-auto mb-4" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    className="inline-block"
+                  >
+                    <FaUsers className="text-5xl text-white mx-auto mb-4" />
+                  </motion.div>
                   <h1 className="text-4xl font-bold text-white mb-2">СОЗДАТЬ СКЛАД</h1>
                   <p className="text-gray-200">Соберите свою команду и управляйте складом эффективно.</p>
                 </div>
@@ -472,35 +679,42 @@ export default function WarehouseLandingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="crew-name" className="text-white text-lg">НАЗВАНИЕ СКЛАДА</Label>
-                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300 border-white/30 focus:border-white/50" />
                   </div>
                   <div>
                     <Label htmlFor="crew-slug" className="text-white text-lg">SLUG (АДРЕС СКЛАДА)</Label>
-                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300 border-white/30 focus:border-white/50" />
                   </div>
                 </div>
                 
                 <div>
                   <Label htmlFor="crew-desc" className="text-white text-lg">ОПИСАНИЕ / ИНСТРУКЦИИ</Label>
-                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-2 text-lg min-h-[100px] bg-white/20 text-white placeholder-gray-300" />
+                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-2 text-lg min-h-[100px] bg-white/20 text-white placeholder-gray-300 border-white/30 focus:border-white/50" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="crew-logo" className="text-white text-lg">URL ЛОГОТИПА</Label>
-                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300 border-white/30 focus:border-white/50" />
                   </div>
                   <div>
                     <Label htmlFor="crew-hq" className="text-white text-lg">КООРДИНАТЫ СКЛАДА</Label>
-                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
+                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300 border-white/30 focus:border-white/50" />
                   </div>
                 </div>
                 
-                <Button type="submit" disabled={isSubmitting} className="w-full text-lg py-6 bg-white text-blue-600 hover:bg-gray-100 font-bold text-xl">
+                <Button type="submit" disabled={isSubmitting} className="w-full text-lg py-6 bg-gradient-to-r from-white to-gray-100 text-blue-600 hover:from-gray-100 hover:to-gray-200 font-bold text-xl rounded-xl shadow-lg transition-all">
                   {isSubmitting ? (
-                    <>
-                      <FaSpinner className='animate-spin mr-2' /> Создание...
-                    </>
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key="loading"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex items-center justify-center"
+                      >
+                        <Loader2 className='animate-spin mr-2' /> Создание...
+                      </motion.span>
+                    </AnimatePresence>
                   ) : (
                     <>
                       <FaFlagCheckered className="mr-2" /> СФОРМИРОВАТЬ СКЛАД
@@ -509,16 +723,22 @@ export default function WarehouseLandingPage() {
                 </Button>
               </form>
             ) : (
-              <div className="space-y-6 text-center">
+              <motion.div 
+                className="space-y-6 text-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
                 <h3 className="text-3xl font-bold">Склад успешно создан!</h3>
                 <p className="text-xl">Теперь пригласите членов команды.</p>
-                <div className="flex justify-center gap-4">
+                <div className="flex justify-center gap-4 flex-col sm:flex-row">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button onClick={handleInvite} className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-bold">
-                          <FaUserPlus className="mr-2" /> Пригласить команду
-                        </Button>
+                        <motion.div whileHover={{ scale: 1.05 }}>
+                          <Button onClick={handleInvite} className="bg-gradient-to-r from-white to-gray-100 text-blue-600 hover:from-gray-100 hover:to-gray-200 px-8 py-3 text-lg font-bold rounded-xl shadow-lg">
+                            <FaUserPlus className="mr-2" /> Пригласить команду
+                          </Button>
+                        </motion.div>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Поделиться ссылкой приглашения</p>
@@ -526,12 +746,14 @@ export default function WarehouseLandingPage() {
                     </Tooltip>
                   </TooltipProvider>
                   <Link href={`/wb/${createdCrew.slug}`}>
-                    <Button variant="outline" className="text-white border-white hover:bg-white/10 px-8 py-3 text-lg font-bold">
-                      Перейти к складу
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.05 }}>
+                      <Button variant="outline" className="text-white border-2 border-white hover:bg-white/10 px-8 py-3 text-lg font-bold rounded-xl">
+                        Перейти к складу
+                      </Button>
+                    </motion.div>
                   </Link>
                 </div>
-              </div>
+              </motion.div>
             )}
           </motion.div>
         </div>
@@ -540,20 +762,40 @@ export default function WarehouseLandingPage() {
       {/* Existing Crews Section */}
       <section className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Существующие склады</h2>
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Существующие склады
+          </motion.h2>
           <CrewsListSimplified />
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-300 py-12 px-4">
+      <footer className="bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 py-12 px-4">
         <div className="max-w-6xl mx-auto text-center space-y-6">
-          <p className="text-lg">&copy; 2025 Управление складом. Все права защищены.</p>
-          <div className="flex flex-wrap justify-center gap-6 text-lg">
+          <motion.p 
+            className="text-lg"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            &copy; 2025 Управление складом. Все права защищены.
+          </motion.p>
+          <motion.div 
+            className="flex flex-wrap justify-center gap-6 text-lg"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+          >
             <a href="/privacy" className="hover:text-white transition-colors duration-200">Политика конфиденциальности</a>
             <a href="/terms" className="hover:text-white transition-colors duration-200">Условия использования</a>
             <a href="/support" className="hover:text-white transition-colors duration-200">Поддержка</a>
-          </div>
+          </motion.div>
         </div>
       </footer>
 
