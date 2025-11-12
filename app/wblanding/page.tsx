@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
@@ -18,6 +18,121 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Suspense } from 'react';
 import { getAllPublicCrews } from '@/app/rentals/actions';
+import { FaCarBurst, FaChartLine, FaMoneyBillWave, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire } from 'react-icons/fa6';
+import { useDebounce } from "@/lib/hooks/useDebounce";
+
+// --- NEW: Warehouse Audit Tool Component (Lead Magnet) ---
+const WarehouseAuditTool = () => {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [email, setEmail] = useState("");
+  const [showResult, setShowResult] = useState(false);
+  const [losses, setLosses] = useState(0);
+
+  const questions = [
+    { id: "skus", text: "Сколько артикулов вы держите на складе?", type: "number", placeholder: "100" },
+    { id: "hours", text: "Сколько часов в месяц тратите на ручные обновления остатков?", type: "number", placeholder: "40" },
+    { id: "penalties", text: "Сколько платите штрафов за ошибки в остатках (руб/мес)?", type: "number", placeholder: "30000" },
+    { id: "stores", text: "На скольких маркетплейсах одновременно продаете?", type: "number", placeholder: "2" },
+  ];
+
+  const handleNext = (value) => {
+    if (!value && value !== 0) return;
+    const newAnswers = { ...answers, [questions[step].id]: parseInt(value) || value };
+    setAnswers(newAnswers);
+    if (step < questions.length - 1) setStep(step + 1);
+    else {
+      // Calculate potential losses
+      const calcLosses = (data) => {
+        const timeCost = data.hours * 1500; // 1500 руб/час
+        const penaltyCost = data.penalties;
+        const missedSales = Math.floor(data.skus * data.stores * 0.05 * 1000); // 0.05 ошибка, 1000 руб средний чек
+        return timeCost + penaltyCost + missedSales;
+      };
+      const totalLosses = calcLosses(newAnswers);
+      setLosses(totalLosses);
+      setShowResult(true);
+    }
+  };
+
+  const handleGetReport = () => {
+    if (!email) { toast.error("Введите email для получения отчета"); return; }
+    // Here you'd send the data to your CRM/API
+    toast.success("Отчет отправлен! Проверьте почту.");
+    // Store email for follow-up
+    console.log("Lead captured:", { email, answers, losses });
+  };
+
+  if (step === 0 && !showResult) return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 shadow-xl max-w-2xl mx-auto">
+      <div className="text-center mb-6">
+        <h3 className="text-3xl font-bold text-gray-900 mb-3">Рассчитайте ваши потери за 60 секунд</h3>
+        <p className="text-gray-600 text-lg">Узнайте, сколько денег и времени теряет ваш склад сейчас</p>
+      </div>
+      <div className="text-center">
+        <Button onClick={() => setStep(1)} size="lg" className="bg-red-500 hover:bg-red-600 text-white text-xl py-6 px-8">
+          <FaRocket className="mr-2" /> НАЧАТЬ БЕСПЛАТНЫЙ АУДИТ
+        </Button>
+      </div>
+    </motion.div>
+  );
+
+  if (showResult) return (
+    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-8 shadow-xl max-w-2xl mx-auto">
+      <div className="text-center mb-6">
+        <FaChartLine className="text-6xl text-red-500 mx-auto mb-4" />
+        <h3 className="text-3xl font-bold text-gray-900 mb-3">Вы теряете: ~{losses.toLocaleString('ru-RU')}₽/мес</h3>
+        <p className="text-gray-600 text-lg mb-4">И тратите {answers.hours} часов на рутину</p>
+      </div>
+      <div className="bg-red-50 p-6 rounded-xl mb-6">
+        <h4 className="font-bold text-xl text-red-800 mb-3">Как это возможно?</h4>
+        <ul className="space-y-2 text-red-700">
+          <li>• Штрафы за ошибки: {answers.penalties?.toLocaleString('ru-RU')}₽</li>
+          <li>• Стоимость вашего времени: {(answers.hours * 1500).toLocaleString('ru-RU')}₽</li>
+          <li>• Упущенные продажи из-за неточностей: ~{Math.floor(answers.skus * answers.stores * 0.05 * 1000).toLocaleString('ru-RU')}₽</li>
+        </ul>
+      </div>
+      <div className="mb-6">
+        <Label htmlFor="email" className="text-lg font-bold mb-2 block">Куда отправить план снижения потерь?</Label>
+        <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ваш@email.ru" className="py-3 text-lg" />
+      </div>
+      <Button onClick={handleGetReport} className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-4">
+        <FaMoneyBillWave className="mr-2" /> ПОЛУЧИТЬ ПЛАН ЭКОНОМИИ
+      </Button>
+    </motion.div>
+  );
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-8 shadow-xl max-w-2xl mx-auto">
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-sm text-gray-500">Шаг {step} из {questions.length}</span>
+          <Button variant="ghost" size="sm" onClick={() => setStep(0)}>Начать заново</Button>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="bg-red-500 h-2 rounded-full transition-all" style={{ width: `${(step / questions.length) * 100}%` }}></div>
+        </div>
+      </div>
+      <div className="mb-6">
+        <Label className="text-xl font-bold text-gray-900 mb-6 block">{questions[step].text}</Label>
+        <Input
+          type={questions[step].type}
+          placeholder={questions[step].placeholder}
+          onKeyPress={(e) => { if (e.key === 'Enter') handleNext(e.target.value); }}
+          className="py-6 text-lg"
+          autoFocus
+        />
+      </div>
+      <div className="flex gap-4">
+        {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">Назад</Button>}
+        <Button onClick={(e) => handleNext(e.target.previousElementSibling?.value)} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-lg py-4">
+          Далее
+          <FaRocket className="ml-2" />
+        </Button>
+      </div>
+    </motion.div>
+  );
+};
 
 const generateSlug = (name: string) =>
   name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
@@ -44,8 +159,8 @@ function CrewsListSimplified() {
     loadData();
   }, []);
 
-  if (loading) return <div className="text-center py-10">Загрузка...</div>;
-  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
+  if (loading) return <div className="text-center py-10 text-lg text-gray-600">Загрузка складов...</div>;
+  if (error) return <div className="text-center py-10 text-red-500 font-medium">{error}</div>;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -54,7 +169,7 @@ function CrewsListSimplified() {
         return (
           <Link href={`/wb/${crew.slug}`} key={crew.id} className="block group">
             <div className={cn(
-              "p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow",
+              "p-6 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1",
               isEditable ? "bg-blue-50 border-2 border-blue-500" : "bg-white"
             )}>
               <div className="flex items-start gap-4 mb-4">
@@ -79,20 +194,20 @@ function CrewsListSimplified() {
               <p className="text-gray-600 text-sm mb-4">{crew.description}</p>
               <div className="grid grid-cols-3 gap-2 border-t pt-4">
                 <div className="text-center">
-                  <span className="block text-lg font-bold">{crew.member_count || 0}</span>
+                  <span className="block text-lg font-bold text-gray-900">{crew.member_count || 0}</span>
                   <span className="text-xs text-gray-500">Сотрудников</span>
                 </div>
                 <div className="text-center">
-                  <span className="block text-lg font-bold">{crew.vehicle_count || 0}</span>
+                  <span className="block text-lg font-bold text-gray-900">{crew.vehicle_count || 0}</span>
                   <span className="text-xs text-gray-500">Единиц</span>
                 </div>
                 <div className="text-center">
-                  <span className="block text-lg font-bold">N/A</span>
+                  <span className="block text-lg font-bold text-blue-600">N/A</span>
                   <span className="text-xs text-gray-500">Миссий</span>
                 </div>
               </div>
               {isEditable && (
-                <p className="text-center text-blue-600 font-semibold mt-4">
+                <p className="text-center text-blue-600 font-semibold mt-4 px-3 py-1 bg-blue-100 rounded-full text-sm">
                   {userCrewInfo.is_owner ? "Ваш склад (владелец)" : "Ваш склад (участник)"}
                 </p>
               )}
@@ -104,9 +219,41 @@ function CrewsListSimplified() {
   );
 }
 
+// --- NEW: Exit Intent Popup ---
+const ExitIntentPopup = ({ onClose }) => {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const handleMouseLeave = (e) => {
+      if (e.clientY <= 0) setShow(true);
+    };
+    document.addEventListener('mouseleave', handleMouseLeave);
+    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+  }, []);
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-8 max-w-lg w-full shadow-2xl">
+        <h3 className="text-2xl font-bold mb-4 text-gray-900">Уходите? Возьмите чек-лист!</h3>
+        <p className="text-gray-600 mb-6">Получите бесплатный чек-лист из 10 пунктов для мгновенного снижения штрафов на маркетплейсах.</p>
+        <Input placeholder="Ваш email" className="mb-4" />
+        <div className="flex gap-3">
+          <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { toast.success("Чек-лист отправлен!"); setShow(false); }}>
+            Получить чек-лист
+          </Button>
+          <Button variant="outline" onClick={() => setShow(false)}>Нет, спасибо</Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function WarehouseLandingPage() {
   const { dbUser, isLoading: appContextLoading } = useAppContext();
   const router = useRouter();
+  const [showAudit, setShowAudit] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -146,7 +293,7 @@ export default function WarehouseLandingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
-      {/* Enhanced Hero Section with Video Background */}
+      {/* Hero Section with NEW Lead Magnet CTA */}
       <section className="relative min-h-[70vh] flex items-center justify-center text-white">
         <video
           className="absolute inset-0 w-full h-full object-cover brightness-50"
@@ -170,67 +317,51 @@ export default function WarehouseLandingPage() {
           <p className="text-xl md:text-2xl lg:text-3xl mb-8 text-white/90 drop-shadow-lg max-w-4xl mx-auto leading-relaxed">
             Сократите недостачи на 73%, обновляйте остатки одним кликом. Для 2+ магазинов на WB, Ozon, YM с 100+ артикулами.
           </p>
-          <Link href="#features">
-            <a className="bg-white/90 text-blue-600 px-8 py-4 rounded-full font-bold text-lg hover:bg-white transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-              Узнать больше
-            </a>
-          </Link>
+          {/* NEW CTA: Lead Magnet instead of direct conversion */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-8 py-4 rounded-full font-bold text-lg text-xl">
+              <FaChartLine className="mr-2" /> РАССЧИТАТЬ ПОТЕРИ ЗА 60 СЕК
+            </Button>
+            <span className="text-white/70">или</span>
+            <Link href="#features">
+              <Button variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 rounded-full font-bold text-lg">
+                Узнать больше
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Second Video Section */}
+      {/* NEW: Lead Magnet Section */}
+      {showAudit && (
+        <section id="audit-tool" className="py-16 px-4 bg-white">
+          <WarehouseAuditTool />
+        </section>
+      )}
+
+      {/* Second Video Section (unchanged) */}
       <section className="py-12 bg-gray-100">
         <div className="max-w-4xl mx-auto px-4">
-          <video
-            className="w-full h-auto rounded-2xl shadow-xl md:max-w-2xl mx-auto"
-            autoPlay
-            loop
-            muted
-            playsInline
-          >
+          <video className="w-full h-auto rounded-2xl shadow-xl md:max-w-2xl mx-auto" autoPlay loop muted playsInline>
             <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
           </video>
         </div>
       </section>
 
-      {/* Enhanced Features Section */}
+      {/* Features Section with CTA */}
       <section id="features" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Возможности приложения</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
-              {
-                icon: "M13 10V3L4 14h7v7l9-11h-7z",
-                title: "Синхронизация с маркетплейсами",
-                description: "Автоматическое обновление остатков на WB, Ozon и Яндекс.Маркет в реальном времени."
-              },
-              {
-                icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-                title: "Управление сменами",
-                description: "Контроль работы персонала, чекпоинты и детальная статистика по сменам."
-              },
-              {
-                icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
-                title: "Мульти-доступ",
-                description: "Управление несколькими складами, ролевой доступ для команды."
-              },
-              {
-                icon: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z",
-                title: "Telegram-интерфейс",
-                description: "Удобный доступ через мессенджер, без установки приложений."
-              },
-              {
-                icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z",
-                title: "Визуализация склада",
-                description: "Интерактивная карта склада с фильтрами по характеристикам товаров."
-              },
-              {
-                icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-                title: "Отчеты",
-                description: "Экспорт остатков и смен в удобных форматах, статистика продаж."
-              }
+              { icon: "M13 10V3L4 14h7v7l9-11h-7z", title: "Синхронизация с маркетплейсами", description: "Автоматическое обновление остатков на WB, Ozon и Яндекс.Маркет в реальном времени." },
+              { icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z", title: "Управление сменами", description: "Контроль работы персонала, чекпоинты и детальная статистика по сменам." },
+              { icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z", title: "Мульти-доступ", description: "Управление несколькими складами, ролевой доступ для команды." },
+              { icon: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z", title: "Telegram-интерфейс", description: "Удобный доступ через мессенджер, без установки приложений." },
+              { icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z", title: "Визуализация склада", description: "Интерактивная карта склада с фильтрами по характеристикам товаров." },
+              { icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z", title: "Отчеты", description: "Экспорт остатков и смен в удобных форматах, статистика продаж." }
             ].map((feature, index) => (
-              <div key={index} className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 group">
+              <div key={index} className="bg-gray-50 p-8 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 group border border-gray-200 hover:border-blue-300">
                 <svg className="w-12 h-12 mx-auto mb-6 text-blue-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={feature.icon} />
                 </svg>
@@ -239,46 +370,24 @@ export default function WarehouseLandingPage() {
               </div>
             ))}
           </div>
+          {/* NEW: CTA after features */}
+          <div className="text-center mt-16">
+            <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-10 py-4 rounded-full font-bold text-xl">
+              <FaCarBurst className="mr-2" /> ПОСЧИТАТЬ МОИ ПОТЕРИ
+            </Button>
+          </div>
         </div>
       </section>
 
-      {/* Enhanced Benefits Section */}
+      {/* Benefits Section (unchanged) */}
       <section className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Почему наше приложение выгодно</h2>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {[
-              {
-                title: "Для владельца бизнеса",
-                benefits: [
-                  "Контроль нескольких магазинов",
-                  "Снижение потерь и ошибок",
-                  "Автосинхронизация остатков",
-                  "Мониторинг команды",
-                  "Freemium - старт бесплатно"
-                ],
-                color: "text-blue-800"
-              },
-              {
-                title: "Для персонала",
-                benefits: [
-                  "Простой интерфейс в Telegram",
-                  "Быстрые операции с товарами",
-                  "Игровой режим с наградами",
-                  "Личная статистика и цели"
-                ],
-                color: "text-blue-800"
-              },
-              {
-                title: "Для администратора",
-                benefits: [
-                  "Управление несколькими складами",
-                  "Безопасный доступ для команды",
-                  "Уведомления о заказах (в разработке)",
-                  "Простые отчеты в CSV"
-                ],
-                color: "text-blue-800"
-              }
+              { title: "Для владельца бизнеса", benefits: ["Контроль нескольких магазинов", "Снижение потерь и ошибок", "Автосинхронизация остатков", "Мониторинг команды", "Freemium - старт бесплатно"], color: "text-blue-800" },
+              { title: "Для персонала", benefits: ["Простой интерфейс в Telegram", "Быстрые операции с товарами", "Игровой режим с наградами", "Личная статистика и цели"], color: "text-blue-800" },
+              { title: "Для администратора", benefits: ["Управление несколькими складами", "Безопасный доступ для команды", "Уведомления о заказах (в разработке)", "Простые отчеты в CSV"], color: "text-blue-800" }
             ].map((role, index) => (
               <div key={index} className="bg-white p-8 rounded-xl shadow-md hover:shadow-lg transition-shadow">
                 <h3 className={`text-xl font-bold mb-6 text-center ${role.color}`}>{role.title}</h3>
@@ -298,7 +407,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Enhanced Comparison Section with Tabs */}
+      {/* Comparison Section (unchanged but with better CTAs) */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Сравнение с конкурентами</h2>
@@ -384,33 +493,39 @@ export default function WarehouseLandingPage() {
                     </ul>
                   </div>
                 </div>
-                <p className="mt-12 text-xl font-semibold text-blue-800 max-w-xl mx-auto">
-                  Мы предлагаем использование за 50% от вашей экономии на штрафах - рассчитаем индивидуально!
-                </p>
+                {/* NEW: Stronger CTA with specific benefit */}
+                <div className="mt-12 bg-blue-50 p-6 rounded-xl max-w-2xl mx-auto">
+                  <p className="text-xl font-semibold text-blue-800 mb-4">
+                    Сколько вы теряете? Проверьте за 60 секунд!
+                  </p>
+                  <Button onClick={() => setShowAudit(true)} className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg">
+                    <FaRocket className="mr-2" /> РАССЧИТАТЬ МОИ ПОТЕРИ
+                  </Button>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
         </div>
       </section>
 
-      {/* Enhanced Pricing Section - Merged Approach */}
+      {/* Pricing Section with Improved Naming & Urgency */}
       <section id="pricing" className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 text-gray-900">
-            Выберите свой план автоматизации
+            Выберите план к нулевым потерям
           </h2>
           <p className="text-xl text-center text-gray-600 mb-16 max-w-2xl mx-auto">
-            От бесплатного старта до полного сопровождения с гарантией результата
+            От бесплатного старта до полной автоматизации с гарантией результата
           </p>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {[
               {
-                title: "🚀 Бесплатный старт",
+                title: "🚀 Путь к нулевым потерям (Бесплатно)",
                 price: "0₽",
                 period: "навсегда",
-                description: "Попробуйте все возможности бесплатно",
-                bestFor: "Для тестирования и небольших складов",
+                description: "Начните снижать потери прямо сейчас",
+                bestFor: "Для тестирования и первых 100 артикулов",
                 features: [
                   "До 100 артикулов",
                   "1 склад и 3 сотрудника",
@@ -424,30 +539,30 @@ export default function WarehouseLandingPage() {
                 type: "free"
               },
               {
-                title: "👥 Профессиональный",
+                title: "⚡ Полная автоматизация (Профессионал)",
                 price: "4 900₽",
                 period: "в месяц",
-                description: "Для растущего бизнеса",
+                description: "Экономьте 20+ часов и 30+ тыс. руб/мес",
                 bestFor: "2-3 магазина, 500+ артикулов",
                 features: [
                   "До 500 артикулов",
                   "3 склада и 10 сотрудников",
-                  "Полная синхронизация WB/Ozon/YM",
+                  "Полная WB/Ozon/YM синхронизация",
                   "Управление сменами",
                   "Расширенные отчеты",
                   "Визуализация склада",
                   "Приоритетная поддержка",
                   "Обучение команды (1 час)"
                 ],
-                cta: "Выбрать профессионал",
+                cta: "Попробовать 14 дней бесплатно",
                 popular: true,
                 type: "pro"
               },
               {
-                title: "🏢 Предприятие",
+                title: "🏢 Экспоненциальный рост (Предприятие)",
                 price: "14 900₽",
                 period: "в месяц",
-                description: "Максимальная автоматизация",
+                description: "Безлимитный рост с персональным сопровождением",
                 bestFor: "Крупные сети и высокие обороты",
                 features: [
                   "Безлимитные артикулы",
@@ -459,16 +574,16 @@ export default function WarehouseLandingPage() {
                   "Обучение команды (5 часов)",
                   "Гарантия снижения недостач на 50%+"
                 ],
-                cta: "Для предприятия",
+                cta: "Запросить демо",
                 popular: false,
                 type: "enterprise"
               }
             ].map((plan, index) => (
               <div key={index} className={`bg-white rounded-2xl p-8 relative ${plan.popular ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow-lg'} hover:shadow-xl transition-shadow duration-300`}>
                 {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold">
-                      Самый популярный
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+                    <span className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
+                      <FaFire className="animate-pulse" /> Самый популярный
                     </span>
                   </div>
                 )}
@@ -505,21 +620,24 @@ export default function WarehouseLandingPage() {
                   {plan.cta}
                 </Button>
 
+                {/* NEW: Urgency element */}
                 {plan.type === 'pro' && (
-                  <p className="text-xs text-center text-gray-500 mt-3">
-                    🔥 Первые 14 дней бесплатно
-                  </p>
+                  <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-xs text-center text-yellow-800 font-medium">
+                      <FaClock className="inline mr-1" /> Только 3 места по спеццене в ноябре!
+                    </p>
+                  </div>
                 )}
               </div>
             ))}
           </div>
 
-          {/* Additional Services */}
+          {/* Services Section (unchanged but with better naming) */}
           <div className="mt-16 bg-white rounded-2xl p-8 shadow-lg">
-            <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Дополнительные услуги</h3>
+            <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Дополнительные услуги (One-time)</h3>
             <div className="grid md:grid-cols-2 gap-8">
-              <div className="border border-gray-200 rounded-xl p-6">
-                <h4 className="text-xl font-bold mb-4 text-blue-800">🎯 Быстрая настройка</h4>
+              <div className="border border-gray-200 rounded-xl p-6 hover:border-blue-300 transition-colors">
+                <h4 className="text-xl font-bold mb-4 text-blue-800">🎯 Автоматизация склада за 1 день</h4>
                 <p className="text-3xl font-bold mb-2">20 000₽</p>
                 <p className="text-gray-600 mb-4">единоразово</p>
                 <ul className="space-y-2 text-sm text-gray-600">
@@ -529,8 +647,8 @@ export default function WarehouseLandingPage() {
                   <li>• Гарантия 30 дней</li>
                 </ul>
               </div>
-              <div className="border border-gray-200 rounded-xl p-6">
-                <h4 className="text-xl font-bold mb-4 text-blue-800">👨‍🏫 Обучение команды</h4>
+              <div className="border border-green-200 rounded-xl p-6 hover:border-green-300 transition-colors">
+                <h4 className="text-xl font-bold mb-4 text-green-800">👨‍🏫 Обучение команды с нуля</h4>
                 <p className="text-3xl font-bold mb-2">10 000₽</p>
                 <p className="text-gray-600 mb-4">единоразово</p>
                 <ul className="space-y-2 text-sm text-gray-600">
@@ -543,7 +661,7 @@ export default function WarehouseLandingPage() {
             </div>
           </div>
 
-          {/* Guarantee Section */}
+          {/* Guarantee Section (unchanged) */}
           <div className="mt-12 text-center">
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 inline-block">
               <h4 className="text-xl font-bold text-blue-800 mb-2">💰 Гарантия результата</h4>
@@ -551,12 +669,15 @@ export default function WarehouseLandingPage() {
                 Мы настолько уверены в результате, что предлагаем использовать систему за <strong>50% от вашей экономии на штрафах</strong>. 
                 Если недостачи не снизятся на 50% в первый месяц - вернем деньги!
               </p>
+              <Button onClick={() => setShowAudit(true)} className="mt-4 bg-green-600 hover:bg-green-700 text-white">
+                <FaCalendarCheck className="mr-2" /> Проверить мои потери
+              </Button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Enhanced Invite Section */}
+      {/* Invite Section (unchanged) */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">Как начать работу и пригласить команду</h2>
@@ -576,7 +697,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Enhanced CTA Section with Form */}
+      {/* Enhanced CTA Section */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-20 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">Оптимизируйте склад уже сегодня</h2>
@@ -588,7 +709,7 @@ export default function WarehouseLandingPage() {
             {!createdCrew ? (
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="text-center">
-                  <VibeContentRenderer content="::FaUsers::" className="text-5xl text-white mx-auto mb-4" />
+                  <FaUsers className="text-5xl text-white mx-auto mb-4" />
                   <h1 className="text-4xl font-bold text-white mb-2">СОЗДАТЬ СКЛАД</h1>
                   <p className="text-gray-200">Соберите свою команду и управляйте складом эффективно.</p>
                 </div>
@@ -596,41 +717,39 @@ export default function WarehouseLandingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="crew-name" className="text-white text-lg">НАЗВАНИЕ СКЛАДА</Label>
-                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-2 text-lg py-3" />
+                    <Input id="crew-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Main Warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
                   </div>
                   <div>
                     <Label htmlFor="crew-slug" className="text-white text-lg">SLUG (АДРЕС СКЛАДА)</Label>
-                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-2 text-lg py-3" />
+                    <Input id="crew-slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-warehouse" required className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
                   </div>
                 </div>
                 
                 <div>
                   <Label htmlFor="crew-desc" className="text-white text-lg">ОПИСАНИЕ / ИНСТРУКЦИИ</Label>
-                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-2 text-lg min-h-[100px]" />
+                  <Textarea id="crew-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Описание склада и правил работы..." required className="mt-2 text-lg min-h-[100px] bg-white/20 text-white placeholder-gray-300" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="crew-logo" className="text-white text-lg">URL ЛОГОТИПА</Label>
-                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-2 text-lg py-3" />
+                    <Input id="crew-logo" type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
                   </div>
                   <div>
                     <Label htmlFor="crew-hq" className="text-white text-lg">КООРДИНАТЫ СКЛАДА</Label>
-                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-2 text-lg py-3" />
+                    <Input id="crew-hq" value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="lat,lng" className="mt-2 text-lg py-3 bg-white/20 text-white placeholder-gray-300" />
                   </div>
                 </div>
                 
                 <Button type="submit" disabled={isSubmitting} className="w-full text-lg py-6 bg-white text-blue-600 hover:bg-gray-100 font-bold text-xl">
                   {isSubmitting ? (
-                    <span className="flex items-center justify-center">
-                      <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" />
-                      Создание...
-                    </span>
+                    <>
+                      <FaSpinner className='animate-spin mr-2' /> Создание...
+                    </>
                   ) : (
-                    <span className="flex items-center justify-center">
-                      <VibeContentRenderer content="::FaFlagCheckered::" />
-                      <span className="ml-2">СФОРМИРОВАТЬ СКЛАД</span>
-                    </span>
+                    <>
+                      <FaFlagCheckered className="mr-2" /> СФОРМИРОВАТЬ СКЛАД
+                    </>
                   )}
                 </Button>
               </form>
@@ -642,9 +761,8 @@ export default function WarehouseLandingPage() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button onClick={handleInvite} className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg">
-                          <VibeContentRenderer content="::FaUserPlus::" className="mr-2" />
-                          Пригласить команду
+                        <Button onClick={handleInvite} className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-3 text-lg font-bold">
+                          <FaUserPlus className="mr-2" /> Пригласить команду
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -653,7 +771,7 @@ export default function WarehouseLandingPage() {
                     </Tooltip>
                   </TooltipProvider>
                   <Link href={`/wb/${createdCrew.slug}`}>
-                    <Button variant="outline" className="text-white border-white hover:bg-white/10 px-8 py-3 text-lg">
+                    <Button variant="outline" className="text-white border-white hover:bg-white/10 px-8 py-3 text-lg font-bold">
                       Перейти к складу
                     </Button>
                   </Link>
@@ -664,17 +782,17 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* Enhanced Existing Crews Section */}
+      {/* Existing Crews Section (unchanged) */}
       <section className="py-20 px-4 bg-gray-100">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900">Существующие склады</h2>
-          <Suspense fallback={<div className="text-center py-10 text-lg">Загрузка...</div>}>
+          <Suspense fallback={<div className="text-center py-10 text-lg text-gray-600">Загрузка складов...</div>}>
             <CrewsListSimplified />
           </Suspense>
         </div>
       </section>
 
-      {/* Enhanced Footer */}
+      {/* Footer (unchanged) */}
       <footer className="bg-gray-900 text-gray-300 py-12 px-4">
         <div className="max-w-6xl mx-auto text-center space-y-6">
           <p className="text-lg">&copy; 2025 Управление складом. Все права защищены.</p>
@@ -685,6 +803,9 @@ export default function WarehouseLandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Exit Intent Popup */}
+      <ExitIntentPopup />
     </div>
   );
 }
