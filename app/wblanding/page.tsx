@@ -39,6 +39,8 @@ export default function WarehouseLandingPage() {
   const [createdCrew, setCreatedCrew] = useState<{ slug: string; name: string } | null>(null);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const footerLinkClass = "text-sm text-muted-foreground hover:text-brand-cyan font-mono flex items-center gap-1.5 transition-colors duration-200 hover:text-glow";
   
   const auditRef = useRef<HTMLDivElement>(null);
 
