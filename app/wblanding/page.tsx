@@ -1,5 +1,5 @@
 "use client";
-
+import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt, BrainCircuit } from "lucide-react"; // Added Bolt
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
