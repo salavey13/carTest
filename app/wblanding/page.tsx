@@ -265,7 +265,7 @@ export default function WarehouseLandingPage() {
             transition={{ delay: 0.2, type: "spring" }}
           >
             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
-              alt="Логотип приложения" width={142} height={69}
+              alt="Логотип приложения" width={200} height={69}
               className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 shadow-2xl ring-4 ring-white/10" />
           </motion.div>
           <motion.h1 
