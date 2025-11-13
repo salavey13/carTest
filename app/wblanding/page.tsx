@@ -244,7 +244,7 @@ export default function WarehouseLandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 font-sans">
       {/* Hero Section */}
-      <section className="relative min-h-[80vh] flex items-center justify-center text-white overflow-hidden">
+      <section className="relative min-h-screen flex items-center justify-center text-white overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
           <video className="w-full h-full object-cover brightness-50" autoPlay loop muted playsInline
             src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" />
@@ -809,7 +809,7 @@ export default function WarehouseLandingPage() {
                 whileHover={{ scale: 1.02 }}
               >
                 <h4 className="text-xl font-bold mb-4 text-blue-800">🎯 Автоматизация склада за 1 день</h4>
-                <p className="text-3xl font-bold mb-2">10 000₽</p> {/* ИСПРАВЛЕНО: снижено с 20 000₽ до 10 000₽ */}
+                <p className="text-3xl font-bold mb-2">10 000₽</p>
                 <p className="text-gray-600 mb-4">единоразово</p>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li>• Полная настройка под ваш склад</li>
@@ -818,7 +818,7 @@ export default function WarehouseLandingPage() {
                   <li>• Гарантия 30 дней</li>
                 </ul>
                 <Button 
-                  onClick={() => handleSendInvoice('quick_setup', 10000)} {/* ИСПРАВЛЕНО: снижено с 20000 до 10000 */}
+                  onClick={() => handleSendInvoice('quick_setup', 10000)}
                   disabled={isSendingInvoice}
                   className="w-full mt-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
