@@ -1087,7 +1087,7 @@ export default function WarehouseLandingPage() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
           >
-            &copy; 2025 Управление складом. Все права защищены.
+            &copy; 2026 Управление складом. Все права защищены.
           </motion.p>
           <motion.div 
             className="flex flex-wrap justify-center gap-6 text-lg"
@@ -1096,9 +1096,15 @@ export default function WarehouseLandingPage() {
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
           >
-            <a href="/privacy" className="hover:text-white transition-colors duration-200">Политика конфиденциальности</a>
-            <a href="/terms" className="hover:text-white transition-colors duration-200">Условия использования</a>
-            <a href="/support" className="hover:text-white transition-colors duration-200">Поддержка</a>
+            <div className="mt-10 md:mt-12 pt-6 border-t border-brand-purple/20">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-muted-foreground font-mono text-xs">
+            <p>© {new Date().getFullYear()} oneSitePls <span className="text-brand-purple/70 mx-0.5">::</span> Powered by CyberVibe <span className="text-brand-purple/70 mx-0.5">::</span> @SALAVEY13</p>
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Link href="/privacy-policy" className={footerLinkClass}><ShieldQuestion className="w-3 h-3"/>Конфиденциальность</Link>
+              <Link href="https://github.com/salavey13/carTest/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className={footerLinkClass}><FileText className="w-3 h-3"/>MIT License</Link>
+            </div>
+          </div>
+        </div>
           </motion.div>
         </div>
       </footer>
