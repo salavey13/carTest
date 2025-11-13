@@ -1,4 +1,6 @@
 "use client";
+import { FixedHeader } from "./components/FixedHeader";
+
 import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt, BrainCircuit } from "lucide-react"; // Added Bolt
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -246,6 +248,7 @@ export default function WarehouseLandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 font-sans">
+<FixedHeader />
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center text-white overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
@@ -896,7 +899,7 @@ export default function WarehouseLandingPage() {
       </section>
 
       {/* Invite Section */}
-      <section className="py-20 px-4 bg-white">
+      <section id="invite"  className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto text-center">
           <motion.h2 
             className="text-3xl md:text-4xl font-bold mb-12 text-gray-900"
