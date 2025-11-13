@@ -465,8 +465,8 @@ export default function WarehouseLandingPage() {
           </motion.h2>
           <Tabs defaultValue="comparison" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="comparison" className="text-lg py-3">Сравнение возможностей</TabsTrigger>
-              <TabsTrigger value="example" className="text-lg py-3">Реальный кейс</TabsTrigger>
+              <TabsTrigger value="comparison" className="text-lg py-3">Сравнение</TabsTrigger>
+              <TabsTrigger value="example" className="text-lg py-3">Реальный пример</TabsTrigger>
             </TabsList>
             
             <TabsContent value="comparison">
