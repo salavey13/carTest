@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
-import { createCrew, sendServiceInvoice, notifyAdmin } from "@/app/actions";
+import { createCrew, sendServiceInvoice, notifyAdmin, sendComplexMessage } from "@/app/actions";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
@@ -38,13 +38,27 @@ export default function WarehouseLandingPage() {
   const [createdCrew, setCreatedCrew] = useState<{ slug: string; name: string } | null>(null);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  
+  const auditRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setSlug(generateSlug(name)); }, [name]);
 
+  const scrollToAudit = () => {
+    setTimeout(() => {
+      auditRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dbUser?.user_id) { toast.error("Ошибка: не удалось определить ID пользователя."); return; }
-    if (!slug) { toast.error("Slug не может быть пустым. Введите название склада."); return; }
+    if (!dbUser?.user_id) { 
+      toast.error("Ошибка: не удалось определить ID пользователя."); 
+      return; 
+    }
+    if (!slug) { 
+      toast.error("Slug не может быть пустым. Введите название склада."); 
+      return; 
+    }
     setIsSubmitting(true);
     toast.info("Создание нового склада...");
     try {
@@ -57,23 +71,39 @@ export default function WarehouseLandingPage() {
         
         // Уведомление администратора о новом складе
         await notifyAdmin(`🎉 Новый склад создан!\nНазвание: ${result.data.name}\nВладелец: ${dbUser.username || dbUser.user_id}`);
-      } else { throw new Error(result.error || "Неизвестная ошибка при создании склада."); }
+        
+        // Отправляем персональное уведомление в Telegram
+        await sendComplexMessage(dbUser.user_id, `🎉 Поздравляем! Ваш склад "${result.data.name}" успешно создан! Теперь пригласите команду и начните оптимизацию.`, []);
+      } else { 
+        throw new Error(result.error || "Неизвестная ошибка при создании склада."); 
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Произошла ошибка.");
-    } finally { setIsSubmitting(false); }
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   const handleInvite = async () => {
     if (!createdCrew) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_ ${createdCrew.slug}_join_crew`;
+    
+    // Фикс: убираем лишние пробелы в URL
+    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
     const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
-    const shareUrl = `https://t.me/share/url?url= ${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
+    
+    // Открываем share URL
     window.open(shareUrl, "_blank");
     
-    // Отправляем уведомление владельцу
+    // Отправляем уведомление владельцу через Telegram
     if (dbUser?.user_id) {
-      await sendComplexMessage(dbUser.user_id, `✅ Приглашение для склада "${createdCrew.name}" готово!`, []);
-      toast.success("Приглашение отправлено!");
+      await sendComplexMessage(
+        dbUser.user_id, 
+        `✅ Приглашение для склада "${createdCrew.name}" готово!\n\nСсылка: ${inviteUrl}\n\nПоделитесь ею с командой.`, 
+        []
+      );
+      toast.success("Приглашение отправлено! Проверьте Telegram.");
+      
       // Уведомляем администратора о приглашении
       await notifyAdmin(`📧 Пользователь ${dbUser.username || dbUser.user_id} создал приглашение для склада "${createdCrew.name}"`);
     }
@@ -118,6 +148,13 @@ export default function WarehouseLandingPage() {
           icon: '📨'
         });
         
+        // Отправляем детальное уведомление пользователю
+        await sendComplexMessage(
+          dbUser.user_id,
+          `💰 Счет на оплату услуги "${service.name}" отправлен!\n\nСумма: ${service.amount}₽\nОписание: ${service.description}\n\nОплатите его в Telegram для продолжения.`,
+          []
+        );
+        
         // Уведомляем администратора
         await notifyAdmin(`💰 Новый заказ услуги!\nТип: ${service.name}\nКлиент: ${dbUser.username || dbUser.user_id}\nСумма: ${service.amount}₽`);
       } else {
@@ -160,11 +197,12 @@ export default function WarehouseLandingPage() {
       });
       
       if (result.ok) {
-        toast.success(`✅ Рассылка успешно отправлена ${result.status === 200 ? 'всем пользователям' : 'администраторам'}!`, {
+        const data = await result.json();
+        toast.success(`✅ Рассылка успешно отправлена ${data.recipients || ''} пользователям!`, {
           duration: 4000,
           icon: '📨'
         });
-        await notifyAdmin(`📢 Массовая рассылка от ${dbUser.username || dbUser.user_id}:\n${message}\n\nРезультат: успешно отправлено`);
+        await notifyAdmin(`📢 Массовая рассылка от ${dbUser.username || dbUser.user_id}:\n${message}\n\nРезультат: успешно отправлено ${data.recipients || ''} пользователям`);
       } else {
         throw new Error(`HTTP ${result.status}: ${result.statusText}`);
       }
@@ -192,6 +230,13 @@ export default function WarehouseLandingPage() {
         enterprise: '🏢 Экспоненциальный рост (Предприятие)'
       };
       
+      // Отправляем персональное сообщение пользователю
+      await sendComplexMessage(
+        dbUser.user_id,
+        `🎯 Вы выбрали тариф "${planNames[planType]}"! Мы подготовим для вас персональное предложение. Ожидайте деталей в Telegram.`,
+        []
+      );
+      
       await notifyAdmin(`💼 Пользователь выбрал тариф!\nПользователь: ${dbUser.username || dbUser.user_id}\nТариф: ${planNames[planType]}\nВремя: ${new Date().toLocaleString('ru-RU')}`);
     }
   };
@@ -202,7 +247,7 @@ export default function WarehouseLandingPage() {
       <section className="relative min-h-[80vh] flex items-center justify-center text-white overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
           <video className="w-full h-full object-cover brightness-50" autoPlay loop muted playsInline
-            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4 " />
+            src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-882e5db9-d256-42f2-a77a-da36b230f67e-0.mp4" />
         </div>
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-indigo-600/30" />
         <motion.div 
@@ -216,7 +261,7 @@ export default function WarehouseLandingPage() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2, type: "spring" }}
           >
-            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png "
+            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
               alt="Логотип приложения" width={142} height={69}
               className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 shadow-2xl ring-4 ring-white/10" />
           </motion.div>
@@ -245,6 +290,7 @@ export default function WarehouseLandingPage() {
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button onClick={() => {
                 setShowAudit(true);
+                scrollToAudit();
                 // Агрессивное всплывающее уведомление
                 toast.info("🔥 УЗНАЙТЕ СВОИ ПОТЕРИ ПРЯМО СЕЙЧАС!", {
                   icon: "⚡",
@@ -266,7 +312,7 @@ export default function WarehouseLandingPage() {
 
       {/* Lead Magnet Section */}
       {showAudit && (
-        <section id="audit-tool" className="py-16 px-4 bg-gradient-to-br from-white to-gray-50">
+        <section id="audit-tool" className="py-16 px-4 bg-gradient-to-br from-white to-gray-50" ref={auditRef}>
           <WarehouseAuditTool />
         </section>
       )}
@@ -284,7 +330,7 @@ export default function WarehouseLandingPage() {
               className="w-full h-auto" 
               autoPlay loop muted playsInline
             >
-              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4 " type="video/mp4" />
+              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
             </video>
           </motion.div>
         </div>
@@ -341,6 +387,7 @@ export default function WarehouseLandingPage() {
           >
             <Button onClick={() => {
               setShowAudit(true);
+              scrollToAudit();
               toast.info("🚀 Анализ начался! Не закрывайте страницу", { icon: "⏳" });
             }} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
               <FaRocket className="mr-2" /> ПРОАНАЛИЗИРОВАТЬ СКЛАД
@@ -527,7 +574,10 @@ export default function WarehouseLandingPage() {
                   <p className="text-xl font-semibold text-blue-800 mb-4">
                     Готовы к таким результатам?
                   </p>
-                  <Button onClick={() => setShowAudit(true)} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
+                  <Button onClick={() => {
+                    setShowAudit(true);
+                    scrollToAudit();
+                  }} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
                     <FaRocket className="mr-2" /> ПОВЫСИТЬ ЭФФЕКТИВНОСТЬ
                   </Button>
                 </motion.div>
@@ -831,7 +881,10 @@ export default function WarehouseLandingPage() {
                 Мы настолько уверены в результате, что предлагаем использовать систему за <strong>50% от вашей экономии на штрафах</strong>. 
                 Если недостачи не снизятся на 50% в первый месяц - вернем деньги!
               </p>
-              <Button onClick={() => setShowAudit(true)} className="mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
+              <Button onClick={() => {
+                setShowAudit(true);
+                scrollToAudit();
+              }} className="mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold text-lg shadow-lg">
                 <FaCalendarCheck className="mr-2" /> Узнать потенциал экономии
               </Button>
             </motion.div>
@@ -851,17 +904,35 @@ export default function WarehouseLandingPage() {
             Как начать работу и пригласить команду
           </motion.h2>
           <div className="max-w-3xl mx-auto text-left space-y-6 text-lg text-gray-600">
-            <ol className="list-decimal pl-6 space-y-6">
-              <li className="pb-2">Откройте приложение в Telegram и авторизуйтесь.</li>
-              <li className="pb-2">Перейдите в раздел "Экипажи" и создайте новый экипаж (кнопка "+").</li>
-              <li className="pb-2">Поделитесь ссылкой приглашения: t.me/[ваш-бот]?start=crew_[ваш-slug]_join_crew</li>
-              <li className="pb-2">Сотрудник перейдет по ссылке и подаст заявку.</li>
-              <li className="pb-2">Подтвердите заявку в карточке экипажа.</li>
-              <li>Назначьте роли и предоставьте доступ к складу.</li>
-            </ol>
-            <p className="text-center font-semibold text-xl mt-12 text-blue-800">
+            <motion.ol className="list-decimal pl-6 space-y-6">
+              {[
+                "Откройте приложение в Telegram и авторизуйтесь.",
+                'Перейдите в раздел "Экипажи" и создайте новый экипаж (кнопка "+").',
+                "Поделитесь ссылкой приглашения: t.me/[ваш-бот]?start=crew_[ваш-slug]_join_crew",
+                "Сотрудник перейдет по ссылке и подаст заявку.",
+                "Подтвердите заявку в карточке экипажа.",
+                "Назначьте роли и предоставьте доступ к складу."
+              ].map((step, index) => (
+                <motion.li 
+                  key={index}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="pb-2"
+                >
+                  {step}
+                </motion.li>
+              ))}
+            </motion.ol>
+            <motion.p 
+              className="text-center font-semibold text-xl mt-12 text-blue-800"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
               Экипаж - это ваш склад. Приглашайте команду для совместной работы!
-            </p>
+            </motion.p>
           </div>
         </div>
       </section>
