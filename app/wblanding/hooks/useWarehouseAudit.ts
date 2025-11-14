@@ -92,42 +92,61 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     if (!userId) return;
     
     const loadProgress = async () => {
-      // Check for incomplete audit
-      const { data: progress } = await supabaseAdmin.from('audit_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .single<AuditProgress>();
-      
-      if (progress) {
-        const timeDiff = Date.now() - new Date(progress.updatedAt).getTime();
-        const hoursDiff = timeDiff / (1000 * 60 * 60);
+      try {
+        // Check for incomplete audit
+        const { data: progress, error: progressError } = await supabaseAdmin
+          .from('audit_progress')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
         
-        // Offer to resume if incomplete audit is less than 24 hours old
-        if (hoursDiff < 24 && progress.currentStep < 8) {
-          setStep(progress.currentStep);
-          setAnswers(progress.answers);
-          setEstimatedTime('Продолжить с шага ' + progress.currentStep);
-          return;
+        if (progressError && progressError.code !== 'PGRST116') {
+          console.error('Progress load error:', progressError);
         }
-      }
-      
-      // Check for last completed audit
-      const { data: lastAudit } = await supabaseAdmin
-        .from('audit_reports')
-        .select('*')
-        .eq('user_id', userId)
-        .order('timestamp', { ascending: false })
-        .limit(1)
-        .single<AuditReport>();
-      
-      if (lastAudit) {
-        setHasCompletedAudit(true);
-        setLastCompletedAudit(lastAudit);
+        
+        if (progress) {
+          const timeDiff = Date.now() - new Date(progress.updated_at).getTime();
+          const hoursDiff = timeDiff / (1000 * 60 * 60);
+          
+          // Offer to resume if incomplete audit is less than 24 hours old
+          if (hoursDiff < 24 && progress.current_step < 8) {
+            setStep(progress.current_step);
+            // Map DB column answers_snapshot to state answers
+            setAnswers(progress.answers_snapshot || {});
+            setEstimatedTime(`Продолжить с шага ${progress.current_step}`);
+            console.log('✅ Progress loaded:', progress);
+            return;
+          } else if (hoursDiff >= 24) {
+            // Delete expired progress
+            await supabaseAdmin.from('audit_progress').delete().eq('user_id', userId);
+          }
+        }
+        
+        // Check for last completed audit
+        const { data: lastAudit, error: auditError } = await supabaseAdmin
+          .from('audit_reports')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (auditError && auditError.code !== 'PGRST116') {
+          console.error('Last audit load error:', auditError);
+        }
+        
+        if (lastAudit) {
+          setHasCompletedAudit(true);
+          setLastCompletedAudit(lastAudit);
+          console.log('✅ Last audit loaded:', lastAudit);
+        }
+      } catch (error) {
+        console.error('Failed to load progress:', error);
       }
     };
     
     loadProgress();
-  }, [userId, supabaseAdmin]);
+  }, [userId]); // Remove supabaseAdmin from deps to prevent infinite loops
 
   // ============= Analytics =============
   const trackAuditEvent = useCallback((eventName: string, properties: Record<string, any>) => {
@@ -255,21 +274,21 @@ export const useWarehouseAudit = (userId: string | undefined) => {
   const saveProgress = useCallback(async () => {
     if (!userId) return;
     
-    const progress: AuditProgress = {
-      userId,
-      currentStep: step,
-      answers,
-      updatedAt: new Date(),
-    };
-    
-    await supabaseAdmin.from('audit_progress').upsert({
-      user_id: userId,
-      current_step: step,
-      answers: answers,
-      updated_at: new Date(),
-    }, { onConflict: 'user_id' });
-    
-    console.log('💾 Progress saved:', { step, answers });
+    try {
+      await supabaseAdmin.from('audit_progress').upsert({
+        user_id: userId,
+        current_step: step,
+        answers_snapshot: answers, // FIX: Use correct column name
+        updated_at: new Date().toISOString(),
+      }, { 
+        onConflict: 'user_id',
+        ignoreDuplicates: false 
+      });
+      
+      console.log('💾 Progress saved:', { step, answers });
+    } catch (error) {
+      console.error('Failed to save progress:', error);
+    }
   }, [userId, step, answers, supabaseAdmin]);
 
   // ============= Roadmap Generation =============
@@ -334,6 +353,17 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     return roadmap.sort((a, b) => a.priority - b.priority);
   }, []);
 
+  // ============= Clear progress after completion =============
+  const clearProgress = useCallback(async () => {
+    if (!userId) return;
+    try {
+      await supabaseAdmin.from('audit_progress').delete().eq('user_id', userId);
+      console.log('🗑️ Progress cleared');
+    } catch (error) {
+      console.error('Failed to clear progress:', error);
+    }
+  }, [userId, supabaseAdmin]);
+
   // ============= Navigation =============
   const handleNext = useCallback(() => {
     const validation = validateAnswer(currentAnswer, questions[step]);
@@ -367,9 +397,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       trackAuditEvent('audit_completed', { totalLosses: result.total });
       
       // Clear progress after completion
-      if (userId) {
-        supabaseAdmin.from('audit_progress').delete().eq('user_id', userId);
-      }
+      clearProgress();
       
       console.log('📊 Audit completed:', { 
         inputs: newAnswers, 
@@ -377,7 +405,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
         roadmap: smartRoadmap,
       });
     }
-  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent, userId, saveProgress, supabaseAdmin]);
+  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent, userId, saveProgress, clearProgress]);
 
   const startAudit = useCallback(() => {
     setStep(1);
