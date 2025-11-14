@@ -314,7 +314,7 @@ export const WarehouseAuditTool = () => {
 
         {/* ROI Summary */}
         <motion.div 
-          className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-6 mb-8"
+          className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-2200 rounded-xl p-6 mb-8"
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 1 }}

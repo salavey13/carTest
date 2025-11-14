@@ -183,9 +183,16 @@ export const useWarehouseAudit = (userId: string | undefined) => {
   }, []); // Убрал зависимость от answers, так как не используется внутри
 
   // ============= Validation =============
+  // ИСПРАВЛЕНО: Добавлена проверка type === 'select'
   const validateAnswer = useCallback((value: string, question: any): { type: 'error' | 'warning' | null; message: string; } | null => {
     if (value === '') return null;
     
+    // Для селект-полей проверяем только наличие значения
+    if (question.type === 'select') {
+      return null; // Любое непустое значение для селекта валидно
+    }
+    
+    // Для числовых полей применяем числовую валидацию
     const num = parseInt(value, 10);
     if (isNaN(num)) return { type: 'error', message: 'Пожалуйста, введите число' };
     if (num < question.min) return { type: 'error', message: `Минимальное значение: ${question.min}` };
