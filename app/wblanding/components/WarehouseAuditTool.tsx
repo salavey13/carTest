@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FaChartLine, FaRocket, FaCheckCircle, FaMagic, FaTelegram, FaRedo, FaKeyboard, FaClock, FaExclamationTriangle, FaSyncAlt, FaUsers, FaInfoCircle } from 'react-icons/fa';
+import { FaChartLine, FaRocket, FaCheckCircle, FaMagic, FaTelegram, FaRedo, FaKeyboard, FaClock, FaExclamationTriangle, FaSyncAlt, FaUsers, FaInfoCircle, FaHistory } from 'react-icons/fa';
 import { Loader2, AlertTriangle, TrendingUp, Zap, ChevronLeft, ChevronRight, Target, Coins } from 'lucide-react';
 import Link from 'next/link';
 import { useWarehouseAudit } from '../hooks/useWarehouseAudit';
@@ -24,11 +24,15 @@ export const WarehouseAuditTool = () => {
     efficiency,
     estimatedTime,
     roadmap,
+    hasCompletedAudit,
+    lastCompletedAudit,
     setCurrentAnswer,
     handleNext,
     handleGetReport,
     reset,
     startAudit,
+    resumeAudit,
+    viewLastAudit,
     validateAnswer,
     trackAuditEvent,
   } = useWarehouseAudit(dbUser?.user_id);
@@ -36,7 +40,6 @@ export const WarehouseAuditTool = () => {
   const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; icon?: string }>(null);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
-  // FIX: Only block on errors, not warnings
   useEffect(() => {
     if (step > 0 && currentAnswer) {
       const result = validateAnswer(currentAnswer, questions[step]);
@@ -46,7 +49,7 @@ export const WarehouseAuditTool = () => {
     }
   }, [currentAnswer, step, questions, validateAnswer]);
 
-  // ============= HERO SCREEN =============
+  // ============= WELCOME SCREEN (with progress options) =============
   if (step === 0 && !showResult) {
     return (
       <motion.div 
@@ -74,7 +77,52 @@ export const WarehouseAuditTool = () => {
             Узнайте реальный потенциал экономии для вашего бизнеса
           </p>
           
-          {/* Honest Social Proof */}
+          {/* Progress-aware options */}
+          <div className="mt-6 space-y-3">
+            {hasCompletedAudit && (
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                className="bg-green-50 border border-green-200 rounded-xl p-4"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <FaCheckCircle className="text-green-600" />
+                  <p className="text-sm text-green-800 font-medium">
+                    У вас есть завершённый аудит
+                  </p>
+                </div>
+                <Button 
+                  onClick={viewLastAudit}
+                  variant="outline"
+                  className="w-full border-green-600 text-green-700 hover:bg-green-600 hover:text-white"
+                >
+                  <FaHistory className="mr-2" /> Посмотреть последний результат
+                </Button>
+              </motion.div>
+            )}
+            
+            {step > 1 && (
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                className="bg-blue-50 border border-blue-200 rounded-xl p-4"
+              >
+                <p className="text-sm text-blue-800 mb-2">
+                  Найден незавершённый аудит (шаг {step})
+                </p>
+                <Button 
+                  onClick={() => {
+                    resumeAudit();
+                  }}
+                  variant="outline"
+                  className="w-full border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white mr-2"
+                >
+                  Продолжить с шага {step}
+                </Button>
+              </motion.div>
+            )}
+          </div>
+          
           <motion.div 
             className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800 max-w-md mx-auto"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -87,7 +135,7 @@ export const WarehouseAuditTool = () => {
         </motion.div>
         
         <motion.div 
-          className="text-center"
+          className="text-center space-y-3"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -101,7 +149,7 @@ export const WarehouseAuditTool = () => {
           >
             <motion.span className="flex items-center justify-center">
               <FaRocket className="mr-3 text-xl" />
-              ПРОЙТИ АУДИТ
+              {step > 1 ? 'НАЧАТЬ ЗАНОВО' : 'ПРОЙТИ АУДИТ'}
               <motion.div
                 className="ml-3"
                 animate={{ rotate: 360 }}
@@ -111,9 +159,13 @@ export const WarehouseAuditTool = () => {
               </motion.div>
             </motion.span>
           </Button>
+          
+          {/* No more "don't close page" warning - progress is saved! */}
+          <p className="text-xs text-gray-500">
+            Прогресс автоматически сохраняется • Можно продолжить позже
+          </p>
         </motion.div>
         
-        {/* HONEST Stats */}
         <motion.div 
           className="mt-8 grid grid-cols-3 gap-4 text-center"
           initial={{ opacity: 0 }}
@@ -372,7 +424,7 @@ export const WarehouseAuditTool = () => {
                       key="send"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex items-center justify-center"
+                      class className="flex items-center justify-center"
                     >
                       <FaRocket className="mr-2" /> ПОЛУЧИТЬ ПЛАН ОПТИМИЗАЦИИ
                     </motion.span>
@@ -528,7 +580,7 @@ export const WarehouseAuditTool = () => {
         </AnimatePresence>
       </motion.div>
 
-      {/* Navigation - FIX: Only disable on errors, not warnings */}
+      {/* Navigation */}
       <motion.div 
         className="flex gap-3"
         initial={{ opacity: 0 }}
