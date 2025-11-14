@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/hooks/supabase';
+
 export async function POST(request: NextRequest) {
-  
   try {
     const body = await request.json();
     const { userId, step, answers, estimatedCompletion } = body;
 
     if (!userId) {
+      console.error('❌ Missing userId in partial audit request');
       return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
@@ -23,11 +24,16 @@ export async function POST(request: NextRequest) {
         onConflict: 'user_id',
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase upsert error:', error);
+      throw error;
+    }
 
+    console.log('✅ Partial audit saved for user:', userId, 'step:', step);
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error('Partial audit save error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('💥 Partial audit save error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

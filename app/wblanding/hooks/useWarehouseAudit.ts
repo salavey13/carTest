@@ -66,6 +66,9 @@ const REGIONAL_HOURLY_RATES = {
   moscow: 3500, spb: 3000, regions: 2000, remote: 1500,
 };
 
+// Cap ROI to prevent absurd values in UI
+const MAX_DISPLAY_ROI = 5000; // Cap at 5000% for display
+
 // ============= Main Hook =============
 export const useWarehouseAudit = (userId: string | undefined) => {
   const [step, setStep] = useState(0);
@@ -96,7 +99,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       type: 'number' as const, 
       placeholder: 'Например: 150', 
       min: 1,
-      max: 10000,
+      max: 5000, // Reduced from 10000 for realism
       required: true,
       helper: 'Считайте все уникальные товары (размеры, цвета, модели)',
     },
@@ -106,6 +109,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       type: 'number' as const, 
       placeholder: 'Например: 50', 
       min: 1,
+      max: 5000, // Added reasonable max
       required: true,
       helper: 'Поможет точнее рассчитать упущенные продажи',
     },
@@ -115,6 +119,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       type: 'number' as const, 
       placeholder: 'Например: 2000', 
       min: 100,
+      max: 50000, // Added max to prevent absurd values
       required: true,
       helper: 'Для расчёта реальной стоимости ошибок и упущенной прибыли',
     },
@@ -124,7 +129,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       type: 'number' as const, 
       placeholder: 'Например: 20', 
       min: 0,
-      max: 200,
+      max: 160, // 40 hours/week * 4 weeks
       required: true,
       helper: 'Включая проверку, ввод данных, исправление ошибок',
     },
@@ -134,7 +139,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       type: 'number' as const, 
       placeholder: 'Например: 15000', 
       min: 0,
-      max: 1000000,
+      max: 500000, // Reduced from 1000000
       required: true,
       helper: 'Штрафы от маркетплейсов за несвоевременное обновление',
     },
@@ -205,9 +210,12 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     const monthlySavings = Math.floor(total * 0.7); // Реалистичная экономия
     const annualSavings = monthlySavings * 12;
     const proPlanPrice = 4900;
-    const roi = Math.round((annualSavings / proPlanPrice) * 100);
-    const paybackMonths = Math.max(1, Math.round(proPlanPrice / monthlySavings * 10) / 10);
+    let roi = Math.round((annualSavings / proPlanPrice) * 100);
+    let paybackMonths = Math.max(1, Math.round(proPlanPrice / monthlySavings * 10) / 10);
 
+    // Cap extreme values for display
+    roi = Math.min(roi, MAX_DISPLAY_ROI);
+    
     return {
       total,
       breakdown: { 
@@ -235,10 +243,13 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     if (num < question.min) return `Минимальное значение: ${question.min}`;
     if (question.max && num > question.max) return `Максимальное значение: ${question.max}`;
     
-    // Реалистичность
-    if (question.id === 'skus' && num > 10000) return 'Введите реалистичное количество (max 10 000)';
-    if (question.id === 'stores' && num > 10) return 'Максимум 10 маркетплейсов';
-    if (question.id === 'penalties' && num > 1000000) return 'Введите реалистичную сумму';
+    // Reality checks
+    if (question.id === 'avgSkuValue' && num > 10000) {
+      return 'Стоимость слишком высока. Уточните данные.';
+    }
+    if (question.id === 'orderVolume' && num > 1000) {
+      return 'Значение кажется завышенным. Проверьте, пожалуйста.';
+    }
     
     return null;
   };
@@ -415,7 +426,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       // Generate recommendations from roadmap
       const recommendations = roadmap.map(item => `${item.priority}. ${item.title}: ${item.description}`);
 
-      // Truncate message if too long for Telegram (4096 chars limit)
+      // Build Telegram message
       let message = `📊 *Ваш аудит склада готов!*
 
 ✅ *Потенциал экономии:* ${result.breakdown.monthlySavings.toLocaleString('ru-RU')}₽/мес
@@ -441,11 +452,10 @@ export const useWarehouseAudit = (userId: string | undefined) => {
 
       message += `\n\n💡 *Следующий шаг:* Начните с бесплатного тарифа`;
 
-      // Telegram message options (imageQuery removed as it's not standard)
+      // Use actual sendComplexMessage with imageQuery support
       await sendComplexMessage(userId, message, [], {
         parseMode: 'Markdown',
-        // Remove unsupported imageQuery to prevent errors
-        // imageQuery: 'warehouse optimization success chart infographic',
+        imageQuery: 'warehouse optimization success',
       });
 
       // Save full report
@@ -475,10 +485,25 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     } catch (error) {
       console.error('Failed to send audit report:', error);
       const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-      toast.error(`❌ Ошибка отправки отчёта: ${errorMessage}`, { 
-        icon: '❌',
-        duration: 5000,
-      });
+      
+      // More helpful error messages
+      if (errorMessage.includes('Too Many Requests')) {
+        toast.error('❌ Слишком много запросов. Попробуйте через минуту.', { 
+          icon: '⏱️',
+          duration: 5000,
+        });
+      } else if (errorMessage.includes('Forbidden')) {
+        toast.error('❌ Ошибка доступа. Проверьте подключение Telegram.', { 
+          icon: '🔐',
+          duration: 5000,
+        });
+      } else {
+        toast.error(`❌ Ошибка отправки отчёта: ${errorMessage}`, { 
+          icon: '❌',
+          duration: 5000,
+        });
+      }
+      
       trackAuditEvent('report_error', { error: errorMessage });
     } finally {
       setIsSending(false);
@@ -487,21 +512,31 @@ export const useWarehouseAudit = (userId: string | undefined) => {
 
   const saveAuditReport = async (report: AuditReport) => {
     try {
+      console.log('💾 Saving audit report for user:', report.userId);
       const response = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(report),
       });
       
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 200)}`);
+      }
+      
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to save audit report');
+        console.error('API error response:', result);
+        throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
       }
       
+      console.log('✅ Audit report saved successfully:', result);
       return result;
     } catch (error) {
-      console.error('Failed to save audit:', error);
+      console.error('💾 Failed to save audit report:', error);
       return { error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
@@ -514,6 +549,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setShowResult(false);
     setIsSending(false);
     setRoadmap([]);
+    setEstimatedTime('60 сек');
     trackAuditEvent('audit_reset', {});
   };
 
