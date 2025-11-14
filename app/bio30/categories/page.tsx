@@ -1,49 +1,82 @@
-// /app/bio30/categories/page.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-
-
 import CategoryFilter from "../components/CategoryFilter";
 import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
+import { fetchCars } from "@/hooks/supabase";
+import { logger } from "@/lib/logger";
 import noUiSlider from "nouislider";
 
-const products = [
-  {
-    id: "lion-s-mane",
-    title: "Lion's Mane",
-    desc: "Гриб Львиная грива. Улучшает когнитивные функции.",
-    price: 1500,
-    img: "https://bio30.ru/front/static/uploads/products/9aeea9dde8f048238a27f43c3997c9fd.webp"
-  },
-  {
-    id: "cordyceps-sinensis",
-    title: "Cordyceps Sinensis",
-    desc: "Кордицепс китайский. Повышает энергию и выносливость.",
-    price: 2000,
-    img: "https://bio30.ru/front/static/uploads/products/deab27a3b7834149ad5187c430301f9c.webp"
-  },
-  {
-    id: "spirulina-chlorella",
-    title: "Spirulina Chlorella",
-    desc: "Спирулина и хлорелла. Детокс и иммунитет.",
-    price: 1200,
-    img: "https://bio30.ru/front/static/uploads/products/44aa9efb6836449bb10a1f7ac9d42923.webp"
-  },
-  {
-    id: "magnesium-pyridoxine",
-    title: "Magnesium Pyridoxine",
-    desc: "Магний и витамин B6. Для нервной системы.",
-    price: 1800,
-    img: "https://bio30.ru/front/static/uploads/products/1552689351894f229843f51efdb813fc.webp"
-  },
-];
+interface Product {
+  id: string;
+  title: string;
+  desc: string;
+  price: number;
+  img: string;
+}
+
+// Helper to transliterate Cyrillic to Latin for URLs
+function transliterate(text: string): string {
+  const map: Record<string, string> = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z',
+    'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r',
+    'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh', 'З': 'Z',
+    'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R',
+    'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Shch',
+    'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+  };
+  
+  return text.split('').map(char => map[char] || char).join('');
+}
+
+// Generate URL-friendly product ID
+function generateProductId(carId: string): string {
+  return transliterate(carId)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Map Supabase car data to UI product format
+function mapCarToProduct(car: any): Product {
+  const specs = car.specs || {};
+  
+  // Extract the display name (remove quantity suffix for cleaner title)
+  const model = car.model || '';
+  const cleanTitle = model.replace(/(\d+)$/, '').trim();
+  
+  // Determine the best image URL
+  const imgUrl = car.image_url || (specs.photos && specs.photos[0]) || 
+    "https://bio30.ru/front/static/uploads/products/default.webp";
+  
+  // Use price from specs (actual product price), not daily_price
+  const price = specs.price || 0;
+  
+  // Get benefits from purpose field or construct from description
+  const desc = specs.purpose || 
+    car.description?.substring(0, 100) + (car.description?.length > 100 ? '...' : '') ||
+    'Пищевая добавка BIO 3.0';
+  
+  return {
+    id: generateProductId(car.id),
+    title: cleanTitle,
+    desc: desc,
+    price: price,
+    img: imgUrl
+  };
+}
 
 const CategoriesPage: React.FC = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
   const productGrid = useStaggerFadeIn(products.length, 0.1);
@@ -51,7 +84,7 @@ const CategoriesPage: React.FC = () => {
 
   useEffect(() => {
     const slider = document.getElementById('price-slider');
-    if (slider) {
+    if (slider && !slider.noUiSlider) {
       noUiSlider.create(slider, {
         start: [0, 5000],
         connect: true,
@@ -62,6 +95,75 @@ const CategoriesPage: React.FC = () => {
       });
     }
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const { success, data, error: fetchError } = await fetchCars();
+      
+      if (!success) {
+        throw new Error(fetchError || "Failed to fetch products");
+      }
+      
+      if (!data || data.length === 0) {
+        logger.warn("No products found in database");
+        setProducts([]);
+        return;
+      }
+      
+      // Filter and map only BIO 3.0 products with valid data
+      const validProducts = data
+        .filter(car => car.make === 'BIO 3.0' && car.specs && car.specs.price)
+        .map(mapCarToProduct)
+        .filter(product => product.price > 0); // Ensure valid price
+      
+      logger.info(`Loaded ${validProducts.length} products from Supabase`);
+      setProducts(validProducts);
+    } catch (err) {
+      logger.error("Error loading products:", err);
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <h2 className="text-2xl font-bold text-destructive mb-4">Ошибка загрузки</h2>
+        <p className="text-muted-foreground mb-6">{error}</p>
+        <button 
+          onClick={loadProducts}
+          className="btn btn--primary"
+        >
+          Попробовать снова
+        </button>
+      </div>
+    );
+  }
+
+  if (products.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <h2 className="text-2xl font-bold mb-4">Товары не найдены</h2>
+        <p className="text-muted-foreground">В каталоге временно отсутствуют товары</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -101,25 +203,25 @@ const CategoriesPage: React.FC = () => {
                   <div className="filter-tags col gp gp--xs">
                     <div className="row ctr gp gp--xs">
                       <input className="ui-checkbox" type="checkbox" name="tag" value="bestseller" id="tag_bestseller" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_bestseller">
+                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_bestseller">
                         Бестселлер
                       </label>
                     </div>
                     <div className="row ctr gp gp--xs">
                       <input className="ui-checkbox" type="checkbox" name="tag" value="for_women" id="tag_for_women" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_for_women">
+                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_for_women">
                         Для женщин
                       </label>
                     </div>
                     <div className="row ctr gp gp--xs">
                       <input className="ui-checkbox" type="checkbox" name="tag" value="for_men" id="tag_for_men" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_for_men">
+                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_for_men">
                         Для мужчин
                       </label>
                     </div>
                     <div className="row ctr gp gp--xs">
                       <input className="ui-checkbox" type="checkbox" name="tag" value="complex" id="tag_complex" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" for="tag_complex">
+                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_complex">
                         Комплекс
                       </label>
                     </div>
@@ -133,7 +235,7 @@ const CategoriesPage: React.FC = () => {
                   </div>
                   <div className="row ctr gp gp--xs">
                     <input className="ui-checkbox" type="checkbox" name="in_stock_only" id="in_stock_only" />
-                    <label className="link fs__md fw__md opc opc--50 anmt" for="in_stock_only">
+                    <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="in_stock_only">
                       Только в наличии
                     </label>
                   </div>
@@ -146,7 +248,7 @@ const CategoriesPage: React.FC = () => {
                   </div>
                   <div className="row ctr gp gp--xs">
                     <input className="ui-checkbox" type="checkbox" name="has_discount" id="has_discount" />
-                    <label className="link fs__md fw__md opc opc--50 anmt" for="has_discount">
+                    <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="has_discount">
                       Только со скидкой
                     </label>
                   </div>
@@ -167,26 +269,21 @@ const CategoriesPage: React.FC = () => {
           >
             {products.map((p, i) => (
               <motion.div
-                key={i}
+                key={p.id}
                 variants={productGrid.child}
-                className={p.class || "card card__default bg-card shadow-md rounded-xl overflow-hidden"}
-                style={{ backgroundColor: p.bg, color: p.text }}
+                className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
               >
                 <Link href={`/bio30/categories/${p.id}`}>
                   <img
                     src={p.img}
                     alt={p.title}
                     className="w-full h-64 object-cover image__web"
-                  />
-                  <img
-                    src={p.mobileImg || p.img}
-                    alt={p.title}
-                    className="w-full h-64 object-cover image__mobile"
+                    loading="lazy"
                   />
                   <div className="p-4">
                     <h3 className="text-lg font-semibold">{p.title}</h3>
-                    <p className="text-sm text-muted-foreground">{p.desc}</p>
-                    <p className="text-base font-bold mt-2">{p.price} руб.</p>
+                    <p className="text-sm text-muted-foreground mt-1">{p.desc}</p>
+                    <p className="text-base font-bold mt-3">{p.price} руб.</p>
                   </div>
                 </Link>
               </motion.div>
