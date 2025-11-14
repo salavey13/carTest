@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import CategoryFilter from "../components/CategoryFilter";
+import CategoryFilter, { FilterState } from "../components/CategoryFilter";
 import { motion } from "framer-motion";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
-import { fetchCars } from "@/hooks/supabase";
+import { fetchBio30Products } from "../categories/actions";
 import { logger } from "@/lib/logger";
 import noUiSlider from "nouislider";
 
@@ -43,49 +43,42 @@ function generateProductId(carId: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-// Map Supabase car data to UI product format
-function mapCarToProduct(car: any): Product {
-  const specs = car.specs || {};
-  
-  // Extract the display name (remove quantity suffix for cleaner title)
-  const model = car.model || '';
-  const cleanTitle = model.replace(/(\d+)$/, '').trim();
-  
-  // Determine the best image URL
-  const imgUrl = car.image_url || (specs.photos && specs.photos[0]) || 
-    "https://bio30.ru/front/static/uploads/products/default.webp";
-  
-  // Use price from specs (actual product price), not daily_price
-  const price = specs.price || 0;
-  
-  // Get benefits from purpose field or construct from description
-  const desc = specs.purpose || 
-    car.description?.substring(0, 100) + (car.description?.length > 100 ? '...' : '') ||
-    'Пищевая добавка BIO 3.0';
-  
+// Map Supabase product data to UI format
+function mapProductToUI(product: any): Product {
   return {
-    id: generateProductId(car.id),
-    title: cleanTitle,
-    desc: desc,
-    price: price,
-    img: imgUrl
+    id: generateProductId(product.id),
+    title: product.title,
+    desc: product.description,
+    price: product.price,
+    img: product.image
   };
 }
 
 const CategoriesPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   const heroTitle = useScrollFadeIn("up", 0.1);
   const heroSubtitle = useScrollFadeIn("up", 0.2);
-  const productGrid = useStaggerFadeIn(products.length, 0.1);
+  const productGrid = useStaggerFadeIn(filteredProducts.length, 0.1);
   useBio30ThemeFix();
+
+  const [filters, setFilters] = useState<FilterState>({
+    category: 'Все категории',
+    search: '',
+    minPrice: 0,
+    maxPrice: 5000,
+    purposes: [],
+    inStockOnly: false,
+    hasDiscount: false
+  });
 
   useEffect(() => {
     const slider = document.getElementById('price-slider');
     if (slider && !slider.noUiSlider) {
-      noUiSlider.create(slider, {
+      const sliderInstance = noUiSlider.create(slider, {
         start: [0, 5000],
         connect: true,
         range: {
@@ -93,44 +86,90 @@ const CategoriesPage: React.FC = () => {
           'max': 5000
         }
       });
+
+      sliderInstance.on('update', (values) => {
+        const min = parseInt(values[0]);
+        const max = parseInt(values[1]);
+        setFilters(prev => ({
+          ...prev,
+          minPrice: min,
+          maxPrice: max
+        }));
+      });
     }
   }, []);
 
   useEffect(() => {
-    loadProducts();
+    loadInitialProducts();
   }, []);
 
-  const loadProducts = async () => {
+  const loadInitialProducts = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const { success, data, error: fetchError } = await fetchCars();
+      const { success, data, error: fetchError } = await fetchBio30Products();
       
       if (!success) {
         throw new Error(fetchError || "Failed to fetch products");
       }
       
-      if (!data || data.length === 0) {
-        logger.warn("No products found in database");
-        setProducts([]);
-        return;
-      }
-      
-      // Filter and map only BIO 3.0 products with valid data
-      const validProducts = data
-        .filter(car => car.make === 'BIO 3.0' && car.specs && car.specs.price)
-        .map(mapCarToProduct)
-        .filter(product => product.price > 0); // Ensure valid price
-      
-      logger.info(`Loaded ${validProducts.length} products from Supabase`);
-      setProducts(validProducts);
+      const uiProducts = (data || []).map(mapProductToUI);
+      setProducts(uiProducts);
+      setFilteredProducts(uiProducts);
     } catch (err) {
       logger.error("Error loading products:", err);
       setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFilterChange = useCallback(async (newFilters: FilterState) => {
+    setFilters(newFilters);
+    
+    try {
+      // Apply server-side filtering
+      const { success, data, error: filterError } = await fetchBio30Products(newFilters);
+      
+      if (!success) {
+        throw new Error(filterError || "Failed to apply filters");
+      }
+      
+      const uiProducts = (data || []).map(mapProductToUI);
+      setFilteredProducts(uiProducts);
+    } catch (err) {
+      logger.error("Error applying filters:", err);
+      // Fallback to client-side filtering
+      applyClientSideFilters(newFilters);
+    }
+  }, [products]);
+
+  const applyClientSideFilters = (newFilters: FilterState) => {
+    // This is a backup in case server-side filtering fails
+    const filtered = products.filter(product => {
+      // Category filter
+      if (newFilters.category !== 'Все категории') {
+        // Filter logic would go here if needed
+      }
+      
+      // Search filter
+      if (newFilters.search) {
+        const searchTerm = newFilters.search.toLowerCase();
+        const matches = product.title.toLowerCase().includes(searchTerm) ||
+                       product.desc.toLowerCase().includes(searchTerm);
+        if (!matches) return false;
+      }
+      
+      // Price filter
+      if (product.price < newFilters.minPrice || product.price > newFilters.maxPrice) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    setFilteredProducts(filtered);
   };
 
   if (isLoading) {
@@ -147,7 +186,7 @@ const CategoriesPage: React.FC = () => {
         <h2 className="text-2xl font-bold text-destructive mb-4">Ошибка загрузки</h2>
         <p className="text-muted-foreground mb-6">{error}</p>
         <button 
-          onClick={loadProducts}
+          onClick={loadInitialProducts}
           className="btn btn--primary"
         >
           Попробовать снова
@@ -156,11 +195,25 @@ const CategoriesPage: React.FC = () => {
     );
   }
 
-  if (products.length === 0) {
+  if (filteredProducts.length === 0) {
     return (
       <div className="text-center py-16">
-        <h2 className="text-2xl font-bold mb-4">Товары не найдены</h2>
-        <p className="text-muted-foreground">В каталоге временно отсутствуют товары</p>
+        <h2 className="text-2xl font-bold mb-4">Продукты не найдены</h2>
+        <p className="text-muted-foreground mb-6">По вашим критериям ничего не найдено</p>
+        <button 
+          onClick={() => handleFilterChange({
+            category: 'Все категории',
+            search: '',
+            minPrice: 0,
+            maxPrice: 5000,
+            purposes: [],
+            inStockOnly: false,
+            hasDiscount: false
+          })}
+          className="btn btn--primary"
+        >
+          Сбросить фильтры
+        </button>
       </div>
     );
   }
@@ -190,43 +243,12 @@ const CategoriesPage: React.FC = () => {
                   </div>
                   <div id="price-slider" className="price-slider mb-6"></div>
                   <div className="row ctr space--between">
-                    <span id="slider_min_value" className="subtitle fs__md fw__md">0</span>
-                    <span id="slider_max_value" className="subtitle fs__md fw__md">5000</span>
+                    <span id="slider_min_value" className="subtitle fs__md fw__md">{filters.minPrice}</span>
+                    <span id="slider_max_value" className="subtitle fs__md fw__md">{filters.maxPrice}</span>
                   </div>
                 </div>
-                <div className="col gp gp--xs">
-                  <div className="row">
-                    <h4 className="title fs__sm fw__bd opc opc--50 mg mg__xs--btm">
-                      Теги
-                    </h4>
-                  </div>
-                  <div className="filter-tags col gp gp--xs">
-                    <div className="row ctr gp gp--xs">
-                      <input className="ui-checkbox" type="checkbox" name="tag" value="bestseller" id="tag_bestseller" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_bestseller">
-                        Бестселлер
-                      </label>
-                    </div>
-                    <div className="row ctr gp gp--xs">
-                      <input className="ui-checkbox" type="checkbox" name="tag" value="for_women" id="tag_for_women" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_for_women">
-                        Для женщин
-                      </label>
-                    </div>
-                    <div className="row ctr gp gp--xs">
-                      <input className="ui-checkbox" type="checkbox" name="tag" value="for_men" id="tag_for_men" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_for_men">
-                        Для мужчин
-                      </label>
-                    </div>
-                    <div className="row ctr gp gp--xs">
-                      <input className="ui-checkbox" type="checkbox" name="tag" value="complex" id="tag_complex" />
-                      <label className="link fs__md fw__md opc opc--50 anmt" htmlFor="tag_complex">
-                        Комплекс
-                      </label>
-                    </div>
-                  </div>
-                </div>
+                
+                {/* Legacy filters kept for visual consistency */}
                 <div className="col gp gp--xs">
                   <div className="row">
                     <h4 className="title fs__sm fw__bd opc opc--50 mg mg__xs--btm">
@@ -240,6 +262,7 @@ const CategoriesPage: React.FC = () => {
                     </label>
                   </div>
                 </div>
+                
                 <div className="col gp gp--xs">
                   <div className="row">
                     <h4 className="title fs__sm fw__bd opc opc--50 mg mg__xs--btm">
@@ -259,7 +282,7 @@ const CategoriesPage: React.FC = () => {
         </aside>
 
         <section className="bside--categories w-full md:w-3/4">
-          <CategoryFilter />
+          <CategoryFilter onFilterChange={handleFilterChange} initialFilters={filters} />
           <motion.div
             ref={productGrid.ref}
             initial="hidden"
@@ -267,23 +290,37 @@ const CategoriesPage: React.FC = () => {
             variants={productGrid.container}
             className="grid grid--cards"
           >
-            {products.map((p, i) => (
+            {filteredProducts.map((p) => (
               <motion.div
                 key={p.id}
                 variants={productGrid.child}
-                className="card card__default bg-card shadow-md rounded-xl overflow-hidden"
+                className="card card__default bg-card shadow-md rounded-xl overflow-hidden hover:shadow-lg transition-shadow"
               >
                 <Link href={`/bio30/categories/${p.id}`}>
-                  <img
-                    src={p.img}
-                    alt={p.title}
-                    className="w-full h-64 object-cover image__web"
-                    loading="lazy"
-                  />
+                  <div className="relative">
+                    <img
+                      src={p.img}
+                      alt={p.title}
+                      className="w-full h-64 object-cover image__web"
+                      loading="lazy"
+                    />
+                    {p.originalPrice && p.originalPrice > p.price && (
+                      <span className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs font-bold">
+                        -{Math.round((1 - p.price / p.originalPrice) * 100)}%
+                      </span>
+                    )}
+                  </div>
                   <div className="p-4">
-                    <h3 className="text-lg font-semibold">{p.title}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">{p.desc}</p>
-                    <p className="text-base font-bold mt-3">{p.price} руб.</p>
+                    <h3 className="text-lg font-semibold mb-1">{p.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{p.desc}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xl font-bold">{p.price} руб.</p>
+                      {p.originalPrice && p.originalPrice > p.price && (
+                        <p className="text-sm text-muted-foreground line-through">
+                          {p.originalPrice} руб.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </Link>
               </motion.div>
