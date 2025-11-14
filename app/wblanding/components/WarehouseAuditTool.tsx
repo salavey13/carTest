@@ -33,26 +33,26 @@ export const WarehouseAuditTool = () => {
     trackAuditEvent,
   } = useWarehouseAudit(dbUser?.user_id);
 
-  const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | 'critical' | null; message: string; icon?: string }>(null);
+  const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; icon?: string }>(null);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
-  // Dynamic validation with context
+  // FIX: Only block on errors, not warnings
   useEffect(() => {
     if (step > 0 && currentAnswer) {
       const error = validateAnswer(currentAnswer, questions[step]);
       if (error) {
         setValidationResult({ type: 'error', message: error });
       } else {
-        // Contextual warnings
+        // Contextual warnings (non-blocking)
         const num = parseInt(currentAnswer, 10);
         const question = questions[step];
         
-        if (question.id === 'skus' && num > 500) {
-          setValidationResult({ type: 'warning', message: 'Рекомендуем Про-план для 500+ SKU', icon: '📈' });
-        } else if (question.id === 'penalties' && num > 25000) {
-          setValidationResult({ type: 'critical', message: 'Ваши потери критичны! Начните сегодня', icon: '⚠️' });
-        } else if (question.id === 'stores' && num > 2) {
-          setValidationResult({ type: 'warning', message: 'Многоканальность требует автоматизации', icon: '🎯' });
+        if (question.id === 'skus' && num > 300) {
+          setValidationResult({ type: 'warning', message: '⚠️ Рекомендуем Про-план для 300+ SKU', icon: '📈' });
+        } else if (question.id === 'penalties' && num > 20000) {
+          setValidationResult({ type: 'warning', message: '⚠️ Ваши потери критичны! Начните сегодня', icon: '⚠️' });
+        } else if (question.id === 'stores' && num > 1) {
+          setValidationResult({ type: 'warning', message: '⚠️ Многоканальность требует автоматизации', icon: '🎯' });
         } else {
           setValidationResult(null);
         }
@@ -62,6 +62,7 @@ export const WarehouseAuditTool = () => {
     }
   }, [currentAnswer, step, questions, validateAnswer]);
 
+  // ============= HERO SCREEN =============
   if (step === 0 && !showResult) {
     return (
       <motion.div 
@@ -86,18 +87,18 @@ export const WarehouseAuditTool = () => {
             Оптимизация склада за <span className="text-blue-600">{estimatedTime}</span>
           </h3>
           <p className="text-lg text-gray-600">
-            Узнайте, как увеличить эффективность и сэкономить время
+            Узнайте реальный потенциал экономии для вашего бизнеса
           </p>
           
-          {/* Social Proof */}
+          {/* Honest Social Proof */}
           <motion.div 
-            className="mt-4 bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800 max-w-md mx-auto"
+            className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800 max-w-md mx-auto"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.5 }}
           >
             <FaUsers className="inline mr-2" /> 
-            <strong>1,247+</strong> складов уже оптимизировано
+            <strong>Бета-тестирование</strong> • Первые 10 складов получают lifetime скидку 50%
           </motion.div>
         </motion.div>
         
@@ -128,6 +129,7 @@ export const WarehouseAuditTool = () => {
           </Button>
         </motion.div>
         
+        {/* HONEST Stats */}
         <motion.div 
           className="mt-8 grid grid-cols-3 gap-4 text-center"
           initial={{ opacity: 0 }}
@@ -135,9 +137,9 @@ export const WarehouseAuditTool = () => {
           transition={{ delay: 0.3 }}
         >
           {[
-            { value: '73%', label: 'Снижение ошибок', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-            { value: '20+', label: 'Часов экономии', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
-            { value: '1,247', label: 'Довольных клиентов', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+            { value: '70%', label: 'Снижение рутины', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+            { value: '15+', label: 'Часов экономии', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+            { value: '0→∞', label: 'Ваш потенциал', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -145,7 +147,6 @@ export const WarehouseAuditTool = () => {
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: index * 0.1 }}
               whileHover={{ scale: 1.05 }}
-              // FIXED: Changed from ${bg} ${border} to ${stat.bg} ${stat.border}
               className={`${stat.bg} ${stat.border} p-3 rounded-xl border`}
             >
               <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
@@ -157,6 +158,7 @@ export const WarehouseAuditTool = () => {
     );
   }
 
+  // ============= RESULT SCREEN =============
   if (showResult && breakdown) {
     return (
       <motion.div 
@@ -209,8 +211,8 @@ export const WarehouseAuditTool = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { id: 'time', label: 'Время', value: `${breakdown.hours} ч`, color: 'blue', icon: FaClock, detail: `${breakdown.timeCost.toLocaleString()}₽/мес на рутину`, action: 'Автоматизация в 1 клик' },
-              { id: 'penalties', label: 'Штрафы', value: `${breakdown.penaltyCost.toLocaleString()}₽`, color: 'red', icon: FaExclamationTriangle, detail: 'За ошибки в остатках', action: 'Экономия 90% с PRO' },
-              { id: 'missed', label: 'Упущено', value: `${breakdown.missedSales.toLocaleString()}₽`, color: 'orange', icon: FaChartLine, detail: 'Потерянные продажи', action: 'Точность 99.9%' },
+              { id: 'penalties', label: 'Штрафы', value: `${breakdown.penaltyCost.toLocaleString()}₽`, color: 'red', icon: FaExclamationTriangle, detail: 'За ошибки в остатках', action: 'Экономия 80% с PRO' },
+              { id: 'missed', label: 'Упущено', value: `${breakdown.missedSales.toLocaleString()}₽`, color: 'orange', icon: FaChartLine, detail: 'Потерянные продажи', action: 'Точность 99%+' },
               { id: 'errors', label: 'Ошибки', value: `${breakdown.humanErrorCost.toLocaleString()}₽`, color: 'purple', icon: FaSyncAlt, detail: 'Человеческий фактор', action: 'Gamification' },
             ].map((item, idx) => {
               const Icon = item.icon;
@@ -254,20 +256,20 @@ export const WarehouseAuditTool = () => {
           </div>
         </motion.div>
 
-        {/* Social Proof */}
+        {/* HONEST Social Proof */}
         <motion.div 
-          className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-8"
+          className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-8"
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
           <div className="flex items-center gap-3">
-            <TrendingUp className="w-6 h-6 text-green-600" />
+            <TrendingUp className="w-6 h-6 text-blue-600" />
             <div>
-              <p className="text-sm text-green-800 font-medium">
-                Склады с похожими параметрами экономят <strong>{(breakdown.monthlySavings * 1.1).toLocaleString()}₽/мес</strong>
+              <p className="text-sm text-blue-800 font-medium">
+                Индивидуальный расчёт на основе <strong>отраслевых метрик</strong>
               </p>
-              <p className="text-xs text-green-600">На основе 1,247+ аудитов</p>
+              <p className="text-xs text-blue-600">Каждый склад уникален • Проверьте данные</p>
             </div>
           </div>
         </motion.div>
@@ -349,7 +351,7 @@ export const WarehouseAuditTool = () => {
           </div>
         </motion.div>
 
-        {/* Action Buttons */}
+        {/* Contact & Action */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -357,10 +359,15 @@ export const WarehouseAuditTool = () => {
         >
           {dbUser?.user_id ? (
             <div className="text-center space-y-4">
-              <p className="text-gray-600 flex items-center justify-center gap-2">
-                <FaTelegram className="text-blue-500" />
-                Персональный план будет отправлен вам в Telegram
-              </p>
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
+                <p className="text-gray-600 mb-2 flex items-center justify-center gap-2">
+                  <FaTelegram className="text-blue-500" />
+                  Персональный план будет отправлен вам в Telegram
+                </p>
+                <p className="text-sm text-gray-500">
+                  Вопросы? Пишите: <strong>@salavey13</strong>
+                </p>
+              </div>
               <Button 
                 onClick={handleGetReport} 
                 disabled={isSending}
@@ -419,7 +426,7 @@ export const WarehouseAuditTool = () => {
     );
   }
 
-  // Question Screen
+  // ============= QUESTION SCREEN =============
   const currentQuestion = questions[step];
   const progress = (step / questions.length) * 100;
 
@@ -527,18 +534,17 @@ export const WarehouseAuditTool = () => {
               exit={{ opacity: 0, y: -10 }}
               className={`mt-3 p-3 rounded-lg flex items-start gap-3 ${
                 validationResult.type === 'error' ? 'bg-red-100 text-red-700' :
-                validationResult.type === 'warning' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-blue-100 text-blue-700'
+                'bg-yellow-100 text-yellow-700'
               }`}
             >
-              <span className="text-lg">{validationResult.icon || '💡'}</span>
+              <span>{validationResult.icon || '💡'}</span>
               <span className="font-medium">{validationResult.message}</span>
             </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
 
-      {/* Navigation */}
+      {/* Navigation - FIX: Only disable on errors, not warnings */}
       <motion.div 
         className="flex gap-3"
         initial={{ opacity: 0 }}
@@ -559,7 +565,7 @@ export const WarehouseAuditTool = () => {
         )}
         <Button 
           onClick={handleNext} 
-          disabled={!currentAnswer || !!validationResult?.type}
+          disabled={!currentAnswer || validationResult?.type === 'error'} // FIX HERE
           className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-lg py-6 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <motion.span className="flex items-center justify-center">
