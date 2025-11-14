@@ -40,6 +40,7 @@ export async function fetchBio30Products(filters?: {
     }
 
     // Apply price range filter - cast to numeric
+    // NOTE: The ::numeric cast works in WHERE clauses but NOT in ORDER clauses
     if (filters?.minPrice !== undefined) {
       query = query.gte("specs->>price::numeric", filters.minPrice);
     }
@@ -66,8 +67,10 @@ export async function fetchBio30Products(filters?: {
       ].join(','));
     }
 
+    // ❌ REMOVED: .order("specs->>price::numeric", { ascending: true })
+    // ✅ CORRECTED: Order by JSONB field directly (must be numeric in DB)
     const { data, error } = await query
-      .order("specs->>price::numeric", { ascending: true })
+      .order('specs->price', { ascending: true })
       .limit(50);
 
     if (error) {
@@ -96,7 +99,7 @@ export async function fetchBio30Products(filters?: {
         description: car.description || purposeStr || 'Пищевая добавка BIO 3.0',
         price: currentPrice,
         originalPrice: hasDiscount ? oldPrice : undefined,
-        image: car.image_url || (specs.photos && specs.photos[0]) || "https://bio30.ru/front/static/uploads/products/default.webp ",
+        image: car.image_url || (specs.photos && specs.photos[0]) || "https://bio30.ru/front/static/uploads/products/default.webp",
         category: specs.type || 'Пищевая добавка',
         purpose: purposes,
         inStock: true,
