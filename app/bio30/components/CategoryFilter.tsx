@@ -3,11 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { getUniqueCategories, getUniquePurposes } from '../categories/actions';
 import { logger } from "@/lib/logger";
-
-interface CategoryFilterProps {
-  onFilterChange: (filters: FilterState) => void;
-  initialFilters?: FilterState;
-}
+import { useAppToast } from "@/hooks/useAppToast";
 
 export interface FilterState {
   category: string;
@@ -19,10 +15,16 @@ export interface FilterState {
   hasDiscount: boolean;
 }
 
+interface CategoryFilterProps {
+  onFilterChange: (filters: FilterState) => void;
+  initialFilters?: FilterState;
+}
+
 const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initialFilters }) => {
   const [categories, setCategories] = useState<string[]>([]);
   const [purposes, setPurposes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const toast = useAppToast();
   
   const [filters, setFilters] = useState<FilterState>({
     category: 'Все категории',
@@ -39,15 +41,6 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initial
     loadFilterOptions();
   }, []);
 
-  useEffect(() => {
-    // Debounce filter changes to avoid excessive updates
-    const timer = setTimeout(() => {
-      onFilterChange(filters);
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [filters, onFilterChange]);
-
   const loadFilterOptions = async () => {
     try {
       setIsLoading(true);
@@ -61,6 +54,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initial
         setCategories(categoriesResult.data || []);
       } else {
         logger.error("Failed to load categories:", categoriesResult.error);
+        toast.error("Не удалось загрузить категории");
         setCategories(['Все категории', 'Пищевая добавка']);
       }
 
@@ -68,38 +62,46 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initial
         setPurposes(purposesResult.data || []);
       } else {
         logger.error("Failed to load purposes:", purposesResult.error);
+        toast.error("Не удалось загрузить теги");
         setPurposes(['Иммунитет', 'Энергия', 'Память']);
       }
     } catch (err) {
       logger.error("Error loading filter options:", err);
+      toast.error("Ошибка загрузки фильтров");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFilters(prev => ({ ...prev, category: e.target.value }));
+    const newFilters = { ...filters, category: e.target.value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters(prev => ({ ...prev, search: e.target.value }));
+    const newFilters = { ...filters, search: e.target.value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
   };
 
   const handlePurposeToggle = (purpose: string) => {
-    setFilters(prev => ({
-      ...prev,
-      purposes: prev.purposes.includes(purpose)
-        ? prev.purposes.filter(p => p !== purpose)
-        : [...prev.purposes, purpose]
-    }));
+    const newPurposes = filters.purposes.includes(purpose)
+      ? filters.purposes.filter(p => p !== purpose)
+      : [...filters.purposes, purpose];
+    const newFilters = { ...filters, purposes: newPurposes };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
   };
 
   const handleCheckboxChange = (field: 'inStockOnly' | 'hasDiscount') => {
-    setFilters(prev => ({ ...prev, [field]: !prev[field] }));
+    const newFilters = { ...filters, [field]: !filters[field] };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
   };
 
   const handleClearFilters = () => {
-    setFilters({
+    const newFilters = {
       category: 'Все категории',
       search: '',
       minPrice: 0,
@@ -107,7 +109,9 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initial
       purposes: [],
       inStockOnly: false,
       hasDiscount: false
-    });
+    };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
   };
 
   if (isLoading) {
@@ -144,7 +148,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initial
 
       {/* Purpose Tags */}
       <div className="flex gap-2 flex-wrap">
-        {purposes.slice(0, 6).map(purpose => (
+        {purposes.slice(0, 8).map(purpose => (
           <label key={purpose} className="flex items-center gap-1 px-2 py-1 bg-muted rounded-md cursor-pointer hover:bg-muted/80">
             <input
               type="checkbox"
@@ -158,12 +162,6 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({ onFilterChange, initial
       </div>
 
       {/* Action Buttons */}
-      <button 
-        className="btn btn--primary fs__md fw__rg whitespace-nowrap"
-        onClick={() => onFilterChange(filters)}
-      >
-        Применить
-      </button>
       <button 
         className="btn btn--secondary fs__md fw__rg whitespace-nowrap"
         onClick={handleClearFilters}

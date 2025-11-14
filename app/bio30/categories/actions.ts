@@ -4,8 +4,6 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 import type { Database } from "@/types/database.types";
 
-type DbCar = Database["public"]["Tables"]["cars"]["Row"];
-
 export interface Bio30Product {
   id: string;
   title: string;
@@ -38,31 +36,38 @@ export async function fetchBio30Products(filters?: {
 
     // Apply category filter from specs.type if provided
     if (filters?.category && filters.category !== 'Все категории') {
-      query = query.contains("specs", { type: filters.category });
+      query = query.eq("specs->>type", filters.category);
     }
 
-    // Apply price range filter
+    // Apply price range filter - cast to numeric
     if (filters?.minPrice !== undefined) {
-      query = query.gte("specs->>price", filters.minPrice.toString());
+      query = query.gte("specs->>price::numeric", filters.minPrice);
     }
     if (filters?.maxPrice !== undefined) {
-      query = query.lte("specs->>price", filters.maxPrice.toString());
+      query = query.lte("specs->>price::numeric", filters.maxPrice);
     }
 
-    // Apply purpose filter
+    // Apply purpose filter - use JSONB containment
     if (filters?.purpose && filters.purpose.length > 0) {
-      // Check if any of the purposes match
-      query = query.or(filters.purpose.map(p => `specs->purpose.ilike.%${p}%`).join(','));
+      // Build OR condition for multiple purposes
+      const purposeConditions = filters.purpose.map(p => 
+        `specs->>purpose.ilike.*${p}*`
+      ).join(',');
+      query = query.or(purposeConditions);
     }
 
     // Apply search filter across multiple fields
     if (filters?.search) {
       const searchTerm = filters.search.toLowerCase();
-      query = query.or(`specs->>model.ilike.%${searchTerm}%,specs->>purpose.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      query = query.or([
+        `specs->>model.ilike.%${searchTerm}%`,
+        `specs->>purpose.ilike.%${searchTerm}%`,
+        `description.ilike.%${searchTerm}%`
+      ].join(','));
     }
 
     const { data, error } = await query
-      .order("specs->>price", { ascending: true })
+      .order("specs->>price::numeric", { ascending: true })
       .limit(50);
 
     if (error) {
@@ -70,7 +75,7 @@ export async function fetchBio30Products(filters?: {
       return { success: false, error: error.message };
     }
 
-    // Transform data and apply client-side filters for complex logic
+    // Transform data
     const products: Bio30Product[] = (data || []).map(car => {
       const specs = car.specs as Record<string, any> || {};
       const model = specs.model || '';
@@ -91,10 +96,10 @@ export async function fetchBio30Products(filters?: {
         description: car.description || purposeStr || 'Пищевая добавка BIO 3.0',
         price: currentPrice,
         originalPrice: hasDiscount ? oldPrice : undefined,
-        image: car.image_url || (specs.photos && specs.photos[0]) || "https://bio30.ru/front/static/uploads/products/default.webp",
+        image: car.image_url || (specs.photos && specs.photos[0]) || "https://bio30.ru/front/static/uploads/products/default.webp ",
         category: specs.type || 'Пищевая добавка',
         purpose: purposes,
-        inStock: true, // Since quantity > 0 in your data
+        inStock: true,
         hasDiscount: hasDiscount
       };
     }).filter(product => {
@@ -104,6 +109,7 @@ export async function fetchBio30Products(filters?: {
       return true;
     });
 
+    logger.info(`Fetched ${products.length} BIO 3.0 products`);
     return { success: true, data: products };
   } catch (err) {
     logger.error("Failed to fetch BIO 3.0 products:", err);
