@@ -58,8 +58,6 @@ export default function WarehouseLandingPage() {
   const [testimonialRating, setTestimonialRating] = useState(5);
   const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
 
-
-
   const footerLinkClass = "text-sm text-muted-foreground hover:text-brand-cyan font-mono flex items-center gap-1.5 transition-colors duration-200 hover:text-glow";
   
   const auditRef = useRef<HTMLDivElement>(null);
@@ -346,7 +344,7 @@ export default function WarehouseLandingPage() {
           >
             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
               alt="Логотип приложения" width={200} height={69}
-              className="mx-auto mb-8 rounded-full w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 shadow-2xl ring-4 ring-white/10" />
+              className="mx-auto mb-8 rounded-full w-40 h-20 sm:w-48 sm:h-24 md:w-64 md:h-32 shadow-2xl ring-4 ring-white/10" />
           </motion.div>
           <motion.h1 
             className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight"
@@ -412,7 +410,7 @@ export default function WarehouseLandingPage() {
               className="w-full h-full object-cover" 
               autoPlay loop muted playsInline
             >
-              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4?download=0" type="video/mp4" />
+              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c046-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
             </video>
           </motion.div>
         </div>
