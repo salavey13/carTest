@@ -6,12 +6,19 @@ import { motion } from 'framer-motion';
 import { useAppContext } from '@/contexts/AppContext';
 import { useAppToast } from "@/hooks/useAppToast";
 import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
-import { fetchBio30ProductById, addToCart, Bio30Product } from '../actions';
+import { fetchBio30ProductById, addToCart } from '../actions';
+import type { Bio30Product } from '../actions';
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const id = params.id as string;
+  
+  // ✅ FIX: Properly decode Cyrillic ID
+  const rawId = params.id as string;
+  const id = decodeURIComponent(rawId || '').trim();
+  
+  console.log('Debug - Raw ID:', rawId);
+  console.log('Debug - Decoded ID:', id);
   
   const [product, setProduct] = useState<Bio30Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +45,7 @@ export default function ProductDetailPage() {
       
       toast.loading('Загрузка продукта...', { id: 'loading-product' });
       
+      // ✅ FIX: Pass the decoded ID
       const result = await fetchBio30ProductById(id);
       
       if (result.success && result.data) {

@@ -197,15 +197,37 @@ export async function getUniquePurposes() {
 
 export async function fetchBio30ProductById(id: string) {
   try {
-    const { data, error } = await supabaseAdmin
+    // First try exact ID match
+    let query = supabaseAdmin
       .from("cars")
       .select("*")
       .eq("id", id)
       .eq("make", "BIO 3.0")
-      .eq("is_test_result", false)
-      .single();
+      .eq("is_test_result", false);
 
-    if (error) {
+    let { data, error } = await query.single();
+
+    // If not found, try searching by model name (for Cyrillic names)
+    if (!data && error?.code === 'PGRST116') { // "JSON object requested, multiple (or no) rows returned"
+      // Try to find by specs->model instead of id
+      const { data: altData, error: altError } = await supabaseAdmin
+        .from("cars")
+        .select("*")
+        .eq("make", "BIO 3.0")
+        .eq("is_test_result", false)
+        .ilike("specs->>model", decodeURIComponent(id).toLowerCase()); // Case-insensitive match
+        .limit(1);
+
+      if (altError) {
+        logger.error("Alternative query error:", altError);
+        return { success: false, error: altError.message };
+      }
+
+      data = altData ? altData[0] : null;
+      error = altError;
+    }
+
+    if (error && error.code !== 'PGRST116') {
       logger.error("Error fetching product by ID:", error);
       return { success: false, error: error.message };
     }
@@ -214,7 +236,7 @@ export async function fetchBio30ProductById(id: string) {
       return { success: false, error: "Product not found" };
     }
 
-    // Transform data using the same logic as fetchBio30Products
+    // Rest of transformation logic...
     const specs = data.specs as Record<string, any> || {};
     const model = specs.model || '';
     const cleanTitle = model.replace(/(\d+)$/, '').trim();
