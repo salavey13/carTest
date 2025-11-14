@@ -4,18 +4,18 @@ import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMe
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { chatId } = body;
+    const chatId = body?.chatId ?? body?.chat_id ?? null;
+
     if (!chatId) {
       return NextResponse.json({ success: false, error: 'chatId missing' }, { status: 400 });
     }
 
-    // Собираем чек-лист (10 пунктов)
     const checklist = [
       '*Чек-лист: 10 шагов для снижения штрафов на маркетплейсах*',
       '',
       '1. *Автоматизируй остатки* — синхронизация остатков в реальном времени (API).',
-      '2. *Проверь логику возвратов* — выдели refunds и автоматизируй возврат/рефанд метки.',
-      '3. *Контроль сроков отгрузки* — SLA в минуту/час; метрики по задержкам.',
+      '2. *Проверь логику возвратов* — выдели refunds и автоматизируй метки возврата.',
+      '3. *Контроль сроков отгрузки* — SLA и мониторинг задержек по периодам.',
       '4. *Внедри чеклисты на линии упаковки* — скан-контроль и фото-фиксация критичных заказов.',
       '5. *Аналитика на 2 недели* — мониторинг refunds/late по скользящему окну.',
       '6. *Авто-оповещения* — если refunds > X или late > Y — мгновенное сообщение в чат.',
@@ -27,8 +27,10 @@ export async function POST(req: Request) {
       'Если хочешь — могу сгенерировать план действий и roadmap по приоритетам. Пиши @salavey13'
     ].join('\n');
 
-    // Отправляем сообщение (с опцией картинка для визуала)
-    const res = await sendComplexMessage(chatId, checklist, [], { imageQuery: 'warehouse checklist', parseMode: 'Markdown' });
+    const res = await sendComplexMessage(chatId, checklist, [], {
+      imageQuery: 'warehouse checklist',
+      parseMode: 'Markdown',
+    });
 
     if (!res.success) {
       return NextResponse.json({ success: false, error: res.error || 'send failed' }, { status: 500 });

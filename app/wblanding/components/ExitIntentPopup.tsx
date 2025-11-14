@@ -9,54 +9,70 @@ import { useAppContext } from '@/contexts/AppContext';
 
 export const ExitIntentPopup = () => {
   const { dbUser } = useAppContext();
-  const telegramChatId = dbUser?.user_id; // в проекте ты так уже передаёшь sendComplexMessage
+  // Поддерживаем несколько возможных полей для chatId
+  const telegramChatId =
+    dbUser?.user_id ?? dbUser?.telegram_id ?? dbUser?.tg_id ?? dbUser?.chat_id ?? null;
 
   const [show, setShow] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  // Desktop exit intent
+  // DESKTOP exit-intent
   useEffect(() => {
-    const handleMouseLeave = (e: MouseEvent) => {
+    const handler = (e: MouseEvent) => {
       if (window.innerWidth > 768 && e.clientY <= 0) setShow(true);
     };
-    document.addEventListener('mouseleave', handleMouseLeave);
-    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mouseleave', handler);
+    return () => document.removeEventListener('mouseleave', handler);
   }, []);
 
-  // Mobile: scroll-up detection near page top
+  // MOBILE: one-shot 100% -> return-to-top logic (fixed)
   useEffect(() => {
-    let lastScrollY = window.scrollY;
+    if (typeof window === 'undefined') return;
+    if (window.innerWidth > 768) return;
 
-    const handleScroll = () => {
-      const current = window.scrollY;
-      const scrollingUp = current < lastScrollY;
-      const nearTop = current < 60;
+    let reachedBottom = false;
+    let shownOnce = false;
 
-      if (window.innerWidth <= 768 && scrollingUp && nearTop) {
+    const onScroll = () => {
+      if (shownOnce) return;
+
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight;
+      const winH = window.innerHeight;
+
+      const atBottom = scrollTop + winH >= docHeight - 20;
+      const atTop = scrollTop <= 30;
+
+      if (atBottom) {
+        reachedBottom = true;
+        return;
+      }
+
+      if (reachedBottom && atTop) {
+        shownOnce = true;
         setShow(true);
       }
-      lastScrollY = current;
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Fallback: timer exit intent (one-time per render)
+  // fallback timer (one-time per render)
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const t = setTimeout(() => {
       if (!show) setShow(true);
-    }, 20000); // 20 seconds
-    return () => clearTimeout(timer);
+    }, 20000);
+    return () => clearTimeout(t);
   }, [show]);
-
-  if (!show) return null;
 
   const handleSendToTelegram = async () => {
     if (!telegramChatId) {
       toast.error('Подключите Telegram (войдите в систему), чтобы получить чек-лист прямо в чат.');
       return;
     }
+
     try {
       setIsSending(true);
       const res = await fetch('/api/send-checklist', {
@@ -64,22 +80,26 @@ export const ExitIntentPopup = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId: telegramChatId }),
       });
+
       const json = await res.json();
       if (!res.ok || !json?.success) {
         console.error('send-checklist failed', json);
-        toast.error('Не удалось отправить. Проверь логи.');
+        toast.error(json?.error ? `Ошибка: ${json.error}` : 'Не удалось отправить. Проверь логи.');
         setIsSending(false);
         return;
       }
+
       toast.success('Чек-лист отправлен в Telegram! Проверь чат.');
       setIsSending(false);
       setShow(false);
     } catch (err) {
-      console.error(err);
+      console.error('send-checklist network error', err);
       toast.error('Ошибка сети при отправке. Попробуй ещё раз.');
       setIsSending(false);
     }
   };
+
+  if (!show) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
