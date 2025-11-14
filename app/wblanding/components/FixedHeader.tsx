@@ -14,8 +14,10 @@ export function FixedHeader() {
     { href: "#", label: "Главная" },
     { href: "#features", label: "Возможности" },
     { href: "#pricing", label: "Тарифы" },
+    { href: "#faq", label: "FAQ" },
+    { href: "#testimonials", label: "Отзывы" },
     { href: "#audit-tool", label: "Аудит" },
-    { href: "#invite", label: "Пригласить команду" }, // Add ID to the Invite section in page.tsx
+    { href: "#invite", label: "Пригласить команду" },
     { href: "https://github.com/salavey13/carTest", label: "GitHub", external: true },
   ];
 
