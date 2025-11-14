@@ -107,7 +107,7 @@ export const WarehouseAuditTool = () => {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
               >
-                <Zep className="w-5 h-5" />
+                <Zap className="w-5 h-5" />
               </motion.div>
             </motion.span>
           </Button>
