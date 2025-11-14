@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // ============= Enhanced Interfaces =============
 interface EnhancedAuditAnswers {
@@ -49,6 +50,13 @@ interface AuditReport {
   roadmap: RoadmapItem[];
 }
 
+interface AuditProgress {
+  userId: string;
+  currentStep: number;
+  answers: Partial<EnhancedAuditAnswers>;
+  updatedAt: Date;
+}
+
 // ============= Industry & Regional Data =============
 const INDUSTRY_MULTIPLIERS = {
   electronics: { avgOrderValue: 5000, errorRate: 0.8, penaltyRisk: 1.5, name: 'Электроника' },
@@ -67,6 +75,8 @@ const REGIONAL_HOURLY_RATES = {
 };
 
 export const useWarehouseAudit = (userId: string | undefined) => {
+  const supabase = createClientComponentClient();
+  
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Partial<EnhancedAuditAnswers>>({});
   const [currentAnswer, setCurrentAnswer] = useState('');
@@ -75,6 +85,51 @@ export const useWarehouseAudit = (userId: string | undefined) => {
   const [isSending, setIsSending] = useState(false);
   const [showResult, setShowResult] = useState(false);
   const [estimatedTime, setEstimatedTime] = useState('60 сек');
+  const [hasCompletedAudit, setHasCompletedAudit] = useState(false);
+  const [lastCompletedAudit, setLastCompletedAudit] = useState<AuditReport | null>(null);
+
+  // ============= Load progress on mount =============
+  useEffect(() => {
+    if (!userId) return;
+    
+    const loadProgress = async () => {
+      // Check for incomplete audit
+      const { data: progress } = await supabase
+        .from('audit_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .single<AuditProgress>();
+      
+      if (progress) {
+        const timeDiff = Date.now() - new Date(progress.updatedAt).getTime();
+        const hoursDiff = timeDiff / (1000 * 60 * 60);
+        
+        // Offer to resume if incomplete audit is less than 24 hours old
+        if (hoursDiff < 24 && progress.currentStep < 8) {
+          setStep(progress.currentStep);
+          setAnswers(progress.answers);
+          setEstimatedTime('Продолжить с шага ' + progress.currentStep);
+          return;
+        }
+      }
+      
+      // Check for last completed audit
+      const { data: lastAudit } = await supabase
+        .from('audit_reports')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single<AuditReport>();
+      
+      if (lastAudit) {
+        setHasCompletedAudit(true);
+        setLastCompletedAudit(lastAudit);
+      }
+    };
+    
+    loadProgress();
+  }, [userId, supabase]);
 
   // ============= Analytics =============
   const trackAuditEvent = useCallback((eventName: string, properties: Record<string, any>) => {
@@ -125,25 +180,18 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     const timeCost = Math.floor(hours * hourlyRate * 4.3); // Часы в неделю → в месяц
 
     // 2. Штрафы (прямой ввод пользователя, основанный на реальной формуле Озон)
-    // Формула Озон: (возвраты×2 + опоздания) ÷ доставки = % от продаж
-    // Пользователь вводит уже посчитанную сумму, мы её используем как есть
     const penaltyCost = penalties;
 
     // 3. Упущенные продажи (консервативно)
-    // Базовая потеря от ручного учёта: 2% (была 5%)
     const baseLossRate = 0.02;
-    // Сложность от количества маркетплейсов (макс 3%)
     const storeComplexity = Math.min(0.03, (stores - 1) * 0.015);
-    // Сложность от количества SKU (макс 2%)
     const skuComplexity = Math.min(0.02, Math.log10(skus) * 0.008);
-    // Фактор объёма заказов (макс 1.5%)
     const volumeFactor = Math.min(0.015, Math.log10(orderVolume) * 0.008);
     
     const totalLossRate = Math.min(0.08, baseLossRate + storeComplexity + skuComplexity + volumeFactor);
     
-    // Реальное количество заказов в месяц
     const monthlyOrders = orderVolume * 30;
-    const avgOrderValue = avgSkuValue * 1.3; // Учёт наценки
+    const avgOrderValue = avgSkuValue * 1.3;
     
     const missedSales = Math.floor(monthlyOrders * totalLossRate * avgOrderValue * multipliers.penaltyRisk);
 
@@ -152,13 +200,12 @@ export const useWarehouseAudit = (userId: string | undefined) => {
 
     const total = timeCost + penaltyCost + missedSales + humanErrorCost;
     
-    // Эффективность: 100% - потери - штрафы - время
     const efficiency = Math.max(10, Math.round(
       100 - (totalLossRate * 100) - Math.min(15, penaltyCost / 5000) - Math.min(10, hours / 10)
     ));
 
     // ROI и срок окупаемости
-    const monthlySavings = Math.floor(total * 0.65); // Более консервативная экономия (была 0.7)
+    const monthlySavings = Math.floor(total * 0.65);
     const annualSavings = monthlySavings * 12;
     const proPlanPrice = 4900;
     const roi = Math.round((annualSavings / proPlanPrice) * 100);
@@ -180,25 +227,19 @@ export const useWarehouseAudit = (userId: string | undefined) => {
         monthlySavings,
       },
     };
-  }, []); // Убрал зависимость от answers, так как не используется внутри
+  }, []);
 
   // ============= Validation =============
-  // ИСПРАВЛЕНО: Добавлена проверка type === 'select'
   const validateAnswer = useCallback((value: string, question: any): { type: 'error' | 'warning' | null; message: string; } | null => {
     if (value === '') return null;
     
-    // Для селект-полей проверяем только наличие значения
-    if (question.type === 'select') {
-      return null; // Любое непустое значение для селекта валидно
-    }
+    if (question.type === 'select') return null;
     
-    // Для числовых полей применяем числовую валидацию
     const num = parseInt(value, 10);
     if (isNaN(num)) return { type: 'error', message: 'Пожалуйста, введите число' };
     if (num < question.min) return { type: 'error', message: `Минимальное значение: ${question.min}` };
     if (question.max && num > question.max) return { type: 'error', message: `Максимальное значение: ${question.max}` };
     
-    // Reality checks with warnings (not errors)
     if (question.id === 'avgSkuValue' && num > 10000) {
       return { type: 'warning', message: '⚠️ Стоимость слишком высока. Уточните данные.' };
     }
@@ -212,11 +253,31 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     return null;
   }, []);
 
+  // ============= Save Progress =============
+  const saveProgress = useCallback(async () => {
+    if (!userId) return;
+    
+    const progress: AuditProgress = {
+      userId,
+      currentStep: step,
+      answers,
+      updatedAt: new Date(),
+    };
+    
+    await supabase.from('audit_progress').upsert({
+      user_id: userId,
+      current_step: step,
+      answers: answers,
+      updated_at: new Date(),
+    }, { onConflict: 'user_id' });
+    
+    console.log('💾 Progress saved:', { step, answers });
+  }, [userId, step, answers, supabase]);
+
   // ============= Roadmap Generation =============
   const generateRoadmap = useCallback((calc: CalculationBreakdown, ans: EnhancedAuditAnswers): RoadmapItem[] => {
     const roadmap: RoadmapItem[] = [];
     
-    // Приоритет по ROI
     if (calc.penaltyCost > 10000) {
       roadmap.push({
         priority: 1,
@@ -289,6 +350,11 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setAnswers(newAnswers);
     trackAuditEvent('question_completed', { questionId: questions[step].id });
 
+    // Save progress after each answer
+    if (userId) {
+      saveProgress();
+    }
+
     if (step < questions.length - 1) {
       setStep(step + 1);
       setCurrentAnswer('');
@@ -302,13 +368,18 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       setShowResult(true);
       trackAuditEvent('audit_completed', { totalLosses: result.total });
       
+      // Clear progress after completion
+      if (userId) {
+        supabase.from('audit_progress').delete().eq('user_id', userId);
+      }
+      
       console.log('📊 Audit completed:', { 
         inputs: newAnswers, 
         result: result.breakdown,
         roadmap: smartRoadmap,
       });
     }
-  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent]);
+  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent, userId, saveProgress, supabase]);
 
   const startAudit = useCallback(() => {
     setStep(1);
@@ -318,8 +389,25 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setShowResult(false);
     setIsSending(false);
     setRoadmap([]);
+    setHasCompletedAudit(false);
+    setLastCompletedAudit(null);
     trackAuditEvent('audit_started', {});
   }, [trackAuditEvent]);
+
+  const resumeAudit = useCallback(() => {
+    trackAuditEvent('audit_resumed', { step });
+  }, [step, trackAuditEvent]);
+
+  const viewLastAudit = useCallback(() => {
+    if (lastCompletedAudit) {
+      setBreakdown(lastCompletedAudit.calculation);
+      setRoadmap(lastCompletedAudit.roadmap);
+      setAnswers(lastCompletedAudit.answers);
+      setStep(8);
+      setShowResult(true);
+      trackAuditEvent('view_last_audit', {});
+    }
+  }, [lastCompletedAudit, trackAuditEvent]);
 
   // ============= Report Generation =============
   const saveAuditReport = useCallback(async (report: AuditReport) => {
@@ -414,6 +502,8 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setShowResult(false);
     setIsSending(false);
     setRoadmap([]);
+    setHasCompletedAudit(false);
+    setLastCompletedAudit(null);
     trackAuditEvent('audit_reset', {});
   }, [trackAuditEvent]);
 
@@ -428,11 +518,15 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     efficiency: breakdown?.efficiency || 0,
     estimatedTime,
     roadmap,
+    hasCompletedAudit,
+    lastCompletedAudit,
     setCurrentAnswer,
     handleNext,
     handleGetReport,
     reset,
     startAudit,
+    resumeAudit,
+    viewLastAudit,
     validateAnswer,
     trackAuditEvent,
   };
