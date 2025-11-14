@@ -6,8 +6,7 @@ import { motion } from 'framer-motion';
 import { useAppContext } from '@/contexts/AppContext';
 import { useAppToast } from "@/hooks/useAppToast";
 import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
-import { fetchBio30ProductById, addToCart } from '../../actions';
-import { Bio30Product } from '../../actions';
+import { fetchBio30ProductById, addToCart, Bio30Product } from '../actions';
 
 export default function ProductDetailPage() {
   const params = useParams();
