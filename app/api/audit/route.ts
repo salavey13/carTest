@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/supabase/server';
+import { supabaseAdmin } from '@/hooks/supabase';
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  
   
   try {
     const body = await request.json();
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save full audit report
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('audit_reports')
       .insert({
         user_id: userId,
