@@ -66,99 +66,144 @@ const REGIONAL_HOURLY_RATES = {
   moscow: 3500, spb: 3000, regions: 2000, remote: 1500,
 };
 
-// ============= Calculation Logic =============
-const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
-  const skus = Math.max(1, Number(data.skus) || 1);
-  const stores = Math.max(1, Number(data.stores) || 1);
-  const hours = Math.max(0, Number(data.hours) || 0);
-  const penalties = Math.max(0, Number(data.penalties) || 0);
-  const orderVolume = Math.max(1, Number(data.orderVolume) || 1);
-  const avgSkuValue = Math.max(100, Number(data.avgSkuValue) || 1500);
-  const staffCount = Math.max(1, Number(data.staffCount) || 1);
-  const industry = data.industry || 'other';
+export const useWarehouseAudit = (userId: string | undefined) => {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState<Partial<EnhancedAuditAnswers>>({});
+  const [currentAnswer, setCurrentAnswer] = useState('');
+  const [breakdown, setBreakdown] = useState<CalculationBreakdown | null>(null);
+  const [roadmap, setRoadmap] = useState<RoadmapItem[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [showResult, setShowResult] = useState(false);
+  const [estimatedTime, setEstimatedTime] = useState('60 сек');
 
-  const multipliers = INDUSTRY_MULTIPLIERS[industry as keyof typeof INDUSTRY_MULTIPLIERS];
-  
-  const hourlyRate = REGIONAL_HOURLY_RATES.regions;
+  // ============= Analytics =============
+  const trackAuditEvent = useCallback((eventName: string, properties: Record<string, any>) => {
+    if (typeof window !== 'undefined' && (window as any).ym) {
+      (window as any).ym(96574217, 'reachGoal', eventName, properties);
+      console.log(`📊 Яндекс.Метрика: ${eventName}`, properties);
+    }
+  }, []);
 
-  // 1. Стоимость времени (реалистичная ставка)
-  const timeCost = Math.floor(hours * hourlyRate);
+  // ============= Questions =============
+  const questions = useMemo(() => [
+    { id: 'skus', text: 'Сколько SKU вы управляете?', type: 'number', min: 1, max: 10000, placeholder: 'Например: 150', helper: 'SKU — это каждая уникальная позиция товара' },
+    { id: 'hours', text: 'Сколько часов в неделю тратите на ручные обновления остатков?', type: 'number', min: 0, max: 168, placeholder: 'Например: 15', helper: 'Включая проверки, переносы между таблицами, исправления ошибок' },
+    { id: 'penalties', text: 'Какие штрафы от маркетплейсов вы платите в месяц (₽)?', type: 'number', min: 0, max: 1000000, placeholder: 'Например: 15000', helper: 'Озон: (возвраты×2 + опоздания) ÷ доставки = % от продаж. Вильфер: до 30% за неточные остатки' },
+    { id: 'stores', text: 'Сколько маркетплейсов вы используете?', type: 'number', min: 1, max: 10, placeholder: 'Например: 3', helper: 'WB, Озон, ЯМ, СберМегаМаркет и др.' },
+    { id: 'industry', text: 'Ваша отрасль?', type: 'select', placeholder: 'Выберите отрасль', options: [
+      { value: 'electronics', label: 'Электроника' },
+      { value: 'clothing', label: 'Одежда и обувь' },
+      { value: 'home-goods', label: 'Товары для дома' },
+      { value: 'cosmetics', label: 'Косметика' },
+      { value: 'auto-parts', label: 'Автозапчасти' },
+      { value: 'toys', label: 'Детские товары' },
+      { value: 'books', label: 'Книги' },
+      { value: 'food', label: 'Продукты питания' },
+      { value: 'other', label: 'Другое' },
+    ]},
+    { id: 'orderVolume', text: 'Сколько заказов в день вы обрабатываете?', type: 'number', min: 1, max: 10000, placeholder: 'Например: 30', helper: 'Среднее количество заказов со всех маркетплейсов' },
+    { id: 'avgSkuValue', text: 'Средняя стоимость товара (₽)?', type: 'number', min: 100, max: 1000000, placeholder: 'Например: 3000', helper: 'Средний чек по товарам' },
+    { id: 'staffCount', text: 'Сколько человек на складе?', type: 'number', min: 1, max: 100, placeholder: 'Например: 1', helper: 'Кладовщики, комплектовщики, приёмка' },
+  ], []);
 
-  // 2. Штрафы (прямой ввод пользователя)
-  const penaltyCost = penalties;
+  // ============= Calculation Logic =============
+  const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
+    const skus = Math.max(1, Number(data.skus) || 1);
+    const stores = Math.max(1, Number(data.stores) || 1);
+    const hours = Math.max(0, Number(data.hours) || 0);
+    const penalties = Math.max(0, Number(data.penalties) || 0);
+    const orderVolume = Math.max(1, Number(data.orderVolume) || 1);
+    const avgSkuValue = Math.max(100, Number(data.avgSkuValue) || 1500);
+    const staffCount = Math.max(1, Number(data.staffCount) || 1);
+    const industry = data.industry || 'other';
 
-  // 3. Упущенные продажи - ИЗМЕНЁННАЯ ФОРМУЛА
-  // Базовая потеря от ручного учёта: 2% (была 5%)
-  const baseLossRate = 0.02;
-  // Сложность от количества маркетплейсов (макс 3%)
-  const storeComplexity = Math.min(0.03, (stores - 1) * 0.015);
-  // Сложность от количества SKU (макс 2%)
-  const skuComplexity = Math.min(0.02, Math.log10(skus) * 0.008);
-  // Фактор объёма заказов (макс 1.5%)
-  const volumeFactor = Math.min(0.015, Math.log10(orderVolume) * 0.008);
-  
-  const totalLossRate = Math.min(0.08, baseLossRate + storeComplexity + skuComplexity + volumeFactor);
-  
-  // Реальное количество заказов в месяц (не 30, а фактическое)
-  const monthlyOrders = orderVolume * 30;
-  const avgOrderValue = avgSkuValue * 1.3; // Учёт наценки
-  
-  const missedSales = Math.floor(monthlyOrders * totalLossRate * avgOrderValue * multipliers.penaltyRisk);
+    const multipliers = INDUSTRY_MULTIPLIERS[industry as keyof typeof INDUSTRY_MULTIPLIERS];
+    
+    const hourlyRate = REGIONAL_HOURLY_RATES.regions;
 
-  // 4. Стоимость ошибок персонала (снижена)
-  const humanErrorCost = Math.floor(skus * stores * 25 * multipliers.errorRate * Math.sqrt(staffCount));
+    // 1. Стоимость времени (реалистичная ставка)
+    const timeCost = Math.floor(hours * hourlyRate * 4.3); // Часы в неделю → в месяц
 
-  const total = timeCost + penaltyCost + missedSales + humanErrorCost;
-  
-  // Эффективность: 100% - потери - штрафы - время
-  const efficiency = Math.max(10, Math.round(
-    100 - (totalLossRate * 100) - Math.min(15, penaltyCost / 5000) - Math.min(10, hours / 10)
-  ));
+    // 2. Штрафы (прямой ввод пользователя, основанный на реальной формуле Озон)
+    // Формула Озон: (возвраты×2 + опоздания) ÷ доставки = % от продаж
+    // Пользователь вводит уже посчитанную сумму, мы её используем как есть
+    const penaltyCost = penalties;
 
-  // ROI и срок окупаемости
-  const monthlySavings = Math.floor(total * 0.65); // Более консервативная экономия (была 0.7)
-  const annualSavings = monthlySavings * 12;
-  const proPlanPrice = 4900;
-  const roi = Math.round((annualSavings / proPlanPrice) * 100);
-  const paybackMonths = Math.max(1, Math.ceil(proPlanPrice / monthlySavings));
+    // 3. Упущенные продажи (консервативно)
+    // Базовая потеря от ручного учёта: 2% (была 5%)
+    const baseLossRate = 0.02;
+    // Сложность от количества маркетплейсов (макс 3%)
+    const storeComplexity = Math.min(0.03, (stores - 1) * 0.015);
+    // Сложность от количества SKU (макс 2%)
+    const skuComplexity = Math.min(0.02, Math.log10(skus) * 0.008);
+    // Фактор объёма заказов (макс 1.5%)
+    const volumeFactor = Math.min(0.015, Math.log10(orderVolume) * 0.008);
+    
+    const totalLossRate = Math.min(0.08, baseLossRate + storeComplexity + skuComplexity + volumeFactor);
+    
+    // Реальное количество заказов в месяц
+    const monthlyOrders = orderVolume * 30;
+    const avgOrderValue = avgSkuValue * 1.3; // Учёт наценки
+    
+    const missedSales = Math.floor(monthlyOrders * totalLossRate * avgOrderValue * multipliers.penaltyRisk);
 
-  return {
-    total,
-    breakdown: { 
-      timeCost, 
-      penaltyCost, 
-      missedSales, 
-      humanErrorCost,
-      skus, 
-      stores, 
-      hours,
-      efficiency,
-      roi,
-      paybackMonths,
-      monthlySavings,
-    },
-  };
-}, [answers]);
+    // 4. Стоимость ошибок персонала (снижена)
+    const humanErrorCost = Math.floor(skus * stores * 25 * multipliers.errorRate * Math.sqrt(staffCount));
+
+    const total = timeCost + penaltyCost + missedSales + humanErrorCost;
+    
+    // Эффективность: 100% - потери - штрафы - время
+    const efficiency = Math.max(10, Math.round(
+      100 - (totalLossRate * 100) - Math.min(15, penaltyCost / 5000) - Math.min(10, hours / 10)
+    ));
+
+    // ROI и срок окупаемости
+    const monthlySavings = Math.floor(total * 0.65); // Более консервативная экономия (была 0.7)
+    const annualSavings = monthlySavings * 12;
+    const proPlanPrice = 4900;
+    const roi = Math.round((annualSavings / proPlanPrice) * 100);
+    const paybackMonths = Math.max(1, Math.ceil(proPlanPrice / monthlySavings));
+
+    return {
+      total,
+      breakdown: { 
+        timeCost, 
+        penaltyCost, 
+        missedSales, 
+        humanErrorCost,
+        skus, 
+        stores, 
+        hours,
+        efficiency,
+        roi,
+        paybackMonths,
+        monthlySavings,
+      },
+    };
+  }, []); // Убрал зависимость от answers, так как не используется внутри
 
   // ============= Validation =============
-  const validateAnswer = (value: string, question: any): string | null => {
+  const validateAnswer = useCallback((value: string, question: any): { type: 'error' | 'warning' | null; message: string; } | null => {
     if (value === '') return null;
     
     const num = parseInt(value, 10);
-    if (isNaN(num)) return 'Пожалуйста, введите число';
-    if (num < question.min) return `Минимальное значение: ${question.min}`;
-    if (question.max && num > question.max) return `Максимальное значение: ${question.max}`;
+    if (isNaN(num)) return { type: 'error', message: 'Пожалуйста, введите число' };
+    if (num < question.min) return { type: 'error', message: `Минимальное значение: ${question.min}` };
+    if (question.max && num > question.max) return { type: 'error', message: `Максимальное значение: ${question.max}` };
     
     // Reality checks with warnings (not errors)
     if (question.id === 'avgSkuValue' && num > 10000) {
-      return '⚠️ Стоимость слишком высока. Уточните данные.';
+      return { type: 'warning', message: '⚠️ Стоимость слишком высока. Уточните данные.' };
     }
     if (question.id === 'orderVolume' && num > 500) {
-      return '⚠️ Значение кажется завышенным. Проверьте, пожалуйста.';
+      return { type: 'warning', message: '⚠️ Значение кажется завышенным. Проверьте, пожалуйста.' };
+    }
+    if (question.id === 'stores' && num > 5) {
+      return { type: 'warning', message: '⚠️ 5+ маркетплейсов требует кастомного решения. Свяжитесь: @salavey13' };
     }
     
     return null;
-  };
+  }, []);
 
   // ============= Roadmap Generation =============
   const generateRoadmap = useCallback((calc: CalculationBreakdown, ans: EnhancedAuditAnswers): RoadmapItem[] => {
@@ -171,7 +216,7 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
         title: '🎯 Автоматизация обновлений остатков',
         impact: Math.floor(calc.penaltyCost * 0.8),
         effort: '1 день',
-        description: 'Настройка API-интеграций с маркетплейсами',
+        description: 'Настройка API-интеграций с маркетплейсами. Исключает 80% штрафов.',
         quickWin: true,
       });
     }
@@ -182,7 +227,7 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
         title: '⚡ Централизация управления',
         impact: Math.floor(calc.hours * 1200),
         effort: '3 дня',
-        description: 'Единая панель для всех маркетплейсов и складов',
+        description: 'Единая панель для всех маркетплейсов и складов. Экономия 15+ часов/нед.',
         quickWin: false,
       });
     }
@@ -193,7 +238,7 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
         title: '🏪 Оптимизация многоканальности',
         impact: Math.floor(calc.missedSales * 0.5),
         effort: '5 дней',
-        description: `Управление ${calc.stores} маркетплейсами из одной системы`,
+        description: `Управление ${calc.stores} маркетплейсами из одной системы. Синхронизация в реальном времени.`,
         quickWin: false,
       });
     }
@@ -204,7 +249,7 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
         title: '📦 Визуализация склада',
         impact: Math.floor(calc.humanErrorCost * 0.4),
         effort: '2 дня',
-        description: `Карта и фильтры для ${calc.skus} SKU → ускорение поиска`,
+        description: `Карта и фильтры для ${calc.skus} SKU → ускорение поиска в 3 раза.`,
         quickWin: true,
       });
     }
@@ -215,7 +260,7 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
         title: '👨‍🏫 Обучение персонала',
         impact: Math.floor(calc.humanErrorCost * 0.25),
         effort: '1 неделя',
-        description: 'Сокращение ошибок кладовщиков с чек-листами',
+        description: 'Сокращение ошибок кладовщиков с чек-листами и геймификацией.',
         quickWin: false,
       });
     }
@@ -224,11 +269,11 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
   }, []);
 
   // ============= Navigation =============
-  const handleNext = () => {
-    const error = validateAnswer(currentAnswer, questions[step]);
-    if (error) {
-      toast.error(error, { icon: '⚠️' });
-      trackAuditEvent('validation_error', { error, questionId: questions[step].id });
+  const handleNext = useCallback(() => {
+    const validation = validateAnswer(currentAnswer, questions[step]);
+    if (validation?.type === 'error') {
+      toast.error(validation.message, { icon: '⚠️' });
+      trackAuditEvent('validation_error', { error: validation.message, questionId: questions[step].id });
       return;
     }
 
@@ -256,16 +301,35 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
         roadmap: smartRoadmap,
       });
     }
-  };
+  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent]);
 
-  const startAudit = () => {
-    reset();
+  const startAudit = useCallback(() => {
     setStep(1);
+    setAnswers({});
+    setCurrentAnswer('');
+    setBreakdown(null);
+    setShowResult(false);
+    setIsSending(false);
+    setRoadmap([]);
     trackAuditEvent('audit_started', {});
-  };
+  }, [trackAuditEvent]);
 
   // ============= Report Generation =============
-  const handleGetReport = async () => {
+  const saveAuditReport = useCallback(async (report: AuditReport) => {
+    try {
+      const response = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(report),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to save audit:', error);
+      return null;
+    }
+  }, []);
+
+  const handleGetReport = useCallback(async () => {
     if (!userId) {
       toast.error('Пожалуйста, войдите в систему', { icon: '🔐' });
       return;
@@ -333,23 +397,9 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
     } finally {
       setIsSending(false);
     }
-  };
+  }, [userId, answers, roadmap, calcLosses, saveAuditReport, trackAuditEvent]);
 
-  const saveAuditReport = async (report: AuditReport) => {
-    try {
-      const response = await fetch('/api/audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(report),
-      });
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to save audit:', error);
-      return null;
-    }
-  };
-
-  const reset = () => {
+  const reset = useCallback(() => {
     setStep(0);
     setAnswers({});
     setCurrentAnswer('');
@@ -357,9 +407,8 @@ const calcLosses = useCallback((data: Partial<EnhancedAuditAnswers>) => {
     setShowResult(false);
     setIsSending(false);
     setRoadmap([]);
-    setEstimatedTime('60 сек');
     trackAuditEvent('audit_reset', {});
-  };
+  }, [trackAuditEvent]);
 
   return {
     step,
