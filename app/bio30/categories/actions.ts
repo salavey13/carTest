@@ -195,8 +195,6 @@ export async function getUniquePurposes() {
   }
 }
 
-// /app/bio30/categories/actions.ts - add this function
-
 export async function fetchBio30ProductById(id: string) {
   try {
     const { data, error } = await supabaseAdmin
