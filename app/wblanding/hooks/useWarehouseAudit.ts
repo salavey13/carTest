@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabaseAdmin } from '@/hooks/supabase';
 
 // ============= Enhanced Interfaces =============
 interface EnhancedAuditAnswers {
@@ -75,7 +75,6 @@ const REGIONAL_HOURLY_RATES = {
 };
 
 export const useWarehouseAudit = (userId: string | undefined) => {
-  const supabase = createClientComponentClient();
   
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Partial<EnhancedAuditAnswers>>({});
@@ -94,8 +93,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     
     const loadProgress = async () => {
       // Check for incomplete audit
-      const { data: progress } = await supabase
-        .from('audit_progress')
+      const { data: progress } = await supabaseAdmin.from('audit_progress')
         .select('*')
         .eq('user_id', userId)
         .single<AuditProgress>();
@@ -114,7 +112,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       }
       
       // Check for last completed audit
-      const { data: lastAudit } = await supabase
+      const { data: lastAudit } = await supabaseAdmin
         .from('audit_reports')
         .select('*')
         .eq('user_id', userId)
@@ -129,7 +127,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     };
     
     loadProgress();
-  }, [userId, supabase]);
+  }, [userId, supabaseAdmin]);
 
   // ============= Analytics =============
   const trackAuditEvent = useCallback((eventName: string, properties: Record<string, any>) => {
@@ -264,7 +262,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       updatedAt: new Date(),
     };
     
-    await supabase.from('audit_progress').upsert({
+    await supabaseAdmin.from('audit_progress').upsert({
       user_id: userId,
       current_step: step,
       answers: answers,
@@ -272,7 +270,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     }, { onConflict: 'user_id' });
     
     console.log('💾 Progress saved:', { step, answers });
-  }, [userId, step, answers, supabase]);
+  }, [userId, step, answers, supabaseAdmin]);
 
   // ============= Roadmap Generation =============
   const generateRoadmap = useCallback((calc: CalculationBreakdown, ans: EnhancedAuditAnswers): RoadmapItem[] => {
@@ -370,7 +368,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       
       // Clear progress after completion
       if (userId) {
-        supabase.from('audit_progress').delete().eq('user_id', userId);
+        supabaseAdmin.from('audit_progress').delete().eq('user_id', userId);
       }
       
       console.log('📊 Audit completed:', { 
@@ -379,7 +377,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
         roadmap: smartRoadmap,
       });
     }
-  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent, userId, saveProgress, supabase]);
+  }, [answers, currentAnswer, questions, step, validateAnswer, calcLosses, generateRoadmap, trackAuditEvent, userId, saveProgress, supabaseAdmin]);
 
   const startAudit = useCallback(() => {
     setStep(1);
