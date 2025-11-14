@@ -57,9 +57,7 @@ export default function WarehouseLandingPage() {
   const [testimonialRating, setTestimonialRating] = useState(5);
   const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
 
-  // Separate loading states
-  const [loadingWbCards, setLoadingWbCards] = useState(false);
-  const [loadingOzonProducts, setLoadingOzonProducts] = useState(false);
+
 
   const footerLinkClass = "text-sm text-muted-foreground hover:text-brand-cyan font-mono flex items-center gap-1.5 transition-colors duration-200 hover:text-glow";
   
@@ -313,15 +311,7 @@ export default function WarehouseLandingPage() {
     }
   };
 
-  const sortedWbCards = useMemo(() => 
-    [...wbCards].sort((a, b) => a.vendorCode.localeCompare(b.vendorCode)), 
-    [wbCards]
-  );
-
-  const sortedOzonProducts = useMemo(() => 
-    [...ozonProducts].sort((a, b) => a.offer_id.localeCompare(b.offer_id)), 
-    [ozonProducts]
-  );
+  
 
   if (appContextLoading) {
     return (
