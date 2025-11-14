@@ -424,7 +424,7 @@ export const WarehouseAuditTool = () => {
                       key="send"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      class className="flex items-center justify-center"
+                      className="flex items-center justify-center"
                     >
                       <FaRocket className="mr-2" /> ПОЛУЧИТЬ ПЛАН ОПТИМИЗАЦИИ
                     </motion.span>
