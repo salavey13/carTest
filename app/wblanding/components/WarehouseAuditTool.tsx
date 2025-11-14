@@ -51,6 +51,8 @@ export const WarehouseAuditTool = () => {
 
   // ============= WELCOME SCREEN (with progress options) =============
   if (step === 0 && !showResult) {
+    const showResumeOption = step > 0 && Object.keys(answers).length > 0;
+    
     return (
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
@@ -101,7 +103,7 @@ export const WarehouseAuditTool = () => {
               </motion.div>
             )}
             
-            {step > 1 && (
+            {showResumeOption && (
               <motion.div
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
@@ -149,7 +151,7 @@ export const WarehouseAuditTool = () => {
           >
             <motion.span className="flex items-center justify-center">
               <FaRocket className="mr-3 text-xl" />
-              {step > 1 ? 'НАЧАТЬ ЗАНОВО' : 'ПРОЙТИ АУДИТ'}
+              {showResumeOption ? 'НАЧАТЬ ЗАНОВО' : 'ПРОЙТИ АУДИТ'}
               <motion.div
                 className="ml-3"
                 animate={{ rotate: 360 }}
@@ -426,7 +428,7 @@ export const WarehouseAuditTool = () => {
                       animate={{ opacity: 1 }}
                       className="flex items-center justify-center"
                     >
-                      <FaRocket className="mr-2" /> ПОЛУЧИТЬ ПЛАН ОПТИМИЗАЦИИ
+                      <FaRocket className="mr-2" /> ГОТОВ ПЛАН ОПТИМИЗАЦИИ
                     </motion.span>
                   )}
                 </AnimatePresence>
