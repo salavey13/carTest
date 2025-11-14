@@ -46,7 +46,6 @@ interface AuditReport {
   calculation: CalculationBreakdown;
   totalLosses: number;
   efficiency: number;
-  recommendations: string[];
   roadmap: RoadmapItem[];
 }
 
@@ -245,7 +244,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
   };
 
   // ============= Roadmap Generation =============
-  const generateSmartRoadmap = useCallback((calc: CalculationBreakdown, ans: EnhancedAuditAnswers): RoadmapItem[] => {
+  const generateRoadmap = useCallback((calc: CalculationBreakdown, ans: EnhancedAuditAnswers): RoadmapItem[] => {
     const roadmap: RoadmapItem[] = [];
     
     // Приоритизация по ROI
@@ -332,7 +331,6 @@ export const useWarehouseAudit = (userId: string | undefined) => {
           userId, 
           step, 
           answers: currentAnswers,
-          timestamp: new Date(),
           estimatedCompletion: `${(questions.length - step) * 15} сек`,
         }),
       });
@@ -382,7 +380,7 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     } else {
       // Final calculation
       const result = calcLosses(newAnswers);
-      const smartRoadmap = generateSmartRoadmap(result.breakdown, newAnswers as EnhancedAuditAnswers);
+      const smartRoadmap = generateRoadmap(result.breakdown, newAnswers as EnhancedAuditAnswers);
       
       setBreakdown(result.breakdown);
       setRoadmap(smartRoadmap);
@@ -413,10 +411,12 @@ export const useWarehouseAudit = (userId: string | undefined) => {
     setIsSending(true);
     try {
       const result = calcLosses(answers);
-      const recommendations = generateRecommendations(result.breakdown, answers as EnhancedAuditAnswers);
+      
+      // Generate recommendations from roadmap
+      const recommendations = roadmap.map(item => `${item.priority}. ${item.title}: ${item.description}`);
 
-      // Telegram message with Markdown
-      const message = `📊 *Ваш аудит склада готов!*
+      // Truncate message if too long for Telegram (4096 chars limit)
+      let message = `📊 *Ваш аудит склада готов!*
 
 ✅ *Потенциал экономии:* ${result.breakdown.monthlySavings.toLocaleString('ru-RU')}₽/мес
 
@@ -431,14 +431,21 @@ export const useWarehouseAudit = (userId: string | undefined) => {
 • Упущено: ${result.breakdown.missedSales.toLocaleString()}₽
 • Ошибки: ${result.breakdown.humanErrorCost.toLocaleString()}₽
 
-🚀 *Приоритетные действия:*
-${roadmap.slice(0, 3).map((item, i) => `${i + 1}. ${item.title} → ${item.impact.toLocaleString()}₽/мес`).join('\n')}
+🚀 *Приоритетные действия:*`;
 
-💡 *Следующий шаг:* Начните с бесплатного тарифа`;
+      // Add roadmap items (limit to top 3 to avoid message length issues)
+      const topRoadmap = roadmap.slice(0, 3);
+      topRoadmap.forEach((item, i) => {
+        message += `\n${i + 1}. ${item.title} → ${item.impact.toLocaleString()}₽/мес`;
+      });
 
+      message += `\n\n💡 *Следующий шаг:* Начните с бесплатного тарифа`;
+
+      // Telegram message options (imageQuery removed as it's not standard)
       await sendComplexMessage(userId, message, [], {
         parseMode: 'Markdown',
-        imageQuery: 'warehouse optimization success chart infographic',
+        // Remove unsupported imageQuery to prevent errors
+        // imageQuery: 'warehouse optimization success chart infographic',
       });
 
       // Save full report
@@ -449,11 +456,15 @@ ${roadmap.slice(0, 3).map((item, i) => `${i + 1}. ${item.title} → ${item.impac
         calculation: result.breakdown,
         totalLosses: result.total,
         efficiency: result.breakdown.efficiency,
-        recommendations,
-        roadmap,
+        roadmap: roadmap,
       };
       
-      await saveAuditReport(report);
+      const saveResult = await saveAuditReport(report);
+      
+      if (saveResult?.error) {
+        console.error('Save audit report error:', saveResult.error);
+        // Don't show error to user, as the main thing (Telegram message) succeeded
+      }
 
       toast.success('✅ План оптимизации отправлен в Telegram!', {
         icon: '📨',
@@ -462,9 +473,13 @@ ${roadmap.slice(0, 3).map((item, i) => `${i + 1}. ${item.title} → ${item.impac
       
       trackAuditEvent('report_sent', { totalLosses: result.total });
     } catch (error) {
-      toast.error('❌ Ошибка отправки отчёта', { icon: '❌' });
       console.error('Failed to send audit report:', error);
-      trackAuditEvent('report_error', { error });
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+      toast.error(`❌ Ошибка отправки отчёта: ${errorMessage}`, { 
+        icon: '❌',
+        duration: 5000,
+      });
+      trackAuditEvent('report_error', { error: errorMessage });
     } finally {
       setIsSending(false);
     }
@@ -477,10 +492,17 @@ ${roadmap.slice(0, 3).map((item, i) => `${i + 1}. ${item.title} → ${item.impac
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(report),
       });
-      return await response.json();
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save audit report');
+      }
+      
+      return result;
     } catch (error) {
       console.error('Failed to save audit:', error);
-      return null;
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 
