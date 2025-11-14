@@ -39,24 +39,8 @@ export const WarehouseAuditTool = () => {
   // FIX: Only block on errors, not warnings
   useEffect(() => {
     if (step > 0 && currentAnswer) {
-      const error = validateAnswer(currentAnswer, questions[step]);
-      if (error) {
-        setValidationResult({ type: 'error', message: error });
-      } else {
-        // Contextual warnings (non-blocking)
-        const num = parseInt(currentAnswer, 10);
-        const question = questions[step];
-        
-        if (question.id === 'skus' && num > 300) {
-          setValidationResult({ type: 'warning', message: '⚠️ Рекомендуем Про-план для 300+ SKU', icon: '📈' });
-        } else if (question.id === 'penalties' && num > 20000) {
-          setValidationResult({ type: 'warning', message: '⚠️ Ваши потери критичны! Начните сегодня', icon: '⚠️' });
-        } else if (question.id === 'stores' && num > 1) {
-          setValidationResult({ type: 'warning', message: '⚠️ Многоканальность требует автоматизации', icon: '🎯' });
-        } else {
-          setValidationResult(null);
-        }
-      }
+      const result = validateAnswer(currentAnswer, questions[step]);
+      setValidationResult(result);
     } else {
       setValidationResult(null);
     }
@@ -98,7 +82,7 @@ export const WarehouseAuditTool = () => {
             transition={{ delay: 0.5 }}
           >
             <FaUsers className="inline mr-2" /> 
-            <strong>Бета-тестирование</strong> • Первые 10 складов получают lifetime скидку 50%
+            <strong>Beta-тест</strong> • Первые 10 клиентов получают скидку 50% навсегда
           </motion.div>
         </motion.div>
         
@@ -123,7 +107,7 @@ export const WarehouseAuditTool = () => {
                 animate={{ rotate: 360 }}
                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
               >
-                <Zap className="w-5 h-5" />
+                <Zep className="w-5 h-5" />
               </motion.div>
             </motion.span>
           </Button>
@@ -211,8 +195,8 @@ export const WarehouseAuditTool = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { id: 'time', label: 'Время', value: `${breakdown.hours} ч`, color: 'blue', icon: FaClock, detail: `${breakdown.timeCost.toLocaleString()}₽/мес на рутину`, action: 'Автоматизация в 1 клик' },
-              { id: 'penalties', label: 'Штрафы', value: `${breakdown.penaltyCost.toLocaleString()}₽`, color: 'red', icon: FaExclamationTriangle, detail: 'За ошибки в остатках', action: 'Экономия 80% с PRO' },
-              { id: 'missed', label: 'Упущено', value: `${breakdown.missedSales.toLocaleString()}₽`, color: 'orange', icon: FaChartLine, detail: 'Потерянные продажи', action: 'Точность 99%+' },
+              { id: 'penalties', label: 'Штрафы', value: `${breakdown.penaltyCost.toLocaleString()}₽`, color: 'red', icon: FaExclamationTriangle, detail: 'Озон: (возвраты×2 + опоздания) ÷ доставки', action: 'Экономия 80% с PRO' },
+              { id: 'missed', label: 'Упущено', value: `${breakdown.missedSales.toLocaleString()}₽`, color: 'orange', icon: FaChartLine, detail: 'Потерянные продажи из-за неточностей', action: 'Точность 99%+' },
               { id: 'errors', label: 'Ошибки', value: `${breakdown.humanErrorCost.toLocaleString()}₽`, color: 'purple', icon: FaSyncAlt, detail: 'Человеческий фактор', action: 'Gamification' },
             ].map((item, idx) => {
               const Icon = item.icon;
@@ -267,9 +251,9 @@ export const WarehouseAuditTool = () => {
             <TrendingUp className="w-6 h-6 text-blue-600" />
             <div>
               <p className="text-sm text-blue-800 font-medium">
-                Индивидуальный расчёт на основе <strong>отраслевых метрик</strong>
+                Индивидуальный расчёт на основе <strong>отраслевых метрик</strong> и реальных данных
               </p>
-              <p className="text-xs text-blue-600">Каждый склад уникален • Проверьте данные</p>
+              <p className="text-xs text-blue-600">Проверьте цифры • Каждый кейс уникален</p>
             </div>
           </div>
         </motion.div>
@@ -362,7 +346,7 @@ export const WarehouseAuditTool = () => {
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
                 <p className="text-gray-600 mb-2 flex items-center justify-center gap-2">
                   <FaTelegram className="text-blue-500" />
-                  Персональный план будет отправлен вам в Telegram
+                  Персональный план отправлен в Telegram
                 </p>
                 <p className="text-sm text-gray-500">
                   Вопросы? Пишите: <strong>@salavey13</strong>
@@ -565,7 +549,7 @@ export const WarehouseAuditTool = () => {
         )}
         <Button 
           onClick={handleNext} 
-          disabled={!currentAnswer || validationResult?.type === 'error'} // FIX HERE
+          disabled={!currentAnswer || validationResult?.type === 'error'}
           className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-lg py-6 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <motion.span className="flex items-center justify-center">
