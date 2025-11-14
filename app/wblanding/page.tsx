@@ -1,8 +1,7 @@
 "use client";
 import { FixedHeader } from "./components/FixedHeader";
-
-import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt, BrainCircuit } from "lucide-react"; // Added Bolt
-import { useState, useEffect, useRef } from 'react';
+import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, FileText, Bolt, BrainCircuit, Clock } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
@@ -12,6 +11,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,11 +19,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaClock, FaFire, FaMoneyBillWave, FaRedo, FaPaperPlane, FaBell } from 'react-icons/fa6';
+import { FaCarBurst, FaChartLine, FaRocket, FaUsers, FaSpinner, FaFlagCheckered, FaUserPlus, FaCalendarCheck, FaFire, FaMoneyBillWave, FaRedo, FaPaperPlane, FaBell, FaStar, FaQuoteLeft, FaClock } from 'react-icons/fa6';
 import { FaKeyboard, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa';
-import { Loader2, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, Zap, ChevronLeft, ChevronRight, Target, Coins } from 'lucide-react';
 import Image from 'next/image';
-import { FaCheckCircle, FaSparkles } from 'react-icons/fa';
+import { supabaseAdmin } from '@/hooks/supabase';
+
+interface Testimonial {
+  id: string;
+  user_id: string;
+  username?: string;
+  avatar_url?: string;
+  content: string;
+  rating: number;
+  created_at: string;
+}
 
 const generateSlug = (name: string) =>
   name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
@@ -42,11 +52,35 @@ export default function WarehouseLandingPage() {
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
 
+  // Testimonials state
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonialContent, setTestimonialContent] = useState("");
+  const [testimonialRating, setTestimonialRating] = useState(5);
+  const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
+
+
+
   const footerLinkClass = "text-sm text-muted-foreground hover:text-brand-cyan font-mono flex items-center gap-1.5 transition-colors duration-200 hover:text-glow";
   
   const auditRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setSlug(generateSlug(name)); }, [name]);
+
+  // Load approved testimonials
+  useEffect(() => {
+    const loadTestimonials = async () => {
+      const { data, error } = await supabaseAdmin
+        .from('testimonials')
+        .select('*')
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setTestimonials(data as Testimonial[]);
+      }
+    };
+    loadTestimonials();
+  }, []);
 
   const scrollToAudit = () => {
     setTimeout(() => {
@@ -74,10 +108,8 @@ export default function WarehouseLandingPage() {
         toast.success(`Склад "${result.data.name}" успешно создан!`);
         setCreatedCrew({ slug: result.data.slug, name: result.data.name });
         
-        // Уведомление администратора о новом складе
         await notifyAdmin(`🎉 Новый склад создан!\nНазвание: ${result.data.name}\nВладелец: ${dbUser.username || dbUser.user_id}`);
         
-        // Отправляем персональное уведомление в Telegram
         await sendComplexMessage(dbUser.user_id, `🎉 Поздравляем! Ваш склад "${result.data.name}" успешно создан! Теперь пригласите команду и начните оптимизацию.`, []);
       } else { 
         throw new Error(result.error || "Неизвестная ошибка при создании склада."); 
@@ -92,15 +124,12 @@ export default function WarehouseLandingPage() {
   const handleInvite = async () => {
     if (!createdCrew) return;
     
-    // Фикс: убираем лишние пробелы в URL
     const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${createdCrew.slug}_join_crew`;
     const text = `Присоединяйся к нашему складу '${createdCrew.name}' в приложении!`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=${encodeURIComponent(text)}`;
     
-    // Открываем share URL
     window.open(shareUrl, "_blank");
     
-    // Отправляем уведомление владельцу через Telegram
     if (dbUser?.user_id) {
       await sendComplexMessage(
         dbUser.user_id, 
@@ -109,12 +138,10 @@ export default function WarehouseLandingPage() {
       );
       toast.success("Приглашение отправлено! Проверьте Telegram.");
       
-      // Уведомляем администратора о приглашении
       await notifyAdmin(`📧 Пользователь ${dbUser.username || dbUser.user_id} создал приглашение для склада "${createdCrew.name}"`);
     }
   };
 
-  // Функция для отправки счета за услугу
   const handleSendInvoice = async (serviceType: 'quick_setup' | 'team_training', amount: number) => {
     if (!dbUser?.user_id) {
       toast.error("Пожалуйста, войдите в систему");
@@ -127,7 +154,7 @@ export default function WarehouseLandingPage() {
         quick_setup: {
           name: "🎯 Автоматизация склада за 1 день",
           description: "Полная настройка, интеграция со всеми маркетплейсами, обучение владельца (2 часа), гарантия 30 дней",
-          amount: 10000 // ИСПРАВЛЕНО: снижено с 20000 до 10000 (лимит Telegram Stars)
+          amount: 10000
         },
         team_training: {
           name: "👨‍🏫 Обучение команды с нуля",
@@ -137,8 +164,6 @@ export default function WarehouseLandingPage() {
       };
       
       const service = services[serviceType];
-      
-      // Отправляем счет в Telegram
       const result = await sendServiceInvoice(
         dbUser.user_id,
         serviceType,
@@ -153,14 +178,12 @@ export default function WarehouseLandingPage() {
           icon: '📨'
         });
         
-        // Отправляем детальное уведомление пользователю
         await sendComplexMessage(
           dbUser.user_id,
           `💰 Счет на оплату услуги "${service.name}" отправлен!\n\nСумма: ${service.amount}₽\nОписание: ${service.description}\n\nОплатите его в Telegram для продолжения.`,
           []
         );
         
-        // Уведомляем администратора
         await notifyAdmin(`💰 Новый заказ услуги!\nТип: ${service.name}\nКлиент: ${dbUser.username || dbUser.user_id}\nСумма: ${service.amount}₽`);
       } else {
         throw new Error(result.error || "Ошибка при отправке счета");
@@ -172,10 +195,14 @@ export default function WarehouseLandingPage() {
     }
   };
 
-  // Функция для массовой рассылки уведомлений
   const handleBroadcast = async () => {
     if (!dbUser?.user_id) {
       toast.error("Ошибка: пользователь не авторизован");
+      return;
+    }
+    
+    if (dbUser.role !== 'admin') {
+      toast.error("Только администратор может делать рассылку");
       return;
     }
     
@@ -222,12 +249,9 @@ export default function WarehouseLandingPage() {
     }
   };
 
-  // Улучшенные обработчики для кнопок планов
   const handlePlanAction = async (planType: 'free' | 'pro' | 'enterprise', action: () => void) => {
-    // Сначала выполняем действие (показать тост)
     action();
     
-    // Затем уведомляем администратора о выборе плана
     if (dbUser?.user_id) {
       const planNames = {
         free: '🚀 Путь к нулевым потерям (Бесплатно)',
@@ -235,7 +259,6 @@ export default function WarehouseLandingPage() {
         enterprise: '🏢 Экспоненциальный рост (Предприятие)'
       };
       
-      // Отправляем персональное сообщение пользователю
       await sendComplexMessage(
         dbUser.user_id,
         `🎯 Вы выбрали тариф "${planNames[planType]}"! Мы подготовим для вас персональное предложение. Ожидайте деталей в Telegram.`,
@@ -246,9 +269,63 @@ export default function WarehouseLandingPage() {
     }
   };
 
+  const handleSubmitTestimonial = async () => {
+    if (!dbUser?.user_id) {
+      toast.error("Пожалуйста, войдите в систему");
+      return;
+    }
+
+    if (!testimonialContent.trim()) {
+      toast.error("Введите текст отзыва");
+      return;
+    }
+
+    setIsSubmittingTestimonial(true);
+    try {
+      const { error } = await supabaseAdmin.from('testimonials').insert({
+        user_id: dbUser.user_id,
+        username: dbUser.username || 'Аноним',
+        avatar_url: dbUser.avatar_url || '',
+        content: testimonialContent,
+        rating: testimonialRating,
+        is_approved: false // Admin will approve manually
+      });
+
+      if (error) throw error;
+
+      toast.success("✅ Отзыв отправлен на модерацию!", {
+        duration: 5000,
+        icon: '📝'
+      });
+
+      setTestimonialContent("");
+      setTestimonialRating(5);
+
+      // Notify admin
+      await notifyAdmin(`📝 Новый отзыв!\nПользователь: ${dbUser.username || dbUser.user_id}\nРейтинг: ${testimonialRating}/5\n\n${testimonialContent.substring(0, 100)}...`);
+      
+    } catch (error) {
+      toast.error("❌ Ошибка отправки отзыва");
+      console.error(error);
+    } finally {
+      setIsSubmittingTestimonial(false);
+    }
+  };
+
+  
+
+  if (appContextLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin w-8 h-8 text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 font-sans">
-<FixedHeader />
+      <FixedHeader />
+      
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center text-white overflow-hidden">
         <div className="absolute inset-0 w-full h-full">
@@ -297,7 +374,6 @@ export default function WarehouseLandingPage() {
               <Button onClick={() => {
                 setShowAudit(true);
                 scrollToAudit();
-                // Агрессивное всплывающее уведомление
                 toast.info("🔥 УЗНАЙТЕ СВОИ ПОТЕРИ ПРЯМО СЕЙЧАС!", {
                   icon: "⚡",
                   duration: 3000
@@ -323,7 +399,7 @@ export default function WarehouseLandingPage() {
         </section>
       )}
 
-      {/* Second Video Section */}
+      {/* Second Video Section - FIXED */}
       <section className="py-12 bg-gray-100">
         <div className="max-w-4xl mx-auto px-4">
           <motion.div 
@@ -333,10 +409,10 @@ export default function WarehouseLandingPage() {
             transition={{ duration: 0.6 }}
           >
             <video 
-              className="w-full h-auto" 
+              className="w-full h-full object-cover" 
               autoPlay loop muted playsInline
             >
-              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4" type="video/mp4" />
+              <source src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/grok-video-c73d1434-fe01-4e30-ad74-3799fdce56eb-5-29a2a26b-c256-4dff-9c32-cc00a6847df5.mp4?download=0" type="video/mp4" />
             </video>
           </motion.div>
         </div>
@@ -416,7 +492,7 @@ export default function WarehouseLandingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {[
               { title: "Для владельца бизнеса", benefits: ["Полный контроль операций", "Рост эффективности на 70%+", "Автоматизация рутины", "Прозрачность процессов", "Бесплатный старт"], color: "text-blue-800" },
-              { title: "Для персонала", benefits: ["Простой интерфейс в Telegram", "Быстрые операции с товарами", "Игровой режим с наградами", "Личная статистика и цели"], color: "text-blue-800" },
+              { title: "Для персонала", benefits: ["Простой интерфейс в Telegram", "Быстрые операции с товарами", "Игровой режим с наградами", "Личная статистика и цели", "⏰ Автоучёт смен — старт/перерыв/окончание в 1 клик"], color: "text-blue-800" },
               { title: "Для администратора", benefits: ["Управление несколькими складами", "Безопасный доступ для команды", "Уведомления о заказах (в разработке)", "Простые отчеты в CSV"], color: "text-blue-800" }
             ].map((role, index) => (
               <motion.div 
@@ -453,6 +529,168 @@ export default function WarehouseLandingPage() {
                 </ul>
               </motion.div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-20 px-4 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Частые вопросы
+          </motion.h2>
+          <Accordion type="single" collapsible className="w-full space-y-4">
+            <AccordionItem value="item-1">
+              <AccordionTrigger className="text-left text-lg font-semibold">У меня только 1 магазин зачем мне это?</AccordionTrigger>
+              <AccordionContent className="text-gray-600 leading-relaxed">
+                Даже 1 магазин теряет 30-70 тыс.₽/мес на штрафах и рутине. Наш аудит покажет точные цифры. А когда решите масштабироваться — мы бесплатно продублируем ваши товары на Ozon/YM за 1 день (услуга "Shop Multiplication" входит в PRO). Начнёте сразу с 3 магазинов без ручной настройки.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-2">
+              <AccordionTrigger className="text-left text-lg font-semibold">Как быстро увижу результат?</AccordionTrigger>
+              <AccordionContent className="text-gray-600 leading-relaxed">
+                Сразу после внедрения: синхронизация остатков начинает работать в день подключения. Снижение штрафов — через 1-2 недели. Полный эффект (70%+ рост эффективности) — через месяц регулярного использования.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-3">
+              <AccordionTrigger className="text-left text-lg font-semibold">Что если у меня нет технических навыков?</AccordionTrigger>
+              <AccordionContent className="text-gray-600 leading-relaxed">
+                Не нужны. Весь интерфейс в Telegram, настройка под ключ за 1 день (услуга "Автоматизация склада за 1 день" за 10 000₽). Персонал обучается за 1 час.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-4">
+              <AccordionTrigger className="text-left text-lg font-semibold">Как отменить подписку?</AccordionTrigger>
+              <AccordionContent className="text-gray-600 leading-relaxed">
+                В любой момент в Telegram-боте: раздел "Настройки" → "Управление подпиской". Деньги за текущий месяц не возвращаем, но доступ остаётся до конца оплаченного периода.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-5">
+              <AccordionTrigger className="text-left text-lg font-semibold">Работает ли с моей учетной системой?</AccordionTrigger>
+              <AccordionContent className="text-gray-600 leading-relaxed">
+                Интегрируемся с 1С, МойСклад, Excel через API или CSV-выгрузку. Если вашей системы нет в списке — сделаем кастомную интеграцию бесплатно при переходе на PRO.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section id="testimonials" className="py-20 px-4 bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="max-w-6xl mx-auto">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold text-center mb-16 text-gray-900"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Отзывы клиентов
+          </motion.h2>
+
+          {/* Testimonial Form */}
+          {dbUser?.user_id && (
+            <motion.div 
+              className="mb-12 bg-white rounded-2xl p-6 sm:p-8 shadow-lg max-w-2xl mx-auto"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <h3 className="text-xl font-bold mb-4 text-gray-900">Поделитесь вашим опытом</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-700">Ваш отзыв</Label>
+                  <Textarea 
+                    placeholder="Расскажите, как приложение помогло вашему бизнесу..."
+                    value={testimonialContent}
+                    onChange={(e) => setTestimonialContent(e.target.value)}
+                    className="mt-2 min-h-[100px]"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-700">Оценка</Label>
+                  <div className="flex gap-2 mt-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setTestimonialRating(star)}
+                        className={`text-2xl transition-colors ${star <= testimonialRating ? 'text-yellow-500' : 'text-gray-300'}`}
+                      >
+                        <FaStar />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleSubmitTestimonial}
+                  disabled={isSubmittingTestimonial}
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold"
+                >
+                  {isSubmittingTestimonial ? (
+                    <motion.span className="flex items-center justify-center">
+                      <Loader2 className="animate-spin mr-2" /> Отправка...
+                    </motion.span>
+                  ) : (
+                    <motion.span className="flex items-center justify-center">
+                      <FaPaperPlane className="mr-2" /> Отправить отзыв
+                    </motion.span>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Testimonials List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {testimonials.length === 0 ? (
+              <motion.div 
+                className="col-span-full text-center py-12 bg-white rounded-xl shadow-md"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <FaQuoteLeft className="text-4xl text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Пока нет отзывов. Станьте первым!</p>
+              </motion.div>
+            ) : (
+              testimonials.map((testimonial, index) => (
+                <motion.div 
+                  key={testimonial.id}
+                  className="bg-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200"
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    {testimonial.avatar_url ? (
+                      <Image 
+                        src={testimonial.avatar_url} 
+                        alt={testimonial.username || 'User'} 
+                        width={50} 
+                        height={50} 
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold">
+                        {(testimonial.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-bold text-gray-900">{testimonial.username || 'Аноним'}</h4>
+                      <div className="flex text-yellow-500">
+                        {[...Array(testimonial.rating)].map((_, i) => (
+                          <FaStar key={i} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 italic">{testimonial.content}</p>
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -899,7 +1137,7 @@ export default function WarehouseLandingPage() {
       </section>
 
       {/* Invite Section */}
-      <section id="invite"  className="py-20 px-4 bg-white">
+      <section id="invite" className="py-20 px-4 bg-white">
         <div className="max-w-6xl mx-auto text-center">
           <motion.h2 
             className="text-3xl md:text-4xl font-bold mb-12 text-gray-900"
@@ -1094,14 +1332,14 @@ export default function WarehouseLandingPage() {
             transition={{ delay: 0.2 }}
           >
             <div className="mt-10 md:mt-12 pt-6 border-t border-brand-purple/20">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-muted-foreground font-mono text-xs">
-            <p>© {new Date().getFullYear()} oneSitePls <span className="text-brand-purple/70 mx-0.5">::</span> Powered by CyberVibe <span className="text-brand-purple/70 mx-0.5">::</span> @SALAVEY13</p>
-            <div className="flex items-center gap-3 sm:gap-4">
-              <Link href="https://github.com/salavey13/carTest/blob/main/SECURITY.md" className={footerLinkClass}><ShieldQuestion className="w-3 h-3"/>Конфиденциальность</Link>
-              <Link href="https://github.com/salavey13/carTest/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer" className={footerLinkClass}><FileText className="w-3 h-3"/>MIT License</Link>
+              <div className="flex flex-col md:flex-row justify-between items-center gap-3 text-muted-foreground font-mono text-xs">
+                <p>© {new Date().getFullYear()} oneSitePls <span className="text-brand-purple/70 mx-0.5">::</span> Powered by CyberVibe <span className="text-brand-purple/70 mx-0.5">::</span> @SALAVEY13</p>
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Link href="https://github.com/salavey13/carTest/blob/main/SECURITY.md" className={footerLinkClass}><ShieldQuestion className="w-3 h-3"/>Конфиденциальность</Link>
+                  <Link href="https://github.com/salavey13/carTest/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer" className={footerLinkClass}><FileText className="w-3 h-3"/>MIT License</Link>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
           </motion.div>
         </div>
       </footer>
