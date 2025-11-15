@@ -2,7 +2,7 @@
 
 import React, { memo } from 'react';
 import { motion, Variants } from 'framer-motion';
-import { Benefit } from '../../types';
+import type { Benefit } from '../../types';
 
 const benefitVariants: Variants = {
   hidden: { 
@@ -25,7 +25,7 @@ const benefitVariants: Variants = {
 export const BenefitCard = memo(({ benefit, index }: { benefit: Benefit; index: number }) => {
   // ✅ Add fallbacks for theme
   const bgColor = benefit.theme?.bg || 'hsl(var(--muted))';
-  const textColor = benefit.theme?.text || 'hsl(var(--muted-foreground))';
+  const textColor = benefit.theme?.text || 'hsl(var(--foreground))';
   
   return (
     <motion.article

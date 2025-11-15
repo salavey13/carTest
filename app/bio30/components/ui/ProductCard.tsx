@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import type { Bio30Product } from '../../categories/actions';
 
 interface ProductCardProps {
-  product: Bio30Product; // ✅ Use dynamic type
+  product: Bio30Product;
   index: number;
 }
 
@@ -43,21 +43,23 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
               </div>
               <div className="mt-auto">
                 <span className="text-base md:text-lg font-bold text-primary">{product.price} ₽</span>
+                {product.originalPrice && (
+                  <span className="text-sm text-muted-foreground line-through ml-2">
+                    {product.originalPrice} ₽
+                  </span>
+                )}
               </div>
             </div>
           </div>
           
           {/* Image Area */}
           <div className="relative h-1/2 min-h-[150px] flex-shrink-0">
-            <picture>
-              <source media="(max-width: 768px)" srcSet={product.image} />
-              <img 
-                src={product.image} 
-                alt={product.title} 
-                className="absolute inset-0 w-full h-full object-cover"
-                loading="lazy"
-              />
-            </picture>
+            <img 
+              src={product.image} 
+              alt={product.title} 
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+            />
             
             {/* Tags */}
             {product.tags.length > 0 && (
@@ -71,6 +73,13 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
                   </span>
                 ))}
               </div>
+            )}
+            
+            {/* Discount Badge */}
+            {product.hasDiscount && product.originalPrice && (
+              <span className="absolute top-3 right-3 bg-destructive text-destructive-foreground px-2 py-1 rounded-md text-xs font-bold">
+                -{Math.round((1 - product.price / product.originalPrice) * 100)}%
+              </span>
             )}
           </div>
         </div>
