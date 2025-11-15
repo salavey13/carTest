@@ -1,6 +1,7 @@
 "use client";
 
-import React, { memo } from 'next/link';
+import React, { memo } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import type { Bio30Product } from '../../categories/actions';
 
@@ -26,7 +27,7 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
       }}
       viewport={{ 
         once: true, 
-        margin: "-10%" // Увеличен отступ для надежного срабатывания анимации
+        margin: "-10%"
       }}
       className="group relative overflow-hidden rounded-xl border border-border hover:shadow-lg hover:-translate-y-1 transition-all duration-300 min-h-[300px] bg-card"
       style={{ 
