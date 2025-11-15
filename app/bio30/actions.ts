@@ -6,16 +6,7 @@ import type { Database } from "@/types/database.types";
 import { updateUserSettings, sendTelegramInvoice } from "@/app/actions";
 import { processReferralCommissions } from "./ref_actions";
 import { fetchBio30ProductById } from "./categories/actions";
-
-// Dynamic CartItem type matching the product structure
-type CartItem = {
-  productId: string;
-  quantity: number;
-  name: string;
-  price: number;
-  image: string;
-  category: string;
-};
+import { CartItem } from "./types";
 
 /**
  * Enhanced checkout with referral processing
