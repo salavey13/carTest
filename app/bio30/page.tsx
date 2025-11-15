@@ -12,7 +12,7 @@ import { BenefitCard } from "./components/ui/BenefitCard";
 import StoriesSlider from "./components/StoriesSlider";
 import PartnerForm from "./components/PartnerForm";
 import { BENEFITS, STORIES } from "./data/products";
-import { HERO_SLIDES } from "./data/hero"; // Will use fallback if undefined
+import { HERO_SLIDES } from "./data/hero";
 import { fetchFeaturedBio30Products } from "./categories/actions";
 import type { Bio30Product } from "./categories/actions";
 
@@ -44,7 +44,8 @@ export default function HomePage(): JSX.Element {
   const benefitsTitle = useScrollFadeIn("up", 0.1);
   const storiesTitle = useScrollFadeIn("up", 0.1);
   
-  const { ref: productsRef, controls: productsControls, container: productsContainer } = useStaggerFadeIn(products.length || 4, 0.1);
+  // УБРАНО использование useStaggerFadeIn для продуктов
+  // Сохранено для бенефитов, так как там оно работает корректно
   const { ref: benefitsRef, controls: benefitsControls, container: benefitsContainer } = useStaggerFadeIn(BENEFITS.length, 0.1);
 
   useEffect(() => {
@@ -57,6 +58,7 @@ export default function HomePage(): JSX.Element {
       const result = await fetchFeaturedBio30Products(8);
       if (result.success && result.data) {
         setProducts(result.data);
+        console.log("✅ PRODUCTS LOADED:", result.data.length); // Отладка
       } else {
         console.error("Failed to load products:", result.error);
       }
@@ -167,31 +169,33 @@ export default function HomePage(): JSX.Element {
             <div className="w-16 h-16 border-4 border-muted border-t-primary rounded-full animate-spin"></div>
           </div>
         ) : (
-          <motion.div
-            ref={productsRef}
-            initial="hidden"
-            animate={productsControls}
-            variants={productsContainer}
-            className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto"
-            style={{ opacity: 1 }}
-          >
-            {products.map((product, i) => (
-              <ProductCard key={product.id} product={product} index={i} />
-            ))}
+          <>
+            <div className="max-w-7xl mx-auto w-full mb-4">
+              <p className="text-sm text-muted-foreground">
+                Загружено продуктов: {products.length}
+              </p>
+            </div>
             
-            {/* "All products" card */}
-            <Link
-              href="/bio30/categories"
-              className="group relative overflow-hidden rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors min-h-[300px]"
-              style={{ backgroundColor: "#0D0D0D" }}
-            >
-              <div className="flex flex-col items-center gap-8 p-8">
-                <h2 className="text-xl font-bold group-hover:text-primary transition-colors">
-                  Все продукты →
-                </h2>
-              </div>
-            </Link>
-          </motion.div>
+            {/* ✅ ИСПРАВЛЕНО: Убран родительский motion.div с initial="hidden" */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto">
+              {products.map((product, i) => (
+                <ProductCard key={product.id} product={product} index={i} />
+              ))}
+              
+              {/* "All products" card */}
+              <Link
+                href="/bio30/categories"
+                className="group relative overflow-hidden rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors min-h-[300px]"
+                style={{ backgroundColor: "#0D0D0D" }}
+              >
+                <div className="flex flex-col items-center gap-8 p-8">
+                  <h2 className="text-xl font-bold group-hover:text-primary transition-colors">
+                    Все продукты →
+                  </h2>
+                </div>
+              </Link>
+            </div>
+          </>
         )}
       </section>
 
