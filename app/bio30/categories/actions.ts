@@ -215,7 +215,7 @@ export async function fetchBio30ProductById(id: string) {
         .select("*")
         .eq("make", "BIO 3.0")
         .eq("is_test_result", false)
-        .ilike("specs->>model", decodeURIComponent(id).toLowerCase()); // Case-insensitive match
+        .ilike("specs->>model", decodeURIComponent(id).toLowerCase())
         .limit(1);
 
       if (altError) {
