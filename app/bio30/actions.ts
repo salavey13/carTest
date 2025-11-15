@@ -11,7 +11,7 @@ import { CartItem } from "./types";
 /**
  * Enhanced checkout with referral processing
  */
-export async function checkoutCart(userId: string, chatId: string) {
+export async function checkoutCart(userId: string) {
   try {
     const user = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
     if (!user.data) throw new Error("User not found");
@@ -25,7 +25,7 @@ export async function checkoutCart(userId: string, chatId: string) {
 
     // Send Telegram invoice (existing functionality)
     const invoiceResult = await sendTelegramInvoice(
-      chatId,
+      userId,
       "Оплата корзины BIO 3.0",
       `Товары: ${description}\nИтого: ${total} руб.`,
       orderId,

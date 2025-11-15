@@ -53,9 +53,7 @@ export default function CartPage() {
       setIsProcessing(true);
       toast.loading('Оформление заказа...', { id: 'processing-checkout' });
       
-      // Here you would integrate with your payment system
-      // For now, we'll just log and clear cart
-      const result = await checkoutCart(dbUser.user_id, dbUser.user_id);
+      const result = await checkoutCart(dbUser.user_id);
       
       if (result.success) {
         await refreshDbUser();
