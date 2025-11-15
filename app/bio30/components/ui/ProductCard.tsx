@@ -31,7 +31,7 @@ export const ProductCard = memo(({ product, index }: ProductCardProps) => {
       className="group relative overflow-hidden rounded-xl border border-border hover:shadow-lg hover:-translate-y-1 transition-all duration-300 min-h-[300px] bg-card"
       style={{ 
         backgroundColor: 'hsl(var(--card))',
-        opacity: 1 // Принудительная видимость
+        opacity: 1
       }}
     >
       <Link href={`/bio30/categories/${encodeURIComponent(product.id)}`} className="block h-full">
