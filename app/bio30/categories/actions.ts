@@ -215,7 +215,7 @@ export async function fetchBio30ProductById(id: string) {
         .select("*")
         .eq("make", "BIO 3.0")
         .eq("is_test_result", false)
-        .ilike("specs->>model", decodeURIComponent(id).toLowerCase()); // Case-insensitive match
+        .ilike("specs->>model", decodeURIComponent(id).toLowerCase())
         .limit(1);
 
       if (altError) {
@@ -274,7 +274,6 @@ export async function fetchBio30ProductById(id: string) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
-
 
 /**
  * Process cart checkout (placeholder for payment integration)
@@ -352,7 +351,6 @@ export async function checkoutCart(userId: string): Promise<{ success: boolean; 
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
-
 
 /**
  * Add product to user's cart in metadata
