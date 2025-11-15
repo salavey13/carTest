@@ -1,4 +1,3 @@
-// /components/layout/ClientLayout.tsx
 "use client";
 
 import type React from "react";
@@ -30,12 +29,13 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import Image from "next/image";
 import { Loading } from "@/components/Loading";
-import { cn } from "@/lib/utils";
-import { setReferrer } from "@/app/bio30/actions"; // Import bio30 setReferrer
+import { cn } from "/lib/utils";
 
 // Bio30 specific components
 import Bio30Header from "@/app/bio30/components/Header";
 import Bio30Footer from "@/app/bio30/components/Footer";
+import { setReferrer } from "@/app/bio30/ref_actions"; // Import new referral function
+import { generateReferralCode } from "@/app/bio30/ref_actions"; // For new users
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
@@ -54,7 +54,6 @@ const THEME_CONFIG = {
     isTransparent: false,
   },
   bio30: {
-    // match any path that starts with /bio30
     paths: ["/bio30"],
     Header: Bio30Header,
     Footer: Bio30Footer,
@@ -153,6 +152,18 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   wb: "/wb",
 };
 
+// BIO30 Product mapping for startapp parameters
+const BIO30_PRODUCT_PATHS: Record<string, string> = {
+  'cordyceps': '/bio30/categories/cordyceps-sinensis',
+  'spirulina': '/bio30/categories/spirulina-chlorella',
+  'lions-mane': '/bio30/categories/lion-s-mane',
+  'lion-s-mane': '/bio30/categories/lion-s-mane',
+  'magnesium': '/bio30/categories/magnesium-pyridoxine',
+  'cordyceps-sinensis': '/bio30/categories/cordyceps-sinensis',
+  'spirulina-chlorella': '/bio30/categories/spirulina-chlorella',
+  'magnesium-pyridoxine': '/bio30/categories/magnesium-pyridoxine'
+};
+
 function useBio30ThemeFix() {
   const pathname = usePathname();
   useEffect(() => {
@@ -161,8 +172,8 @@ function useBio30ThemeFix() {
     const prevBg = root.style.getPropertyValue("--background");
     const prevFg = root.style.getPropertyValue("--foreground");
 
-    root.style.setProperty("--background", "hsl(0 0% 6%)"); // тёмный фон
-    root.style.setProperty("--foreground", "hsl(0 0% 100%)"); // белый текст
+    root.style.setProperty("--background", "hsl(0 0% 6%)");
+    root.style.setProperty("--foreground", "hsl(0 0% 100%)");
     document.body.style.backgroundColor = "hsl(0 0% 6%)";
     document.body.style.color = "hsl(0 0% 100%)";
 
@@ -202,7 +213,6 @@ function useBio30ExternalCSS() {
       "faq.css",
       "cards__cart.css",
       "grid__cards.css",
-      "grid__benefit.css",
       "default.css",
       "grid__delivery.css",
       "grid__referral_01.css",
@@ -251,7 +261,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
 
   // load bio30 CSS when on bio30 paths
-  useBio30ExternalCSS();
+  // useBio30ExternalCSS();
   // apply theme fix (colors) when on bio30
   useBio30ThemeFix();
 
@@ -268,7 +278,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
             logger.info(
               `[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`
             );
-            // Refresh user data to get updated metadata
             await refreshDbUser();
           } else {
             logger.error(
@@ -321,19 +330,47 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       } else if (paramToProcess.startsWith("viz_")) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
+      } else if (prefix === "bio30") {
+        // Handle BIO30 startapp parameters
+        // Format: bio30_<product-id>_ref_<referrer_id> or bio30_ref_<referrer_id> or bio30_<product-id>
+        let productId: string | undefined;
+        let referrerId: string | undefined;
+        
+        // Check for product ID (second part, unless it's "ref")
+        if (parts.length > 1 && parts[1] !== 'ref') {
+          productId = parts[1];
+        }
+        
+        // Check for referral (look for "ref" followed by referrer ID)
+        const refIndex = parts.indexOf('ref');
+        if (refIndex !== -1 && refIndex + 1 < parts.length) {
+          referrerId = parts[refIndex + 1];
+        }
+        
+        // Set up referral if user exists and doesn't have one yet
+        if (referrerId && dbUser?.user_id && !dbUser.metadata?.referrer_id) {
+          handleBio30Referral(referrerId, paramToProcess).catch((error) => {
+            logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
+          });
+        }
+        
+        // Set target path
+        if (productId && BIO30_PRODUCT_PATHS[productId]) {
+          targetPath = BIO30_PRODUCT_PATHS[productId];
+        } else {
+          targetPath = '/bio30';
+        }
       } else if (
         paramToProcess.startsWith("ref_") &&
         parts.length === 2 &&
         pathname.startsWith("/bio30")
       ) {
-        // Bio30 referral handling - extract and process asynchronously
+        // Legacy referral format: ref_<referrer_id>
         const referrerId = parts[1];
-        // Process referral without blocking the rest of the logic
         handleBio30Referral(referrerId, paramToProcess).catch((error) => {
           logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
         });
-        // No redirect, stay on bio30
-        targetPath = undefined;
+        targetPath = undefined; // Stay on current BIO30 page
       } else {
         targetPath = `/${paramToProcess}`;
       }
@@ -345,7 +382,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         router.replace(targetPath);
         clearStartParam?.();
       } else {
-        // Clear start param even if no redirect happens (like in bio30 referral case)
         clearStartParam?.();
       }
     }
@@ -381,7 +417,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     pathname?.startsWith(p)
   ) || pathname === "/";
 
-  // NOTE: removed hiding of header/footer for /bio30 here — bio30 gets its own Header/Footer theme
   useEffect(() => {
     setShowHeaderAndFooter(
       !(
@@ -389,7 +424,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
         pathname?.startsWith("/wb") ||
-        // pathname?.startsWith("/bio30") <-- intentionally removed so bio30 uses its header/footer
         pathname === "/csv-compare" ||
         pathname === "/streamer" ||
         pathname === "/blogger" ||
@@ -412,8 +446,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       </main>
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
       <Suspense fallback={null}>
-        {/* keep sticky chat for non-bio30 pages to avoid CSS collisions */}
-        <StickyChatButton />{/*!pathname.startsWith("/bio30") && <StickyChatButton />*/}
+        <StickyChatButton />
       </Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
     </>

@@ -33,119 +33,115 @@
 }
 
 .verif {
-  background-image: url('/front/static/img/icons/verif.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/verif.svg');
 }
 
 .profile {
-  background-image: url('/front/static/img/icons/profile.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/profile.svg');
 
 }
 
 .dzen {
-  background-image: url('/front/static/img/icons/dzen.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/dzen.svg');
 }
 
 .vk {
-  background-image: url('/front/static/img/icons/vk.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/vk.svg');
 
 }
-
 
 .settings__icon {
-  background-image: url('/front/static/img/icons/settings.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/settings.svg');
 }
-
 
 .referral__icon {
-  background-image: url('/front/static/img/icons/referral.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/referral.svg');
 
 }
 
-
 .cart__icon {
-  background-image: url('/front/static/img/icons/cart.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/cart.svg');
 
 }
 
 .open {
-  background-image: url('/fronts/static/img/icons/open.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/open.svg');
 
 }
 
 .open.cancel {
-  background-image: url('/static/img/icons/cancel.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/cancel.svg');
 }
 
 .cancel {
-  background-image: url('/front/static/img/icons/cancel.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/cancel.svg');
 
 }
 
 .check {
-  background-image: url('/front/static/img/icons/check.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/check.svg');
 
 }
 
 .menu-icon {
-  background-image: url('/front/static/img/icons/menu.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/menu.svg');
 }
 .bag {
-  background-image: url('/front/static/img/icons/bag.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/bag.svg');
 }
 
 .chat {
-  background-image: url('/front/static/img/icons/help.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/help.svg');
 }
 
 .dots {
-  background-image: url('/front/static/img/icons/dots_white.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/dots_white.svg');
 }
 
 .close {
-  background-image: url('/front/static/img/icons/delete.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/delete.svg');
 }
 
 .cancel {
-  background-image: url('/front/static/img/icons/profile.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/profile.svg');
 }
 
 .phone {
-  background-image: url('/front/static/img/icons/phone.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/phone.svg');
 }
 
 .language {
-  background-image: url('/front/static/img/icons/language.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/language.svg');
 }
 
-
 .facebook {
-  background-image: url('/front/static/img/icons/facebook.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/facebook.svg');
 }
 
 .telegram {
-  background-image: url('/front/static/img/icons/telegram.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/telegram.svg');
 }
 
 .instagram {
-  background-image: url('/front/static/img/icons/instagram.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/instagram.svg');
 }
 
 .delete {
-  background-image: url('/front/static/img/icons/delete.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/delete.svg');
 }
 
 .youtube {
-  background-image: url('/front/static/img/icons/youtube.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/youtube.svg');
 }
 
 .verification {
-  background-image: url('/front/static/img/icons/verif.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/verif.svg');
 }
 
 .plus {
-  background-image: url('/front/static/img/icons/plus.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/plus.svg');
 }
 
 .minus {
-  background-image: url('/front/static/img/icons/minus.svg');
+  background-image: url('https://bio30.ru/front/static/img/icons/minus.svg');
 }
