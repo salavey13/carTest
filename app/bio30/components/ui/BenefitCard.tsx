@@ -23,6 +23,10 @@ const benefitVariants: Variants = {
 };
 
 export const BenefitCard = memo(({ benefit, index }: { benefit: Benefit; index: number }) => {
+  // ✅ Add fallbacks for theme
+  const bgColor = benefit.theme?.bg || 'hsl(var(--muted))';
+  const textColor = benefit.theme?.text || 'hsl(var(--muted-foreground))';
+  
   return (
     <motion.article
       custom={index}
@@ -32,17 +36,17 @@ export const BenefitCard = memo(({ benefit, index }: { benefit: Benefit; index: 
       variants={benefitVariants}
       className="relative overflow-hidden rounded-xl border border-border min-h-[300px] shadow-sm hover:shadow-lg transition-shadow"
       style={{ 
-        backgroundColor: benefit.theme.bg, 
-        color: benefit.theme.text
-      } as React.CSSProperties}
+        backgroundColor: bgColor,
+        color: textColor
+      }}
     >
       <div className="flex flex-col h-full">
         {/* Text Content */}
         <div className={`flex-1 p-6 md:p-8 ${benefit.variant === 'center' ? 'text-center' : ''}`}>
-          <h2 className="text-base md:text-lg font-bold mb-2" style={{ color: benefit.theme.text }}>
+          <h2 className="text-base md:text-lg font-bold mb-2" style={{ color: textColor }}>
             {benefit.title}
           </h2>
-          <p className="text-sm md:text-base opacity-50" style={{ color: benefit.theme.text }}>
+          <p className="text-sm md:text-base opacity-50" style={{ color: textColor }}>
             {benefit.description}
           </p>
         </div>
@@ -56,7 +60,6 @@ export const BenefitCard = memo(({ benefit, index }: { benefit: Benefit; index: 
               alt={benefit.title}
               className="w-full h-full object-cover"
               loading="lazy"
-              decoding="async"
             />
           </picture>
         </div>
