@@ -12,11 +12,25 @@ import { BenefitCard } from "./components/ui/BenefitCard";
 import StoriesSlider from "./components/StoriesSlider";
 import PartnerForm from "./components/PartnerForm";
 import { BENEFITS, STORIES } from "./data/products";
-import { HERO_SLIDES } from "./data/hero";
+import { HERO_SLIDES } from "./data/hero"; // Will use fallback if undefined
 import { fetchFeaturedBio30Products } from "./categories/actions";
 import type { Bio30Product } from "./categories/actions";
 
 const SlickSlider = dynamic(() => import("react-slick"), { ssr: false });
+
+// ✅ Fallback hero data if import fails
+const FALLBACK_HERO_SLIDES = [
+  {
+    title: "BIO 3.0",
+    subtitle: "Новая эра здоровья",
+    theme: { bg: "#1A1A1A", text: "#F9F9F9" },
+    cta: { text: "Каталог", link: "/bio30/categories" },
+    images: {
+      web: "https://bio30.ru/front/static/uploads/hero/bio30-hero.jpg",
+      mobile: "https://bio30.ru/front/static/uploads/hero/bio30-hero-mobile.jpg"
+    }
+  }
+];
 
 export default function HomePage(): JSX.Element {
   useBio30ThemeFix();
@@ -60,62 +74,81 @@ export default function HomePage(): JSX.Element {
     autoplay: true,
     autoplaySpeed: 5000,
     arrows: false,
-    dots: false, // ✅ FIXED: Remove dots that show "1 2 3"
+    dots: false,
     fade: true,
     speed: 800,
     cssEase: 'ease-out',
   };
 
+  // ✅ Ensure heroSlides is always an array
+  const heroSlides = Array.isArray(HERO_SLIDES) ? HERO_SLIDES : FALLBACK_HERO_SLIDES;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* ✅ FIXED: Герой-слайдер без лишнего пространства */}
+      {/* ✅ FIXED: Hero slider with defensive checks */}
       <section className="relative">
-        <SlickSlider {...heroSettings}>
-          {HERO_SLIDES.map((slide, index) => (
-            <div key={index} className="relative min-h-[80vh] md:min-h-[70vh] flex items-center">
-              <div 
-                className="absolute inset-0" 
-                style={{ backgroundColor: slide.theme.bg }}
-                aria-hidden="true"
-              />
-              <div className="container mx-auto grid md:grid-cols-2 items-center px-6 py-20 relative z-10">
-                <motion.div 
-                  className="p-8 md:p-16"
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.6 }}
-                >
-                  <h1 className="text-4xl md:text-6xl font-bold font-orbitron mb-4" style={{ color: slide.theme.text }}>
-                    {slide.title}
-                  </h1>
-                  <h2 className="text-lg md:text-2xl mb-8 opacity-75" style={{ color: slide.theme.text }}>
-                    {slide.subtitle}
-                  </h2>
-                  <Link 
-                    href={slide.cta.link} 
-                    className="inline-block px-8 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors shadow-lg"
-                  >
-                    {slide.cta.text}
-                  </Link>
-                </motion.div>
-                <div className="relative h-80 md:h-full min-h-[300px]">
-                  <picture>
-                    <source media="(max-width: 768px)" srcSet={slide.images.mobile} />
-                    <img
-                      src={slide.images.web}
-                      alt={slide.title}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="eager"
-                    />
-                  </picture>
+        {heroSlides.length > 0 ? (
+          <SlickSlider {...heroSettings}>
+            {heroSlides.map((slide, index) => {
+              // ✅ Safety checks for every property
+              const theme = slide?.theme || { bg: '#1A1A1A', text: '#F9F9F9' };
+              const cta = slide?.cta || { text: 'Узнать больше', link: '/bio30/categories' };
+              const images = slide?.images || {
+                web: 'https://bio30.ru/front/static/uploads/products/default.webp',
+                mobile: 'https://bio30.ru/front/static/uploads/products/default.webp'
+              };
+              
+              return (
+                <div key={index} className="relative min-h-[80vh] md:min-h-[70vh] flex items-center">
+                  <div 
+                    className="absolute inset-0" 
+                    style={{ backgroundColor: theme.bg }}
+                    aria-hidden="true"
+                  />
+                  <div className="container mx-auto grid md:grid-cols-2 items-center px-6 py-20 relative z-10">
+                    <motion.div 
+                      className="p-8 md:p-16"
+                      initial={{ opacity: 0, x: -30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.6 }}
+                    >
+                      <h1 className="text-4xl md:text-6xl font-bold font-orbitron mb-4" style={{ color: theme.text }}>
+                        {slide.title || 'BIO 3.0'}
+                      </h1>
+                      <h2 className="text-lg md:text-2xl mb-8 opacity-75" style={{ color: theme.text }}>
+                        {slide.subtitle || 'Новая эра здоровья'}
+                      </h2>
+                      <Link 
+                        href={cta.link} 
+                        className="inline-block px-8 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary/90 transition-colors shadow-lg"
+                      >
+                        {cta.text}
+                      </Link>
+                    </motion.div>
+                    <div className="relative h-80 md:h-full min-h-[300px]">
+                      <picture>
+                        <source media="(max-width: 768px)" srcSet={images.mobile} />
+                        <img
+                          src={images.web}
+                          alt={slide.title || 'BIO 3.0'}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="eager"
+                        />
+                      </picture>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </SlickSlider>
+              );
+            })}
+          </SlickSlider>
+        ) : (
+          <div className="h-96 bg-muted flex items-center justify-center">
+            <p className="text-muted-foreground">Hero content not available</p>
+          </div>
+        )}
       </section>
 
-      {/* ✅ Динамические продукты */}
+      {/* Products section */}
       <section className="py-16 px-6" aria-labelledby="products-title">
         <motion.header
           ref={productsTitle.ref}
@@ -145,7 +178,7 @@ export default function HomePage(): JSX.Element {
               <ProductCard key={product.id} product={product} index={i} />
             ))}
             
-            {/* Карточка "Все продукты" */}
+            {/* "All products" card */}
             <Link
               href="/bio30/categories"
               className="group relative overflow-hidden rounded-xl border border-border flex items-center justify-center hover:bg-accent transition-colors min-h-[300px]"
@@ -161,7 +194,7 @@ export default function HomePage(): JSX.Element {
         )}
       </section>
 
-      {/* Преимущества */}
+      {/* Benefits */}
       <section className="py-16 px-6 bg-muted" aria-labelledby="benefits-title">
         <motion.header
           ref={benefitsTitle.ref}
@@ -188,10 +221,10 @@ export default function HomePage(): JSX.Element {
         </motion.div>
       </section>
 
-      {/* Истории успеха */}
+      {/* Stories */}
       <StoriesSlider stories={STORIES} />
 
-      {/* Партнерская форма */}
+      {/* Partner Form */}
       <PartnerForm />
     </div>
   );
