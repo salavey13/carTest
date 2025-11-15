@@ -1,0 +1,49 @@
+/* Исправляем черный фон героя и проблемы с позиционированием */
+.hero-section {
+  position: relative;
+  z-index: 1;
+}
+
+/* Убираем "плавающий" заголовок на страницах */
+.page-referral .hero-section,
+.page-home .hero-section {
+  position: relative !important;
+  background-color: transparent !important;
+}
+
+/* Убеждаемся, что картинки показываются на мобильных */
+@media (max-width: 768px) {
+  .card--product .bside {
+    display: block !important;
+    width: 100% !important;
+  }
+  
+  .card--product img {
+    width: 100% !important;
+    height: 200px !important;
+    object-fit: cover !important;
+  }
+}
+
+/* Фикс для картинок без picture */
+.bside picture,
+.bside img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Убираем лишние отступы у PartnerForm */
+.partner-form-wrapper .title {
+  margin-bottom: 0 !important;
+}
+
+/* Гарантируем, что slick-slider виден */
+.slick-slider {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.slick-slide > div {
+  height: 100%;
+}
