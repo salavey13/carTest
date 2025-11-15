@@ -173,6 +173,7 @@ export default function HomePage(): JSX.Element {
             animate={productsControls}
             variants={productsContainer}
             className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-w-7xl mx-auto"
+            style={{ opacity: 1 }}
           >
             {products.map((product, i) => (
               <ProductCard key={product.id} product={product} index={i} />
