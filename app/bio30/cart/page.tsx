@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
 import { useAppToast } from "@/hooks/useAppToast";
-import { removeFromCart, checkoutCart } from "../../actions";
+import { removeFromCart, checkoutCart } from "../actions";
 import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";

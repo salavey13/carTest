@@ -7,7 +7,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useAppToast } from "@/hooks/useAppToast";
 import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
 import { fetchBio30ProductById } from '../actions';
-import { addToCart } from '../../../actions';
+import { addToCart } from '../../actions';
 import type { Bio30Product } from '../actions';
 
 export default function ProductDetailPage() {
