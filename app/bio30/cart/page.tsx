@@ -11,8 +11,6 @@ import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 import Image from "next/image";
 import { CartItem } from "../types";
 
-
-
 export default function CartPage() {
   const { dbUser, refreshDbUser } = useAppContext();
   const cart: CartItem[] = dbUser?.metadata?.cart || [];
@@ -57,7 +55,7 @@ export default function CartPage() {
       
       // Here you would integrate with your payment system
       // For now, we'll just log and clear cart
-      const result = await checkoutCart(dbUser.user_id);
+      const result = await checkoutCart(dbUser.user_id, dbUser.user_id);
       
       if (result.success) {
         await refreshDbUser();
