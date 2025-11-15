@@ -9,15 +9,9 @@ import { useScrollFadeIn } from "../hooks/useScrollFadeIn";
 import { useStaggerFadeIn } from "../hooks/useStaggerFadeIn";
 import { useBio30ThemeFix } from "../hooks/useBio30ThemeFix";
 import Image from "next/image";
+import { CartItem } from "../types";
 
-interface CartItem {
-  productId: string;
-  name: string;
-  price: number;
-  image: string;
-  quantity: number;
-  category: string;
-}
+
 
 export default function CartPage() {
   const { dbUser, refreshDbUser } = useAppContext();
