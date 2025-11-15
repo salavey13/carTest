@@ -215,7 +215,7 @@ export async function fetchBio30ProductById(id: string) {
         .select("*")
         .eq("make", "BIO 3.0")
         .eq("is_test_result", false)
-        .ilike("specs->>model", decodeURIComponent(id).toLowerCase())
+        .ilike("specs->>model", decodeURIComponent(id).toLowerCase()); // Case-insensitive match
         .limit(1);
 
       if (altError) {
@@ -271,6 +271,198 @@ export async function fetchBio30ProductById(id: string) {
     return { success: true, data: product };
   } catch (err) {
     logger.error("Failed to fetch product by ID:", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+
+/**
+ * Process cart checkout (placeholder for payment integration)
+ */
+export async function checkoutCart(userId: string): Promise<{ success: boolean; error?: string; orderId?: string }> {
+  try {
+    // Get user's cart
+    const { data: userData, error: fetchError } = await supabaseAdmin
+      .from("user_settings")
+      .select("metadata")
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError) {
+      logger.error("Error fetching cart for checkout:", fetchError);
+      return { success: false, error: fetchError.message };
+    }
+
+    const cart = userData?.metadata?.cart || [];
+    
+    if (cart.length === 0) {
+      return { success: false, error: "Cart is empty" };
+    }
+
+    // Calculate total
+    const total = cart.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+
+    // Create order record (you'll need to create this table)
+    const { data: orderData, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .insert({
+        user_id: userId,
+        items: cart,
+        total_amount: total,
+        status: "pending",
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      logger.error("Error creating order:", orderError);
+      return { success: false, error: orderError.message };
+    }
+
+    // Clear cart
+    await supabaseAdmin
+      .from("user_settings")
+      .update({
+        metadata: {
+          ...userData.metadata,
+          cart: []
+        }
+      })
+      .eq("user_id", userId);
+
+    // Log purchase activity for referrals
+    try {
+      const { processReferralCommissions } = await import('../ref_actions');
+      await processReferralCommissions(
+        orderData.id,
+        userId,
+        total
+      );
+    } catch (refError) {
+      logger.error("Referral processing error:", refError);
+      // Continue even if referral fails
+    }
+
+    return { 
+      success: true, 
+      orderId: orderData.id 
+    };
+  } catch (err) {
+    logger.error("Checkout error:", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+
+/**
+ * Add product to user's cart in metadata
+ */
+export async function addToCart(userId: string, productId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Get current user settings
+    const { data: userData, error: fetchError } = await supabaseAdmin
+      .from("user_settings")
+      .select("metadata")
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError) {
+      logger.error("Error fetching user cart:", fetchError);
+      return { success: false, error: fetchError.message };
+    }
+
+    // Get product details
+    const result = await fetchBio30ProductById(productId);
+    if (!result.success || !result.data) {
+      return { success: false, error: "Product not found" };
+    }
+
+    const product = result.data;
+    const currentMetadata = userData?.metadata || {};
+    const cart = currentMetadata.cart || [];
+
+    // Check if product already in cart
+    const existingIndex = cart.findIndex((item: any) => item.productId === productId);
+    
+    if (existingIndex >= 0) {
+      // Increment quantity
+      cart[existingIndex].quantity += 1;
+    } else {
+      // Add new item
+      cart.push({
+        productId: product.id,
+        name: product.title,
+        price: product.price,
+        image: product.image,
+        quantity: 1,
+        category: product.category
+      });
+    }
+
+    // Update metadata
+    const { error: updateError } = await supabaseAdmin
+      .from("user_settings")
+      .update({
+        metadata: {
+          ...currentMetadata,
+          cart: cart
+        }
+      })
+      .eq("user_id", userId);
+
+    if (updateError) {
+      logger.error("Error updating cart:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    logger.error("Failed to add to cart:", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+/**
+ * Remove product from user's cart
+ */
+export async function removeFromCart(userId: string, productId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: userData, error: fetchError } = await supabaseAdmin
+      .from("user_settings")
+      .select("metadata")
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError) {
+      logger.error("Error fetching user cart:", fetchError);
+      return { success: false, error: fetchError.message };
+    }
+
+    const currentMetadata = userData?.metadata || {};
+    let cart = currentMetadata.cart || [];
+
+    // Remove item
+    cart = cart.filter((item: any) => item.productId !== productId);
+
+    // Update metadata
+    const { error: updateError } = await supabaseAdmin
+      .from("user_settings")
+      .update({
+        metadata: {
+          ...currentMetadata,
+          cart: cart
+        }
+      })
+      .eq("user_id", userId);
+
+    if (updateError) {
+      logger.error("Error removing from cart:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    logger.error("Failed to remove from cart:", err);
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
