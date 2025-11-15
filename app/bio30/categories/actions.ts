@@ -464,3 +464,58 @@ export async function removeFromCart(userId: string, productId: string): Promise
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 }
+
+export async function fetchFeaturedBio30Products(limit: number = 8) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("cars")
+      .select("*")
+      .eq("make", "BIO 3.0")
+      .eq("is_test_result", false)
+      .limit(limit)
+      .order('specs->price', { ascending: true });
+
+    if (error) {
+      logger.error("Error fetching featured products:", error);
+      return { success: false, error: error.message };
+    }
+
+    const products: Bio30Product[] = (data || []).map(car => {
+      const specs = car.specs as Record<string, any> || {};
+      const model = specs.model || '';
+      const cleanTitle = model.replace(/(\d+)$/, '').trim();
+      
+      const purposeStr = specs.purpose || '';
+      const purposes = purposeStr.split(';').map((p: string) => p.trim()).filter(Boolean);
+      
+      const hashtagsStr = specs.hashtags || '';
+      const tags = hashtagsStr
+        .split(/\s+/)
+        .map((t: string) => t.replace(/^#/, '').trim())
+        .filter(Boolean);
+      
+      const currentPrice = parseFloat(specs.price || 0);
+      const oldPrice = parseFloat(specs.old_price || 0);
+      const hasDiscount = oldPrice > currentPrice;
+
+      return {
+        id: car.id,
+        title: cleanTitle,
+        description: car.description || purposeStr || 'Пищевая добавка BIO 3.0',
+        price: currentPrice,
+        originalPrice: hasDiscount ? oldPrice : undefined,
+        image: car.image_url || (specs.photos && specs.photos[0]) || "https://bio30.ru/front/static/uploads/products/default.webp",
+        category: specs.type || 'Пищевая добавка',
+        purpose: purposes,
+        tags: tags,
+        inStock: true,
+        hasDiscount: hasDiscount
+      };
+    });
+
+    return { success: true, data: products };
+  } catch (err) {
+    logger.error("Failed to fetch featured products:", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
