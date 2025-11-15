@@ -7,7 +7,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useAppToast } from "@/hooks/useAppToast";
 import { useBio30ThemeFix } from "../../hooks/useBio30ThemeFix";
 import { addToCart } from '../../actions';
-import type { fetchBio30ProductById, Bio30Product } from '../actions';
+import { fetchBio30ProductById } from '../actions';
+import type { Bio30Product } from '../actions';
 
 export default function ProductDetailPage() {
   const params = useParams();
