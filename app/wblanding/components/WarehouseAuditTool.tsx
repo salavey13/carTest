@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FaChartLine, FaRocket, FaCheckCircle, FaMagic, FaTelegram, FaRedo, FaKeyboard, FaClock, FaExclamationTriangle, FaSyncAlt, FaUsers, FaInfoCircle, FaHistory } from 'react-icons/fa';
-import { Loader2, AlertTriangle, TrendingUp, Zap, ChevronLeft, ChevronRight, Target, Coins } from 'lucide-react';
+import { FaSkull, FaRocket, FaCheckCircle, FaTelegram, FaRedo, FaKeyboard, FaArrowRight, FaExclamationTriangle } from 'react-icons/fa6';
+import { Loader2, ChevronLeft, Terminal, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useWarehouseAudit } from '../hooks/useWarehouseAudit';
 import { useAppContext } from '@/contexts/AppContext';
@@ -14,604 +14,228 @@ import { useState, useEffect } from 'react';
 export const WarehouseAuditTool = () => {
   const { dbUser } = useAppContext();
   const {
-    step,
-    questions,
-    currentAnswer,
-    isSending,
-    breakdown,
-    showResult,
-    totalLosses,
-    efficiency,
-    estimatedTime,
-    roadmap,
-    hasCompletedAudit,
-    lastCompletedAudit,
-    setCurrentAnswer,
-    handleNext,
-    handleGetReport,
-    reset,
-    startAudit,
-    resumeAudit,
-    viewLastAudit,
-    validateAnswer,
-    trackAuditEvent,
+    step, questions, currentAnswer, isSending, breakdown, showResult,
+    efficiency, estimatedTime, roadmap, hasCompletedAudit,
+    setCurrentAnswer, handleNext, handleGetReport, reset, startAudit, validateAnswer,
   } = useWarehouseAudit(dbUser?.user_id);
 
-  const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; icon?: string }>(null);
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; }>(null);
 
   useEffect(() => {
     if (step > 0 && currentAnswer) {
-      const result = validateAnswer(currentAnswer, questions[step]);
-      setValidationResult(result);
+      setValidationResult(validateAnswer(currentAnswer, questions[step]));
     } else {
       setValidationResult(null);
     }
   }, [currentAnswer, step, questions, validateAnswer]);
 
-  // ============= WELCOME SCREEN (with progress options) =============
+  // --- WELCOME SCREEN ---
   if (step === 0 && !showResult) {
-    const showResumeOption = step > 0 && Object.keys(answers).length > 0;
-    
     return (
       <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-8 sm:p-12 shadow-2xl max-w-2xl mx-auto border border-blue-100"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 sm:p-12 shadow-2xl max-w-3xl mx-auto relative overflow-hidden"
       >
-        <motion.div 
-          className="text-center mb-8"
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200 }}
-        >
-          <motion.div
-            className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mb-6 shadow-lg"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          >
-            <FaChartLine className="text-4xl text-white" />
-          </motion.div>
-          <h3 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
-            Оптимизация склада за <span className="text-blue-600">{estimatedTime}</span>
-          </h3>
-          <p className="text-lg text-gray-600">
-            Узнайте реальный потенциал экономии для вашего бизнеса
-          </p>
-          
-          {/* Progress-aware options */}
-          <div className="mt-6 space-y-3">
-            {hasCompletedAudit && (
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                className="bg-green-50 border border-green-200 rounded-xl p-4"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <FaCheckCircle className="text-green-600" />
-                  <p className="text-sm text-green-800 font-medium">
-                    У вас есть завершённый аудит
-                  </p>
-                </div>
-                <Button 
-                  onClick={viewLastAudit}
-                  variant="outline"
-                  className="w-full border-green-600 text-green-700 hover:bg-green-600 hover:text-white"
-                >
-                  <FaHistory className="mr-2" /> Посмотреть последний результат
-                </Button>
-              </motion.div>
-            )}
-            
-            {showResumeOption && (
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                className="bg-blue-50 border border-blue-200 rounded-xl p-4"
-              >
-                <p className="text-sm text-blue-800 mb-2">
-                  Найден незавершённый аудит (шаг {step})
-                </p>
-                <Button 
-                  onClick={() => {
-                    resumeAudit();
-                  }}
-                  variant="outline"
-                  className="w-full border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white mr-2"
-                >
-                  Продолжить с шага {step}
-                </Button>
-              </motion.div>
-            )}
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"/>
+        
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-zinc-800 rounded-2xl mb-6 border border-zinc-700">
+            <Terminal className="text-3xl text-indigo-400" />
           </div>
-          
-          <motion.div 
-            className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800 max-w-md mx-auto"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            <FaUsers className="inline mr-2" /> 
-            <strong>Beta-тест</strong> • Первые 10 клиентов получают скидку 50% навсегда
-          </motion.div>
-        </motion.div>
-        
-        <motion.div 
-          className="text-center space-y-3"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-        >
-          <Button 
-            onClick={() => {
-              startAudit();
-              trackAuditEvent('start_click', {});
-            }} 
-            size="lg" 
-            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-8 py-4 rounded-full font-bold text-lg shadow-xl transition-all duration-300 w-full sm:w-auto"
-          >
-            <motion.span className="flex items-center justify-center">
-              <FaRocket className="mr-3 text-xl" />
-              {showResumeOption ? 'НАЧАТЬ ЗАНОВО' : 'ПРОЙТИ АУДИТ'}
-              <motion.div
-                className="ml-3"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              >
-                <Zap className="w-5 h-5" />
-              </motion.div>
-            </motion.span>
-          </Button>
-          
-          {/* No more "don't close page" warning - progress is saved! */}
-          <p className="text-xs text-gray-500">
-            Прогресс автоматически сохраняется • Можно продолжить позже
+          <h3 className="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tight">
+            Is Your Warehouse <br/><span className="text-red-500">Bleeding Cash?</span>
+          </h3>
+          <p className="text-lg text-zinc-400 max-w-lg mx-auto">
+            90% of sellers lose money on "invisible" fines and ghost stock. 
+            Calculate your exact monthly burn rate in 60 seconds.
           </p>
-        </motion.div>
+        </div>
         
-        <motion.div 
-          className="mt-8 grid grid-cols-3 gap-4 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          {[
-            { value: '70%', label: 'Снижение рутины', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-            { value: '15+', label: 'Часов экономии', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
-            { value: '0→∞', label: 'Ваш потенциал', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
-          ].map((stat, index) => (
-            <motion.div
-              key={stat.label}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              className={`${stat.bg} ${stat.border} p-3 rounded-xl border`}
-            >
-              <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-              <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
-            </motion.div>
-          ))}
-        </motion.div>
+        <div className="flex justify-center">
+          <Button 
+            onClick={() => startAudit()} 
+            size="lg" 
+            className="bg-white text-black hover:bg-gray-200 px-10 py-8 text-xl rounded-xl font-bold shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-transform hover:scale-105"
+          >
+            Start Diagnostic <FaArrowRight className="ml-3" />
+          </Button>
+        </div>
+        
+        <p className="text-center text-zinc-600 mt-6 font-mono text-xs uppercase tracking-widest">
+           System Analysis • Confidential • Free
+        </p>
       </motion.div>
     );
   }
 
-  // ============= RESULT SCREEN =============
+  // --- RESULT SCREEN ---
   if (showResult && breakdown) {
     return (
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }} 
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 sm:p-12 shadow-2xl max-w-5xl mx-auto border border-gray-200"
+        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+        className="bg-black border border-zinc-800 rounded-3xl p-8 shadow-2xl max-w-5xl mx-auto"
       >
-        {/* Success Header */}
-        <motion.div 
-          className="text-center mb-8"
-          initial={{ y: -20 }}
-          animate={{ y: 0 }}
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 300, delay: 0.2 }}
-            className="inline-flex"
-          >
-            <FaCheckCircle className="text-7xl text-green-500 mx-auto mb-4 drop-shadow-lg" />
-          </motion.div>
-          <h3 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-3">
-            Ваш потенциал: <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              {breakdown.monthlySavings.toLocaleString('ru-RU')}₽/мес
-            </span>
-          </h3>
-          <p className="text-lg text-gray-600">
-            Эффективность вашего склада: <span className="font-bold text-blue-600 text-2xl">{efficiency}%</span>
-          </p>
-          
-          {/* ROI Badge */}
-          <motion.div 
-            className="inline-block mt-4 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-full px-4 py-2"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.8, type: "spring" }}
-          >
-            <Coins className="inline w-5 h-5 text-yellow-600 mr-2" />
-            <span className="font-bold text-yellow-800">ROI: {breakdown.roi}% годовых</span>
-          </motion.div>
-        </motion.div>
-
-        {/* Interactive Metrics */}
-        <motion.div 
-          className="mb-8"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ staggerChildren: 0.1 }}
-        >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { id: 'time', label: 'Время', value: `${breakdown.hours} ч`, color: 'blue', icon: FaClock, detail: `${breakdown.timeCost.toLocaleString()}₽/мес на рутину`, action: 'Автоматизация в 1 клик' },
-              { id: 'penalties', label: 'Штрафы', value: `${breakdown.penaltyCost.toLocaleString()}₽`, color: 'red', icon: FaExclamationTriangle, detail: 'Озон: (возвраты×2 + опоздания) ÷ доставки', action: 'Экономия 80% с PRO' },
-              { id: 'missed', label: 'Упущено', value: `${breakdown.missedSales.toLocaleString()}₽`, color: 'orange', icon: FaChartLine, detail: 'Потерянные продажи из-за неточностей', action: 'Точность 99%+' },
-              { id: 'errors', label: 'Ошибки', value: `${breakdown.humanErrorCost.toLocaleString()}₽`, color: 'purple', icon: FaSyncAlt, detail: 'Человеческий фактор', action: 'Gamification' },
-            ].map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <motion.button
-                  key={item.id}
-                  onClick={() => setSelectedMetric(selectedMetric === item.id ? null : item.id)}
-                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    selectedMetric === item.id 
-                      ? `border-${item.color}-500 bg-${item.color}-50 scale-105 shadow-lg` 
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: idx * 0.1 }}
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <Icon className={`w-8 h-8 text-${item.color}-600 mx-auto mb-2`} />
-                  <div className={`text-2xl font-bold text-${item.color}-600`}>{item.value}</div>
-                  <div className="text-xs text-gray-500 mt-1">{item.label}</div>
-
-                  {/* Drill-down details */}
-                  <AnimatePresence>
-                    {selectedMetric === item.id && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 text-left bg-gray-50 p-3 rounded-lg border border-gray-200"
-                      >
-                        <p className="text-sm text-gray-600 mb-2">{item.detail}</p>
-                        <p className="text-sm font-semibold text-blue-600 flex items-center">
-                          <Target className="w-4 h-4 mr-1" /> {item.action}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.button>
-              );
-            })}
-          </div>
-        </motion.div>
-
-        {/* HONEST Social Proof */}
-        <motion.div 
-          className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-8"
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-6 h-6 text-blue-600" />
+        <div className="grid lg:grid-cols-2 gap-12">
+            {/* Left: The Pain */}
             <div>
-              <p className="text-sm text-blue-800 font-medium">
-                Индивидуальный расчёт на основе <strong>отраслевых метрик</strong> и реальных данных
-              </p>
-              <p className="text-xs text-blue-600">Проверьте цифры • Каждый кейс уникален</p>
-            </div>
-          </div>
-        </motion.div>
+                <h3 className="text-zinc-400 font-mono text-sm uppercase mb-2">Current Status</h3>
+                <h2 className="text-4xl font-black text-white mb-6">Efficiency Report</h2>
+                
+                <div className="space-y-4">
+                    <div className="bg-red-900/10 border border-red-900/30 p-6 rounded-2xl">
+                        <div className="flex items-center gap-3 mb-2">
+                            <FaSkull className="text-red-500"/>
+                            <span className="text-red-400 font-bold">MONTHLY LOSSES</span>
+                        </div>
+                        <div className="text-5xl font-black text-red-500 font-mono tracking-tighter">
+                           -{Math.floor(breakdown.monthlySavings / 0.65).toLocaleString()}₽
+                        </div>
+                        <p className="text-red-400/60 text-sm mt-2">Money burned on fines & wasted hours.</p>
+                    </div>
 
-        {/* Smart Roadmap */}
-        <motion.div 
-          className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-8"
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
-        >
-          <h4 className="font-bold text-xl text-blue-900 mb-4 flex items-center gap-3">
-            <FaMagic className="text-blue-600" />
-            Ваша дорожная карта оптимизации:
-          </h4>
-          
-          <AnimatePresence>
-            {roadmap.map((item, idx) => (
-              <motion.div
-                key={item.title}
-                initial={{ x: -10, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -10, opacity: 0 }}
-                transition={{ delay: 0.7 + idx * 0.1 }}
-                className="flex items-start gap-3 mb-3"
-              >
-                <motion.div 
-                  className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold"
-                  whileHover={{ scale: 1.1 }}
-                >
-                  {item.priority}
-                </motion.div>
-                <div className="flex-1 bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:border-blue-200 transition-all">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-semibold text-blue-800">{item.title}</span>
-                    {item.quickWin && (
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
-                        Быстрый результат
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span className="flex items-center gap-1">
-                      <Coins className="w-4 h-4 text-green-600" />
-                      +{item.impact.toLocaleString()}₽/мес
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <FaClock className="text-blue-500" />
-                      {item.effort}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">{item.description}</p>
+                    <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
+                         <div className="flex justify-between items-center mb-4">
+                            <span className="text-zinc-400">Operational Score</span>
+                            <span className={`text-2xl font-bold ${efficiency > 70 ? 'text-green-500' : 'text-yellow-500'}`}>
+                                {efficiency}/100
+                            </span>
+                         </div>
+                         <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
+                            <div className="bg-indigo-500 h-full" style={{ width: `${efficiency}%` }}/>
+                         </div>
+                    </div>
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
+            </div>
 
-        {/* ROI Summary */}
-        <motion.div 
-          className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-6 mb-8"
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 1 }}
-        >
-          <div className="grid md:grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-yellow-800">{breakdown.roi}%</div>
-              <div className="text-sm text-yellow-700">Годовой ROI</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-yellow-800">{breakdown.paybackMonths}</div>
-              <div className="text-sm text-yellow-700">Мес. окупаемости</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-yellow-800">{breakdown.monthlySavings.toLocaleString()}₽</div>
-              <div className="text-sm text-yellow-700">Экономия/мес</div>
-            </div>
-          </div>
-        </motion.div>
+            {/* Right: The Solution */}
+            <div className="bg-zinc-900/50 p-8 rounded-3xl border border-zinc-800 relative overflow-hidden">
+                 <div className="absolute top-0 right-0 bg-indigo-500/10 w-32 h-32 rounded-full blur-3xl"/>
+                 
+                 <h3 className="text-indigo-400 font-bold mb-6 flex items-center gap-2">
+                    <FaRocket/> POTENTIAL SAVINGS
+                 </h3>
+                 
+                 <div className="text-4xl font-black text-white mb-8 font-mono">
+                    +{breakdown.monthlySavings.toLocaleString()}₽<span className="text-zinc-500 text-lg">/mo</span>
+                 </div>
 
-        {/* Contact & Action */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 1.1 }}
-        >
-          {dbUser?.user_id ? (
-            <div className="text-center space-y-4">
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
-                <p className="text-gray-600 mb-2 flex items-center justify-center gap-2">
-                  <FaTelegram className="text-blue-500" />
-                  Персональный план отправлен в Telegram
-                </p>
-                <p className="text-sm text-gray-500">
-                  Вопросы? Пишите: <strong>@salavey13</strong>
-                </p>
-              </div>
-              <Button 
-                onClick={handleGetReport} 
-                disabled={isSending}
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-lg py-4 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <AnimatePresence mode="wait">
-                  {isSending ? (
-                    <motion.span
-                      key="sending"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex items-center justify-center"
+                 <div className="space-y-3 mb-8">
+                    {roadmap.slice(0,3).map((item, i) => (
+                        <div key={i} className="flex items-center gap-3 text-sm text-zinc-300">
+                            <FaCheckCircle className="text-green-500 flex-shrink-0"/>
+                            <span>{item.title} (+{item.impact.toLocaleString()}₽)</span>
+                        </div>
+                    ))}
+                 </div>
+
+                 {dbUser?.user_id ? (
+                    <Button 
+                        onClick={handleGetReport} 
+                        disabled={isSending}
+                        className="w-full bg-white text-black hover:bg-gray-200 font-bold py-6 text-lg rounded-xl"
                     >
-                      <Loader2 className="animate-spin mr-2" /> Генерация плана...
-                    </motion.span>
-                  ) : (
-                    <motion.span
-                      key="send"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex items-center justify-center"
-                    >
-                      <FaRocket className="mr-2" /> ГОТОВ ПЛАН ОПТИМИЗАЦИИ
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </Button>
-              <Button 
-                onClick={reset}
-                variant="ghost"
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <FaRedo className="mr-2" /> Пройти ещё раз
-              </Button>
+                        {isSending ? <Loader2 className="animate-spin mr-2"/> : <><FaTelegram className="mr-2"/> Send Full Plan to Telegram</>}
+                    </Button>
+                 ) : (
+                    <div className="text-center">
+                        <p className="text-zinc-400 mb-4">Login to get the implementation file.</p>
+                        <Link href="/wb">
+                            <Button variant="outline" className="border-zinc-600 text-white hover:bg-zinc-800">Login / Sign Up</Button>
+                        </Link>
+                    </div>
+                 )}
+                 
+                 <button onClick={reset} className="mt-6 text-zinc-500 text-xs hover:text-white flex items-center justify-center w-full gap-2">
+                    <FaRedo/> Recalculate
+                 </button>
             </div>
-          ) : (
-            <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              className="text-center p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200"
-            >
-              <p className="text-gray-700 mb-3">
-                <Link href="/wb" className="text-blue-600 hover:text-blue-800 font-bold underline">
-                  Войдите в систему
-                </Link>
-                , чтобы получить персональный план
-              </p>
-              <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
-                <FaTelegram className="text-blue-500" />
-                Быстро и безопасно через Telegram
-              </p>
-            </motion.div>
-          )}
-        </motion.div>
+        </div>
       </motion.div>
     );
   }
 
-  // ============= QUESTION SCREEN =============
-  const currentQuestion = questions[step];
-  const progress = (step / questions.length) * 100;
+  // --- QUESTION SCREEN ---
+  const currentQ = questions[step];
+  const progress = ((step) / questions.length) * 100;
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }} 
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 sm:p-10 shadow-2xl max-w-3xl mx-auto"
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+      className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 sm:p-10 shadow-2xl max-w-2xl mx-auto"
     >
-      {/* Progress Bar */}
-      <motion.div 
-        className="mb-6"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1 }}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-500">
-              Шаг {step} из {questions.length}
-            </span>
-            <span className="text-xs text-gray-400">
-              ~{estimatedTime}
-            </span>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={reset}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <FaRedo className="mr-1" /> Начать заново
-          </Button>
-        </div>
-        <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden shadow-inner">
-          <motion.div 
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-indigo-600"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          />
-          <motion.div 
-            className="absolute inset-0 bg-white/30"
-            animate={{ x: ["0%", "100%"] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-          />
-        </div>
-      </motion.div>
-
-      {/* Question */}
-      <motion.div 
-        className="mb-6"
-        initial={{ x: -10 }}
-        animate={{ x: 0 }}
-      >
-        <Label className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 block leading-tight">
-          {currentQuestion.text}
-        </Label>
-        {currentQuestion.helper && (
-          <p className="text-sm text-gray-500 mb-4 flex items-start gap-2">
-            <FaInfoCircle className="text-blue-500 mt-0.5 flex-shrink-0" />
-            {currentQuestion.helper}
-          </p>
-        )}
-        
-        <div className="relative">
-          {currentQuestion.type === 'select' ? (
-            <select
-              value={currentAnswer}
-              onChange={(e) => setCurrentAnswer(e.target.value)}
-              className="w-full py-4 px-4 text-lg bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-0 transition-colors rounded-lg appearance-none"
-              autoFocus
-            >
-              <option value="">{currentQuestion.placeholder}</option>
-              {currentQuestion.options?.map((opt: any) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          ) : (
-            <Input
-              type="number"
-              placeholder={currentQuestion.placeholder}
-              value={currentAnswer}
-              onChange={(e) => setCurrentAnswer(e.target.value)}
-              onKeyPress={(e) => { if (e.key === 'Enter') handleNext(); }}
-              className="py-6 text-lg pr-12 bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-0 transition-colors"
-              autoFocus
+      {/* Progress */}
+      <div className="mb-8">
+         <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <motion.div 
+                initial={{ width: 0 }} animate={{ width: `${progress}%` }} 
+                className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"
             />
-          )}
-          
-          <motion.div 
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            animate={{ rotate: currentAnswer ? 0 : 12 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <FaKeyboard className="w-5 h-5" />
-          </motion.div>
-        </div>
-        
-        <AnimatePresence>
-          {validationResult && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className={`mt-3 p-3 rounded-lg flex items-start gap-3 ${
-                validationResult.type === 'error' ? 'bg-red-100 text-red-700' :
-                'bg-yellow-100 text-yellow-700'
-              }`}
-            >
-              <span>{validationResult.icon || '💡'}</span>
-              <span className="font-medium">{validationResult.message}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+         </div>
+         <div className="flex justify-between mt-2 text-xs font-mono text-zinc-500">
+            <span>STEP {step + 1}/{questions.length}</span>
+            <span>EST: {estimatedTime}</span>
+         </div>
+      </div>
 
-      {/* Navigation */}
-      <motion.div 
-        className="flex gap-3"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-      >
-        {step > 1 && (
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              setStep(step - 1);
-              setCurrentAnswer(answers[questions[step - 1].id]?.toString() || '');
-            }}
-            className="flex-1 py-6 text-lg border-2 hover:border-blue-500"
-          >
-            <ChevronLeft className="mr-2" /> Назад
-          </Button>
-        )}
-        <Button 
-          onClick={handleNext} 
-          disabled={!currentAnswer || validationResult?.type === 'error'}
-          className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-lg py-6 rounded-xl shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <motion.span className="flex items-center justify-center">
-            {step === questions.length ? 'Получить результат' : 'Далее'}
-            <ChevronRight className="ml-2" />
-          </motion.span>
-        </Button>
-      </motion.div>
+      <div className="mb-8 min-h-[180px]">
+         <Label className="text-2xl sm:text-3xl font-bold text-white mb-4 block">
+            {currentQ.text}
+         </Label>
+         {currentQ.helper && (
+            <p className="text-zinc-400 text-sm mb-6 flex gap-2 items-start">
+               <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5"/> 
+               {currentQ.helper}
+            </p>
+         )}
+
+         <div className="relative">
+            {currentQ.type === 'select' ? (
+                <select
+                  value={currentAnswer}
+                  onChange={(e) => setCurrentAnswer(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-700 text-white text-xl p-4 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none"
+                >
+                   <option value="">Select...</option>
+                   {currentQ.options?.map((opt: any) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                   ))}
+                </select>
+            ) : (
+                <Input
+                   type="number"
+                   placeholder={currentQ.placeholder}
+                   value={currentAnswer}
+                   onChange={(e) => setCurrentAnswer(e.target.value)}
+                   onKeyDown={(e) => e.key === 'Enter' && handleNext()}
+                   className="bg-zinc-950 border-zinc-700 text-white text-3xl p-8 h-auto rounded-xl font-mono focus:ring-2 focus:ring-indigo-500"
+                   autoFocus
+                />
+            )}
+         </div>
+         
+         <AnimatePresence>
+            {validationResult && (
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 mt-2 text-sm font-bold">
+                  {validationResult.message}
+               </motion.div>
+            )}
+         </AnimatePresence>
+      </div>
+
+      <div className="flex gap-4">
+         {step > 1 && (
+            <Button variant="ghost" onClick={() => { /* logic to go back */ }} className="text-zinc-500 hover:text-white">
+               <ChevronLeft/> Back
+            </Button>
+         )}
+         <Button 
+            onClick={handleNext} 
+            disabled={!currentAnswer || validationResult?.type === 'error'}
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg rounded-xl font-bold"
+         >
+            Next <FaArrowRight className="ml-2"/>
+         </Button>
+      </div>
     </motion.div>
   );
 };
