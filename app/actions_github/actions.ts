@@ -28,7 +28,6 @@ function parseRepoUrl(repoUrl: string | null | undefined): { owner: string; repo
     return { owner: match[1], repo: match[2] };
 }
 
-
 interface PrCheckResult {
     exists: boolean;
     prNumber?: number;
@@ -127,12 +126,6 @@ export async function fetchRepoTree(repoUrl: string, branchName?: string | null)
     }
 }
 
-
-
-
-
-
-
 export async function fetchRepoContents_pro(repoUrl: string, customToken?: string, branchName?: string | null) {
   let owner: string | undefined, repo: string | undefined;
   let targetBranch = branchName;
@@ -216,7 +209,7 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
       return false;
     });
 
-    const MAX_FILES_TO_FETCH = 500;
+    const MAX_FILES_TO_FETCH = 690;
     if (filesToFetch.length > MAX_FILES_TO_FETCH) {
       console.warn(`⚠️ High file count (${filesToFetch.length}). Truncating.`);
       filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH);
@@ -276,7 +269,6 @@ export async function fetchRepoContents_pro(repoUrl: string, customToken?: strin
     return { success: false, error: error.message || String(error) };
   }
 }
-
 
  
 
