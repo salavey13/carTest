@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { useAppContext } from '@/contexts/AppContext';
 
-export const GentleBottomBar = () => {
+export const ExitIntentPopup = () => {
   const { dbUser } = useAppContext();
   const telegramChatId = dbUser?.user_id ?? dbUser?.telegram_id ?? dbUser?.tg_id ?? null;
 
