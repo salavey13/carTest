@@ -4,8 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FaSkull, FaRocket, FaCircleCheck, FaTelegram, FaRedo, FaKeyboard, FaArrowRight, FaTriangleExclamation } from 'react-icons/fa6';
-import { Loader2, ChevronLeft, Terminal, AlertTriangle } from 'lucide-react';
+// REPLACED: Switched to Lucide icons to fix React Error #130 (undefined component imports)
+import { 
+  Loader2, ChevronLeft, Terminal, TriangleAlert, 
+  Skull, Rocket, CheckCircle2, Send, RotateCcw, 
+  Keyboard, ArrowRight 
+} from 'lucide-react';
 import Link from 'next/link';
 import { useWarehouseAudit } from '../hooks/useWarehouseAudit';
 import { useAppContext } from '@/contexts/AppContext';
@@ -21,10 +25,10 @@ export const WarehouseAuditTool = () => {
   } = useWarehouseAudit(dbUser?.user_id);
 
   const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; }>(null);
-  const [selectedMetric, setSelectedMetric] = useState<string | null>(null); // Added missing state
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
   useEffect(() => {
-    // Safety check: make sure question exists before validating
     if (step > 0 && currentAnswer && questions && questions[step]) {
       setValidationResult(validateAnswer(currentAnswer, questions[step]));
     } else {
@@ -43,7 +47,7 @@ export const WarehouseAuditTool = () => {
         
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-zinc-800 rounded-2xl mb-6 border border-zinc-700">
-            <Terminal className="text-3xl text-indigo-400" />
+            <Terminal className="w-8 h-8 text-indigo-400" />
           </div>
           <h3 className="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tight">
             Ваш Склад <br/><span className="text-red-500">Сжигает Деньги?</span>
@@ -60,7 +64,7 @@ export const WarehouseAuditTool = () => {
             size="lg" 
             className="bg-white text-black hover:bg-gray-200 px-10 py-8 text-xl rounded-xl font-bold shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-transform hover:scale-105"
           >
-            Начать Диагностику <FaArrowRight className="ml-3" />
+            Начать Диагностику <ArrowRight className="ml-3 w-6 h-6" />
           </Button>
         </div>
         
@@ -87,10 +91,10 @@ export const WarehouseAuditTool = () => {
                 <div className="space-y-4">
                     <div className="bg-red-900/10 border border-red-900/30 p-6 rounded-2xl">
                         <div className="flex items-center gap-3 mb-2">
-                            <FaSkull className="text-red-500"/>
+                            <Skull className="w-6 h-6 text-red-500"/>
                             <span className="text-red-400 font-bold">ЕЖЕМЕСЯЧНЫЕ ПОТЕРИ</span>
                         </div>
-                        <div className="text-5xl font-black text-red-500 font-mono tracking-tighter">
+                        <div className="text-4xl sm:text-5xl font-black text-red-500 font-mono tracking-tighter">
                            -{Math.floor(breakdown.monthlySavings / 0.65).toLocaleString()}₽
                         </div>
                         <p className="text-red-400/60 text-sm mt-2">Деньги, сгорающие на штрафах и простоях.</p>
@@ -115,7 +119,7 @@ export const WarehouseAuditTool = () => {
                  <div className="absolute top-0 right-0 bg-indigo-500/10 w-32 h-32 rounded-full blur-3xl"/>
                  
                  <h3 className="text-indigo-400 font-bold mb-6 flex items-center gap-2">
-                    <FaRocket/> ПОТЕНЦИАЛ ЭКОНОМИИ
+                    <Rocket className="w-5 h-5"/> ПОТЕНЦИАЛ ЭКОНОМИИ
                  </h3>
                  
                  <div className="text-4xl font-black text-white mb-8 font-mono">
@@ -125,7 +129,7 @@ export const WarehouseAuditTool = () => {
                  <div className="space-y-3 mb-8">
                     {roadmap.slice(0,3).map((item, i) => (
                         <div key={i} className="flex items-center gap-3 text-sm text-zinc-300">
-                            <FaCircleCheck className="text-green-500 flex-shrink-0"/>
+                            <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0"/>
                             <span>{item.title} (+{item.impact.toLocaleString()}₽)</span>
                         </div>
                     ))}
@@ -137,7 +141,7 @@ export const WarehouseAuditTool = () => {
                         disabled={isSending}
                         className="w-full bg-white text-black hover:bg-gray-200 font-bold py-6 text-lg rounded-xl"
                     >
-                        {isSending ? <Loader2 className="animate-spin mr-2"/> : <><FaTelegram className="mr-2"/> Отправить план в Telegram</>}
+                        {isSending ? <Loader2 className="animate-spin mr-2"/> : <><Send className="mr-2 w-5 h-5"/> Отправить план в Telegram</>}
                     </Button>
                  ) : (
                     <div className="text-center">
@@ -149,7 +153,7 @@ export const WarehouseAuditTool = () => {
                  )}
                  
                  <button onClick={reset} className="mt-6 text-zinc-500 text-xs hover:text-white flex items-center justify-center w-full gap-2">
-                    <FaRedo/> Пересчитать
+                    <RotateCcw className="w-3 h-3"/> Пересчитать
                  </button>
             </div>
         </div>
@@ -158,7 +162,6 @@ export const WarehouseAuditTool = () => {
   }
 
   // --- QUESTION SCREEN ---
-  // CRITICAL FIX: Guard clause to prevent undefined error on last step transition
   if (!questions || !questions[step]) return null;
 
   const currentQ = questions[step];
@@ -184,12 +187,12 @@ export const WarehouseAuditTool = () => {
       </div>
 
       <div className="mb-8 min-h-[180px]">
-         <Label className="text-2xl sm:text-3xl font-bold text-white mb-4 block">
+         <Label className="text-2xl sm:text-3xl font-bold text-white mb-4 block leading-tight">
             {currentQ.text}
          </Label>
          {currentQ.helper && (
             <p className="text-zinc-400 text-sm mb-6 flex gap-2 items-start">
-               <AlertTriangle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5"/> 
+               <TriangleAlert className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5"/> 
                {currentQ.helper}
             </p>
          )}
@@ -217,12 +220,19 @@ export const WarehouseAuditTool = () => {
                    autoFocus
                 />
             )}
+            
+             {/* Keyboard Icon Decorator */}
+             {currentQ.type !== 'select' && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-600">
+                    <Keyboard className="w-6 h-6"/>
+                </div>
+             )}
          </div>
          
          <AnimatePresence>
             {validationResult && (
-               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 mt-2 text-sm font-bold">
-                  {validationResult.message}
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 mt-2 text-sm font-bold flex items-center gap-2">
+                  <TriangleAlert className="w-4 h-4"/> {validationResult.message}
                </motion.div>
             )}
          </AnimatePresence>
@@ -230,16 +240,16 @@ export const WarehouseAuditTool = () => {
 
       <div className="flex gap-4">
          {step > 1 && (
-            <Button variant="ghost" onClick={() => { /* logic to go back handled in hook usually, simplified here */ }} className="text-zinc-500 hover:text-white">
-               <ChevronLeft/> Назад
+            <Button variant="ghost" onClick={() => { /* back logic if needed */ }} className="text-zinc-500 hover:text-white">
+               <ChevronLeft className="w-5 h-5 mr-1"/> Назад
             </Button>
          )}
          <Button 
             onClick={handleNext} 
             disabled={!currentAnswer || validationResult?.type === 'error'}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg rounded-xl font-bold"
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg rounded-xl font-bold transition-all"
          >
-            Далее <FaArrowRight className="ml-2"/>
+            Далее <ArrowRight className="ml-2 w-5 h-5"/>
          </Button>
       </div>
     </motion.div>
