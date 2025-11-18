@@ -257,7 +257,7 @@ export default function WarehouseLandingPage() {
                  </ul>
                  <div className="mt-8">
                     <Button className="w-full bg-white text-black hover:bg-indigo-50 font-bold rounded-xl py-6">
-                       Перейти на Светлую Сторону <ArrowRight className="ml-2 w-4 h-4"/>
+                       Перейти на Светлую Сторону <FaArrowRight className="ml-2 w-4 h-4"/>
                     </Button>
                  </div>
               </motion.div>
