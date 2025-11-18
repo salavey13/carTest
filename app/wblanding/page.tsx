@@ -150,8 +150,8 @@ export default function WarehouseLandingPage() {
             >
               <FaSkullCrossbones className="mr-2" /> ПОСЧИТАТЬ УБЫТКИ
             </Button>
-            <Link href="https://t.me/oneBikePlsBot/app" target="_blank">
-              <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10 px-8 py-6 text-lg rounded-full font-medium backdrop-blur-sm">
+            <Link href="https://t.me/oneBikePlsBot/sklad" target="_blank">
+              <Button variant="outline" size="lg" className="border-white/20 text-indigo-400 hover:bg-white/10 px-8 py-6 text-lg rounded-full font-medium backdrop-blur-sm">
                 <FaRocket className="mr-2 text-indigo-400" /> Запуск (Telegram)
               </Button>
             </Link>
