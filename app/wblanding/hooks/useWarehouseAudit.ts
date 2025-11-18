@@ -461,32 +461,26 @@ export const useWarehouseAudit = (userId: string | undefined) => {
       const result = calcLosses(answers);
       
       // Build Telegram message with contact
-      let message = `📊 *Ваш аудит склада готов!*
+      let message = `🏴‍☠️ *WAREHOUSE DIAGNOSTIC REPORT*
 
-✅ *Потенциал экономии:* ${result.breakdown.monthlySavings.toLocaleString('ru-RU')}₽/мес
+🛑 *Monthly Burn:* ${result.breakdown.monthlySavings.toLocaleString('ru-RU')}₽
+(Money currently wasted on fines/manual work)
 
-📈 *Текущая эффективность:* ${result.breakdown.efficiency}%
+⚡ *Efficiency Score:* ${result.breakdown.efficiency}%
 
-💰 *Годовой ROI:* ${result.breakdown.roi}%
-⏱️ *Срок окупаемости:* ${result.breakdown.paybackMonths} мес
+📉 *The Leaks:*
+• Wasted Labor: ${result.breakdown.timeCost.toLocaleString()}₽
+• MP Fines: ${result.breakdown.penaltyCost.toLocaleString()}₽
+• Lost Sales: ${result.breakdown.missedSales.toLocaleString()}₽
 
-📋 *Детализация потерь:*
-• Время: ${result.breakdown.timeCost.toLocaleString()}₽
-• Штрафы: ${result.breakdown.penaltyCost.toLocaleString()}₽
-• Упущено: ${result.breakdown.missedSales.toLocaleString()}₽
-• Ошибки: ${result.breakdown.humanErrorCost.toLocaleString()}₽
+🚀 *BATTLE PLAN (Immediate fixes):*`;
 
-🚀 *Приоритетные действия:*`;
-
-      // Add top 3 roadmap items
       const topRoadmap = roadmap.slice(0, 3);
       topRoadmap.forEach((item, i) => {
-        message += `\n${i + 1}. ${item.title} → ${item.impact.toLocaleString()}₽/мес`;
+        message += `\n${i + 1}. 🔹 ${item.title} (Save ~${item.impact.toLocaleString()}₽)`;
       });
 
-      message += `\n\n💡 *Следующий шаг:* Начните с бесплатного тарифа
-
-📞 *Вопросы/предложения:* @salavey13`;
+      message += `\n\n💾 *Save this report.*\n👉 [Start Free Setup](https://t.me/oneBikePlsBot/app)`;
 
       await sendComplexMessage(userId, message, [], {
         parseMode: 'Markdown',

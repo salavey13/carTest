@@ -6,39 +6,27 @@ export async function POST(req: Request) {
     const body = await req.json();
     const chatId = body?.chatId ?? body?.chat_id ?? null;
 
-    if (!chatId) {
-      return NextResponse.json({ success: false, error: 'chatId missing' }, { status: 400 });
-    }
+    if (!chatId) return NextResponse.json({ success: false }, { status: 400 });
 
     const checklist = [
-      '*Чек-лист: 10 шагов для снижения штрафов на маркетплейсах*',
+      '*🏴‍☠️ THE ANTI-FINE MANIFESTO*',
+      'How to stop feeding the marketplaces your profit.',
       '',
-      '1. *Автоматизируй остатки* — синхронизация остатков в реальном времени (API).',
-      '2. *Проверь логику возвратов* — выдели refunds и автоматизируй метки возврата.',
-      '3. *Контроль сроков отгрузки* — SLA и мониторинг задержек по периодам.',
-      '4. *Внедри чеклисты на линии упаковки* — скан-контроль и фото-фиксация критичных заказов.',
-      '5. *Аналитика на 2 недели* — мониторинг refunds/late по скользящему окну.',
-      '6. *Авто-оповещения* — если refunds > X или late > Y — мгновенное сообщение в чат.',
-      '7. *Резервные остатки* — safety stock и автоматическое закрытие карточек при нехватке.',
-      '8. *Обучение персонала* — 5-минутные инструкции + чек-листы в таске.',
-      '9. *Проверка загрузок прайсов и SKU* — контроль дублей и неверных артикулов.',
-      '10. *Ревью штрафов* — еженедельный разбор причин и план корректировок.',
+      '1. *Kill Ghost Stock:* API Sync must be <5 min delay. Manual sync is suicide.',
+      '2. *The Return Trap:* Separate "Refunds" from "Stock" physically on the shelf.',
+      '3. *SLA Monitor:* Set alerts 2 hours BEFORE the MP shipment deadline.',
+      '4. *Visual Proof:* Photo-fixation at packing. Dispute fines with evidence.',
+      '5. *The 2-Week Rule:* Analyze returns data bi-weekly. Spot bad SKUs early.',
+      '6. *Safety Buffer:* Keep 5% "Invisible Stock" to prevent overselling.',
+      '7. *Barcode Discipline:* No item enters without a scan. No exceptions.',
       '',
-      'Если хочешь — могу сгенерировать план действий и roadmap по приоритетам. Пиши @salavey13'
+      '🚀 *Need the tool we use?* Type /start to launch WarehouseBot.'
     ].join('\n');
 
-    const res = await sendComplexMessage(chatId, checklist, [], {
-      imageQuery: 'warehouse checklist',
-      parseMode: 'Markdown',
-    });
+    await sendComplexMessage(chatId, checklist, [], { parseMode: 'Markdown' });
 
-    if (!res.success) {
-      return NextResponse.json({ success: false, error: res.error || 'send failed' }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, data: res.data });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('send-checklist error', err);
-    return NextResponse.json({ success: false, error: 'internal error' }, { status: 500 });
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }
