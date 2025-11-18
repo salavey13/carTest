@@ -60,7 +60,7 @@ export const WarehouseAuditTool = () => {
             size="lg" 
             className="bg-white text-black hover:bg-gray-200 px-10 py-8 text-xl rounded-xl font-bold shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-transform hover:scale-105"
           >
-            Начать Диагностику <FaArrowRight className="ml-3" />
+            Начать Диагностику <FaFaArrowRight className="ml-3" />
           </Button>
         </div>
         
