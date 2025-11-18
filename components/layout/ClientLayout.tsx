@@ -27,15 +27,13 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
-import Image from "next/image";
 import { Loading } from "@/components/Loading";
-import { cn } from "/lib/utils";
+import { cn } from "@/lib/utils";
 
 // Bio30 specific components
 import Bio30Header from "@/app/bio30/components/Header";
 import Bio30Footer from "@/app/bio30/components/Footer";
-import { setReferrer } from "@/app/bio30/ref_actions"; // Import new referral function
-import { generateReferralCode } from "@/app/bio30/ref_actions"; // For new users
+import { setReferrer } from "@/app/bio30/ref_actions"; 
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
@@ -140,6 +138,7 @@ function AppInitializers() {
 }
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
+  // Legacy / Standard
   elon: "/elon",
   musk_market: "/elon",
   arbitrage_seeker: "/elon",
@@ -149,7 +148,25 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   sauna: "/sauna-rent",
   streamer: "/streamer",
   demo: "/about_en",
-  wb: "/wb",
+  
+  // Warehouse / Pirate Code Ops
+  // FIXED: Pointing generic terms to landing page since /wb root doesn't exist
+  wb: "/wblanding", 
+  wb_dashboard: "/wblanding", // Dynamic logic handles override below
+  "audit-tool": "/wblanding",
+  "create_crew": "/wblanding",
+  reports: "/wblanding",
+  crews: "/crews", 
+  
+  // Developer / CyberDev Ops
+  "repo-xml": "/repo-xml",
+  "style-guide": "/style-guide",
+  "start-training": "/selfdev/gamified",
+  
+  // Racing / Legacy
+  paddock: "/paddock",
+  leaderboard: "/leaderboard",
+  "rent-bike": "/rent-bike",
 };
 
 // BIO30 Product mapping for startapp parameters
@@ -186,60 +203,6 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
-function useBio30ExternalCSS() {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!pathname.startsWith("/bio30")) return;
-
-    const BASE = "https://bio30.ru/front/static/css/";
-    const VERSION = "?v=05.07.2025-1";
-    const files = [
-      "grid.css",
-      "style__dark.css",
-      "cards.css",
-      "global.css",
-      "icons.css",
-      "help.css",
-      "fonts.css",
-      "hero.css",
-      "story.css",
-      "glass.css",
-      "header.css",
-      "welcome.css",
-      "categories.css",
-      "cart.css",
-      "footer.css",
-      "faq.css",
-      "cards__cart.css",
-      "grid__cards.css",
-      "default.css",
-      "grid__delivery.css",
-      "grid__referral_01.css",
-      "grid__referral_02.css",
-      "grid__product.css",
-      "grid__product2.css",
-      "grid__categories.css",
-      "comment.css",
-      "fluids.css",
-    ];
-
-    const links: HTMLLinkElement[] = [];
-    files.forEach((f) => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = `${BASE}${f}${VERSION}`;
-      link.dataset.source = "bio30-external";
-      document.head.appendChild(link);
-      links.push(link);
-    });
-
-    return () => {
-      links.forEach((l) => l.remove());
-    };
-  }, [pathname]);
-}
-
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -247,6 +210,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
+    userCrewInfo, // Access crew info for smart redirects
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
@@ -260,9 +224,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
 
-  // load bio30 CSS when on bio30 paths
-  // useBio30ExternalCSS();
-  // apply theme fix (colors) when on bio30
   useBio30ThemeFix();
 
   useEffect(() => {
@@ -291,6 +252,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     };
 
     const paramToProcess = startParamPayload || searchParams.get("tgWebAppStartParam");
+    
+    // Ensure we wait for authentication before making decisions about "userCrewInfo" dependent routes
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
@@ -298,9 +261,18 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       const parts = paramToProcess.split("_");
       const prefix = parts[0];
 
-      if (START_PARAM_PAGE_MAP[paramToProcess]) {
+      // 1. Check Smart Dashboard Redirect (wb_dashboard)
+      // If user wants dashboard and HAS a crew -> go directly to slug
+      // Else -> map will send them to landing
+      if (paramToProcess === "wb_dashboard" && userCrewInfo?.slug) {
+        targetPath = `/wb/${userCrewInfo.slug}`;
+      }
+      // 2. Standard Map Lookup
+      else if (START_PARAM_PAGE_MAP[paramToProcess]) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
-      } else if (prefix === "rental" || prefix === "rentals") {
+      } 
+      // 3. Dynamic Prefixes
+      else if (prefix === "rental" || prefix === "rentals") {
         if (parts.length === 2) {
           const rentalId = parts[1];
           targetPath = `/rentals/${rentalId}`;
@@ -309,52 +281,55 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
           const rentalId = parts.slice(2).join("_");
           targetPath = `/rentals/${rentalId}?action=${action}`;
         }
-      } else if (prefix === "crew" && parts.length > 2) {
-        const actionIndex = parts.findIndex((p) => p === "join" || p === "confirm");
-        if (actionIndex > 1) {
-          const slug = parts.slice(1, actionIndex).join("-");
-          const action = parts[actionIndex];
-          const actionVerb = parts[actionIndex + 1];
+      } else if (prefix === "crew") {
+        // Updated logic to support new Warehouse /wb/ paths
+        if (parts.length === 2) {
+            // Case: crew_<slug> -> Direct Dashboard Access
+            const slug = parts[1];
+            targetPath = `/wb/${slug}`;
+        } else if (parts.length > 2) {
+            // Case: crew_<slug>_<action>...
+            const actionIndex = parts.findIndex((p) => p === "join" || p === "confirm");
+            if (actionIndex > 1) {
+                const slug = parts.slice(1, actionIndex).join("-");
+                const action = parts[actionIndex];
+                const actionVerb = parts[actionIndex + 1];
 
-          if (action === "join" && actionVerb === "crew") {
-            targetPath = `/crews/${slug}?join_crew=true`;
-          } else if (
-            action === "confirm" &&
-            actionVerb === "member" &&
-            parts.length > actionIndex + 2
-          ) {
-            const id = parts.slice(actionIndex + 2).join("_");
-            targetPath = `/crews/${slug}?confirm_member=${id}`;
-          }
+                if (action === "join" && actionVerb === "crew") {
+                    targetPath = `/wb/${slug}?join_crew=true`;
+                } else if (
+                    action === "confirm" &&
+                    actionVerb === "member" &&
+                    parts.length > actionIndex + 2
+                ) {
+                    const id = parts.slice(actionIndex + 2).join("_");
+                    targetPath = `/wb/${slug}?confirm_member=${id}`;
+                }
+            }
         }
       } else if (paramToProcess.startsWith("viz_")) {
         const simId = paramToProcess.substring(4);
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       } else if (prefix === "bio30") {
         // Handle BIO30 startapp parameters
-        // Format: bio30_<product-id>_ref_<referrer_id> or bio30_ref_<referrer_id> or bio30_<product-id>
         let productId: string | undefined;
         let referrerId: string | undefined;
         
-        // Check for product ID (second part, unless it's "ref")
         if (parts.length > 1 && parts[1] !== 'ref') {
           productId = parts[1];
         }
         
-        // Check for referral (look for "ref" followed by referrer ID)
         const refIndex = parts.indexOf('ref');
         if (refIndex !== -1 && refIndex + 1 < parts.length) {
           referrerId = parts[refIndex + 1];
         }
         
-        // Set up referral if user exists and doesn't have one yet
         if (referrerId && dbUser?.user_id && !dbUser.metadata?.referrer_id) {
           handleBio30Referral(referrerId, paramToProcess).catch((error) => {
             logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
           });
         }
         
-        // Set target path
         if (productId && BIO30_PRODUCT_PATHS[productId]) {
           targetPath = BIO30_PRODUCT_PATHS[productId];
         } else {
@@ -365,13 +340,13 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         parts.length === 2 &&
         pathname.startsWith("/bio30")
       ) {
-        // Legacy referral format: ref_<referrer_id>
         const referrerId = parts[1];
         handleBio30Referral(referrerId, paramToProcess).catch((error) => {
           logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
         });
-        targetPath = undefined; // Stay on current BIO30 page
+        targetPath = undefined; 
       } else {
+        // Fallback to raw param as path
         targetPath = `/${paramToProcess}`;
       }
 
@@ -393,6 +368,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     isAppLoading,
     isAuthenticating,
     dbUser,
+    userCrewInfo,
     refreshDbUser,
     clearStartParam,
   ]);
@@ -412,6 +388,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
+    // "/wb" -- Removed from bottom nav logic to keep it clean/standalone as requested by Pirate aesthetic
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -423,7 +400,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/profile" ||
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") ||
+        pathname?.startsWith("/wb") || // Hides standard header/footer for Warehouse pages
+        pathname === "/wblanding" || 
         pathname === "/csv-compare" ||
         pathname === "/streamer" ||
         pathname === "/blogger" ||
@@ -434,7 +412,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     );
   }, [pathname]);
 
-  const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb"];
+  const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb", "/wblanding"];
   const isTransparentPage =
     TRANSPARENT_LAYOUT_PAGES.some((p) => pathname.startsWith(p)) || theme.isTransparent;
 
