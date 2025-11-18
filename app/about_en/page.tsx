@@ -14,8 +14,8 @@ export default function RentAYogForMePage() {
   return (
     <>
       <Head>
-        <title>Аренда Йога Разума — oneSitePls / VIBE</title>
-        <meta name="description" content="Йог для ума, сауна, байки и SelfDev. Плати звёздами в Telegram - быстро, по делу, без блядства." />
+        <title>Аренда Йога & WMS — oneSitePls / VIBE</title>
+        <meta name="description" content="Йог для ума, складской софт, сауна и байки. Плати звёздами в Telegram - быстро, по делу, без блядства." />
       </Head>
 
       {/* Always dark mode — black edition */}
@@ -66,28 +66,27 @@ export default function RentAYogForMePage() {
           <div className="relative z-10 max-w-4xl mx-auto px-4 text-white">
             <h1 className="font-orbitron text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-tight tracking-tight">
               <span className="block">АРЕНДУЙ ВАЙБ</span>
-              <span className="block text-primary">Йог. Сауна. Байк. Разум.</span>
+              <span className="block text-primary">Йог. Склад. Байк. Разум.</span>
             </h1>
 
             <p className="mt-5 text-sm sm:text-base md:text-lg text-gray-300 font-light max-w-3xl mx-auto">
               Возьми не услугу — возьми опыт. Плати звёздами (Telegram Stars) — быстро, без посредников.
-              <strong className="text-accent-text"> Я не лечу душу — я режу хаос в голове.</strong>
+              <strong className="text-accent-text"> Я не лечу душу — я режу хаос в голове и в бизнесе.</strong>
             </p>
 
             <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link href="/rent-bike" legacyBehavior>
-                <a aria-label="Арендовать байк" className="w-full sm:w-auto">
-                  <Button size="lg" variant="accent" className="font-orbitron w-full sm:w-auto">
-                    <VibeContentRenderer content="::FaMotorcycle:: Арендовать байк" />
+              <Link href="/wblanding" legacyBehavior>
+                <a aria-label="Оптимизация Склада" className="w-full sm:w-auto">
+                  <Button size="lg" className="font-orbitron w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-[0_0_15px_rgba(79,70,229,0.5)]">
+                    <VibeContentRenderer content="::FaBox:: FIX WAREHOUSE" />
                   </Button>
                 </a>
               </Link>
 
-              {/* RENT A YOG -> leads to /about#mind (you) */}
-              <Link href="/about#mind" legacyBehavior>
-                <a aria-label="Арендовать йога для ума" className="w-full sm:w-auto">
-                  <Button size="lg" variant="ghost" className="font-orbitron w-full sm:w-auto">
-                    <VibeContentRenderer content="::FaPersonChalkboard:: Арендовать йога (для ума)" />
+              <Link href="/rent-bike" legacyBehavior>
+                <a aria-label="Арендовать байк" className="w-full sm:w-auto">
+                  <Button size="lg" variant="accent" className="font-orbitron w-full sm:w-auto">
+                    <VibeContentRenderer content="::FaMotorcycle:: RENT BIKE" />
                   </Button>
                 </a>
               </Link>
@@ -102,7 +101,31 @@ export default function RentAYogForMePage() {
 
         {/* MAIN GRID */}
         <main className="container mx-auto px-4 py-10 space-y-10">
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Grid updated to 2 columns on MD to neatly fit 4 items */}
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* 1. WAREHOUSE (New) */}
+            <Card className="bg-[#090909] border-zinc-800 hover:border-indigo-500/50 transition-all duration-300 shadow-lg">
+              <CardHeader>
+                <CardTitle className="font-orbitron text-2xl flex items-center gap-3 text-white">
+                  <VibeContentRenderer content="::FaBox::" /> WarehouseBot (WMS)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-300 mb-4">Убийца энтерпрайз-софта. Управление складом для селлеров (WB, Ozon). Минимум кнопок, максимум денег.</p>
+                <ul className="list-disc list-inside text-sm space-y-2 mb-4 text-gray-400">
+                  <li>Real-time API синк (нет штрафам)</li>
+                  <li>Геймификация персонала (RPG на складе)</li>
+                  <li>Бесплатный аудит потерь</li>
+                </ul>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link href="/wblanding"><a className="w-full sm:w-auto"><Button className="w-full bg-indigo-600 hover:bg-indigo-700">Аудит Склада</Button></a></Link>
+                  <Link href="/wblanding#pricing"><a className="w-full sm:w-auto"><Button variant="secondary" className="w-full">Тарифы</Button></a></Link>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 2. BIKES */}
             <Card className="bg-[#070707] border-border">
               <CardHeader>
                 <CardTitle className="font-orbitron text-2xl flex items-center gap-3 text-white">
@@ -123,6 +146,7 @@ export default function RentAYogForMePage() {
               </CardContent>
             </Card>
 
+            {/* 3. SAUNA */}
             <Card className="bg-[#070707] border-border">
               <CardHeader>
                 <CardTitle className="font-orbitron text-2xl flex items-center gap-3 text-white">
@@ -134,15 +158,16 @@ export default function RentAYogForMePage() {
                 <ul className="list-disc list-inside text-sm space-y-2 mb-4 text-gray-300">
                   <li>Частные сессии по времени</li>
                   <li>Ароматы, полотенца, chill-zone</li>
-                  <li>Можно бронировать группой — делится опытом</li>
+                  <li>Можно бронировать группой</li>
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Link href="/sauna-rent"><a className="w-full sm:w-auto"><Button className="w-full">Забронировать сауну</Button></a></Link>
+                  <Link href="/sauna-rent"><a className="w-full sm:w-auto"><Button className="w-full">В Сауну</Button></a></Link>
                   <Link href="/about#sauna"><a className="w-full sm:w-auto"><Button variant="secondary" className="w-full">Подробнее</Button></a></Link>
                 </div>
               </CardContent>
             </Card>
 
+            {/* 4. MIND YOGA */}
             <Card className="bg-[#070707] border-border">
               <CardHeader>
                 <CardTitle className="font-orbitron text-2xl flex items-center gap-3 text-white">
@@ -152,8 +177,8 @@ export default function RentAYogForMePage() {
               <CardContent>
                 <p className="text-sm text-gray-300 mb-4">Я — йог для ума: сажаю порядок в голове, режу страхи, учу фокусироваться. Не буддизм — результат.</p>
                 <ul className="list-disc list-inside text-sm space-y-2 mb-4 text-gray-300">
-                  <li>Индивидуальные сессии — практики концентрации</li>
-                  <li>Короткие циклы для собственников и байкеров</li>
+                  <li>Индивидуальные сессии — практики</li>
+                  <li>Короткие циклы для собственников</li>
                   <li>Оплата — только Telegram Stars (XTR)</li>
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -191,7 +216,7 @@ export default function RentAYogForMePage() {
                     </div>
                     <div className="p-4 bg-[#0b0b0b] rounded-lg border border-border">
                       <h5 className="font-semibold text-accent-text mb-2">Security</h5>
-                      <p className="text-xs text-gray-300">SAST, PR scans, zero-trust — скорость без дуры.</p>
+                      <p className="text-xs text-gray-300">SAST, PR scans, zero-trust — скорость без дури.</p>
                     </div>
                   </div>
                 </CardContent>
@@ -204,7 +229,7 @@ export default function RentAYogForMePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-gray-300 mb-4">Не работай на чужой ритм. Создавай сервисы вокруг своей жизни: сауна, байк, менторство. Я учу делать это быстро и без стыда.</p>
+                  <p className="text-sm text-gray-300 mb-4">Не работай на чужой ритм. Создавай сервисы вокруг своей жизни: сауна, байк, менторство, **склад**. Я учу делать это быстро и без стыда.</p>
 
                   <ol className="list-decimal list-inside text-sm text-gray-300 space-y-3 pl-4">
                     <li>Начни с высокочековой услуги и протестируй спрос.</li>
@@ -243,6 +268,7 @@ export default function RentAYogForMePage() {
                 <CardContent>
                   <h4 className="font-semibold text-accent-text mb-2">Быстрые ссылки</h4>
                   <ul className="text-sm list-inside space-y-2 text-gray-300">
+                    <li><Link href="/wblanding"><a className="hover:underline text-indigo-400">WarehouseBot (WMS)</a></Link></li>
                     <li><Link href="/vipbikerental"><a className="hover:underline">VIP Байк</a></Link></li>
                     <li><Link href="/sauna-rent"><a className="hover:underline">Сауна</a></Link></li>
                     <li><Link href="/about#mind"><a className="hover:underline">Аренда йога — я</a></Link></li>
