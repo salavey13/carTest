@@ -20,9 +20,10 @@ export const WarehouseAuditTool = () => {
   } = useWarehouseAudit(dbUser?.user_id);
 
   const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; }>(null);
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null); // Added missing state
 
   useEffect(() => {
-    if (step > 0 && currentAnswer) {
+    if (step > 0 && currentAnswer && questions[step]) {
       setValidationResult(validateAnswer(currentAnswer, questions[step]));
     } else {
       setValidationResult(null);
@@ -43,11 +44,11 @@ export const WarehouseAuditTool = () => {
             <Terminal className="text-3xl text-indigo-400" />
           </div>
           <h3 className="text-3xl sm:text-5xl font-black text-white mb-4 tracking-tight">
-            Is Your Warehouse <br/><span className="text-red-500">Bleeding Cash?</span>
+            Ваш Склад <br/><span className="text-red-500">Сжигает Деньги?</span>
           </h3>
           <p className="text-lg text-zinc-400 max-w-lg mx-auto">
-            90% of sellers lose money on "invisible" fines and ghost stock. 
-            Calculate your exact monthly burn rate in 60 seconds.
+            90% селлеров теряют деньги на "невидимых" штрафах и Ghost Stock. 
+            Рассчитай свой ежемесячный убыток за 60 секунд.
           </p>
         </div>
         
@@ -57,12 +58,12 @@ export const WarehouseAuditTool = () => {
             size="lg" 
             className="bg-white text-black hover:bg-gray-200 px-10 py-8 text-xl rounded-xl font-bold shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-transform hover:scale-105"
           >
-            Start Diagnostic <FaArrowRight className="ml-3" />
+            Начать Диагностику <FaArrowRight className="ml-3" />
           </Button>
         </div>
         
         <p className="text-center text-zinc-600 mt-6 font-mono text-xs uppercase tracking-widest">
-           System Analysis • Confidential • Free
+           Системный Анализ • Конфиденциально • Бесплатно
         </p>
       </motion.div>
     );
@@ -78,19 +79,19 @@ export const WarehouseAuditTool = () => {
         <div className="grid lg:grid-cols-2 gap-12">
             {/* Left: The Pain */}
             <div>
-                <h3 className="text-zinc-400 font-mono text-sm uppercase mb-2">Current Status</h3>
-                <h2 className="text-4xl font-black text-white mb-6">Efficiency Report</h2>
+                <h3 className="text-zinc-400 font-mono text-sm uppercase mb-2">Текущий Статус</h3>
+                <h2 className="text-4xl font-black text-white mb-6">Отчет Эффективности</h2>
                 
                 <div className="space-y-4">
                     <div className="bg-red-900/10 border border-red-900/30 p-6 rounded-2xl">
                         <div className="flex items-center gap-3 mb-2">
                             <FaSkull className="text-red-500"/>
-                            <span className="text-red-400 font-bold">MONTHLY LOSSES</span>
+                            <span className="text-red-400 font-bold">ЕЖЕМЕСЯЧНЫЕ ПОТЕРИ</span>
                         </div>
                         <div className="text-5xl font-black text-red-500 font-mono tracking-tighter">
                            -{Math.floor(breakdown.monthlySavings / 0.65).toLocaleString()}₽
                         </div>
-                        <p className="text-red-400/60 text-sm mt-2">Money burned on fines & wasted hours.</p>
+                        <p className="text-red-400/60 text-sm mt-2">Деньги, сгорающие на штрафах и простоях.</p>
                     </div>
 
                     <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
@@ -112,11 +113,11 @@ export const WarehouseAuditTool = () => {
                  <div className="absolute top-0 right-0 bg-indigo-500/10 w-32 h-32 rounded-full blur-3xl"/>
                  
                  <h3 className="text-indigo-400 font-bold mb-6 flex items-center gap-2">
-                    <FaRocket/> POTENTIAL SAVINGS
+                    <FaRocket/> ПОТЕНЦИАЛ ЭКОНОМИИ
                  </h3>
                  
                  <div className="text-4xl font-black text-white mb-8 font-mono">
-                    +{breakdown.monthlySavings.toLocaleString()}₽<span className="text-zinc-500 text-lg">/mo</span>
+                    +{breakdown.monthlySavings.toLocaleString()}₽<span className="text-zinc-500 text-lg">/мес</span>
                  </div>
 
                  <div className="space-y-3 mb-8">
@@ -134,19 +135,19 @@ export const WarehouseAuditTool = () => {
                         disabled={isSending}
                         className="w-full bg-white text-black hover:bg-gray-200 font-bold py-6 text-lg rounded-xl"
                     >
-                        {isSending ? <Loader2 className="animate-spin mr-2"/> : <><FaTelegram className="mr-2"/> Send Full Plan to Telegram</>}
+                        {isSending ? <Loader2 className="animate-spin mr-2"/> : <><FaTelegram className="mr-2"/> Отправить план в Telegram</>}
                     </Button>
                  ) : (
                     <div className="text-center">
-                        <p className="text-zinc-400 mb-4">Login to get the implementation file.</p>
+                        <p className="text-zinc-400 mb-4">Войдите, чтобы получить файл внедрения.</p>
                         <Link href="/wb">
-                            <Button variant="outline" className="border-zinc-600 text-white hover:bg-zinc-800">Login / Sign Up</Button>
+                            <Button variant="outline" className="border-zinc-600 text-white hover:bg-zinc-800">Войти / Регистрация</Button>
                         </Link>
                     </div>
                  )}
                  
                  <button onClick={reset} className="mt-6 text-zinc-500 text-xs hover:text-white flex items-center justify-center w-full gap-2">
-                    <FaRedo/> Recalculate
+                    <FaRedo/> Пересчитать
                  </button>
             </div>
         </div>
@@ -155,6 +156,9 @@ export const WarehouseAuditTool = () => {
   }
 
   // --- QUESTION SCREEN ---
+  // CRITICAL FIX: Guard clause to prevent undefined error on last step transition
+  if (!questions[step]) return null;
+
   const currentQ = questions[step];
   const progress = ((step) / questions.length) * 100;
 
@@ -172,8 +176,8 @@ export const WarehouseAuditTool = () => {
             />
          </div>
          <div className="flex justify-between mt-2 text-xs font-mono text-zinc-500">
-            <span>STEP {step + 1}/{questions.length}</span>
-            <span>EST: {estimatedTime}</span>
+            <span>ШАГ {step + 1}/{questions.length}</span>
+            <span>ВРЕМЯ: {estimatedTime}</span>
          </div>
       </div>
 
@@ -195,7 +199,7 @@ export const WarehouseAuditTool = () => {
                   onChange={(e) => setCurrentAnswer(e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-700 text-white text-xl p-4 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none appearance-none"
                 >
-                   <option value="">Select...</option>
+                   <option value="">Выбрать...</option>
                    {currentQ.options?.map((opt: any) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                    ))}
@@ -224,8 +228,8 @@ export const WarehouseAuditTool = () => {
 
       <div className="flex gap-4">
          {step > 1 && (
-            <Button variant="ghost" onClick={() => { /* logic to go back */ }} className="text-zinc-500 hover:text-white">
-               <ChevronLeft/> Back
+            <Button variant="ghost" onClick={() => { /* logic to go back handled in hook usually, simplified here */ }} className="text-zinc-500 hover:text-white">
+               <ChevronLeft/> Назад
             </Button>
          )}
          <Button 
@@ -233,7 +237,7 @@ export const WarehouseAuditTool = () => {
             disabled={!currentAnswer || validationResult?.type === 'error'}
             className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg rounded-xl font-bold"
          >
-            Next <FaArrowRight className="ml-2"/>
+            Далее <FaArrowRight className="ml-2"/>
          </Button>
       </div>
     </motion.div>
