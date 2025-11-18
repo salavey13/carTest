@@ -15,9 +15,21 @@ import { Label } from "@/components/ui/label";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaSkullCrossbones, FaRocket, FaUserPlus, FaGhost, FaBolt, FaUsers, FaCheck, FaTimes, FaArrowRight } from 'react-icons/fa6';
+import { FaSkullCrossbones, FaRocket, FaUserPlus, FaGhost, FaBolt, FaUsers, FaCheck, FaTimes, FaArrowRight, FaStar, FaQuoteLeft } from 'react-icons/fa6';
 import { Loader2, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { supabaseAdmin } from '@/hooks/supabase';
+
+// --- UTILS & TYPES ---
+interface Testimonial {
+  id: string;
+  user_id: string;
+  username?: string;
+  avatar_url?: string;
+  content: string;
+  rating: number;
+  created_at: string;
+}
 
 const generateSlug = (name: string) =>
   name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
@@ -39,10 +51,33 @@ export default function WarehouseLandingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCrew, setCreatedCrew] = useState<{ slug: string; name: string } | null>(null);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  
+  // Testimonials state
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonialContent, setTestimonialContent] = useState("");
+  const [testimonialRating, setTestimonialRating] = useState(5);
+  const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
 
   const auditRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setSlug(generateSlug(name)); }, [name]);
+
+  // Load approved testimonials
+  useEffect(() => {
+    const loadTestimonials = async () => {
+      const { data, error } = await supabaseAdmin
+        .from('testimonials')
+        .select('*')
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false })
+        .limit(6);
+      
+      if (!error && data) {
+        setTestimonials(data as Testimonial[]);
+      }
+    };
+    loadTestimonials();
+  }, []);
 
   const scrollToAudit = () => {
     setTimeout(() => {
@@ -56,15 +91,25 @@ export default function WarehouseLandingPage() {
     if (!slug) { toast.error("Slug не может быть пустым."); return; }
     setIsSubmitting(true);
     try {
+      // FIXED: Ensure all parameters are passed correctly
       const result = await createCrew({
-        name, slug, description, logo_url: logoUrl, owner_id: dbUser.user_id, hq_location: hqLocation,
+        name, 
+        slug, 
+        description, 
+        logo_url: logoUrl, 
+        owner_id: dbUser.user_id, 
+        hq_location: hqLocation,
       });
       if (result.success && result.data) {
         toast.success(`Склад "${result.data.name}" активирован!`);
         setCreatedCrew({ slug: result.data.slug, name: result.data.name });
         await notifyAdmin(`🎉 New Warehouse: ${result.data.name} by ${dbUser.username}`);
       } else { throw new Error(result.error); }
-    } catch (error) { toast.error("Ошибка при создании склада."); } finally { setIsSubmitting(false); }
+    } catch (error: any) { 
+        toast.error(error.message || "Ошибка при создании склада."); 
+    } finally { 
+        setIsSubmitting(false); 
+    }
   };
 
   const handleInvite = async () => {
@@ -90,6 +135,19 @@ export default function WarehouseLandingPage() {
   const handlePlanAction = async (planType: string, action: () => void) => {
     action();
     if (dbUser?.user_id) await sendComplexMessage(dbUser.user_id, `Вы выбрали тариф ${planType}. Скоро свяжемся!`, []);
+  };
+
+  const handleSubmitTestimonial = async () => {
+    if (!dbUser?.user_id || !testimonialContent.trim()) return;
+    setIsSubmittingTestimonial(true);
+    try {
+      await supabaseAdmin.from('testimonials').insert({
+        user_id: dbUser.user_id, username: dbUser.username, avatar_url: dbUser.avatar_url,
+        content: testimonialContent, rating: testimonialRating, is_approved: false
+      });
+      toast.success("Отзыв отправлен на модерацию!");
+      setTestimonialContent("");
+    } catch { toast.error("Ошибка"); } finally { setIsSubmittingTestimonial(false); }
   };
 
   if (appContextLoading) return <div className="min-h-screen flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin w-8 h-8 text-indigo-500" /></div>;
@@ -257,7 +315,7 @@ export default function WarehouseLandingPage() {
                  </ul>
                  <div className="mt-8">
                     <Button className="w-full bg-white text-black hover:bg-indigo-50 font-bold rounded-xl py-6">
-                       Перейти на Светлую Сторону <FaArrowRight className="ml-2 w-4 h-4"/>
+                       Перейти на Светлую Сторону <ArrowRight className="ml-2 w-4 h-4"/>
                     </Button>
                  </div>
               </motion.div>
@@ -367,26 +425,152 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
+      {/* --- TESTIMONIALS SECTION --- */}
+      <section id="testimonials" className="py-24 bg-zinc-900 border-t border-zinc-800">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-3xl md:text-5xl font-black text-center mb-16 text-white">
+             Что говорит <span className="text-indigo-500">Племя</span>
+          </h2>
+
+          {/* Form */}
+          {dbUser?.user_id && (
+            <motion.div 
+              className="mb-16 bg-zinc-800/50 border border-zinc-700 rounded-2xl p-6 sm:p-8 max-w-2xl mx-auto"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <h3 className="text-xl font-bold mb-4 text-white">Поделись опытом</h3>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-zinc-400">Твой отзыв</Label>
+                  <Textarea 
+                    placeholder="Как WarehouseBot изменил твой бизнес? Без цензуры."
+                    value={testimonialContent}
+                    onChange={(e) => setTestimonialContent(e.target.value)}
+                    className="mt-2 min-h-[100px] bg-black/50 border-zinc-600 text-white placeholder-zinc-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <Label className="text-zinc-400">Оценка</Label>
+                  <div className="flex gap-2 mt-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setTestimonialRating(star)}
+                        className={`text-2xl transition-colors ${star <= testimonialRating ? 'text-yellow-400' : 'text-zinc-600 hover:text-zinc-500'}`}
+                      >
+                        <FaStar />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleSubmitTestimonial}
+                  disabled={isSubmittingTestimonial}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold mt-2"
+                >
+                  {isSubmittingTestimonial ? (
+                    <Loader2 className="animate-spin mr-2" /> 
+                  ) : (
+                    <FaPaperPlane className="mr-2" />
+                  )}
+                  Отправить
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {testimonials.length === 0 ? (
+              <motion.div 
+                className="col-span-full text-center py-12 border border-zinc-800 rounded-xl bg-zinc-900/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <FaQuoteLeft className="text-4xl text-zinc-700 mx-auto mb-4" />
+                <p className="text-zinc-500">Пока тихо... Стань первым голосом революции.</p>
+              </motion.div>
+            ) : (
+              testimonials.map((testimonial, index) => (
+                <motion.div 
+                  key={testimonial.id}
+                  className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg hover:border-indigo-500/50 transition-all"
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    {testimonial.avatar_url ? (
+                      <Image 
+                        src={testimonial.avatar_url} 
+                        alt={testimonial.username || 'User'} 
+                        width={40} 
+                        height={40} 
+                        className="rounded-full border border-zinc-700"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-indigo-900 rounded-full flex items-center justify-center text-indigo-200 font-bold border border-indigo-700">
+                        {(testimonial.username || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{testimonial.username || 'Аноним'}</h4>
+                      <div className="flex text-yellow-500 text-xs">
+                        {[...Array(testimonial.rating)].map((_, i) => (
+                          <FaStar key={i} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-zinc-400 italic text-sm leading-relaxed">"{testimonial.content}"</p>
+                </motion.div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* --- CTA: CREATE WAREHOUSE --- */}
       <section id="invite" className="py-24 bg-gradient-to-br from-indigo-900 to-black text-white relative overflow-hidden border-t border-zinc-800">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
         <div className="container mx-auto px-4 relative z-10 text-center">
            <motion.div initial={{ scale: 0.9 }} whileInView={{ scale: 1 }} viewport={{ once: true }}>
-             <h2 className="text-4xl md:text-6xl font-white mb-8">Готов к прокачке?</h2>
+             <h2 className="text-4xl md:text-6xl font-black mb-8">Готов к прокачке?</h2>
              
              {!createdCrew ? (
-                <div className="max-w-md mx-auto bg-white/10 backdrop-blur-lg p-8 rounded-3xl border border-white/20 shadow-2xl">
-                   <h3 className="text-2xl text-whitefont-bold mb-6">Создать Штаб (HQ)</h3>
+                <div className="max-w-2xl mx-auto bg-white/10 backdrop-blur-lg p-8 rounded-3xl border border-white/20 shadow-2xl">
+                   <h3 className="text-2xl font-bold mb-6">Создать Штаб (HQ)</h3>
                    <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                      <div>
-                         <Label className="text-white/80 text-xs uppercase tracking-wider">Название Склада</Label>
-                         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Напр: Главный Склад" className="bg-black/40 border-white/20 text-white focus:border-indigo-500" />
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <Label className="text-white/80 text-xs uppercase tracking-wider">Название Склада</Label>
+                            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Напр: Главный Склад" className="bg-black/40 border-white/20 text-white focus:border-indigo-500" />
+                        </div>
+                        <div>
+                            <Label className="text-white/80 text-xs uppercase tracking-wider">Уникальный Slug (ID)</Label>
+                            <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-base" className="bg-black/40 border-white/20 text-white focus:border-indigo-500" />
+                        </div>
                       </div>
+                      
                       <div>
-                         <Label className="text-white/80 text-xs uppercase tracking-wider">Уникальный Slug (ID)</Label>
-                         <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-base" className="bg-black/40 border-white/20 text-white focus:border-indigo-500" />
+                         <Label className="text-white/80 text-xs uppercase tracking-wider">Описание / Инфо</Label>
+                         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Для чего этот склад..." className="bg-black/40 border-white/20 text-white focus:border-indigo-500 min-h-[80px]" />
                       </div>
-                      <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-6 text-lg rounded-xl mt-4">
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <Label className="text-white/80 text-xs uppercase tracking-wider">URL Логотипа</Label>
+                            <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://..." className="bg-black/40 border-white/20 text-white focus:border-indigo-500" />
+                        </div>
+                        <div>
+                            <Label className="text-white/80 text-xs uppercase tracking-wider">Геолокация (Lat, Lng)</Label>
+                            <Input value={hqLocation} onChange={(e) => setHqLocation(e.target.value)} placeholder="55.75, 37.61" className="bg-black/40 border-white/20 text-white focus:border-indigo-500" />
+                        </div>
+                      </div>
+
+                      <Button type="submit" disabled={isSubmitting} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-6 text-lg rounded-xl mt-6">
                          {isSubmitting ? <Loader2 className="animate-spin"/> : "Инициализировать Систему 🚀"}
                       </Button>
                    </form>

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { FaSkull, FaRocket, FaCheckCircle, FaTelegram, FaRedo, FaKeyboard, FaArrowRight, FaExclamationTriangle } from 'react-icons/fa6';
+import { FaSkull, FaRocket, FaCircleCheck, FaTelegram, FaRedo, FaKeyboard, FaArrowRight, FaTriangleExclamation } from 'react-icons/fa6';
 import { Loader2, ChevronLeft, Terminal, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useWarehouseAudit } from '../hooks/useWarehouseAudit';
@@ -17,13 +17,15 @@ export const WarehouseAuditTool = () => {
     step, questions, currentAnswer, isSending, breakdown, showResult,
     efficiency, estimatedTime, roadmap, hasCompletedAudit,
     setCurrentAnswer, handleNext, handleGetReport, reset, startAudit, validateAnswer,
+    trackAuditEvent,
   } = useWarehouseAudit(dbUser?.user_id);
 
   const [validationResult, setValidationResult] = useState<{ type: 'error' | 'warning' | null; message: string; }>(null);
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null); // Added missing state
 
   useEffect(() => {
-    if (step > 0 && currentAnswer && questions[step]) {
+    // Safety check: make sure question exists before validating
+    if (step > 0 && currentAnswer && questions && questions[step]) {
       setValidationResult(validateAnswer(currentAnswer, questions[step]));
     } else {
       setValidationResult(null);
@@ -123,7 +125,7 @@ export const WarehouseAuditTool = () => {
                  <div className="space-y-3 mb-8">
                     {roadmap.slice(0,3).map((item, i) => (
                         <div key={i} className="flex items-center gap-3 text-sm text-zinc-300">
-                            <FaCheckCircle className="text-green-500 flex-shrink-0"/>
+                            <FaCircleCheck className="text-green-500 flex-shrink-0"/>
                             <span>{item.title} (+{item.impact.toLocaleString()}₽)</span>
                         </div>
                     ))}
@@ -157,7 +159,7 @@ export const WarehouseAuditTool = () => {
 
   // --- QUESTION SCREEN ---
   // CRITICAL FIX: Guard clause to prevent undefined error on last step transition
-  if (!questions[step]) return null;
+  if (!questions || !questions[step]) return null;
 
   const currentQ = questions[step];
   const progress = ((step) / questions.length) * 100;
