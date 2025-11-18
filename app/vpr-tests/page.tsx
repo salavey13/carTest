@@ -6,7 +6,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { debugLogger } from "@/lib/debugLogger";
-import { Loader2, Trophy, BookOpen, Info, GraduationCap } from "lucide-react";
+import { Loader2, Trophy, BookOpen, Info, GraduationCap, Terminal } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer"; 
 import type { Database } from '@/types/database.types';
 
