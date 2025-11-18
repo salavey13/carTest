@@ -231,7 +231,7 @@ export default function InformaticsCheatsheet() {
 
           <Link href="/vpr-tests">
             <Button className="bg-green-600 hover:bg-green-500 text-white font-bold rounded-full px-8 py-6 text-lg transition-all hover:scale-105 shadow-lg shadow-green-900/20">
-              Вернуться в Базу (Ко всем тестам)
+              На Базу
             </Button>
           </Link>
         </div>
