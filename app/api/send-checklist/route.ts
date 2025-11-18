@@ -9,18 +9,18 @@ export async function POST(req: Request) {
     if (!chatId) return NextResponse.json({ success: false }, { status: 400 });
 
     const checklist = [
-      '*🏴‍☠️ THE ANTI-FINE MANIFESTO*',
-      'How to stop feeding the marketplaces your profit.',
+      '*🏴‍☠️ МАНИФЕСТ АНТИ-ШТРАФ*',
+      'Как перестать кормить маркетплейсы своей прибылью.',
       '',
-      '1. *Kill Ghost Stock:* API Sync must be <5 min delay. Manual sync is suicide.',
-      '2. *The Return Trap:* Separate "Refunds" from "Stock" physically on the shelf.',
-      '3. *SLA Monitor:* Set alerts 2 hours BEFORE the MP shipment deadline.',
-      '4. *Visual Proof:* Photo-fixation at packing. Dispute fines with evidence.',
-      '5. *The 2-Week Rule:* Analyze returns data bi-weekly. Spot bad SKUs early.',
-      '6. *Safety Buffer:* Keep 5% "Invisible Stock" to prevent overselling.',
-      '7. *Barcode Discipline:* No item enters without a scan. No exceptions.',
+      '1. *Убей Фантомов:* API-синк должен быть < 5 мин. Ручное обновление — это самоубийство.',
+      '2. *Ловушка Возвратов:* Физически отделяй "Возвраты" от "Стока" на полке.',
+      '3. *Контроль Тайминга:* Ставь алерты за 2 часа ДО дедлайна отгрузки.',
+      '4. *Фото-фиксация:* Снимай процесс упаковки. Оспаривай штрафы с железными пруфами.',
+      '5. *Правило 2 Недель:* Анализируй возвраты каждые 14 дней. Вычисляй проблемные SKU заранее.',
+      '6. *Страховочный Буфер:* Держи 5% "Невидимого остатка", чтобы избежать оверселлинга.',
+      '7. *Культ Сканера:* Ни один товар не двигается без "пика". Исключений нет.',
       '',
-      '🚀 *Need the tool we use?* Type /start to launch WarehouseBot.'
+      '🚀 *Нужен инструмент, который это делает?* Жми /start, чтобы запустить WarehouseBot.'
     ].join('\n');
 
     await sendComplexMessage(chatId, checklist, [], { parseMode: 'Markdown' });
