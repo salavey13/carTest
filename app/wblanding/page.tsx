@@ -372,11 +372,11 @@ export default function WarehouseLandingPage() {
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
         <div className="container mx-auto px-4 relative z-10 text-center">
            <motion.div initial={{ scale: 0.9 }} whileInView={{ scale: 1 }} viewport={{ once: true }}>
-             <h2 className="text-4xl md:text-6xl font-black mb-8">Готов остановить кровотечение?</h2>
+             <h2 className="text-4xl md:text-6xl font-white mb-8">Готов к прокачке?</h2>
              
              {!createdCrew ? (
                 <div className="max-w-md mx-auto bg-white/10 backdrop-blur-lg p-8 rounded-3xl border border-white/20 shadow-2xl">
-                   <h3 className="text-2xl font-bold mb-6">Создать Штаб (HQ)</h3>
+                   <h3 className="text-2xl text-whitefont-bold mb-6">Создать Штаб (HQ)</h3>
                    <form onSubmit={handleSubmit} className="space-y-4 text-left">
                       <div>
                          <Label className="text-white/80 text-xs uppercase tracking-wider">Название Склада</Label>
