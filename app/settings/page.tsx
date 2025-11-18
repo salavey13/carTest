@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,16 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { Loading } from "@/components/Loading";
+import dynamic from 'next/dynamic';
+
+const ArbitrageAgent = dynamic(
+  () => import('@/app/arbitrage/agent'),
+  { ssr: false }
+);
+const HappyFuturesSuggestor = dynamic(
+  () => import('@/app/happy-futures/suggestor'),
+  { ssr: false }
+);
 
 interface GeneralSettingConfig {
   key: string;
@@ -75,7 +86,6 @@ export default function SettingsPage() {
   const [generalSettingsProfile, setGeneralSettingsProfile] = useState<GeneralSettingsProfile | null>(null);
   const [arbitrageSettings, setArbitrageSettings] = useState<ArbitrageSettings | null>(null);
   const [isLoadingArbitrageSettings, setIsLoadingArbitrageSettings] = useState(false);
-
   const [isSavingGeneral, setIsSavingGeneral] = useState(false);
   const [isSavingArbitrage, setIsSavingArbitrage] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -83,6 +93,7 @@ export default function SettingsPage() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('SettingsPage module loaded'); // Отладка
     if (!isAppContextLoading && dbUser) {
       logger.debug("[SettingsPage] AppContext loaded, dbUser found. Metadata:", dbUser.metadata);
       const userGeneralSettings = dbUser.metadata?.settings_profile as GeneralSettingsProfile | undefined;
@@ -96,7 +107,6 @@ export default function SettingsPage() {
       }
     } else if (!isAppContextLoading && !dbUser) {
       logger.warn("[SettingsPage] AppContext loaded, but no dbUser. Using default general settings.");
-
       const defaults = getDefaultGeneralSettings();
       setGeneralSettingsProfile(defaults);
       document.documentElement.classList.toggle('dark', defaults.dark_mode_enabled);
@@ -132,7 +142,6 @@ export default function SettingsPage() {
       loadArbitrageSettings();
     }
   }, [dbUser?.user_id, loadArbitrageSettings]);
-
 
   const handleGeneralSettingChange = useCallback(async (settingKey: string, value: boolean) => {
     if (!generalSettingsProfile || !dbUser?.user_id) { 
@@ -172,7 +181,6 @@ export default function SettingsPage() {
     }
   }, [generalSettingsProfile, dbUser]);
 
-
   const handleArbitrageSettingChange = (key: keyof Omit<ArbitrageSettings, "exchangeFees" | "networkFees">, value: any) => {
     setArbitrageSettings(prev => {
         if (!prev) return null;
@@ -188,7 +196,6 @@ export default function SettingsPage() {
   const handleArbitrageExchangeEnabledToggle = (exchangeName: ExchangeName, checked: boolean) => {
     setArbitrageSettings(prev => {
       if (!prev) return null;
-
       const newEnabledExchanges = checked
         ? [...prev.enabledExchanges, exchangeName]
         : prev.enabledExchanges.filter(ex => ex !== exchangeName);
@@ -375,7 +382,6 @@ export default function SettingsPage() {
                        <VibeContentRenderer content="::FaNetworkWired className='inline mr-1.5'::" />Сетевые Комиссии (USD)
                     </h4>
                     <ScrollArea className="h-[200px] p-2 border rounded-md simple-scrollbar bg-muted/20">
-
                         <div className="space-y-3 pr-2">
                         {DEFAULT_TRACKED_ASSETS_FOR_NETWORK_FEES.map(assetSymbol => (
                             <div key={`arbNetFee-${assetSymbol}`} className="p-2.5 bg-background/70 rounded-md border">
@@ -392,6 +398,8 @@ export default function SettingsPage() {
                 <Button onClick={handleSaveArbitrageSettings} disabled={isSavingArbitrage || isSavingGeneral} className="w-full">
                     {isSavingArbitrage ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2':: Сохранение..." /> : <VibeContentRenderer content="::FaSave className='mr-2':: Сохранить Настройки Арбитража" />}
                 </Button>
+                <ArbitrageAgent />
+                <HappyFuturesSuggestor />
             </CardContent>
         </Card>
         )}

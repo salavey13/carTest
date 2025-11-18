@@ -1,7 +1,8 @@
 // /lib/utils.ts
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { logger } from "./logger"; // Import logger for warnings
+import { logger } from "./logger";
+import { BigNumber, ethers } from 'ethers';
 
 /**
  * Formats a date into a readable string like "10.08.2025".
@@ -28,7 +29,6 @@ export function formatDate(dateInput: Date | string | number, locale: string = '
     }
 }
 
-
 /**
  * Combines Tailwind CSS class names intelligently.
  * Handles conditional classes and merges conflicting utility classes.
@@ -49,7 +49,7 @@ export function getBaseUrl(): string {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
   }
 
-  // 2. Fallback to a hardcoded production URL (Your suggestion, very reliable)
+  // 2. Fallback to a hardcoded production URL
   const productionUrl = "https://v0-car-test.vercel.app";
   
   // 3. Fallback for local development
@@ -90,7 +90,11 @@ export function formatTime(dateInput: Date | string | number, locale: string = '
     }
 }
 
-// New helper function to escape characters for Telegram's MarkdownV2 parser
+/**
+ * Escapes characters for Telegram's MarkdownV2 parser.
+ * @param text - The text to escape.
+ * @returns The escaped text string.
+ */
 export const escapeMarkdown = (text: string | null | undefined): string => {
   if (text === null || typeof text === 'undefined') {
     return '';
@@ -98,3 +102,50 @@ export const escapeMarkdown = (text: string | null | undefined): string => {
   const toEscape = '_*[]()~`>#+-=|{}.!';
   return String(text).replace(new RegExp(`[${toEscape.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}]`, 'g'), '\\$&');
 };
+
+/**
+ * Escapes characters for Telegram's MarkdownV2 parser (alias for escapeMarkdown).
+ * @param text - The text to escape.
+ * @returns The escaped text string.
+ */
+export const escapeTelegramMarkdown = escapeMarkdown;
+
+/**
+ * Calculates a fee based on an amount in wei and a fee in basis points.
+ * @param amountWei - The amount in wei as a string.
+ * @param feeBps - The fee in basis points.
+ * @param round - Rounding mode: 'floor' or 'round'.
+ * @returns The calculated fee as a string.
+ */
+export function calcFee(amountWei: string, feeBps: number, round: 'floor' | 'round' = 'round') {
+  const amt = BigNumber.from(amountWei);
+  const numerator = amt.mul(feeBps);
+  const denom = 10_000;
+  const raw = numerator.div(denom);
+  if (round === 'floor') return raw.toString();
+  const rem = numerator.mod(denom);
+  const add = rem.mul(2).gte(denom) ? BigNumber.from(1) : BigNumber.from(0);
+  return raw.add(add).toString();
+}
+
+/**
+ * Reverses an amount with a fee to calculate the original amount before the fee.
+ * @param repayWei - The amount after fee in wei as a string.
+ * @param feeBps - The fee in basis points.
+ * @returns The original amount as a string.
+ */
+export function reverseAmountWithFee(repayWei: string, feeBps: number) {
+  const r = BigNumber.from(repayWei);
+  const loan = r.mul(10000).div(10000 + feeBps);
+  return loan.toString();
+}
+
+/**
+ * Converts an amount with decimals to wei.
+ * @param amount - The amount as a string.
+ * @param decimals - The number of decimals.
+ * @returns The amount in wei as a string.
+ */
+export function decimalsToWei(amount: string, decimals: number) {
+  return ethers.utils.parseUnits(amount, decimals).toString();
+}
