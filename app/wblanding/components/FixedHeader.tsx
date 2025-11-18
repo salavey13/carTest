@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Menu, X, User, Bell, Search, LogOut, Settings, ChevronDown, Zap, Terminal } from "lucide-react";
+import { Menu, X, User, Bell, Search, LogOut, Settings, ChevronDown, Zap, Terminal, Sparkles, Box } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -27,12 +26,12 @@ export function FixedHeader() {
 
   const navLinks: NavLink[] = useMemo(
     () => [
-      { href: "#features", label: "The Hack", icon: <Zap className="w-4 h-4" /> },
-      { href: "#pricing", label: "Pricing", icon: <Terminal className="w-4 h-4" /> },
-      { href: "#audit-tool", label: "Calculator", badge: "FREE" },
+      { href: "#features", label: "Фишки", icon: <Zap className="w-4 h-4" /> },
+      { href: "#pricing", label: "Цены", icon: <Sparkles className="w-4 h-4" /> },
+      { href: "#audit-tool", label: "Калькулятор", badge: "FREE" },
       { 
         href: "https://github.com/salavey13/carTest", 
-        label: "Source Code", 
+        label: "Исходный код", 
         external: true,
       },
     ],
@@ -45,7 +44,6 @@ export function FixedHeader() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close menus on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
@@ -138,27 +136,24 @@ export function FixedHeader() {
                         className="absolute right-0 mt-2 w-56 rounded-xl bg-zinc-950 border border-white/10 shadow-2xl overflow-hidden z-50"
                       >
                         <div className="p-3 border-b border-white/10">
-                           <p className="text-xs text-gray-500 uppercase tracking-wider">Signed in as</p>
-                           <p className="text-sm text-white font-mono truncate">{dbUser.email}</p>
+                           <p className="text-xs text-gray-500 uppercase tracking-wider">Вы вошли как</p>
+                           <p className="text-sm text-white font-mono truncate">{dbUser.username || 'User'}</p>
                         </div>
                         <div className="p-1">
                            <Link href="/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg">
-                              <Settings className="w-4 h-4"/> Settings
+                              <Settings className="w-4 h-4"/> Настройки
                            </Link>
-                           <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg text-left">
-                              <LogOut className="w-4 h-4"/> Disconnect
-                           </button>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
               ) : (
-                <Button 
-                  className="bg-white text-black hover:bg-gray-200 font-bold rounded-full px-6"
-                >
-                  Login
-                </Button>
+                <Link href="/wb">
+                    <Button className="bg-white text-black hover:bg-gray-200 font-bold rounded-full px-6">
+                    Войти
+                    </Button>
+                </Link>
               )}
 
               {/* Mobile Menu Button */}
