@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaSkullCrossbones, FaRocket, FaUserPlus, FaGhost, FaBolt, FaUsers, FaCheck, FaTimes, FaArrowRight, FaStar, FaQuoteLeft } from 'react-icons/fa6';
+import { FaSkullCrossbones, FaRocket, FaUserPlus, FaGhost, FaBolt, FaUsers, FaCheck, FaTimes, FaArrowRight, FaStar, FaQuoteLeft, FaPaperPlane } from 'react-icons/fa6';
 import { Loader2, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import { supabaseAdmin } from '@/hooks/supabase';
