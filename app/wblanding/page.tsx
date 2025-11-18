@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { CrewsListSimplified } from "./components/CrewsListSimplified";
 import { WarehouseAuditTool } from "./components/WarehouseAuditTool";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
-import { FaSkullCrossbones, FaRocket, FaUserPlus, FaGhost, FaBolt, FaUsers, FaCheck, FaTimes, FaArrowRight, FaStar, FaQuoteLeft } from 'react-icons/fa6';
+import { FaSkullCrossbones, FaRocket, FaUserPlus, FaGhost, FaBolt, FaUsers, FaCheck, FaTimes, FaFaArrowRight, FaStar, FaQuoteLeft } from 'react-icons/fa6';
 import { Loader2, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import Image from 'next/image';
 import { supabaseAdmin } from '@/hooks/supabase';
@@ -315,7 +315,7 @@ export default function WarehouseLandingPage() {
                  </ul>
                  <div className="mt-8">
                     <Button className="w-full bg-white text-black hover:bg-indigo-50 font-bold rounded-xl py-6">
-                       Перейти на Светлую Сторону <ArrowRight className="ml-2 w-4 h-4"/>
+                       Перейти на Светлую Сторону <FaArrowRight className="ml-2 w-4 h-4"/>
                     </Button>
                  </div>
               </motion.div>
