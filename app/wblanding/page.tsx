@@ -533,11 +533,11 @@ export default function WarehouseLandingPage() {
       </section>
 
       {/* --- CTA: CREATE WAREHOUSE --- */}
-      <section id="invite" className="py-24 bg-gradient-to-br from-indigo-900 to-black text-white relative overflow-hidden border-t border-zinc-800">
+      <section id="invite" className="py-24 bg-gradient-to-br from-indigo-900 to-black font-white relative overflow-hidden border-t border-zinc-800">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
         <div className="container mx-auto px-4 relative z-10 text-center">
            <motion.div initial={{ scale: 0.9 }} whileInView={{ scale: 1 }} viewport={{ once: true }}>
-             <h2 className="text-4xl md:text-6xl font-black mb-8">Готов к прокачке?</h2>
+             <h2 className="text-4xl md:text-6xl font-white mb-8">Готов к прокачке?</h2>
              
              {!createdCrew ? (
                 <div className="max-w-2xl mx-auto bg-white/10 backdrop-blur-lg p-8 rounded-3xl border border-white/20 shadow-2xl">
