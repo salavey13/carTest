@@ -268,7 +268,7 @@ export default function WarehouseLandingPage() {
       {/* --- FEATURES --- */}
       <section id="features" className="py-24 bg-black text-white border-t border-zinc-800">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-5xl font-black text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-white text-center mb-16">
              Функции для <span className="text-indigo-500">Скорости</span>, а не для галочки.
           </h2>
           
@@ -283,7 +283,7 @@ export default function WarehouseLandingPage() {
                   initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: i*0.1 }}
                   className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 hover:border-indigo-500 transition-colors group"
                 >
-                   <f.icon className="w-10 h-10 text-zinc-500 group-hover:text-indigo-400 mb-4 transition-colors"/>
+                   <f.icon className="w-10 h-10 text-indigo-500 group-hover:text-indigo-400 mb-4 transition-colors"/>
                    <h3 className="text-xl font-bold mb-2">{f.title}</h3>
                    <p className="text-zinc-400">{f.desc}</p>
                 </motion.div>
