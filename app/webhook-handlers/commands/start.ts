@@ -3,16 +3,14 @@
 import { notifyAdmin, updateUserSettings } from "@/app/actions";
 import { supabaseAdmin, createOrUpdateUser } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
-import { getBaseUrl } from "@/lib/utils";
-import { howtoCommand } from "./howto";
-import { sendComplexMessage, deleteTelegramMessage, KeyboardButton } from "../actions/sendComplexMessage";
-import { surveyQuestions, SurveyQuestion, answerTexts } from "./content/start_survey_questions_sportbike";
+import { sendComplexMessage } from "../actions/sendComplexMessage";
+// CHANGED IMPORT: Now using warehouse questions
+import { surveyQuestions, answerTexts } from "./content/start_survey_questions_warehouse";
 
 interface SurveyState {
   user_id: string;
   current_step: number;
   answers: Record<string, string>;
-  message_id?: number | null;
 }
 
 const handleSurveyCompletion = async (chatId: number, state: SurveyState, username?: string) => {
@@ -22,31 +20,39 @@ const handleSurveyCompletion = async (chatId: number, state: SurveyState, userna
   await supabaseAdmin.from("user_surveys").insert({ user_id, username: username || "unknown", survey_data: answers });
   // Delete the temporary state
   await supabaseAdmin.from("user_survey_state").delete().eq('user_id', user_id);
-  // NEW: Save results to user's metadata for personalization
+  // Save results to user's metadata
   await updateUserSettings(user_id, { survey_results: answers });
 
-  let adminSummary = `🚨 *Новый Райдер прошел онбординг!*\n- *User:* @${username || user_id} (${user_id})\n`;
+  // Admin Notification (Warehouse Style)
+  let adminSummary = `🏭 *Новый Оператор в Системе!*\n- *User:* @${username || user_id} (${user_id})\n`;
   for (const key in answers) {
-    adminSummary += `- *${answerTexts[key] || key}:* ${answers[key] || 'не указана'}\n`;
+    adminSummary += `- *${answerTexts[key] || key}:* ${answers[key] || '—'}\n`;
   }
   await notifyAdmin(adminSummary);
 
   const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
-  let summary = `✅ *Опрос Завершен!*\nТвои предпочтения записаны. Спасибо!\n`;
+  
+  // User Summary (Warehouse Style)
+  let summary = `✅ *Профиль настроен.*\nМы зафиксировали параметры твоего склада:\n`;
   for (const key in answers) {
-    summary += `- *${answerTexts[key] || key}:* ${answers[key] || 'не указана'}\n`;
+    summary += `- *${answerTexts[key] || key}:* ${answers[key] || '—'}\n`;
   }
-  summary += `\n\nТеперь клавиатура убрана. Используй /howto, чтобы получить рекомендованные гайды, или /help для списка всех команд.`;
-  summary += `\n\n👉 Готов выбрать байк? Посети наш мото-гараж: ${botUrl}`;
-  await sendComplexMessage(chatId, summary, [], { removeKeyboard: true });
+  
+  summary += `\n\n⌨️ Клавиатура скрыта. \n\nИспользуй /howto для инструкций или открывай приложение, чтобы начать работу.`;
+  summary += `\n\n👇 *Твой центр управления:*`;
+
+  // Send summary with a direct button to the App
+  await sendComplexMessage(chatId, summary, [
+      [{ text: "🚀 Открыть Склад (Web App)", url: botUrl }]
+  ], { removeKeyboard: true });
 };
 
 export async function startCommand(chatId: number, userId: number, from_user: any, text?: string) {
-  logger.info(`[StartCommand V5] User: ${userId}, Text: "${text}"`);
+  logger.info(`[StartCommand Warehouse] User: ${userId}, Text: "${text}"`);
   const userIdStr = String(userId);
   const username = from_user.username;
 
-  // --- CRITICAL FIX: Ensure user exists before starting survey ---
+  // Ensure user exists
   const user = await createOrUpdateUser(userIdStr, {
     username: from_user.username,
     first_name: from_user.first_name,
@@ -55,13 +61,13 @@ export async function startCommand(chatId: number, userId: number, from_user: an
   });
 
   if (!user) {
-    logger.error(`[StartCommand V5] Failed to create or find user ${userIdStr}. Aborting survey.`);
-    await sendComplexMessage(chatId, "Произошла ошибка при регистрации. Не могу начать опрос.", [], { removeKeyboard: true });
+    logger.error(`[StartCommand] Failed to create/find user ${userIdStr}.`);
+    await sendComplexMessage(chatId, "⚠️ Ошибка доступа к базе данных. Попробуйте позже.", [], { removeKeyboard: true });
     return;
   }
-  // --- END FIX ---
 
   if (text === '/start') {
+    // Reset previous state
     await supabaseAdmin.from("user_survey_state").delete().eq('user_id', userIdStr);
     await supabaseAdmin.from("user_surveys").delete().eq('user_id', userIdStr);
 
@@ -71,7 +77,7 @@ export async function startCommand(chatId: number, userId: number, from_user: an
       .select().single();
 
     if (error || !newState) {
-      logger.error('[StartCommand V5] Failed to create new survey state', error);
+      logger.error('[StartCommand] Failed to init survey state', error);
       return;
     }
 
@@ -81,22 +87,25 @@ export async function startCommand(chatId: number, userId: number, from_user: an
     await sendComplexMessage(chatId, question.question, buttons, { keyboardType: question.answers ? 'reply' : 'remove' });
 
   } else {
+    // Handle Answer
     const { data: currentState } = await supabaseAdmin.from("user_survey_state").select('*').eq('user_id', userIdStr).maybeSingle();
 
     if (!currentState) {
-      logger.warn(`[StartCommand V5] Received text "${text}" from user ${userId} but no active survey found.`);
+      // User sent text without an active survey -> redirect to app or restart
+      if (text !== '/start') {
+         await sendComplexMessage(chatId, "Система в режиме ожидания. Нажми /start, чтобы начать заново, или открой меню.", [], { removeKeyboard: true });
+      }
       return;
     }
 
     const currentQuestion = surveyQuestions.find(q => q.step === currentState.current_step)!;
 
+    // Validation
     if (currentQuestion.answers && !currentQuestion.free_answer) {
       const isValidAnswer = currentQuestion.answers.some(a => a.text === text);
-
       if (!isValidAnswer) {
-        logger.warn(`[StartCommand V5] Invalid answer "${text}" for step ${currentState.current_step}. Resending question.`);
         const buttons = currentQuestion.answers.map(a => ([{ text: a.text }]));
-        await sendComplexMessage(chatId, `Неверный ответ. Пожалуйста, выбери один из вариантов или введи свой ответ.\n\n${currentQuestion.question}`, buttons, { keyboardType: 'reply' });
+        await sendComplexMessage(chatId, `⛔ Некорректный ввод.\nПожалуйста, выбери вариант из меню:\n\n${currentQuestion.question}`, buttons, { keyboardType: 'reply' });
         return;
       }
     }
