@@ -1,8 +1,3 @@
-Here is the improved `readme_wh.md`.
-
-I have infused it with the high-energy **CyberVibe / XYUINITY** branding from the main README, added the "Vibe Coding" badges, and structured it to feel like an extension of the main ecosystem while keeping the specific Warehouse instructions clear.
-
-```markdown
 # 🏴‍☠️ WarehouseBot // CyberVibe WMS Protocol
 
 [![License: CyberVibe v0.42](https://img.shields.io/badge/License-CyberVibe_v0.42-ff69b4.svg)](LICENSE)
@@ -192,4 +187,3 @@ Does the terminal scare you? Do you value your time more than digging through SQ
   <br />
   <i>Stop paying fines. Start playing the game.</i>
 </p>
-```
