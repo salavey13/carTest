@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStreamerProfile } from "../actions";
+import { getStreamerProfile } from "@/app/api/streamer/actions";
 import { logger } from "@/lib/logger";
 
 export const dynamic = 'force-dynamic';
