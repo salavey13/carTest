@@ -3,80 +3,88 @@
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 
-// Получение отзывов (Public)
-export async function getApprovedTestimonials() {
+// === REFERRAL LOGIC ===
+
+export async function getMyReferralCode(userId: string) {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('testimonials')
-      .select('*')
-      .eq('is_approved', true)
-      .order('created_at', { ascending: false });
+    // 1. Получаем юзера
+    const { data: user, error } = await supabaseAdmin
+      .from('users')
+      .select('username, user_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !user) throw new Error("User not found");
+
+    // 2. Код — это Username (если есть) или ID
+    // Мы приводим к верхнему регистру для стиля, но искать будем case-insensitive
+    const code = user.username ? user.username.toUpperCase() : `ID${user.user_id}`;
     
-    if (error) throw error;
-    return { success: true, data };
+    return { success: true, code };
   } catch (error) {
-    logger.error("[Landing] Error fetching testimonials:", error);
-    return { success: false, data: [] };
+    logger.error("[Referral] Error fetching code:", error);
+    return { success: false, code: "ERROR" };
   }
 }
 
-// Генерация "Личного Бренда" (Рефералки)
-export async function getOrGenerateReferralCode(userId: string) {
+export async function applyReferralCode(userId: string, referralCode: string) {
+  // Защита от само-реферальства
+  if (!referralCode || referralCode.includes(userId)) return { success: false };
+
   try {
-    // 1. Получаем данные юзера, чтобы узнать username
-    const { data: user, error: userError } = await supabaseAdmin
+    // 1. Проверяем, не установлен ли уже реферер
+    const { data: me } = await supabaseAdmin
         .from('users')
-        .select('username')
+        .select('metadata')
         .eq('user_id', userId)
         .single();
-
-    if (userError) throw userError;
-
-    // 2. Определяем желаемый код: Username (без @) или ID
-    let desiredCode = user?.username 
-        ? user.username.toUpperCase() 
-        : `ID${userId}`;
-
-    // 3. Проверяем, есть ли уже код у этого юзера
-    const { data: existing } = await supabaseAdmin
-      .from("referral_codes")
-      .select("code")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .single();
-
-    if (existing) {
-        // Если код уже есть, и он отличается от username (например, юзер сменил ник),
-        // в идеале можно обновить, но для стабильности пока вернем старый, 
-        // либо можно сделать логику обновления.
-        // Пока вернем существующий, чтобы ссылки не ломались.
-        return { success: true, code: existing.code };
+    
+    if (me?.metadata?.referrer) {
+        return { success: false, error: "Referrer already set" };
     }
 
-    // 4. Пытаемся создать новый
-    // Проверка на коллизии (вдруг кто-то занял такой же код, маловероятно для username, но все же)
-    const { data: collision } = await supabaseAdmin
-        .from("referral_codes")
-        .select("id")
-        .eq("code", desiredCode)
-        .single();
-
-    if (collision) {
-        // Если коллизия (редкость), добавляем суффикс
-        desiredCode = `${desiredCode}_${Math.floor(Math.random() * 999)}`;
+    // 2. Ищем реферера (по username или ID)
+    // Сначала пробуем как ID
+    let referrerId = null;
+    if (referralCode.startsWith("ID")) {
+        referrerId = referralCode.replace("ID", "");
+    } else {
+        // Ищем по username (case insensitive)
+        const { data: refUser } = await supabaseAdmin
+            .from('users')
+            .select('user_id')
+            .ilike('username', referralCode) // Case insensitive match
+            .maybeSingle();
+        if (refUser) referrerId = refUser.user_id;
     }
 
-    await supabaseAdmin.from("referral_codes").insert({
-      user_id: userId,
-      code: desiredCode,
-      is_active: true,
-      // Можно добавить metadata: { source: 'username_strategy' }
-    });
+    if (!referrerId || referrerId === userId) return { success: false, error: "Invalid referrer" };
 
-    return { success: true, code: desiredCode };
-  } catch (error) {
-    logger.error("[Landing] Error managing referral code:", error);
-    // Fallback на ID в случае ошибки
-    return { success: true, code: `ID${userId}` };
+    // 3. Записываем связь в metadata
+    const newMeta = { ...me?.metadata, referrer: referrerId, referrer_code: referralCode, referred_at: new Date().toISOString() };
+    
+    await supabaseAdmin
+        .from('users')
+        .update({ metadata: newMeta })
+        .eq('user_id', userId);
+
+    logger.info(`[Referral] User ${userId} linked to referrer ${referrerId} (${referralCode})`);
+    return { success: true, referrerId };
+
+  } catch (e) {
+    logger.error("[Referral] Apply failed", e);
+    return { success: false };
   }
+}
+
+// === CONTENT LOGIC ===
+
+export async function getApprovedTestimonials() {
+  const { data } = await supabaseAdmin
+    .from('testimonials')
+    .select('*')
+    .eq('is_approved', true)
+    .order('created_at', { ascending: false })
+    .limit(6);
+  return { success: true, data: data || [] };
 }
