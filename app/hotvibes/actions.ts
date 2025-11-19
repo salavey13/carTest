@@ -2,13 +2,10 @@
 
 import { supabaseAdmin } from '@/hooks/supabase'; 
 import { sendTelegramMessage, sendTelegramInvoice as tgSendInvoice } from '@/app/actions'; 
-// FIXED: Importing from the new server-only actions file.
-import { spendKiloVibes, addKiloVibes } from '@/app/cyberfitness/actions';
+import { spendKiloVibes, addKiloVibes } from '@/app/cyberfitness/actions'; // This import now works
 import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types";
 import { getBaseUrl } from '@/lib/utils';
-
-type User = Database["public"]["Tables"]["users"]["Row"];
 
 export interface ProtoCardDetails {
   cardId: string; 
@@ -98,7 +95,6 @@ export async function purchaseProtoCardAction(
       return { success: false, error: "У вас уже есть доступ к этой возможности.", purchaseMethod: 'ALREADY_OWNED' };
   }
 
-  // --- KV Payment Logic ---
   const attemptKvPayment = (paymentMethodHint === 'KV' || !paymentMethodHint) && cardDetails.amountKV && cardDetails.amountKV > 0;
   if (attemptKvPayment) {
     logger.info(`[purchaseProtoCardAction] Attempting KV payment for card ${cardDetails.cardId} (${cardDetails.amountKV} KV).`);
@@ -117,7 +113,6 @@ export async function purchaseProtoCardAction(
       return { success: true, purchaseMethod: 'KV' };
 
     } else if (paymentMethodHint === 'KV') {
-        // If user explicitly chose KV and it failed, do NOT fall back to XTR. Return the error directly.
         logger.warn(`[purchaseProtoCardAction] KV purchase failed for user ${userId} with explicit 'KV' hint. Error: ${spendResult.error}`);
         return { success: false, error: spendResult.error, purchaseMethod: 'INSUFFICIENT_FUNDS' };
     } else if (spendResult.error && spendResult.error.includes("Insufficient")) {
@@ -128,8 +123,7 @@ export async function purchaseProtoCardAction(
     }
   }
 
-  // --- XTR Payment Logic ---
-  const attemptXtrPayment = paymentMethodHint === 'XTR' || !paymentMethodHint; // Attempt if hint is XTR, or if it's a fallback
+  const attemptXtrPayment = paymentMethodHint === 'XTR' || !paymentMethodHint; 
   if(attemptXtrPayment) {
       if (!cardDetails.amountXTR || cardDetails.amountXTR <= 0) {
         logger.warn(`[purchaseProtoCardAction] No XTR price, and KV purchase failed or was skipped. Aborting.`);
@@ -181,7 +175,6 @@ export async function purchaseProtoCardAction(
       }
   }
   
-  // This should only be reached if no payment path was taken, which indicates a logic error.
   logger.error(`[purchaseProtoCardAction] Reached end of function without a payment path for card ${cardDetails.cardId}`);
   return { success: false, error: "Не удалось определить метод оплаты." };
 }

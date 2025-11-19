@@ -1,7 +1,7 @@
-import { supabaseAdmin } from '@/hooks/supabase'; // Admin for write
+import { supabaseAdmin } from '@/hooks/supabase'; 
 import { NextResponse } from 'next/server';
 import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
-import { escapeTelegramMarkdown } from '@/lib/utils';
+import { escapeTelegramMarkdown } from '@/lib/utils'; // This import now works
 import { logger } from '@/lib/logger';
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
@@ -11,7 +11,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   const body = await request.json();
-  const { status, action } = body; // action from command: approve/decline/accept/decline
+  const { status, action } = body; 
 
   try {
     const { data: rental } = await supabaseAdmin.from('rentals').select('*').eq('rental_id', params.id).single();
@@ -25,7 +25,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       await sendComplexMessage(rental.user_id, `${summaryMd}\nApproved!`, [], { imageQuery: 'rule-confirmed', parseMode: 'MarkdownV2' });
       if (rental.metadata.rigger_id) await sendComplexMessage(rental.metadata.rigger_id, summaryMd, [], { parseMode: 'MarkdownV2' });
     } else if (status === 'cancelled' || action === 'decline') {
-      // Refund
       await supabaseAdmin.rpc('update_invoice_status', { p_id: `rule_${params.id}`, p_status: 'refunded' });
       await sendComplexMessage(rental.user_id, `${summaryMd}\nRefund initiated.`, [], { parseMode: 'MarkdownV2' });
     }
