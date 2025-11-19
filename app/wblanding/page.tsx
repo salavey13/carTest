@@ -1,14 +1,20 @@
 "use client";
+
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { useAppContext } from "@/contexts/AppContext";
 import { sendServiceInvoice, notifyAdmin } from "@/app/actions";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Loader2, ShieldCheck, Server, Lock, Zap, Clock, Users, Smartphone, BarChart3, Database, Ban, Skull, Fingerprint, Key } from 'lucide-react';
+import { 
+  Loader2, ShieldCheck, Server, Lock, Zap, Clock, Users, 
+  Smartphone, BarChart3, Database, Ban, Skull, Fingerprint, 
+  Key, Anchor, ArrowRight 
+} from 'lucide-react';
 
-// Imported Components
+// --- Components ---
 import { FixedHeader } from "./components/FixedHeader";
 import { HeroSection } from "./components/HeroSection";
 import { WarehouseMigrator } from "./components/WarehouseMigrator";
@@ -17,6 +23,8 @@ import { CrewCreationForm } from "./components/CrewCreationForm";
 import { ReferralPirateCard } from "./components/ReferralPirateCard";
 import { WbFooter } from "./components/WbFooter";
 import { ExitIntentPopup } from "./components/ExitIntentPopup";
+
+// --- Actions ---
 import { getApprovedTestimonials } from "./actions_view";
 
 interface Testimonial {
@@ -33,6 +41,7 @@ export default function WarehouseLandingPage() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const auditRef = useRef<HTMLDivElement>(null);
 
+  // Load Social Proof
   useEffect(() => {
     getApprovedTestimonials().then(res => {
        if(res.success && res.data) setTestimonials(res.data as any);
@@ -71,10 +80,10 @@ export default function WarehouseLandingPage() {
     <div className="min-h-screen bg-black text-gray-100 font-sans overflow-x-hidden">
       <FixedHeader />
       
-      {/* HERO (Extracted) */}
+      {/* 1. HERO SECTION (Video + Hook) */}
       <HeroSection onAuditClick={() => { setShowAudit(true); scrollToAudit(); }} />
 
-      {/* SECURITY */}
+      {/* 2. SECURITY & TRUST (Anti-Fear) */}
       <section className="py-16 bg-zinc-900/80 border-y border-white/5 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4">
             <div className="flex flex-col md:flex-row items-center gap-8 mb-8">
@@ -106,7 +115,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* MIGRATOR */}
+      {/* 3. CSV MIGRATOR (The "Hook") */}
       <section id="migrator" className="py-20 bg-black relative border-b border-white/5">
           <div className="max-w-4xl mx-auto px-4">
               <div className="text-center mb-12">
@@ -117,7 +126,7 @@ export default function WarehouseLandingPage() {
           </div>
       </section>
 
-      {/* FEATURES */}
+      {/* 4. FEATURES (The Value) */}
       <section id="features" className="py-20 bg-zinc-900">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-white font-orbitron">АРСЕНАЛ БУНТАРЯ</h2>
@@ -141,7 +150,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* PAIN POINTS */}
+      {/* 5. PAIN POINTS (The Enemy) */}
       <section className="py-20 bg-black border-y border-white/10">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl md:text-5xl font-bold text-center mb-16 text-white font-orbitron">ПОЧЕМУ ОНИ ВАС БЕСЯТ</h2>
@@ -165,11 +174,12 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* PRICING */}
+      {/* 6. PRICING (The Offer) */}
       <section id="pricing" className="py-20 bg-zinc-900">
         <div className="max-w-6xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 text-white font-orbitron">ТАРИФЫ</h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* FREE */}
             <div className="bg-black border border-gray-700 rounded-2xl p-8 hover:border-white transition-all">
                 <h3 className="text-2xl font-bold text-white mb-2">ПАРТИЗАН</h3>
                 <div className="text-4xl font-bold text-white mb-4">0 ₽</div>
@@ -180,6 +190,7 @@ export default function WarehouseLandingPage() {
                 </ul>
                 <Button onClick={() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }} className="w-full bg-gray-800">НАЧАТЬ</Button>
             </div>
+            {/* PRO */}
             <div className="bg-black border-2 border-brand-cyan rounded-2xl p-8 relative shadow-[0_0_30px_rgba(0,255,255,0.15)]">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-brand-cyan text-black px-4 py-1 rounded-full text-xs font-bold">TOP</div>
                 <h3 className="text-2xl font-bold text-brand-cyan mb-2">КАПИТАН</h3>
@@ -191,6 +202,7 @@ export default function WarehouseLandingPage() {
                 </ul>
                 <Button className="w-full bg-brand-cyan hover:bg-brand-cyan/80 text-black font-bold">В ЛИСТ ОЖИДАНИЯ</Button>
             </div>
+            {/* ENTERPRISE */}
             <div className="bg-black border border-purple-500/50 rounded-2xl p-8">
                 <h3 className="text-2xl font-bold text-purple-400 mb-2">ИМПЕРИЯ</h3>
                 <div className="text-xl font-bold text-white mb-4">Индив.</div>
@@ -205,7 +217,7 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* SERVICES (Paid) */}
+      {/* 7. SERVICES (Upsell) */}
       <section className="py-16 bg-black">
          <div className="max-w-4xl mx-auto px-4 text-center">
             <h3 className="text-2xl font-bold text-gray-200 mb-8">Нужна помощь? (One-Time)</h3>
@@ -228,23 +240,35 @@ export default function WarehouseLandingPage() {
          </div>
       </section>
       
-      {/* REFERRAL SYSTEM (Genius Move) */}
-      <section className="py-16 bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-y border-indigo-500/20">
+      {/* 8. REFERRAL SYSTEM (The Virus) */}
+      <section className="py-20 bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-y border-indigo-500/20">
          <div className="max-w-3xl mx-auto px-4 text-center">
-            <h2 className="text-3xl font-bold text-white mb-6 font-orbitron">ВЗЛАМЫВАЕМ СИСТЕМУ ВМЕСТЕ</h2>
-            <p className="text-gray-400 mb-8">Не тратьте деньги. Приглашайте коллег.</p>
+            <div className="flex items-center justify-center gap-3 mb-6">
+               <Anchor className="w-8 h-8 text-indigo-400" />
+               <h2 className="text-3xl md:text-4xl font-bold text-white font-orbitron">СИНДИКАТ (Referral)</h2>
+            </div>
+            <p className="text-gray-400 mb-8 text-lg">
+               Не плати за софт. Пусть за него платят другие. 
+               <br/>Получи <span className="text-white font-bold">личный промокод (твой ник)</span> и зарабатывай на каждом приглашенном.
+            </p>
             <ReferralPirateCard />
+            
+            <div className="mt-8">
+               <Link href="/wblanding/referral" className="inline-flex items-center text-indigo-400 hover:text-indigo-300 hover:underline font-mono">
+                  Читать манифест синдиката <ArrowRight className="ml-2 w-4 h-4" />
+               </Link>
+            </div>
          </div>
       </section>
 
-      {/* AUDIT TOOL */}
+      {/* 9. AUDIT TOOL (The Lead Magnet) */}
       {showAudit && (
         <section id="audit-tool" className="py-16 px-4 bg-white/5 backdrop-blur-sm" ref={auditRef}>
           <WarehouseAuditTool />
         </section>
       )}
 
-      {/* TESTIMONIALS */}
+      {/* 10. TESTIMONIALS (Social Proof) */}
       <section className="py-20 bg-zinc-900">
         <div className="max-w-6xl mx-auto px-4">
             <h2 className="text-3xl font-bold text-center mb-12 text-white font-orbitron">ЭФИР (ОТЗЫВЫ)</h2>
@@ -266,26 +290,30 @@ export default function WarehouseLandingPage() {
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* 11. FAQ */}
       <section className="py-20 bg-black">
           <div className="max-w-3xl mx-auto px-4">
             <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">FAQ</h2>
             <Accordion type="single" collapsible className="w-full space-y-2">
                 <AccordionItem value="item-1" className="border-b border-gray-800">
                     <AccordionTrigger className="text-gray-200 hover:text-brand-cyan text-left">Где подвох (бесплатно)?</AccordionTrigger>
-                    <AccordionContent className="text-gray-400">Нет подвоха. Мы зарабатываем на сложных внедрениях. База — бесплатно.</AccordionContent>
+                    <AccordionContent className="text-gray-400">Нет подвоха. Мы зарабатываем на сложных внедрениях и Enterprise. База — бесплатно.</AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-2" className="border-b border-gray-800">
                     <AccordionTrigger className="text-gray-200 hover:text-brand-cyan text-left">Безопасно ли?</AccordionTrigger>
                     <AccordionContent className="text-gray-400">Да. CSV парсится в RAM. API ключи в ENV.</AccordionContent>
                 </AccordionItem>
+                <AccordionItem value="item-3" className="border-b border-gray-800">
+                    <AccordionTrigger className="text-gray-200 hover:text-brand-cyan text-left">Как работает рефералка?</AccordionTrigger>
+                    <AccordionContent className="text-gray-400">Ты даешь другу код. Он получает скидку 1000р. Ты получаешь 2000р (20% от чека) при его оплате настройки.</AccordionContent>
+                </AccordionItem>
             </Accordion>
           </div>
       </section>
 
-      {/* CREW CREATION (CTA) */}
+      {/* 12. CREW CREATION (Final CTA) */}
       <section className="py-24 bg-zinc-900 text-center border-t border-gray-800">
-          <h2 className="text-3xl md:text-5xl font-bold text-white mb-8">ТВОЙ СКЛАД ЖДЕТ</h2>
+          <h2 className="text-3xl md:text-5xl font-bold text-white mb-8 font-orbitron">ТВОЙ СКЛАД ЖДЕТ</h2>
           <CrewCreationForm />
       </section>
 
