@@ -1,22 +1,27 @@
 import { NextResponse } from "next/server";
-import { getLeaderboard } from "../actions"; // Updated import path
+import { getStreamerProfile } from "../actions";
 import { logger } from "@/lib/logger";
 
-export const dynamic = 'force-dynamic'; // FIXED: Prevent static generation error
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const streamerId = url.searchParams.get("streamerId");
-    if (!streamerId) return NextResponse.json({ success: false, error: "streamerId required" }, { status: 400 });
+    
+    if (!streamerId) {
+        return NextResponse.json({ success: false, error: "streamerId required" }, { status: 400 });
+    }
 
-    const res = await getLeaderboard({ streamerId, limit: 20 });
+    const res = await getStreamerProfile(streamerId);
+    
     if (!res.success) {
       return NextResponse.json(res, { status: 500 });
     }
+    
     return NextResponse.json({ success: true, data: res.data });
   } catch (e: any) {
-    logger.error("[/api/streamer/leaderboard] error", e);
+    logger.error("[/api/streamer/profile] error", e);
     return NextResponse.json({ success: false, error: e.message || String(e) }, { status: 500 });
   }
 }
