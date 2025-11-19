@@ -9,7 +9,7 @@ import {
   FaRecycle, FaCode, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaFlaskVial, FaInfinity, FaDumbbell,
   FaEye, FaHatWizard, FaPoo, FaKey, FaBolt, FaScroll,
-  FaHandPointer, FaUserSecret, FaGamepad, FaCheckCircle, FaLock, FaUnlock
+  FaHandPointer, FaUserSecret, FaGamepad, FaCircleCheck, FaLock, FaUnlock
 } from "react-icons/fa6";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -248,7 +248,7 @@ const SectionCard = ({
                 )}
                 title={isCompleted ? "Отменить" : "Отметить как выполненное"}
             >
-                <FaCheckCircle className="text-lg" />
+                <FaCircleCheck className="text-lg" />
             </button>
             <FaHandPointer className={cn("text-gray-600 transition-transform duration-300", isOpen && "rotate-180")} />
         </div>
@@ -404,7 +404,7 @@ export default function PPlanPage() {
                         className="bg-green-900/20 border border-green-500/30 p-4 rounded-lg text-center"
                     >
                         <p className="text-green-400 font-bold flex items-center justify-center gap-2">
-                            <FaCheckCircle /> Симуляция завершена. Ты готов к реальности.
+                            <FaCircleCheck /> Симуляция завершена. Ты готов к реальности.
                         </p>
                     </motion.div>
                 )}
