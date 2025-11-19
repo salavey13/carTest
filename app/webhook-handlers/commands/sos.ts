@@ -2,7 +2,8 @@
 
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { sendComplexMessage, KeyboardButton, sendTelegramInvoice } from "@/app/actions";
+import { sendComplexMessage } from '@/app/webhook-handlers/actions/sendComplexMessage';
+import { KeyboardButton, sendTelegramInvoice } from "@/app/actions";
 
 // This function INITIATES the SOS flow by requesting a location
 export async function sosCommand(chatId: number, userId: string) {
