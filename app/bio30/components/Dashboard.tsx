@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getReferralStats } from '../actions';
+import { getReferralStats } from '../actions'; // Now correctly imported
 import { motion } from 'framer-motion';
 
 const Dashboard: React.FC = () => {

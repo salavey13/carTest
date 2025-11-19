@@ -2,7 +2,8 @@
 
 import { logger } from "@/lib/logger";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { sendComplexMessage, KeyboardButton, sendTelegramInvoice } from "../actions/sendComplexMessage";
+import { sendComplexMessage, KeyboardButton } from "../actions/sendComplexMessage"; // This import now works
+import { sendTelegramInvoice } from "@/app/actions"
 import { sosCommand } from './sos';
 import { confirmVehiclePickup, confirmVehicleReturn } from '@/app/rentals/actions';
 
@@ -108,7 +109,6 @@ export async function handleActionChoice(chatId: number, userId: string, choice:
              await sendComplexMessage(chatId, "Неизвестное действие.", [], { removeKeyboard: true });
             break;
     }
-    // For non-branching actions, remove keyboard implicitly if not already done.
     if (actionKey !== "sos" && actionKey !== "cancel") {
         await sendComplexMessage(chatId, "✅ Команда принята.", [], { removeKeyboard: true });
     }
