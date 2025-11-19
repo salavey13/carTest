@@ -306,8 +306,8 @@ export default function WarehouseLandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               { icon: Zap, title: "Синхронизация (позже)", description: "Авто-обновление остатков WB/Ozon/YM (доступно после верификации)." },
-              { icon: Clock, title: "Контроль смен", description: "Фиксация 'кто трогал коробку'. Чекпоинты и тайминг операций." },
-              { icon: Users, title: "Мульти-Крю", description: "Управление несколькими складами. Роли: Оунер, Менеджер, Кладовщик." },
+              { icon: FaClock, title: "Контроль смен", description: "Фиксация 'кто трогал коробку'. Чекпоинты и тайминг операций." },
+              { icon: FaUsers, title: "Мульти-Крю", description: "Управление несколькими складами. Роли: Оунер, Менеджер, Кладовщик." },
               { icon: Smartphone, title: "Telegram Native", description: "Всё в телефоне. Не нужно покупать сканеры или ПК на склад." },
               { icon: BarChart3, title: "Визуализация", description: "Интерактивная карта склада. Видишь, где лежит товар (voxel_id)." },
               { icon: Database, title: "CSV Экспорт", description: "Забирай свои данные в любой момент. Мы не держим их в заложниках." }
@@ -577,6 +577,7 @@ export default function WarehouseLandingPage() {
               </div>
           </div>
       </footer>
+
 
       <ExitIntentPopup />
     </div>
