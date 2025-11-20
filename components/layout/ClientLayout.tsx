@@ -168,7 +168,7 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   "rent-bike": "/rent-bike",
 };
 
-// BIO30 Product mapping
+// BIO30 Product mapping for startapp parameters
 const BIO30_PRODUCT_PATHS: Record<string, string> = {
   'cordyceps': '/bio30/categories/cordyceps-sinensis',
   'spirulina': '/bio30/categories/spirulina-chlorella',
@@ -209,7 +209,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
-    userCrewInfo,
+    userCrewInfo, // Access crew info for smart redirects
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
@@ -226,19 +226,28 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
   useBio30ThemeFix();
 
-  // --- REFERRAL & START PARAMETER HANDLER ---
   useEffect(() => {
     // Bio30 Referral Helper
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
       if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
         try {
-          const result = await setReferrer({ userId: dbUser.user_id, referrerId, referrerCode: paramToProcess });
+          const result = await setReferrer({
+            userId: dbUser.user_id,
+            referrerId,
+            referrerCode: paramToProcess,
+          });
           if (result.success) {
-            logger.info(`[ClientLayout] Bio30 Referral set for user ${dbUser.user_id}`);
+            logger.info(
+              `[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`
+            );
             await refreshDbUser();
+          } else {
+            logger.error(
+              `[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`
+            );
           }
         } catch (error) {
-          logger.error(`[ClientLayout] Error setting Bio30 referrer:`, error);
+          logger.error(`[ClientLayout] Error setting referrer:`, error);
         }
       }
     };
@@ -252,7 +261,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
             logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
             const res = await applyReferralCode(dbUser.user_id, refCode);
             if (res.success) {
-                await refreshDbUser(); // Sync UI with new metadata
+                await refreshDbUser(); 
                 showToast("🎁 Реферальный код принят! Скидка 1000₽ активирована.");
             }
         }
@@ -264,43 +273,45 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
-      const parts = paramToProcess.split("_");
-      const prefix = parts[0];
 
       logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
 
-      // --- 1. UNIVERSAL REFERRAL CATCHER (The "Viral" part) ---
-      if (paramToProcess.startsWith("ref_")) {
-          const refCode = paramToProcess.replace("ref_", "");
-          handleSyndicateReferral(refCode);
-          
-          // If on main page, redirect to WB landing for conversion
-          if (pathname === '/') targetPath = '/wblanding';
-          else targetPath = pathname; // Stay where we are
-      }
+      // ===================== ROUTING & PARSING LOGIC =====================
 
-      // --- 2. ROUTING LOGIC ---
-      
-      // A. Warehouse Dashboard Smart Redirect
-      else if (paramToProcess === "wb_dashboard") {
+      // 1. Specific Prefixes Check
+      if (paramToProcess === "wb_dashboard") {
          if (userCrewInfo?.slug) targetPath = `/wb/${userCrewInfo.slug}`;
          else targetPath = "/wblanding";
       }
-      // B. Standard Map
       else if (START_PARAM_PAGE_MAP[paramToProcess]) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } 
-      // C. Crew Invites
-      else if (prefix === "crew") {
-        if (parts.length === 2) {
-            targetPath = `/wb/${parts[1]}`;
-        } else if (parts.length > 2 && parts[2] === "join") {
-            // crew_slug_join_crew
-            targetPath = `/wb/${parts[1]}?join_crew=true`;
+      else if (paramToProcess.startsWith("crew_")) {
+        // crew_slug OR crew_slug_join_crew
+        const parts = paramToProcess.split("_");
+        // parts[0] = crew
+        // parts[1] = slug (can contain underscores? ideally slugs shouldn't, but let's be safe)
+        
+        // Reconstruct slug if it was split by underscores incorrectly? 
+        // Assuming standard format: crew_{slug}_join_crew OR crew_{slug}
+        // If slug has underscores, this split is tricky. 
+        // Better logic: remove 'crew_' prefix, check if ends with '_join_crew'
+        
+        const content = paramToProcess.substring(5); // remove 'crew_'
+        if (content.endsWith("_join_crew")) {
+             const slug = content.substring(0, content.length - 10); // remove '_join_crew'
+             targetPath = `/wb/${slug}?join_crew=true`;
+        } else {
+             targetPath = `/wb/${content}`;
         }
       }
-      // D. Bio30 Products
-      else if (prefix === "bio30") {
+      else if (paramToProcess.startsWith("viz_")) {
+        const simId = paramToProcess.substring(4);
+        targetPath = `/god-mode-sandbox?simId=${simId}`;
+      }
+      else if (paramToProcess.startsWith("bio30_")) {
+        // bio30 logic...
+        const parts = paramToProcess.split("_");
         let productId: string | undefined;
         let referrerId: string | undefined;
         if (parts.length > 1 && parts[1] !== 'ref') productId = parts[1];
@@ -310,12 +321,31 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         if (referrerId) handleBio30Referral(referrerId, paramToProcess);
         targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
       }
-      // E. Fallback
+      else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
+          // rental_ID
+          const parts = paramToProcess.split("_");
+          if (parts.length === 2) targetPath = `/rentals/${parts[1]}`;
+      }
+      
+      // 2. UNIVERSAL REFERRAL CATCHER (Last check to catch ref_I_O_S_NN)
+      else if (paramToProcess.startsWith("ref_")) {
+          // FIXED: Take everything after 'ref_' as the code.
+          // This handles underscores in usernames correctly (e.g., ref_I_O_S_NN -> I_O_S_NN)
+          const refCode = paramToProcess.substring(4); 
+          
+          handleSyndicateReferral(refCode);
+          
+          // If on main page, redirect to WB landing for conversion
+          if (pathname === '/') targetPath = '/wblanding';
+          else targetPath = pathname; // Stay where we are
+      }
+
+      // 3. Fallback
       else {
         targetPath = `/${paramToProcess}`;
       }
 
-      // --- 3. EXECUTE REDIRECT ---
+      // ===================== EXECUTE REDIRECT =====================
       if (targetPath && targetPath !== pathname) {
         logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
         router.replace(targetPath);
@@ -324,30 +354,63 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       // Clear param to prevent loops
       clearStartParam?.();
     }
-  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, dbUser, userCrewInfo, refreshDbUser, clearStartParam, showToast]);
+  }, [
+    startParamPayload,
+    searchParams,
+    pathname,
+    router,
+    isAppLoading,
+    isAuthenticating,
+    dbUser,
+    userCrewInfo,
+    refreshDbUser,
+    clearStartParam,
+    showToast
+  ]);
 
-  // Bottom Nav Visibility Logic
   const pathsToShowBottomNavForStartsWith = [
-    "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", 
-    "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", 
-    "/rentals", "/vipbikerental"
+    "/selfdev/gamified",
+    "/p-plan",
+    "/profile",
+    "/hotvibes",
+    "/leads",
+    "/elon",
+    "/god-mode-sandbox",
+    "/rent",
+    "/crews",
+    "/leaderboard",
+    "/admin",
+    "/paddock",
+    "/rentals",
+    "/vipbikerental",
+    // "/wb" -- Removed from bottom nav logic to keep it clean/standalone as requested by Pirate aesthetic
   ];
-  // Removed "/wb" from bottom nav to give it standalone app feel
-  const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p)) || pathname === "/";
+  const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
+    pathname?.startsWith(p)
+  ) || pathname === "/";
 
   useEffect(() => {
     setShowHeaderAndFooter(
       !(
-        pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") || pathname === "/wblanding" || pathname === "/wblanding/referral" ||
-        pathname === "/csv-compare" || pathname === "/streamer" || pathname === "/blogger" ||
-        pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"
+        pathname === "/profile" ||
+        pathname === "/repo-xml" ||
+        pathname === "/sauna-rent" ||
+        pathname?.startsWith("/wb") || // Hides standard header/footer for Warehouse pages
+        pathname === "/wblanding" || 
+        pathname === "/wblanding/referral" ||
+        pathname === "/csv-compare" ||
+        pathname === "/streamer" ||
+        pathname === "/blogger" ||
+        pathname?.startsWith("/optimapipe") ||
+        pathname?.startsWith("/rules") ||
+        pathname === "/"
       )
     );
   }, [pathname]);
 
   const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb", "/wblanding"];
-  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some((p) => pathname.startsWith(p)) || theme.isTransparent;
+  const isTransparentPage =
+    TRANSPARENT_LAYOUT_PAGES.some((p) => pathname.startsWith(p)) || theme.isTransparent;
 
   return (
     <>
@@ -356,7 +419,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
-      <Suspense fallback={null}><StickyChatButton /></Suspense>
+      <Suspense fallback={null}>
+        <StickyChatButton />
+      </Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
     </>
   );
