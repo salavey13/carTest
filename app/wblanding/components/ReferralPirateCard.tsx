@@ -27,13 +27,12 @@ export const ReferralPirateCard = () => {
 
   const handleCopy = () => {
     if (!code) return;
-    // Ссылка сразу ведет на startapp с рефкой
-    const link = `https://t.me/oneBikePlsBot/app?startapp=ref_${code}`;
+    // FIX: Correct link
+    const link = `https://t.me/oneBikePlsBot/sklad?startapp=ref_${code}`;
     navigator.clipboard.writeText(link);
     toast.success("Ссылка скопирована! Отправляй в чат селлеров.");
   };
 
-  // Math for motivation (20% from 10k service = 2000 RUB)
   const rewardPerFriend = 2000;
   const potentialEarnings = friendsCount * rewardPerFriend;
 
@@ -58,7 +57,6 @@ export const ReferralPirateCard = () => {
         viewport={{ once: true }}
     >
         <Card className="bg-black border border-indigo-500/50 shadow-[0_0_50px_rgba(79,70,229,0.15)] relative overflow-hidden group">
-            {/* Decorative background elements */}
             <div className="absolute -top-32 -right-32 w-64 h-64 bg-indigo-600/20 rounded-full blur-[100px] transition-all group-hover:bg-indigo-600/30"></div>
             
             <CardHeader className="relative z-10 border-b border-white/5 pb-6">
@@ -76,7 +74,6 @@ export const ReferralPirateCard = () => {
             
             <CardContent className="space-y-8 pt-8 relative z-10">
                 
-                {/* Value Prop Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
                         <p className="text-gray-300 font-bold text-sm uppercase tracking-wide text-neon-lime">Твоя добыча (20%)</p>
@@ -94,7 +91,6 @@ export const ReferralPirateCard = () => {
                     </div>
                 </div>
 
-                {/* The Code Box */}
                 <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-6 shadow-inner relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-purple-500"></div>
                     
@@ -113,7 +109,6 @@ export const ReferralPirateCard = () => {
                     </Button>
                 </div>
 
-                {/* Greed Calculator */}
                 <div className="space-y-4 pt-4">
                      <div className="flex justify-between items-end">
                         <span className="text-xs font-mono text-gray-500 uppercase">Калькулятор профита</span>
@@ -145,7 +140,6 @@ export const ReferralPirateCard = () => {
                         </div>
                     )}
                 </div>
-
             </CardContent>
         </Card>
     </motion.div>

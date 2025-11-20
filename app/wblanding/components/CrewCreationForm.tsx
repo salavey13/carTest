@@ -18,7 +18,7 @@ const generateSlug = (name: string) =>
   name.toLowerCase().trim().replace(/[\s_]+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+|-+$/g, '');
 
 export const CrewCreationForm = () => {
-  const { dbUser, userCrewInfo, refreshDbUser } = useAppContext(); // Using global context for state
+  const { dbUser, userCrewInfo, refreshDbUser } = useAppContext();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -26,7 +26,6 @@ export const CrewCreationForm = () => {
   const [hqLocation, setHqLocation] = useState("56.3269,44.0059");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auto-generate slug
   useEffect(() => { setSlug(generateSlug(name)); }, [name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,7 +41,7 @@ export const CrewCreationForm = () => {
       
       if (result.success && result.data) {
         toast.success(`Штаб "${result.data.name}" развернут!`);
-        await refreshDbUser(); // Update context to reflect new crew
+        await refreshDbUser(); 
         await notifyAdmin(`🎉 New Crew: ${result.data.name} by ${dbUser.username}`);
         await sendComplexMessage(dbUser.user_id, `🎉 Склад "${result.data.name}" готов.`, []);
       } else { throw new Error(result.error || "Error creating crew"); }
@@ -53,6 +52,7 @@ export const CrewCreationForm = () => {
 
   const handleInvite = () => {
     if (!userCrewInfo) return;
+    // FIX: Correct link
     const inviteUrl = `https://t.me/oneBikePlsBot/sklad?startapp=crew_${userCrewInfo.slug}_join_crew`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=Вступай в команду склада ${userCrewInfo.name}!`;
     window.open(shareUrl, "_blank");
@@ -83,12 +83,15 @@ export const CrewCreationForm = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                 {userCrewInfo.is_owner && (
-                    <Button onClick={handleInvite} className="w-full bg-brand-cyan text-black font-bold h-12 text-base hover:bg-brand-cyan/90 shadow-lg shadow-cyan-500/20">
+                    <Button 
+                        onClick={handleInvite} 
+                        className="w-full bg-brand-cyan text-black font-black h-12 text-base hover:bg-brand-cyan/90 shadow-lg shadow-cyan-500/20 transition-transform hover:scale-105"
+                    >
                         <FaUserPlus className="mr-2"/> ПРИГЛАСИТЬ БАНДУ
                     </Button>
                 )}
                 <Link href={`/wb/${userCrewInfo.slug}`} className={userCrewInfo.is_owner ? "" : "col-span-2"}>
-                    <Button variant="outline" className="w-full border-zinc-600 text-purple-400 hover:bg-white hover:text-black h-12 text-base">
+                    <Button variant="outline" className="w-full border-zinc-600 text-white hover:bg-white hover:text-black h-12 text-base font-bold">
                         ВОЙТИ В ШТАБ <ArrowRight className="ml-2 w-4 h-4" />
                     </Button>
                 </Link>
@@ -110,28 +113,33 @@ export const CrewCreationForm = () => {
         <div className="text-center mb-8">
             <FaUsers className="w-12 h-12 text-neon-lime mx-auto mb-4" />
             <h3 className="text-2xl font-bold text-white font-orbitron">РАЗВЕРНУТЬ БАЗУ</h3>
-            <p className="text-gray-400 text-sm">Создай своё пространство. Пригласи команду. Начни игру.</p>
+            <p className="text-gray-400 text-sm">Бесплатно. Без СМС. 30 секунд.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label className="text-gray-400 text-xs font-mono">НАЗВАНИЕ</Label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Black Star Warehouse" className="bg-black border-zinc-700 text-white" required />
+                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Main Warehouse" className="bg-black border-zinc-700 text-white focus:border-neon-lime transition-colors" required />
                 </div>
                 <div>
                     <Label className="text-gray-400 text-xs font-mono">SLUG (URL)</Label>
-                    <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="black-star" className="bg-black border-zinc-700 text-white" required />
+                    <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="main-wh" className="bg-black border-zinc-700 text-white focus:border-neon-lime transition-colors" required />
                 </div>
             </div>
             
             <div>
                 <Label className="text-gray-400 text-xs font-mono">ОПИСАНИЕ</Label>
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Главный распределительный центр..." className="bg-black border-zinc-700 text-white" />
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Главный склад на Южной..." className="bg-black border-zinc-700 text-white focus:border-neon-lime transition-colors" />
             </div>
 
-            <Button type="submit" disabled={isSubmitting} className="w-full bg-neon-lime hover:bg-neon-lime/80 text-black font-bold py-4 text-lg rounded-xl shadow-[0_0_15px_rgba(100,255,100,0.3)] transition-all">
-                {isSubmitting ? <Loader2 className="animate-spin" /> : <span className="flex items-center gap-2"><FaFlagCheckered /> СОЗДАТЬ ЭКИПАЖ</span>}
+            {/* FIX: Black Text on Neon Lime for max readability */}
+            <Button 
+                type="submit" 
+                disabled={isSubmitting} 
+                className="w-full bg-neon-lime hover:bg-neon-lime/90 text-black font-black py-6 text-lg rounded-xl shadow-[0_0_20px_rgba(100,255,100,0.4)] transition-all hover:scale-[1.02] active:scale-95"
+            >
+                {isSubmitting ? <Loader2 className="animate-spin" /> : <span className="flex items-center gap-2"><FaFlagCheckered /> СФОРМИРОВАТЬ ЭКИПАЖ</span>}
             </Button>
         </form>
     </motion.div>
