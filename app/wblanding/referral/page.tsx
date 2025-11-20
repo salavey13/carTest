@@ -71,8 +71,8 @@ export default function ReferralPage() {
 
                {/* YOU */}
                <div className="bg-black p-8 rounded-2xl border-2 border-neon-lime relative transform md:-translate-y-4 shadow-2xl shadow-lime-500/10">
-                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-neon-lime text-black px-4 py-1 rounded-full text-xs font-bold">ТЫ (АГЕНТ)</div>
-                   <h3 className="text-neon-lime font-mono text-sm uppercase mb-4">Cashback King</h3>
+                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-white text-black px-4 py-1 rounded-full text-xs font-bold">ТЫ (АГЕНТ)</div>
+                   <h3 className="text-white font-mono text-sm uppercase mb-4">Cashback King</h3>
                    <div className="text-5xl font-black text-white mb-2">+2 000 ₽</div>
                    <p className="text-gray-400 text-sm">Получаешь 20% кэшем. 5 друзей = 10 000 ₽ (Полная окупаемость).</p>
                </div>
@@ -100,7 +100,7 @@ export default function ReferralPage() {
       <section className="py-24 text-center bg-zinc-900 border-t border-zinc-800">
          <h2 className="text-3xl font-bold text-white mb-8">Твоя сеть начинается сегодня</h2>
          <Link href="/wblanding">
-            <Button size="lg" className="bg-white text-black hover:bg-gray-200 px-12 py-8 text-xl rounded-full font-bold shadow-xl">
+            <Button size="lg" className="bg-white text-black hover:bg-gray-200 px-12 py-8 text-l rounded-full font-bold shadow-xl">
                ВЕРНУТЬСЯ И КОПИРОВАТЬ КОД
             </Button>
          </Link>
