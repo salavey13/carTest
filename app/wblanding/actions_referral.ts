@@ -135,3 +135,13 @@ async function creditUserBalance(userId: string, amount: number, historyEntry: a
     })
     .eq('user_id', userId);
 }
+
+// Хелпер для получения цены со скидкой
+export async function getDiscountedPrice(userId: string, basePrice: number) {
+  const { data } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
+  const hasReferrer = !!data?.metadata?.referrer;
+return {
+    finalPrice: hasReferrer ? Math.max(0, basePrice - BASE_DISCOUNT) : basePrice,
+    discountApplied: hasReferrer ? BASE_DISCOUNT : 0,
+    hasReferrer
+  };
