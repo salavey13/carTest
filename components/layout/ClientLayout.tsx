@@ -27,15 +27,16 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
-import Image from "next/image";
 import { Loading } from "@/components/Loading";
-import { cn } from "/lib/utils";
+import { cn } from "@/lib/utils";
 
 // Bio30 specific components
 import Bio30Header from "@/app/bio30/components/Header";
 import Bio30Footer from "@/app/bio30/components/Footer";
-import { setReferrer } from "@/app/bio30/ref_actions"; // Import new referral function
-import { generateReferralCode } from "@/app/bio30/ref_actions"; // For new users
+import { setReferrer } from "@/app/bio30/ref_actions"; 
+
+// WB Syndicate Actions
+import { applyReferralCode } from "@/app/wblanding/actions_view";
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
@@ -113,9 +114,6 @@ function AppInitializers() {
         );
         newAchievements?.forEach((ach) => {
           addToast(`🏆 Ачивка: ${ach.name}!`, { description: ach.description });
-          logger.info(
-            `[ClientLayout ScrollAch] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`
-          );
         });
       } catch (error) {
         logger.error("[ClientLayout] Error unlocking achievement:", error);
@@ -140,6 +138,7 @@ function AppInitializers() {
 }
 
 const START_PARAM_PAGE_MAP: Record<string, string> = {
+  // Legacy / Standard
   elon: "/elon",
   musk_market: "/elon",
   arbitrage_seeker: "/elon",
@@ -149,10 +148,27 @@ const START_PARAM_PAGE_MAP: Record<string, string> = {
   sauna: "/sauna-rent",
   streamer: "/streamer",
   demo: "/about_en",
-  wb: "/wb",
+  
+  // Warehouse / Pirate Code Ops
+  wb: "/wblanding", 
+  wb_dashboard: "/wblanding",
+  "audit-tool": "/wblanding",
+  "create_crew": "/wblanding",
+  reports: "/wblanding",
+  crews: "/crews", 
+  
+  // Developer / CyberDev Ops
+  "repo-xml": "/repo-xml",
+  "style-guide": "/style-guide",
+  "start-training": "/selfdev/gamified",
+  
+  // Racing / Legacy
+  paddock: "/paddock",
+  leaderboard: "/leaderboard",
+  "rent-bike": "/rent-bike",
 };
 
-// BIO30 Product mapping for startapp parameters
+// BIO30 Product mapping
 const BIO30_PRODUCT_PATHS: Record<string, string> = {
   'cordyceps': '/bio30/categories/cordyceps-sinensis',
   'spirulina': '/bio30/categories/spirulina-chlorella',
@@ -186,60 +202,6 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
-function useBio30ExternalCSS() {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!pathname.startsWith("/bio30")) return;
-
-    const BASE = "https://bio30.ru/front/static/css/";
-    const VERSION = "?v=05.07.2025-1";
-    const files = [
-      "grid.css",
-      "style__dark.css",
-      "cards.css",
-      "global.css",
-      "icons.css",
-      "help.css",
-      "fonts.css",
-      "hero.css",
-      "story.css",
-      "glass.css",
-      "header.css",
-      "welcome.css",
-      "categories.css",
-      "cart.css",
-      "footer.css",
-      "faq.css",
-      "cards__cart.css",
-      "grid__cards.css",
-      "default.css",
-      "grid__delivery.css",
-      "grid__referral_01.css",
-      "grid__referral_02.css",
-      "grid__product.css",
-      "grid__product2.css",
-      "grid__categories.css",
-      "comment.css",
-      "fluids.css",
-    ];
-
-    const links: HTMLLinkElement[] = [];
-    files.forEach((f) => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = `${BASE}${f}${VERSION}`;
-      link.dataset.source = "bio30-external";
-      document.head.appendChild(link);
-      links.push(link);
-    });
-
-    return () => {
-      links.forEach((l) => l.remove());
-    };
-  }, [pathname]);
-}
-
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -247,6 +209,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
+    userCrewInfo,
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
@@ -254,189 +217,137 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   } = useAppContext();
   const [showHeaderAndFooter, setShowHeaderAndFooter] = useState(true);
   const startParamHandledRef = useRef(false);
+  const { success: showToast } = useAppToast();
 
   const theme = getThemeForPath(pathname);
   const CurrentHeader = theme.Header;
   const CurrentFooter = theme.Footer;
   const CurrentBottomNav = theme.BottomNav;
 
-  // load bio30 CSS when on bio30 paths
-  // useBio30ExternalCSS();
-  // apply theme fix (colors) when on bio30
   useBio30ThemeFix();
 
+  // --- REFERRAL & START PARAMETER HANDLER ---
   useEffect(() => {
+    // Bio30 Referral Helper
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
       if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
         try {
-          const result = await setReferrer({
-            userId: dbUser.user_id,
-            referrerId,
-            referrerCode: paramToProcess,
-          });
+          const result = await setReferrer({ userId: dbUser.user_id, referrerId, referrerCode: paramToProcess });
           if (result.success) {
-            logger.info(
-              `[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`
-            );
+            logger.info(`[ClientLayout] Bio30 Referral set for user ${dbUser.user_id}`);
             await refreshDbUser();
-          } else {
-            logger.error(
-              `[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`
-            );
           }
         } catch (error) {
-          logger.error(`[ClientLayout] Error setting referrer:`, error);
+          logger.error(`[ClientLayout] Error setting Bio30 referrer:`, error);
         }
       }
     };
 
+    // WB Syndicate Referral Helper
+    const handleSyndicateReferral = async (refCode: string) => {
+        if (!dbUser?.user_id) return;
+        
+        // Only apply if no referrer exists (First Touch Attribution)
+        if (!dbUser.metadata?.referrer) {
+            logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
+            const res = await applyReferralCode(dbUser.user_id, refCode);
+            if (res.success) {
+                await refreshDbUser(); // Sync UI with new metadata
+                showToast("🎁 Реферальный код принят! Скидка 1000₽ активирована.");
+            }
+        }
+    };
+
     const paramToProcess = startParamPayload || searchParams.get("tgWebAppStartParam");
+    
+    // Process logic only when auth is done
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
-
       const parts = paramToProcess.split("_");
       const prefix = parts[0];
 
-      if (START_PARAM_PAGE_MAP[paramToProcess]) {
-        targetPath = START_PARAM_PAGE_MAP[paramToProcess];
-      } else if (prefix === "rental" || prefix === "rentals") {
-        if (parts.length === 2) {
-          const rentalId = parts[1];
-          targetPath = `/rentals/${rentalId}`;
-        } else if (parts.length > 2) {
-          const action = parts[1];
-          const rentalId = parts.slice(2).join("_");
-          targetPath = `/rentals/${rentalId}?action=${action}`;
-        }
-      } else if (prefix === "crew" && parts.length > 2) {
-        const actionIndex = parts.findIndex((p) => p === "join" || p === "confirm");
-        if (actionIndex > 1) {
-          const slug = parts.slice(1, actionIndex).join("-");
-          const action = parts[actionIndex];
-          const actionVerb = parts[actionIndex + 1];
+      logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
 
-          if (action === "join" && actionVerb === "crew") {
-            targetPath = `/crews/${slug}?join_crew=true`;
-          } else if (
-            action === "confirm" &&
-            actionVerb === "member" &&
-            parts.length > actionIndex + 2
-          ) {
-            const id = parts.slice(actionIndex + 2).join("_");
-            targetPath = `/crews/${slug}?confirm_member=${id}`;
-          }
+      // --- 1. UNIVERSAL REFERRAL CATCHER (The "Viral" part) ---
+      if (paramToProcess.startsWith("ref_")) {
+          const refCode = paramToProcess.replace("ref_", "");
+          handleSyndicateReferral(refCode);
+          
+          // If on main page, redirect to WB landing for conversion
+          if (pathname === '/') targetPath = '/wblanding';
+          else targetPath = pathname; // Stay where we are
+      }
+
+      // --- 2. ROUTING LOGIC ---
+      
+      // A. Warehouse Dashboard Smart Redirect
+      else if (paramToProcess === "wb_dashboard") {
+         if (userCrewInfo?.slug) targetPath = `/wb/${userCrewInfo.slug}`;
+         else targetPath = "/wblanding";
+      }
+      // B. Standard Map
+      else if (START_PARAM_PAGE_MAP[paramToProcess]) {
+        targetPath = START_PARAM_PAGE_MAP[paramToProcess];
+      } 
+      // C. Crew Invites
+      else if (prefix === "crew") {
+        if (parts.length === 2) {
+            targetPath = `/wb/${parts[1]}`;
+        } else if (parts.length > 2 && parts[2] === "join") {
+            // crew_slug_join_crew
+            targetPath = `/wb/${parts[1]}?join_crew=true`;
         }
-      } else if (paramToProcess.startsWith("viz_")) {
-        const simId = paramToProcess.substring(4);
-        targetPath = `/god-mode-sandbox?simId=${simId}`;
-      } else if (prefix === "bio30") {
-        // Handle BIO30 startapp parameters
-        // Format: bio30_<product-id>_ref_<referrer_id> or bio30_ref_<referrer_id> or bio30_<product-id>
+      }
+      // D. Bio30 Products
+      else if (prefix === "bio30") {
         let productId: string | undefined;
         let referrerId: string | undefined;
-        
-        // Check for product ID (second part, unless it's "ref")
-        if (parts.length > 1 && parts[1] !== 'ref') {
-          productId = parts[1];
-        }
-        
-        // Check for referral (look for "ref" followed by referrer ID)
+        if (parts.length > 1 && parts[1] !== 'ref') productId = parts[1];
         const refIndex = parts.indexOf('ref');
-        if (refIndex !== -1 && refIndex + 1 < parts.length) {
-          referrerId = parts[refIndex + 1];
-        }
+        if (refIndex !== -1 && refIndex + 1 < parts.length) referrerId = parts[refIndex + 1];
         
-        // Set up referral if user exists and doesn't have one yet
-        if (referrerId && dbUser?.user_id && !dbUser.metadata?.referrer_id) {
-          handleBio30Referral(referrerId, paramToProcess).catch((error) => {
-            logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
-          });
-        }
-        
-        // Set target path
-        if (productId && BIO30_PRODUCT_PATHS[productId]) {
-          targetPath = BIO30_PRODUCT_PATHS[productId];
-        } else {
-          targetPath = '/bio30';
-        }
-      } else if (
-        paramToProcess.startsWith("ref_") &&
-        parts.length === 2 &&
-        pathname.startsWith("/bio30")
-      ) {
-        // Legacy referral format: ref_<referrer_id>
-        const referrerId = parts[1];
-        handleBio30Referral(referrerId, paramToProcess).catch((error) => {
-          logger.error(`[ClientLayout] Error in bio30 referral processing:`, error);
-        });
-        targetPath = undefined; // Stay on current BIO30 page
-      } else {
+        if (referrerId) handleBio30Referral(referrerId, paramToProcess);
+        targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
+      }
+      // E. Fallback
+      else {
         targetPath = `/${paramToProcess}`;
       }
 
+      // --- 3. EXECUTE REDIRECT ---
       if (targetPath && targetPath !== pathname) {
-        logger.info(
-          `[ClientLayout Logic] startParam '${paramToProcess}' => '${targetPath}'. Redirecting.`
-        );
+        logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
         router.replace(targetPath);
-        clearStartParam?.();
-      } else {
-        clearStartParam?.();
       }
+      
+      // Clear param to prevent loops
+      clearStartParam?.();
     }
-  }, [
-    startParamPayload,
-    searchParams,
-    pathname,
-    router,
-    isAppLoading,
-    isAuthenticating,
-    dbUser,
-    refreshDbUser,
-    clearStartParam,
-  ]);
+  }, [startParamPayload, searchParams, pathname, router, isAppLoading, isAuthenticating, dbUser, userCrewInfo, refreshDbUser, clearStartParam, showToast]);
 
+  // Bottom Nav Visibility Logic
   const pathsToShowBottomNavForStartsWith = [
-    "/selfdev/gamified",
-    "/p-plan",
-    "/profile",
-    "/hotvibes",
-    "/leads",
-    "/elon",
-    "/god-mode-sandbox",
-    "/rent",
-    "/crews",
-    "/leaderboard",
-    "/admin",
-    "/paddock",
-    "/rentals",
-    "/vipbikerental",
+    "/selfdev/gamified", "/p-plan", "/profile", "/hotvibes", "/leads", "/elon", 
+    "/god-mode-sandbox", "/rent", "/crews", "/leaderboard", "/admin", "/paddock", 
+    "/rentals", "/vipbikerental"
   ];
-  const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
-    pathname?.startsWith(p)
-  ) || pathname === "/";
+  // Removed "/wb" from bottom nav to give it standalone app feel
+  const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) => pathname?.startsWith(p)) || pathname === "/";
 
   useEffect(() => {
     setShowHeaderAndFooter(
       !(
-        pathname === "/profile" ||
-        pathname === "/repo-xml" ||
-        pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") ||
-        pathname === "/csv-compare" ||
-        pathname === "/streamer" ||
-        pathname === "/blogger" ||
-        pathname?.startsWith("/optimapipe") ||
-        pathname?.startsWith("/rules") ||
-        pathname === "/"
+        pathname === "/profile" || pathname === "/repo-xml" || pathname === "/sauna-rent" ||
+        pathname?.startsWith("/wb") || pathname === "/wblanding" || pathname === "/wblanding/referral" ||
+        pathname === "/csv-compare" || pathname === "/streamer" || pathname === "/blogger" ||
+        pathname?.startsWith("/optimapipe") || pathname?.startsWith("/rules") || pathname === "/"
       )
     );
   }, [pathname]);
 
-  const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb"];
-  const isTransparentPage =
-    TRANSPARENT_LAYOUT_PAGES.some((p) => pathname.startsWith(p)) || theme.isTransparent;
+  const TRANSPARENT_LAYOUT_PAGES = ["/rentals", "/crews", "/paddock", "/admin", "/leaderboard", "/wb", "/wblanding"];
+  const isTransparentPage = TRANSPARENT_LAYOUT_PAGES.some((p) => pathname.startsWith(p)) || theme.isTransparent;
 
   return (
     <>
@@ -445,9 +356,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
-      <Suspense fallback={null}>
-        <StickyChatButton />
-      </Suspense>
+      <Suspense fallback={null}><StickyChatButton /></Suspense>
       {showHeaderAndFooter && CurrentFooter && <CurrentFooter />}
     </>
   );
@@ -460,7 +369,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         <AppInitializers />
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
-            <Suspense fallback={<Loading variant="bike" text="🕶️" />}>
+            <Suspense fallback={<Loading variant="bike" text="🏴‍☠️ LOADING VIBE..." />}>
               <LayoutLogicController>{children}</LayoutLogicController>
             </Suspense>
           </ErrorBoundaryForOverlay>
@@ -469,13 +378,11 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
             richColors
             toastOptions={{
               style: {
-                background: "rgba(34, 34, 34, 0.9)",
+                background: "rgba(10, 10, 10, 0.95)",
                 color: "#00FF9D",
-                border: "1px solid rgba(0, 255, 157, 0.4)",
-                boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
+                border: "1px solid rgba(0, 255, 157, 0.3)",
                 fontFamily: "monospace",
               },
-              className: "text-sm",
             }}
           />
           <DevErrorOverlay />

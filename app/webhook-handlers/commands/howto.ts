@@ -2,38 +2,36 @@ import { sendComplexMessage } from "../actions/sendComplexMessage";
 import { logger } from "@/lib/logger";
 
 export async function howtoCommand(chatId: number, userId: number) {
-  logger.info(`[HOWTO_V12_COMBO] User ${userId} triggered /howto command.`);
+  logger.info(`[HOWTO_WAREHOUSE] User ${userId} triggered /howto.`);
 
-  const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneSitePlsBot/app";
+  const botUrl = process.env.TELEGRAM_BOT_LINK || "https://t.me/oneBikePlsBot/app";
 
-  const message = `Агент, это не просто платформа. Это **комбо-вомбо**: ты можешь быть **Звездой Трека** или **Архитектором Цифры**. Или и тем, и другим.
+  const message = `📡 **СПРАВОЧНЫЙ ТЕРМИНАЛ**
 
---- 🏆 **ПУТЬ ГОНЩИКА** ---
-Доминируй на улицах, создавай экипажи, впиши свое имя в историю.
+Здесь ты можешь управлять хаосом или строить новый порядок.
 
---- 🛠️ **ПУТЬ АРХИТЕКТОРА** ---
-Создавай такие же приложения, прокачивай VIBE, стань легендой-разработчиком.
+--- 🏭 **ОПЕРАТОР СКЛАДА** ---
+Управляй остатками, сканируй товары, исключай штрафы и следи за KPI сотрудников. Твой склад в твоем кармане.
 
-Выбери свой путь. Или пройди оба.`;
+--- 👨‍💻 **АРХИТЕКТОР VIBE** ---
+Используй инструменты разработки, создавай свои сценарии автоматизации и клонируй лучшие практики.
+
+👇 *Доступные модули:*`;
 
   const buttons = [
-    // Racer's Path
+    // Warehouse Ops
     [
-      { text: "🏍️ Арендовать Байк", url: `${botUrl}?startapp=rent-bike` },
-      { text: "🏆 Таблица Лидеров", url: `${botUrl}?startapp=leaderboard` },
+      { text: "📦 Мой Склад (Dashboard)", url: `${botUrl}?startapp=wb_dashboard` },
+      { text: "⚡ Быстрый Аудит", url: `${botUrl}?startapp=audit-tool` },
     ],
     [
-      { text: "👥 Мои Экипажи", url: `${botUrl}?startapp=crews` },
-      { text: "⛽ Мой Гараж", url: `${botUrl}?startapp=paddock` },
+      { text: "👥 Управление Командой", url: `${botUrl}?startapp=crews` },
+      { text: "📊 Отчеты и CSV", url: `${botUrl}?startapp=reports` },
     ],
-    // Architect's Path
+    // Dev Ops
     [
-      { text: "📱 VIBE Studio (IDE)", url: `${botUrl}?startapp=repo-xml` },
-      { text: "🚀 Прокачка (CyberDev OS)", url: `${botUrl}?startapp=start-training` },
-    ],
-    [
-      { text: "🎨 Гайд по Стилю", url: `${botUrl}?startapp=style-guide` },
-      { text: "⚙️ Настройки OS", url: `${botUrl}?startapp=settings` },
+      { text: "💻 VIBE Studio (IDE)", url: `${botUrl}?startapp=repo-xml` },
+      { text: "🛠️ Настройки Профиля", url: `${botUrl}?startapp=settings` },
     ]
   ];
 
@@ -42,20 +40,20 @@ export async function howtoCommand(chatId: number, userId: number) {
       chatId,
       message,
       buttons,
-      "cyberpunk motorcycle, racing, neon city, data streams, code" // Combo image query
+      { imageQuery: "cyberpunk warehouse automation holographic interface" }
     );
     
     if (!result.success) {
       throw new Error(result.error || "Unknown error sending message.");
     }
     
-    logger.info(`[HOWTO_V12_COMBO] Combo Racer/Architect guide sent successfully to user ${userId}.`);
+    logger.info(`[HOWTO_WAREHOUSE] Guide sent to user ${userId}.`);
 
   } catch (error) {
-    logger.error("[HOWTO_V12_COMBO] Failed to send interactive guide:", error);
+    logger.error("[HOWTO_WAREHOUSE] Failed to send guide:", error);
     await sendComplexMessage(
         chatId,
-        "🚨 Не удалось отправить инструктаж. Сервера, возможно, на перезарядке. Попробуй позже."
+        "🚨 Ошибка терминала. Связь прервана. Попробуйте позже."
     );
   }
 }
