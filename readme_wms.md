@@ -1,35 +1,45 @@
-# 🏴‍☠️ WarehouseBot (CyberVibe WMS)
+# 🏴‍☠️ WarehouseBot // CyberVibe WMS Protocol
 
-**Stop paying for air. Start managing chaos.**
+[![License: CyberVibe v0.42](https://img.shields.io/badge/License-CyberVibe_v0.42-ff69b4.svg)](LICENSE)
+[![Stack: Vercel+Supabase](https://img.shields.io/badge/Stack-Vercel_%2B_Supabase-black?logo=vercel&logoColor=white)](https://vercel.com)
+[![Mode: Pirate](https://img.shields.io/badge/Mode-Pirate_Copy-red?style=for-the-badge&logo=skull-and-crossbones)](https://t.me/oneSitePlsBot)
+![Cybervibe: WTF Certified](https://img.shields.io/badge/cybervibe-WTF%20Certified-%23efefef?style=for-the-badge&labelColor=232323&color=ff69b4)
 
-> "Marketplaces were milking us like cows until we started playing differently. This is the story of how warehouse chaos turned into a manageable beast."
+<!-- XYUINITY ON TOP -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/910a623e-1c9d-4630-a8b4-7c361565dc97" width="180" alt="Xuinity logo"/>
+</p>
 
-**WarehouseBot** is a Telegram-first Warehouse Management System (WMS) built for e-commerce sellers (Wildberries, Ozon, Yandex Market). It strips away the bloat of enterprise ERPs (13k+ RUB/mo) and gives you exactly what you need: speed, gamification for staff, and zero-bullshit inventory tracking.
-
----
-
-## ⚡ Features
-
-*   **Mobile-First:** 100% functional via Telegram Web App (TWA). No heavy laptops required.
-*   **Gamified Workflow:** Staff earn XP/Streaks for accurate scanning (`onload`/`offload`).
-*   **Shift Management:** Auto-payroll calculation based on operations count.
-*   **Marketplace Sync:** Real-time stock updates to WB/Ozon/YM to kill fines.
-*   **Crew Architecture:** Multi-warehouse support with role-based access.
-*   **Audit & Analytics:** "Pirate Copy" your competitor's efficiency with built-in audit tools.
+> **"Marketplaces were milking us like cows. We built a pirate ship to fight back."**
+>
+> WarehouseBot is a **Vibe-Coded** Warehouse Management System (WMS) designed to execute e-commerce operations with military precision and arcade-game engagement.
 
 ---
 
-## 🛠 Deployment Guide (The DIY Path)
+## 🧬 WHAT IS THIS?
 
-You can deploy this completely free using the Vercel + Supabase + Telegram stack.
+This is **Module: WAREHOUSE** of the [CyberVibe Studio](https://github.com/salavey13/carTest) ecosystem.
 
-### 1. Fork the Repo
-Go to [github.com/salavey13/cartest](https://github.com/salavey13/cartest) and click **Fork**. This creates your own copy of the pirate ship.
+It is a direct assault on bloated, expensive enterprise software (13k+ RUB/mo). We stripped the corporate garbage and left only what prints money and saves time:
 
-### 2. Set up Supabase (Database)
-1.  Create a new project at [Supabase.com](https://supabase.com).
-2.  Go to **Settings -> API** and copy your `URL`, `anon public` key, and `service_role` key.
-3.  Go to **SQL Editor** and run the migration script below to set up your tables.
+*   **Mobile-First Command Deck:** Run your entire logistics operation from a Telegram Mini App.
+*   **Gamified Labor:** Staff earn XP, streaks, and bounties for `onload`/`offload` tasks. High score = High salary.
+*   **Ghost Stock Killer:** Real-time API sync with Wildberries, Ozon, and Yandex Market. Zero fines.
+*   **Crew Architecture:** Multi-warehouse support with role-based access control (Owner, Manager, Worker).
+
+---
+
+## 🚦 QUICKSTART (The Pirate Path)
+
+You can deploy this 100% free using the Vercel + Supabase + Telegram stack.
+
+### 1. Fork & Vibe
+Go to the repo and click **Fork**. This creates your own instance of the system.
+
+### 2. Database Injection (Supabase)
+1.  Create a project at [Supabase.com](https://supabase.com).
+2.  Go to **SQL Editor**.
+3.  Copy/Paste the migration script below to initialize the `crews`, `shifts`, and `cars` tables.
 
 <details>
 <summary>📜 <strong>Click to view SQL Migration Script</strong></summary>
@@ -38,12 +48,12 @@ Go to [github.com/salavey13/cartest](https://github.com/salavey13/cartest) and c
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- 1. USERS
+-- 1. USERS (The Crew)
 create table public.users (
   user_id text primary key, -- Telegram ID
   username text,
   full_name text,
-  role text default 'user', -- 'admin', 'user', 'support'
+  role text default 'user',
   status text default 'active',
   language_code text,
   metadata jsonb default '{}'::jsonb,
@@ -51,7 +61,7 @@ create table public.users (
   updated_at timestamptz default now()
 );
 
--- 2. CREWS (Warehouses)
+-- 2. CREWS (The Warehouses)
 create table public.crews (
   id uuid default uuid_generate_v4() primary key,
   slug text unique not null,
@@ -68,39 +78,37 @@ create table public.crew_members (
   id uuid default uuid_generate_v4() primary key,
   crew_id uuid references public.crews(id),
   user_id text references public.users(user_id),
-  role text default 'staff', -- 'owner', 'manager', 'staff'
+  role text default 'staff',
   membership_status text default 'active',
   live_status text,
   joined_at timestamptz default now(),
   unique(crew_id, user_id)
 );
 
--- 4. ITEMS (Cars/Inventory)
+-- 4. ITEMS (Inventory/Cars)
 create table public.cars (
   id text primary key, -- SKU or Barcode
   crew_id uuid references public.crews(id),
   make text, -- Brand
   model text, -- Name
   type text default 'wb_item',
-  specs jsonb default '{}'::jsonb, -- Stores locations: { warehouse_locations: [{voxel: 'A1', qty: 5}] }
-  daily_price numeric default 0, -- Used for internal value
+  specs jsonb default '{}'::jsonb, -- { warehouse_locations: [{voxel: 'A1', qty: 5}] }
   image_url text,
-  status text default 'available',
   created_at timestamptz default now()
 );
 
--- 5. SHIFTS (Time tracking)
+-- 5. SHIFTS (Gamified Time Tracking)
 create table public.crew_member_shifts (
   id uuid default uuid_generate_v4() primary key,
   crew_id uuid references public.crews(id),
   member_id text references public.users(user_id),
   clock_in_time timestamptz default now(),
   clock_out_time timestamptz,
-  actions jsonb default '[]'::jsonb, -- Log of scans
+  actions jsonb default '[]'::jsonb, -- Log of scans/XP
   checkpoint jsonb default '{}'::jsonb
 );
 
--- 6. INVOICES & PAYMENTS
+-- 6. INVOICES (The Treasure)
 create table public.invoices (
   id text primary key,
   user_id text references public.users(user_id),
@@ -114,81 +122,68 @@ create table public.invoices (
 ```
 </details>
 
-### 3. Set up Telegram Bot
-1.  Talk to [@BotFather](https://t.me/BotFather) on Telegram.
-2.  Create a new bot (`/newbot`).
-3.  Copy the **HTTP API Token**.
+### 3. Bot Authorization
+1.  Talk to [@BotFather](https://t.me/BotFather).
+2.  Create a new bot.
+3.  Save the API Token.
 
 ### 4. Deploy to Vercel
-1.  Go to [Vercel.com](https://vercel.com) and "Add New Project".
-2.  Import your forked Git repository.
-3.  **IMPORTANT:** Configure the Environment Variables in Vercel settings.
-
-#### Required Environment Variables
+Import your forked repo to Vercel and set these Environment Variables:
 
 ```env
-# Supabase Keys
+# Database
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# Telegram Config
+# Telegram
 TELEGRAM_BOT_TOKEN=123456:ABC-Def...
 ADMIN_CHAT_ID=your-telegram-id
 
-# App Config
+# Core Config
 NEXT_PUBLIC_BASE_URL=https://your-project.vercel.app
 NEXT_PUBLIC_DEBUG=0
-
-# Optional (AI Features)
-COZE_API_KEY=your-coze-key
-COZE_BOT_ID=your-bot-id
 ```
 
-#### Marketplace Variables (Dynamic)
-*Note: These are usually set per-crew in the database, but can be set globally for single-tenant deployments.*
-*   `WB_API_TOKEN_[SLUG]`
-*   `OZON_API_KEY_[SLUG]`
-*   `YM_API_TOKEN_[SLUG]`
-
-### 5. Connect Webhook
-After Vercel deploys, set your bot's webhook to your new URL. You can use a simple browser call or `curl`:
-
+### 5. Link the Webhook
+Connect your bot to your Vercel deployment:
 ```bash
 curl -X POST https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=<YOUR_VERCEL_DOMAIN>/api/telegramWebhook
 ```
 
 ---
 
-## 💸 Don't want to touch code?
+## 🤖 THE VIBE CODING PHILOSOPHY
 
-Does the terminal scare you? Do you value your time more than digging through SQL migrations?
+This isn't just software. It's a methodology.
 
-**I will configure everything for you.**
+1.  **AI as Architect:** Large portions of this system were synthesized by AI under the guidance of the **CyberVibe Master Prompt**.
+2.  **Leaf Node Focus:** We isolate risk in features so we can move fast without breaking the core.
+3.  **Verifiability:** Inputs and outputs are designed for human auditability. We trust the AI, but we verify the loot.
+
+---
+
+## 💸 "I DON'T WANT TO CODE, I WANT TO SELL"
+
+Does the terminal scare you? Do you value your time more than digging through SQL?
+
+**I will deploy the entire Pirate Ship for you.**
 
 *   **Price:** 10,000 RUB (One-time fee).
-*   **What you get:**
-    *   Full server setup (Vercel/Supabase).
-    *   Bot configuration.
-    *   Marketplace API integration (WB/Ozon/YM).
-    *   2-hour onboarding/training for you (the owner).
-    *   30 days of "it just works" guarantee.
+*   **Included:** Full Server Setup, Bot Configuration, Marketplace Integration, and a 2-hour Masterclass for you and your crew.
 
-**👉 Contact me: [@salavey13](https://t.me/salavey13)**
+**👉 Contact the Captain: [@salavey13](https://t.me/salavey13)**
 
 ---
 
-## 🤖 The "Vibe Coding" Philosophy
+## 🔥 JOIN THE TRIBE
 
-This project was built using **Vibe Coding**:
-1.  **Focus on Leaf Nodes:** We isolate risk in UI/Features.
-2.  **Design for Verifiability:** Systems are built to be checked by humans easily.
-3.  **AI as Architect:** Large portions of this codebase were synthesized by AI under strict architectural guidance.
+- [CYBERVIBE Studio Main Repo](https://github.com/salavey13/carTest)
+- [Telegram Entrypoint](https://t.me/oneSitePlsBot)
+- [Full Contribution Guide](https://github.com/salavey13/carTest/blob/main/README.md#contributing)
 
----
-
-## 📜 License
-
-MIT License. Use it, fork it, sell it. Just don't blame us if you create a Skynet for cardboard boxes.
-
-*Powered by [CyberVibe](https://t.me/oneBikePlsBot)*
+<p align="center" style="font-size:1.2em">
+  <b>Ready?</b>
+  <br />
+  <i>Stop paying fines. Start playing the game.</i>
+</p>
