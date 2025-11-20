@@ -58,7 +58,7 @@ export default function ReferralPage() {
                <div className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 opacity-50 hover:opacity-100 transition-opacity">
                    <h3 className="text-gray-500 font-mono text-sm uppercase mb-4">Обычный клиент</h3>
                    <div className="text-4xl font-bold text-gray-400 mb-2 line-through">10 000 ₽</div>
-                   <p className="text-gray-800 text-sm">Платит полную цену за настройку. Никто не получает бонус.</p>
+                   <p className="text-gray text-sm">Платит полную цену за настройку. Никто не получает бонус.</p>
                </div>
 
                {/* The Friend */}
