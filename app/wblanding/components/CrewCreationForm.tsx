@@ -53,7 +53,7 @@ export const CrewCreationForm = () => {
 
   const handleInvite = () => {
     if (!userCrewInfo) return;
-    const inviteUrl = `https://t.me/oneBikePlsBot/app?startapp=crew_${userCrewInfo.slug}_join_crew`;
+    const inviteUrl = `https://t.me/oneBikePlsBot/sklad?startapp=crew_${userCrewInfo.slug}_join_crew`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(inviteUrl)}&text=Вступай в команду склада ${userCrewInfo.name}!`;
     window.open(shareUrl, "_blank");
   };
