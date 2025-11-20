@@ -88,7 +88,7 @@ export const CrewCreationForm = () => {
                     </Button>
                 )}
                 <Link href={`/wb/${userCrewInfo.slug}`} className={userCrewInfo.is_owner ? "" : "col-span-2"}>
-                    <Button variant="outline" className="w-full border-zinc-600 text-white hover:bg-white hover:text-black h-12 text-base">
+                    <Button variant="outline" className="w-full border-zinc-600 text-purple-400 hover:bg-white hover:text-black h-12 text-base">
                         ВОЙТИ В ШТАБ <ArrowRight className="ml-2 w-4 h-4" />
                     </Button>
                 </Link>
