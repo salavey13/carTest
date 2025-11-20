@@ -140,8 +140,10 @@ async function creditUserBalance(userId: string, amount: number, historyEntry: a
 export async function getDiscountedPrice(userId: string, basePrice: number) {
   const { data } = await supabaseAdmin.from('users').select('metadata').eq('user_id', userId).single();
   const hasReferrer = !!data?.metadata?.referrer;
-return {
+  
+  return {
     finalPrice: hasReferrer ? Math.max(0, basePrice - BASE_DISCOUNT) : basePrice,
     discountApplied: hasReferrer ? BASE_DISCOUNT : 0,
     hasReferrer
   };
+}
