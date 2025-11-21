@@ -100,7 +100,7 @@ export default function ReferralPage() {
       <section className="py-24 text-center bg-zinc-900 border-t border-zinc-800">
          <h2 className="text-3xl font-bold text-white mb-8">Твоя сеть начинается сегодня</h2>
          <Link href="/wblanding">
-            <Button size="lg" className="bg-white text-black hover:bg-gray-200 px-12 py-8 text-l rounded-full font-bold shadow-xl">
+            <Button size="lg" className="text-brand-cyan hover:bg-gray-200 px-12 py-8 text-l rounded-full font-bold shadow-xl">
                ВЕРНУТЬСЯ И КОПИРОВАТЬ КОД
             </Button>
          </Link>
