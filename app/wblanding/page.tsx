@@ -337,15 +337,6 @@ export default function WarehouseLandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-          >
-            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250623_004400_844-152720e6-ad84-48d1-b4e7-e0f238b7442b.png"
-              alt="Логотип приложения" width={200} height={69}
-              className="mx-auto mb-8 rounded-full w-40 h-20 sm:w-48 sm:h-24 md:w-64 md:h-32 shadow-2xl ring-4 ring-white/10" />
-          </motion.div>
           <motion.h1 
             className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-white leading-tight"
             initial={{ opacity: 0, y: 20 }}
