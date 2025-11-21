@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Copy, UserPlus, CreditCard, Gem, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-
+import { VibeToolSection } from "../components/VibeToolSection";
 const steps = [
     { icon: Copy, title: "1. ИДЕНТИФИКАЦИЯ", desc: "Твой Telegram Username = Твой Промокод. Никаких сложных цифр. Это твой бренд." },
     { icon: UserPlus, title: "2. ВЕРБОВКА", desc: "Отправь ссылку в чат селлеров. Предложи им скидку 1000₽, которую нельзя получить на сайте." },
@@ -105,7 +105,7 @@ export default function ReferralPage() {
             </Button>
          </Link>
       </section>
-
+      <VibeToolSection />
       <WbFooter />
     </div>
   );
