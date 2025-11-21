@@ -6,9 +6,10 @@ import {
   Brain, Zap, Skull, Crown, Rocket, 
   Bot, Terminal, Code2, Fingerprint, 
   ShieldAlert, ChevronRight, Server, Construction,
-  FileWarning, Eye, Sparkles
+  FileWarning, Eye, Sparkles, Database, FileCode, Layers, Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link"; // Added Link for download button
 
 // --- Custom Glitch Title Component ---
 const GlitchText = ({ text }: { text: string }) => {
@@ -307,6 +308,106 @@ export const VibeToolSection = () => {
                     <span>Возможности AI: БЕЗГРАНИЧНЫ</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* --- LEVEL 13: NAKED AI POWER (DEMUSTIFICATION) --- */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.8 }}
+          className="mt-8 relative p-[1px] rounded-3xl bg-gradient-to-r from-zinc-800 via-brand-purple/50 to-zinc-800"
+        >
+          <div className="bg-zinc-950 rounded-[23px] p-8 md:p-12 relative overflow-hidden border border-brand-purple/20">
+            {/* Technical Grid Texture */}
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10 pointer-events-none" />
+            
+            <div className="flex flex-col lg:flex-row gap-10 items-start relative z-10">
+              <div className="flex-shrink-0 hidden lg:block">
+                <div className="w-20 h-20 rounded-2xl bg-brand-purple/10 border border-brand-purple/30 flex items-center justify-center">
+                  <Terminal className="w-10 h-10 text-brand-purple" />
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="px-3 py-1 rounded-full bg-brand-purple/10 text-brand-purple text-xs font-bold font-mono tracking-wider border border-brand-purple/20 animate-pulse">
+                    LVL.13 // NAKED POWER
+                  </span>
+                </div>
+                
+                <h3 className="text-2xl md:text-4xl font-bold text-white font-orbitron mb-6 leading-tight">
+                  МАГИИ НЕ СУЩЕСТВУЕТ.
+                  <br/>
+                  <span className="text-zinc-500">ЕСТЬ ТОЛЬКО КОНТЕКСТ.</span>
+                </h3>
+                
+                <div className="prose prose-invert max-w-none text-gray-300 leading-relaxed mb-8">
+                  <p>
+                    Тот крутой «Аудит», о котором мы говорили выше? Мы его не кодили руками.
+                    И если ты просто скажешь AI: <em>"Сделай мне красиво"</em> — он выдаст галлюцинации.
+                  </p>
+                  <p>
+                    Чтобы получить идеальный результат (без багов, с первого раза), ты должен кормить AI не только хотелками, но и <strong>инженерной правдой</strong>.
+                    Хочешь кнопку, которая показывает логи?
+                  </p>
+                  <p className="font-bold text-white">
+                    Не будь туристом. Будь Архитектором. Передай в Vibe Toolz эти 4 компонента, и ты получишь софт уровня Enterprise за 5 минут:
+                  </p>
+                </div>
+
+                {/* The Checklist */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-sm">
+                  <div className="p-4 bg-black/50 rounded-lg border border-white/10 flex items-start gap-3 hover:border-brand-cyan/50 transition-colors">
+                    <div className="p-2 bg-brand-cyan/10 rounded text-brand-cyan"><Rocket className="w-4 h-4" /></div>
+                    <div>
+                      <strong className="text-white block mb-1">Page Context</strong>
+                      <span className="text-zinc-500">Выдели файл страницы (page.tsx), чтобы AI знал, КУДА вставить кнопку.</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black/50 rounded-lg border border-white/10 flex items-start gap-3 hover:border-brand-green/50 transition-colors">
+                    <div className="p-2 bg-brand-green/10 rounded text-brand-green"><Layers className="w-4 h-4" /></div>
+                    <div>
+                      <strong className="text-white block mb-1">Component Examples</strong>
+                      <span className="text-zinc-500">Покажи ему любую кнопку из проекта. Он скопирует стиль идеально.</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black/50 rounded-lg border border-white/10 flex items-start gap-3 hover:border-brand-purple/50 transition-colors">
+                    <div className="p-2 bg-brand-purple/10 rounded text-brand-purple"><FileCode className="w-4 h-4" /></div>
+                    <div>
+                      <strong className="text-white block mb-1">Actions Logic</strong>
+                      <span className="text-zinc-500">Приложи actions.ts. AI поймет, как работает твой сервер, и не сломает базу.</span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-black/50 rounded-lg border border-white/10 flex items-start gap-3 hover:border-brand-red-orange/50 transition-colors">
+                    <div className="p-2 bg-brand-red-orange/10 rounded text-brand-red-orange"><Database className="w-4 h-4" /></div>
+                    <div>
+                      <strong className="text-white block mb-1">The Source of Truth</strong>
+                      <span className="text-zinc-500">ОБЯЗАТЕЛЬНО: <code>init.sql</code> или <code>database.types.ts</code>. Без схемы базы AI слеп.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 text-center lg:text-left border-t border-white/10 pt-6">
+                  <p className="text-sm text-zinc-400 font-mono mb-4">
+                    // PRO TIP: Если ты реально решил это сделать, скачай структуру базы. 
+                    AI нужно знать, как выглядят таблицы <code>crew_member_shifts</code>.
+                  </p>
+                  <Link 
+                    href="https://github.com/salavey13/carTest/blob/main/supabase/migrations/20240727000000_crew_and_shifts_setup.sql" 
+                    target="_blank"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold uppercase tracking-wider rounded transition-colors"
+                  >
+                    <Download className="w-4 h-4 text-brand-cyan" />
+                    Скачать init.sql (Исходник Правды)
+                  </Link>
+                </div>
+
               </div>
             </div>
           </div>
