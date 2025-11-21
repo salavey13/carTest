@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Brain, Zap, Skull, Crown, Rocket, 
   Bot, Terminal, Code2, Fingerprint, 
-  ShieldAlert, ChevronRight, Server, Construction 
+  ShieldAlert, ChevronRight, Server, Construction,
+  FileWarning, Eye, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -243,6 +244,73 @@ export const VibeToolSection = () => {
             </p>
           </div>
         </div>
+
+        {/* --- BONUS SECTION: THE BLUFF REVEAL --- */}
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.8 }}
+          className="mt-24 relative p-[1px] rounded-3xl bg-gradient-to-r from-zinc-800 via-brand-red-orange/50 to-zinc-800"
+        >
+          <div className="bg-zinc-950 rounded-[23px] p-8 md:p-12 relative overflow-hidden">
+            {/* Texture */}
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagonal-noise.png')] opacity-20 pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-2xl bg-red-900/20 border border-red-500/30 flex items-center justify-center animate-pulse-slow">
+                  <FileWarning className="w-8 h-8 text-brand-red-orange" />
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-xs font-bold font-mono tracking-wider border border-red-500/20">
+                    CONFIDENTIAL // LEVEL 10 ONLY
+                  </span>
+                </div>
+                
+                <h3 className="text-2xl md:text-4xl font-bold text-white font-orbitron mb-6">
+                  P.S. МЫ СБЛЕФОВАЛИ НАСЧЕТ АУДИТА.
+                  <br/>
+                  <span className="text-zinc-500 text-lg md:text-2xl block mt-2 font-mono">И ЭТО ЛУЧШЕЕ, ЧТО МОГЛО СЛУЧИТЬСЯ.</span>
+                </h3>
+                
+                <div className="prose prose-invert max-w-none text-gray-300 leading-relaxed">
+                  <p>
+                    Ладно, карты на стол. Тот «Мощный Аудит Действий», о котором мы кричали выше?
+                    В базе данных это просто сырой <code className="text-brand-cyan bg-brand-cyan/10 px-1 rounded">JSON-лог</code>. 
+                    Скучный список: кто, что, когда.
+                  </p>
+                  <p>
+                    Мы могли бы потратить месяц и нарисовать вам красивые графики, как у всех. 
+                    <strong className="text-white"> Но мы этого не сделали.</strong>
+                  </p>
+                  <p>
+                    Почему? Потому что с <strong>Vibe Toolz</strong> ты не ждешь, пока мы придумаем отчет.
+                    Ты берешь этот лог и говоришь AI: 
+                    <span className="italic text-brand-gold block border-l-2 border-brand-gold pl-4 my-4">
+                      "Построй мне таблицу, кто из кладовщиков чаще всего делает ошибки по пятницам после обеда".
+                    </span>
+                    И ты получаешь инструмент аудита <strong>ТВОЕЙ мечты</strong> за 30 секунд. 
+                    А не то усредненное говно, которое мы бы придумали за тебя.
+                  </p>
+                </div>
+
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2 text-sm text-zinc-500 font-mono">
+                    <Eye className="w-4 h-4" />
+                    <span>Доступ к логам: ОТКРЫТ</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-brand-cyan font-mono">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Возможности AI: БЕЗГРАНИЧНЫ</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
       </div>
     </section>
