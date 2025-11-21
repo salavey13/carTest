@@ -10,8 +10,8 @@ interface GitTreeResponseData { sha: string; url: string; tree: GitTreeFile[]; t
 interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; base: { ref: string }; updated_at: string; } // Added base ref
 
 // --- Константы ---
-const BATCH_SIZE = 130;
-const DELAY_BETWEEN_BATCHES_MS = 1013;
+const BATCH_SIZE = 169;
+const DELAY_BETWEEN_BATCHES_MS = 313;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- Улучшенная parseRepoUrl ---
