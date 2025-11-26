@@ -1,39 +1,32 @@
 import React from 'react';
 import type { VprTableData } from '@/lib/vprVisualData';
 
-interface TableDisplayProps {
-  tableData: VprTableData;
-}
-
-export function TableDisplay({ tableData }: TableDisplayProps) {
+export function TableDisplay({ tableData }: { tableData: VprTableData }) {
   const { title, headers, rows } = tableData;
 
   return (
-    <div className="my-6 w-full overflow-hidden rounded-lg border border-gray-700 bg-gray-800/50 shadow-sm">
+    <div className="my-4 w-full rounded-xl border border-white/10 bg-black/40 shadow-inner overflow-hidden">
       {title && (
-        <div className="bg-gray-800 px-4 py-2 border-b border-gray-700">
-          <h4 className="text-sm font-semibold text-gray-200 text-center">{title}</h4>
+        <div className="bg-white/5 px-4 py-3 border-b border-white/10">
+          <h4 className="text-sm font-bold text-brand-cyan uppercase tracking-widest text-center">{title}</h4>
         </div>
       )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left text-gray-300">
-          <thead className="text-xs text-gray-400 uppercase bg-gray-700/50">
+          <thead className="text-xs uppercase bg-black/60 text-gray-400 font-mono">
             <tr>
               {headers.map((head, i) => (
-                <th key={i} scope="col" className="px-4 py-3 border-r border-gray-700 last:border-r-0">
+                <th key={i} className="px-6 py-3 border-r border-white/5 last:border-r-0">
                   {head}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-white/5">
             {rows.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors last:border-b-0"
-              >
+              <tr key={rowIndex} className="hover:bg-white/5 transition-colors group">
                 {row.map((cell, cellIndex) => (
-                  <td key={cellIndex} className="px-4 py-3 font-mono border-r border-gray-700/50 last:border-r-0">
+                  <td key={cellIndex} className="px-6 py-4 border-r border-white/5 last:border-r-0 group-hover:text-white transition-colors">
                     {cell}
                   </td>
                 ))}
