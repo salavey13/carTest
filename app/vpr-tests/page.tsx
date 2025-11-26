@@ -299,6 +299,20 @@ export default function VprTestsListPage() {
                                              <VibeContentRenderer content="<FaRulerCombined />" className="w-4 h-4" /> Геометрия: Blueprint
                                          </div>
                                      </Link>
+                                     
+                                     {/* Physics 7 */}
+                                     <Link href="/vpr/physics/7/cheatsheet">
+                                         <div className="flex items-center gap-2 px-5 py-3 bg-orange-900/20 hover:bg-orange-900/40 text-orange-300 rounded-lg border border-orange-500/30 transition-all cursor-pointer hover:scale-105">
+                                             <VibeContentRenderer content="<FaAtom />" className="w-4 h-4" /> Физика: Gravity Lab
+                                         </div>
+                                     </Link>
+
+                                     {/* English 7 */}
+                                     <Link href="/vpr/english/7/cheatsheet">
+                                         <div className="flex items-center gap-2 px-5 py-3 bg-fuchsia-900/20 hover:bg-fuchsia-900/40 text-fuchsia-300 rounded-lg border border-fuchsia-500/30 transition-all cursor-pointer hover:scale-105">
+                                             <VibeContentRenderer content="<FaGlobe />" className="w-4 h-4" /> Английский: Neon
+                                         </div>
+                                     </Link>
                                 </div>
                             </div>
                         </motion.div>
