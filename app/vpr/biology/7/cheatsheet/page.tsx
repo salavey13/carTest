@@ -11,16 +11,16 @@ import { Bug, Dna, Microscope, Waves } from "lucide-react";
 // Промпты для генерации изображений (вставь ссылки, когда сгенеришь)
 const imageUrls: Record<string, string> = {
   // Prompt: "Microscopic view of Amoeba proteus and Euglena viridis, colorful scientific illustration, dark background, neon outlines"
-  'bio7-protozoa': 'https://placehold.co/600x400/102020/00ff00?text=Простейшие+(Amoeba+Euglena)',
+  'bio7-protozoa': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/IMG_20251126_214900-cb9221fd-8197-4c43-9a49-232a287f880b.jpg',
   
   // Prompt: "Hydra polyp anatomy diagram, cross section showing two layers of cells, ectoderm and endoderm, scientific schematic style"
-  'bio7-hydra': 'https://placehold.co/600x400/102020/00ccff?text=Кишечнополостные+(Hydra)',
+  'bio7-hydra': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/IMG_20251126_215159-943d4b87-c2a8-45ca-b4e9-0518881e3b71.jpg',
   
   // Prompt: "Comparison of Flatworm, Roundworm and Annelid (earthworm) anatomy, cross sections, biology textbook style"
-  'bio7-worms': 'https://placehold.co/600x400/201010/ff5555?text=Типы+Червей',
+  'bio7-worms': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/IMG_20251126_215325-84ebcac3-91e9-49a1-b816-4c2f4c6bd8f1.jpg',
   
   // Prompt: "Detailed structure of a Crustacean (Crayfish) and Arachnid (Spider), showing external skeleton and legs, vintage biology poster style"
-  'bio7-arthropods': 'https://placehold.co/600x400/202010/ffff00?text=Членистоногие',
+  'bio7-arthropods': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/IMG_20251126_215447-944f460c-5274-4b28-8c8b-771de138d7e3.jpg',
 };
 
 export default function Biology7Cheatsheet() {
