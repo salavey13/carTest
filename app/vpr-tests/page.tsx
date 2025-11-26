@@ -254,7 +254,7 @@ export default function VprTestsListPage() {
                         </motion.div>
                     )}
 
-                    {/* GRADE 7 CHEATSHEETS (New!) */}
+                    {/* GRADE 7 CHEATSHEETS (UPDATED) */}
                     {selectedGrade === 7 && (
                         <motion.div
                             key="grade-7-cheats"
@@ -272,17 +272,33 @@ export default function VprTestsListPage() {
                                 </div>
 
                                 <div className="flex flex-wrap gap-3">
-                                     {/* Informatics Interactive Lesson */}
+                                     {/* Informatics */}
                                      <Link href="/vpr/informatics/7/cheatsheet">
                                          <div className="flex items-center gap-2 px-6 py-4 bg-green-900/20 hover:bg-green-900/40 text-green-400 rounded-lg border border-green-500/50 transition-all cursor-pointer hover:scale-105 shadow-[0_0_15px_rgba(34,197,94,0.1)] font-mono">
                                              <VibeContentRenderer content="<FaTerminal />" className="w-4 h-4" /> Информатика: URL Decoder
                                          </div>
                                      </Link>
                                      
-                                     {/* Placeholder for future Physics/Algebra if needed */}
-                                     <div className="flex items-center gap-2 px-5 py-3 bg-zinc-800/50 text-zinc-600 rounded-lg border border-zinc-700 cursor-not-allowed">
-                                        <GraduationCap className="w-4 h-4"/> Физика (Скоро)
-                                     </div>
+                                     {/* Biology 7 */}
+                                     <Link href="/vpr/biology/7/cheatsheet">
+                                         <div className="flex items-center gap-2 px-5 py-3 bg-emerald-900/20 hover:bg-emerald-900/40 text-emerald-300 rounded-lg border border-emerald-500/30 transition-all cursor-pointer hover:scale-105">
+                                             <VibeContentRenderer content="<FaBug />" className="w-4 h-4" /> Биология: Зоология
+                                         </div>
+                                     </Link>
+
+                                     {/* Algebra 7 */}
+                                     <Link href="/vpr/algebra/7/cheatsheet">
+                                         <div className="flex items-center gap-2 px-5 py-3 bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 rounded-lg border border-blue-500/30 transition-all cursor-pointer hover:scale-105">
+                                             <VibeContentRenderer content="<FaCalculator />" className="w-4 h-4" /> Алгебра: Функции
+                                         </div>
+                                     </Link>
+
+                                     {/* Geometry 7 */}
+                                     <Link href="/vpr/geometry/7/cheatsheet">
+                                         <div className="flex items-center gap-2 px-5 py-3 bg-indigo-900/20 hover:bg-indigo-900/40 text-indigo-300 rounded-lg border border-indigo-500/30 transition-all cursor-pointer hover:scale-105">
+                                             <VibeContentRenderer content="<FaRulerCombined />" className="w-4 h-4" /> Геометрия: Blueprint
+                                         </div>
+                                     </Link>
                                 </div>
                             </div>
                         </motion.div>
