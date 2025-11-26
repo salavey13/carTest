@@ -1,14 +1,29 @@
-// Interface for Chart data (e.g., Pie or Bar)
-export interface VprChartData {
-  type: 'chart';
-  data: number[];
-  labels: string[];
+export type VprVisualType = 'chart' | 'table' | 'axis' | 'plot' | 'compare' | 'image';
+
+// Base interface for common properties
+export interface VprBaseVisual {
+  type: VprVisualType;
   title?: string; // Optional title for context
-  chartType?: 'pie' | 'bar'; // Optional: specify chart type
+}
+
+// Interface for Chart data (e.g., Pie, Bar, Line)
+export interface VprChartData extends VprBaseVisual {
+  type: 'chart';
+  chartType: 'pie' | 'bar' | 'line'; 
+  labels: string[];
+  data: number[];
+  colors?: string[]; // Optional custom colors (hex codes)
+}
+
+// --- NEW: Interface for Table data ---
+export interface VprTableData extends VprBaseVisual {
+  type: 'table';
+  headers: string[];
+  rows: string[][]; // Array of rows, where each row is an array of cell strings
 }
 
 // Interface for Comparison data (visual size comparison)
-export interface VprCompareData {
+export interface VprCompareData extends VprBaseVisual {
   type: 'compare';
   size1: number; // Relative or absolute size/value
   size2: number;
@@ -23,7 +38,7 @@ export interface VprAxisPoint {
   label: string;
 }
 
-export interface VprAxisData {
+export interface VprAxisData extends VprBaseVisual {
   type: 'axis';
   points: VprAxisPoint[];
   minVal?: number; // Optional explicit range minimum
@@ -32,35 +47,35 @@ export interface VprAxisData {
 
 // Interface for points on a 2D plot (e.g., function graph, time series)
 export interface VprPlotPoint {
-  x: number | string; // Can be time (string) or numerical value
+  x: number; 
   y: number;
-  label?: string; // Optional label for the point
+  label?: string; // Optional label for specific points
 }
-export interface VprPlotData {
+
+export interface VprPlotData extends VprBaseVisual {
     type: 'plot';
     points: VprPlotPoint[];
     xLabel?: string; // e.g., "Время, ч"
     yLabel?: string; // e.g., "Температура, °C"
-    title?: string;
+    showLine?: boolean; // Whether to connect points with a line
 }
 
-// --- NEW: Interface for direct Image display ---
+// Interface for direct Image display
 // Use this if you want to explicitly link an image via visual_data
-// instead of embedding it via Markdown in the question text.
-export interface VprImageData {
+export interface VprImageData extends VprBaseVisual {
     type: 'image';
     url: string;
     alt?: string;
     caption?: string;
-    width?: string | number; // Optional width control
-    height?: string | number; // Optional height control
+    width?: number; // Optional width (px)
+    height?: number; // Optional height (px)
 }
 
-
 // Union type for all possible visual data structures
-// Added VprImageData
-export type VprVisualDataType = VprChartData | VprCompareData | VprAxisData | VprPlotData | VprImageData;
-
-// NOTE: The static 'vprVisuals' dictionary and 'getVisualDataForQuestion' function
-// have been removed as visual data should now be fetched directly from the
-// 'visual_data' JSONB column in the 'vpr_questions' table.
+export type VprVisualDataType = 
+  | VprChartData 
+  | VprTableData 
+  | VprCompareData 
+  | VprAxisData 
+  | VprPlotData 
+  | VprImageData;
