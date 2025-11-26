@@ -20,7 +20,7 @@ const imageUrls: Record<string, string> = {
   'bio7-worms': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/IMG_20251126_215325-84ebcac3-91e9-49a1-b816-4c2f4c6bd8f1.jpg',
   
   // Prompt: "Detailed structure of a Crustacean (Crayfish) and Arachnid (Spider), showing external skeleton and legs, vintage biology poster style"
-  'bio7-arthropods': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/IMG_20251126_215447-944f460c-5274-4b28-8c8b-771de138d7e3.jpg',
+  'bio7-arthropods': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/2a29d09b-61f7-4006-a442-5bbb505200b3-d206ca8c-f707-43a5-ba69-bcc30d277a06.png',
 };
 
 export default function Biology7Cheatsheet() {
