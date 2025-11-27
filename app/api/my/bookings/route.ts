@@ -17,16 +17,18 @@ export async function GET(request: Request) {
   }
 
   try {
+    logger.info('[GET /api/my/bookings] Fetching for userId:', userId);
     const { data, error } = await supabaseAnon.rpc('get_user_rentals_dashboard_new', { p_user_id: userId, p_minimal: false });
     
     if (error) {
-      logger.error('[GET /api/my/bookings] RPC error:', error);
+      logger.error('[GET /api/my/bookings] RPC error details:', { code: error.code, message: error.message, hint: error.hint, details: error.details });
       return NextResponse.json({ error: 'Failed to fetch bookings: ' + error.message }, { status: 500 });
     }
 
+    logger.info('[GET /api/my/bookings] Data fetched successfully, length:', data?.length);
     return NextResponse.json(data || []);
   } catch (error) {
-    logger.error('[GET /api/my/bookings] Unexpected error:', error);
+    logger.error('[GET /api/my/bookings] Unexpected error details:', { message: error.message, stack: error.stack });
     return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 });
   }
 }
