@@ -110,11 +110,10 @@ const allPages: PageInfo[] = [
 const groupOrder = ["Vibe HQ", "Core Vibe", "GTA Vibe Missions", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 
 // --- Styles & Colors ---
-// Using semantic borders and text colors that adapt to themes via CSS variables
 const tileColorClasses: Record<ColorKey | 'default', string> = {
   purple: "border-brand-purple/50 text-brand-purple hover:bg-brand-purple/10",
   blue: "border-brand-blue/50 text-brand-blue hover:bg-brand-blue/10",
-  yellow: "border-brand-gold/50 text-brand-gold hover:bg-brand-gold/10", // Gold maps to yellow vibe
+  yellow: "border-brand-gold/50 text-brand-gold hover:bg-brand-gold/10",
   lime: "border-neon-lime/50 text-neon-lime hover:bg-neon-lime/10",
   green: "border-brand-green/50 text-brand-green hover:bg-brand-green/10",
   pink: "border-brand-pink/50 text-brand-pink hover:bg-brand-pink/10",
@@ -162,32 +161,32 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
+const RenderIconFromPage = React.memo(({ icon, className }: { icon?: string; className?: string }) => {
+  if (!icon) return null;
+  const iconString = icon.startsWith("::") ? icon : `::${icon}::`;
+  return <VibeContentRenderer content={iconString} className={className || ''} />;
+});
+RenderIconFromPage.displayName = "RenderIconFromPage";
+
 const gridContainerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.035, delayChildren: 0.1 },
+    transition: { staggerChildren: 0.02, delayChildren: 0.05 }, // Faster animation
   },
 };
 
 const tileItemVariants = {
-  hidden: { y: 8, opacity: 0, scale: 0.98 },
+  hidden: { y: 10, opacity: 0, scale: 0.95 },
   visible: {
     y: 0,
     opacity: 1,
     scale: 1,
-    transition: { type: "spring", stiffness: 120, damping: 10 },
+    transition: { type: "spring", stiffness: 200, damping: 15 },
   },
 };
 
 const MotionLink = motion(Link);
-
-const RenderIconFromPage = React.memo(({ icon, className }: { icon?: string; className?: string }) => {
-  if (!icon) return null;
-  const iconString = icon.startsWith("::") && icon.endsWith("::") ? icon : `::${icon}::`;
-  return <VibeContentRenderer content={iconString} className={className || ''} />;
-});
-RenderIconFromPage.displayName = "RenderIconFromPage";
 
 export default function Header() {
   const appContext = useAppContext();
@@ -203,50 +202,72 @@ export default function Header() {
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
-  useEffect(() => {
-    const newLangBasedOnUser = user?.language_code === 'ru' ? 'ru' : 'en';
-    if (newLangBasedOnUser !== currentLang) {
-       setCurrentLang(newLangBasedOnUser);
-    }
-  }, [user?.language_code, currentLang]);
-
   const isAdmin = useMemo(() => {
-    if (typeof isAdminFunc === 'function') {
-        return isAdminFunc();
-    }
-    logger.warn("[Header] isAdmin function not available on context. Defaulting to false.");
-    return false;
+    return typeof isAdminFunc === 'function' ? isAdminFunc() : false;
   }, [isAdminFunc]);
 
-  const fetchProfile = useCallback(async () => {
-    if (dbUser?.user_id) {
-      setProfileLoading(true);
-      const profileData = await fetchUserCyberFitnessProfile(dbUser.user_id);
-      if (profileData.success && profileData.data) {
-        setCyberProfile(profileData.data);
-      }
-      setProfileLoading(false);
-    } else {
-      setCyberProfile(null);
-      setProfileLoading(false);
-    }
-  }, [dbUser?.user_id]);
-
-  useEffect(() => {
-    if(isNavOpen && !appContextLoading){
-      fetchProfile();
-    }
-  }, [isNavOpen, fetchProfile, appContextLoading]);
-
   const t = useCallback((key: string): string => {
-    const langDict = translations[currentLang];
-    if (langDict && langDict[key] !== undefined) return langDict[key];
-    const enDict = translations['en'];
-    if (enDict && enDict[key] !== undefined) return enDict[key];
-    return key;
+    const dict = translations[currentLang] || translations['en'];
+    return dict[key] || key;
   }, [currentLang]);
 
-  const toggleLang = useCallback(() => setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en'), []);
+  // Fetch profile on nav open to update locked status
+  useEffect(() => {
+    if (isNavOpen && dbUser?.user_id) {
+        setProfileLoading(true);
+        fetchUserCyberFitnessProfile(dbUser.user_id).then(res => {
+            if (res.success && res.data) setCyberProfile(res.data);
+            setProfileLoading(false);
+        });
+    } else {
+        setProfileLoading(false);
+    }
+  }, [isNavOpen, dbUser?.user_id]);
+
+  const groupedPages = useMemo(() => {
+    const lowerSearch = searchTerm.toLowerCase();
+    const userLevel = cyberProfile?.level ?? 0;
+
+    const filtered = allPages.filter(page => {
+      // Permission checks
+      if (page.isAdminOnly && !isAdmin) return false;
+      if (page.supportOnly && dbUser?.role !== 'support' && !isAdmin) return false;
+      
+      // Level checks (Unlockable missions)
+      if (page.questId && cyberProfile && !isAdmin) {
+         return checkQuestUnlockedFromHook(page.questId, cyberProfile.completedQuests || [], QUEST_ORDER);
+      }
+      if (page.minLevel && userLevel < page.minLevel && !isAdmin) return false;
+
+      // Search filter
+      const transName = t(page.name);
+      return transName.toLowerCase().includes(lowerSearch) || 
+             page.path.toLowerCase().includes(lowerSearch);
+    });
+
+    const groups: Record<string, PageInfo[]> = {};
+    groupOrder.forEach(g => groups[g] = []); 
+    
+    filtered.forEach(page => {
+      const g = page.group || "Misc";
+      if (groups[g]) groups[g].push({ ...page, translatedName: t(page.name) });
+    });
+
+    return groups;
+  }, [searchTerm, isAdmin, cyberProfile, dbUser, t, profileLoading]);
+
+  const handleScroll = useCallback(() => {
+    if (isNavOpen) return;
+    const currentScrollY = window.scrollY;
+    if (currentScrollY > lastScrollY && currentScrollY > 60) setIsHeaderVisible(false);
+    else if (currentScrollY < lastScrollY) setIsHeaderVisible(true);
+    setLastScrollY(currentScrollY);
+  }, [lastScrollY, isNavOpen]);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
 
   const logoText = useMemo(() => {
     if (pathname.includes('/vpr')) return "VPR MASTER";
@@ -254,57 +275,6 @@ export default function Header() {
     if (pathname.includes('/nexus')) return "VIBE NEXUS";
     return "CYBERVIBE";
   }, [pathname]);
-
-  const groupedAndFilteredPages = useMemo(() => {
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    const userLevel = cyberProfile?.level ?? 0;
-
-    const filtered = allPages
-      .filter(page => {
-        if (page.isAdminOnly && !isAdmin) return false;
-        if (!isAdmin && page.minLevel !== undefined && userLevel < page.minLevel) return false;
-        if (!isAdmin && page.supportOnly && !(dbUser?.role === 'support')) return false;
-
-        if (page.group === "GTA Vibe Missions" && page.questId && cyberProfile && !profileLoading) {
-          const unlocked = checkQuestUnlockedFromHook(page.questId, cyberProfile.completedQuests || [], QUEST_ORDER);
-          return unlocked;
-        }
-        return true;
-      })
-      .map(page => ({ ...page, translatedName: t(page.name) }))
-      .filter(page =>
-        (page.translatedName || '').toLowerCase().includes(lowerSearchTerm) ||
-        (page.path || '').toLowerCase().includes(lowerSearchTerm) ||
-        (t(page.group || 'Misc') || '').toLowerCase().includes(lowerSearchTerm)
-      );
-
-    const groups: Record<string, PageInfo[]> = {};
-    groupOrder.forEach(groupName => {
-      groups[groupName] = [];
-    });
-    
-    if (!groups["Misc"]) groups["Misc"] = [];
-
-    filtered.forEach(page => {
-      const groupName = page.group || "Misc";
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(page);
-    });
-    
-    return groups;
-  }, [searchTerm, isAdmin, t, appContextLoading, cyberProfile, profileLoading, dbUser?.role]);
-
-  const handleScroll = useCallback(() => {
-    const currentScrollY = window.scrollY;
-    if (isNavOpen) { if (!isHeaderVisible) setIsHeaderVisible(true); setLastScrollY(currentScrollY); return; }
-    if (currentScrollY > lastScrollY && currentScrollY > 60) { if (isHeaderVisible) setIsHeaderVisible(false); }
-    else if (currentScrollY < lastScrollY || currentScrollY <= 60) { if (!isHeaderVisible) setIsHeaderVisible(true); }
-    setLastScrollY(currentScrollY);
-  }, [lastScrollY, isNavOpen, isHeaderVisible]);
-
-  useEffect(() => { window.addEventListener("scroll", handleScroll, { passive: true }); return () => window.removeEventListener("scroll", handleScroll); }, [handleScroll]);
-  useEffect(() => { if (isNavOpen) { setSearchTerm(""); } }, [pathname, isNavOpen]);
-  useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
   return (
     <>
@@ -325,7 +295,7 @@ export default function Header() {
           <div className="flex items-center gap-2">
             <ThemeToggleButton />
             <button 
-              onClick={toggleLang}
+              onClick={() => setCurrentLang(l => l === 'en' ? 'ru' : 'en')}
               className="p-2 rounded-md hover:bg-accent text-xs font-bold hidden sm:block"
             >
               {currentLang.toUpperCase()}
@@ -341,24 +311,29 @@ export default function Header() {
         </div>
       </motion.header>
 
+      {/* --- MEGA MENU OVERLAY --- */}
       <AnimatePresence>
         {isNavOpen && (
           <motion.div
-            key="nav-overlay"
-            initial={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
-            animate={{ opacity: 1, clipPath: 'circle(150vmax at calc(100% - 3rem) 3rem)' }}
-            exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
-            transition={{ type: "tween", ease: "easeOut", duration: 0.4 }}
-            className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl overflow-y-auto pb-10 px-4 simple-scrollbar"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed inset-0 z-50 bg-background/95 backdrop-blur-xl overflow-y-auto pb-10"
           >
-            <button
-              onClick={() => setIsNavOpen(false)}
-              className="fixed top-4 right-4 z-[51] p-2 text-brand-pink hover:bg-brand-pink/10 rounded-full transition-colors"
-            >
-              <X className="h-8 w-8" />
-            </button>
+            <div className="container mx-auto px-4 pt-4 pb-10">
+              
+              {/* Menu Header with Close */}
+              <div className="flex justify-between items-center mb-6 sticky top-0 bg-background/95 backdrop-blur-md py-4 z-10 -mx-4 px-4 border-b border-border/50">
+                <h2 className="text-2xl font-bold font-orbitron text-foreground">NAVIGATION</h2>
+                <button 
+                  onClick={() => setIsNavOpen(false)}
+                  className="p-2 rounded-full bg-accent/50 hover:bg-accent text-foreground transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
 
-            <div className="container mx-auto max-w-5xl pt-20">
+              {/* Search */}
               <div className="relative mb-8 max-w-2xl mx-auto w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input 
@@ -370,61 +345,67 @@ export default function Header() {
                 />
               </div>
 
-              <div className="space-y-10 pb-10">
-                {(profileLoading && !appContextLoading && !isAdmin) && <div className="text-center text-muted-foreground"><VibeContentRenderer content="::FaSpinner className='animate-spin'::"/></div>}
-                
-                {(!profileLoading || appContextLoading || isAdmin) && groupOrder.map(groupName => {
-                  const pagesInGroup = groupedAndFilteredPages[groupName];
-                  if (!pagesInGroup || pagesInGroup.length === 0) return null;
-                  
+              <div className="space-y-12">
+                {groupOrder.map(group => {
+                  const pages = groupedPages[group];
+                  if (!pages || pages.length === 0) return null;
+
                   return (
-                    <div key={groupName}>
-                       <div className="flex items-center gap-4 mb-4">
-                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">{t(groupName)}</h3>
+                    <div key={group} className="max-w-6xl mx-auto">
+                      <div className="flex items-center gap-4 mb-4">
+                        <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest whitespace-nowrap">{t(group)}</h3>
                         <div className="h-px bg-border flex-1" />
                       </div>
-
+                      
+                      {/* Grid: 3 cols on mobile, 4 on sm, 6 on lg */}
                       <motion.div
-                        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"
+                        className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4"
                         variants={gridContainerVariants}
                         initial="hidden"
                         animate="visible"
                       >
-                        {pagesInGroup.map((page) => {
-                          const isCurrentPage = page.path === pathname;
+                        {pages.map(page => {
                           const style = tileColorClasses[page.color || 'default'];
                           const isBig = page.isImportant;
 
                           return (
-                            <MotionLink
-                              key={page.path} href={page.path}
+                            <MotionLink 
+                              key={page.path} 
+                              href={page.path}
                               onClick={() => setIsNavOpen(false)}
                               variants={tileItemVariants}
                               className={cn(
-                                "relative flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200 hover:scale-[1.02] active:scale-95 text-center gap-2 group shadow-sm hover:shadow-md",
+                                "relative flex flex-col items-center justify-center rounded-xl border transition-all hover:scale-[1.02] active:scale-95 text-center gap-1 group",
+                                // Smaller padding for mobile, larger for desktop
+                                "p-2 sm:p-4",
                                 style,
-                                isBig && "col-span-2 aspect-[2/1] md:aspect-auto",
-                                !isBig && "aspect-square",
-                                isCurrentPage && "ring-2 ring-offset-2 ring-offset-background ring-brand-purple"
+                                // Sizing logic: Big items take 2 cols on mobile/desktop. Regular items take 1.
+                                isBig ? "col-span-2 aspect-[2/1] sm:aspect-auto sm:h-auto" : "col-span-1 aspect-square sm:aspect-square",
+                                // Ensure big items have enough height on mobile if they wrap text
+                                isBig && "min-h-[80px]"
                               )}
                             >
+                              {/* Hot Badge */}
                               {page.isHot && (
-                                <span className="absolute top-2 right-2 flex h-2 w-2">
+                                <span className="absolute top-1 right-1 sm:top-2 sm:right-2 flex h-1.5 w-1.5 sm:h-2 sm:w-2">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                  <span className="relative inline-flex rounded-full h-full w-full bg-red-500"></span>
                                 </span>
                               )}
 
-                              <div className="text-3xl mb-1 group-hover:-translate-y-1 transition-transform duration-300">
+                              {/* Icon - Smaller on mobile */}
+                              <div className="text-xl sm:text-3xl mb-1 group-hover:-translate-y-1 transition-transform duration-300">
                                 <RenderIconFromPage icon={page.icon} />
                               </div>
 
-                              <span className="font-semibold text-xs sm:text-sm leading-tight line-clamp-2">
+                              {/* Title - Tiny on mobile, normal on desktop */}
+                              <span className="font-semibold text-[0.65rem] sm:text-sm leading-tight line-clamp-2">
                                 {page.translatedName}
                               </span>
 
+                              {/* Admin Tag */}
                               {page.isAdminOnly && (
-                                <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono opacity-60 bg-black/20 px-1.5 py-0.5 rounded-full">
+                                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] sm:text-[10px] font-mono opacity-60 bg-black/20 px-1 py-0.5 rounded-full">
                                   ADMIN
                                 </span>
                               )}
