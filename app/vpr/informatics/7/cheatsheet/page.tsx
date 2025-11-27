@@ -430,7 +430,7 @@ export default function InformaticsCheatsheet() {
                         </Button>
                     </Link>
                     
-                    <Link href="/vpr-test/77" className="flex-1">
+                    <Link href="/vpr-test/70" className="flex-1">
                         <Button variant="outline" className="w-full h-14 text-lg font-bold bg-black/40 border-indigo-500/50 text-indigo-300 hover:bg-indigo-900/30 hover:text-white hover:border-indigo-400 rounded-xl backdrop-blur-sm transition-all">
                             <Terminal className="mr-2 w-5 h-5" /> ПРОЙТИ СЕКРЕТНЫЙ ТЕСТ (№77)
                         </Button>
