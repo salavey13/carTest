@@ -3,31 +3,32 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Lock, Server, FileText, RotateCcw, CheckCircle2, AlertTriangle, Terminal, Wifi, Search, Circle, MoveDown, Rocket, Zap, ShieldCheck } from "lucide-react";
+import { motion } from "framer-motion";
+import { Globe, Lock, Server, FileText, RotateCcw, CheckCircle2, AlertTriangle, Terminal, Wifi, Search, Circle, MoveDown, Rocket, Zap, ShieldCheck, Network } from "lucide-react";
 import Link from "next/link";
 import { cn } from '@/lib/utils';
 
-// --- GAME 1 DATA: URL ---
+// --- GAME 1 DATA: ROUTING (Next.js Style) ---
+// Задача: Собрать путь к веб-приложению
 const TASK_FRAGMENTS = [
-  { id: 1, text: "//", type: "separator" },
-  { id: 2, text: "/", type: "separator" },
-  { id: 3, text: "http:", type: "protocol" },
-  { id: 4, text: "ru", type: "domain-zone" },
-  { id: 5, text: "help.", type: "domain-name" },
-  { id: 6, text: "game", type: "filename" },
-  { id: 7, text: ".ppt", type: "extension" },
+  { id: 1, text: "https://", type: "protocol" },
+  { id: 2, text: "cyber.", type: "subdomain" },
+  { id: 3, text: "net", type: "domain-zone" },
+  { id: 4, text: "/", type: "separator" },
+  { id: 5, text: "app", type: "folder" },
+  { id: 6, text: "/", type: "separator" },
+  { id: 7, text: "start-training", type: "page" },
 ];
-const CORRECT_SEQUENCE = [3, 1, 5, 4, 2, 6, 7]; // http://help.ru/game.ppt
+// Цель: https://cyber.net/app/start-training
+const CORRECT_SEQUENCE = [1, 2, 3, 4, 5, 6, 7]; 
 
 // --- GAME 2 DATA: EULER CIRCLES ---
-// Задача: Расположить в порядке УБЫВАНИЯ количества страниц
 const EULER_ITEMS = [
-  { id: 101, text: "Крейсер & Аврора", type: "and", label: "Мало (Пересечение)" },
-  { id: 102, text: "Крейсер | Аврора", type: "or", label: "Много (Объединение)" },
-  { id: 103, text: "Крейсер", type: "single", label: "Средне (Одно слово)" },
+  { id: 101, text: "Python & Java", type: "and", label: "Мало (Пересечение)" },
+  { id: 102, text: "Python | Java", type: "or", label: "Много (Объединение)" },
+  { id: 103, text: "Python", type: "single", label: "Средне (Одно слово)" },
 ];
-// Правильный порядок убывания: ИЛИ (Много) -> Одно слово -> И (Мало)
+// Порядок убывания: ИЛИ -> Одно -> И
 const EULER_CORRECT_SEQUENCE = [102, 103, 101]; 
 
 export default function InformaticsCheatsheet() {
@@ -88,31 +89,29 @@ export default function InformaticsCheatsheet() {
             animate={{ opacity: 1, y: 0 }}
             className="inline-block border border-green-500/50 bg-green-900/20 px-4 py-1 rounded-full text-xs tracking-widest uppercase mb-4"
           >
-            Protocol: Knowledge_Transfer_v7.0
+            Protocol: Routing_v7.0
           </motion.div>
           <h1 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-tighter">
-            <span className="text-green-500">&lt;</span> NET MASTER <span className="text-green-500">/&gt;</span>
+            <span className="text-green-500">&lt;</span> NET ARCHITECT <span className="text-green-500">/&gt;</span>
           </h1>
-          <p className="text-zinc-400">Информатика 7 класс • Адресация • Поиск</p>
+          <p className="text-zinc-400">Информатика 7 класс • Маршрутизация • Логика</p>
         </header>
 
         {/* ================================================================================== */}
-        {/* SECTION 1: URL DECODER */}
+        {/* SECTION 1: ROUTING GAME */}
         {/* ================================================================================== */}
         <Card className="bg-zinc-900 border-green-500/30 shadow-[0_0_30px_rgba(34,197,94,0.1)] mb-12 overflow-hidden">
           <CardHeader className="border-b border-green-500/20 bg-zinc-900/50">
             <CardTitle className="flex items-center gap-2 text-white">
-              <Terminal className="w-5 h-5 text-green-500" /> 
-              Mission 1: Собери Адрес
+              <Network className="w-5 h-5 text-green-500" /> 
+              Mission 1: Построй Маршрут (Routing)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             <div className="mb-6 bg-zinc-950 p-4 rounded-lg border border-zinc-800 font-mono text-sm md:text-base text-zinc-300">
-              <p className="mb-2"><span className="text-green-500">root@school:~$</span> cat task.txt</p>
+              <p className="mb-2"><span className="text-green-500">dev@local:~$</span> cat requirements.txt</p>
               <p className="italic text-zinc-400">
-                "Доступ к файлу <span className="text-white font-bold">gаme.ppt</span>, 
-                находящемуся на сервере <span className="text-white font-bold">help.ru</span>, 
-                осуществляется по протоколу <span className="text-white font-bold">http</span>."
+                "Для доступа к панели тренировки, перейдите на защищенный протокол <span className="text-white font-bold">https</span>, сервер <span className="text-white font-bold">cyber.net</span>, в раздел приложения <span className="text-white font-bold">app</span>, на страницу <span className="text-white font-bold">start-training</span>."
               </p>
             </div>
 
@@ -124,15 +123,15 @@ export default function InformaticsCheatsheet() {
               "bg-zinc-950 border-zinc-700 text-zinc-400"
             )}>
               <Globe className="w-5 h-5 mr-3 opacity-50" />
-              <span className="truncate w-full">
-                {constructedUrl || "Нажимай на фрагменты ниже..."}
+              <span className="truncate w-full tracking-wider">
+                {constructedUrl || "Нажимай фрагменты..."}
               </span>
               {status === 'success' && <CheckCircle2 className="w-6 h-6 text-green-500 ml-2" />}
               {status === 'error' && <AlertTriangle className="w-6 h-6 text-red-500 ml-2" />}
             </div>
 
             {/* FRAGMENTS BUTTONS */}
-            <div className="flex flex-wrap gap-3 justify-center mb-8">
+            <div className="flex flex-wrap gap-2 justify-center mb-8">
               {TASK_FRAGMENTS.map((frag) => {
                 const isUsed = sequence.includes(frag.id);
                 return (
@@ -143,13 +142,12 @@ export default function InformaticsCheatsheet() {
                     onClick={() => handleFragmentClick(frag.id)}
                     disabled={isUsed || status === 'success'}
                     className={cn(
-                      "px-4 py-3 rounded border font-bold font-mono text-lg relative overflow-hidden group transition-all",
+                      "px-3 py-2 rounded border font-bold font-mono text-lg relative overflow-hidden group transition-all",
                       isUsed 
                         ? "bg-zinc-800 border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50" 
                         : "bg-zinc-900 border-green-500/50 text-green-400 hover:bg-green-500/10 hover:border-green-400 hover:shadow-[0_0_15px_rgba(34,197,94,0.4)]"
                     )}
                   >
-                    <span className="absolute top-0 left-1 text-[8px] opacity-50">{frag.id}</span>
                     {frag.text}
                   </motion.button>
                 );
@@ -166,35 +164,35 @@ export default function InformaticsCheatsheet() {
                 disabled={status === 'success' || sequence.length === 0}
                 className={cn("font-bold min-w-[140px]", status === 'success' ? "bg-green-600" : "bg-white text-black")}
               >
-                {status === 'success' ? "ACCESS GRANTED" : "Connect ->"}
+                {status === 'success' ? "ROUTING OK" : "Проверить Путь"}
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* --- CHEATSHEET 1: URL --- */}
+        {/* --- CHEATSHEET 1: URL THEORY --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
           <InfoCard 
             icon={<Lock className="w-6 h-6" />}
             title="1. Протокол"
-            code="http:// или https://"
-            desc="Правила общения. Как рукопожатие. HTTPS — это защищенное рукопожатие (шифрование)."
+            code="https://"
+            desc="Язык общения. HTTP — открытый текст. HTTPS (Secure) — шифрованный канал. Как бронированный кабель."
             color="text-pink-400"
             borderColor="border-pink-500/30"
           />
           <InfoCard 
             icon={<Server className="w-6 h-6" />}
-            title="2. Сервер (Домен)"
-            code="help.ru"
-            desc="Имя компьютера в сети. 'ru' — домен верхнего уровня, 'help' — имя сайта."
+            title="2. Домен (Сервер)"
+            code="cyber.net"
+            desc="Адрес дома в интернете. DNS-серверы переводят эти буквы в IP-адреса (цифры), чтобы компьютеры нашли друг друга."
             color="text-cyan-400"
             borderColor="border-cyan-500/30"
           />
           <InfoCard 
             icon={<FileText className="w-6 h-6" />}
-            title="3. Файл (Путь)"
-            code="/game.ppt"
-            desc="Что конкретно берем. Слэш '/' разделяет папки. В конце — расширение (.ppt)."
+            title="3. Путь (Роутинг)"
+            code="/app/start..."
+            desc="Путь внутри сервера. В современном вебе это не всегда файл, а часто 'маршрут' к коду, который генерирует страницу."
             color="text-yellow-400"
             borderColor="border-yellow-500/30"
           />
@@ -220,7 +218,6 @@ export default function InformaticsCheatsheet() {
                     <div className="absolute top-2 right-4 text-4xl font-black text-purple-500/10 pointer-events-none">OR</div>
                     <h3 className="text-purple-400 font-bold text-xl mb-2">Объединение (ИЛИ / |)</h3>
                     <div className="relative w-48 h-32 my-4">
-                         {/* SVG Representation for Union */}
                         <svg viewBox="0 0 200 120" className="w-full h-full drop-shadow-[0_0_10px_rgba(168,85,247,0.4)]">
                             <circle cx="70" cy="60" r="40" fill="rgba(168, 85, 247, 0.6)" stroke="#a855f7" strokeWidth="2" />
                             <circle cx="130" cy="60" r="40" fill="rgba(168, 85, 247, 0.6)" stroke="#a855f7" strokeWidth="2" />
@@ -228,9 +225,8 @@ export default function InformaticsCheatsheet() {
                         </svg>
                     </div>
                     <p className="text-zinc-300 text-sm">
-                        Поисковик ищет страницы, где есть <span className="text-purple-400 font-bold">ХОТЯ БЫ ОДНО</span> слово.
-                        <br/><br/>
-                        <span className="bg-purple-500/20 px-2 py-1 rounded text-purple-200">РЕЗУЛЬТАТОВ МНОГО 📈</span>
+                        Ищет где есть <span className="text-purple-400 font-bold">ХОТЯ БЫ ОДНО</span> слово.
+                        <br/><span className="bg-purple-500/20 px-2 py-1 rounded text-purple-200">РЕЗУЛЬТАТОВ МАКСИМУМ 📈</span>
                     </p>
                 </div>
 
@@ -239,19 +235,16 @@ export default function InformaticsCheatsheet() {
                     <div className="absolute top-2 right-4 text-4xl font-black text-blue-500/10 pointer-events-none">AND</div>
                     <h3 className="text-blue-400 font-bold text-xl mb-2">Пересечение (И / &)</h3>
                     <div className="relative w-48 h-32 my-4">
-                        {/* SVG Representation for Intersection */}
                         <svg viewBox="0 0 200 120" className="w-full h-full drop-shadow-[0_0_10px_rgba(59,130,246,0.4)]">
                             <circle cx="70" cy="60" r="40" fill="none" stroke="#3b82f6" strokeWidth="2" strokeOpacity="0.3" />
                             <circle cx="130" cy="60" r="40" fill="none" stroke="#3b82f6" strokeWidth="2" strokeOpacity="0.3" />
-                            {/* Intersection path */}
                             <path d="M 110,26 A 40 40 0 0 1 110,94 A 40 40 0 0 1 110,26" fill="rgba(59, 130, 246, 0.9)" stroke="#3b82f6" />
                             <text x="100" y="115" textAnchor="middle" fill="#fff" fontSize="12" className="font-mono">ТОЛЬКО ОБЩЕЕ</text>
                         </svg>
                     </div>
                     <p className="text-zinc-300 text-sm">
-                        Поисковик ищет страницы, где есть <span className="text-blue-400 font-bold">ОБА СЛОВА СРАЗУ</span>.
-                        <br/><br/>
-                        <span className="bg-blue-500/20 px-2 py-1 rounded text-blue-200">РЕЗУЛЬТАТОВ МАЛО 📉</span>
+                        Ищет где есть <span className="text-blue-400 font-bold">ОБА СЛОВА СРАЗУ</span>.
+                        <br/><span className="bg-blue-500/20 px-2 py-1 rounded text-blue-200">РЕЗУЛЬТАТОВ МИНИМУМ 📉</span>
                     </p>
                 </div>
             </div>
@@ -271,7 +264,7 @@ export default function InformaticsCheatsheet() {
                     <p>
                         Расположите поисковые запросы в порядке <span className="text-red-400 font-bold underline">УБЫВАНИЯ</span> количества страниц.
                         <br/>
-                        <span className="text-zinc-500 text-xs">(Сначала то, что найдет больше всего страниц, в конце — меньше всего).</span>
+                        <span className="text-zinc-500 text-xs">(От самого широкого запроса к самому узкому).</span>
                     </p>
                 </div>
 
@@ -302,12 +295,12 @@ export default function InformaticsCheatsheet() {
                 <div className="h-8 mb-4 text-center">
                      {eulerStatus === 'success' && (
                         <span className="text-green-400 font-bold flex items-center justify-center gap-2">
-                            <CheckCircle2 className="w-5 h-5" /> Верно! "ИЛИ" {'>'} "СЛОВО" {'>'} "И"
+                            <CheckCircle2 className="w-5 h-5" /> Верно! Правило воронки: ИЛИ {'>'} СЛОВО {'>'} И
                         </span>
                     )}
                     {eulerStatus === 'error' && (
                         <span className="text-red-400 font-bold flex items-center justify-center gap-2">
-                            <AlertTriangle className="w-5 h-5" /> Неверно. Вспомни правило: (ИЛИ {'>'} И)
+                            <AlertTriangle className="w-5 h-5" /> Ошибка. Вспомни: "ИЛИ" дает больше всего результатов.
                         </span>
                     )}
                 </div>
@@ -345,46 +338,13 @@ export default function InformaticsCheatsheet() {
                         disabled={eulerStatus === 'success' || eulerSequence.length !== EULER_ITEMS.length}
                         className={cn("font-bold min-w-[140px]", eulerStatus === 'success' ? "bg-green-600 hover:bg-green-700" : "bg-purple-600 hover:bg-purple-700 text-white")}
                     >
-                        {eulerStatus === 'success' ? "LOGIC VERIFIED" : "Проверить Порядок"}
+                        {eulerStatus === 'success' ? "VERIFIED" : "Проверить"}
                     </Button>
                 </div>
             </CardContent>
         </Card>
 
-        {/* --- VIBE CODING CONNECTION (The Morale Boost) --- */}
-        <div className="relative p-8 rounded-2xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-20">
-            <Wifi className="w-24 h-24 text-white" />
-          </div>
-          
-          <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
-            🚀 Как это связано с Vibe Coding?
-          </h3>
-          <p className="text-zinc-300 mb-4 leading-relaxed">
-            Думаешь, это просто школьные задачки? <strong className="text-green-400">Не-а.</strong>
-          </p>
-          <div className="space-y-4">
-            <p className="text-zinc-300 leading-relaxed">
-              <strong>1. URL (Ссылки):</strong> В нашем <strong>Warehouse App</strong> мы используем такие же адреса для API. 
-              <span className="block bg-black p-2 rounded mt-1 border border-zinc-800 font-mono text-xs">
-                 <span className="text-pink-500">https://</span>api.wb.ru<span className="text-zinc-500">/stocks/</span><span className="text-yellow-500">update</span>
-              </span>
-            </p>
-            <p className="text-zinc-300 leading-relaxed">
-               <strong>2. Логика (И/ИЛИ):</strong> Когда ты фильтруешь товары на маркетплейсе (например: "Кроссовки" <span className="text-blue-400 font-bold">И</span> "Черные" <span className="text-blue-400 font-bold">И</span> "38 размер"), ты используешь операцию <strong>AND</strong>, отсекая лишнее.
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <Link href="/vpr-tests">
-                <Button className="bg-green-600 hover:bg-green-500 text-white font-bold rounded-full px-8 py-6 text-lg transition-all hover:scale-105 shadow-lg shadow-green-900/20 w-full md:w-auto">
-                На Базу (Тесты)
-                </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* --- NEW: CYBER ACADEMY TEASER --- */}
+        {/* --- NEW: CYBER ACADEMY TEASER (BONUS SECTION) --- */}
         <div className="mt-12 bg-gradient-to-br from-indigo-950 to-purple-950 rounded-2xl border border-indigo-500/30 p-8 relative overflow-hidden group hover:border-indigo-400 transition-colors">
             {/* Decorative Background */}
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none" />
@@ -408,7 +368,7 @@ export default function InformaticsCheatsheet() {
 
                 <div className="prose prose-invert max-w-none text-indigo-100/80 mb-8 leading-relaxed">
                     <p>
-                        Ты прошел основы. Теперь ты знаешь, как работает URL и логика поиска. Но что, если я скажу тебе, что ты можешь не просто <em>решать</em> тесты, а <strong>СОЗДАВАТЬ</strong> их?
+                        Ты прошел основы Информатики. Теперь ты знаешь, как работают URL и логика. Но что, если я скажу тебе, что ты можешь не просто <em>решать</em> тесты, а <strong>СОЗДАВАТЬ</strong> их?
                     </p>
                     <p>
                         Мы построили тренировочный полигон, где ты научишься кодить, деплоить сайты и даже настраивать базы данных, просто играя.
@@ -430,9 +390,10 @@ export default function InformaticsCheatsheet() {
                         </Button>
                     </Link>
                     
+                    {/* Link to the Informatics Subject Page (ID 70), where the tutorial variant might appear or be selected */}
                     <Link href="/vpr-test/70" className="flex-1">
                         <Button variant="outline" className="w-full h-14 text-lg font-bold bg-black/40 border-indigo-500/50 text-indigo-300 hover:bg-indigo-900/30 hover:text-white hover:border-indigo-400 rounded-xl backdrop-blur-sm transition-all">
-                            <Terminal className="mr-2 w-5 h-5" /> ПРОЙТИ СЕКРЕТНЫЙ ТЕСТ (№77)
+                            <Terminal className="mr-2 w-5 h-5" /> ПРОЙТИ СЕКРЕТНЫЙ ТЕСТ
                         </Button>
                     </Link>
                 </div>
