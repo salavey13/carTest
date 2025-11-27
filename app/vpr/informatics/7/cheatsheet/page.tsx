@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Lock, Server, FileText, RotateCcw, CheckCircle2, AlertTriangle, Terminal, Wifi, Search, Circle, MoveDown } from "lucide-react";
+import { Globe, Lock, Server, FileText, RotateCcw, CheckCircle2, AlertTriangle, Terminal, Wifi, Search, Circle, MoveDown, Rocket, Zap, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { cn } from '@/lib/utils';
 
@@ -200,7 +200,6 @@ export default function InformaticsCheatsheet() {
           />
         </div>
 
-
         {/* ================================================================================== */}
         {/* SECTION 2: EULER CIRCLES */}
         {/* ================================================================================== */}
@@ -352,7 +351,6 @@ export default function InformaticsCheatsheet() {
             </CardContent>
         </Card>
 
-
         {/* --- VIBE CODING CONNECTION (The Morale Boost) --- */}
         <div className="relative p-8 rounded-2xl border-2 border-dashed border-zinc-700 bg-zinc-900/50 overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-20">
@@ -384,6 +382,67 @@ export default function InformaticsCheatsheet() {
                 </Button>
             </Link>
           </div>
+        </div>
+
+        {/* --- NEW: CYBER ACADEMY TEASER --- */}
+        <div className="mt-12 bg-gradient-to-br from-indigo-950 to-purple-950 rounded-2xl border border-indigo-500/30 p-8 relative overflow-hidden group hover:border-indigo-400 transition-colors">
+            {/* Decorative Background */}
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none" />
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/20 blur-[100px] rounded-full pointer-events-none group-hover:bg-indigo-400/30 transition-colors" />
+
+            <div className="relative z-10">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-6 mb-6">
+                    <div className="bg-indigo-500/20 p-4 rounded-xl border border-indigo-500/40 animate-pulse-slow">
+                        <Rocket className="w-10 h-10 text-indigo-300" />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest">Secret Level</span>
+                            <span className="text-indigo-300 text-xs font-mono">/// ACCESS_GRANTED</span>
+                        </div>
+                        <h3 className="text-2xl md:text-4xl font-black text-white font-orbitron leading-tight">
+                            КИБЕРШКОЛА: <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">ZERO TO HERO</span>
+                        </h3>
+                    </div>
+                </div>
+
+                <div className="prose prose-invert max-w-none text-indigo-100/80 mb-8 leading-relaxed">
+                    <p>
+                        Ты прошел основы. Теперь ты знаешь, как работает URL и логика поиска. Но что, если я скажу тебе, что ты можешь не просто <em>решать</em> тесты, а <strong>СОЗДАВАТЬ</strong> их?
+                    </p>
+                    <p>
+                        Мы построили тренировочный полигон, где ты научишься кодить, деплоить сайты и даже настраивать базы данных, просто играя.
+                        <br/>
+                        <span className="text-white font-bold">Твой путь от "просто школьник" до "Full-Stack Cyber Demon" начинается здесь.</span>
+                    </p>
+                    <ul className="grid md:grid-cols-2 gap-2 text-sm mt-4 list-none pl-0">
+                        <li className="flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400"/> Как менять иконки и картинки кодом</li>
+                        <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-green-400"/> Как задеплоить свой проект бесплатно</li>
+                        <li className="flex items-center gap-2"><Terminal className="w-4 h-4 text-pink-400"/> Как работать с GitHub и Vercel</li>
+                        <li className="flex items-center gap-2"><Server className="w-4 h-4 text-blue-400"/> Как поднять свою базу данных (Supabase)</li>
+                    </ul>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <Link href="/start-training" className="flex-1">
+                        <Button className="w-full h-14 text-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-900/50 border border-indigo-400/50 rounded-xl transition-all hover:scale-[1.02]">
+                            <Rocket className="mr-2 w-5 h-5" /> НАЧАТЬ ТРЕНИРОВКУ
+                        </Button>
+                    </Link>
+                    
+                    <Link href="/vpr-test/77" className="flex-1">
+                        <Button variant="outline" className="w-full h-14 text-lg font-bold bg-black/40 border-indigo-500/50 text-indigo-300 hover:bg-indigo-900/30 hover:text-white hover:border-indigo-400 rounded-xl backdrop-blur-sm transition-all">
+                            <Terminal className="mr-2 w-5 h-5" /> ПРОЙТИ СЕКРЕТНЫЙ ТЕСТ (№77)
+                        </Button>
+                    </Link>
+                </div>
+                
+                <div className="mt-6 text-center">
+                     <Link href="/wblanding" className="text-xs text-indigo-400/60 hover:text-indigo-300 underline decoration-dashed underline-offset-4 transition-colors">
+                        P.S. Хочешь узнать, как на этом заработать? (Схема "Синдикат")
+                    </Link>
+                </div>
+            </div>
         </div>
 
       </div>
