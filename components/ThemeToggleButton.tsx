@@ -16,51 +16,53 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Prevent hydration mismatch
   useEffect(() => setIsMounted(true), []);
 
-  // Sync DB setting to local theme on load (one-way sync from DB)
+  // Initial Sync from DB (One-off)
   useEffect(() => {
-    if (dbUser?.metadata?.settings_profile) {
-      const dbSettings = dbUser.metadata.settings_profile as Record<string, any>;
-      const dbWantsDark = dbSettings.dark_mode_enabled;
-      
-      // Only sync if explicit preference exists and differs from current
-      if (typeof dbWantsDark === 'boolean') {
-        const currentIsDark = resolvedTheme === 'dark';
-        if (dbWantsDark !== currentIsDark) {
-           logger.debug(`[ThemeToggle] Syncing theme from DB: ${dbWantsDark ? 'dark' : 'light'}`);
-           setTheme(dbWantsDark ? 'dark' : 'light');
-        }
+    if (isMounted && dbUser?.metadata?.settings_profile) {
+      const settings = dbUser.metadata.settings_profile as Record<string, any>;
+      const dbDark = settings.dark_mode_enabled;
+      if (typeof dbDark === 'boolean') {
+        // If DB says dark but theme is light, force dark
+        if (dbDark && resolvedTheme !== 'dark') setTheme('dark');
+        // If DB says light but theme is dark, force light
+        if (!dbDark && resolvedTheme === 'dark') setTheme('light');
       }
     }
-  }, [dbUser, resolvedTheme, setTheme]);
+  // Run this logic primarily when dbUser loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbUser?.user_id, isMounted]); 
 
   const handleToggle = useCallback(async () => {
     if (isSaving || !isMounted) return;
 
-    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
+    const currentTheme = resolvedTheme;
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
     
-    // 1. UI Update
-    setTheme(newTheme);
+    // 1. Immediate UI feedback
+    setTheme(nextTheme);
 
-    // 2. Save to DB
+    // 2. Persist if user logged in
     if (dbUser?.user_id) {
       setIsSaving(true);
       try {
-        const currentMetadata = dbUser.metadata || {};
-        const currentSettings = (currentMetadata.settings_profile || {}) as Record<string, any>;
+        const currentMeta = dbUser.metadata || {};
+        const currentSettings = (currentMeta.settings_profile || {}) as Record<string, any>;
+        
         const updatedMetadata = {
-           ...currentMetadata, 
-           settings_profile: { ...currentSettings, dark_mode_enabled: newTheme === 'dark' }
+          ...currentMeta,
+          settings_profile: { ...currentSettings, dark_mode_enabled: nextTheme === 'dark' }
         };
 
-        // We don't await the toast to make UI snappy, but we await the action
-        await updateUserSettings(dbUser.user_id, updatedMetadata);
-        logger.debug(`[ThemeToggle] Saved theme preference: ${newTheme}`);
+        // We just fire and forget the DB update toast unless error
+        const result = await updateUserSettings(dbUser.user_id, updatedMetadata);
+        if(!result.success) {
+           console.error("Theme save failed:", result.error);
+           // Optional: toast.error("Failed to save theme preference");
+        }
       } catch (e) {
-        logger.error("[ThemeToggle] Failed to save:", e);
-        toast.error("Сбой сохранения темы");
+        console.error(e);
       } finally {
         setIsSaving(false);
       }
@@ -82,11 +84,11 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
         "hover:bg-accent text-foreground active:scale-90",
         size === 'md' ? "w-9 h-9" : "w-8 h-8"
       )}
-      aria-label={resolvedTheme === 'dark' ? "Включить светлую тему" : "Включить темную тему"}
+      title={`Тема: ${resolvedTheme === 'dark' ? 'Темная' : 'Светлая'}`}
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
-          key={isSaving ? 'loading' : resolvedTheme}
+          key={isSaving ? 'saving' : resolvedTheme}
           initial={{ y: -10, opacity: 0, rotate: -90 }}
           animate={{ y: 0, opacity: 1, rotate: 0 }}
           exit={{ y: 10, opacity: 0, rotate: 90 }}

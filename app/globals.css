@@ -14,9 +14,10 @@
 
 @layer base {
   :root {
-    /* --- LIGHT MODE COLORS (Improved Contrast) --- */
-    --background: 0 0% 98%;       /* #FAFAFA */
-    --foreground: 228 19% 15%;    /* Dark text for light mode */
+    /* --- LIGHT MODE PALETTE (High Contrast) --- */
+    /* Backgrounds */
+    --background: 0 0% 98%;        /* #FAFAFA */
+    --foreground: 228 19% 15%;     /* Dark Text */
     
     --card: 0 0% 100%;
     --card-foreground: 228 19% 15%;
@@ -24,48 +25,50 @@
     --popover: 0 0% 100%;
     --popover-foreground: 228 19% 15%;
     
-    --primary: 7 85% 55%;         /* Darker Red-Orange for text readability */
+    /* UI Elements */
+    --primary: 7 85% 55%;          /* Darker Red-Orange for readability */
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 228 20% 90%;     /* Light bluish-gray */
+    --secondary: 228 20% 90%;
     --secondary-foreground: 228 19% 15%;
     
     --muted: 228 20% 92%;
     --muted-foreground: 228 10% 40%;
     
-    --accent: 34 90% 55%;         /* Darker Gold for text */
+    --accent: 34 90% 45%;          /* Dark Gold/Orange for light mode text */
     --accent-foreground: 0 0% 100%;
     
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
     --border: 228 20% 85%;
-    --input: 228 20% 95%;
+    --input: 228 20% 96%;
     --input-border: 228 20% 80%;
     --ring: 7 85% 60%;
     --radius: 0.75rem;
 
-    /* --- Brand Colors (HSL) - Light Mode adjustments for text --- */
-    --brand-red-orange: 7 85% 60%;
+    /* --- BRAND COLORS (HSL) --- */
+    /* Adjusted for Light Mode Visibility */
+    --brand-red-orange: 7 85% 55%;
     --brand-deep-indigo: 228 30% 30%;
-    --brand-gold: 34 90% 50%;       /* Darker for visibility on white */
-    --brand-beige: 40 30% 90%;
-    --brand-cyan: 180 100% 35%;     /* Much darker cyan for light mode text! */
-    --brand-green: 145 70% 40%;     /* Darker green */
+    --brand-gold: 34 90% 45%; 
+    --brand-beige: 40 20% 80%;
+    --brand-cyan: 180 100% 35%;      /* Darker Cyan for white backgrounds */
+    --brand-green: 145 70% 35%;      /* Darker Green */
     --brand-purple: 270 60% 50%;
     --brand-pink: 330 70% 50%;
 
-    /* --- RGB Helpers --- */
+    /* --- RGB HELPERS (Crucial for shadows/opacity) --- */
+    /* These match the generic brand hues */
     --red-orange-rgb: 238, 106, 89;
     --deep-indigo-rgb: 58, 63, 88;
     --gold-rgb: 249, 172, 103;
     --beige-rgb: 236, 230, 205;
     --black-rgb: 0, 0, 0;
     
-    /* Legacy Mappings */
     --purple-rgb: 90, 60, 180;
     --pink-rgb: 230, 80, 140;
-    --cyan-rgb: 0, 150, 180;
+    --cyan-rgb: 0, 180, 200;
     --blue-rgb: 40, 60, 180;
     --yellow-rgb: 220, 160, 20;
     --green-rgb: 30, 160, 80;
@@ -84,7 +87,7 @@
     --chart-4: 228 30% 30%;
     --chart-5: 180 100% 35%;
 
-    /* Sidebar (Always dark usually, but mapping to variables) */
+    /* Sidebar */
     --sidebar-background: 228 20% 10%;
     --sidebar-foreground: 240 5% 96%;
     --sidebar-primary: 7 85% 60%;
@@ -94,13 +97,13 @@
     --sidebar-border: 228 20% 20%;
     --sidebar-ring: 7 85% 60%;
     
-    /* Text Colors */
+    /* Text helpers */
     --light-text: 228 19% 15%; 
     --accent-text: 7 85% 55%; 
   }
 
   .dark {
-    /* --- DARK MODE COLORS --- */
+    /* --- DARK MODE PALETTE (Cyber/Neon) --- */
     --background: 228 20% 8%;      /* #101218 */
     --foreground: 48 43% 86%;      /* Light Beige Text */
     
@@ -110,7 +113,7 @@
     --popover: 228 20% 10%;
     --popover-foreground: 48 43% 86%;
     
-    --primary: 34 92% 70%;         /* Gold for primary in dark */
+    --primary: 34 92% 70%;         /* Gold/Orange for primary in dark */
     --primary-foreground: 228 20% 10%;
     
     --secondary: 228 19% 29%;
@@ -140,10 +143,11 @@
     --brand-purple: 270 70% 60%;
     --brand-pink: 330 80% 65%;
 
-    /* RGB Helpers (Update for neon glow effects) */
+    /* RGB Helpers (Update for neon glow effects in dark mode) */
     --cyan-rgb: 100, 220, 255;
     --green-rgb: 100, 255, 150;
     --purple-rgb: 180, 100, 255;
+    
     --bg-rgb: 20, 22, 29;
     --card-rgb: 27, 29, 39;
 
@@ -154,11 +158,19 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Orbitron', sans-serif;
     @apply text-foreground; 
+  }
+  section {
+    scroll-margin-top: 96px; 
   }
 }
 
@@ -167,7 +179,6 @@
     font-family: 'Orbitron', sans-serif; 
     @apply tracking-wider uppercase; 
     
-    /* Light mode gradient: darker colors */
     background-image: linear-gradient(
       to top, 
       hsl(var(--brand-red-orange)), 
@@ -178,10 +189,11 @@
     background-clip: text;
     -webkit-text-fill-color: transparent;
     text-fill-color: transparent;
+    user-select: none;
   }
   
   .dark .gta-vibe-text-effect {
-     /* Dark mode gradient: brighter colors */
+    /* Restore specific dark mode gradient and shadow */
     background-image: linear-gradient(
       to top, 
       hsl(var(--brand-red-orange)), 
@@ -190,7 +202,9 @@
     );
     text-shadow: 
       0px 2px 1px hsla(var(--brand-deep-indigo), 0.85), 
-      0px 0px 5px hsla(var(--brand-red-orange), 0.5);
+      0px 2px 3px hsla(var(--brand-deep-indigo), 0.65),
+      0px 0px 5px hsla(var(--brand-red-orange), 0.75),   
+      0px 0px 10px hsla(var(--brand-red-orange), 0.55);
   }
 
   .gta-icon-fix {
@@ -199,22 +213,35 @@
   }
   .dark .gta-icon-fix {
     color: hsl(var(--brand-gold)); 
-    filter: drop-shadow(0 0 3px hsla(var(--gold-rgb), 0.7));
+    filter: drop-shadow(0 0 3px hsla(var(--gold-rgb), 0.7)) drop-shadow(0 0 1px black);
   }
 
   /* Inputs */
   .input-cyber {
     @apply bg-input border border-input-border text-foreground placeholder:opacity-70 rounded-md px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring transition-all shadow-sm;
+    placeholder-color: hsl(var(--muted-foreground));
   }
   .dark .input-cyber {
-    @apply shadow-inner shadow-black/30;
+    @apply bg-input border-border text-foreground placeholder:opacity-70 shadow-inner shadow-black/30;
+  }
+
+  .textarea-cyber {
+      @apply bg-input border border-input-border text-foreground placeholder:opacity-70 rounded-md px-3 py-2 text-sm min-h-[80px]
+             focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
+             transition-all duration-200 ease-in-out shadow-sm;
+      placeholder-color: hsl(var(--muted-foreground));
+  }
+  .dark .textarea-cyber {
+      @apply bg-input border-border text-foreground placeholder:opacity-70 shadow-inner shadow-black/30;
+      placeholder-color: hsl(var(--muted-foreground));
   }
   
   /* Wheelie Effect */
   .title-wheelie-effect {
     @apply font-orbitron font-bold inline-block;
     perspective: 400px;
+    transition: transform 0.4s cubic-bezier(0.2, 1, 0.3, 1);
   }
   .title-wheelie-effect span {
     display: inline-block;
@@ -224,20 +251,88 @@
   .title-wheelie-effect:hover span {
     transform: rotateX(45deg) translateY(-10%);
   }
+  .title-wheelie-effect:hover {
+    transform: scale(1.05);
+  }
+
+  /* Text Gradients */
+  .text-gradient { 
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-red-orange via-brand-gold to-brand-cyan; 
+  }
+
+  /* Custom Component Classes (Restored) */
+  .homepage-wrapper {
+    @apply min-h-screen text-foreground relative overflow-x-hidden pt-20 pb-28;
+    background-color: hsl(var(--background)); 
+  }
+  .loading-spinner-cyber {
+    border-width: 4px;
+    border-radius: 9999px; 
+    border-top-color: hsl(var(--brand-gold) / 0.5);
+    border-left-color: hsl(var(--brand-red-orange) / 0.5);
+    border-right-color: hsl(var(--brand-red-orange) / 0.5);
+    border-bottom-color: hsl(var(--brand-deep-indigo) / 0.5);
+    border-style: solid;
+    box-shadow: 0 0 25px hsl(var(--brand-gold)), 0 0 15px hsl(var(--brand-red-orange));
+  }
+  .avatar-cyber {
+    @apply rounded-full border-2 object-cover;
+    border-color: hsl(var(--brand-red-orange) / 0.8);
+    box-shadow: 0 0 10px hsla(var(--red-orange-rgb), 0.5); 
+  }
+  .activity-card-cyber {
+    @apply backdrop-blur-sm shadow-2xl text-white rounded-xl md:rounded-2xl;
+    background-image: linear-gradient(to bottom right, hsl(var(--brand-red-orange) / 0.95), hsl(var(--brand-deep-indigo) / 0.9));
+    border: 1px solid hsl(var(--brand-red-orange) / 0.7); 
+    box-shadow: 0 0 30px hsla(var(--red-orange-rgb), 0.3);
+  }
+  .bottom-nav-cyber {
+    @apply fixed bottom-0 left-0 right-0 backdrop-blur-xl z-40 py-1.5 px-1;
+    background-color: hsl(var(--background) / 0.85); 
+    border-top: 1px solid hsl(var(--border)); 
+    box-shadow: 0 -4px 15px hsla(var(--foreground), 0.05); 
+  }
+  .dark .bottom-nav-cyber {
+    background-color: hsl(var(--background) / 0.9);
+    border-top: 2px solid hsl(var(--brand-deep-indigo) / 0.6);
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+  }
+  .bottom-nav-item {
+    @apply flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md transition-colors;
+  }
+  .bottom-nav-item:hover { background-color: hsl(var(--muted) / 0.3); }
+  .bottom-nav-item:active { background-color: hsl(var(--muted) / 0.5); }
+  .active-bottom-link { background-color: hsl(var(--muted) / 0.5); }
+  .dark .active-bottom-link { background-color: hsl(var(--card) / 0.7); }
 }
 
 @layer utilities {
-  .text-shadow-neon { text-shadow: 0 0 10px currentColor; }
-  .text-shadow-cyber { text-shadow: 1px 1px 0px rgba(0,0,0,0.2); }
-  .dark .text-shadow-cyber { text-shadow: 0 0 5px rgba(var(--cyan-rgb), 0.5); }
+  .text-shadow-neon {
+    text-shadow: 0 0 5px hsl(var(--brand-red-orange)), 0 0 10px hsl(var(--brand-red-orange)), 0 0 15px hsl(var(--brand-deep-indigo)), 0 0 20px hsl(var(--brand-deep-indigo));
+  }
+  .text-shadow-cyber {
+    text-shadow: 0 0 4px hsla(var(--gold-rgb), 0.8), 0 0 10px hsla(var(--red-orange-rgb), 0.6); 
+  }
+  .dark .text-shadow-cyber { 
+      text-shadow: 0 0 5px rgba(var(--cyan-rgb), 0.5); 
+  }
+  
+  /* Glow Shadows */
+  .shadow-glow { box-shadow: 0 0 10px hsla(var(--gold-rgb), 0.5); }
+  .shadow-yellow-glow { box-shadow: 0 0 15px hsla(var(--gold-rgb), 0.4), 0 0 30px hsla(var(--gold-rgb), 0.2); }
+  .shadow-purple-glow { box-shadow: 0 0 15px hsla(var(--deep-indigo-rgb), 0.4), 0 0 30px hsla(var(--deep-indigo-rgb), 0.2); }
+  .shadow-green-glow { box-shadow: 0 0 15px hsla(var(--green-rgb), 0.4), 0 0 30px hsla(var(--green-rgb), 0.2); }
+  .shadow-pink-glow { box-shadow: 0 0 15px hsla(var(--red-orange-rgb), 0.4), 0 0 30px hsla(var(--red-orange-rgb), 0.2); }
+  .shadow-blue-glow { box-shadow: 0 0 15px hsla(var(--deep-indigo-rgb), 0.4), 0 0 30px hsla(var(--deep-indigo-rgb), 0.2); }
+  .shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--cyan-rgb), 0.4), 0 0 30px hsla(var(--cyan-rgb), 0.2); }
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: hsl(var(--muted)); }
-::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.5); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.5); border-radius: 4px; border: 1px solid hsl(var(--border) / 0.3); }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 
-.dark ::-webkit-scrollbar-track { background: hsl(var(--card)); }
-.dark ::-webkit-scrollbar-thumb { background: hsl(var(--brand-deep-indigo)); border: 1px solid hsl(var(--border)); }
-.dark ::-webkit-scrollbar-thumb:hover { background: hsl(var(--brand-red-orange)); }
+.dark ::-webkit-scrollbar-track { background: hsla(var(--card-rgb), 0.5); }
+.dark ::-webkit-scrollbar-thumb { background: hsl(var(--brand-gold) / 0.7); border: 1px solid hsl(var(--brand-red-orange) / 0.3); }
+.dark ::-webkit-scrollbar-thumb:hover { background: hsl(var(--brand-red-orange) / 0.8); }
