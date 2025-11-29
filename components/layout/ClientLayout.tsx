@@ -3,6 +3,7 @@
 import type React from "react";
 import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTheme } from "next-themes";
 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -13,6 +14,7 @@ import SaunaFooter from "@/components/SaunaFooter";
 import StickyChatButton from "@/components/StickyChatButton";
 
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
+import { ThemeProvider } from "@/components/theme-provider"; // Imported here
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
@@ -202,6 +204,29 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
+// --- THEME SYNC HOOK ---
+function useThemeSync() {
+  const { dbUser, isLoading } = useAppContext();
+  const { setTheme, resolvedTheme } = useTheme();
+  const [hasSynced, setHasSynced] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && dbUser && !hasSynced) {
+      const settings = dbUser.metadata?.settings_profile as Record<string, any> | undefined;
+      if (settings && typeof settings.dark_mode_enabled === 'boolean') {
+        const dbWantsDark = settings.dark_mode_enabled;
+        const currentIsDark = resolvedTheme === 'dark';
+        
+        if (dbWantsDark !== currentIsDark) {
+            logger.info(`[ThemeSync] Syncing theme from DB. User wants: ${dbWantsDark ? 'DARK' : 'LIGHT'}`);
+            setTheme(dbWantsDark ? 'dark' : 'light');
+        }
+      }
+      setHasSynced(true);
+    }
+  }, [dbUser, isLoading, hasSynced, resolvedTheme, setTheme]);
+}
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -225,6 +250,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
 
   useBio30ThemeFix();
+  useThemeSync(); 
 
   useEffect(() => {
     // Bio30 Referral Helper
@@ -287,16 +313,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } 
       else if (paramToProcess.startsWith("crew_")) {
-        // crew_slug OR crew_slug_join_crew
-        const parts = paramToProcess.split("_");
-        // parts[0] = crew
-        // parts[1] = slug (can contain underscores? ideally slugs shouldn't, but let's be safe)
-        
-        // Reconstruct slug if it was split by underscores incorrectly? 
-        // Assuming standard format: crew_{slug}_join_crew OR crew_{slug}
-        // If slug has underscores, this split is tricky. 
-        // Better logic: remove 'crew_' prefix, check if ends with '_join_crew'
-        
         const content = paramToProcess.substring(5); // remove 'crew_'
         if (content.endsWith("_join_crew")) {
              const slug = content.substring(0, content.length - 10); // remove '_join_crew'
@@ -329,8 +345,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       
       // 2. UNIVERSAL REFERRAL CATCHER (Last check to catch ref_I_O_S_NN)
       else if (paramToProcess.startsWith("ref_")) {
-          // FIXED: Take everything after 'ref_' as the code.
-          // This handles underscores in usernames correctly (e.g., ref_I_O_S_NN -> I_O_S_NN)
           const refCode = paramToProcess.substring(4); 
           
           handleSyndicateReferral(refCode);
@@ -383,7 +397,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
-    // "/wb" -- Removed from bottom nav logic to keep it clean/standalone as requested by Pirate aesthetic
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -432,26 +445,29 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     <ErrorOverlayProvider>
       <AppProvider>
         <AppInitializers />
-        <TooltipProvider>
-          <ErrorBoundaryForOverlay>
-            <Suspense fallback={<Loading variant="bike" text="🏴‍☠️ LOADING VIBE..." />}>
-              <LayoutLogicController>{children}</LayoutLogicController>
-            </Suspense>
-          </ErrorBoundaryForOverlay>
-          <SonnerToaster
-            position="bottom-right"
-            richColors
-            toastOptions={{
-              style: {
-                background: "rgba(10, 10, 10, 0.95)",
-                color: "#00FF9D",
-                border: "1px solid rgba(0, 255, 157, 0.3)",
-                fontFamily: "monospace",
-              },
-            }}
-          />
-          <DevErrorOverlay />
-        </TooltipProvider>
+        {/* ADDED THEME PROVIDER HERE */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <TooltipProvider>
+            <ErrorBoundaryForOverlay>
+              <Suspense fallback={<Loading variant="bike" text="🏴‍☠️ LOADING VIBE..." />}>
+                <LayoutLogicController>{children}</LayoutLogicController>
+              </Suspense>
+            </ErrorBoundaryForOverlay>
+            <SonnerToaster
+              position="bottom-right"
+              richColors
+              toastOptions={{
+                style: {
+                  background: "rgba(10, 10, 10, 0.95)",
+                  color: "#00FF9D",
+                  border: "1px solid rgba(0, 255, 157, 0.3)",
+                  fontFamily: "monospace",
+                },
+              }}
+            />
+            <DevErrorOverlay />
+          </TooltipProvider>
+        </ThemeProvider>
         <Analytics />
         <SpeedInsights />
       </AppProvider>
