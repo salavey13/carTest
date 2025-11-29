@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { FaMoon, FaSun, FaSpinner } from 'react-icons/fa6';
 import { useAppContext } from '@/contexts/AppContext';
-import { updateUserSettings } from '@/app/actions'; // <-- ИСПОЛЬЗУЕМ СУЩЕСТВУЮЩИЙ ЭКШЕН
-import { toast } from 'sonner';
+import { updateUserSettings } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { debugLogger as logger } from '@/lib/debugLogger';
+import { toast } from 'sonner';
 
 export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const { dbUser } = useAppContext();
@@ -19,46 +19,54 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
   useEffect(() => setIsMounted(true), []);
 
   const handleToggle = useCallback(async () => {
-    if (isSaving) return;
-
-    const newTheme = resolvedTheme === 'dark' ? 'light' : 'dark';
+    if (!isMounted) return;
     
-    // 1. Оптимистичное обновление UI
+    // 1. Определяем новую тему
+    const currentTheme = resolvedTheme === 'dark' ? 'dark' : 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // 2. МГНОВЕННО применяем визуально (Оптимистичный UI)
     setTheme(newTheme);
-
-    // 2. Если нет пользователя, просто выходим
-    if (!dbUser?.user_id) {
-      logger.debug("[ThemeToggle] User not logged in, theme changed locally.");
-      return;
-    }
-
-    // 3. Сохранение в БД с помощью существующего экшена
-    setIsSaving(true);
     
-    // Подготовка данных для updateUserSettings
-    const currentMetadata = dbUser.metadata || {};
-    const currentSettings = (currentMetadata.settings_profile || {}) as Record<string, any>;
-    const newSettingsProfile = { ...currentSettings, dark_mode_enabled: newTheme === 'dark' };
-    const updatedMetadata = { ...currentMetadata, settings_profile: newSettingsProfile };
+    // 3. Если есть юзер, сохраняем в фоне
+    if (dbUser?.user_id) {
+      setIsSaving(true);
+      try {
+        const currentMeta = dbUser.metadata || {};
+        const currentSettings = (currentMeta.settings_profile || {}) as Record<string, any>;
+        
+        const updatedMetadata = {
+          ...currentMeta,
+          settings_profile: { 
+            ...currentSettings, 
+            dark_mode_enabled: newTheme === 'dark' 
+          }
+        };
 
-    const result = await updateUserSettings(dbUser.user_id, updatedMetadata);
-
-    if (result.success) {
-      toast.success(`Тема сохранена: ${newTheme === 'dark' ? 'Темная' : 'Светлая'}`);
-    } else {
-      toast.error("Ошибка сохранения темы");
-      logger.error("[ThemeToggle] Failed to save theme setting", result.error);
-      // Откатываем UI в случае ошибки
-      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+        // Отправляем, но не блокируем интерфейс ожиданием (fire and forget, но со спиннером)
+        const result = await updateUserSettings(dbUser.user_id, updatedMetadata);
+        
+        if (!result.success) {
+           logger.error("Theme save failed:", result.error);
+           // Не откатываем тему автоматически, чтобы не бесить юзера мерцанием.
+           // Просто в следующий раз загрузится старая, если сейв не прошел.
+           toast.error("Сбой сохранения темы в облако");
+        }
+      } catch (e) {
+        logger.error("Theme toggle error:", e);
+      } finally {
+        setIsSaving(false);
+      }
     }
-    setIsSaving(false);
-  }, [resolvedTheme, dbUser, isSaving, setTheme]);
+  }, [resolvedTheme, dbUser, isMounted, setTheme]);
 
   if (!isMounted) {
-    return <div className={cn("bg-muted/50 rounded-full animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8")} />;
+    return <div className={cn("bg-muted/20 rounded-full animate-pulse", size === 'md' ? "w-9 h-9" : "w-8 h-8")} />;
   }
   
   const iconSizeClass = size === 'md' ? "h-5 w-5" : "h-4 w-4";
+  // Используем resolvedTheme для надежности иконок
+  const isDark = resolvedTheme === 'dark';
 
   return (
     <button
@@ -66,26 +74,25 @@ export function ThemeToggleButton({ size = 'md' }: { size?: 'sm' | 'md' }) {
       disabled={isSaving}
       className={cn(
         "relative flex items-center justify-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background",
-        "hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 active:scale-90",
-        size === 'md' ? "w-9 h-9" : "w-8 h-8",
-        "text-brand-yellow focus:ring-brand-yellow"
+        "hover:bg-accent text-foreground active:scale-90",
+        size === 'md' ? "w-9 h-9" : "w-8 h-8"
       )}
-      aria-label="Переключить тему"
+      title={isDark ? "Включить светлую тему" : "Включить темную тему"}
     >
       <AnimatePresence mode="wait" initial={false}>
         <motion.span
-          key={isSaving ? 'saving' : resolvedTheme}
-          initial={{ y: -15, opacity: 0, rotate: -45 }}
+          key={isSaving ? 'saving' : (isDark ? 'dark' : 'light')}
+          initial={{ y: -10, opacity: 0, rotate: -90 }}
           animate={{ y: 0, opacity: 1, rotate: 0 }}
-          exit={{ y: 15, opacity: 0, rotate: 45 }}
-          transition={{ duration: 0.2, type: 'tween', ease: 'easeInOut' }}
+          exit={{ y: 10, opacity: 0, rotate: 90 }}
+          transition={{ duration: 0.2 }}
           className="absolute"
         >
           {isSaving 
             ? <FaSpinner className={cn("animate-spin text-muted-foreground", iconSizeClass)} />
-            : resolvedTheme === 'dark' 
-              ? <FaMoon className={cn(iconSizeClass)} /> 
-              : <FaSun className={cn(iconSizeClass, "text-brand-deep-indigo dark:text-brand-yellow")} />
+            : isDark 
+              ? <FaMoon className={cn(iconSizeClass, "text-brand-purple")} /> 
+              : <FaSun className={cn(iconSizeClass, "text-brand-orange")} />
           }
         </motion.span>
       </AnimatePresence>
