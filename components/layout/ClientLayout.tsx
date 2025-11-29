@@ -203,33 +203,31 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
-// --- NEW: Theme Sync Hook ---
+// --- THEME SYNC LOGIC (Fixed) ---
 function useThemeSync() {
   const { dbUser, isLoading } = useAppContext();
   const { setTheme, resolvedTheme } = useTheme();
   const [hasSynced, setHasSynced] = useState(false);
 
   useEffect(() => {
-    // Only sync ONCE when the user is fully loaded and we haven't synced yet
-    if (!isLoading && dbUser?.metadata?.settings_profile && !hasSynced) {
-      const settings = dbUser.metadata.settings_profile as Record<string, any>;
-      const dbWantsDark = settings.dark_mode_enabled;
-
-      if (typeof dbWantsDark === 'boolean') {
+    // 1. Ждем загрузки пользователя и проверяем, что синхронизация еще не выполнялась
+    if (!isLoading && dbUser && !hasSynced) {
+      const settings = dbUser.metadata?.settings_profile as Record<string, any> | undefined;
+      
+      if (settings && typeof settings.dark_mode_enabled === 'boolean') {
+        const dbWantsDark = settings.dark_mode_enabled;
         const currentIsDark = resolvedTheme === 'dark';
-        
-        // If DB says Dark, but UI is Light -> Switch to Dark
-        if (dbWantsDark && !currentIsDark) {
-            logger.info("[ThemeSync] Applying DB preference: DARK");
-            setTheme('dark');
-        }
-        // If DB says Light, but UI is Dark -> Switch to Light
-        else if (!dbWantsDark && currentIsDark) {
-            logger.info("[ThemeSync] Applying DB preference: LIGHT");
-            setTheme('light');
+
+        // 2. Применяем тему ТОЛЬКО если она отличается от текущей
+        if (dbWantsDark !== currentIsDark) {
+            logger.info(`[ThemeSync] Syncing theme from DB. User wants: ${dbWantsDark ? 'DARK' : 'LIGHT'}`);
+            setTheme(dbWantsDark ? 'dark' : 'light');
         }
       }
-      setHasSynced(true); // Mark as synced so we don't override manual toggles later
+      
+      // 3. Ставим флаг, что синхронизация завершена. 
+      // Это предотвратит повторное переключение, когда dbUser обновится после ручного переключения темы.
+      setHasSynced(true);
     }
   }, [dbUser, isLoading, hasSynced, resolvedTheme, setTheme]);
 }
@@ -241,7 +239,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
-    userCrewInfo, // Access crew info for smart redirects
+    userCrewInfo, 
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
@@ -257,10 +255,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
 
   useBio30ThemeFix();
-  useThemeSync(); // <--- Activate theme sync here
+  useThemeSync(); // Активируем синхронизацию
 
   useEffect(() => {
-    // Bio30 Referral Helper
     const handleBio30Referral = async (referrerId: string, paramToProcess: string) => {
       if (dbUser && dbUser.user_id && !dbUser.metadata?.referrer_id) {
         try {
@@ -274,10 +271,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
               `[ClientLayout] Referral set for user ${dbUser.user_id} to referrer ${referrerId}`
             );
             await refreshDbUser();
-          } else {
-            logger.error(
-              `[ClientLayout] Failed to set referrer for user ${dbUser.user_id}: ${result.error}`
-            );
           }
         } catch (error) {
           logger.error(`[ClientLayout] Error setting referrer:`, error);
@@ -285,11 +278,8 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // WB Syndicate Referral Helper
     const handleSyndicateReferral = async (refCode: string) => {
         if (!dbUser?.user_id) return;
-        
-        // Only apply if no referrer exists (First Touch Attribution)
         if (!dbUser.metadata?.referrer) {
             logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
             const res = await applyReferralCode(dbUser.user_id, refCode);
@@ -302,16 +292,12 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
 
     const paramToProcess = startParamPayload || searchParams.get("tgWebAppStartParam");
     
-    // Process logic only when auth is done
     if (!isAppLoading && !isAuthenticating && paramToProcess && !startParamHandledRef.current) {
       startParamHandledRef.current = true;
       let targetPath: string | undefined;
 
       logger.info(`[ClientLayout] Processing Start Param: ${paramToProcess}`);
 
-      // ===================== ROUTING & PARSING LOGIC =====================
-
-      // 1. Specific Prefixes Check
       if (paramToProcess === "wb_dashboard") {
          if (userCrewInfo?.slug) targetPath = `/wb/${userCrewInfo.slug}`;
          else targetPath = "/wblanding";
@@ -320,19 +306,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } 
       else if (paramToProcess.startsWith("crew_")) {
-        // crew_slug OR crew_slug_join_crew
-        const parts = paramToProcess.split("_");
-        // parts[0] = crew
-        // parts[1] = slug (can contain underscores? ideally slugs shouldn't, but let's be safe)
-        
-        // Reconstruct slug if it was split by underscores incorrectly? 
-        // Assuming standard format: crew_{slug}_join_crew OR crew_{slug}
-        // If slug has underscores, this split is tricky. 
-        // Better logic: remove 'crew_' prefix, check if ends with '_join_crew'
-        
-        const content = paramToProcess.substring(5); // remove 'crew_'
+        const content = paramToProcess.substring(5); 
         if (content.endsWith("_join_crew")) {
-             const slug = content.substring(0, content.length - 10); // remove '_join_crew'
+             const slug = content.substring(0, content.length - 10); 
              targetPath = `/wb/${slug}?join_crew=true`;
         } else {
              targetPath = `/wb/${content}`;
@@ -343,7 +319,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       }
       else if (paramToProcess.startsWith("bio30_")) {
-        // bio30 logic...
         const parts = paramToProcess.split("_");
         let productId: string | undefined;
         let referrerId: string | undefined;
@@ -355,36 +330,24 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
       }
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
-          // rental_ID
           const parts = paramToProcess.split("_");
           if (parts.length === 2) targetPath = `/rentals/${parts[1]}`;
       }
-      
-      // 2. UNIVERSAL REFERRAL CATCHER (Last check to catch ref_I_O_S_NN)
       else if (paramToProcess.startsWith("ref_")) {
-          // FIXED: Take everything after 'ref_' as the code.
-          // This handles underscores in usernames correctly (e.g., ref_I_O_S_NN -> I_O_S_NN)
           const refCode = paramToProcess.substring(4); 
-          
           handleSyndicateReferral(refCode);
-          
-          // If on main page, redirect to WB landing for conversion
           if (pathname === '/') targetPath = '/wblanding';
-          else targetPath = pathname; // Stay where we are
+          else targetPath = pathname; 
       }
-
-      // 3. Fallback
       else {
         targetPath = `/${paramToProcess}`;
       }
 
-      // ===================== EXECUTE REDIRECT =====================
       if (targetPath && targetPath !== pathname) {
         logger.info(`[ClientLayout] Redirecting to ${targetPath}`);
         router.replace(targetPath);
       }
       
-      // Clear param to prevent loops
       clearStartParam?.();
     }
   }, [
@@ -416,7 +379,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
-    // "/wb" -- Removed from bottom nav logic to keep it clean/standalone as requested by Pirate aesthetic
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -428,7 +390,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/profile" ||
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") || // Hides standard header/footer for Warehouse pages
+        pathname?.startsWith("/wb") || 
         pathname === "/wblanding" || 
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
