@@ -3,6 +3,7 @@
 import type React from "react";
 import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTheme } from "next-themes"; // Import useTheme
 
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -202,6 +203,37 @@ function useBio30ThemeFix() {
   }, [pathname]);
 }
 
+// --- NEW: Theme Sync Hook ---
+function useThemeSync() {
+  const { dbUser, isLoading } = useAppContext();
+  const { setTheme, resolvedTheme } = useTheme();
+  const [hasSynced, setHasSynced] = useState(false);
+
+  useEffect(() => {
+    // Only sync ONCE when the user is fully loaded and we haven't synced yet
+    if (!isLoading && dbUser?.metadata?.settings_profile && !hasSynced) {
+      const settings = dbUser.metadata.settings_profile as Record<string, any>;
+      const dbWantsDark = settings.dark_mode_enabled;
+
+      if (typeof dbWantsDark === 'boolean') {
+        const currentIsDark = resolvedTheme === 'dark';
+        
+        // If DB says Dark, but UI is Light -> Switch to Dark
+        if (dbWantsDark && !currentIsDark) {
+            logger.info("[ThemeSync] Applying DB preference: DARK");
+            setTheme('dark');
+        }
+        // If DB says Light, but UI is Dark -> Switch to Light
+        else if (!dbWantsDark && currentIsDark) {
+            logger.info("[ThemeSync] Applying DB preference: LIGHT");
+            setTheme('light');
+        }
+      }
+      setHasSynced(true); // Mark as synced so we don't override manual toggles later
+    }
+  }, [dbUser, isLoading, hasSynced, resolvedTheme, setTheme]);
+}
+
 function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -225,6 +257,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const CurrentBottomNav = theme.BottomNav;
 
   useBio30ThemeFix();
+  useThemeSync(); // <--- Activate theme sync here
 
   useEffect(() => {
     // Bio30 Referral Helper
