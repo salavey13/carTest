@@ -19,7 +19,9 @@ import {
   BrainCircuit,
   FileX,
   TrendingDown,
-  Rocket
+  Rocket,
+  Megaphone,
+  Snowflake
 } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
 
@@ -82,27 +84,27 @@ export default function History7Cheatsheet() {
                 <CardContent className="space-y-6 relative z-10">
                     <div className="bg-stone-950/80 p-5 rounded-xl border-l-4 border-red-600 shadow-inner">
                         <div className="flex justify-between items-center mb-2">
-                            <h4 className="text-sm font-bold text-stone-500 uppercase tracking-wider">Официальная версия</h4>
+                            <h4 className="text-sm font-bold text-stone-500 uppercase tracking-wider">Официальная версия (Газета "Правда")</h4>
                             <Radio className="w-4 h-4 text-red-500 animate-pulse" />
                         </div>
-                        <p className="italic text-xl text-stone-200 font-serif">"Финская артиллерия обстреляла советских солдат. Мы вынуждены отодвинуть границу!"</p>
+                        <p className="italic text-xl text-stone-200 font-serif">"Наглая финская военщина обстреляла советских солдат у деревни Майнила. Мы вынуждены отодвинуть границу ради безопасности Ленинграда!"</p>
                     </div>
                     
                     <div className="grid md:grid-cols-2 gap-6">
                         <div className="space-y-2 bg-stone-800/30 p-4 rounded-lg">
                             <div className="flex items-center gap-2 text-amber-500 font-bold uppercase text-xs tracking-widest">
-                                <Search className="w-4 h-4" /> Реальность
+                                <Search className="w-4 h-4" /> Реальность (Архивы)
                             </div>
                             <p className="text-sm text-stone-300 leading-relaxed">
-                                Финских орудий там <strong>не было</strong>. Выстрелы произвело НКВД. Это классическая "провокация под чужим флагом".
+                                Финских орудий в этом районе <strong>физически не было</strong> (они были отведены на 20 км, чтобы не провоцировать). Выстрелы были произведены с советской стороны силами НКВД.
                             </p>
                         </div>
                         <div className="space-y-2 bg-stone-800/30 p-4 rounded-lg">
                             <div className="flex items-center gap-2 text-amber-500 font-bold uppercase text-xs tracking-widest">
-                                <EyeOff className="w-4 h-4" /> Цель
+                                <EyeOff className="w-4 h-4" /> Зачем это нужно?
                             </div>
                             <p className="text-sm text-stone-300 leading-relaxed">
-                                Агрессору нужно выглядеть жертвой в телевизоре, чтобы солдаты не задавали вопросов "Зачем мы умираем в чужом лесу?".
+                                Агрессору всегда нужно выглядеть жертвой в глазах своего населения. Никто не хочет быть злодеем. Все хотят "защищать родину", даже если для этого нужно напасть на соседа.
                             </p>
                         </div>
                     </div>
@@ -138,7 +140,7 @@ export default function History7Cheatsheet() {
                                 <div className="bg-amber-500/20 p-1 rounded text-amber-500 mt-1"><FileWarning size={16} /></div>
                                 <div>
                                     <span className="text-amber-500 font-bold text-xs uppercase block">Фейк</span>
-                                    <span className="text-stone-400 text-sm">В первом захваченном поселке (Терийоки) посадили коммуниста Куусинена и объявили его президентом.</span>
+                                    <span className="text-stone-400 text-sm">В первом захваченном поселке (Терийоки) посадили коммуниста Отто Куусинена и объявили его президентом.</span>
                                 </div>
                             </div>
                             <div className="flex items-start gap-3 bg-stone-950/50 p-3 rounded border border-stone-800">
@@ -150,8 +152,122 @@ export default function History7Cheatsheet() {
                             </div>
                         </div>
                     </div>
+                    <div className="bg-gradient-to-b from-stone-800 to-black p-4 rounded-xl border border-stone-700 flex flex-col justify-center items-center text-center shadow-2xl">
+                        <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mb-4 text-white font-black text-2xl border-4 border-stone-900 shadow-lg">
+                            🛑
+                        </div>
+                        <p className="text-xs text-stone-500 font-mono leading-tight">
+                            УРОК:<br/>Если перед вторжением на границе внезапно появляется "Народная Республика", которая просит ввести войска — это сценарий 1939 года.
+                        </p>
+                    </div>
                 </CardContent>
             </Card>
+        </div>
+
+        {/* --- BLOCK 3: NEWSPEAK & BREADBASKETS --- */}
+        <Card className="bg-stone-900 border-stone-800 overflow-hidden relative">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-5"></div>
+            <CardHeader className="text-center pb-2">
+                 <div className="inline-block bg-stone-800 px-4 py-1 rounded-full text-xs text-stone-400 font-mono mb-2">Лингвистическая экспертиза: Новояз</div>
+                <CardTitle className="text-3xl text-stone-200 font-bold flex items-center justify-center gap-3">
+                    <Megaphone className="w-8 h-8 text-amber-500" />
+                    Хлебницы Молотова 🍞💣
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+                 <div className="grid md:grid-cols-2 gap-0 md:gap-12 items-center relative">
+                    {/* Divider for desktop */}
+                    <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-stone-600 to-transparent"></div>
+                    
+                    <div className="space-y-4 text-center md:text-right">
+                        <div className="inline-block bg-red-900/30 text-red-400 px-3 py-1 rounded text-xs font-bold uppercase">Заявление (Ложь)</div>
+                        <div className="bg-stone-950 p-6 rounded-2xl border border-stone-800 shadow-xl relative">
+                             <div className="absolute top-0 right-0 p-2 opacity-10 text-6xl select-none">🤥</div>
+                            <p className="text-sm text-stone-500 mb-2 font-mono">Вячеслав Молотов (Глава МИД СССР):</p>
+                            <p className="text-xl text-white font-serif italic">
+                                "Советская авиация не бомбит Хельсинки! Мы сбрасываем голодающим финским рабочим корзины с хлебом!"
+                            </p>
+                            <p className="text-xs text-stone-600 mt-2">(Речь о кассетных бомбах РРАБ-3, которые при вращении разбрасывали зажигательные снаряды)</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 text-center md:text-left mt-8 md:mt-0">
+                        <div className="inline-block bg-green-900/30 text-green-400 px-3 py-1 rounded text-xs font-bold uppercase">Реакция (Сарказм)</div>
+                        <div className="bg-stone-950 p-6 rounded-2xl border border-stone-800 shadow-xl relative">
+                            <div className="absolute top-0 left-0 p-2 opacity-10 text-6xl select-none">🍾</div>
+                            <p className="text-sm text-stone-500 mb-2 font-mono">Финская армия:</p>
+                            <p className="text-sm text-stone-300 leading-relaxed">
+                                "Спасибо за хлеб! А вот вам напиток, чтобы запить." <br/>
+                                Финны начали массово производить зажигательную смесь в бутылках, назвав её: <br/>
+                                <span className="text-xl text-amber-500 font-black block mt-2 transform rotate-1 inline-block">"Коктейль ДЛЯ Молотова"</span>
+                            </p>
+                            <p className="text-xs text-stone-600 mt-2">(Позже предлог "для" потерялся, и название стало нарицательным).</p>
+                        </div>
+                    </div>
+                 </div>
+                 <div className="mt-8 text-center bg-stone-800/50 p-4 rounded-lg border border-stone-700">
+                    <p className="text-stone-400 text-sm">
+                        <span className="text-white font-bold">УРОК:</span> Тотальная ложь — это база диктатур. Если они бомбят город, они скажут, что везут гуманитарку. Если они отступают, они скажут "жест доброй воли".
+                    </p>
+                 </div>
+            </CardContent>
+        </Card>
+
+        {/* --- BLOCK 4: THE GRINDER & THE PARADE --- */}
+        <div className="grid lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-4 space-y-4">
+                <h2 className="text-3xl font-bold text-stone-200 flex items-center gap-3">
+                    <span className="text-6xl opacity-20 font-black absolute -left-8">04</span>
+                    Цена "Величия"
+                </h2>
+                <p className="text-stone-400 text-sm">
+                    История о том, как "Маленькая победоносная война" превращается в мясорубку.
+                </p>
+            </div>
+            
+            <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* The Plan vs Reality */}
+                <div className="bg-stone-900/80 p-6 rounded-xl border border-stone-800 space-y-4">
+                     <div className="flex items-center gap-2 mb-2">
+                        <Skull className="w-5 h-5 text-red-500" />
+                        <h3 className="text-white font-bold uppercase tracking-wide text-sm">Ожидание: Парад</h3>
+                     </div>
+                     <p className="text-stone-400 text-sm">
+                        СССР планировал захватить Финляндию за <strong>2 недели</strong> (подарок к дню рождения Сталина). 
+                        Солдатам выдали <strong>парадную форму</strong> в рюкзаки, но забыли выдать теплую одежду. 
+                        Музыкальные оркестры ехали в первых эшелонах.
+                     </p>
+                </div>
+
+                <div className="bg-stone-900/80 p-6 rounded-xl border border-stone-800 space-y-4">
+                     <div className="flex items-center gap-2 mb-2">
+                        <Snowflake className="w-5 h-5 text-blue-400" />
+                        <h3 className="text-white font-bold uppercase tracking-wide text-sm">Реальность: "Мотти"</h3>
+                     </div>
+                     <p className="text-stone-400 text-sm">
+                        Вместо парада — <strong>3.5 месяца ада</strong>. Финны использовали тактику <strong>"Мотти"</strong>: 
+                        они пропускали советские колонны вглубь леса, рубили их на куски, окружали и уничтожали по частям. 
+                        Танки без топлива становились железными гробами.
+                     </p>
+                </div>
+
+                {/* The Score */}
+                <div className="md:col-span-2 bg-gradient-to-r from-stone-900 to-black p-6 rounded-xl border border-stone-700 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="text-center md:text-left">
+                        <h3 className="text-white font-bold mb-1 uppercase tracking-wide text-xs">Итог (Потери)</h3>
+                        <div className="space-y-1 font-mono text-base">
+                            <div><span className="text-red-500 font-black">СССР:</span> ~127,000+ убитых / пропавших</div>
+                            <div><span className="text-green-500 font-black">Финляндия:</span> ~26,000</div>
+                        </div>
+                    </div>
+                    <div className="text-center md:text-right border-t md:border-t-0 md:border-l border-stone-700 pt-4 md:pt-0 md:pl-6 w-full md:w-auto">
+                         <span className="text-amber-500 font-bold text-lg block">Последствия</span>
+                         <p className="text-stone-500 text-xs mt-1 max-w-xs mx-auto md:mx-0">
+                            СССР исключили из Лиги Наций как агрессора. Миф о "непобедимости" был разрушен, что дало смелость Гитлеру напасть позже.
+                         </p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         {/* --- CLASSIFIED SECTION: MODERN WARFARE 2.0 (THE UPDATE) --- */}
@@ -200,8 +316,8 @@ export default function History7Cheatsheet() {
                                         <FileX className="w-4 h-4" />
                                     </h4>
                                     <p className="text-stone-300 text-sm leading-relaxed">
-                                        Верит в сделки. Думает, что войну можно остановить, подписав бумагу ("Мирный план"). Боится эскалации. Хочет продать мир как товар.
-                                        <br/><span className="text-red-400 font-bold block mt-2">Ошибка:</span> Диктаторы не уважают контракты. Они уважают только силу.
+                                        Верит в сделки и PR. Думает, что войну можно остановить, подписав красивую бумагу ("Мирный план"). Боится эскалации, потому что она мешает бизнесу.
+                                        <br/><span className="text-red-400 font-bold block mt-2">Ошибка:</span> Диктаторы не уважают контракты. Они видят в переговорах слабость.
                                     </p>
                                 </div>
 
@@ -213,7 +329,7 @@ export default function History7Cheatsheet() {
                                     </h4>
                                     <p className="text-stone-300 text-sm leading-relaxed">
                                         Не верит в слова. Верит в <strong>Термодинамику</strong>. Знает, что если уничтожить генератор, свет погаснет, что бы там ни говорили по телевизору.
-                                        <br/><span className="text-blue-400 font-bold block mt-2">Метод:</span> Если враг не хочет переговоров, ты выключаешь ему свет (Крым, Шатура) и сжигаешь его топливо (Сызрань). Это называется <strong>Кинетический Аргумент</strong>.
+                                        <br/><span className="text-blue-400 font-bold block mt-2">Метод:</span> Если враг не хочет мира, ты выключаешь ему свет (Крым, Шатура) и сжигаешь его топливо (Сызрань). Это называется <strong>Кинетический Аргумент</strong>.
                                     </p>
                                 </div>
                             </div>
@@ -236,9 +352,9 @@ export default function History7Cheatsheet() {
                                     <CardContent className="p-5 flex items-start gap-4">
                                         <div className="text-3xl">📰</div>
                                         <div>
-                                            <span className="font-bold text-stone-300 block mb-1">Новости (Пропаганда):</span>
+                                            <span className="font-bold text-stone-300 block mb-1">Пропаганда (Skybox):</span>
                                             <p className="text-sm text-stone-400">
-                                                "Бензин подешевел на 13 копеек! Экономика растет! Мы сбили все дроны!"
+                                                "Бензин подешевел на 13 копеек! Санкции не работают! Мы сбили все 100% дронов!"
                                             </p>
                                         </div>
                                     </CardContent>
@@ -253,10 +369,10 @@ export default function History7Cheatsheet() {
                                     <CardContent className="p-5 flex items-start gap-4 relative z-10">
                                         <div className="text-3xl">🔥</div>
                                         <div>
-                                            <span className="font-bold text-white block mb-1">Реальность (Физика):</span>
+                                            <span className="font-bold text-white block mb-1">Реальность (3D Fact):</span>
                                             <p className="text-sm text-stone-300">
-                                                НПЗ горит. Бензина на заправке нет (поэтому цена "теоретическая"). Завод в Якутии не может платить зарплату.
-                                                <br/><span className="text-amber-500 font-bold block mt-2">Урок:</span> Пропаганда (Skybox) может нарисовать любую картинку, но она не может согреть батареи, если ГРЭС взорвана.
+                                                НПЗ горит (видео в Telegram). Бензина на заправке нет (поэтому "цена" не важна). Завод в Якутии (алмазы) банкрот и не платит солдатам.
+                                                <br/><span className="text-amber-500 font-bold block mt-2">Урок:</span> Пропаганда может нарисовать любую картинку, но она не может согреть батареи, если ГРЭС взорвана.
                                             </p>
                                         </div>
                                     </CardContent>
@@ -275,10 +391,9 @@ export default function History7Cheatsheet() {
                             <div className="flex-1 text-center md:text-left space-y-4">
                                 <h4 className="text-2xl font-black text-white uppercase tracking-wide">Косплей Диктатора</h4>
                                 <p className="text-stone-300 text-lg leading-relaxed font-serif">
-                                    "Диктаторы любят надевать фуражки времен Второй Мировой (косплей) и пугать картами. Это работает на Торговцев. <br/>
-                                    Но это не работает на Физиков. 
-                                    <span className="text-red-500 font-bold bg-red-900/10 px-1 rounded"> Баллистика не уважает исторические костюмы.</span> 
-                                    В современной войне побеждает тот, кто строит свои дроны (Фламинго/Лютый) и выключает рубильник врагу, пока тот читает лекцию про Рюрика."
+                                    "Диктаторы любят надевать фуражки времен Второй Мировой (косплей) и пугать картами. Они думают, что это работает. <br/>
+                                    Но <span className="text-red-500 font-bold bg-red-900/10 px-1 rounded">баллистика не уважает исторические костюмы.</span> 
+                                    В современной войне побеждает не тот, у кого больше 'мяса', а тот, кто строит свои дроны (Фламинго/Лютый) и выключает рубильник врагу, пока тот читает лекцию про Рюрика."
                                 </p>
                                 <div className="text-xs font-mono text-stone-500 pt-2">
                                     STATUS: PEACE PLAN DESTROYED // KINETIC ARGUMENT ACCEPTED
