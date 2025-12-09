@@ -9,7 +9,7 @@ import { debugLogger } from "@/lib/debugLogger";
 import { Loader2, Trophy, BookOpen, Info, GraduationCap, Terminal } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer"; 
 import type { Database } from '@/types/database.types';
-
+import { AdBreak } from "@/components/AdBreak";
 // --- Types ---
 type Subject = Database['public']['Tables']['subjects']['Row'] & {
     grade_level?: number | null;
@@ -346,7 +346,7 @@ export default function VprTestsListPage() {
                         </div>
                      )}
                 </div>
-
+                <AdBreak/>
                 {/* Leaderboard Section */}
                 <Leaderboard entries={leaderboard} />
 
