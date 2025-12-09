@@ -68,8 +68,6 @@ const ADS = [
   }
 ];
 
-import { Globe } from 'lucide-react'; // Fix missing import
-
 export const AdBreak = () => {
   const [isVisible, setIsVisible] = useState(true);
   const [ad, setAd] = useState(ADS[0]);
