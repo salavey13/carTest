@@ -307,7 +307,19 @@ export default function VprTestsListPage() {
                                          </div>
                                      </Link>
 
-                                     {/* English 7 */}
+ {/* History 7 - SPECIAL ADDITION */}
+<Link href="/vpr/history/7/cheatsheet">
+    <div className="flex items-center gap-2 px-6 py-4 bg-amber-900/20 hover:bg-amber-900/40 text-amber-500 rounded-lg border border-amber-600/50 transition-all cursor-pointer hover:scale-105 shadow-[0_0_15px_rgba(245,158,11,0.1)] font-mono group">
+        <VibeContentRenderer content="<FaHistory />" className="w-4 h-4 group-hover:rotate-12 transition-transform" /> 
+        <span className="font-bold">История: Механика лжи (XX век)</span>
+        <span className="flex h-2 w-2 relative ml-1">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+        </span>
+    </div>
+</Link>
+
+                                    {/* English 7 */}
                                      <Link href="/vpr/english/7/cheatsheet">
                                          <div className="flex items-center gap-2 px-5 py-3 bg-fuchsia-900/20 hover:bg-fuchsia-900/40 text-fuchsia-300 rounded-lg border border-fuchsia-500/30 transition-all cursor-pointer hover:scale-105">
                                              <VibeContentRenderer content="<FaGlobe />" className="w-4 h-4" /> Английский: Neon
