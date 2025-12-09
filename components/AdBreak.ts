@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ExternalLink, Zap, Rocket, GraduationCap, Flame } from 'lucide-react';
+import { Globe, X, ExternalLink, Zap, Rocket, GraduationCap, Flame } from 'lucide-react';
 import Link from 'next/link';
 
 // --- AD CONTENT DATA ---
