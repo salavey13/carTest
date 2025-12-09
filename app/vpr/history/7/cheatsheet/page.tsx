@@ -24,6 +24,7 @@ import {
   Snowflake
 } from "lucide-react";
 import { VibeContentRenderer } from "@/components/VibeContentRenderer";
+import { HumanityExam } from "./components/HumanityExam"
 
 export default function History7Cheatsheet() {
   return (
@@ -405,6 +406,8 @@ export default function History7Cheatsheet() {
                 </div>
             </div>
         </section>
+
+        <HumanityExam/>
 
         {/* FINAL CTA */}
         <div className="flex justify-center pb-12">
