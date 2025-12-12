@@ -37,7 +37,7 @@ export async function createStrikeballLobby(
     if (error) throw error;
 
     // Auto-join owner
-    await supabaseAdmin.from("strikeball_members").insert({
+    await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
       team: "blue",
@@ -67,7 +67,7 @@ export async function createStrikeballLobby(
 export async function joinLobby(userId: string, lobbyId: string, team: string = "red") {
   try {
     const { data: existing } = await supabaseAdmin
-      .from("strikeball_members")
+      .from("lobby_members")
       .select("id")
       .eq("lobby_id", lobbyId)
       .eq("user_id", userId)
@@ -75,7 +75,7 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
 
     if (existing) return { success: true, message: "Already deployed." };
 
-    await supabaseAdmin.from("strikeball_members").insert({
+    await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: userId,
       team,
@@ -121,7 +121,7 @@ export async function getOpenLobbies() {
 
 export async function addNoobBot(lobbyId: string, team: string) {
   try {
-    await supabaseAdmin.from("strikeball_members").insert({
+    await supabaseAdmin.from("lobby_members").insert({
       lobby_id: lobbyId,
       user_id: null,
       is_bot: true,
@@ -136,7 +136,7 @@ export async function addNoobBot(lobbyId: string, team: string) {
 
 export async function togglePlayerStatus(memberId: string, currentStatus: string) {
     const newStatus = currentStatus === 'alive' ? 'dead' : 'alive';
-    await supabaseAdmin.from("strikeball_members").update({ status: newStatus }).eq("id", memberId);
+    await supabaseAdmin.from("lobby_members").update({ status: newStatus }).eq("id", memberId);
     return { success: true, newStatus };
 }
 
