@@ -84,7 +84,7 @@ export default function LobbiesPageClient() {
 
       <div className="grid grid-cols-1 gap-3">
         {crews.map(crew => (
-           <Link key={crew.id} href={`/wb/${crew.slug}`} className="block">
+           <Link key={crew.id} href={`/crews/${crew.slug}`} className="block">
              <div className="bg-zinc-900/50 border border-zinc-800 p-4 flex items-center gap-4 hover:bg-zinc-800 hover:border-cyan-500/50 transition-all">
                 {/* Logo/Avatar */}
                 <div className="w-12 h-12 bg-black border border-zinc-700 flex-shrink-0 relative">
