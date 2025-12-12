@@ -4,14 +4,15 @@ import React, { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getOpenLobbies, joinLobby } from "../actions";
 import { toast } from "sonner";
+import { FaUserAstronaut } from "react-icons/fa6";
 
 type Lobby = {
   id: string;
   name: string;
-  owner_id?: string;
   mode?: string;
   max_players?: number;
   created_at?: string;
+  start_at?: string;
 };
 
 export default function LobbiesPageClient() {
@@ -24,42 +25,64 @@ export default function LobbiesPageClient() {
     setLoading(true);
     try {
       const res = await getOpenLobbies();
-      if (!res.success) throw new Error(res.error || "Не удалось загрузить");
+      if (!res.success) throw new Error(res.error || "Failed");
       setLobbies(res.data || []);
     } catch (e) {
-      toast.error("Ошибка загрузки лобби: " + ((e as Error).message || ""));
+      toast.error("Error: " + ((e as Error).message));
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
   const handleJoin = async (lobbyId: string) => {
-    if (!userId) return toast.error("Войдите для присоединения.");
-    try {
-      const res = await joinLobby(userId, lobbyId);
-      if (!res.success) throw new Error(res.error || "Join failed");
-      toast.success("Вы присоединились к лобби!");
-      // Optionally refresh
-    } catch (e) {
-      toast.error("Ошибка: " + ((e as Error).message || ""));
-    }
+    if (!userId) return toast.error("LOGIN REQUIRED");
+    const res = await joinLobby(userId, lobbyId);
+    if (!res.success) toast.error(res.error);
+    else toast.success("DEPLOYED!");
   };
 
   return (
-    // UPDATED PADDING: pt-24
-    <div className="pt-24 p-4 min-h-screen bg-neutral-950 text-white">
-      <h2 className="text-xl font-bold mb-3 font-orbitron text-cyan-400">OPEN LOBBIES</h2>
-      {loading ? <div className="text-neutral-500 animate-pulse">Scanning frequencies...</div> : (
-        <div className="space-y-3">
-          {lobbies.length === 0 && <div className="text-neutral-500 border border-dashed border-neutral-800 p-4 rounded text-center">No signals found. Deploy a new lobby!</div>}
+    // Added pt-24
+    <div className="pt-24 pb-24 p-4 min-h-screen bg-zinc-950 text-white font-orbitron">
+      <h2 className="text-3xl font-black mb-6 text-red-600 tracking-tighter uppercase border-b border-red-900/50 pb-2">
+        Active Operations
+      </h2>
+      
+      {loading ? (
+        <div className="text-center py-10 font-mono text-red-500 animate-pulse">
+          SCANNING FREQUENCIES...
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {lobbies.length === 0 && (
+            <div className="text-zinc-600 border border-dashed border-zinc-800 p-8 rounded text-center font-mono">
+              NO SIGNALS DETECTED.
+            </div>
+          )}
           {lobbies.map(l => (
-            <div key={l.id} className="p-3 border border-neutral-800 rounded flex justify-between items-center bg-neutral-900/50 backdrop-blur-md">
-              <div>
-                <div className="font-semibold text-white">{l.name}</div>
-                <div className="text-xs font-mono text-neutral-400">{l.mode || "tdm"} • {l.max_players || 0} SLOTS</div>
+            <div key={l.id} className="group relative bg-zinc-900/50 border border-zinc-800 hover:border-red-600/50 transition-colors p-4 overflow-hidden">
+              <div className="absolute top-0 right-0 bg-zinc-800 px-2 py-1 text-[10px] font-mono text-zinc-400">
+                 {l.mode?.toUpperCase() || "TDM"}
               </div>
-              <div>
-                <button onClick={() => handleJoin(l.id)} className="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white transition-colors">JOIN</button>
+              
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-lg font-bold text-zinc-200 group-hover:text-red-500 transition-colors">
+                    {l.name}
+                  </div>
+                  <div className="text-xs font-mono text-zinc-500 mt-1 flex gap-2">
+                    <span>Slots: {l.max_players}</span>
+                    <span>•</span>
+                    <span>{l.start_at ? new Date(l.start_at).toLocaleDateString() : "ASAP"}</span>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => handleJoin(l.id)} 
+                  className="bg-red-900/20 text-red-500 border border-red-900/50 px-4 py-2 hover:bg-red-600 hover:text-white transition-all active:scale-95"
+                >
+                  JOIN
+                </button>
               </div>
             </div>
           ))}

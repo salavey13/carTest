@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppContext } from "@/contexts/AppContext";
 import { CreateLobbyForm } from "./components/CreateLobbyForm";
 import { cn } from "@/lib/utils";
-import { FaShieldHalved, FaUsers, FaCrosshairs, FaSkull, FaQrcode } from "react-icons/fa6";
 
-// Q3 Style Menu Item Component
+// Q3 Style Menu Item
 const Q3MenuItem = ({ 
   label, 
   subLabel, 
@@ -29,19 +28,19 @@ const Q3MenuItem = ({
   const content = (
     <div 
       className={cn(
-        "relative group flex items-center justify-between w-full p-4 border-b-2 transition-all duration-75 uppercase cursor-pointer select-none",
-        disabled ? "opacity-50 cursor-not-allowed border-zinc-800" : 
-        hovered || isActive ? "bg-red-900/40 border-red-500 pl-8" : "bg-black/40 border-zinc-700 pl-4"
+        "relative group flex items-center justify-between w-full py-5 px-6 border-b-2 transition-all duration-100 uppercase cursor-pointer select-none",
+        disabled ? "opacity-50 cursor-not-allowed border-zinc-900" : 
+        hovered || isActive ? "bg-red-950/60 border-red-600 pl-10" : "bg-black/60 border-zinc-800"
       )}
       onMouseEnter={() => !disabled && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={!disabled ? onClick : undefined}
     >
-      {/* "Selector" graphic on the left */}
+      {/* "Selector" graphic */}
       {(hovered || isActive) && (
         <motion.div 
           layoutId="q3-selector"
-          className="absolute left-2 top-1/2 -translate-y-1/2 text-red-500 text-2xl font-black"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500 text-3xl font-black"
         >
           ►
         </motion.div>
@@ -49,20 +48,20 @@ const Q3MenuItem = ({
 
       <div className="flex flex-col">
         <span className={cn(
-          "font-orbitron font-black text-2xl tracking-widest transition-colors shadow-black drop-shadow-md",
-          hovered || isActive ? "text-red-500" : "text-zinc-400"
+          "font-orbitron font-black text-2xl sm:text-3xl tracking-widest transition-colors shadow-black drop-shadow-md",
+          hovered || isActive ? "text-red-500 scale-105 origin-left" : "text-zinc-400"
         )}>
           {label}
         </span>
         {subLabel && (
-          <span className="text-[10px] font-mono text-zinc-500 tracking-widest">
+          <span className="text-[10px] sm:text-xs font-mono text-zinc-500 tracking-[0.2em]">
             {subLabel}
           </span>
         )}
       </div>
 
-      {/* Background Scanline Effect (CSS handled via tailwind arbitrary values or global css) */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[-1] bg-[length:100%_4px,6px_100%] pointer-events-none" />
+      {/* Industrial Scanline BG */}
+      <div className="absolute inset-0 z-[-1] bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.5)_3px)] pointer-events-none" />
     </div>
   );
 
@@ -76,43 +75,41 @@ export default function StrikeballDashboard() {
   const { user } = useAppContext();
   const [menuStep, setMenuStep] = useState<'main' | 'create'>('main');
 
-  // Background Ambience Sound (Conceptual - browsers block autoplay)
-  // useEffect(() => { const audio = new Audio('/sounds/drone.mp3'); ... }, []);
-
   return (
-    <div className="min-h-screen bg-zinc-950 text-white pt-20 pb-24 overflow-hidden relative font-orbitron">
+    // Added pt-24 for top padding, pb-32 for bottom nav
+    <div className="min-h-screen bg-zinc-950 text-white pt-24 pb-32 overflow-hidden relative font-orbitron">
       
-      {/* Background Texture (Rust/Metal Vibe) */}
-      <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" 
+      {/* Grungy Texture Overlay */}
+      <div className="fixed inset-0 z-0 opacity-10 pointer-events-none" 
            style={{ 
-             backgroundImage: `url("https://www.transparenttextures.com/patterns/dark-matter.png")`, // Or a local asset
-             filter: 'contrast(120%) brightness(80%)' 
+             backgroundImage: `radial-gradient(circle, #330000 0%, #000000 80%)`
            }} 
       />
       
-      {/* Vignette */}
-      <div className="fixed inset-0 z-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)] pointer-events-none" />
-
-      {/* Header Container */}
-      <div className="relative z-10 container mx-auto px-4 mb-12 text-center">
+      {/* Header */}
+      <div className="relative z-10 container mx-auto px-4 mb-10 text-center">
         <motion.div 
           initial={{ y: -50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.8 }}
         >
-          <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-zinc-300 drop-shadow-[0_0_15px_rgba(255,0,0,0.5)]">
+          <h1 className="text-5xl sm:text-7xl font-black italic tracking-tighter text-zinc-300 drop-shadow-lg transform -skew-x-12">
             STRIKE<span className="text-red-600">BALL</span>
           </h1>
-          <h2 className="text-sm md:text-lg font-mono text-red-500/80 tracking-[0.5em] mt-2 uppercase border-t border-b border-red-900/30 py-1 inline-block">
-            Tactical Operations // {user?.username || "GUEST"}
-          </h2>
+          <div className="mt-2 flex justify-center">
+             <div className="bg-red-900/30 border-x-4 border-red-600 px-6 py-1 transform skew-x-12">
+                <h2 className="text-xs sm:text-sm font-mono text-red-400 tracking-[0.3em] uppercase transform -skew-x-12">
+                  Operator: {user?.username || "GUEST"}
+                </h2>
+             </div>
+          </div>
         </motion.div>
       </div>
 
-      {/* Main Menu Container */}
-      <div className="relative z-10 max-w-md mx-auto px-4">
-        <div className="border-4 border-zinc-800 bg-zinc-900/80 backdrop-blur-sm p-1 shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-          <div className="border border-red-900/20 p-2">
+      {/* Main Menu Box */}
+      <div className="relative z-10 max-w-lg mx-auto px-2 sm:px-4">
+        <div className="border-4 border-zinc-800 bg-zinc-900/90 backdrop-blur-md p-1 shadow-[0_0_60px_rgba(100,0,0,0.3)] rounded-sm">
+          <div className="border-2 border-red-900/30 p-1">
             
             <AnimatePresence mode="wait">
               {menuStep === 'main' ? (
@@ -121,7 +118,7 @@ export default function StrikeballDashboard() {
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: -20, opacity: 0 }}
-                  className="space-y-2"
+                  className="space-y-3"
                 >
                   <Q3MenuItem 
                     label="MULTIPLAYER" 
@@ -141,18 +138,12 @@ export default function StrikeballDashboard() {
                     href="/strikeball/shop" 
                   />
                   
-                  <div className="h-4" /> {/* Spacer */}
+                  <div className="h-2" />
 
                   <Q3MenuItem 
                     label="QR CONNECT" 
                     subLabel="JOIN VIA FIELD SCAN" 
-                    onClick={() => alert("Simulating Camera Open...")}
-                  />
-                  
-                  <Q3MenuItem 
-                    label="EXIT" 
-                    subLabel="RETURN TO OS" 
-                    href="/" 
+                    onClick={() => alert("Initializing Optical Sensors...")}
                   />
                 </motion.div>
               ) : (
@@ -162,14 +153,14 @@ export default function StrikeballDashboard() {
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: 20, opacity: 0 }}
                 >
-                  <div className="bg-black/50 p-4 mb-4 border border-zinc-700">
-                    <h3 className="text-red-500 text-xl font-black mb-4 uppercase">Match Settings</h3>
+                  <div className="bg-black/80 p-6 mb-4 border border-zinc-700">
+                    <h3 className="text-red-500 text-xl font-black mb-4 uppercase tracking-widest border-b border-red-900 pb-2">Match Settings</h3>
                     <CreateLobbyForm />
                   </div>
                   
                   <Q3MenuItem 
                     label="BACK" 
-                    subLabel="RETURN TO MAIN MENU" 
+                    subLabel="RETURN TO BASE" 
                     onClick={() => setMenuStep('main')} 
                   />
                 </motion.div>
@@ -180,17 +171,11 @@ export default function StrikeballDashboard() {
         </div>
       </div>
 
-      {/* Footer Status Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-zinc-900 border-t-2 border-zinc-800 p-2 z-20">
-        <div className="container mx-auto flex justify-between items-center text-[10px] font-mono text-zinc-500 uppercase">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            NET: ONLINE
-          </div>
-          <div>
-            VER: 0.9.1 BETA
-          </div>
-        </div>
+      {/* Footer Info */}
+      <div className="fixed bottom-20 left-0 right-0 p-4 text-center z-0 pointer-events-none">
+         <p className="text-[10px] text-zinc-600 font-mono tracking-widest">
+            SYSTEM READY. WAITING FOR COMMAND.
+         </p>
       </div>
 
     </div>
