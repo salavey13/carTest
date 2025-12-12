@@ -5,14 +5,30 @@ import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 
+// Standard Components
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import BottomNavigation from "@/components/layout/BottomNavigation";
+
+// Theme: Bike
 import BikeHeader from "@/components/BikeHeader";
 import BikeFooter from "@/components/BikeFooter";
+import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
+
+// Theme: Sauna
 import SaunaHeader from "@/components/SaunaHeader";
 import SaunaFooter from "@/components/SaunaFooter";
-import StickyChatButton from "@/components/StickyChatButton";
+import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 
+// Theme: Bio30
+import Bio30Header from "@/app/bio30/components/Header";
+import Bio30Footer from "@/app/bio30/components/Footer";
+
+// Theme: Strikeball (NEW STATE OF THE ART)
+import StrikeballHeader from "@/app/strikeball/components/StrikeballHeader";
+import StrikeballBottomNav from "@/app/strikeball/components/StrikeballBottomNav";
+
+import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
 import { ThemeProvider } from "@/components/theme-provider"; 
 import { Toaster as SonnerToaster } from "sonner";
@@ -20,8 +36,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
-import BottomNavigationBike from "@/components/layout/BottomNavigationBike";
-import BottomNavigationSauna from "@/components/layout/BottomNavigationSauna";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useFocusTimeTracker } from "@/hooks/useFocusTimeTracker";
 import { Analytics } from "@vercel/analytics/react";
@@ -31,19 +45,20 @@ import { useAppToast } from "@/hooks/useAppToast";
 import { useTelegramBackButton } from "@/hooks/useTelegramBackButton";
 import { Loading } from "@/components/Loading";
 import { cn } from "@/lib/utils";
-
-// Bio30 specific components
-import Bio30Header from "@/app/bio30/components/Header";
-import Bio30Footer from "@/app/bio30/components/Footer";
 import { setReferrer } from "@/app/bio30/ref_actions"; 
-
-// WB Syndicate Actions
 import { applyReferralCode } from "@/app/wblanding/actions_view";
 
 // --- THEME ENGINE ---
 const THEME_CONFIG = {
+  strikeball: {
+    paths: ["/strikeball"],
+    Header: StrikeballHeader,
+    Footer: null, // No standard footer for immersive view
+    BottomNav: StrikeballBottomNav, // Custom tactical nav
+    isTransparent: true, // Allow background to bleed through
+  },
   bike: {
-    paths: ["/vipbikerental", "/rent-bike", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals", "/strikeball"], // Added strikeball here for transparent feel if needed, or keep standard
+    paths: ["/vipbikerental", "/rent-bike", "/rent/", "/crews", "/leaderboard", "/admin", "/paddock", "/rentals"],
     Header: BikeHeader,
     Footer: BikeFooter,
     BottomNav: BottomNavigationBike,
@@ -67,12 +82,15 @@ const THEME_CONFIG = {
     paths: [],
     Header: Header,
     Footer: Footer,
-    BottomNav: BottomNavigationBike,
+    BottomNav: BottomNavigationBike, // Default fallback
     isTransparent: false,
   },
 };
 
 const getThemeForPath = (pathname: string) => {
+  if (THEME_CONFIG.strikeball.paths.some((p) => pathname.startsWith(p))) {
+    return THEME_CONFIG.strikeball;
+  }
   if (THEME_CONFIG.bike.paths.some((p) => pathname.startsWith(p))) {
     return THEME_CONFIG.bike;
   }
@@ -85,6 +103,9 @@ const getThemeForPath = (pathname: string) => {
   return THEME_CONFIG.default;
 };
 
+// ... [AppInitializers, START_PARAM_PAGE_MAP, BIO30_PRODUCT_PATHS, useBio30ThemeFix remain unchanged] ...
+
+// Helper function needed for AppInitializers context
 function AppInitializers() {
   const { dbUser, isAuthenticated } = useAppContext();
   const { success: addToast } = useAppToast();
@@ -338,7 +359,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
-    "/strikeball", // ADDED: Show bottom nav in Strikeball module
+    "/strikeball", // ADDED for Strikeball logic
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -373,6 +394,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
       <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "", !isTransparentPage && "bg-background")}>
         {children}
       </main>
+      {/* Logic Update: Strikeball uses its own Nav independent of showBottomNav check if needed, but keeping it standard for now */}
       {showBottomNav && CurrentBottomNav && <CurrentBottomNav pathname={pathname} />}
       <Suspense fallback={null}>
         <StickyChatButton />
