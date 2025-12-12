@@ -12,10 +12,10 @@ const BOT_USERNAME = "oneSitePlsBot";
 
 export async function createStrikeballLobby(
   userId: string, 
-  name: string, 
-  mode: string
+  payload: { name: string; mode: string; start_at?: string | null; max_players?: number }
 ) {
   if (!userId) return { success: false, error: "Unauthorized" };
+  const { name, mode, start_at, max_players = 20 } = payload;
 
   try {
     const qrHash = uuidv4(); 
@@ -27,6 +27,8 @@ export async function createStrikeballLobby(
         mode,
         qr_code_hash: qrHash,
         status: "open",
+        start_at: start_at || null,
+        max_players,
         metadata: { bots_enabled: true }
       })
       .select()
@@ -34,6 +36,7 @@ export async function createStrikeballLobby(
 
     if (error) throw error;
 
+    // Auto-join owner
     await supabaseAdmin.from("strikeball_members").insert({
       lobby_id: lobby.id,
       user_id: userId,
@@ -43,9 +46,13 @@ export async function createStrikeballLobby(
     });
 
     const deepLink = `https://t.me/${BOT_USERNAME}/app?startapp=lobby_${lobby.id}`;
+    
+    // Format date for message if exists
+    const timeStr = start_at ? new Date(start_at).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : 'ASAP';
+
     await sendComplexMessage(
       userId,
-      `🎮 **Strikeball Lobby Created: ${name}**\n\nMode: ${mode.toUpperCase()}\n\n[🔗 Invite Link](${deepLink})`,
+      `🔴 **ARENA INITIALIZED** 🔴\n\n**Operation:** ${name}\n**Mode:** ${mode.toUpperCase()}\n**Time:** ${timeStr}\n\n[🔗 CLICK TO DEPLOY SQUAD](${deepLink})`,
       [],
       { parseMode: "Markdown" }
     );
@@ -76,12 +83,13 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
       status: "ready"
     });
 
-    const { data: lobby } = await supabaseAdmin.from("strikeball_lobbies").select("owner_id").eq("id", lobbyId).single();
+    // Notify Owner
+    const { data: lobby } = await supabaseAdmin.from("strikeball_lobbies").select("owner_id, name").eq("id", lobbyId).single();
     if (lobby?.owner_id) {
        const user = await fetchUserData(userId);
        await sendComplexMessage(
          lobby.owner_id, 
-         `⚠️ **Operator Joined!**\nUser: ${user?.username || userId}\nTeam: ${team.toUpperCase()}`
+         `⚠️ **REINFORCEMENTS ARRIVED**\nUser: ${user?.username || userId} joined ${lobby.name}.`
        );
     }
 
@@ -91,24 +99,25 @@ export async function joinLobby(userId: string, lobbyId: string, team: string = 
   }
 }
 
-// --- MISSING FUNCTION IMPLEMENTED HERE ---
+// --- IMPLEMENTATION OF MISSING FUNCTION ---
 export async function getOpenLobbies() {
   try {
     const { data, error } = await supabaseAdmin
       .from("strikeball_lobbies")
       .select("*")
       .eq("status", "open")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(20);
 
     if (error) throw error;
     return { success: true, data: data || [] };
   } catch (e) {
     logger.error("getOpenLobbies Failed", e);
-    return { success: false, error: "Failed to fetch operations." };
+    return { success: false, error: "Connection lost." };
   }
 }
 
-// --- PATH C: TACTICAL (Bots & Status) ---
+// --- PATH C: TACTICAL ---
 
 export async function addNoobBot(lobbyId: string, team: string) {
   try {
@@ -131,7 +140,7 @@ export async function togglePlayerStatus(memberId: string, currentStatus: string
     return { success: true, newStatus };
 }
 
-// --- PATH A: ECONOMY (Gear via 'cars' table) ---
+// --- PATH A: ECONOMY ---
 
 export async function getGearList() {
     const { data, error } = await supabaseAdmin
@@ -149,20 +158,14 @@ export async function getGearList() {
 
 export async function rentGear(userId: string, gearId: string) {
   try {
-    const { data: item } = await supabaseAdmin
-        .from("cars")
-        .select("*")
-        .eq("id", gearId)
-        .single();
-
+    const { data: item } = await supabaseAdmin.from("cars").select("*").eq("id", gearId).single();
     if (!item) throw new Error("Gear not found.");
 
     const invoicePayload = `gear_rent_${gearId}_${Date.now()}`;
-    
     const result = await sendTelegramInvoice(
       userId,
-      `Rental: ${item.make} ${item.model}`,
-      `Tactical gear. ${item.description || ""}`,
+      `ARMORY: ${item.make} ${item.model}`,
+      `Rental for: ${item.description || "Classified Item"}`,
       invoicePayload,
       item.daily_price,
       0,
@@ -170,8 +173,7 @@ export async function rentGear(userId: string, gearId: string) {
     );
 
     if (!result.success) throw new Error(result.error);
-
-    return { success: true, message: "Invoice sent!" };
+    return { success: true, message: "Invoice sent to datalink." };
   } catch (e) {
     logger.error("Rent Gear Failed", e);
     return { success: false, error: (e as Error).message };
@@ -179,7 +181,5 @@ export async function rentGear(userId: string, gearId: string) {
 }
 
 export async function updateUserPreferences(userId: string, partialPrefs: Record<string, any>) {
-  // Placeholder stub if needed by client, currently not heavily used but requested previously
-  const result = await updateUserMetadata(userId, partialPrefs);
-  return result;
+  return await updateUserMetadata(userId, partialPrefs);
 }

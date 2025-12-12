@@ -3,18 +3,17 @@
 import React, { useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { toast } from "sonner";
-import { createLobby } from "../actions";
+import { createStrikeballLobby } from "../actions";
 import { cn } from "@/lib/utils";
 
-// Helper for Q3 Input Style
 const Q3Input = ({ label, value, onChange, type = "text", placeholder }: any) => (
   <label className="block mb-3">
-    <div className="text-xs text-red-500 font-bold mb-1 uppercase tracking-wider">{label}</div>
+    <div className="text-[10px] text-red-500 font-bold mb-1 uppercase tracking-wider">{label}</div>
     <input 
       type={type}
       value={value} 
       onChange={onChange} 
-      className="w-full p-2 bg-black border border-zinc-700 text-zinc-300 font-mono focus:border-red-500 focus:outline-none focus:bg-zinc-900 transition-colors rounded-none placeholder:text-zinc-700" 
+      className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-900 transition-colors rounded-none placeholder:text-zinc-800" 
       placeholder={placeholder} 
     />
   </label>
@@ -38,7 +37,6 @@ export const CreateLobbyForm: React.FC = () => {
 
     setIsSubmitting(true);
     
-    // Combine Date and Time for ISO string
     let startAtISO = null;
     if (date && time) {
         const d = new Date(`${date}T${time}`);
@@ -46,7 +44,7 @@ export const CreateLobbyForm: React.FC = () => {
     }
 
     try {
-      const result = await createLobby(userId, { 
+      const result = await createStrikeballLobby(userId, { 
           name, 
           mode, 
           max_players: maxPlayers,
@@ -63,38 +61,37 @@ export const CreateLobbyForm: React.FC = () => {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-2">
+    <form onSubmit={submit} className="space-y-1">
       <Q3Input 
         label="Operation Name" 
         value={name} 
         onChange={(e: any) => setName(e.target.value)} 
-        placeholder="Operation: Sunday Rain" 
+        placeholder="Op: Red Storm" 
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <label className="block mb-3">
-            <div className="text-xs text-red-500 font-bold mb-1 uppercase tracking-wider">Game Mode</div>
+            <div className="text-[10px] text-red-500 font-bold mb-1 uppercase tracking-wider">Mode</div>
             <select 
                 value={mode} 
                 onChange={e => setMode(e.target.value)} 
-                className="w-full p-2 bg-black border border-zinc-700 text-zinc-300 font-mono focus:border-red-500 focus:outline-none rounded-none"
+                className="w-full p-3 bg-zinc-950 border border-zinc-700 text-zinc-300 font-mono text-sm focus:border-red-500 focus:outline-none rounded-none"
             >
                 <option value="tdm">Team Deathmatch</option>
                 <option value="ctf">Capture The Flag</option>
-                <option value="mil">Milsim (Slow)</option>
-                <option value="cqb">Indoor CQB</option>
+                <option value="mil">Milsim</option>
             </select>
         </label>
 
         <Q3Input 
-            label="Max Operators" 
+            label="Slots" 
             type="number" 
             value={maxPlayers} 
             onChange={(e: any) => setMaxPlayers(Number(e.target.value))} 
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
          <Q3Input 
             label="Date" 
             type="date" 
@@ -102,7 +99,7 @@ export const CreateLobbyForm: React.FC = () => {
             onChange={(e: any) => setDate(e.target.value)} 
          />
          <Q3Input 
-            label="Time (24h)" 
+            label="Time" 
             type="time" 
             value={time} 
             onChange={(e: any) => setTime(e.target.value)} 
@@ -113,7 +110,7 @@ export const CreateLobbyForm: React.FC = () => {
         type="submit" 
         disabled={isSubmitting} 
         className={cn(
-            "w-full py-3 mt-4 font-black text-xl uppercase tracking-widest border-2 transition-all duration-100 active:scale-95",
+            "w-full py-4 mt-6 font-black text-lg uppercase tracking-[0.2em] border-2 transition-all duration-100 active:scale-95",
             isSubmitting ? "bg-zinc-800 border-zinc-600 text-zinc-500" : "bg-red-700 border-red-500 text-black hover:bg-red-600 hover:text-white"
         )}
       >
