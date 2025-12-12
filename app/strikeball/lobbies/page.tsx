@@ -46,19 +46,20 @@ export default function LobbiesPageClient() {
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-3">Открытые лобби</h2>
-      {loading ? <div>Загрузка...</div> : (
+    // UPDATED PADDING: pt-24
+    <div className="pt-24 p-4 min-h-screen bg-neutral-950 text-white">
+      <h2 className="text-xl font-bold mb-3 font-orbitron text-cyan-400">OPEN LOBBIES</h2>
+      {loading ? <div className="text-neutral-500 animate-pulse">Scanning frequencies...</div> : (
         <div className="space-y-3">
-          {lobbies.length === 0 && <div>Лобби пока нет — создай своё!</div>}
+          {lobbies.length === 0 && <div className="text-neutral-500 border border-dashed border-neutral-800 p-4 rounded text-center">No signals found. Deploy a new lobby!</div>}
           {lobbies.map(l => (
-            <div key={l.id} className="p-3 border rounded flex justify-between items-center bg-neutral-900">
+            <div key={l.id} className="p-3 border border-neutral-800 rounded flex justify-between items-center bg-neutral-900/50 backdrop-blur-md">
               <div>
-                <div className="font-semibold">{l.name}</div>
-                <div className="text-sm text-neutral-400">{l.mode || "tdm"} • {l.max_players || 0} мест</div>
+                <div className="font-semibold text-white">{l.name}</div>
+                <div className="text-xs font-mono text-neutral-400">{l.mode || "tdm"} • {l.max_players || 0} SLOTS</div>
               </div>
               <div>
-                <button onClick={() => handleJoin(l.id)} className="px-3 py-1 rounded bg-blue-600">Присоединиться</button>
+                <button onClick={() => handleJoin(l.id)} className="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white transition-colors">JOIN</button>
               </div>
             </div>
           ))}

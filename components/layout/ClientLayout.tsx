@@ -14,7 +14,7 @@ import SaunaFooter from "@/components/SaunaFooter";
 import StickyChatButton from "@/components/StickyChatButton";
 
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
-import { ThemeProvider } from "@/components/theme-provider"; // Imported here
+import { ThemeProvider } from "@/components/theme-provider"; 
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
@@ -234,7 +234,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
   const {
     startParamPayload,
     dbUser,
-    userCrewInfo, // Access crew info for smart redirects
+    userCrewInfo,
     refreshDbUser,
     isLoading: isAppLoading,
     isAuthenticating,
@@ -282,7 +282,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     const handleSyndicateReferral = async (refCode: string) => {
         if (!dbUser?.user_id) return;
         
-        // Only apply if no referrer exists (First Touch Attribution)
         if (!dbUser.metadata?.referrer) {
             logger.info(`[Syndicate] Attempting to link referrer: ${refCode}`);
             const res = await applyReferralCode(dbUser.user_id, refCode);
@@ -313,9 +312,9 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = START_PARAM_PAGE_MAP[paramToProcess];
       } 
       else if (paramToProcess.startsWith("crew_")) {
-        const content = paramToProcess.substring(5); // remove 'crew_'
+        const content = paramToProcess.substring(5); 
         if (content.endsWith("_join_crew")) {
-             const slug = content.substring(0, content.length - 10); // remove '_join_crew'
+             const slug = content.substring(0, content.length - 10); 
              targetPath = `/wb/${slug}?join_crew=true`;
         } else {
              targetPath = `/wb/${content}`;
@@ -326,7 +325,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         targetPath = `/god-mode-sandbox?simId=${simId}`;
       }
       else if (paramToProcess.startsWith("bio30_")) {
-        // bio30 logic...
         const parts = paramToProcess.split("_");
         let productId: string | undefined;
         let referrerId: string | undefined;
@@ -337,21 +335,23 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         if (referrerId) handleBio30Referral(referrerId, paramToProcess);
         targetPath = (productId && BIO30_PRODUCT_PATHS[productId]) ? BIO30_PRODUCT_PATHS[productId] : '/bio30';
       }
+      // === STRIKEBALL LOBBY PARSING ===
+      else if (paramToProcess.startsWith("lobby_")) {
+          const lobbyId = paramToProcess.substring(6); // remove 'lobby_'
+          if (lobbyId) targetPath = `/strikeball/lobbies/${lobbyId}`;
+      }
+      // ================================
       else if (paramToProcess.startsWith("rental_") || paramToProcess.startsWith("rentals_")) {
-          // rental_ID
           const parts = paramToProcess.split("_");
           if (parts.length === 2) targetPath = `/rentals/${parts[1]}`;
       }
       
-      // 2. UNIVERSAL REFERRAL CATCHER (Last check to catch ref_I_O_S_NN)
+      // 2. UNIVERSAL REFERRAL CATCHER 
       else if (paramToProcess.startsWith("ref_")) {
           const refCode = paramToProcess.substring(4); 
-          
           handleSyndicateReferral(refCode);
-          
-          // If on main page, redirect to WB landing for conversion
           if (pathname === '/') targetPath = '/wblanding';
-          else targetPath = pathname; // Stay where we are
+          else targetPath = pathname; 
       }
 
       // 3. Fallback
@@ -365,7 +365,6 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         router.replace(targetPath);
       }
       
-      // Clear param to prevent loops
       clearStartParam?.();
     }
   }, [
@@ -397,6 +396,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
     "/paddock",
     "/rentals",
     "/vipbikerental",
+    "/strikeball", // Ensure bottom nav shows for Strikeball pages too if desired
   ];
   const showBottomNav = pathsToShowBottomNavForStartsWith.some((p) =>
     pathname?.startsWith(p)
@@ -408,7 +408,7 @@ function LayoutLogicController({ children }: { children: React.ReactNode }) {
         pathname === "/profile" ||
         pathname === "/repo-xml" ||
         pathname === "/sauna-rent" ||
-        pathname?.startsWith("/wb") || // Hides standard header/footer for Warehouse pages
+        pathname?.startsWith("/wb") || 
         pathname === "/wblanding" || 
         pathname === "/wblanding/referral" ||
         pathname === "/csv-compare" ||
@@ -445,7 +445,6 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
     <ErrorOverlayProvider>
       <AppProvider>
         <AppInitializers />
-        {/* ADDED THEME PROVIDER HERE */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>
             <ErrorBoundaryForOverlay>
