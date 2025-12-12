@@ -6,122 +6,174 @@ export const StrikeballBackground = () => {
   return (
     <div className="fixed inset-0 z-[-1] overflow-hidden bg-[#050000] pointer-events-none">
       {/* 1. Deep Atmospheric Vignette */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.95)_90%)] z-10" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.98)_100%)] z-10" />
 
-      {/* 2. The "Void" Grid - Perspective Floor */}
+      {/* 2. Perspective Void Grid */}
       <div 
-        className="absolute inset-0 opacity-20 z-0"
+        className="absolute inset-0 opacity-25 z-0"
         style={{
           backgroundImage: `
-            linear-gradient(to right, rgba(150, 0, 0, 0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(150, 0, 0, 0.1) 1px, transparent 1px)
+            linear-gradient(to right, rgba(180, 20, 20, 0.15) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(180, 20, 20, 0.15) 1px, transparent 1px)
           `,
-          backgroundSize: '40px 40px',
-          maskImage: 'linear-gradient(to bottom, transparent 20%, black 100%)',
-          transform: 'perspective(500px) rotateX(20deg) scale(1.5)'
+          backgroundSize: '60px 60px',
+          maskImage: 'linear-gradient(to bottom, transparent 10%, black 80%)',
+          transform: 'perspective(800px) rotateX(35deg) scale(2) translateY(200px)'
         }}
       />
 
-      {/* 3. The ARENA LOGO (The "Tribal Q") */}
+      {/* 3. The Tribal Q Logo - Much Closer to Original */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
+        initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.5, ease: "easeOut" }}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vw] max-w-[600px] max-h-[600px] z-0"
+        transition={{ duration: 2, ease: "easeOut" }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vw] max-w-[700px] max-h-[700px] z-0"
       >
         <motion.svg
           viewBox="0 0 200 200"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full drop-shadow-[0_0_30px_rgba(200,0,0,0.3)]"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 120, repeat: Infinity, ease: "linear" }}
+          className="w-full h-full"
         >
           <defs>
-            <linearGradient id="rustGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#7f1d1d" /> {/* Red 900 */}
-              <stop offset="50%" stopColor="#991b1b" /> {/* Red 800 */}
-              <stop offset="100%" stopColor="#450a0a" /> {/* Red 950 */}
+            {/* Intense Red Gradient */}
+            <linearGradient id="tribalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ff3333" />
+              <stop offset="50%" stopColor="#cc0000" />
+              <stop offset="100%" stopColor="#660000" />
             </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+
+            {/* Strong Multi-Layer Glow */}
+            <filter id="intenseGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" result="blur1"/>
+              <feGaussianBlur stdDeviation="8" result="blur2"/>
+              <feGaussianBlur stdDeviation="16" result="blur3"/>
               <feMerge>
-                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="blur3"/>
+                <feMergeNode in="blur2"/>
+                <feMergeNode in="blur1"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+
+            {/* Subtle inner glow */}
+            <filter id="softGlow">
+              <feGaussianBlur stdDeviation="2" result="glow"/>
+              <feMerge>
+                <feMergeNode in="glow"/>
                 <feMergeNode in="SourceGraphic"/>
               </feMerge>
             </filter>
           </defs>
 
-          {/* Grouping for internal pulse */}
+          {/* Slow eternal rotation */}
           <motion.g
-            animate={{ scale: [1, 1.02, 1] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 180, repeat: Infinity, ease: "linear" }}
           >
-            {/* The Central Spike (Vertical) */}
-            <path 
-              d="M100 20 L110 50 L100 180 L90 50 Z" 
-              fill="url(#rustGradient)" 
-              stroke="#ef4444" 
-              strokeWidth="1"
-              filter="url(#glow)"
-            />
+            {/* Pulsing core group */}
+            <motion.g
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            >
+              {/* Central Vertical Spike - Sharper */}
+              <path
+                d="M100 15 L108 55 L104 185 L96 185 L92 55 Z"
+                fill="url(#tribalGradient)"
+                stroke="#ff4444"
+                strokeWidth="2"
+                filter="url(#intenseGlow)"
+              />
 
-            {/* Top Left Claw */}
-            <path 
-              d="M100 20 Q 40 20 20 80 L 40 90 Q 60 50 100 50 Z" 
-              fill="url(#rustGradient)" 
-              stroke="#ef4444" 
-              strokeWidth="1"
-              opacity="0.9"
-            />
+              {/* Top-Left Claw - More Aggressive Curve */}
+              <path
+                d="M100 15 Q 50 10 25 65 L45 85 Q65 55 100 55 Z"
+                fill="url(#tribalGradient)"
+                stroke="#ff2222"
+                strokeWidth="1.5"
+                filter="url(#softGlow)"
+                opacity="0.95"
+              />
 
-            {/* Right Claw */}
-            <path 
-              d="M100 20 Q 160 20 180 80 L 160 90 Q 140 50 100 50 Z" 
-              fill="url(#rustGradient)" 
-              stroke="#ef4444" 
-              strokeWidth="1"
-              opacity="0.9"
-            />
+              {/* Top-Right Claw */}
+              <path
+                d="M100 15 Q 150 10 175 65 L155 85 Q135 55 100 55 Z"
+                fill="url(#tribalGradient)"
+                stroke="#ff2222"
+                strokeWidth="1.5"
+                filter="url(#softGlow)"
+                opacity="0.95"
+              />
 
-            {/* Bottom Curve (The "Tail") */}
-            <path 
-              d="M100 180 Q 160 160 140 100 L 120 110 Q 130 140 100 150 Z" 
-              fill="url(#rustGradient)" 
-              stroke="#ef4444" 
-              strokeWidth="1"
-              opacity="0.8"
-            />
-            
-            {/* Inner Ring (The Binding) */}
-            <circle cx="100" cy="100" r="30" stroke="#ef4444" strokeWidth="2" fill="none" opacity="0.5" strokeDasharray="5 5" />
+              {/* Bottom Tail Curve - More Fluid */}
+              <path
+                d="M100 185 Q 160 170 145 120 L125 125 Q135 155 100 160 Z"
+                fill="url(#tribalGradient)"
+                stroke="#cc0000"
+                strokeWidth="1.5"
+                filter="url(#softGlow)"
+                opacity="0.9"
+              />
+
+              {/* Inner Binding Ring - Pulsing */}
+              <motion.circle
+                cx="100"
+                cy="100"
+                r="35"
+                stroke="#ff3333"
+                strokeWidth="2"
+                fill="none"
+                opacity="0.6"
+                strokeDasharray="8 6"
+                filter="url(#softGlow)"
+                animate={{ opacity: [0.4, 0.8, 0.4] }}
+                transition={{ duration: 3, repeat: Infinity }}
+              />
+            </motion.g>
           </motion.g>
         </motion.svg>
       </motion.div>
 
-      {/* 4. CRT Scanlines & Noise Texture */}
-      <div className="absolute inset-0 z-20 pointer-events-none opacity-10 mix-blend-overlay"
-           style={{ backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, #ff0000 3px)` }}
+      {/* 4. Enhanced CRT Effects */}
+      {/* Scanlines */}
+      <div 
+        className="absolute inset-0 z-20 pointer-events-none opacity-15 mix-blend-soft-light"
+        style={{
+          background: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,0,0,0.1) 2px, rgba(255,0,0,0.15) 4px)`,
+        }}
       />
-      <div className="absolute inset-0 z-20 pointer-events-none opacity-5 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
 
-      {/* 5. Floating Dust Particles (CSS Animation) */}
-      {[...Array(5)].map((_, i) => (
+      {/* Subtle flicker overlay */}
+      <motion.div
+        className="absolute inset-0 z-20 pointer-events-none opacity-5 bg-red-900 mix-blend-overlay"
+        animate={{ opacity: [0.03, 0.08, 0.03] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* Noise texture */}
+      <div className="absolute inset-0 z-20 pointer-events-none opacity-8 mix-blend-soft-light bg-[url('https://www.transparenttextures.com/patterns/noise.png')]" />
+
+      {/* 5. Glowing Ember Particles */}
+      {[...Array(8)].map((_, i) => (
         <motion.div
           key={i}
-          className="absolute bg-red-600 rounded-full blur-[1px]"
+          className="absolute rounded-full"
           style={{
-            width: Math.random() * 3 + 1 + 'px',
-            height: Math.random() * 3 + 1 + 'px',
+            width: Math.random() * 4 + 2 + 'px',
+            height: Math.random() * 4 + 2 + 'px',
             left: Math.random() * 100 + '%',
-            top: Math.random() * 100 + '%',
+            top: '100%',
+            background: '#ff3333',
+            boxShadow: '0 0 10px #ff0000',
+            filter: 'blur(1px)',
           }}
           animate={{
-            y: [0, -100],
-            opacity: [0, 0.8, 0],
+            y: [0, -window.innerHeight - 100],
+            x: [0, (Math.random() - 0.5) * 200],
+            opacity: [0, 1, 0.7, 0],
           }}
           transition={{
-            duration: Math.random() * 5 + 5,
+            duration: Math.random() * 8 + 8,
             repeat: Infinity,
             delay: Math.random() * 5,
             ease: "linear"
