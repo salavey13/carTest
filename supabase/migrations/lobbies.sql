@@ -11,6 +11,10 @@ CREATE TABLE public.lobbies (
   created_at timestamptz DEFAULT now()
 );
 
+-- Fix Lobbies Table (Add missing column)
+ALTER TABLE public.lobbies 
+ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
 -- lobby_members
 CREATE TABLE public.lobby_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
