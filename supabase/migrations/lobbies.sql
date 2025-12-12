@@ -15,6 +15,11 @@ CREATE TABLE public.lobbies (
 ALTER TABLE public.lobbies 
 ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 
+-- Fix: Add missing qr_code_hash column to lobbies
+ALTER TABLE public.lobbies 
+ADD COLUMN IF NOT EXISTS qr_code_hash text;
+
+
 -- lobby_members
 CREATE TABLE public.lobby_members (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
